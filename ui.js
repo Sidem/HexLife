@@ -222,12 +222,7 @@ function setupStateListeners(sim) {
         reader.readAsText(file);
     });
     uiElements.resetStatesButton.addEventListener('click', () => {
-        if (confirm("Reset all world states to their initial configurations?")) {
             sim.resetAllWorldStates();
-            // Update UI to reflect pause state
-            updatePauseButton(sim.isSimulationPaused());
-            // Need redraw signal? Simulation state changed, renderer should pick it up.
-        }
     });
 }
 
