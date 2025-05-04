@@ -1,0 +1,81 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Prevent scrollbars */
+    background-color: #222; /* Dark background */
+    font-family: sans-serif;
+    color: white;
+}
+
+canvas {
+    display: block; /* Remove extra space below canvas */
+    width: 100vw;
+    height: 100vh;
+}
+
+#ui-container {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px 15px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Spacing between elements */
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+#ui-container label {
+    margin-right: 5px;
+}
+
+#ui-container input[type="range"] {
+    cursor: pointer;
+    vertical-align: middle; /* Align sliders better */
+}
+#ui-container button {
+    padding: 5px 10px;
+    cursor: pointer;
+}
+#ui-container code {
+    background-color: #444;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+.separator {
+    color: #666;
+    margin: 0 5px;
+}
+
+#stats-container {
+    position: absolute;
+    bottom: 100px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px 15px;
+    border-radius: 5px;
+    color: white;
+    font-family: sans-serif;
+    font-size: 0.9em;
+    min-width: 200px;
+}
+
+#stats-container h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #555;
+    padding-bottom: 5px;
+}
+
+#stats-container div {
+    margin-bottom: 4px;
+}
+
+#stats-container span {
+    font-weight: bold;
+    min-width: 40px;
+    display: inline-block;
+    text-align: right;
+    margin-left: 5px;
+}

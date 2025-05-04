@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Hex CA - Multi-World</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="hexGridCanvas"></canvas>
+
+    <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
+
+    <div id="ui-container">
+        <button id="playPauseButton">Play</button>
+        <label for="speedSlider">Speed:</label>
+        <input type="range" id="speedSlider" name="speedSlider" min="1" max="60" value="10" step="1">
+        <span id="speedValue">10</span> tps
+        <span class="separator">|</span>
+        <label for="neighborhoodSize">Brush:</label>
+        <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="5" value="1" step="1">
+        <span id="neighborhoodValue">1</span>
+        <span class="separator">|</span>
+        <button id="randomRulesetButton">New Ruleset</button>
+        <input type="checkbox" id="resetOnNewRuleCheckbox" title="Reset all world states when generating a new ruleset"> <label for="resetOnNewRuleCheckbox" style="cursor:pointer; user-select:none;">Reset States</label>
+        <button id="copyRuleButton" title="Copy current ruleset hex code">Copy Rule</button>
+        <label for="rulesetInput">Set Rule:</label>
+        <input type="text" id="rulesetInput" placeholder="Paste 32 hex chars" size="35">
+        <button id="setRuleButton">Set</button>
+        <span> | Rule: <code id="rulesetDisplay">N/A</code></span>
+        <span class="separator">|</span>
+        <button id="saveStateButton" title="Save current grid state">Save State</button>
+        <button id="loadStateButton" title="Load grid state from .json/.txt file">Load State</button>
+        <span class="separator">|</span>
+        <button id="resetStatesButton" title="Reset all worlds to initial densities">Reset States</button>
+    </div>
+
+    <div id="stats-container">
+        <h4>Selected World Stats</h4>
+        <div>Ratio: <span id="stat-ratio">--</span>%</div>
+        <div>Avg Ratio (100 steps): <span id="stat-avg-ratio">--</span>%</div>
+        </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

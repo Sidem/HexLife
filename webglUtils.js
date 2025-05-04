@@ -1,0 +1,164 @@
+// webglUtils.js
+
+/**
+ * Creates and compiles a shader.
+ * @param {WebGL2RenderingContext} gl The WebGL Context.
+ * @param {number} type Shader type (gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
+ * @param {string} source Shader source code.
+ * @returns {WebGLShader|null} The compiled shader or null if compilation fails.
+ */
+export function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+    if (success) {
+        return shader;
+    }
+    console.error(`Shader compilation error (${type === gl.VERTEX_SHADER ? 'Vertex' : 'Fragment'}):`, gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+}
+
+/**
+ * Creates and links a shader program.
+ * @param {WebGL2RenderingContext} gl The WebGL Context.
+ * @param {WebGLShader} vertexShader Compiled vertex shader.
+ * @param {WebGLShader} fragmentShader Compiled fragment shader.
+ * @returns {WebGLProgram|null} The linked program or null if linking fails.
+ */
+export function createProgram(gl, vertexShader, fragmentShader) {
+    if (!vertexShader || !fragmentShader) return null;
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    const success = gl.getProgramParameter(program, gl.LINK_STATUS);
+    if (success) {
+        // Shaders no longer needed after linking
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        return program;
+    }
+    console.error("Shader program linking error:", gl.getProgramInfoLog(program));
+    gl.deleteProgram(program);
+    return null;
+}
+
+/**
+ * Loads shader source from files and creates a shader program.
+ * @param {WebGL2RenderingContext} gl WebGL context.
+ * @param {string} vsPath Path to vertex shader file.
+ * @param {string} fsPath Path to fragment shader file.
+ * @returns {Promise<WebGLProgram|null>} Linked shader program or null on error.
+ */
+export async function loadShaderProgram(gl, vsPath, fsPath) {
+    try {
+        const responses = await Promise.all([fetch(vsPath), fetch(fsPath)]);
+        if (!responses[0].ok || !responses[1].ok) {
+            throw new Error(`HTTP error loading shaders! Status: ${responses[0].status}, ${responses[1].status}`);
+        }
+        const vsSource = await responses[0].text();
+        const fsSource = await responses[1].text();
+
+        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+        return createProgram(gl, vertexShader, fragmentShader);
+
+    } catch (e) {
+        console.error("Failed to load or compile shaders:", e);
+        alert("Failed to load shaders. Check console.");
+        return null;
+    }
+}
+
+
+/**
+ * Creates a buffer and uploads data.
+ * @param {WebGL2RenderingContext} gl WebGL context.
+ * @param {GLenum} target Buffer type (e.g., gl.ARRAY_BUFFER).
+ * @param {BufferSource} data Data to upload.
+ * @param {GLenum} usage Usage hint (e.g., gl.STATIC_DRAW, gl.DYNAMIC_DRAW).
+ * @returns {WebGLBuffer} The created buffer.
+ */
+export function createBuffer(gl, target, data, usage) {
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(target, buffer);
+    gl.bufferData(target, data, usage);
+    gl.bindBuffer(target, null); // Unbind
+    return buffer;
+}
+
+/**
+ * Updates data in an existing buffer.
+ * @param {WebGL2RenderingContext} gl WebGL context.
+ * @param {WebGLBuffer} buffer The buffer to update.
+ * @param {GLenum} target Buffer type (must match creation type).
+ * @param {BufferSource} data New data to upload.
+ * @param {number} [offset=0] Offset in bytes where to start updating.
+ */
+export function updateBuffer(gl, buffer, target, data, offset = 0) {
+    gl.bindBuffer(target, buffer);
+    // Use bufferSubData for partial updates if needed, otherwise bufferData replaces the whole content
+    if (offset > 0 || data.byteLength < gl.getBufferParameter(target, gl.BUFFER_SIZE)) {
+         gl.bufferSubData(target, offset, data);
+    } else {
+         gl.bufferData(target, data, gl.getBufferParameter(target, gl.BUFFER_USAGE)); // Use original usage hint
+    }
+    gl.bindBuffer(target, null); // Unbind
+}
+
+
+/**
+ * Creates a texture suitable for use as a Framebuffer Object (FBO) color attachment.
+ * @param {WebGL2RenderingContext} gl WebGL context.
+ * @param {number} width Texture width.
+ * @param {number} height Texture height.
+ * @returns {WebGLTexture} The created texture.
+ */
+export function createFBOTexture(gl, width, height) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    // Define size and format of level 0
+    const level = 0;
+    const internalFormat = gl.RGBA; // Standard color format
+    const border = 0;
+    const format = gl.RGBA;
+    const type = gl.UNSIGNED_BYTE; // Use bytes for color texture
+    const data = null; // No initial data needed, we render into it
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                  width, height, border, format, type, data);
+
+    // Set filtering so it renders correctly (important!)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // Sharp pixels when smaller
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); // Sharp pixels when larger (magnified)
+    
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.bindTexture(gl.TEXTURE_2D, null); // Unbind
+    return texture;
+}
+
+/**
+ * Creates a Framebuffer Object (FBO) and attaches a texture.
+ * @param {WebGL2RenderingContext} gl WebGL context.
+ * @param {WebGLTexture} texture The texture to attach as color buffer.
+ * @returns {WebGLFramebuffer} The created FBO.
+ */
+export function createFBO(gl, texture) {
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+    // Check FBO status (optional but recommended)
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+        console.error("FBO creation failed:", status);
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind
+    return fbo;
+}
