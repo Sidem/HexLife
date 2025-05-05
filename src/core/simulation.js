@@ -1,6 +1,6 @@
 // simulation.js
 import * as Config from './config.js';
-import { indexToCoords, coordsToIndex, hexCoordMap } from './utils.js'; // Use map from utils
+import { indexToCoords, coordsToIndex, hexCoordMap } from '../utils/utils.js'; // Use map from utils
 
 // --- Module State ---
 

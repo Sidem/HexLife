@@ -1,5 +1,5 @@
 // utils.js
-import * as Config from './config.js'; 
+import * as Config from '../core/config.js'; 
 
 // --- Coordinate/Index Helpers ---
 /**

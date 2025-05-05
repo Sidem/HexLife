@@ -18,7 +18,7 @@ export const WORLD_LAYOUT_COLS = 3;
 export const NUM_WORLDS = WORLD_LAYOUT_ROWS * WORLD_LAYOUT_COLS;
 export const DEFAULT_SELECTED_WORLD_INDEX = Math.floor(NUM_WORLDS / 2); // Center world
 
-export const INITIAL_DENSITIES = [0, 0.01, 0.1, 0.2, 0.5, 0.8, 0.9, 0.99, 1.0];
+export const INITIAL_DENSITIES = [0, 0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 1.0];
 
 
 // Simulation Defaults

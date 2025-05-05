@@ -1,9 +1,9 @@
 // main.js
-import * as Config from './config.js';
-import * as Simulation from './simulation.js';
-import * as Renderer from './renderer.js';
-import * as UI from './ui.js';
-import * as Utils from './utils.js';
+import * as Config from './core/config.js';
+import * as Simulation from './core/simulation.js';
+import * as Renderer from './rendering/renderer.js';
+import * as UI from './ui/ui.js';
+import * as Utils from './utils/utils.js';
 
 // --- Global State ---
 let gl; // WebGL Context
@@ -171,7 +171,7 @@ function handleCanvasMouseWheel(event) {
 // --- Coordinate Conversion (Crucial for Interaction) ---
 /**
  * Determines which world view (mini/selected) and grid cell corresponds
- * to a mouse event's screen coordinates.
+ * to a mouse event's screen coordinates, adapting to orientation.
  * @param {MouseEvent} event
  * @returns {{worldIndex: number|null, col: number|null, row: number|null, viewType: 'mini'|'selected'|null}}
  */
@@ -184,29 +184,49 @@ function getCoordsFromMouseEvent(event) {
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
 
-    // --- Replicate Layout Calculation from renderer.js ---
-    const selectedViewWidth = canvasWidth * 0.6;
-    const selectedViewHeight = canvasHeight * 0.9;
-    const selectedViewX = canvasWidth * 0.02;
-    const selectedViewY = (canvasHeight - selectedViewHeight) / 2;
+    // --- Replicate Layout Calculation from updated renderer.js ---
+    const isLandscape = canvasWidth >= canvasHeight; // Determine orientation
+    let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
+    let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+    const padding = canvasWidth * 0.02; // Use consistent padding
 
-    const miniMapAreaX = selectedViewX + selectedViewWidth + canvasWidth * 0.02;
-    const miniMapAreaWidth = canvasWidth - miniMapAreaX - canvasWidth * 0.02;
-    const miniMapAreaHeight = canvasHeight * 0.9;
-    const miniMapAreaY = canvasHeight * 0.05; // Position near top (5% margin) - MIRROR renderer.js
+    if (isLandscape) {
+        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
+        selectedViewHeight = canvasHeight - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
+        miniMapAreaHeight = selectedViewHeight;
+        miniMapAreaX = selectedViewX + selectedViewWidth + padding;
+        miniMapAreaY = padding;
+    } else {
+        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
+        selectedViewWidth = canvasWidth - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
+        miniMapAreaWidth = selectedViewWidth;
+        miniMapAreaX = padding;
+        miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+    }
 
-    // --- ADJUST MINIMAP AREA SIZE (Mirrors renderer.js) ---
-    const finalMiniMapAreaWidth = miniMapAreaWidth * 0.8; // 20% reduction
-    const finalMiniMapAreaHeight = miniMapAreaHeight * 0.65; // 35% reduction
-    const finalMiniMapAreaX = miniMapAreaX + (miniMapAreaWidth - finalMiniMapAreaWidth) / 2;
-    const finalMiniMapAreaY = miniMapAreaY; // Use the already top-aligned Y - MIRROR renderer.js
-    // --- END ADJUSTMENT ---
-
+    // Mini-Map Grid Calculation (Replicated exactly from renderMainScene)
+    const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
+    const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
+    let gridContainerWidth, gridContainerHeight;
+    if (miniMapAreaRatio > miniMapGridRatio) {
+        gridContainerHeight = miniMapAreaHeight * 0.95;
+        gridContainerWidth = gridContainerHeight * miniMapGridRatio;
+    } else {
+        gridContainerWidth = miniMapAreaWidth * 0.95;
+        gridContainerHeight = gridContainerWidth / miniMapGridRatio;
+    }
+    const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
+    const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
     const miniMapSpacing = 5;
-    const miniMapVerticalSpacing = 1; // Match renderer's value
-    const miniMapW = (finalMiniMapAreaWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
-    const miniMapH = (finalMiniMapAreaHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapVerticalSpacing) / Config.WORLD_LAYOUT_ROWS;
-    // --- End Layout Calculation ---
+    const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
+    const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
+    // --- End Layout Calculation Replication ---
 
 
     // 1. Check Selected View Area
@@ -217,29 +237,26 @@ function getCoordsFromMouseEvent(event) {
         const texCoordX = (mouseX - selectedViewX) / selectedViewWidth;
         const texCoordY = (mouseY - selectedViewY) / selectedViewHeight;
         const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
-        return { worldIndex: selWorldIdx, col, row, viewType: 'selected' }; // Return 'selected'
+        return { worldIndex: selWorldIdx, col, row, viewType: 'selected' };
     }
 
-    // 2. Check Mini-Map Area
-    if (mouseX >= finalMiniMapAreaX && mouseX < finalMiniMapAreaX + finalMiniMapAreaWidth &&
-        mouseY >= finalMiniMapAreaY && mouseY < finalMiniMapAreaY + finalMiniMapAreaHeight)
-    {
-        for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const r = Math.floor(i / Config.WORLD_LAYOUT_COLS);
-            const c = i % Config.WORLD_LAYOUT_COLS;
-            const miniX = finalMiniMapAreaX + c * (miniMapW + miniMapSpacing);
-            const miniY = finalMiniMapAreaY + r * (miniMapH + miniMapVerticalSpacing); // Use correct spacing
+    // 2. Check Mini-Map Area (Iterate through calculated grid positions)
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
+        const c_map = i % Config.WORLD_LAYOUT_COLS;
+        const miniX = gridContainerX + c_map * (miniMapW + miniMapSpacing);
+        const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing); // Use same spacing
 
-            if (mouseX >= miniX && mouseX < miniX + miniMapW &&
-                mouseY >= miniY && mouseY < miniY + miniMapH)
-            {
-                const texCoordX = (mouseX - miniX) / miniMapW;
-                const texCoordY = (mouseY - miniY) / miniMapH;
-                const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
-                return { worldIndex: i, col, row, viewType: 'mini' }; // Return 'mini'
-            }
+        if (mouseX >= miniX && mouseX < miniX + miniMapW &&
+            mouseY >= miniY && mouseY < miniY + miniMapH)
+        {
+            const texCoordX = (mouseX - miniX) / miniMapW;
+            const texCoordY = (mouseY - miniY) / miniMapH;
+            const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
+            return { worldIndex: i, col, row, viewType: 'mini' };
         }
     }
+
 
     return { worldIndex: null, col: null, row: null, viewType: null };
 }

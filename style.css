@@ -1,28 +1,53 @@
 body {
     margin: 0;
-    overflow: hidden; /* Prevent scrollbars */
+    /* overflow: hidden; Removed */
     background-color: #222; /* Dark background */
     font-family: sans-serif;
     color: white;
+    display: flex; /* Use flexbox for body */
+    height: 100vh; /* Make body fill viewport height */
+}
+
+#app-container { /* NEW */
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Allow container to fill body */
+    width: 100%; /* Ensure it takes full width */
+    overflow: hidden; /* Prevent scrollbars within the app */
 }
 
 canvas {
     display: block; /* Remove extra space below canvas */
-    width: 100vw;
-    height: 100vh;
+    /* width: 100vw; Removed */
+    /* height: 100vh; Removed */
+    width: 100%; /* Take full width of parent */
+    height: 0; /* Allow flex-grow to determine height */
+    flex-grow: 1; /* Allow canvas to take up remaining space */
 }
 
 #ui-container {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
+    /* position: absolute; Removed */
+    /* bottom: 10px; Removed */
+    /* left: 10px; Removed */
+    width: 100%; /* Take full width */
+    box-sizing: border-box; /* Include padding in width */
+    background-color: rgba(0, 0, 0, 0.85); /* Slightly less transparent */
     padding: 10px 15px;
-    border-radius: 5px;
+    /* border-radius: 5px; Removed */
     display: flex;
     align-items: center;
-    gap: 10px; /* Spacing between elements */
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    gap: 15px; /* Increased spacing a bit */
+    flex-wrap: wrap; /* Allow wrapping */
+    flex-shrink: 0; /* Prevent UI from shrinking */
+}
+
+#world-controls {
+    width: 85%;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap; /* Allow wrapping */
+    flex-shrink: 0; /* Prevent UI from shrinking */
 }
 
 #ui-container label {
@@ -48,34 +73,34 @@ canvas {
     margin: 0 5px;
 }
 
-#stats-container {
-    position: absolute;
-    bottom: 100px;
-    right: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 10px 15px;
-    border-radius: 5px;
-    color: white;
-    font-family: sans-serif;
+/* Styles for moved stats content */
+#stats-content { /* NEW */
+    width: 10%;
+    background-color: rgba(255, 255, 255, 0.1); /* Slight highlight */
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+#stats-content h4 {
+    margin: 0 0 5px 0;
     font-size: 0.9em;
-    min-width: 200px;
-}
-
-#stats-container h4 {
-    margin-top: 0;
-    margin-bottom: 8px;
+    font-weight: normal;
     border-bottom: 1px solid #555;
-    padding-bottom: 5px;
+    padding-bottom: 3px;
 }
 
-#stats-container div {
-    margin-bottom: 4px;
+#stats-content div {
+    margin-bottom: 2px;
+    font-size: 0.85em;
 }
 
-#stats-container span {
+#stats-content span {
     font-weight: bold;
     min-width: 40px;
     display: inline-block;
     text-align: right;
     margin-left: 5px;
 }
+
+/* Remove old stats container styles */
+/* #stats-container { ... } */

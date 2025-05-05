@@ -1,6 +1,6 @@
 // ui.js
-import * as Config from './config.js';
-import { formatHexCode } from './utils.js'; // Import formatting helper
+import * as Config from '../core/config.js';
+import { formatHexCode } from '../utils/utils.js'; // Import formatting helper
 
 // --- DOM Element References ---
 let uiElements; // Object to hold references
@@ -38,7 +38,6 @@ export function initUI(simulationInterface, rendererInterface = {}) {
         loadStateButton: document.getElementById('loadStateButton'),
         resetStatesButton: document.getElementById('resetStatesButton'),
         // Stats Display
-        statsContainer: document.getElementById('stats-container'),
         statRatio: document.getElementById('stat-ratio'),
         statAvgRatio: document.getElementById('stat-avg-ratio'),
     };
@@ -242,7 +241,7 @@ export function updateRulesetDisplay(hexCode) {
 }
 
 export function updateStatsDisplay(statsData) {
-    if (!statsData || !uiElements || !uiElements.statsContainer) return;
+    if (!statsData || !uiElements) return;
 
     if (uiElements.statRatio) {
         uiElements.statRatio.textContent = (statsData.ratio * 100).toFixed(2);

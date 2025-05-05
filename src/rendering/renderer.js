@@ -1,7 +1,7 @@
 // renderer.js
-import * as Config from './config.js';
+import * as Config from '../core/config.js';
 import * as WebGLUtils from './webglUtils.js';
-import * as Utils from './utils.js';
+import * as Utils from '../utils/utils.js';
 
 // --- Module State ---
 let gl;
@@ -48,8 +48,8 @@ export async function initRenderer(canvasElement) {
     }
 
     // Load Shaders
-    hexShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'vertex.glsl', 'fragment.glsl');
-    quadShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'quad_vertex.glsl', 'quad_fragment.glsl');
+    hexShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/vertex.glsl', 'shaders/fragment.glsl');
+    quadShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/quad_vertex.glsl', 'shaders/quad_fragment.glsl');
 
     if (!hexShaderProgram || !quadShaderProgram) {
         return null;
@@ -255,7 +255,7 @@ function renderWorldsToTextures(worldsData) {
 
 
 /**
- * Renders the mini-maps and selected view to the main canvas.
+ * Renders the mini-maps and selected view to the main canvas, adjusting layout based on orientation.
  * @param {Array<object>} worldsData Array of world data objects.
  * @param {number} selectedWorldIndex Index of the selected world.
  */
@@ -274,35 +274,61 @@ function renderMainScene(worldsData, selectedWorldIndex) {
     gl.useProgram(quadShaderProgram);
     gl.bindVertexArray(quadVAO);
 
-    // --- Calculate Layout ---
+    // --- Calculate Layout Based on Orientation ---
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
+    const isLandscape = canvasWidth >= canvasHeight; // Determine orientation
 
-    const selectedViewWidth = canvasWidth * 0.6;
-    const selectedViewHeight = canvasHeight * 0.9;
-    const selectedViewX = canvasWidth * 0.02;
-    const selectedViewY = (canvasHeight - selectedViewHeight) / 2;
+    let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
+    let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+    const padding = canvasWidth * 0.02; // Use consistent padding
 
-    const miniMapAreaX = selectedViewX + selectedViewWidth + canvasWidth * 0.02;
-    const miniMapAreaWidth = canvasWidth - miniMapAreaX - canvasWidth * 0.02;
-    const miniMapAreaHeight = canvasHeight * 0.9;
-    const miniMapAreaY = canvasHeight * 0.05; // Position near top (5% margin)
+    if (isLandscape) {
+        // Landscape: Side-by-side layout
+        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5; // Adjust for padding
+        selectedViewHeight = canvasHeight - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
 
-    // --- ADJUST MINIMAP AREA SIZE ---
-    const finalMiniMapAreaWidth = miniMapAreaWidth * 0.8; // 20% reduction
-    const finalMiniMapAreaHeight = miniMapAreaHeight * 0.65; // 35% reduction
-    // Center the reduced area horizontally, keep top alignment vertically
-    const finalMiniMapAreaX = miniMapAreaX + (miniMapAreaWidth - finalMiniMapAreaWidth) / 2;
-    const finalMiniMapAreaY = miniMapAreaY; // Use the already top-aligned Y
-    // --- END ADJUSTMENT ---
+        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5; // Adjust for padding
+        miniMapAreaHeight = selectedViewHeight; // Match height
+        miniMapAreaX = selectedViewX + selectedViewWidth + padding;
+        miniMapAreaY = padding;
 
-    const miniMapSpacing = 5; // Horizontal spacing
-    const miniMapVerticalSpacing = 1; // *** REDUCED vertical spacing ***
+    } else {
+        // Portrait: Top-bottom layout
+        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5; // Adjust for padding
+        selectedViewWidth = canvasWidth - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
 
-    // Recalculate dimensions using potentially different spacings and FINAL area size
-    const miniMapW = (finalMiniMapAreaWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
-    // Use VERTICAL spacing for height calculation
-    const miniMapH = (finalMiniMapAreaHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapVerticalSpacing) / Config.WORLD_LAYOUT_ROWS;
+        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5; // Adjust for padding
+        miniMapAreaWidth = selectedViewWidth; // Match width
+        miniMapAreaX = padding;
+        miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+    }
+
+    // --- Mini-Map Grid Calculation ---
+    // Apply centering within the allocated miniMapArea
+    const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
+    const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
+
+    let gridContainerWidth, gridContainerHeight;
+    if (miniMapAreaRatio > miniMapGridRatio) { // Area is wider than grid aspect ratio
+        gridContainerHeight = miniMapAreaHeight * 0.95; // Add some vertical padding
+        gridContainerWidth = gridContainerHeight * miniMapGridRatio;
+    } else { // Area is taller or equal aspect ratio
+        gridContainerWidth = miniMapAreaWidth * 0.95; // Add some horizontal padding
+        gridContainerHeight = gridContainerWidth / miniMapGridRatio;
+    }
+
+    // Center the grid container within the miniMapArea
+    const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
+    const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
+
+    const miniMapSpacing = 5; // Spacing between minimaps
+    const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
+    const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
 
     // --- Draw Mini-Maps ---
@@ -310,10 +336,8 @@ function renderMainScene(worldsData, selectedWorldIndex) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
 
-        // Use HORIZONTAL spacing for X calc, using FINAL area start X
-        const miniX = finalMiniMapAreaX + col * (miniMapW + miniMapSpacing);
-        // Use VERTICAL spacing for Y calc, using FINAL area start Y
-        const miniY = finalMiniMapAreaY + row * (miniMapH + miniMapVerticalSpacing); // *** USE CORRECT SPACING ***
+        const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
+        const miniY = gridContainerY + row * (miniMapH + miniMapSpacing); // Use same spacing for Y
 
         // --- Draw Selection Outline ---
         if (i === selectedWorldIndex) {
@@ -342,14 +366,12 @@ function renderMainScene(worldsData, selectedWorldIndex) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
     gl.uniform1i(quadUniformLocations.texture, 0);
+    gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); // Ensure texture is used
     drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight, canvasWidth, canvasHeight);
 
-    // --- Draw Outlines (Optional) ---
-    // ... (outline logic if needed) ...
 
     gl.bindVertexArray(null); // Unbind VAO
 }
-
 
 /**
  * Helper to draw a quad at specific screen pixel coordinates.
