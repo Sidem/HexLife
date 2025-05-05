@@ -1,6 +1,6 @@
 // ui.js
 import * as Config from '../core/config.js';
-import { formatHexCode } from '../utils/utils.js'; // Import formatting helper
+import { formatHexCode, downloadFile } from '../utils/utils.js'; // Import formatting helper
 
 // --- DOM Element References ---
 let uiElements; // Object to hold references
@@ -173,7 +173,7 @@ function setupStateListeners(sim) {
         const jsonString = JSON.stringify(stateData, null, 2);
         const timestamp = new Date().toISOString().replace(/[:.-]/g, '').slice(0, -4);
         const filename = `hex_state_${sim.getCurrentRulesetHex()}_${timestamp}.json`;
-        Utils.downloadFile(filename, jsonString, 'application/json'); // Use Utils helper
+        downloadFile(filename, jsonString, 'application/json'); // Use Utils helper
     });
 
     // Load State Button (triggers hidden input)
@@ -198,7 +198,6 @@ function setupStateListeners(sim) {
                 }
                 const success = sim.loadWorldState(sim.getSelectedWorldIndex(), loadedData); // Try loading into selected world
                 if (success) {
-                    alert("State loaded successfully!");
                     // Update UI to reflect loaded state (pause button, stats, ruleset display if loaded)
                     updatePauseButton(sim.isSimulationPaused());
                     updateRulesetDisplay(sim.getCurrentRulesetHex());
