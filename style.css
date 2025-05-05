@@ -26,59 +26,130 @@ canvas {
 }
 
 #ui-container {
-    /* position: absolute; Removed */
-    /* bottom: 10px; Removed */
-    /* left: 10px; Removed */
-    width: 100%; /* Take full width */
-    box-sizing: border-box; /* Include padding in width */
-    background-color: rgba(0, 0, 0, 0.85); /* Slightly less transparent */
-    padding: 10px 15px;
-    /* border-radius: 5px; Removed */
+    width: 100%;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 12px 15px;
     display: flex;
-    align-items: center;
-    gap: 15px; /* Increased spacing a bit */
-    flex-wrap: wrap; /* Allow wrapping */
-    flex-shrink: 0; /* Prevent UI from shrinking */
+    align-items: center; /* Align items vertically */
+    justify-content: space-between; /* Push controls and stats apart */
+    gap: 2%; /* Add a small gap between controls and stats (adjust as needed) */
+    flex-wrap: nowrap; /* Prevent wrapping of controls/stats */
+    flex-shrink: 0;
+    border-top: 1px solid #444;
 }
 
-#world-controls {
+#controls-wrapper { /* NEW Style for the controls area */
     width: 85%;
     display: flex;
     align-items: center;
-    gap: 15px;
-    flex-wrap: wrap; /* Allow wrapping */
-    flex-shrink: 0; /* Prevent UI from shrinking */
+    gap: 15px; /* Gap between control groups */
+    flex-wrap: wrap; /* Allow control groups to wrap */
+    flex-shrink: 1; /* Allow controls to shrink if needed */
+    flex-grow: 1; /* Allow controls to take up available space within 85% */
+}
+
+.ui-group { /* NEW Style for groups */
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Gap within groups */
+    padding: 5px 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    flex-shrink: 0; /* Prevent groups from shrinking too much */
+    flex-wrap: wrap; /* Allow items within a group to wrap if needed */
 }
 
 #ui-container label {
-    margin-right: 5px;
+    margin-right: 3px; /* Reduced margin */
+    user-select: none; /* Prevent text selection on touch */
+}
+
+#ui-container label.checkbox-label { /* Specific style for checkbox label */
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+#ui-container label.checkbox-label:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 #ui-container input[type="range"] {
     cursor: pointer;
-    vertical-align: middle; /* Align sliders better */
-}
-#ui-container button {
-    padding: 5px 10px;
-    cursor: pointer;
-}
-#ui-container code {
-    background-color: #444;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-family: monospace;
-}
-.separator {
-    color: #666;
-    margin: 0 5px;
+    vertical-align: middle;
+    min-width: 100px; /* Ensure slider is wide enough */
 }
 
-/* Styles for moved stats content */
-#stats-content { /* NEW */
-    width: 10%;
-    background-color: rgba(255, 255, 255, 0.1); /* Slight highlight */
-    padding: 5px 10px;
+#group-ruleset {
+    display: flex;
+    align-items: left;
+    flex-wrap: wrap;
+}
+
+#ui-container input[type="text"] {
+    padding: 6px 8px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: white;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+#ui-container input[type="checkbox"] {
+    margin-right: -2px; /* Adjust spacing next to label */
+    vertical-align: middle;
+    transform: scale(1.1); /* Slightly larger checkbox */
+}
+
+#ui-container button {
+    padding: 6px 12px; /* Increased padding for touch */
+    cursor: pointer;
+    background-color: #4a4a4a;
+    border: 1px solid #666;
+    color: white;
     border-radius: 4px;
+    font-size: 0.95em;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    user-select: none; /* Prevent text selection on touch */
+}
+#ui-container button:hover {
+    background-color: #5a5a5a;
+}
+#ui-container button:active {
+    background-color: #6a6a6a;
+    transform: scale(0.98);
+}
+
+#ui-container code {
+    background-color: #333; /* Matched input bg */
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 1.3em;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.rule-display-wrapper { /* Wrapper for better spacing */
+    margin-left: 5px;
+}
+
+.separator { /* Keep separator for potential future use, but not currently used */
+    color: #666;
+    margin: 0 8px;
+}
+
+/* Stats Content Adjustments */
+#stats-content {
+    display: none;
+    width: 10%; /* Set explicit width */
+    flex-basis: auto; /* Override previous basis */
+    flex-grow: 0;
+    flex-shrink: 0; /* Prevent stats from shrinking */
+    background-color: rgba(255, 255, 255, 0.08);
+    padding: 8px 12px;
+    border-radius: 4px;
+    box-sizing: border-box; /* Include padding in width calculation */
 }
 
 #stats-content h4 {
@@ -87,19 +158,23 @@ canvas {
     font-weight: normal;
     border-bottom: 1px solid #555;
     padding-bottom: 3px;
+    text-align: center;
 }
 
 #stats-content div {
-    margin-bottom: 2px;
-    font-size: 0.85em;
+    margin-bottom: 3px; /* Increased spacing */
+    font-size: 0.9em;
 }
 
 #stats-content span {
     font-weight: bold;
-    min-width: 40px;
+    min-width: 45px; /* Adjusted */
     display: inline-block;
     text-align: right;
     margin-left: 5px;
+    background-color: rgba(0,0,0,0.2);
+    padding: 1px 4px;
+    border-radius: 2px;
 }
 
 /* Remove old stats container styles */
