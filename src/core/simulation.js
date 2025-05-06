@@ -568,3 +568,8 @@ export function getSelectedWorldStats() {
     }
     return null; // Or return default stats object
 }
+// ADDED: Getter for the raw ruleset array
+export function getCurrentRulesetArray() {
+    // Return a copy to prevent accidental modification outside the module
+    return new Uint8Array(currentRuleset);
+}

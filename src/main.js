@@ -46,6 +46,7 @@ async function initialize() {
         setNeighborhoodSize: (size) => { neighborhoodSize = size; },
         generateRandomRuleset: Simulation.generateRandomRuleset,
         getCurrentRulesetHex: Simulation.getCurrentRulesetHex,
+        getCurrentRulesetArray: Simulation.getCurrentRulesetArray, // <-- ADDED
         setRuleset: Simulation.setRuleset,
         getWorldStateForSave: Simulation.getWorldStateForSave,
         getSelectedWorldIndex: Simulation.getSelectedWorldIndex,

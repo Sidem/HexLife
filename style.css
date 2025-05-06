@@ -177,5 +177,169 @@ canvas {
     border-radius: 2px;
 }
 
-/* Remove old stats container styles */
-/* #stats-container { ... } */
+/* --- Ruleset Explainer Panel --- */
+#rulesetExplainerPanel {
+    position: fixed; /* Changed from absolute to fixed */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 85%; /* Adjust width as needed */
+    max-width: 1200px; /* Max width */
+    height: 80%; /* Adjust height */
+    max-height: 800px; /* Max height */
+    background-color: rgba(40, 40, 40, 0.98); /* Slightly lighter than body */
+    border: 2px solid #555;
+    border-radius: 8px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 1000; /* Ensure it's on top */
+    overflow-y: auto; /* Allow scrolling if content overflows */
+    color: #eee;
+    display: flex; /* Use flexbox for layout */
+    flex-direction: column; /* Stack elements vertically */
+}
+
+#rulesetExplainerPanel.hidden {
+    display: none;
+}
+
+#closeExplainerButton {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 2em;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+}
+#closeExplainerButton:hover {
+    color: white;
+}
+
+#rulesetExplainerPanel h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid #555;
+    padding-bottom: 10px;
+}
+
+.explainer-text {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 15px;
+    text-align: center;
+    line-height: 1.6; /* Improve readability */
+}
+
+/* --- Ruleset Explainer Grid --- */
+#rulesetExplainerGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); /* Responsive grid */
+    gap: 20px 15px; /* Row and column gap */
+    flex-grow: 1; /* Allow grid to fill available space */
+    padding: 10px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 4px;
+}
+
+/* --- Individual Rule Visualization --- */
+.rule-viz {
+    position: relative;
+    width: 100px; /* Fixed width for consistency */
+    height: 110px; /* Fixed height */
+    margin: auto; /* Center in grid cell */
+    transform: scale(0.8); /* Scale down slightly if needed */
+}
+/* --- Hexagon Base Styles (Pointy-Top using CSS Clip Path) --- */
+.hexagon {
+    position: absolute;
+    width: 40px; /* Base size - Adjust if needed */
+    height: calc(40px * 1.154701); /* height = width * 2 / sqrt(3) ≈ width * 1.1547 */
+    /* Pointy-top polygon */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    background-color: #555; /* Default/fallback */
+    box-sizing: border-box;
+}
+
+/* Hexagon States (Remain the same) */
+.hexagon.state-0 {
+    background-color: #404040; /* Darker grey for inactive */
+}
+.hexagon.state-1 {
+    background-color: #FFFF00; /* Yellow for active */
+}
+
+/* Center Hexagon (Remains the same - centered) */
+.center-hex {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(1.0); /* Slightly larger center */
+    z-index: 1;
+}
+
+/* Inner Hexagon (Result - Adjust height calculation if base width changed) */
+.inner-hex {
+    width: 60%;
+    height: calc(60% * 1.154701); /* Maintain aspect ratio */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    border: 1.0px solid #CCCCCC; /* ALWAYS show border */
+    z-index: 2; /* Above center hex */
+}
+
+/* Neighbor Hexagons Positioning (Pointy-Top Arrangement) */
+/* Adjust scale and offsets as needed for visual appeal */
+.neighbor-hex {
+    /* Scale neighbors down slightly */
+    /* Center the scaled neighbor on its target position */
+    transform-origin: center center;
+    transform: translate(-50%, -50%) scale(0.9);
+}
+/* Standard neighbor order: 0:SE, 1:NE, 2:N, 3:NW, 4:SW, 5:S */
+/* Positions are % of the .rule-viz container (100x110px approx) */
+/* Fine-tune these percentages for best visual fit */
+.neighbor-0 { top: 70%; left: 23%; }   /* Bottom-left */
+.neighbor-1 { top: 31%; left: 23%; }   /* Top-left */
+.neighbor-2 { top: 88%; left: 50%; }   /* Top */
+.neighbor-3 { top: 31%; left: 78%; }   /* Top-Right */
+.neighbor-4 { top: 70%; left: 78%; }   /* Bottom-Right */
+.neighbor-5 { top: 12%; left: 50%; }   /* Bottom */
+
+
+/* Inline hexagons for the explanation text (Update clip-path and height) */
+.inline-hex {
+    display: inline-block;
+    width: 1em; /* Size relative to text */
+    height: calc(1em * 1.154701); /* Pointy-top aspect ratio */
+    /* Pointy-top polygon */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    vertical-align: middle;
+    margin: 0 2px;
+    position: relative; /* Needed for inner hex */
+    box-sizing: border-box;
+}
+.inline-hex-inner {
+    position: absolute;
+    display: inline-block;
+    width: 60%;
+    height: calc(60% * 1.154701); /* Pointy-top aspect ratio */
+     /* Pointy-top polygon */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid #CCCCCC;
+    box-sizing: border-box;
+}
+/* State colors remain the same */
+.inline-hex.state-0 { background-color: #404040; }
+.inline-hex.state-1 { background-color: #FFFF00; }
+.inline-hex-inner.state-0 { background-color: #404040; }
+.inline-hex-inner.state-1 { background-color: #FFFF00; }

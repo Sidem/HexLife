@@ -38,13 +38,13 @@
                     <button id="copyRuleButton" title="Copy current ruleset hex code">Copy</button>
                     <input type="text" id="rulesetInput" placeholder="32 hex chars">
                     <button id="setRuleButton">Set</button>
-                </div>
+                    <button id="explainRuleButton" title="Show visual explanation of the current ruleset">Explain</button> </div>
                 <div class="ui-group" id="group-state">
                     <button id="saveStateButton" title="Save current grid state">Save</button>
                     <button id="loadStateButton" title="Load grid state from .json/.txt file">Load</button>
                     <button id="resetStatesButton" title="Reset all worlds to initial densities">Reset All</button>
                 </div>
-            </div>
+                 </div>
 
             <div class="ui-group" id="stats-content">
                 <h4>Selected World</h4>
@@ -52,7 +52,20 @@
                 <div>Avg: <span id="stat-avg-ratio">--</span>%</div>
             </div>
         </div>
-    </div>
+
+        <div id="rulesetExplainerPanel" class="hidden">
+            <button id="closeExplainerButton" title="Close Panel">&times;</button>
+            <h3>Ruleset Explanation</h3>
+            <p class="explainer-text">
+                Each group shows a possible neighborhood configuration (center hex + 6 neighbors).
+                The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
+                ( <span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> = Active,
+                  <span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> = Inactive )
+            </p>
+            <div id="rulesetExplainerGrid">
+                </div>
+        </div>
+        </div>
 
     <script type="module" src="src/main.js"></script>
 </body>

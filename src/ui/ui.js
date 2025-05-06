@@ -7,6 +7,7 @@ let uiElements; // Object to hold references
 
 // --- UI State ---
 // (Could store things like last stats values to avoid unnecessary updates)
+let simulationInterfaceRef; // Store reference for later use
 
 // --- Initialization ---
 
@@ -32,7 +33,8 @@ export function initUI(simulationInterface, rendererInterface = {}) {
         rulesetInput: document.getElementById('rulesetInput'),
         setRuleButton: document.getElementById('setRuleButton'),
         rulesetDisplay: document.getElementById('rulesetDisplay'),
-        resetOnNewRuleCheckbox: document.getElementById('resetOnNewRuleCheckbox'), // <-- NEW
+        resetOnNewRuleCheckbox: document.getElementById('resetOnNewRuleCheckbox'),
+        explainRuleButton: document.getElementById('explainRuleButton'),
         // State
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
@@ -40,6 +42,10 @@ export function initUI(simulationInterface, rendererInterface = {}) {
         // Stats Display
         statRatio: document.getElementById('stat-ratio'),
         statAvgRatio: document.getElementById('stat-avg-ratio'),
+        // Ruleset Explainer Panel Elements <-- NEW
+        rulesetExplainerPanel: document.getElementById('rulesetExplainerPanel'),
+        closeExplainerButton: document.getElementById('closeExplainerButton'),
+        rulesetExplainerGrid: document.getElementById('rulesetExplainerGrid'),
     };
 
     if (!validateElements()) return false;
@@ -47,6 +53,7 @@ export function initUI(simulationInterface, rendererInterface = {}) {
     setupControlListeners(simulationInterface);
     setupRulesetListeners(simulationInterface);
     setupStateListeners(simulationInterface); // Pass sim interface for save/load actions
+    setupExplainerListeners(); // <-- NEW
 
     // Initial UI setup based on config/defaults
     uiElements.speedSlider.max = Config.MAX_SIM_SPEED;
@@ -66,17 +73,25 @@ export function initUI(simulationInterface, rendererInterface = {}) {
     // Add global key listener for hotkeys
     window.addEventListener('keydown', handleGlobalKeyDown);
 
+    // Initial population of the ruleset explainer
+    updateRulesetExplanation(simulationInterface.getCurrentRulesetArray()); // <-- NEW
+
     console.log("UI Initialized.");
     return true;
 }
 
 function validateElements() {
     for (const key in uiElements) {
-        if (!uiElements[key]) {
-            console.error(`UI Initialization Error: Element with ID '${key}' not found.`);
+        // Allow rulesetExplainerPanel to be initially null if validation happens early
+        if (!uiElements[key] && key !== 'rulesetExplainerPanel' && key !== 'closeExplainerButton' && key !== 'rulesetExplainerGrid') {
+             console.error(`UI Initialization Error: Element with ID '${key}' not found.`);
             alert(`UI Error: Element '${key}' not found. Check index.html.`);
             return false;
         }
+         // Specific check for explainer elements after main validation
+         if (!uiElements.rulesetExplainerPanel || !uiElements.closeExplainerButton || !uiElements.rulesetExplainerGrid) {
+            console.warn(`UI Warning: Ruleset explainer elements not found. Feature disabled.`);
+         }
     }
     return true;
 }
@@ -109,7 +124,10 @@ function setupRulesetListeners(sim) {
     // Random Ruleset
     uiElements.randomRulesetButton.addEventListener('click', () => {
         sim.generateRandomRuleset(Math.random());
-        updateRulesetDisplay(sim.getCurrentRulesetHex()); // Update display
+        const newRulesetHex = sim.getCurrentRulesetHex();
+        const newRulesetArr = sim.getCurrentRulesetArray(); // Get the array
+        updateRulesetDisplay(newRulesetHex); // Update display
+        updateRulesetExplanation(newRulesetArr); // <-- UPDATE EXPLAINER
 
         // Check if state reset is needed
         if (uiElements.resetOnNewRuleCheckbox.checked) { // <-- CHECK ADDED
@@ -139,17 +157,35 @@ function setupRulesetListeners(sim) {
 
     // Set Ruleset from Input
     uiElements.setRuleButton.addEventListener('click', () => {
-        const hexString = uiElements.rulesetInput.value;
+        const hexString = uiElements.rulesetInput.value.trim().toUpperCase(); // Trim and uppercase
+        if (!hexString) return; // Ignore empty input
+
+        // Basic validation before calling simulation
+         if (!/^[0-9A-F]{32}$/.test(hexString)) {
+             alert("Invalid Hex Code: Must be 32 hexadecimal characters (0-9, A-F).");
+             uiElements.rulesetInput.select();
+             return;
+         }
+
+
         try {
-            const success = sim.setRuleset(hexString); // Use sim function directly
+            const success = sim.setRuleset(hexString);
             if (success) {
-                updateRulesetDisplay(sim.getCurrentRulesetHex()); // Update display on success
+                const currentHex = sim.getCurrentRulesetHex(); // Get hex after setting
+                const currentArr = sim.getCurrentRulesetArray(); // Get array after setting
+                updateRulesetDisplay(currentHex);
+                updateRulesetExplanation(currentArr); // <-- UPDATE EXPLAINER
                 uiElements.rulesetInput.value = '';
                 uiElements.rulesetInput.blur();
+                 // Check if state reset is needed (Optional: could add a checkbox for this)
+                 // if (uiElements.resetOnSetRuleCheckbox.checked) { sim.resetAllWorldStates(); }
             } else {
-                throw new Error("Invalid hex code or simulation error.");
+                // Simulation's setRuleset might handle errors, but add fallback
+                 alert("Error setting ruleset. Please check the code.");
+                 uiElements.rulesetInput.select();
             }
         } catch (error) {
+            // Catch potential errors from hexToRuleset called within sim.setRuleset
             alert(`Error setting ruleset: ${error.message}`);
             uiElements.rulesetInput.select();
         }
@@ -157,6 +193,7 @@ function setupRulesetListeners(sim) {
      // Allow pressing Enter in the input field
      uiElements.rulesetInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent form submission if applicable
             uiElements.setRuleButton.click(); // Simulate button click
         }
     });
@@ -200,7 +237,10 @@ function setupStateListeners(sim) {
                 if (success) {
                     // Update UI to reflect loaded state (pause button, stats, ruleset display if loaded)
                     updatePauseButton(sim.isSimulationPaused());
-                    updateRulesetDisplay(sim.getCurrentRulesetHex());
+                    const currentHex = sim.getCurrentRulesetHex(); // Get ruleset potentially loaded
+                    const currentArr = sim.getCurrentRulesetArray();
+                    updateRulesetDisplay(currentHex);
+                    updateRulesetExplanation(currentArr); // <-- UPDATE EXPLAINER
                     // Stats will update on next frame
                 } else {
                     // Error handled by simulation, maybe alert was already shown
@@ -224,6 +264,27 @@ function setupStateListeners(sim) {
     });
 }
 
+// --- NEW: Ruleset Explainer Listeners ---
+function setupExplainerListeners() {
+    if (!uiElements.explainRuleButton || !uiElements.rulesetExplainerPanel || !uiElements.closeExplainerButton) return; // Exit if elements don't exist
+
+   uiElements.explainRuleButton.addEventListener('click', () => {
+       uiElements.rulesetExplainerPanel.classList.remove('hidden');
+       // Optional: Regenerate explanation every time it's opened, in case ruleset changed while hidden
+       // updateRulesetExplanation(simulationInterfaceRef.getCurrentRulesetArray());
+   });
+
+   uiElements.closeExplainerButton.addEventListener('click', () => {
+       uiElements.rulesetExplainerPanel.classList.add('hidden');
+   });
+
+    // Optional: Close panel if clicking outside of it
+    uiElements.rulesetExplainerPanel.addEventListener('click', (event) => {
+        if (event.target === uiElements.rulesetExplainerPanel) { // Clicked on the backdrop, not content
+           uiElements.rulesetExplainerPanel.classList.add('hidden');
+        }
+    });
+}
 
 // --- UI Update Functions ---
 
@@ -263,6 +324,63 @@ export function updateSpeedSlider(speed) {
         uiElements.speedValueSpan.textContent = speed;
     }
 }
+
+// --- NEW: Ruleset Explainer Generation ---
+
+/**
+ * Generates the visual explanation grid for the given ruleset.
+ * @param {Uint8Array} rulesetArray The 128-element ruleset array.
+ */
+export function updateRulesetExplanation(rulesetArray) {
+    if (!uiElements || !uiElements.rulesetExplainerGrid || !rulesetArray || rulesetArray.length !== 128) {
+        console.log("uiElements:", uiElements);
+        console.log("rulesetArray:", rulesetArray);
+        console.log("rulesetExplainerGrid:", uiElements.rulesetExplainerGrid);
+        console.log("rulesetExplainerPanel:", uiElements.rulesetExplainerPanel);
+        console.warn("Cannot update ruleset explanation - missing elements or invalid ruleset array.");
+        return;
+    }
+
+   const grid = uiElements.rulesetExplainerGrid;
+   grid.innerHTML = ''; // Clear previous content
+   const fragment = document.createDocumentFragment(); // Use fragment for performance
+
+   for (let i = 0; i < 128; i++) {
+       const centerState = (i >> 6) & 1;
+       const neighborMask = i & 0x3F; // 0b00111111
+       const outputState = rulesetArray[i];
+
+       // Create main container for this rule viz
+       const ruleViz = document.createElement('div');
+       ruleViz.className = 'rule-viz';
+       ruleViz.title = `Rule ${i}: Input C=${centerState} N=${neighborMask.toString(2).padStart(6,'0')} -> Output C=${outputState}`; // Tooltip
+
+       // Create center hexagon (input state)
+       const centerHex = document.createElement('div');
+       centerHex.className = `hexagon center-hex state-${centerState}`;
+
+       // Create inner hexagon (output state)
+       const innerHex = document.createElement('div');
+       innerHex.className = `hexagon inner-hex state-${outputState}`;
+       centerHex.appendChild(innerHex); // Add inner hex to center hex
+
+       ruleViz.appendChild(centerHex);
+
+       // Create neighbor hexagons
+       for (let n = 0; n < 6; n++) {
+           const neighborState = (neighborMask >> n) & 1;
+           const neighborHex = document.createElement('div');
+           // Class names match the CSS positioning rules
+           neighborHex.className = `hexagon neighbor-hex neighbor-${n} state-${neighborState}`;
+           ruleViz.appendChild(neighborHex);
+       }
+
+       fragment.appendChild(ruleViz);
+   }
+
+   grid.appendChild(fragment); // Append all generated elements at once
+}
+
 
 // --- Hotkey Handler ---
 
