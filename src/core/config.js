@@ -1,8 +1,8 @@
 // config.js
 
 // Grid Dimensions (per world)
-export const GRID_ROWS = 51; // Logical rows
-export const GRID_COLS = 62; // Logical columns
+export const GRID_ROWS = 57; // Logical rows
+export const GRID_COLS = 68; // Logical columns
 export const NUM_CELLS = GRID_ROWS * GRID_COLS;
 
 // Hex Geometry

@@ -185,9 +185,10 @@ export function stepSimulation(timeDelta) {
 
 // --- Ruleset Management ---
 
-export function generateRandomRuleset() {
+export function generateRandomRuleset(bias = 0.5) {
+    console.log("Generating random ruleset with bias:", bias);
     for (let i = 0; i < 128; i++) {
-        currentRuleset[i] = Math.random() < 0.5 ? 1 : 0;
+        currentRuleset[i] = Math.random() < bias ? 1 : 0;
     }
     // Ensure non-flickering (optional)
      if (currentRuleset[0] === 1 && currentRuleset[127] === 0) {

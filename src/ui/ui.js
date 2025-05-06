@@ -108,7 +108,7 @@ function setupControlListeners(sim) {
 function setupRulesetListeners(sim) {
     // Random Ruleset
     uiElements.randomRulesetButton.addEventListener('click', () => {
-        sim.generateRandomRuleset();
+        sim.generateRandomRuleset(Math.random());
         updateRulesetDisplay(sim.getCurrentRulesetHex()); // Update display
 
         // Check if state reset is needed
