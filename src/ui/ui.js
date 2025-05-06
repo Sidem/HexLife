@@ -46,6 +46,10 @@ export function initUI(simulationInterface, rendererInterface = {}) {
         rulesetExplainerPanel: document.getElementById('rulesetExplainerPanel'),
         closeExplainerButton: document.getElementById('closeExplainerButton'),
         rulesetExplainerGrid: document.getElementById('rulesetExplainerGrid'),
+        // ADDED Bias Control Elements
+        useCustomBiasCheckbox: document.getElementById('useCustomBiasCheckbox'),
+        biasSlider: document.getElementById('biasSlider'),
+        biasValueSpan: document.getElementById('biasValueSpan'),
     };
 
     if (!validateElements()) return false;
@@ -67,8 +71,13 @@ export function initUI(simulationInterface, rendererInterface = {}) {
 
     // Set initial button text with hotkeys
     uiElements.playPauseButton.textContent = "[P]lay"; // Assuming starts paused
-    uiElements.randomRulesetButton.textContent = "[N]ew Ruleset";
+    uiElements.randomRulesetButton.textContent = "[N]ew Rules";
     uiElements.resetStatesButton.textContent = "[R]eset States";
+    
+    // Initial setup for bias controls
+    uiElements.biasSlider.value = 0.5; // Default slider position
+    uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(2);
+    updateBiasSliderDisabledState(); // Set initial disabled state
 
     // Add global key listener for hotkeys
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -78,6 +87,18 @@ export function initUI(simulationInterface, rendererInterface = {}) {
 
     console.log("UI Initialized.");
     return true;
+}
+
+
+// ADDED function to manage bias slider's disabled state
+function updateBiasSliderDisabledState() {
+    if (uiElements.useCustomBiasCheckbox && uiElements.biasSlider) {
+        if (uiElements.useCustomBiasCheckbox.checked) {
+            uiElements.biasSlider.disabled = false;
+        } else {
+            uiElements.biasSlider.disabled = true;
+        }
+    }
 }
 
 function validateElements() {
@@ -105,6 +126,16 @@ function setupControlListeners(sim) {
         updatePauseButton(nowPaused);
     });
 
+    // ADDED Listeners for Bias Controls
+    if (uiElements.useCustomBiasCheckbox) {
+        uiElements.useCustomBiasCheckbox.addEventListener('change', updateBiasSliderDisabledState);
+    }
+    if (uiElements.biasSlider) {
+        uiElements.biasSlider.addEventListener('input', (event) => {
+            uiElements.biasValueSpan.textContent = parseFloat(event.target.value).toFixed(2);
+        });
+    }
+
     // Speed Slider
     uiElements.speedSlider.addEventListener('input', (event) => {
         const speed = parseInt(event.target.value, 10);
@@ -123,7 +154,18 @@ function setupControlListeners(sim) {
 function setupRulesetListeners(sim) {
     // Random Ruleset
     uiElements.randomRulesetButton.addEventListener('click', () => {
-        sim.generateRandomRuleset(Math.random());
+        let biasToUse;
+        if (uiElements.useCustomBiasCheckbox.checked) {
+            biasToUse = parseFloat(uiElements.biasSlider.value);
+        } else {
+            biasToUse = Math.random(); // Fully random bias
+            // Optionally, you could update the disabled slider's visual value here if desired,
+            // but it might be confusing as it's not "active".
+            // For now, just log it if using a fully random one.
+            console.log("Using fully random bias for new ruleset:", biasToUse.toFixed(3));
+        }
+
+        sim.generateRandomRuleset(biasToUse); // Pass the determined bias
         const newRulesetHex = sim.getCurrentRulesetHex();
         const newRulesetArr = sim.getCurrentRulesetArray(); // Get the array
         updateRulesetDisplay(newRulesetHex); // Update display

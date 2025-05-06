@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL Hex CA - Multi-World</title>
+    <title>HexLife Exlorer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,6 +33,11 @@
                 <div class="ui-group" id="group-ruleset">
                     <button id="randomRulesetButton">New Rules</button>
                     <input type="checkbox" id="resetOnNewRuleCheckbox" title="Reset all world states when generating a new ruleset" checked>
+                    <div class="bias-controls"> <input type="checkbox" id="useCustomBiasCheckbox" checked>
+                        <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
+                        <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.01" style="vertical-align: middle;">
+                        <span id="biasValueSpan">0.50</span>
+                    </div>
                 </div>
                 <div class="ui-group" id="group-ruleset-input">
                     <button id="copyRuleButton" title="Copy current ruleset hex code">Copy</button>

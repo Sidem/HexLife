@@ -24,16 +24,23 @@ canvas {
     height: 0; /* Allow flex-grow to determine height */
     flex-grow: 1; /* Allow canvas to take up remaining space */
 }
+#rulesetInput {
+    width: 50px;
+}
+
+#resetOnNewRuleCheckbox {
+    display: none;
+}
 
 #ui-container {
     width: 100%;
     box-sizing: border-box;
     background-color: rgba(0, 0, 0, 0.9);
-    padding: 12px 15px;
+    padding: 0px 0px;
     display: flex;
     align-items: center; /* Align items vertically */
     justify-content: space-between; /* Push controls and stats apart */
-    gap: 2%; /* Add a small gap between controls and stats (adjust as needed) */
+    gap: 3px; /* Add a small gap between controls and stats (adjust as needed) */
     flex-wrap: nowrap; /* Prevent wrapping of controls/stats */
     flex-shrink: 0;
     border-top: 1px solid #444;
@@ -47,6 +54,7 @@ canvas {
     flex-wrap: wrap; /* Allow control groups to wrap */
     flex-shrink: 1; /* Allow controls to shrink if needed */
     flex-grow: 1; /* Allow controls to take up available space within 85% */
+    justify-content: center;
 }
 
 .ui-group { /* NEW Style for groups */
@@ -87,6 +95,22 @@ canvas {
     flex-wrap: wrap;
 }
 
+#group-ruleset .bias-controls {
+    display: inline-flex; /* Align items in a row */
+    align-items: center; /* Vertically center items */
+    gap: 5px; /* Space between checkbox, label, slider, span */
+    margin-left: 10px; /* Space from the "New Rules" button */
+}
+
+/* Style for when the slider is disabled via JS (by checkbox) */
+#biasSlider:disabled {
+    opacity: 0.5;
+    cursor: not-allowed; /* Indicate it's not interactive */
+}
+#biasSlider:disabled + #biasValueSpan {
+    opacity: 0.5;
+}
+
 #ui-container input[type="text"] {
     padding: 6px 8px;
     border: 1px solid #555;
@@ -109,9 +133,16 @@ canvas {
     border: 1px solid #666;
     color: white;
     border-radius: 4px;
-    font-size: 0.95em;
+    font-size: 1.0em;
     transition: background-color 0.2s ease, transform 0.1s ease;
     user-select: none; /* Prevent text selection on touch */
+    width: 70px;
+    height: 50px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
 }
 #ui-container button:hover {
     background-color: #5a5a5a;
