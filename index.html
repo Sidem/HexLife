@@ -61,12 +61,14 @@
         <div id="rulesetExplainerPanel" class="hidden">
             <button id="closeExplainerButton" title="Close Panel">&times;</button>
             <h3>Ruleset Explanation</h3>
-            <p class="explainer-text">
-                Each group shows a possible neighborhood configuration (center hex + 6 neighbors).
-                The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
-                ( <span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> = Active,
-                  <span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> = Inactive )
-            </p>
+            <div class="explainer-text">
+                <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
+                <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
+                <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
+                <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
+                <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
+                <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
+            </div>
             <div id="rulesetExplainerGrid">
                 </div>
         </div>

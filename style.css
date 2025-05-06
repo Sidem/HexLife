@@ -218,10 +218,9 @@ canvas {
     max-width: 1200px; /* Max width */
     height: 80%; /* Adjust height */
     max-height: 800px; /* Max height */
-    background-color: rgba(40, 40, 40, 0.98); /* Slightly lighter than body */
+    background-color: rgba(10, 10, 10, 0.98); /* Slightly lighter than body */
     border: 2px solid #555;
     border-radius: 8px;
-    box-shadow: 0 5px 25px rgba(0,0,0,0.5);
     padding: 20px;
     box-sizing: border-box;
     z-index: 1000; /* Ensure it's on top */
@@ -261,22 +260,25 @@ canvas {
 }
 
 .explainer-text {
-    font-size: 0.9em;
-    color: #ccc;
-    margin-bottom: 15px;
-    text-align: center;
-    line-height: 1.6; /* Improve readability */
+    font-size: 1.0em;
+    color: #eee;
+    margin: 0 auto;
+    background-color: #111;
+    text-align: left;
+    line-height: 1.0; /* Improve readability */
+}
+
+.explainer-text > p {
+    margin: 2px;
 }
 
 /* --- Ruleset Explainer Grid --- */
 #rulesetExplainerGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); /* Responsive grid */
-    gap: 20px 15px; /* Row and column gap */
-    flex-grow: 1; /* Allow grid to fill available space */
-    padding: 10px;
-    background-color: rgba(0,0,0,0.1);
-    border-radius: 4px;
+    margin: 0 auto;
+    grid-template-columns: repeat(16, 42px); /* Responsive grid */
+    grid-template-rows: repeat(8, 56px);
+    transform: translate(-28px, -21px);
 }
 
 /* --- Individual Rule Visualization --- */
@@ -285,7 +287,7 @@ canvas {
     width: 100px; /* Fixed width for consistency */
     height: 110px; /* Fixed height */
     margin: auto; /* Center in grid cell */
-    transform: scale(0.8); /* Scale down slightly if needed */
+    transform: scale(0.4); /* Scale down slightly if needed */
 }
 /* --- Hexagon Base Styles (Pointy-Top using CSS Clip Path) --- */
 .hexagon {
@@ -325,6 +327,7 @@ canvas {
     z-index: 2; /* Above center hex */
 }
 
+
 /* Neighbor Hexagons Positioning (Pointy-Top Arrangement) */
 /* Adjust scale and offsets as needed for visual appeal */
 .neighbor-hex {
@@ -338,10 +341,10 @@ canvas {
 /* Fine-tune these percentages for best visual fit */
 .neighbor-0 { top: 70%; left: 23%; }   /* Bottom-left */
 .neighbor-1 { top: 31%; left: 23%; }   /* Top-left */
-.neighbor-2 { top: 88%; left: 50%; }   /* Top */
+.neighbor-2 { top: 12%; left: 50%; }   /* Top */
 .neighbor-3 { top: 31%; left: 78%; }   /* Top-Right */
 .neighbor-4 { top: 70%; left: 78%; }   /* Bottom-Right */
-.neighbor-5 { top: 12%; left: 50%; }   /* Bottom */
+.neighbor-5 { top: 88%; left: 50%; }   /* Bottom */
 
 
 /* Inline hexagons for the explanation text (Update clip-path and height) */
@@ -370,7 +373,9 @@ canvas {
     box-sizing: border-box;
 }
 /* State colors remain the same */
+.inner-hex.state-0 { background-color: #990000; }
+.inner-hex.state-1 { background-color: #00BB00; }
 .inline-hex.state-0 { background-color: #404040; }
 .inline-hex.state-1 { background-color: #FFFF00; }
-.inline-hex-inner.state-0 { background-color: #404040; }
-.inline-hex-inner.state-1 { background-color: #FFFF00; }
+.inline-hex-inner.state-0 { background-color: #990000; }
+.inline-hex-inner.state-1 { background-color: #00BB00; }
