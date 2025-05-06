@@ -208,17 +208,14 @@ canvas {
     border-radius: 2px;
 }
 
-/* --- Ruleset Explainer Panel --- */
-#rulesetExplainerPanel {
+/* --- Ruleset Editor Panel --- */
+#rulesetEditorPanel {
     position: fixed; /* Changed from absolute to fixed */
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 85%; /* Adjust width as needed */
     max-width: 1200px; /* Max width */
-    height: 80%; /* Adjust height */
-    max-height: 800px; /* Max height */
-    background-color: rgba(10, 10, 10, 0.98); /* Slightly lighter than body */
+    background-color: rgba(0, 00, 00, 0.99); /* Slightly lighter than body */
     border: 2px solid #555;
     border-radius: 8px;
     padding: 20px;
@@ -230,11 +227,11 @@ canvas {
     flex-direction: column; /* Stack elements vertically */
 }
 
-#rulesetExplainerPanel.hidden {
+#rulesetEditorPanel.hidden {
     display: none;
 }
 
-#closeExplainerButton {
+#closeEditorButton {
     position: absolute;
     top: 10px;
     right: 15px;
@@ -247,11 +244,11 @@ canvas {
     padding: 0 5px;
     line-height: 1;
 }
-#closeExplainerButton:hover {
+#closeEditorButton:hover {
     color: white;
 }
 
-#rulesetExplainerPanel h3 {
+#rulesetEditorPanel h3 {
     margin-top: 0;
     margin-bottom: 10px;
     text-align: center;
@@ -259,26 +256,81 @@ canvas {
     padding-bottom: 10px;
 }
 
-.explainer-text {
+.editor-controls {
+    display: flex; /* Align input and button in a row */
+    justify-content: center; /* Center them */
+    align-items: center; /* Vertically align */
+    gap: 10px; /* Space between input and button */
+    margin-bottom: 15px; /* Space below controls */
+}
+
+.editor-controls .editor-hex-input {
+    font-family: monospace;
+    font-size: 1.7em; /* Slightly larger for readability */
+    background-color: #222; /* Dark background */
+    color: #eee; /* Light text */
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 8px 10px;
+    width: 400px; /* Adjust width as needed */
+    text-align: center;
+}
+.editor-controls .editor-hex-input::placeholder {
+    color: #777;
+}
+
+
+/* Style for the "Clear" button in editor-controls to match ui-container buttons */
+.editor-controls button {
+    padding: 6px 12px;
+    cursor: pointer;
+    background-color: #4a4a4a;
+    border: 1px solid #666;
+    color: white;
+    border-radius: 4px;
+    font-size: 1.0em; /* Match ui-container button font size */
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    user-select: none;
+    width: auto; /* Let content define width, or set fixed if preferred */
+    height: auto; /* Let content define height, or set fixed */
+    /* Ensure flex alignment works if needed */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.editor-controls button:hover {
+    background-color: #5a5a5a;
+}
+.editor-controls button:active {
+    background-color: #6a6a6a;
+    transform: scale(0.98);
+}
+
+
+.editor-text {
     font-size: 1.0em;
     color: #eee;
-    margin: 0 auto;
-    background-color: #111;
+    margin: 0 auto 10px auto; /* Add bottom margin */
     text-align: left;
     line-height: 1.0; /* Improve readability */
 }
 
-.explainer-text > p {
-    margin: 2px;
-}
-
-/* --- Ruleset Explainer Grid --- */
-#rulesetExplainerGrid {
+/* --- Ruleset Editor Grid --- */
+#rulesetEditorGrid {
     display: grid;
     margin: 0 auto;
     grid-template-columns: repeat(16, 42px); /* Responsive grid */
     grid-template-rows: repeat(8, 56px);
     transform: translate(-28px, -21px);
+}
+
+.editor-text-rules {
+    display: grid;
+    grid-template-columns: repeat(2, 50%);
+}
+
+.inline-hex {
+    transform: scale(1.5);
 }
 
 /* --- Individual Rule Visualization --- */
@@ -288,7 +340,14 @@ canvas {
     height: 110px; /* Fixed height */
     margin: auto; /* Center in grid cell */
     transform: scale(0.4); /* Scale down slightly if needed */
+    cursor: pointer; /* Add cursor pointer for clickable items */
 }
+
+.rule-viz:hover .inner-hex { /* Add a slight hover effect */
+    border-color: #FFF;
+}
+
+
 /* --- Hexagon Base Styles (Pointy-Top using CSS Clip Path) --- */
 .hexagon {
     position: absolute;
@@ -325,6 +384,7 @@ canvas {
     transform: translate(-50%, -50%) scale(0.8);
     border: 1.0px solid #CCCCCC; /* ALWAYS show border */
     z-index: 2; /* Above center hex */
+    transition: background-color 0.2s ease, border-color 0.2s ease; /* Smooth transition */
 }
 
 

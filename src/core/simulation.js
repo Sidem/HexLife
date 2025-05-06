@@ -251,13 +251,36 @@ export function setRuleset(hexString) {
           return true; // Indicate success
      } else {
          console.error("Failed to apply ruleset from hex:", hexString);
-         // Optionally revert to previous or keep default error state?
-         // currentRuleset.fill(0); // Example: Reset to all off on error
-         // currentRulesetHex = rulesetToHex(currentRuleset);
          return false; // Indicate failure
      }
-
 }
+
+/**
+ * Toggles the output state of a single rule.
+ * @param {number} ruleIndex The index of the rule (0-127) to toggle.
+ */
+export function toggleRuleOutputState(ruleIndex) {
+    if (ruleIndex >= 0 && ruleIndex < 128) {
+        currentRuleset[ruleIndex] = 1 - currentRuleset[ruleIndex];
+        currentRulesetHex = rulesetToHex(currentRuleset);
+        console.log(`Rule ${ruleIndex} toggled. New hex: ${currentRulesetHex}`);
+    }
+}
+
+/**
+ * Sets all rule output states to a target state (0 or 1).
+ * @param {0 | 1} targetState The state to set all rules to.
+ */
+export function setAllRulesState(targetState) {
+    if (targetState === 0 || targetState === 1) {
+        for (let i = 0; i < 128; i++) {
+            currentRuleset[i] = targetState;
+        }
+        currentRulesetHex = rulesetToHex(currentRuleset);
+        console.log(`All rules set to ${targetState}. New hex: ${currentRulesetHex}`);
+    }
+}
+
 
 // --- Neighbor Finding (Adapted from previous main.js / utils.js) ---
 

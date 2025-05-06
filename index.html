@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Exlorer</title>
+    <title>HexLife Editor</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div id="app-container">
         <canvas id="hexGridCanvas"></canvas>
@@ -26,16 +28,19 @@
 
                 <div class="ui-group" id="group-brush">
                     <label for="neighborhoodSize">Brush:</label>
-                    <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="20" value="1" step="1">
+                    <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="20" value="1"
+                        step="1">
                     <span id="neighborhoodValue">1</span>
                 </div>
 
                 <div class="ui-group" id="group-ruleset">
                     <button id="randomRulesetButton">New Rules</button>
-                    <input type="checkbox" id="resetOnNewRuleCheckbox" title="Reset all world states when generating a new ruleset" checked>
+                    <input type="checkbox" id="resetOnNewRuleCheckbox"
+                        title="Reset all world states when generating a new ruleset" checked>
                     <div class="bias-controls"> <input type="checkbox" id="useCustomBiasCheckbox" checked>
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
-                        <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.01" style="vertical-align: middle;">
+                        <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.01"
+                            style="vertical-align: middle;">
                         <span id="biasValueSpan">0.50</span>
                     </div>
                 </div>
@@ -43,13 +48,15 @@
                     <button id="copyRuleButton" title="Copy current ruleset hex code">Copy</button>
                     <input type="text" id="rulesetInput" placeholder="32 hex chars">
                     <button id="setRuleButton">Set</button>
-                    <button id="explainRuleButton" title="Show visual explanation of the current ruleset">Explain</button> </div>
+                    <button id="editRuleButton"
+                        title="Show visual editor for the current ruleset">Edit</button>
+                </div>
                 <div class="ui-group" id="group-state">
                     <button id="saveStateButton" title="Save current grid state">Save</button>
                     <button id="loadStateButton" title="Load grid state from .json/.txt file">Load</button>
                     <button id="resetStatesButton" title="Reset all worlds to initial densities">Reset All</button>
                 </div>
-                 </div>
+            </div>
 
             <div class="ui-group" id="stats-content">
                 <h4>Selected World</h4>
@@ -58,22 +65,33 @@
             </div>
         </div>
 
-        <div id="rulesetExplainerPanel" class="hidden">
-            <button id="closeExplainerButton" title="Close Panel">&times;</button>
-            <h3>Ruleset Explanation</h3>
-            <div class="explainer-text">
+        <div id="rulesetEditorPanel" class="hidden">
+            <button id="closeEditorButton" title="Close Panel">&times;</button>
+            <h3>Ruleset Editor</h3>
+            <div class="editor-controls">
+                <input type="text" id="editorRulesetInput" class="editor-hex-input" placeholder="32 hex chars (e.g., FFFFFF...000000)" title="Current ruleset hex code. Edit and press Enter or click away to apply.">
+                <button id="clearRulesButton" title="Set all rules to inactive, or active if all are already inactive">Clear</button>
+            </div>
+            <div id="rulesetEditorGrid"></div>
+            <div class="editor-text">
                 <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                 <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
-                <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
-                <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
-                <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
-                <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
-            </div>
-            <div id="rulesetExplainerGrid">
+                <p>Click on a rule visualization below to toggle its output state.</p>
+                <div class="editor-text-rules">
+                    <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive
+                    </p>
+                    <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active
+                    </p>
+                    <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes
+                        inactive</p>
+                    <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active
+                    </p>
                 </div>
+            </div>
         </div>
-        </div>
+    </div>
 
     <script type="module" src="src/main.js"></script>
 </body>
+
 </html>
