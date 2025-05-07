@@ -22,8 +22,8 @@ export const INITIAL_DENSITIES = [0, 0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 1.
 
 
 // Simulation Defaults
-export const DEFAULT_SPEED = 10; // ticks per second
-export const MAX_SIM_SPEED = 60;
+export const DEFAULT_SPEED = 20; // ticks per second
+export const MAX_SIM_SPEED = 120;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 1;
 export const MAX_NEIGHBORHOOD_SIZE = 20;
 export const STATS_HISTORY_SIZE = 100; // For moving average ratio

@@ -8,6 +8,97 @@ body {
     height: 100vh; /* Make body fill viewport height */
 }
 
+input[type="range"] {
+	color: #2b2d42;
+	--track-color: rgba(0, 0, 0, 0.4);
+	--brightness-hover: 180%;
+	--brightness-down: 80%;
+	--thumb-height: 2.1rem;
+	--thumb-width: 1px;
+	--clip-edges: 0.0125em;
+}
+
+input[type="range"] {
+	position: relative;
+	background: #fff0;
+	overflow: hidden;
+}
+
+input[type="range"]:active {
+	cursor: pointer;
+}
+
+input[type="range"]:disabled {
+	filter: grayscale(1);
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+#biasSlider {
+    width: 200px;
+}
+
+/* === WebKit specific styles === */
+input[type="range"],
+input[type="range"]::-webkit-slider-runnable-track,
+input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	transition: all ease 100ms;
+	height: var(--thumb-height);
+}
+
+input[type="range"]::-webkit-slider-runnable-track,
+input[type="range"]::-webkit-slider-thumb {
+	position: relative;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+	--thumb-radius: calc((var(--thumb-height) * 0.5) - 1px);
+	--clip-top: calc((var(--thumb-height) - var(--track-height)) * 0.5 - 0.5px);
+	--clip-bottom: calc(var(--thumb-height) - var(--clip-top));
+	--clip-further: calc(100% + 1px);
+	--box-fill: calc(-100vmax - var(--thumb-width, var(--thumb-height))) 0 0
+		100vmax currentColor;
+
+	width: var(--thumb-width, var(--thumb-height));
+	background: linear-gradient(currentColor 0 0) scroll no-repeat left center /
+		50% calc(var(--track-height) + 1px);
+	background-color: currentColor;
+	box-shadow: var(--box-fill);
+	border-radius: var(--thumb-width, var(--thumb-height));
+
+	filter: brightness(100%);
+	clip-path: polygon(
+		100% -1px,
+		var(--clip-edges) -1px,
+		0 var(--clip-top),
+		-100vmax var(--clip-top),
+		-100vmax var(--clip-bottom),
+		0 var(--clip-bottom),
+		var(--clip-edges) 100%,
+		var(--clip-further) var(--clip-further)
+	);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+	filter: brightness(var(--brightness-hover));
+	cursor: grab;
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+	filter: brightness(var(--brightness-down));
+	cursor: grabbing;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+	background: linear-gradient(var(--track-color) 0 0) scroll no-repeat center /
+		100% calc(var(--track-height) + 1px);
+}
+
+input[type="range"]:disabled::-webkit-slider-thumb {
+	cursor: not-allowed;
+}
+
 #app-container { /* NEW */
     display: flex;
     flex-direction: column;
@@ -229,6 +320,16 @@ canvas {
     flex-direction: column; /* Stack elements vertically */
 }
 
+#rulesetEditorPanel h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid #555;
+    padding-bottom: 10px;
+    user-select: none; /* Add this to prevent text selection during drag */
+    /* cursor: move; will be set by JS, but can be here too */
+}
+
 #rulesetEditorPanel.hidden {
     display: none;
 }
@@ -448,3 +549,45 @@ canvas {
 .inline-hex.state-1 { background-color: #FFFF00; }
 .inline-hex-inner.state-0 { background-color: #990000; }
 .inline-hex-inner.state-1 { background-color: #00BB00; }
+
+/* Added styles for slider value display */
+.slider-container {
+    position: relative; /* Establishes a positioning context for the span */
+    display: inline-flex; /* Aligns slider and potential future elements */
+    align-items: center; /* Vertically centers items if needed */
+    /* Adjust width if necessary, or let the input define it */
+    /* e.g., width: 150px; */
+}
+
+.slider-container input[type="range"] {
+    /* Ensure the input itself doesn't have extra padding that pushes the span away */
+    /* If the container has a fixed width, make the slider take it up: */
+    /* width: 100%; */
+    vertical-align: middle; /* Keeps slider aligned with labels etc. */
+}
+
+.slider-container span {
+    position: absolute; /* Position the span relative to the .slider-container */
+    left: 50%;          /* Center horizontally */
+    top: 50%;           /* Center vertically */
+    transform: translate(-50%, -50%); /* Fine-tune centering */
+    color: #FFFFFF;     /* White text for visibility */
+    font-size: 0.8rem;    /* Smaller font size to fit inside */
+    font-family: Arial, sans-serif; /* A clear, legible font */
+    pointer-events: none; /* Allows clicks to pass through to the slider */
+    z-index: 2;         /* Ensure the text is above the slider track */
+    text-shadow: 0px 0px 3px rgba(0,0,0,0.9); /* Shadow for better readability */
+    padding: 1px 3px;   /* A little padding around the text */
+    /* background-color: rgba(0,0,0,0.3); /* Optional: Slight background for contrast */
+    /* border-radius: 2px; */
+}
+
+/* Ensure existing biasSlider vertical alignment works with the new container */
+#group-ruleset .bias-controls .slider-container {
+    vertical-align: middle;
+}
+
+/* --- End of added styles --- */
+
+/* Make sure to place these before any @media queries if you want them to be general,
+   or inside specific media queries if they need to be responsive. */

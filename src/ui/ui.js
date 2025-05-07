@@ -8,6 +8,70 @@ let uiElements; // Object to hold references
 // --- UI State ---
 let simulationInterfaceRef; // Store reference for later use
 
+// --- Draggable Function ---
+function makeDraggable(panelElement, handleElement) {
+    let initialMouseX, initialMouseY;
+    let offsetX, offsetY;
+
+    handleElement.style.cursor = 'move'; // Set cursor on the handle
+
+    handleElement.addEventListener('mousedown', (e) => {
+        // Prevent dragging if clicking on interactive elements within the panel itself
+        // (inputs, buttons, or the rule visualizations)
+        if (e.target.tagName === 'INPUT' ||
+            e.target.tagName === 'BUTTON' ||
+            e.target.tagName === 'SELECT' ||
+            e.target.tagName === 'TEXTAREA' ||
+            e.target.closest('.rule-viz')) {
+            return;
+        }
+
+        e.preventDefault(); // Prevent text selection, etc.
+
+        const rect = panelElement.getBoundingClientRect();
+
+        // Calculate mouse offset relative to the panel's top-left corner
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+
+        // If the panel uses transform for centering, explicitly set top/left
+        // based on current visual position and remove transform for direct positioning.
+        if (window.getComputedStyle(panelElement).transform !== 'none') {
+            panelElement.style.left = `${rect.left}px`;
+            panelElement.style.top = `${rect.top}px`;
+            panelElement.style.transform = 'none';
+        }
+
+        document.addEventListener('mousemove', dragMouseMove);
+        document.addEventListener('mouseup', dragMouseUp);
+    });
+
+    function dragMouseMove(e) {
+        let newLeft = e.clientX - offsetX;
+        let newTop = e.clientY - offsetY;
+
+        // Optional: Constrain movement within viewport boundaries
+        const panelWidth = panelElement.offsetWidth;
+        const panelHeight = panelElement.offsetHeight;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        if (newLeft < 0) newLeft = 0;
+        if (newTop < 0) newTop = 0;
+        if (newLeft + panelWidth > viewportWidth) newLeft = viewportWidth - panelWidth;
+        if (newTop + panelHeight > viewportHeight) newTop = viewportHeight - panelHeight;
+
+        panelElement.style.left = `${newLeft}px`;
+        panelElement.style.top = `${newTop}px`;
+    }
+
+    function dragMouseUp() {
+        document.removeEventListener('mousemove', dragMouseMove);
+        document.removeEventListener('mouseup', dragMouseUp);
+    }
+}
+
+
 // --- Initialization ---
 
 /**
@@ -57,25 +121,25 @@ export function initUI(simulationInterface) {
     setupControlListeners(simulationInterface);
     setupRulesetListeners(simulationInterface);
     setupStateListeners(simulationInterface);
-    setupEditorListeners(simulationInterface);
+    setupEditorListeners(simulationInterface); // This will also set up dragging
 
     // Initial UI setup
     uiElements.speedSlider.max = Config.MAX_SIM_SPEED;
     uiElements.speedSlider.value = Config.DEFAULT_SPEED;
-    uiElements.speedValueSpan.textContent = Config.DEFAULT_SPEED;
+    // uiElements.speedValueSpan.textContent = Config.DEFAULT_SPEED; // Already handled by slider value display change
 
     uiElements.neighborhoodSlider.max = Config.MAX_NEIGHBORHOOD_SIZE;
     uiElements.neighborhoodSlider.min = 0;
     uiElements.neighborhoodSlider.value = Config.DEFAULT_NEIGHBORHOOD_SIZE;
-    uiElements.neighborhoodValueSpan.textContent = Config.DEFAULT_NEIGHBORHOOD_SIZE;
+    // uiElements.neighborhoodValueSpan.textContent = Config.DEFAULT_NEIGHBORHOOD_SIZE; // Already handled
 
     uiElements.playPauseButton.textContent = "[P]lay";
     uiElements.randomRulesetButton.textContent = "[N]ew Rules";
     uiElements.resetStatesButton.textContent = "[R]eset States";
-    uiElements.editRuleButton.textContent = "Edit";
+    uiElements.editRuleButton.textContent = "[E]dit";
 
     uiElements.biasSlider.value = 0.5;
-    uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(2);
+    // uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(2); // Already handled
     updateBiasSliderDisabledState();
 
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -114,9 +178,6 @@ function updateBiasSliderDisabledState() {
 function validateElements() {
     for (const key in uiElements) {
         if (!uiElements[key]) {
-            // Allow editor panel elements to be initially null if validation happens early
-            // or if the feature is optional and the HTML might not contain them.
-            // However, for this implementation, they are expected.
             if (key === 'rulesetEditorPanel' || key === 'closeEditorButton' || key === 'rulesetEditorGrid' || key === 'clearFillRulesButton') {
                 console.warn(`UI Warning: Editor element '${key}' not found. Editor feature might be incomplete.`);
             } else {
@@ -126,7 +187,6 @@ function validateElements() {
             }
         }
     }
-    // Specific check for critical editor elements
     if (!uiElements.rulesetEditorPanel || !uiElements.closeEditorButton || !uiElements.rulesetEditorGrid || !uiElements.clearFillRulesButton) {
         console.warn(`UI Warning: Essential Ruleset Editor elements not found. Editor functionality will be impaired.`);
     }
@@ -167,7 +227,7 @@ function setupRulesetListeners(sim) {
     uiElements.randomRulesetButton.addEventListener('click', () => {
         let biasToUse = uiElements.useCustomBiasCheckbox.checked ? parseFloat(uiElements.biasSlider.value) : Math.random();
         sim.generateRandomRuleset(biasToUse);
-        refreshAllRulesetViews(sim); // Use helper
+        refreshAllRulesetViews(sim); 
 
         if (uiElements.resetOnNewRuleCheckbox.checked) {
             sim.resetAllWorldStates();
@@ -200,13 +260,13 @@ function setupRulesetListeners(sim) {
         }
         const success = sim.setRuleset(hexString);
         if (success) {
-            uiElements.rulesetInput.value = ''; // Clear main input on success
+            uiElements.rulesetInput.value = ''; 
             uiElements.rulesetInput.blur();
         } else {
             alert("Error setting ruleset. Please check the code. The ruleset might have been rejected.");
             uiElements.rulesetInput.select();
         }
-        refreshAllRulesetViews(sim); // Refresh all views regardless of success to show actual state
+        refreshAllRulesetViews(sim); 
     });
 
     uiElements.rulesetInput.addEventListener('keydown', (event) => {
@@ -249,7 +309,7 @@ function setupStateListeners(sim) {
                 const success = sim.loadWorldState(sim.getSelectedWorldIndex(), loadedData);
                 if (success) {
                     updatePauseButton(sim.isSimulationPaused());
-                    refreshAllRulesetViews(sim); // Refresh views as ruleset might have loaded
+                    refreshAllRulesetViews(sim); 
                 }
             } catch (error) {
                 alert(`Error processing state file: ${error.message}`);
@@ -278,18 +338,27 @@ function setupEditorListeners(sim) {
 
     uiElements.editRuleButton.addEventListener('click', () => {
         uiElements.rulesetEditorPanel.classList.remove('hidden');
-        refreshAllRulesetViews(sim); // Refresh editor content when opened
+        // Center panel on show if it's the first time or it was moved and hidden
+        const panel = uiElements.rulesetEditorPanel;
+        if (panel.style.transform !== 'none' || (!panel.style.left && !panel.style.top)) {
+            // If still using transform or no explicit position, reset to centered
+            panel.style.left = '50%';
+            panel.style.top = '50%';
+            panel.style.transform = 'translate(-50%, -50%)';
+        }
+        refreshAllRulesetViews(sim); 
     });
 
     uiElements.closeEditorButton.addEventListener('click', () => {
         uiElements.rulesetEditorPanel.classList.add('hidden');
     });
 
-    uiElements.rulesetEditorPanel.addEventListener('click', (event) => {
-        if (event.target === uiElements.rulesetEditorPanel) {
-            uiElements.rulesetEditorPanel.classList.add('hidden');
-        }
-    });
+    // REMOVED: Click outside to close panel behavior
+    // uiElements.rulesetEditorPanel.addEventListener('click', (event) => {
+    //     if (event.target === uiElements.rulesetEditorPanel) {
+    //         uiElements.rulesetEditorPanel.classList.add('hidden');
+    //     }
+    // });
 
     uiElements.rulesetEditorGrid.addEventListener('click', (event) => {
         const ruleVizElement = event.target.closest('.rule-viz');
@@ -310,33 +379,38 @@ function setupEditorListeners(sim) {
         refreshAllRulesetViews(sim);
     });
 
-    // Listener for the new editor ruleset input field
     const handleEditorInputChange = () => {
         const hexString = uiElements.editorRulesetInput.value.trim().toUpperCase();
-        if (!hexString) { // If input is empty, don't try to set, just refresh to current
+        if (!hexString) { 
             refreshAllRulesetViews(sim);
             return;
         }
         if (!/^[0-9A-F]{32}$/.test(hexString)) {
             alert("Invalid Hex Code in Editor: Must be 32 hexadecimal characters (0-9, A-F).\nReverting to current ruleset.");
-             // No explicit set, just refresh to show the actual current state
         } else {
-            const success = sim.setRuleset(hexString); // Attempt to set
+            const success = sim.setRuleset(hexString); 
             if (!success) {
                  alert("Error setting ruleset from editor. The ruleset might have been rejected.\nReverting to current ruleset.");
             }
         }
-        refreshAllRulesetViews(sim); // Always refresh all views to reflect actual state
+        refreshAllRulesetViews(sim); 
     };
 
-    uiElements.editorRulesetInput.addEventListener('change', handleEditorInputChange); // `change` fires on blur if value changed
+    uiElements.editorRulesetInput.addEventListener('change', handleEditorInputChange); 
     uiElements.editorRulesetInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             handleEditorInputChange();
-            uiElements.editorRulesetInput.blur(); // Optionally blur after Enter
+            uiElements.editorRulesetInput.blur(); 
         }
     });
+
+    // Make the panel draggable
+    const editorPanel = uiElements.rulesetEditorPanel;
+    const editorHandle = editorPanel.querySelector('h3'); // Use the H3 title as the drag handle
+    if (editorPanel && editorHandle) {
+        makeDraggable(editorPanel, editorHandle);
+    }
 }
 
 // --- UI Update Functions ---
@@ -366,13 +440,13 @@ export function updateStatsDisplay(statsData) {
 export function updateBrushSlider(size) {
     if (uiElements && uiElements.neighborhoodSlider) {
         uiElements.neighborhoodSlider.value = size;
-        uiElements.neighborhoodValueSpan.textContent = size;
+        if(uiElements.neighborhoodValueSpan) uiElements.neighborhoodValueSpan.textContent = size;
     }
 }
 export function updateSpeedSlider(speed) {
     if (uiElements && uiElements.speedSlider) {
         uiElements.speedSlider.value = speed;
-        uiElements.speedValueSpan.textContent = speed;
+        if(uiElements.speedValueSpan) uiElements.speedValueSpan.textContent = speed;
     }
 }
 
@@ -420,16 +494,21 @@ export function updateRulesetEditorGrid(rulesetArray) {
 
 // --- Hotkey Handler ---
 function handleGlobalKeyDown(event) {
-    if (document.activeElement && (
-        document.activeElement.tagName === 'INPUT' ||
-        document.activeElement.tagName === 'TEXTAREA' ||
-        document.activeElement.tagName === 'SELECT')) {
-        return;
+    // Check if focus is on an input element where typing should be allowed
+    const activeEl = document.activeElement;
+    if (activeEl) {
+        const tagName = activeEl.tagName.toLowerCase();
+        const isInputElement = tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+        const isContentEditable = activeEl.isContentEditable;
+
+        // Allow Enter key specifically for the editorRulesetInput if it's active
+        if (event.key === 'Enter' && activeEl === uiElements.editorRulesetInput) {
+            // Let the existing listener for editorRulesetInput handle this Enter key
+        } else if (isInputElement || isContentEditable) {
+            return; // Don't trigger global hotkeys if typing in an input field
+        }
     }
-    if (event.key === 'Enter' && document.activeElement === uiElements.editorRulesetInput) {
-    } else {
-        return;
-    }
+
     switch (event.key.toUpperCase()) {
         case 'P':
             if (uiElements.playPauseButton) uiElements.playPauseButton.click();
@@ -441,6 +520,14 @@ function handleGlobalKeyDown(event) {
             break;
         case 'R':
             if (uiElements.resetStatesButton) uiElements.resetStatesButton.click();
+            event.preventDefault();
+            break;
+        case 'E':
+            if (uiElements.rulesetEditorPanel.classList.contains('hidden')) {
+                if (uiElements.editRuleButton) uiElements.editRuleButton.click();
+            } else {
+                if (uiElements.closeEditorButton) uiElements.closeEditorButton.click();
+            }
             event.preventDefault();
             break;
     }
