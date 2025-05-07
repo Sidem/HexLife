@@ -1,4 +1,3 @@
-// utils.js
 import * as Config from '../core/config.js'; 
 
 // --- Coordinate/Index Helpers ---
@@ -14,35 +13,46 @@ export function indexToCoords(index) {
     return { col, row };
 }
 
-/**
- * Creates a Map for quick coordinate string ("col,row") to index lookup.
- * @returns {Map<string, number>} The generated map.
- */
-export function createCoordMap() {
-    const map = new Map();
-    for (let i = 0; i < Config.NUM_CELLS; i++) {
-        const coords = indexToCoords(i);
-        if (coords) {
-            map.set(`${coords.col},${coords.row}`, i);
-        }
-    }
-    return map;
-}
-// Pre-create the map for efficiency if grid size is fixed
-export const hexCoordMap = createCoordMap();
+// REMOVE THE FOLLOWING:
+// /**
+//  * Creates a Map for quick coordinate string ("col,row") to index lookup.
+//  * @returns {Map<string, number>} The generated map.
+//  */
+// export function createCoordMap() {
+//     const map = new Map();
+//     for (let i = 0; i < Config.NUM_CELLS; i++) {
+//         const coords = indexToCoords(i);
+//         if (coords) {
+//             map.set(`${coords.col},${coords.row}`, i);
+//         }
+//     }
+//     return map;
+// }
+// // Pre-create the map for efficiency if grid size is fixed
+// export const hexCoordMap = createCoordMap();
 
 /**
- * Gets the index for given coordinates using the precomputed map.
+ * Gets the index for given coordinates using direct arithmetic.
+ * Returns undefined if coordinates are out of bounds or invalid,
+ * mimicking Map.get behavior for non-existent keys.
  * @param {number} col Column index.
  * @param {number} row Row index.
- * @returns {number|undefined} The index or undefined if not found.
+ * @returns {number|undefined} The index or undefined if not found/invalid.
  */
 export function coordsToIndex(col, row) {
-    return hexCoordMap.get(`${col},${row}`);
+    // Check if col and row are valid numbers and within the defined grid boundaries
+    if (typeof col !== 'number' || typeof row !== 'number' || 
+        isNaN(col) || isNaN(row) || // Ensure they are not NaN
+        col < 0 || col >= Config.GRID_COLS ||
+        row < 0 || row >= Config.GRID_ROWS) {
+        return undefined; 
+    }
+    return row * Config.GRID_COLS + col;
 }
 
 
 // --- Geometry Helpers ---
+// ... (rest of the file remains the same) ...
 /**
  * Generates vertices for a flat-top hexagon centered at (0,0) with radius 1.
  * @returns {Float32Array} Array of vertex coordinates (x, y).
@@ -152,7 +162,9 @@ export function resizeCanvasToDisplaySize(canvas, gl) {
  * @returns {string} Formatted string.
  */
 export function formatHexCode(hexCode) {
-    if (!hexCode || hexCode.length !== 32) return hexCode;
+    if (!hexCode || hexCode.length !== 32) return hexCode; // Also handle "Error" or "N/A"
+    if (hexCode === "Error" || hexCode === "N/A") return hexCode;
+
     let formatted = "";
     for (let i = 0; i < 32; i += 4) {
         formatted += hexCode.substring(i, i + 4);
@@ -171,14 +183,23 @@ export function formatHexCode(hexCode) {
  */
 export function calculateHexSizeForTexture() {
     // Aim to fit the grid somewhat tightly within the texture
-    const approxGridWidth = Config.GRID_COLS * Config.HORIZ_SPACING;
-    const approxGridHeight = Config.GRID_ROWS * Config.VERT_SPACING;
+    // Note: Config.HORIZ_SPACING and Config.VERT_SPACING are based on Config.HEX_SIZE
+    // We need to calculate approximate grid pixel width/height using GRID_COLS/ROWS and their effective spacing
+    // The effective horizontal spacing for a cell in a row-major layout of a hex grid is HORIZ_SPACING.
+    // The effective vertical spacing for a cell in a column is VERT_SPACING, but rows are staggered.
+    // A simpler approximation:
+    const approxGridPixelWidth = Config.GRID_COLS * Config.HEX_WIDTH * 0.75; // Each column adds 3/4 of a hex width
+    const approxGridPixelHeight = Config.GRID_ROWS * Config.HEX_HEIGHT;    // Each row adds a full hex height
 
-    const scaleX = Config.RENDER_TEXTURE_SIZE / approxGridWidth;
-    const scaleY = Config.RENDER_TEXTURE_SIZE / approxGridHeight;
+    // Prevent division by zero if grid dimensions are tiny or HEX_SIZE is zero
+    if (approxGridPixelWidth === 0 || approxGridPixelHeight === 0) return Config.HEX_SIZE;
+
+
+    const scaleX = Config.RENDER_TEXTURE_SIZE / approxGridPixelWidth;
+    const scaleY = Config.RENDER_TEXTURE_SIZE / approxGridPixelHeight;
 
     // Use a scale slightly smaller than the minimum to ensure padding
-    const scale = Math.min(scaleX, scaleY) * 0.95; // Increased padding slightly
+    const scale = Math.min(scaleX, scaleY) * 0.95;
 
     // Calculate the scaled hex size based on the original configured HEX_SIZE
     return Config.HEX_SIZE * scale;

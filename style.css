@@ -172,14 +172,15 @@ canvas {
 
 /* Stats Content Adjustments */
 #stats-content {
-    display: none;
-    width: 10%; /* Set explicit width */
+    /*display: none;*/
     flex-basis: auto; /* Override previous basis */
-    flex-grow: 0;
-    flex-shrink: 0; /* Prevent stats from shrinking */
     background-color: rgba(255, 255, 255, 0.08);
-    padding: 8px 12px;
+    padding: 4px 6px;
     border-radius: 4px;
+    font-size: 0.9em;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
     box-sizing: border-box; /* Include padding in width calculation */
 }
 
