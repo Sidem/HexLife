@@ -79,7 +79,7 @@ function makeDraggable(panelElement, handleElement) {
  * @param {object} simulationInterface - An object with functions to interact with the simulation
  */
 export function initUI(simulationInterface) {
-    simulationInterfaceRef = simulationInterface; // Store for later use in editor interactions
+    simulationInterfaceRef = simulationInterface;
     uiElements = {
         canvas: document.getElementById('hexGridCanvas'),
         fileInput: document.getElementById('fileInput'),
@@ -96,7 +96,7 @@ export function initUI(simulationInterface) {
         setRuleButton: document.getElementById('setRuleButton'),
         rulesetDisplay: document.getElementById('rulesetDisplay'),
         resetOnNewRuleCheckbox: document.getElementById('resetOnNewRuleCheckbox'),
-        editRuleButton: document.getElementById('editRuleButton'), // Renamed
+        editRuleButton: document.getElementById('editRuleButton'),
         // State
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
@@ -105,15 +105,18 @@ export function initUI(simulationInterface) {
         statRatio: document.getElementById('stat-ratio'),
         statAvgRatio: document.getElementById('stat-avg-ratio'),
         // Ruleset Editor Panel Elements
-        rulesetEditorPanel: document.getElementById('rulesetEditorPanel'), // Renamed
-        closeEditorButton: document.getElementById('closeEditorButton'), // Renamed
-        rulesetEditorGrid: document.getElementById('rulesetEditorGrid'), // Renamed
-        editorRulesetInput: document.getElementById('editorRulesetInput'), // New input in editor
-        clearRulesButton: document.getElementById('clearRulesButton'), // Renamed from clearFillRulesButton if ID was that
+        rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
+        closeEditorButton: document.getElementById('closeEditorButton'),
+        rulesetEditorGrid: document.getElementById('rulesetEditorGrid'),
+        editorRulesetInput: document.getElementById('editorRulesetInput'),
+        clearRulesButton: document.getElementById('clearRulesButton'),
         // Bias Control Elements
         useCustomBiasCheckbox: document.getElementById('useCustomBiasCheckbox'),
         biasSlider: document.getElementById('biasSlider'),
         biasValueSpan: document.getElementById('biasValueSpan'),
+        // Performance Indicators (NEW)
+        statFps: document.getElementById('stat-fps'),
+        statActualTps: document.getElementById('stat-actual-tps'),
     };
 
     if (!validateElements()) return false;
@@ -155,6 +158,17 @@ export function initUI(simulationInterface) {
 
     console.log("UI Initialized.");
     return true;
+}
+
+export function updatePerformanceDisplay(fps, actualTps) {
+    if (uiElements) {
+        if (uiElements.statFps) {
+            uiElements.statFps.textContent = fps;
+        }
+        if (uiElements.statActualTps) {
+            uiElements.statActualTps.textContent = actualTps;
+        }
+    }
 }
 
 // Helper to update all ruleset related displays

@@ -12,6 +12,15 @@ let lastTimestamp = 0;
 let neighborhoodSize = Config.DEFAULT_NEIGHBORHOOD_SIZE;
 let pausedByVisibilityChange = false;
 
+// Performance Metrics
+let frameCount = 0;
+let lastFpsUpdateTime = 0;
+let actualFps = 0;
+
+let accumulatedTicks = 0;
+let lastTpsUpdateTime = 0;
+let actualTps = 0;
+
 // --- Initialization ---
 
 async function initialize() {
@@ -53,7 +62,7 @@ async function initialize() {
         setAllRulesState: Simulation.setAllRulesState,
     };
 
-    if (!UI.initUI(simulationInterface)) { // Pass the full interface
+    if (!UI.initUI(simulationInterface)) {
         console.error("UI initialization failed.");
         return;
     }
@@ -67,6 +76,10 @@ async function initialize() {
 
     isInitialized = true;
     lastTimestamp = performance.now();
+    // Initialize performance update timestamps
+    lastFpsUpdateTime = lastTimestamp;
+    lastTpsUpdateTime = lastTimestamp;
+
     console.log("Initialization Complete. Starting Render Loop.");
     requestAnimationFrame(renderLoop);
 }
@@ -266,9 +279,34 @@ function renderLoop(timestamp) {
     const timeDelta = (timestamp - lastTimestamp) / 1000.0;
     lastTimestamp = timestamp;
 
-    Simulation.stepSimulation(timeDelta);
+    // --- Simulation Step ---
+    const ticksProcessedThisFrame = Simulation.stepSimulation(timeDelta);
+    accumulatedTicks += ticksProcessedThisFrame;
+
+    // --- Rendering ---
     Renderer.renderFrame(Simulation.getWorldsData(), Simulation.getSelectedWorldIndex());
+    frameCount++;
+
+    // --- Update Stats and Performance Indicators ---
     UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
+
+    // Calculate and update FPS (once per second)
+    if (timestamp - lastFpsUpdateTime > 1000) {
+        actualFps = frameCount;
+        frameCount = 0;
+        lastFpsUpdateTime = timestamp;
+    }
+
+    // Calculate and update actual TPS (once per second)
+    if (timestamp - lastTpsUpdateTime > 1000) {
+        actualTps = accumulatedTicks;
+        accumulatedTicks = 0;
+        lastTpsUpdateTime = timestamp;
+    }
+
+    // Update the performance display every frame with the latest calculated values
+    UI.updatePerformanceDisplay(actualFps, actualTps);
+
     requestAnimationFrame(renderLoop);
 }
 

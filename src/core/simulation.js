@@ -142,44 +142,35 @@ function updateWorldStats(world, activeCount) {
  * Advances the simulation based on time delta. Calls internal step if needed.
  * Limits the number of steps processed per frame to avoid freezing after inactivity.
  * @param {number} timeDelta Time elapsed since last frame in seconds.
- * @returns {boolean} True if at least one simulation step occurred, false otherwise.
+ * @returns {number} The number of simulation steps (ticks) processed in this call.
  */
 export function stepSimulation(timeDelta) {
-    if (isPaused) return false;
+    if (isPaused) return 0; // Return 0 steps if paused
 
     // --- Prevent massive catch-up ---
-    // Cap the time delta to avoid excessive steps after long pauses (e.g., 1 second max)
     const maxDeltaTime = 1.0; // Maximum time to process per frame (in seconds)
     timeDelta = Math.min(timeDelta, maxDeltaTime);
-    // Alternatively, or in addition, limit the number of steps directly:
     const maxStepsPerFrame = 10; // e.g., don't run more than 10 steps per render frame
     let stepsTakenThisFrame = 0;
     // --- End prevention ---
 
-
     tickTimer += timeDelta;
-    let stepOccurred = false;
 
     // Original loop, but now respects maxStepsPerFrame
     while (tickTimer >= tickDuration && stepsTakenThisFrame < maxStepsPerFrame) {
         runSingleStepForAllWorlds();
         tickTimer -= tickDuration;
-        stepOccurred = true;
         stepsTakenThisFrame++;
         if (isPaused) break; // Check pause state again in case it changed mid-frame
     }
 
     // Optional: If timer is still large after max steps, reset it partially or fully
     // to prevent it growing indefinitely if frame rate is too low for sim speed.
-    if (tickTimer >= tickDuration) {
-        // Example: Reset timer slightly ahead, keeps some accumulated time but avoids huge values
+    if (tickTimer >= tickDuration && stepsTakenThisFrame >= maxStepsPerFrame) {
          tickTimer = tickDuration + (tickTimer % tickDuration);
-        // Or simply clamp it:
-        // tickTimer = Math.max(0, tickTimer); // Ensure non-negative
     }
 
-
-    return stepOccurred;
+    return stepsTakenThisFrame; // Return the number of steps processed
 }
 
 
