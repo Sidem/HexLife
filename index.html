@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Editor</title>
+    <title>HexLife Explorer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -40,6 +40,8 @@
 
                 <div class="ui-group" id="group-ruleset">
                     <button id="randomRulesetButton">New Rules</button>
+                    <input type="checkbox" id="generateSymmetricalCheckbox" title="Generate rules symmetrically (based on neighbor count)" checked>
+                    <label for="generateSymmetricalCheckbox" class="checkbox-label sym-label">Symmetrical</label>
                     <input type="checkbox" id="resetOnNewRuleCheckbox"
                         title="Reset all world states when generating a new ruleset" checked>
                     <div class="bias-controls"> <input type="checkbox" id="useCustomBiasCheckbox">
@@ -80,8 +82,13 @@
             <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input" placeholder="32 hex chars (e.g., FFFFFF...000000)" title="Current ruleset hex code. Edit and press Enter or click away to apply.">
                 <button id="clearRulesButton" title="Set all rules to inactive, or active if all are already inactive">Clear</button>
+                <select id="rulesetEditorMode" title="Choose editor mode">
+                    <option value="detailed" selected>Detailed (128 rules)</option>
+                    <option value="neighborCount">Neighbor Count (14 rules)</option>
+                </select>
             </div>
             <div id="rulesetEditorGrid"></div>
+            <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
             <div class="editor-text">
                 <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                 <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>

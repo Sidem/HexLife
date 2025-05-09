@@ -22,7 +22,8 @@ function makeDraggable(panelElement, handleElement) {
             e.target.tagName === 'BUTTON' ||
             e.target.tagName === 'SELECT' ||
             e.target.tagName === 'TEXTAREA' ||
-            e.target.closest('.rule-viz')) {
+            e.target.closest('.rule-viz') || // for detailed editor
+            e.target.closest('.neighbor-count-rule-viz')) { // for neighbor count editor
             return;
         }
 
@@ -91,6 +92,7 @@ export function initUI(simulationInterface) {
         neighborhoodValueSpan: document.getElementById('neighborhoodValue'),
         // Ruleset
         randomRulesetButton: document.getElementById('randomRulesetButton'),
+        generateSymmetricalCheckbox: document.getElementById('generateSymmetricalCheckbox'), // NEW
         copyRuleButton: document.getElementById('copyRuleButton'),
         rulesetInput: document.getElementById('rulesetInput'),
         setRuleButton: document.getElementById('setRuleButton'),
@@ -108,6 +110,8 @@ export function initUI(simulationInterface) {
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         closeEditorButton: document.getElementById('closeEditorButton'),
         rulesetEditorGrid: document.getElementById('rulesetEditorGrid'),
+        neighborCountRulesetEditorGrid: document.getElementById('neighborCountRulesetEditorGrid'), // NEW
+        rulesetEditorMode: document.getElementById('rulesetEditorMode'), // NEW
         editorRulesetInput: document.getElementById('editorRulesetInput'),
         clearRulesButton: document.getElementById('clearRulesButton'),
         // Bias Control Elements
@@ -129,12 +133,12 @@ export function initUI(simulationInterface) {
     // Initial UI setup
     uiElements.speedSlider.max = Config.MAX_SIM_SPEED;
     uiElements.speedSlider.value = Config.DEFAULT_SPEED;
-    // uiElements.speedValueSpan.textContent = Config.DEFAULT_SPEED; // Already handled by slider value display change
+    uiElements.speedValueSpan.textContent = Config.DEFAULT_SPEED;
 
     uiElements.neighborhoodSlider.max = Config.MAX_NEIGHBORHOOD_SIZE;
     uiElements.neighborhoodSlider.min = 0;
     uiElements.neighborhoodSlider.value = Config.DEFAULT_NEIGHBORHOOD_SIZE;
-    // uiElements.neighborhoodValueSpan.textContent = Config.DEFAULT_NEIGHBORHOOD_SIZE; // Already handled
+    uiElements.neighborhoodValueSpan.textContent = Config.DEFAULT_NEIGHBORHOOD_SIZE;
 
     uiElements.playPauseButton.textContent = "[P]lay";
     uiElements.randomRulesetButton.textContent = "[N]ew Rules";
@@ -142,19 +146,20 @@ export function initUI(simulationInterface) {
     uiElements.editRuleButton.textContent = "[E]dit";
 
     uiElements.biasSlider.value = 0.5;
-    // uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(2); // Already handled
+    uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(2);
     updateBiasSliderDisabledState();
+
+    // Ensure correct initial state for editor grids
+    uiElements.rulesetEditorGrid.classList.remove('hidden');
+    uiElements.neighborCountRulesetEditorGrid.classList.add('hidden');
+    uiElements.rulesetEditorMode.value = 'detailed';
+
 
     window.addEventListener('keydown', handleGlobalKeyDown);
 
     // Initial population of the ruleset editor and displays
-    const initialHex = simulationInterface.getCurrentRulesetHex();
-    const initialArr = simulationInterface.getCurrentRulesetArray();
-    updateMainRulesetDisplay(initialHex); // Update main display
-    if (uiElements.editorRulesetInput) {
-        uiElements.editorRulesetInput.value = initialHex === "Error" ? "" : initialHex; // Update editor input
-    }
-    updateRulesetEditorGrid(initialArr); // Update editor grid
+    refreshAllRulesetViews(simulationInterfaceRef);
+
 
     console.log("UI Initialized.");
     return true;
@@ -173,6 +178,10 @@ export function updatePerformanceDisplay(fps, actualTps) {
 
 // Helper to update all ruleset related displays
 export function refreshAllRulesetViews(sim) {
+    if (!sim) {
+        console.warn("refreshAllRulesetViews called without simulation interface.");
+        return;
+    }
     const currentHex = sim.getCurrentRulesetHex();
     const currentArr = sim.getCurrentRulesetArray();
 
@@ -180,7 +189,8 @@ export function refreshAllRulesetViews(sim) {
     if (uiElements.editorRulesetInput) {
         uiElements.editorRulesetInput.value = currentHex === "Error" ? "" : currentHex;
     }
-    updateRulesetEditorGrid(currentArr);
+    // Update the appropriate editor grid based on current mode
+    updateRulesetEditorGrids(currentArr, sim);
 }
 
 function updateBiasSliderDisabledState() {
@@ -192,8 +202,14 @@ function updateBiasSliderDisabledState() {
 function validateElements() {
     for (const key in uiElements) {
         if (!uiElements[key]) {
-            if (key === 'rulesetEditorPanel' || key === 'closeEditorButton' || key === 'rulesetEditorGrid' || key === 'clearFillRulesButton') {
-                console.warn(`UI Warning: Editor element '${key}' not found. Editor feature might be incomplete.`);
+            // Allow some editor elements to be optional for basic functionality, but warn.
+            const optionalEditorElements = [
+                'rulesetEditorPanel', 'closeEditorButton', 'rulesetEditorGrid',
+                'neighborCountRulesetEditorGrid', 'rulesetEditorMode',
+                'editorRulesetInput', 'clearRulesButton'
+            ];
+            if (optionalEditorElements.includes(key)) {
+                console.warn(`UI Warning: Editor element '${key}' not found. Editor feature might be incomplete or disabled.`);
             } else {
                 console.error(`UI Initialization Error: Element with ID '${key}' not found.`);
                 alert(`UI Error: Element '${key}' not found. Check index.html.`);
@@ -201,8 +217,15 @@ function validateElements() {
             }
         }
     }
-    if (!uiElements.rulesetEditorPanel || !uiElements.closeEditorButton || !uiElements.rulesetEditorGrid || !uiElements.clearFillRulesButton) {
-        console.warn(`UI Warning: Essential Ruleset Editor elements not found. Editor functionality will be impaired.`);
+    // Specifically check essential editor parts if panel itself is found
+    if (uiElements.rulesetEditorPanel && (
+        !uiElements.closeEditorButton ||
+        !uiElements.rulesetEditorGrid ||
+        !uiElements.neighborCountRulesetEditorGrid ||
+        !uiElements.rulesetEditorMode ||
+        !uiElements.clearRulesButton ||
+        !uiElements.editorRulesetInput)) {
+        console.warn(`UI Warning: Some essential Ruleset Editor child elements not found. Editor functionality will be impaired.`);
     }
     return true;
 }
@@ -220,7 +243,7 @@ function setupControlListeners(sim) {
     }
     if (uiElements.biasSlider) {
         uiElements.biasSlider.addEventListener('input', (event) => {
-            uiElements.biasValueSpan.textContent = parseFloat(event.target.value).toFixed(3);
+           if(uiElements.biasValueSpan) uiElements.biasValueSpan.textContent = parseFloat(event.target.value).toFixed(3);
         });
     }
 
@@ -240,8 +263,9 @@ function setupControlListeners(sim) {
 function setupRulesetListeners(sim) {
     uiElements.randomRulesetButton.addEventListener('click', () => {
         let biasToUse = uiElements.useCustomBiasCheckbox.checked ? parseFloat(uiElements.biasSlider.value) : Math.random();
-        sim.generateRandomRuleset(biasToUse);
-        refreshAllRulesetViews(sim); 
+        const generateSymmetrically = uiElements.generateSymmetricalCheckbox.checked;
+        sim.generateRandomRuleset(biasToUse, generateSymmetrically);
+        refreshAllRulesetViews(sim);
 
         if (uiElements.resetOnNewRuleCheckbox.checked) {
             sim.resetAllWorldStates();
@@ -250,7 +274,7 @@ function setupRulesetListeners(sim) {
 
     uiElements.copyRuleButton.addEventListener('click', () => {
         const hex = sim.getCurrentRulesetHex();
-        if (!hex || hex === "N/A") {
+        if (!hex || hex === "N/A" || hex === "Error") {
             alert("No ruleset available to copy.");
             return;
         }
@@ -274,13 +298,13 @@ function setupRulesetListeners(sim) {
         }
         const success = sim.setRuleset(hexString);
         if (success) {
-            uiElements.rulesetInput.value = ''; 
+            uiElements.rulesetInput.value = '';
             uiElements.rulesetInput.blur();
         } else {
             alert("Error setting ruleset. Please check the code. The ruleset might have been rejected.");
             uiElements.rulesetInput.select();
         }
-        refreshAllRulesetViews(sim); 
+        refreshAllRulesetViews(sim);
     });
 
     uiElements.rulesetInput.addEventListener('keydown', (event) => {
@@ -323,7 +347,7 @@ function setupStateListeners(sim) {
                 const success = sim.loadWorldState(sim.getSelectedWorldIndex(), loadedData);
                 if (success) {
                     updatePauseButton(sim.isSimulationPaused());
-                    refreshAllRulesetViews(sim); 
+                    refreshAllRulesetViews(sim);
                 }
             } catch (error) {
                 alert(`Error processing state file: ${error.message}`);
@@ -345,28 +369,29 @@ function setupStateListeners(sim) {
 }
 
 function setupEditorListeners(sim) {
-    if (!uiElements.editRuleButton || !uiElements.rulesetEditorPanel || !uiElements.closeEditorButton || !uiElements.rulesetEditorGrid || !uiElements.clearRulesButton || !uiElements.editorRulesetInput) {
+    if (!uiElements.editRuleButton || !uiElements.rulesetEditorPanel || !uiElements.closeEditorButton ||
+        !uiElements.rulesetEditorGrid || !uiElements.neighborCountRulesetEditorGrid ||
+        !uiElements.rulesetEditorMode || !uiElements.clearRulesButton || !uiElements.editorRulesetInput) {
         console.warn("One or more editor elements missing, editor listeners not fully set up.");
         return;
     }
 
     uiElements.editRuleButton.addEventListener('click', () => {
         uiElements.rulesetEditorPanel.classList.remove('hidden');
-        // Center panel on show if it's the first time or it was moved and hidden
         const panel = uiElements.rulesetEditorPanel;
         if (panel.style.transform !== 'none' || (!panel.style.left && !panel.style.top)) {
-            // If still using transform or no explicit position, reset to centered
             panel.style.left = '50%';
             panel.style.top = '50%';
             panel.style.transform = 'translate(-50%, -50%)';
         }
-        refreshAllRulesetViews(sim); 
+        refreshAllRulesetViews(sim);
     });
 
     uiElements.closeEditorButton.addEventListener('click', () => {
         uiElements.rulesetEditorPanel.classList.add('hidden');
     });
 
+    // Listener for Detailed Ruleset Grid
     uiElements.rulesetEditorGrid.addEventListener('click', (event) => {
         const ruleVizElement = event.target.closest('.rule-viz');
         if (ruleVizElement && ruleVizElement.dataset.ruleIndex !== undefined) {
@@ -378,6 +403,20 @@ function setupEditorListeners(sim) {
         }
     });
 
+    // Listener for Ruleset Editor Mode Change
+    uiElements.rulesetEditorMode.addEventListener('change', () => {
+        const currentMode = uiElements.rulesetEditorMode.value;
+        if (currentMode === 'detailed') {
+            uiElements.rulesetEditorGrid.classList.remove('hidden');
+            uiElements.neighborCountRulesetEditorGrid.classList.add('hidden');
+        } else { // neighborCount
+            uiElements.rulesetEditorGrid.classList.add('hidden');
+            uiElements.neighborCountRulesetEditorGrid.classList.remove('hidden');
+        }
+        refreshAllRulesetViews(sim); // Refresh to populate the correct grid
+    });
+
+
     uiElements.clearRulesButton.addEventListener('click', () => {
         const currentArr = sim.getCurrentRulesetArray();
         const isCurrentlyAllInactive = currentArr.every(state => state === 0);
@@ -388,33 +427,33 @@ function setupEditorListeners(sim) {
 
     const handleEditorInputChange = () => {
         const hexString = uiElements.editorRulesetInput.value.trim().toUpperCase();
-        if (!hexString) { 
+        if (!hexString) {
+            // If input is cleared, refresh to show the current ruleset's hex
             refreshAllRulesetViews(sim);
             return;
         }
         if (!/^[0-9A-F]{32}$/.test(hexString)) {
             alert("Invalid Hex Code in Editor: Must be 32 hexadecimal characters (0-9, A-F).\nReverting to current ruleset.");
         } else {
-            const success = sim.setRuleset(hexString); 
+            const success = sim.setRuleset(hexString);
             if (!success) {
                  alert("Error setting ruleset from editor. The ruleset might have been rejected.\nReverting to current ruleset.");
             }
         }
-        refreshAllRulesetViews(sim); 
+        refreshAllRulesetViews(sim);
     };
 
-    uiElements.editorRulesetInput.addEventListener('change', handleEditorInputChange); 
+    uiElements.editorRulesetInput.addEventListener('change', handleEditorInputChange);
     uiElements.editorRulesetInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             handleEditorInputChange();
-            uiElements.editorRulesetInput.blur(); 
+            uiElements.editorRulesetInput.blur();
         }
     });
 
-    // Make the panel draggable
     const editorPanel = uiElements.rulesetEditorPanel;
-    const editorHandle = editorPanel.querySelector('h3'); // Use the H3 title as the drag handle
+    const editorHandle = editorPanel.querySelector('h3');
     if (editorPanel && editorHandle) {
         makeDraggable(editorPanel, editorHandle);
     }
@@ -457,17 +496,34 @@ export function updateSpeedSlider(speed) {
     }
 }
 
-export function updateRulesetEditorGrid(rulesetArray) {
+/**
+ * Chooses which editor grid to populate based on the current mode.
+ * @param {Uint8Array} rulesetArray The current 128-bit ruleset.
+ * @param {object} sim The simulation interface.
+ */
+function updateRulesetEditorGrids(rulesetArray, sim) {
+    if (!uiElements || !uiElements.rulesetEditorMode) return;
+    const currentMode = uiElements.rulesetEditorMode.value;
+
+    if (currentMode === 'detailed') {
+        populateDetailedRulesetEditorGrid(rulesetArray);
+    } else { // neighborCount
+        populateNeighborCountEditorGrid(sim); // Pass sim interface
+    }
+}
+
+
+function populateDetailedRulesetEditorGrid(rulesetArray) {
     if (!uiElements || !uiElements.rulesetEditorGrid || !rulesetArray || rulesetArray.length !== 128) {
-        console.warn("Cannot update ruleset editor grid - missing elements or invalid ruleset array.");
+        console.warn("Cannot update detailed ruleset editor grid - missing elements or invalid ruleset array.");
         if (uiElements && uiElements.rulesetEditorGrid) {
-            uiElements.rulesetEditorGrid.innerHTML = '<p style="color:red; text-align:center;">Error loading editor grid.</p>';
+            uiElements.rulesetEditorGrid.innerHTML = '<p style="color:red; text-align:center;">Error loading detailed editor grid.</p>';
         }
         return;
     }
 
     const grid = uiElements.rulesetEditorGrid;
-    grid.innerHTML = '';
+    grid.innerHTML = ''; // Clear previous content
     const fragment = document.createDocumentFragment();
 
     for (let i = 0; i < 128; i++) {
@@ -498,6 +554,62 @@ export function updateRulesetEditorGrid(rulesetArray) {
     }
     grid.appendChild(fragment);
 }
+
+function populateNeighborCountEditorGrid(sim) {
+    if (!uiElements || !uiElements.neighborCountRulesetEditorGrid || !sim) {
+        console.warn("Cannot update neighbor count editor grid - missing elements or simulation interface.");
+        if (uiElements && uiElements.neighborCountRulesetEditorGrid) {
+            uiElements.neighborCountRulesetEditorGrid.innerHTML = '<p style="color:red; text-align:center;">Error loading N-count editor.</p>';
+        }
+        return;
+    }
+
+    const grid = uiElements.neighborCountRulesetEditorGrid;
+    grid.innerHTML = ''; // Clear previous content
+    const fragment = document.createDocumentFragment();
+
+    for (let centerState = 0; centerState <= 1; centerState++) {
+        for (let numActive = 0; numActive <= 6; numActive++) {
+            const effectiveOutput = sim.getEffectiveRuleForNeighborCount(centerState, numActive);
+
+            const ruleViz = document.createElement('div');
+            ruleViz.className = 'neighbor-count-rule-viz';
+            ruleViz.dataset.centerState = centerState;
+            ruleViz.dataset.numActive = numActive;
+            ruleViz.title = `Center ${centerState === 1 ? 'ON' : 'OFF'}, ${numActive} Neighbors ON -> Result ${effectiveOutput === 2 ? 'MIXED' : (effectiveOutput === 1 ? 'ON' : 'OFF')}\n(Click to toggle output)`;
+
+            const vizCenterHex = document.createElement('div');
+            vizCenterHex.className = `hexagon center-hex state-${centerState}`;
+            const vizInnerHex = document.createElement('div');
+            vizInnerHex.className = `hexagon inner-hex state-${effectiveOutput}`; // Uses 0, 1, or 2 for mixed
+            vizCenterHex.appendChild(vizInnerHex);
+
+            const label = document.createElement('div');
+            label.className = 'neighbor-count-label';
+            let outputText = effectiveOutput === 1 ? 'ON' : 'OFF';
+            if (effectiveOutput === 2) outputText = 'MIXED';
+            label.innerHTML = `Center: ${centerState === 1 ? 'ON' : 'OFF'}<br>${numActive}/6 N-ON &rarr; ${outputText}`;
+
+
+            ruleViz.appendChild(label);
+            ruleViz.appendChild(vizCenterHex);
+
+            ruleViz.addEventListener('click', () => {
+                const cs = parseInt(ruleViz.dataset.centerState, 10);
+                const na = parseInt(ruleViz.dataset.numActive, 10);
+                const currentEffOutput = sim.getEffectiveRuleForNeighborCount(cs, na);
+                // Toggle logic: if 1 or mixed, go to 0. If 0, go to 1.
+                const newOutput = (currentEffOutput === 1 || currentEffOutput === 2) ? 0 : 1;
+                sim.setRulesForNeighborCountCondition(cs, na, newOutput);
+                refreshAllRulesetViews(sim); // Re-render all rule views
+            });
+
+            fragment.appendChild(ruleViz);
+        }
+    }
+    grid.appendChild(fragment);
+}
+
 
 // --- Hotkey Handler ---
 function handleGlobalKeyDown(event) {
@@ -530,7 +642,7 @@ function handleGlobalKeyDown(event) {
             event.preventDefault();
             break;
         case 'E':
-            if (uiElements.rulesetEditorPanel.classList.contains('hidden')) {
+            if (uiElements.rulesetEditorPanel && uiElements.rulesetEditorPanel.classList.contains('hidden')) {
                 if (uiElements.editRuleButton) uiElements.editRuleButton.click();
             } else {
                 if (uiElements.closeEditorButton) uiElements.closeEditorButton.click();

@@ -119,8 +119,8 @@ canvas {
     width: 50px;
 }
 
-#resetOnNewRuleCheckbox {
-    display: none;
+#resetOnNewRuleCheckbox, #generateSymmetricalCheckbox, #useCustomBiasCheckbox { /* Apply to both checkboxes */
+    display: none; /* Hide the actual checkbox input */
 }
 
 #ui-container {
@@ -169,10 +169,20 @@ canvas {
     padding: 4px 6px;
     border-radius: 3px;
     transition: background-color 0.2s ease;
+    border: 1px solid #555; /* Add a subtle border */
 }
 #ui-container label.checkbox-label:hover {
     background-color: rgba(255, 255, 255, 0.1);
 }
+#ui-container input[type="checkbox"]:checked + label.checkbox-label {
+    background-color: #4CAF50; /* Green background when checked */
+    border-color: #3e8e41;
+    color: white;
+}
+#ui-container label.sym-label { /* Specific styling for "Symmetrical" to make it less wide */
+    padding: 4px 3px;
+}
+
 
 #ui-container input[type="range"] {
     cursor: pointer;
@@ -182,7 +192,7 @@ canvas {
 
 #group-ruleset {
     display: flex;
-    align-items: left;
+    align-items: center; /* Align items including new checkbox/label */
     flex-wrap: wrap;
 }
 
@@ -211,11 +221,11 @@ canvas {
     font-size: 0.9em;
 }
 
-#ui-container input[type="checkbox"] {
-    margin-right: -2px; /* Adjust spacing next to label */
+/* #ui-container input[type="checkbox"] {  -- We are hiding the default checkbox now
+    margin-right: -2px;
     vertical-align: middle;
-    transform: scale(1.1); /* Slightly larger checkbox */
-}
+    transform: scale(1.1);
+} */
 
 #ui-container button {
     padding: 6px 12px; /* Increased padding for touch */
@@ -331,8 +341,9 @@ canvas {
 }
 
 #rulesetEditorPanel.hidden {
-    display: none;
+    display: none !important; /* Ensure hidden class takes precedence */
 }
+
 
 #closeEditorButton {
     position: absolute;
@@ -351,13 +362,6 @@ canvas {
     color: white;
 }
 
-#rulesetEditorPanel h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    text-align: center;
-    border-bottom: 1px solid #555;
-    padding-bottom: 10px;
-}
 
 .editor-controls {
     display: flex; /* Align input and button in a row */
@@ -365,21 +369,33 @@ canvas {
     align-items: center; /* Vertically align */
     gap: 10px; /* Space between input and button */
     margin-bottom: 15px; /* Space below controls */
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
 }
 
 .editor-controls .editor-hex-input {
     font-family: monospace;
-    font-size: 1.7em; /* Slightly larger for readability */
+    font-size: 1.4em; /* Slightly smaller to fit with select */
     background-color: #222; /* Dark background */
     color: #eee; /* Light text */
     border: 1px solid #555;
     border-radius: 4px;
     padding: 8px 10px;
-    width: 400px; /* Adjust width as needed */
+    width: 320px; /* Adjust width as needed */
     text-align: center;
+    flex-grow: 1; /* Allow input to take more space */
+    min-width: 200px;
 }
 .editor-controls .editor-hex-input::placeholder {
     color: #777;
+}
+
+#rulesetEditorMode {
+    padding: 8px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 0.9em;
 }
 
 
@@ -400,6 +416,7 @@ canvas {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: 8px 12px; /* Match hex input padding for vertical alignment */
 }
 .editor-controls button:hover {
     background-color: #5a5a5a;
@@ -411,26 +428,49 @@ canvas {
 
 
 .editor-text {
-    font-size: 1.0em;
+    font-size: 0.9em; /* Slightly smaller to save space */
     color: #eee;
-    margin: 0 auto 10px auto; /* Add bottom margin */
+    margin: 10px auto 10px auto; /* Adjust margin */
     text-align: left;
-    line-height: 1.0; /* Improve readability */
+    line-height: 1.4; /* Improve readability */
 }
 
 /* --- Ruleset Editor Grid --- */
-#rulesetEditorGrid {
+#rulesetEditorGrid, #neighborCountRulesetEditorGrid {
     display: grid;
-    margin: 0 auto;
+    margin: 0 auto; /* Center the grid */
+    gap: 2px; /* Small gap between rule visualizations */
+    padding: 5px;
+    border: 1px solid #333;
+    background-color: #1a1a1a;
+    border-radius: 4px;
+    overflow: auto; /* If panel itself doesn't scroll enough */
+}
+
+#rulesetEditorGrid {
     grid-template-columns: repeat(16, 42px); /* Responsive grid */
     grid-template-rows: repeat(8, 56px);
-    transform: translate(-28px, -21px);
 }
+
+#neighborCountRulesetEditorGrid {
+    grid-template-columns: repeat(7, 14%); /* Responsive columns */
+    grid-template-rows: auto;
+    width: 95%;
+}
+
+
 /*if width less than 700px switch grid columns to 8 and rows to 16*/
 @media (max-width: 700px) {
     #rulesetEditorGrid {
         grid-template-columns: repeat(8, 42px);
         grid-template-rows: repeat(16, 56px);
+    }
+    .editor-controls .editor-hex-input {
+        font-size: 1.2em;
+        width: 250px;
+    }
+    #neighborCountRulesetEditorGrid {
+         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     }
 }
 
@@ -443,18 +483,52 @@ canvas {
     transform: scale(1.5);
 }
 
-/* --- Individual Rule Visualization --- */
+/* --- Individual Rule Visualization (Detailed) --- */
 .rule-viz {
     position: relative;
     width: 100px; /* Fixed width for consistency */
     height: 110px; /* Fixed height */
     margin: auto; /* Center in grid cell */
-    transform: scale(0.4); /* Scale down slightly if needed */
+    transform: scale(0.4) translate(-70px, -65px); /* Scale down slightly if needed */
     cursor: pointer; /* Add cursor pointer for clickable items */
 }
 
 .rule-viz:hover .inner-hex { /* Add a slight hover effect */
     border-color: #FFF;
+}
+
+/* --- Neighbor Count Rule Visualization --- */
+.neighbor-count-rule-viz {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 5px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: #282828;
+    transition: background-color 0.2s ease;
+    min-height: 80px; /* Min height for consistency */
+    box-sizing: border-box;
+}
+.neighbor-count-rule-viz:hover {
+    background-color: #3a3a3a;
+}
+.neighbor-count-rule-viz .hexagon.center-hex {
+    position: relative; /* Not absolute within this context */
+    transform: scale(0.8) translate(-53px, -53px);
+    margin-bottom: 5px;
+    /* Ensure width/height are applied if base .hexagon doesn't */
+    width: 40px;
+    height: calc(40px * 1.154701);
+}
+.neighbor-count-label {
+    font-size: 0.75em;
+    text-align: center;
+    color: #ccc;
+    margin-top: 3px;
+    line-height: 1.2;
 }
 
 
@@ -476,6 +550,10 @@ canvas {
 .hexagon.state-1 {
     background-color: #FFFF00; /* Yellow for active */
 }
+.hexagon.state-2 { /* For "mixed" states, primarily for inner-hex in neighbor-count view */
+    background: linear-gradient(45deg, #633030, #306330); /* Darker mixed colors */
+}
+
 
 /* Center Hexagon (Remains the same - centered) */
 .center-hex {
@@ -495,6 +573,12 @@ canvas {
     border: 1.0px solid #CCCCCC; /* ALWAYS show border */
     z-index: 2; /* Above center hex */
     transition: background-color 0.2s ease, border-color 0.2s ease; /* Smooth transition */
+}
+.inner-hex.state-0 { background-color: #990000 !important; } /* Use important to override base if needed */
+.inner-hex.state-1 { background-color: #00BB00 !important; }
+.inner-hex.state-2 {
+    background: linear-gradient(45deg, #700000, #005000) !important; /* Darker mixed colors */
+    border-color: #888 !important;
 }
 
 
@@ -542,13 +626,13 @@ canvas {
     border: 1px solid #CCCCCC;
     box-sizing: border-box;
 }
-/* State colors remain the same */
-.inner-hex.state-0 { background-color: #990000; }
-.inner-hex.state-1 { background-color: #00BB00; }
+/* State colors remain the same for inline hex explanation */
+/* .inner-hex.state-0 { background-color: #990000; } -- These are general, apply specific below if needed */
+/* .inner-hex.state-1 { background-color: #00BB00; } */
 .inline-hex.state-0 { background-color: #404040; }
 .inline-hex.state-1 { background-color: #FFFF00; }
-.inline-hex-inner.state-0 { background-color: #990000; }
-.inline-hex-inner.state-1 { background-color: #00BB00; }
+.inline-hex-inner.state-0 { background-color: #990000 !important; }
+.inline-hex-inner.state-1 { background-color: #00BB00 !important; }
 
 /* Added styles for slider value display */
 .slider-container {
@@ -591,3 +675,7 @@ canvas {
 
 /* Make sure to place these before any @media queries if you want them to be general,
    or inside specific media queries if they need to be responsive. */
+
+.hidden {
+    display: none !important;
+}

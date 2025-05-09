@@ -80,6 +80,21 @@ export function initSimulation() {
     console.log(`Simulation initialized with ${Config.NUM_WORLDS} worlds.`);
 }
 
+/**
+ * Counts the number of set bits (1s) in a 6-bit number.
+ * @param {number} n The number (0-63).
+ * @returns {number} The count of set bits.
+ */
+function countSetBits(n) {
+    let count = 0;
+    for (let i = 0; i < 6; i++) { // Check 6 bits for neighbors
+        if ((n >> i) & 1) {
+            count++;
+        }
+    }
+    return count;
+}
+
 
 // --- Simulation Step Logic ---
 
@@ -192,20 +207,97 @@ export function stepSimulation(timeDelta) {
 
 // --- Ruleset Management ---
 
-export function generateRandomRuleset(bias = 0.5) {
-    console.log("Generating random ruleset with bias:", bias);
-    for (let i = 0; i < 128; i++) {
-        currentRuleset[i] = Math.random() < bias ? 1 : 0;
-    }
-    // Ensure non-flickering (optional)
-     if (currentRuleset[0] === 1 && currentRuleset[127] === 0) {
-       if(Math.random() < 0.5) currentRuleset[127] = 1; else currentRuleset[0] = 0;
-    } else if (currentRuleset[0] === 0 && currentRuleset[127] === 1) {
-       if(Math.random() < 0.5) currentRuleset[127] = 0; else currentRuleset[0] = 1;
+/**
+ * Generates a random ruleset.
+ * @param {number} [bias=0.5] Probability of a rule outputting 1.
+ * @param {boolean} [generateSymmetrically=false] If true, generates rules based on neighbor count.
+ */
+export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false) {
+    console.log(`Generating random ruleset with bias: ${bias}, symmetrical: ${generateSymmetrically}`);
+    if (generateSymmetrically) {
+        for (let centerState = 0; centerState <= 1; centerState++) {
+            for (let numActiveNeighbors = 0; numActiveNeighbors <= 6; numActiveNeighbors++) {
+                const randomOutput = Math.random() < bias ? 1 : 0;
+                // Internal call to set rules for this condition without repeatedly updating hex
+                _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, randomOutput);
+            }
+        }
+    } else {
+        for (let i = 0; i < 128; i++) {
+            currentRuleset[i] = Math.random() < bias ? 1 : 0;
+        }
+        // Ensure non-flickering (optional)
+        if (currentRuleset[0] === 1 && currentRuleset[127] === 0) {
+            if (Math.random() < 0.5) currentRuleset[127] = 1; else currentRuleset[0] = 0;
+        } else if (currentRuleset[0] === 0 && currentRuleset[127] === 1) {
+            if (Math.random() < 0.5) currentRuleset[127] = 0; else currentRuleset[0] = 1;
+        }
     }
     currentRulesetHex = rulesetToHex(currentRuleset); // Update hex cache
     console.log("Generated random ruleset:", currentRulesetHex);
 }
+
+
+/**
+ * Internal function to set rules based on neighbor count condition without updating hex.
+ * @param {0|1} centerState The state of the center cell.
+ * @param {number} numActiveNeighbors The number of active neighbors (0-6).
+ * @param {0|1} outputState The desired output state for this condition.
+ */
+function _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, outputState) {
+    if (centerState !== 0 && centerState !== 1) return;
+    if (numActiveNeighbors < 0 || numActiveNeighbors > 6) return;
+    if (outputState !== 0 && outputState !== 1) return;
+
+    for (let neighborMask = 0; neighborMask < 64; neighborMask++) { // 2^6 = 64
+        if (countSetBits(neighborMask) === numActiveNeighbors) {
+            const ruleIndex = (centerState << 6) | neighborMask;
+            currentRuleset[ruleIndex] = outputState;
+        }
+    }
+}
+
+/**
+ * Sets all rules matching a specific center state and neighbor count to a given output state.
+ * @param {0|1} centerState The state of the center cell.
+ * @param {number} numActiveNeighbors The number of active neighbors (0-6).
+ * @param {0|1} outputState The desired output state for this condition.
+ */
+export function setRulesForNeighborCountCondition(centerState, numActiveNeighbors, outputState) {
+    _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, outputState);
+    currentRulesetHex = rulesetToHex(currentRuleset); // Update hex after setting
+    console.log(`Rules set for C=${centerState}, N=${numActiveNeighbors} -> ${outputState}. New hex: ${currentRulesetHex}`);
+}
+
+/**
+ * Determines the effective output state for a rule defined by center state and neighbor count.
+ * @param {0|1} centerState The state of the center cell.
+ * @param {number} numActiveNeighbors The number of active neighbors (0-6).
+ * @returns {0|1|2} The output state (0 or 1), or 2 if rules are mixed ("indeterminate").
+ */
+export function getEffectiveRuleForNeighborCount(centerState, numActiveNeighbors) {
+    if (centerState !== 0 && centerState !== 1) return 2; // Invalid input
+    if (numActiveNeighbors < 0 || numActiveNeighbors > 6) return 2; // Invalid input
+
+    let firstOutput = -1;
+    let ruleFound = false;
+
+    for (let neighborMask = 0; neighborMask < 64; neighborMask++) {
+        if (countSetBits(neighborMask) === numActiveNeighbors) {
+            ruleFound = true;
+            const ruleIndex = (centerState << 6) | neighborMask;
+            const currentOutput = currentRuleset[ruleIndex];
+
+            if (firstOutput === -1) {
+                firstOutput = currentOutput;
+            } else if (firstOutput !== currentOutput) {
+                return 2; // Mixed states
+            }
+        }
+    }
+    return ruleFound ? firstOutput : 2; // If no rule matched (shouldn't happen for valid counts), treat as mixed.
+}
+
 
 export function rulesetToHex(rulesetArray) {
     let binaryString = "";

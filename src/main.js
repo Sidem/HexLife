@@ -48,7 +48,7 @@ async function initialize() {
         },
         setSpeed: Simulation.setSimulationSpeed,
         setNeighborhoodSize: (size) => { neighborhoodSize = size; },
-        generateRandomRuleset: Simulation.generateRandomRuleset,
+        generateRandomRuleset: (bias, symmetrical) => Simulation.generateRandomRuleset(bias, symmetrical), // MODIFIED
         getCurrentRulesetHex: Simulation.getCurrentRulesetHex,
         getCurrentRulesetArray: Simulation.getCurrentRulesetArray,
         setRuleset: Simulation.setRuleset,
@@ -60,6 +60,9 @@ async function initialize() {
         // New functions for editor interaction
         toggleRuleOutputState: Simulation.toggleRuleOutputState,
         setAllRulesState: Simulation.setAllRulesState,
+        // Functions for neighbor count mode
+        setRulesForNeighborCountCondition: Simulation.setRulesForNeighborCountCondition, // NEW
+        getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount, // NEW
     };
 
     if (!UI.initUI(simulationInterface)) {
@@ -67,7 +70,7 @@ async function initialize() {
         return;
     }
 
-    UI.refreshAllRulesetViews(Simulation);
+    UI.refreshAllRulesetViews(simulationInterface); // Pass sim interface
     UI.updatePauseButton(Simulation.isSimulationPaused());
 
     setupCanvasListeners(canvas);
