@@ -14,7 +14,7 @@ const NEIGHBOR_DIRS_EVEN_R = [ // For even columns
 // --- Module State ---
 
 let worldsData = []; // Array to hold data for each world instance
-// Each element: { jsStateArray, jsNextStateArray, jsHoverStateArray, stats: { ratio, avgRatio, history } }
+// Each element: { jsStateArray, jsNextStateArray, jsHoverStateArray, jsRuleIndexArray, jsNextRuleIndexArray, stats: { ratio, avgRatio, history } }
 
 let currentRuleset = new Uint8Array(128);
 let currentRulesetHex = "N/A";
@@ -38,6 +38,8 @@ export function initSimulation() {
         const jsStateArray = new Uint8Array(Config.NUM_CELLS);
         const jsNextStateArray = new Uint8Array(Config.NUM_CELLS);
         const jsHoverStateArray = new Uint8Array(Config.NUM_CELLS); // For hover effect
+        const jsRuleIndexArray = new Uint8Array(Config.NUM_CELLS); // To store the rule that caused the current state
+        const jsNextRuleIndexArray = new Uint8Array(Config.NUM_CELLS); // To store the rule for the next state
 
         // Initialize state based on density
         const density = Config.INITIAL_DENSITIES[i] ?? 0; // Use configured density or 0
@@ -45,9 +47,11 @@ export function initSimulation() {
         for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
             const state = Math.random() < density ? 1 : 0;
             jsStateArray[cellIdx] = state;
+            jsRuleIndexArray[cellIdx] = 0; // Default rule index (e.g., rule 0) for initial state
             if (state === 1) activeCount++;
         }
         jsNextStateArray.fill(0);
+        jsNextRuleIndexArray.fill(0);
         jsHoverStateArray.fill(0);
 
         // Initialize statistics
@@ -62,6 +66,8 @@ export function initSimulation() {
             jsStateArray,
             jsNextStateArray,
             jsHoverStateArray,
+            jsRuleIndexArray,
+            jsNextRuleIndexArray,
             stats
         });
     }
@@ -107,7 +113,7 @@ function runSingleStepForAllWorlds() {
 
     for (let worldIdx = 0; worldIdx < worldsData.length; worldIdx++) {
         const world = worldsData[worldIdx];
-        const { jsStateArray, jsNextStateArray } = world;
+        const { jsStateArray, jsNextStateArray, jsNextRuleIndexArray } = world;
         let activeCount = 0;
 
         for (let i = 0; i < Config.NUM_CELLS; i++) {
@@ -141,6 +147,7 @@ function runSingleStepForAllWorlds() {
             const ruleIndex = (centerState << 6) | neighborStatesBitmask;
             const nextState = currentRuleset[ruleIndex];
             jsNextStateArray[i] = nextState;
+            jsNextRuleIndexArray[i] = ruleIndex; // Store the rule index
 
             if (nextState === 1) {
                 activeCount++;
@@ -149,6 +156,7 @@ function runSingleStepForAllWorlds() {
 
         updateWorldStats(world, activeCount);
         world.jsStateArray.set(world.jsNextStateArray);
+        world.jsRuleIndexArray.set(world.jsNextRuleIndexArray); // Update the main rule index array
     }
 }
 
@@ -520,6 +528,10 @@ export function applyBrush(worldIndex, col, row, brushSize) {
     if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
     const world = worldsData[worldIndex];
     const stateArray = world.jsStateArray;
+    // When manually painting, we don't have a specific "rule" that caused this state change.
+    // We can assign a default rule index (e.g., 0 or a special value like -1 if we want to distinguish).
+    // For simplicity, let's use rule 0.
+    const ruleIndexArray = world.jsRuleIndexArray;
     let changed = false;
 
     const affectedIndices = findHexagonsInNeighborhood(col, row, brushSize);
@@ -527,6 +539,7 @@ export function applyBrush(worldIndex, col, row, brushSize) {
     for (const index of affectedIndices) {
         if (index >= 0 && index < stateArray.length) {
             stateArray[index] = 1 - stateArray[index]; // Toggle
+            ruleIndexArray[index] = 0; // Assign default rule for manual toggle
             changed = true;
         }
     }
@@ -594,7 +607,9 @@ export function loadWorldState(worldIndex, stateData) {
 
      const world = worldsData[worldIndex];
      world.jsStateArray = Uint8Array.from(stateData.state);
+     world.jsRuleIndexArray.fill(0); // Reset rule indices to default on load
      world.jsNextStateArray.fill(0); // Clear next state
+     world.jsNextRuleIndexArray.fill(0);
      world.jsHoverStateArray.fill(0); // Clear hover state
 
      // Load associated ruleset if present
@@ -626,6 +641,7 @@ export function getWorldStateForSave(worldIndex) {
         cols: Config.GRID_COLS,
         ruleset: currentRulesetHex,
         state: Array.from(world.jsStateArray) // Convert to standard array for JSON
+        // Not saving jsRuleIndexArray as it's determined by the ruleset and state
     };
 }
 
@@ -648,7 +664,7 @@ export function resetAllWorldStates() {
             world.jsStateArray[middleIndex] = 1;
             activeCount = 1;
         } else if (density === 1) {
-            world.jsStateArray.fill(1); 
+            world.jsStateArray.fill(1);
             world.jsStateArray[middleIndex] = 0;
             activeCount = Config.NUM_CELLS - 1;
         } else {
@@ -658,7 +674,9 @@ export function resetAllWorldStates() {
                 if (state === 1) activeCount++;
             }
         }
+        world.jsRuleIndexArray.fill(0); // Reset rule indices
         world.jsNextStateArray.fill(0); // Clear next state buffer
+        world.jsNextRuleIndexArray.fill(0); // Clear next rule index buffer
         world.jsHoverStateArray.fill(0); // Clear hover state
 
         // Reset statistics

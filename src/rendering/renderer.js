@@ -26,7 +26,7 @@ let worldFBOs = []; // Array of { fbo: WebGLFramebuffer, texture: WebGLTexture }
 let lineBuffer;
 
 // Buffers & VAOs
-let hexBuffers; // { positionBuffer, offsetBuffer, stateBuffer, hoverStateBuffer }
+let hexBuffers; // { positionBuffer, offsetBuffer, stateBuffer, hoverStateBuffer, ruleIndexBuffer }
 let quadBuffers; // { positionBuffer, texCoordBuffer }
 let hexVAO;
 let quadVAO;
@@ -61,14 +61,16 @@ export async function initRenderer(canvasElement) {
         instanceOffset: gl.getAttribLocation(hexShaderProgram, "a_instance_offset"),
         instanceState: gl.getAttribLocation(hexShaderProgram, "a_instance_state"),
         instanceHoverState: gl.getAttribLocation(hexShaderProgram, "a_instance_hover_state"),
+        instanceRuleIndex: gl.getAttribLocation(hexShaderProgram, "a_instance_rule_index"), // NEW
     };
     hexUniformLocations = {
         resolution: gl.getUniformLocation(hexShaderProgram, "u_resolution"),
         hexSize: gl.getUniformLocation(hexShaderProgram, "u_hexSize"),
-        fillColor: gl.getUniformLocation(hexShaderProgram, "u_fillColor"),
-        hoverEmptyFillColor: gl.getUniformLocation(hexShaderProgram, "u_hoverEmptyFillColor"),
-        hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
-        hoverBorderColor: gl.getUniformLocation(hexShaderProgram, "u_hoverBorderColor"),
+        // FILL_COLOR and hover uniforms might be deprecated by new fragment shader logic
+        // fillColor: gl.getUniformLocation(hexShaderProgram, "u_fillColor"),
+        // hoverEmptyFillColor: gl.getUniformLocation(hexShaderProgram, "u_hoverEmptyFillColor"),
+        // hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
+        // hoverBorderColor: gl.getUniformLocation(hexShaderProgram, "u_hoverBorderColor"),
     };
 
     // --- Get Locations for Quad Shader ---
@@ -120,10 +122,11 @@ function setupHexBuffersAndVAO() {
     }
     hexBuffers.offsetBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, instanceOffsets, gl.STATIC_DRAW);
 
-    // 3. Instance State & Hover Buffers (Dynamic - sized for one world)
+    // 3. Instance State, Hover & RuleIndex Buffers (Dynamic - sized for one world)
     const initialZeros = new Float32Array(Config.NUM_CELLS).fill(0.0);
     hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZeros, gl.DYNAMIC_DRAW);
     hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZeros, gl.DYNAMIC_DRAW);
+    hexBuffers.ruleIndexBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZeros, gl.DYNAMIC_DRAW); // NEW
 
     // 4. Setup Hex VAO
     hexVAO = gl.createVertexArray();
@@ -151,6 +154,13 @@ function setupHexBuffersAndVAO() {
     gl.enableVertexAttribArray(hexAttributeLocations.instanceHoverState);
     gl.vertexAttribPointer(hexAttributeLocations.instanceHoverState, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(hexAttributeLocations.instanceHoverState, 1);
+
+    // Rule Index Attribute (per instance) - NEW
+    gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.ruleIndexBuffer);
+    gl.enableVertexAttribArray(hexAttributeLocations.instanceRuleIndex);
+    gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(hexAttributeLocations.instanceRuleIndex, 1);
+
 
     gl.bindVertexArray(null); // Unbind VAO
 }
@@ -212,10 +222,11 @@ function renderWorldsToTextures(worldsData) {
     const textureHexSize = Utils.calculateHexSizeForTexture();
     gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
     gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
-    gl.uniform4fv(hexUniformLocations.fillColor, Config.FILL_COLOR);
-    gl.uniform4fv(hexUniformLocations.hoverEmptyFillColor, Config.HOVER_EMPTY_FILL_COLOR);
-    gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
-    gl.uniform4fv(hexUniformLocations.hoverBorderColor, Config.HOVER_BORDER_COLOR);
+    // The following color uniforms are likely no longer needed if fragment shader handles all coloring
+    // gl.uniform4fv(hexUniformLocations.fillColor, Config.FILL_COLOR);
+    // gl.uniform4fv(hexUniformLocations.hoverEmptyFillColor, Config.HOVER_EMPTY_FILL_COLOR);
+    // gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
+    // gl.uniform4fv(hexUniformLocations.hoverBorderColor, Config.HOVER_BORDER_COLOR);
 
     // Set viewport for rendering into textures
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
@@ -227,12 +238,16 @@ function renderWorldsToTextures(worldsData) {
         // Update the shared instance buffers with this world's data
         const gpuState = new Float32Array(Config.NUM_CELLS);
         const gpuHover = new Float32Array(Config.NUM_CELLS);
+        const gpuRuleIndex = new Float32Array(Config.NUM_CELLS); // NEW
+
         for(let j=0; j < Config.NUM_CELLS; j++) {
             gpuState[j] = world.jsStateArray[j];
             gpuHover[j] = world.jsHoverStateArray[j];
+            gpuRuleIndex[j] = world.jsRuleIndexArray[j]; // NEW
         }
         WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, gpuState);
         WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, gpuHover);
+        WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, gpuRuleIndex); // NEW
 
         // Bind FBO and render
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);

@@ -6,12 +6,14 @@ layout (location=0) in vec2 a_position;
 // Attributes per instance
 layout (location=1) in vec2 a_instance_offset;
 layout (location=2) in float a_instance_state;
-layout (location=3) in float a_instance_hover_state; // <-- ADDED attribute input
+layout (location=3) in float a_instance_hover_state;
+layout (location=4) in float a_instance_rule_index; // NEW attribute
 
 // Output to fragment shader
 out float v_state;
 out vec2 v_localPos;
-out float v_hover_state; // <-- ADDED varying output
+out float v_hover_state;
+out float v_rule_index; // NEW varying
 
 // Uniforms
 uniform vec2 u_resolution;
@@ -29,5 +31,6 @@ void main() {
 
   // Pass values to fragment shader
   v_state = a_instance_state;
-  v_hover_state = a_instance_hover_state; // <-- ASSIGN attribute value to varying output
+  v_hover_state = a_instance_hover_state;
+  v_rule_index = a_instance_rule_index; // Pass rule index
 }

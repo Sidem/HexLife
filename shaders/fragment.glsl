@@ -1,55 +1,51 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
-// Varying inputs from Vertex Shader
-in float v_state;
-in vec2 v_localPos;
-in float v_hover_state;
+// Varyings from vertex shader
+in float v_state;         // 0.0 (inactive) or 1.0 (active)
+in float v_hover_state;   // 0.0 (no hover) or 1.0 (hover)
+in float v_rule_index;    // Rule index (0-127)
+
+// Uniforms for hover effects (from config.js)
+uniform vec4 u_hoverEmptyFillColor;   // Color for hovering over an empty cell
+uniform float u_hoverFilledDarkenFactor; // Factor to darken active cells on hover
 
 out vec4 outColor;
 
-// Uniforms
-uniform float u_hexSize;
-uniform vec4 u_fillColor;
-uniform vec4 u_hoverBorderColor;
-uniform vec4 u_hoverEmptyFillColor;
-uniform float u_hoverFilledDarkenFactor;
-
-// Signed Distance Function
-float signedDistToHexEdgeFlatTop( vec2 p, float size ) {
-    vec2 p_abs = abs(p);
-    float hexHalfHeight = size * sqrt(3.0) * 0.5;
-    vec2 k_diag_normal = vec2(0.86602540378, 0.5); // cos(30), sin(30)
-    float proj_y = p_abs.y;
-    float proj_diag = dot(k_diag_normal, p_abs);
-    return hexHalfHeight - max(proj_y, proj_diag); // distance from point to closest edge (positive inside)
+// Function to convert HSV to RGB
+// H: 0-1, S: 0-1, V: 0-1
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
 void main() {
-    float distanceToEdge = signedDistToHexEdgeFlatTop(v_localPos, u_hexSize);
+    vec3 base_color_rgb;
 
-    if (distanceToEdge < 0.0) {
-        discard;
+    float hue_offset = 60.0 / 360.0; // Offset for yellow (approx 0.1667)
+    float calculated_hue = v_rule_index / 128.0;
+    float hue = mod(calculated_hue + hue_offset, 1.0); // Add offset and wrap around
+
+    if (v_state == 1.0) { // Active cell
+        float saturation = 1.0;
+        float value = 1.0;
+        base_color_rgb = hsv2rgb(vec3(hue, saturation, value));
+    } else { // Inactive cell
+        float saturation = 0.5;
+        float value = 0.2;
+        // Inactive cells will also use the shifted hue
+        base_color_rgb = hsv2rgb(vec3(hue, saturation, value));
     }
 
-    vec4 currentFillColor = u_fillColor;
-    bool isFilled = v_state > 0.5;
-    bool isHovered = v_hover_state > 0.5;
-
-    if (isHovered) {
-        if (isFilled) {
-            currentFillColor.rgb *= u_hoverFilledDarkenFactor;
+    // Apply hover effect
+    if (v_hover_state == 1.0) {
+        if (v_state == 1.0) { // Hovering over an active cell
+            base_color_rgb *= u_hoverFilledDarkenFactor; // Darken existing color
+        } else { // Hovering over an inactive cell
+            base_color_rgb = u_hoverEmptyFillColor.rgb; // Use the specific hover color for empty
         }
     }
 
-    if (isFilled) {
-        outColor = currentFillColor;
-    } else if (isHovered && !isFilled) {
-        outColor = u_hoverEmptyFillColor;
-    } else {
-        // Empty, non-hovered cells are not drawn
-        discard;
-    }
-
-    outColor = clamp(outColor, 0.0, 1.0);
+    outColor = vec4(base_color_rgb, 1.0);
 }
