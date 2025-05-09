@@ -2,6 +2,15 @@
 import * as Config from './config.js';
 import { indexToCoords, coordsToIndex } from '../utils/utils.js'; // Use map from utils
 
+const NEIGHBOR_DIRS_ODD_R = [ // For odd columns (col % 2 !== 0)
+    [+1,  0], [+1, +1], [ 0, +1], // Right, Bottom-right, Bottom
+    [-1, +1], [-1,  0], [ 0, -1]  // Bottom-left, Left, Top-left
+];
+
+const NEIGHBOR_DIRS_EVEN_R = [ // For even columns
+    [+1, -1], [+1,  0], [ 0, +1], // Top-right, Right, Bottom-right
+    [-1,  0], [-1, -1], [ 0, -1]  // Left, Top-left, Top
+];
 // --- Module State ---
 
 let worldsData = []; // Array to hold data for each world instance
@@ -78,29 +87,39 @@ export function initSimulation() {
  * Performs a single simulation step update for all worlds. (Internal)
  */
 function runSingleStepForAllWorlds() {
+    const numCols = Config.GRID_COLS; // Cache for minor optimization
+    const numRows = Config.GRID_ROWS; // Cache
+
     for (let worldIdx = 0; worldIdx < worldsData.length; worldIdx++) {
         const world = worldsData[worldIdx];
         const { jsStateArray, jsNextStateArray } = world;
         let activeCount = 0;
 
         for (let i = 0; i < Config.NUM_CELLS; i++) {
-            const centerCoords = indexToCoords(i);
-            if (!centerCoords) continue;
-
+            const centerCol = i % numCols;
+            const centerRow = Math.floor(i / numCols);
             const centerState = jsStateArray[i];
             let neighborStatesBitmask = 0;
-            const potentialNeighbors = getNeighbors(centerCoords.col, centerCoords.row);
+
+            // Inlined getNeighbors logic for maximum efficiency in this critical loop
+            const base_dirs = (centerCol % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
 
             for (let neighborOrder = 0; neighborOrder < 6; neighborOrder++) {
-                const [nCol, nRow] = potentialNeighbors[neighborOrder] || [null, null];
-                if (nCol !== null) {
-                    const wrappedNCol = (nCol % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
-                    const wrappedNRow = (nRow % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
-                    const neighborMapIndex = coordsToIndex(wrappedNCol, wrappedNRow);
+                const dCol = base_dirs[neighborOrder][0];
+                const dRow = base_dirs[neighborOrder][1];
 
-                    if (neighborMapIndex !== undefined && jsStateArray[neighborMapIndex] === 1) {
-                        neighborStatesBitmask |= (1 << neighborOrder);
-                    }
+                const nCol = centerCol + dCol;
+                const nRow = centerRow + dRow;
+
+                // Toroidal wrapping
+                const wrappedNCol = (nCol % numCols + numCols) % numCols;
+                const wrappedNRow = (nRow % numRows + numRows) % numRows;
+
+                // Inlined coordsToIndex, valid index is guaranteed by wrapping
+                const neighborMapIndex = wrappedNRow * numCols + wrappedNCol;
+
+                if (jsStateArray[neighborMapIndex] === 1) {
+                    neighborStatesBitmask |= (1 << neighborOrder);
                 }
             }
 
@@ -113,10 +132,7 @@ function runSingleStepForAllWorlds() {
             }
         }
 
-        // Update stats after calculating next state
         updateWorldStats(world, activeCount);
-
-        // Swap buffers (copy next state to current state)
         world.jsStateArray.set(world.jsNextStateArray);
     }
 }
@@ -277,28 +293,16 @@ export function setAllRulesState(targetState) {
 
 /**
  * Gets potential neighbor coordinates for a given cell. (Flat-top, odd-r layout)
+ * Uses precomputed direction arrays.
  * @param {number} col Column index.
  * @param {number} row Row index.
  * @returns {Array<[number, number]>} Array of [col, row] pairs for neighbors.
  */
-function getNeighbors(col, row) {
-    let neighbor_dirs;
-     // Using odd-r layout directions from previous Java code logic
-    if (col % 2 !== 0) { // Odd column (shifted down)
-        neighbor_dirs = [
-            [+1,  0], [+1, +1], [ 0, +1], // Right, Bottom-right, Bottom
-            [-1, +1], [-1,  0], [ 0, -1]  // Bottom-left, Left, Top-left
-        ];
-    } else { // Even column
-        neighbor_dirs = [
-            [+1, -1], [+1,  0], [ 0, +1], // Top-right, Right, Bottom-right
-            [-1,  0], [-1, -1], [ 0, -1]  // Left, Top-left, Top
-        ];
-    }
-
-    const neighbors = [];
-    for (const [dCol, dRow] of neighbor_dirs) {
-        neighbors.push([col + dCol, row + dRow]);
+function getNeighbors(col, row) { // This function is still used by findHexagonsInNeighborhood
+    const base_dirs = (col % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
+    const neighbors = []; // Array creation is necessary here
+    for (let i = 0; i < 6; i++) { // Loop 6 times explicitly
+        neighbors.push([col + base_dirs[i][0], row + base_dirs[i][1]]);
     }
     return neighbors;
 }
@@ -546,10 +550,21 @@ export function resetAllWorldStates() {
         const density = Config.INITIAL_DENSITIES[i] ?? 0;
         let activeCount = 0;
 
-        for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
-            const state = Math.random() < density ? 1 : 0;
-            world.jsStateArray[cellIdx] = state; // Reset state
-            if (state === 1) activeCount++;
+        const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
+        if (density === 0) {
+            world.jsStateArray.fill(0);
+            world.jsStateArray[middleIndex] = 1;
+            activeCount = 1;
+        } else if (density === 1) {
+            world.jsStateArray.fill(1); 
+            world.jsStateArray[middleIndex] = 0;
+            activeCount = Config.NUM_CELLS - 1;
+        } else {
+            for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
+                const state = Math.random() < density ? 1 : 0;
+                world.jsStateArray[cellIdx] = state;
+                if (state === 1) activeCount++;
+            }
         }
         world.jsNextStateArray.fill(0); // Clear next state buffer
         world.jsHoverStateArray.fill(0); // Clear hover state

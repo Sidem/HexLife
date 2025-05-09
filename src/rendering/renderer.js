@@ -66,11 +66,8 @@ export async function initRenderer(canvasElement) {
         resolution: gl.getUniformLocation(hexShaderProgram, "u_resolution"),
         hexSize: gl.getUniformLocation(hexShaderProgram, "u_hexSize"),
         fillColor: gl.getUniformLocation(hexShaderProgram, "u_fillColor"),
-        borderColor: gl.getUniformLocation(hexShaderProgram, "u_borderColor"),
-        borderThickness: gl.getUniformLocation(hexShaderProgram, "u_borderThickness"),
         hoverEmptyFillColor: gl.getUniformLocation(hexShaderProgram, "u_hoverEmptyFillColor"),
         hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
-        hoverFillColor: gl.getUniformLocation(hexShaderProgram, "u_hoverFillColor"),
         hoverBorderColor: gl.getUniformLocation(hexShaderProgram, "u_hoverBorderColor"),
     };
 
@@ -216,11 +213,8 @@ function renderWorldsToTextures(worldsData) {
     gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
     gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
     gl.uniform4fv(hexUniformLocations.fillColor, Config.FILL_COLOR);
-    gl.uniform4fv(hexUniformLocations.borderColor, Config.BORDER_COLOR);
-    gl.uniform1f(hexUniformLocations.borderThickness, Config.BORDER_THICKNESS);
     gl.uniform4fv(hexUniformLocations.hoverEmptyFillColor, Config.HOVER_EMPTY_FILL_COLOR);
     gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
-    gl.uniform4fv(hexUniformLocations.hoverFillColor, Config.HOVER_FILL_COLOR);
     gl.uniform4fv(hexUniformLocations.hoverBorderColor, Config.HOVER_BORDER_COLOR);
 
     // Set viewport for rendering into textures

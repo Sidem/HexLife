@@ -220,7 +220,7 @@ function setupControlListeners(sim) {
     }
     if (uiElements.biasSlider) {
         uiElements.biasSlider.addEventListener('input', (event) => {
-            uiElements.biasValueSpan.textContent = parseFloat(event.target.value).toFixed(2);
+            uiElements.biasValueSpan.textContent = parseFloat(event.target.value).toFixed(3);
         });
     }
 
@@ -366,13 +366,6 @@ function setupEditorListeners(sim) {
     uiElements.closeEditorButton.addEventListener('click', () => {
         uiElements.rulesetEditorPanel.classList.add('hidden');
     });
-
-    // REMOVED: Click outside to close panel behavior
-    // uiElements.rulesetEditorPanel.addEventListener('click', (event) => {
-    //     if (event.target === uiElements.rulesetEditorPanel) {
-    //         uiElements.rulesetEditorPanel.classList.add('hidden');
-    //     }
-    // });
 
     uiElements.rulesetEditorGrid.addEventListener('click', (event) => {
         const ruleVizElement = event.target.closest('.rule-viz');
