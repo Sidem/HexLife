@@ -1,4 +1,5 @@
 // src/ui/components/RulesetEditor.js
+import * as Config from '../../core/config.js'; // For localStorage keys
 import { DraggablePanel } from './DraggablePanel.js';
 
 export class RulesetEditor {
@@ -15,25 +16,24 @@ export class RulesetEditor {
         this.panelElement = panelElement;
         this.simInterface = simulationInterface;
         this.uiElements = {
-            closeButton: this.panelElement.querySelector('#closeEditorButton'),
+            closeButton: this.panelElement.querySelector('#closeEditorButton') || this.panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: this.panelElement.querySelector('#editorRulesetInput'),
             clearRulesButton: this.panelElement.querySelector('#clearRulesButton'),
             rulesetEditorMode: this.panelElement.querySelector('#rulesetEditorMode'),
             rulesetEditorGrid: this.panelElement.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: this.panelElement.querySelector('#neighborCountRulesetEditorGrid'),
-            // Add any other elements specifically managed by this component
         };
 
-        // Validate essential elements
         for (const key in this.uiElements) {
             if (!this.uiElements[key]) {
                 console.warn(`RulesetEditor: UI element '${key}' not found within the panel.`);
             }
         }
 
-        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3'); // Assuming 'h3' is the drag handle
+        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
+        this._loadPanelState(); // Load position and open/closed state
         this._setupInternalListeners();
-        this.refreshViews(); // Initial population of views
+        // refreshViews will be called by show/toggle or explicitly if needed
     }
 
     _setupInternalListeners() {
@@ -53,7 +53,7 @@ export class RulesetEditor {
                 const isCurrentlyAllInactive = currentArr.every(state => state === 0);
                 const targetState = isCurrentlyAllInactive ? 1 : 0;
                 this.simInterface.setAllRulesState(targetState);
-                this.refreshViews(); // Refresh to show updated state
+                this.refreshViews();
             });
         }
 
@@ -61,7 +61,7 @@ export class RulesetEditor {
             if (!this.uiElements.editorRulesetInput) return;
             const hexString = this.uiElements.editorRulesetInput.value.trim().toUpperCase();
             if (!hexString) {
-                this.refreshViews(); // Revert to current ruleset hex if cleared
+                this.refreshViews();
                 return;
             }
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
@@ -69,10 +69,10 @@ export class RulesetEditor {
             } else {
                 const success = this.simInterface.setRuleset(hexString);
                 if (!success) {
-                    alert("Error setting ruleset from editor. The ruleset might have been rejected.\nReverting to current ruleset.");
+                     alert("Error setting ruleset from editor. The ruleset might have been rejected.\nReverting to current ruleset.");
                 }
             }
-            this.refreshViews(); // Refresh to show (potentially new) current ruleset
+            this.refreshViews();
         };
 
         if (this.uiElements.editorRulesetInput) {
@@ -93,17 +93,15 @@ export class RulesetEditor {
                     const ruleIndex = parseInt(ruleVizElement.dataset.ruleIndex, 10);
                     if (!isNaN(ruleIndex)) {
                         this.simInterface.toggleRuleOutputState(ruleIndex);
-                        this.refreshViews(); // Update the visuals
+                        this.refreshViews();
                     }
                 }
             });
         }
-        // Listener for neighborCountRulesetEditorGrid will be added in _populateNeighborCountGrid
-        // as its elements are dynamically created.
     }
 
     refreshViews() {
-        if (!this.simInterface) return;
+        if (!this.simInterface || this.panelElement.classList.contains('hidden')) return;
 
         const currentHex = this.simInterface.getCurrentRulesetHex();
         const currentArr = this.simInterface.getCurrentRulesetArray();
@@ -115,6 +113,7 @@ export class RulesetEditor {
     }
 
     _updateEditorGrids(rulesetArray) {
+        // ... (rest of _updateEditorGrids, _populateDetailedGrid, _populateNeighborCountGrid unchanged from before)
         if (!this.uiElements.rulesetEditorMode || !this.uiElements.rulesetEditorGrid || !this.uiElements.neighborCountRulesetEditorGrid) {
             return;
         }
@@ -141,33 +140,25 @@ export class RulesetEditor {
             return;
         }
 
-        grid.innerHTML = ''; // Clear previous content
+        grid.innerHTML = '';
         const fragment = document.createDocumentFragment();
-
         for (let i = 0; i < 128; i++) {
             const centerState = (i >> 6) & 1;
             const neighborMask = i & 0x3F;
             const outputState = rulesetArray[i];
-
             const ruleViz = document.createElement('div');
             ruleViz.className = 'rule-viz';
             ruleViz.title = `Rule ${i}: Input C=${centerState} N=${neighborMask.toString(2).padStart(6, '0')} -> Output C=${outputState}\n(Click inner hex to toggle output)`;
             ruleViz.dataset.ruleIndex = i;
-
             const centerHex = document.createElement('div');
             centerHex.className = `hexagon center-hex state-${centerState}`;
-
             const innerHex = document.createElement('div');
             innerHex.className = `hexagon inner-hex state-${outputState}`;
             centerHex.appendChild(innerHex);
             ruleViz.appendChild(centerHex);
-
             for (let n = 0; n < 6; n++) {
-                // Standard neighbor order for visualization: 0:SE, 1:NE, 2:N, 3:NW, 4:SW, 5:S
-                // This needs to map to the bit order in neighborMask (e.g., bit 0 = neighbor 0, etc.)
                 const neighborState = (neighborMask >> n) & 1;
                 const neighborHex = document.createElement('div');
-                // The class `neighbor-${n}` is for CSS positioning
                 neighborHex.className = `hexagon neighbor-hex neighbor-${n} state-${neighborState}`;
                 ruleViz.appendChild(neighborHex);
             }
@@ -185,76 +176,108 @@ export class RulesetEditor {
             }
             return;
         }
-
-        grid.innerHTML = ''; // Clear previous content
+        grid.innerHTML = '';
         const fragment = document.createDocumentFragment();
-
         for (let centerState = 0; centerState <= 1; centerState++) {
             for (let numActive = 0; numActive <= 6; numActive++) {
                 const effectiveOutput = this.simInterface.getEffectiveRuleForNeighborCount(centerState, numActive);
-
                 const ruleViz = document.createElement('div');
                 ruleViz.className = 'neighbor-count-rule-viz';
                 ruleViz.dataset.centerState = centerState;
                 ruleViz.dataset.numActive = numActive;
-
                 let outputDescription = 'OFF';
                 if (effectiveOutput === 1) outputDescription = 'ON';
                 else if (effectiveOutput === 2) outputDescription = 'MIXED';
-
                 ruleViz.title = `Center ${centerState === 1 ? 'ON' : 'OFF'}, ${numActive} Neighbors ON -> Result ${outputDescription}\n(Click to toggle output batch)`;
-
                 const vizCenterHex = document.createElement('div');
                 vizCenterHex.className = `hexagon center-hex state-${centerState}`;
                 const vizInnerHex = document.createElement('div');
-                // state-2 for mixed, state-1 for ON, state-0 for OFF
                 vizInnerHex.className = `hexagon inner-hex state-${effectiveOutput}`;
                 vizCenterHex.appendChild(vizInnerHex);
-
                 const label = document.createElement('div');
                 label.className = 'neighbor-count-label';
                 label.innerHTML = `Center: ${centerState === 1 ? '<b>ON</b>' : 'OFF'}<br>${numActive}/6 N-ON &rarr; ${outputDescription}`;
-
-                ruleViz.appendChild(label); // Label first for better layout
+                ruleViz.appendChild(label);
                 ruleViz.appendChild(vizCenterHex);
-
-                // Add event listener directly here as elements are created
                 ruleViz.addEventListener('click', () => {
                     const cs = parseInt(ruleViz.dataset.centerState, 10);
                     const na = parseInt(ruleViz.dataset.numActive, 10);
                     const currentEffOutput = this.simInterface.getEffectiveRuleForNeighborCount(cs, na);
-                    // Toggle logic: if 1 or mixed(2), go to 0. If 0, go to 1.
                     const newOutput = (currentEffOutput === 1 || currentEffOutput === 2) ? 0 : 1;
                     this.simInterface.setRulesForNeighborCountCondition(cs, na, newOutput);
-                    this.refreshViews(); // Re-render all rule views
+                    this.refreshViews();
                 });
-
                 fragment.appendChild(ruleViz);
             }
         }
         grid.appendChild(fragment);
     }
 
-    show() {
-        this.draggablePanel.show();
-        this.refreshViews(); // Refresh content when shown
+    _savePanelState() {
+        if (!this.panelElement) return;
+        const state = {
+            isOpen: !this.panelElement.classList.contains('hidden'),
+            x: this.panelElement.style.left,
+            y: this.panelElement.style.top,
+        };
+         try {
+            localStorage.setItem(Config.LS_KEY_RULESET_PANEL_STATE, JSON.stringify(state));
+        } catch (e) {
+            console.error("Error saving ruleset panel state to localStorage:", e);
+        }
     }
 
-    hide() {
+    _loadPanelState() {
+        if (!this.panelElement) return;
+        try {
+            const savedStateJSON = localStorage.getItem(Config.LS_KEY_RULESET_PANEL_STATE);
+            if (savedStateJSON) {
+                const savedState = JSON.parse(savedStateJSON);
+                if (savedState.isOpen) {
+                    this.show(false); // Show without re-saving state immediately
+                } else {
+                    this.hide(false); // Hide without re-saving state immediately
+                }
+                if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
+                if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
+
+                if ((savedState.x || savedState.y) && parseFloat(this.panelElement.style.left) > 0 && parseFloat(this.panelElement.style.top) > 0) {
+                    this.panelElement.style.transform = 'none';
+                } else if (this.panelElement.style.transform === 'none' && savedState.isOpen) {
+                    // If it was open but had no specific position, re-center it
+                    this.panelElement.style.left = '50%';
+                    this.panelElement.style.top = '50%';
+                    this.panelElement.style.transform = 'translate(-50%, -50%)';
+                }
+            } else {
+                this.hide(false); // Default to hidden
+            }
+        } catch (e) {
+            console.error("Error loading ruleset panel state from localStorage:", e);
+            this.hide(false); // Default to hidden
+        }
+    }
+
+    show(saveState = true) {
+        this.draggablePanel.show();
+        this.refreshViews();
+        if (saveState) this._savePanelState();
+    }
+
+    hide(saveState = true) {
         this.draggablePanel.hide();
+        if (saveState) this._savePanelState();
     }
 
     toggle() {
         const nowVisible = this.draggablePanel.toggle();
+        this._savePanelState();
         if (nowVisible) {
             this.refreshViews();
         }
     }
 
-    // Optional: If this component itself could be "destroyed" or removed from UI
     destroy() {
         this.draggablePanel.destroy();
-        // Remove other event listeners added by this component if necessary
-        // For example, if listeners were added to elements outside this.panelElement
     }
 }

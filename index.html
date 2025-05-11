@@ -15,7 +15,7 @@
         <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
 
         <div id="ui-container">
-            <div id="controls-wrapper">
+            <div id="primary-controls-area">
                 <div class="ui-group" id="group-title">
                     <span class="rule-display-wrapper"><code id="rulesetDisplay">N/A</code></span>
                 </div>
@@ -42,7 +42,6 @@
                     <button id="randomRulesetButton" class="button">New Rules</button>
                     <input type="checkbox" id="generateSymmetricalCheckbox" class="checkbox-input" title="Generate rules symmetrically (based on neighbor count)" checked>
                     <label for="generateSymmetricalCheckbox" class="checkbox-label sym-label">Symmetrical</label>
-
                     <div class="bias-controls">
                         <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
@@ -58,13 +57,17 @@
                     <button id="copyRuleButton" class="button" title="Copy current ruleset hex code">Copy</button>
                     <input type="text" id="rulesetInput" class="hex-input" placeholder="32 hex chars">
                     <button id="setRuleButton" class="button">Set</button>
-                    <button id="editRuleButton" class="button" title="Show visual editor for the current ruleset">Edit</button>
+                    <button id="editRuleButton" class="button" title="[E] Show visual editor for the current ruleset">Edit</button>
                 </div>
                 <div class="ui-group" id="group-state">
                     <button id="saveStateButton" class="button" title="Save current grid state">Save</button>
                     <button id="loadStateButton" class="button" title="Load grid state from .json/.txt file">Load</button>
-                    <button id="resetStatesButton" class="button" title="Reset all worlds to initial densities">Reset All</button>
+                    <button id="resetStatesButton" class="button" title="[R] Reset all worlds to initial densities">Reset All</button>
+                    <button id="setupPanelButton" class="button" title="[S] Open world setup panel">[S]etup</button>
                 </div>
+            </div>
+
+            <div id="status-info-area">
                 <div class="ui-group" id="stats-content">
                     <div>Ratio: <span id="stat-ratio">--</span>%</div>
                     <div>Avg: <span id="stat-avg-ratio">--</span>%</div>
@@ -74,33 +77,49 @@
                     <div>TPS: <span id="stat-actual-tps">--</span></div>
                 </div>
             </div>
-
         </div>
 
-        <div id="rulesetEditorPanel" class="hidden"> <button id="closeEditorButton" title="Close Panel">&times;</button> <h3>Ruleset Editor</h3> <div class="editor-controls">
+        <div id="rulesetEditorPanel" class="draggable-panel-base hidden">
+            <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
+            <h3>Ruleset Editor</h3>
+            <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input" placeholder="32 hex chars (e.g., FFFFFF...000000)" title="Current ruleset hex code. Edit and press Enter or click away to apply.">
-                <button id="clearRulesButton" class="button" title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button> <select id="rulesetEditorMode" title="Choose editor mode">
+                <button id="clearRulesButton" class="button" title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
+                <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed" selected>Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 rules)</option>
                 </select>
             </div>
-            <div class="editor-content-area"> <div id="rulesetEditorGrid"></div> <div id="neighborCountRulesetEditorGrid" class="hidden"></div> <div class="editor-text">
+            <div class="editor-content-area">
+                <div id="rulesetEditorGrid"></div>
+                <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
+                <div class="editor-text">
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                     <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
                     <p>Click on a rule's inner hexagon (Detailed) or the whole visualization (Neighbor Count) to toggle its output state.</p>
                     <div class="editor-text-rules">
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive
-                        </p>
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active
-                        </p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes
-                            inactive</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active
-                        </p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div id="setupPanel" class="draggable-panel-base hidden">
+            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
+            <h3>World Setup</h3>
+            <div class="panel-content-area">
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Changes are saved automatically. Click "Apply & Reset" to re-initialize all worlds with the current settings.</p>
+                <div id="worldSetupGrid" class="world-config-grid">
+                    </div>
+                <div class="panel-actions">
+                    <button id="applySetupButton" class="button">Apply & Reset Worlds</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script type="module" src="src/main.js"></script>

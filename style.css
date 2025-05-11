@@ -1,7 +1,7 @@
 /* === 1. RESET/BASE STYLES === */
 body {
     margin: 0;
-    /* overflow: hidden; Removed */ /* This was an intentional change from original, keeping it as user provided */
+    /* overflow: hidden; Removed */
     background-color: #222; /* Dark background */
     font-family: sans-serif;
     color: white;
@@ -10,47 +10,52 @@ body {
 }
 
 /* === 2. LAYOUT STYLES === */
-#app-container { /* NEW */
+#app-container {
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* Allow container to fill body */
-    width: 100%; /* Ensure it takes full width */
-    overflow: hidden; /* Prevent scrollbars within the app */
+    flex-grow: 1;
+    width: 100%;
+    overflow: hidden;
 }
 
-canvas {
-    display: block; /* Remove extra space below canvas */
-    /* width: 100vw; Removed */
-    /* height: 100vh; Removed */
-    width: 100%; /* Take full width of parent */
-    height: 0; /* Allow flex-grow to determine height */
-    flex-grow: 1; /* Allow canvas to take up remaining space */
+canvas#hexGridCanvas {
+    display: block;
+    width: 100%;
+    height: 0;
+    flex-grow: 1;
 }
 
+/* Main UI Bar - Assuming split structure based on last HTML update */
 #ui-container {
     width: 100%;
     box-sizing: border-box;
     background-color: rgba(0, 0, 0, 0.9);
-    padding: 0px 0px;
+    padding: 5px 10px; /* Padding for the whole bar */
     display: flex;
-    align-items: center; /* Align items vertically */
-    justify-content: space-between; /* Push controls and stats apart */
-    gap: 3px; /* Add a small gap between controls and stats (adjust as needed) */
-    flex-wrap: nowrap; /* Prevent wrapping of controls/stats */
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px; /* Gap between primary controls and status info */
+    flex-wrap: nowrap;
     flex-shrink: 0;
     border-top: 1px solid #444;
 }
 
-#controls-wrapper { /* NEW Style for the controls area */
-    width: 85%;
+#primary-controls-area {
+    flex-grow: 1;
     display: flex;
     align-items: center;
-    gap: 15px; /* Gap between control groups */
-    flex-wrap: wrap; /* Allow control groups to wrap */
-    flex-shrink: 1; /* Allow controls to shrink if needed */
-    flex-grow: 1; /* Allow controls to take up available space within 85% */
-    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center; /* Or flex-start */
 }
+
+#status-info-area {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 
 /* === 3. GENERAL UI COMPONENT STYLES === */
 input[type="range"] {
@@ -59,27 +64,24 @@ input[type="range"] {
 	--brightness-hover: 180%;
 	--brightness-down: 80%;
 	--thumb-height: 2.1rem;
-	--thumb-width: 1px; /* This might be a typo in original and intended for border or specific effect */
+	--thumb-width: 1px;
 	--clip-edges: 0.0125em;
 }
-
-input[type="range"] { /* This is a duplicate block in the original, merging for order but keeping rules */
+input[type="range"] {
 	position: relative;
 	background: #fff0;
 	overflow: hidden;
 }
-
 input[type="range"]:active {
-	cursor: pointer; /* Should be grabbing for active state */
+	cursor: grabbing; /* Corrected from 'pointer' */
 }
-
 input[type="range"]:disabled {
 	filter: grayscale(1);
 	opacity: 0.3;
 	cursor: not-allowed;
 }
 
-/* === WebKit specific styles === */
+/* WebKit specific styles for range slider */
 input[type="range"],
 input[type="range"]::-webkit-slider-runnable-track,
 input[type="range"]::-webkit-slider-thumb {
@@ -87,71 +89,55 @@ input[type="range"]::-webkit-slider-thumb {
 	transition: all ease 100ms;
 	height: var(--thumb-height);
 }
-
 input[type="range"]::-webkit-slider-runnable-track,
 input[type="range"]::-webkit-slider-thumb {
 	position: relative;
 }
-
 input[type="range"]::-webkit-slider-thumb {
 	--thumb-radius: calc((var(--thumb-height) * 0.5) - 1px);
-	--clip-top: calc((var(--thumb-height) - var(--track-height)) * 0.5 - 0.5px); /* --track-height not defined here in original */
+	/* Assuming --track-height would be defined if these clip-paths are to work perfectly */
+	/* For now, it might rely on browser defaults or other CSS if --track-height is not set */
+	--clip-top: calc((var(--thumb-height) - var(--track-height, 0.5rem)) * 0.5 - 0.5px);
 	--clip-bottom: calc(var(--thumb-height) - var(--clip-top));
 	--clip-further: calc(100% + 1px);
-	--box-fill: calc(-100vmax - var(--thumb-width, var(--thumb-height))) 0 0
-		100vmax currentColor;
+	--box-fill: calc(-100vmax - var(--thumb-width, var(--thumb-height))) 0 0 100vmax currentColor;
 
 	width: var(--thumb-width, var(--thumb-height));
-	background: linear-gradient(currentColor 0 0) scroll no-repeat left center /
-		50% calc(var(--track-height) + 1px); /* --track-height not defined here in original */
+	background: linear-gradient(currentColor 0 0) scroll no-repeat left center / 50% calc(var(--track-height, 0.5rem) + 1px);
 	background-color: currentColor;
 	box-shadow: var(--box-fill);
 	border-radius: var(--thumb-width, var(--thumb-height));
-
 	filter: brightness(100%);
 	clip-path: polygon(
-		100% -1px,
-		var(--clip-edges) -1px,
-		0 var(--clip-top),
-		-100vmax var(--clip-top),
-		-100vmax var(--clip-bottom),
-		0 var(--clip-bottom),
-		var(--clip-edges) 100%,
+		100% -1px, var(--clip-edges) -1px, 0 var(--clip-top),
+		-100vmax var(--clip-top), -100vmax var(--clip-bottom),
+		0 var(--clip-bottom), var(--clip-edges) 100%,
 		var(--clip-further) var(--clip-further)
 	);
 }
-
 input[type="range"]:hover::-webkit-slider-thumb {
 	filter: brightness(var(--brightness-hover));
 	cursor: grab;
 }
-
 input[type="range"]:active::-webkit-slider-thumb {
 	filter: brightness(var(--brightness-down));
 	cursor: grabbing;
 }
-
 input[type="range"]::-webkit-slider-runnable-track {
-	background: linear-gradient(var(--track-color) 0 0) scroll no-repeat center /
-		100% calc(var(--track-height) + 1px); /* --track-height not defined here in original */
+	background: linear-gradient(var(--track-color) 0 0) scroll no-repeat center / 100% calc(var(--track-height, 0.5rem) + 1px);
 }
-
 input[type="range"]:disabled::-webkit-slider-thumb {
 	cursor: not-allowed;
 }
 
-#ui-container label {
-    margin-right: 3px; /* Reduced margin */
-    user-select: none; /* Prevent text selection on touch */
+/* Labels in UI bar */
+#primary-controls-area label, #status-info-area label { /* Target labels within these areas */
+    margin-right: 3px;
+    user-select: none;
 }
 
-#ui-container input[type="range"] { /* This applies to sliders inside #ui-container */
-    cursor: pointer;
-    vertical-align: middle;
-    min-width: 100px; /* Ensure slider is wide enough */
-}
-
-#ui-container input[type="text"] {
+/* Text Inputs in UI bar */
+#primary-controls-area input[type="text"].hex-input {
     padding: 6px 8px;
     border: 1px solid #555;
     background-color: #333;
@@ -160,8 +146,9 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-size: 0.9em;
 }
 
-#ui-container button {
-    padding: 6px 12px; /* Increased padding for touch */
+/* Buttons in UI bar */
+#primary-controls-area button.button, #status-info-area button.button {
+    padding: 6px 12px;
     cursor: pointer;
     background-color: #4a4a4a;
     border: 1px solid #666;
@@ -169,25 +156,27 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     border-radius: 4px;
     font-size: 1.0em;
     transition: background-color 0.2s ease, transform 0.1s ease;
-    user-select: none; /* Prevent text selection on touch */
-    width: 70px;
+    user-select: none;
+    width: auto; /* Let content or min-width define */
+    min-width: 70px;
     height: 50px;
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto;
+    margin: 0; /* Removed margin: 0 auto */
 }
-#ui-container button:hover {
+#primary-controls-area button.button:hover, #status-info-area button.button:hover {
     background-color: #5a5a5a;
 }
-#ui-container button:active {
+#primary-controls-area button.button:active, #status-info-area button.button:active {
     background-color: #6a6a6a;
     transform: scale(0.98);
 }
 
-#ui-container code {
-    background-color: #333; /* Matched input bg */
+/* Code display in UI bar */
+#primary-controls-area code#rulesetDisplay {
+    background-color: #333;
     padding: 4px 6px;
     border-radius: 3px;
     font-size: 1.3em;
@@ -195,18 +184,17 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-family: monospace;
 }
 
-/* Added styles for slider value display (from original, seems to be for text overlay) */
+/* Slider value display (text overlay on slider) */
 .slider-container {
-    position: relative; /* Establishes a positioning context for the span */
-    display: inline-flex; /* Aligns slider and potential future elements */
-    align-items: center; /* Vertically centers items if needed */
+    position: relative;
+    display: inline-flex;
+    align-items: center;
 }
-
-.slider-container input[type="range"] {
-    vertical-align: middle; /* Keeps slider aligned with labels etc. */
+.slider-container input[type="range"] { /* Sliders within this container */
+    vertical-align: middle;
+    min-width: 100px;
 }
-
-.slider-container span { /* This is the value display span */
+.slider-container span.value-display { /* For the text value on the slider */
     position: absolute;
     left: 50%;
     top: 50%;
@@ -220,111 +208,110 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     padding: 1px 3px;
 }
 
-
-/* === 4. SPECIFIC UI GROUP/SECTION STYLES === */
-.ui-group { /* NEW Style for groups */
-    display: flex;
-    align-items: center;
-    gap: 10px; /* Gap within groups */
-    padding: 5px 8px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
-    flex-shrink: 0; /* Prevent groups from shrinking too much */
-    flex-wrap: wrap; /* Allow items within a group to wrap if needed */
+/* Checkbox custom styling */
+input.checkbox-input { /* The actual hidden checkbox */
+    display: none;
 }
-
-#rulesetInput { /* From original, ID specific */
-    width: 50px; /* This is very small for a 32char hex */
-}
-
-#resetOnNewRuleCheckbox, #generateSymmetricalCheckbox, #useCustomBiasCheckbox { /* Apply to all these checkboxes */
-    display: none; /* Hide the actual checkbox input */
-}
-
-#ui-container label.checkbox-label { /* Specific style for checkbox label */
+label.checkbox-label { /* The visible part for the checkbox */
     cursor: pointer;
     padding: 4px 6px;
     border-radius: 3px;
     transition: background-color 0.2s ease;
-    border: 1px solid #555; /* Add a subtle border */
+    border: 1px solid #555;
+    user-select: none;
+    display: inline-block;
+    line-height: normal; /* Adjust if needed */
 }
-#ui-container label.checkbox-label:hover {
+label.checkbox-label:hover {
     background-color: rgba(255, 255, 255, 0.1);
 }
-#ui-container input[type="checkbox"]:checked + label.checkbox-label { /* Assumes label immediately follows input */
-    background-color: #4CAF50; /* Green background when checked */
+input.checkbox-input:checked + label.checkbox-label {
+    background-color: #4CAF50;
     border-color: #3e8e41;
     color: white;
 }
-#ui-container label.sym-label { /* Specific styling for "Symmetrical" to make it less wide */
+label.sym-label { /* Specific for "Symmetrical" checkbox label if less width needed */
     padding: 4px 3px;
 }
 
-#group-ruleset {
+
+/* === 4. SPECIFIC UI GROUP/SECTION STYLES === */
+.ui-group {
     display: flex;
-    align-items: center; /* Align items including new checkbox/label */
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap; /* Allow items within a group to wrap */
+}
+
+#rulesetInput { /* ID specific for main UI hex input */
+    width: 150px; /* Adjusted width from original 50px */
+    text-align: center;
 }
 
 #group-ruleset .bias-controls {
-    display: inline-flex; /* Align items in a row */
-    align-items: center; /* Vertically center items */
-    gap: 5px; /* Space between checkbox, label, slider, span */
-    margin-left: 10px; /* Space from the "New Rules" button */
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
 }
-
-#biasSlider { /* From original, ID specific */
+#biasSlider { /* ID specific slider width */
     width: 200px;
 }
-/* Style for when the slider is disabled via JS (by checkbox) */
-#biasSlider:disabled { /* This is a more specific version of the general input[type=range]:disabled */
-    opacity: 0.5; /* Original had 0.3 for general, this is more specific */
-    cursor: not-allowed; /* Indicate it's not interactive */
-}
-#biasSlider:disabled + #biasValueSpan { /* Assumes span immediately follows */
+#biasSlider:disabled + span.value-display { /* More specific selector for value display */
     opacity: 0.5;
 }
 
-.rule-display-wrapper { /* Wrapper for better spacing */
+.rule-display-wrapper {
     margin-left: 5px;
 }
 
-.separator { /* Keep separator for potential future use, but not currently used */
+.separator {
     color: #666;
     margin: 0 8px;
 }
 
-/* Stats Content Adjustments */
-#stats-content {
-    /*display: none;*/ /* This was commented out in original */
-    flex-basis: auto; /* Override previous basis */
-    background-color: rgba(255, 255, 255, 0.08);
-    padding: 4px 6px;
-    border-radius: 4px;
+/* Stats Content Styling */
+#stats-content { /* This is now a .ui-group itself */
+    /* flex-basis: auto; */ /* flex-basis is on flex items, .ui-group is already one */
+    /* background-color, padding, border-radius inherited from .ui-group */
     font-size: 0.9em;
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    box-sizing: border-box; /* Include padding in width calculation */
+    /* display: flex; inherited from .ui-group, default row */
+    flex-direction: column; /* Stack stat lines vertically */
+    box-sizing: border-box;
 }
-
-#stats-content h4 {
+#stats-content h4 { /* If you re-add a title inside stats */
     margin: 0 0 5px 0;
-    font-size: 0.9em;
+    font-size: 0.9em; /* Relative to parent .ui-group */
     font-weight: normal;
     border-bottom: 1px solid #555;
     padding-bottom: 3px;
     text-align: center;
 }
-
-#stats-content div {
-    margin-bottom: 3px; /* Increased spacing */
+#stats-content div { /* Each stat line */
+    margin-bottom: 3px;
+    font-size: 0.9em; /* Relative to parent .ui-group */
+}
+#stats-content span { /* The value part of the stat */
+    font-weight: bold;
+    min-width: 45px;
+    display: inline-block;
+    text-align: right;
+    margin-left: 5px;
+    background-color: rgba(0,0,0,0.2);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+/* #group-performance would also be a .ui-group and styled similarly if containing text */
+#group-performance div {
     font-size: 0.9em;
 }
-
-#stats-content span {
+#group-performance span {
     font-weight: bold;
-    min-width: 45px; /* Adjusted */
+    min-width: 30px; /* Adjusted for FPS/TPS */
     display: inline-block;
     text-align: right;
     margin-left: 5px;
@@ -333,156 +320,157 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     border-radius: 2px;
 }
 
-/* Ensure existing biasSlider vertical alignment works with the new container */
-/* This was a note, not an actual rule in original */
-/* #group-ruleset .bias-controls .slider-container {
-    vertical-align: middle;
-} */
 
-
-/* === 5. RULESET EDITOR PANEL STYLES === */
-#rulesetEditorPanel {
+/* === 5. COMMON PANEL STYLES (Ruleset Editor & Setup Panel) === */
+/* Base styles for panels like Ruleset Editor and Setup Panel */
+.draggable-panel-base { /* Apply this class to #rulesetEditorPanel and #setupPanel in HTML */
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    max-width: 100%; /* Max width */
-    max-height: 100%; /* Max height */
-    background-color: rgba(0, 00, 00, 0.99); /* Slightly lighter than body */
-    border: 2px solid #555;
+    max-width: 90vw; /* Use viewport units for better responsiveness */
+    max-height: 90vh;
+    background-color: rgba(15, 15, 15, 0.98); /* Consistent background */
+    border: 1px solid #555; /* Consistent border */
     border-radius: 8px;
-    padding: 20px;
+    padding: 15px; /* Consistent padding */
     box-sizing: border-box;
-    z-index: 1000; /* Ensure it's on top */
-    overflow-y: auto; /* Allow scrolling if content overflows */
+    z-index: 1000;
     color: #eee;
-    display: flex; /* Use flexbox for layout */
-    flex-direction: column; /* Stack elements vertically */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Panel manages internal scroll via .panel-content-area */
 }
-
-#rulesetEditorPanel h3 {
+.draggable-panel-base h3 { /* Common style for panel titles (drag handles) */
     margin-top: 0;
     margin-bottom: 10px;
     text-align: center;
-    border-bottom: 1px solid #555;
-    padding-bottom: 10px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 8px;
     user-select: none;
+    font-size: 1.2em;
+    cursor: move; /* Indicate draggable */
 }
-
-#closeEditorButton {
+.close-panel-button { /* Common style for close buttons */
     position: absolute;
-    top: 10px;
-    right: 15px;
+    top: 8px;
+    right: 12px;
     background: none;
     border: none;
-    color: #ccc;
-    font-size: 2em;
+    color: #aaa;
+    font-size: 1.8em;
     font-weight: bold;
     cursor: pointer;
     padding: 0 5px;
     line-height: 1;
 }
-#closeEditorButton:hover {
+.close-panel-button:hover {
     color: white;
 }
+.panel-content-area { /* Wrapper for scrollable content within panels */
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 5px; /* Padding for the content area itself */
+    border-top: 1px solid #333; /* Optional separator */
+    margin-top: 5px; /* Optional separator */
+}
+.panel-actions { /* For buttons at the bottom of a panel */
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #444;
+    display: flex;
+    justify-content: center; /* Or flex-end */
+    gap: 10px;
+}
+.panel-actions .button { /* Buttons inside panel actions */
+    height: auto; /* Let padding define height */
+    padding: 8px 15px;
+}
+
+/* === 6. RULESET EDITOR PANEL SPECIFIC STYLES === */
+/* Apply .draggable-panel-base to #rulesetEditorPanel in HTML */
+#rulesetEditorPanel {
+    width: clamp(320px, 90vw, 700px); /* Specific width constraints if needed */
+}
+/* #rulesetEditorPanel.hidden inherited from .hidden */
 
 .editor-controls {
     display: flex;
-    justify-content: center;
+    justify-content: space-around;
     align-items: center;
     gap: 10px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
 }
-
 .editor-controls .editor-hex-input {
     font-family: monospace;
-    font-size: 1.4em;
+    font-size: 1.2em;
     background-color: #222;
     color: #eee;
-    border: 1px solid #555;
+    border: 1px solid #444;
     border-radius: 4px;
-    padding: 8px 10px;
-    width: 320px;
+    padding: 6px 8px;
+    width: 280px;
     text-align: center;
     flex-grow: 1;
     min-width: 200px;
 }
 .editor-controls .editor-hex-input::placeholder {
-    color: #777;
+    color: #666;
 }
-
-#rulesetEditorMode {
-    padding: 8px;
+.editor-controls #rulesetEditorMode {
+    padding: 7px;
     background-color: #333;
     color: white;
     border: 1px solid #555;
     border-radius: 4px;
-    font-size: 0.9em;
+    font-size: 0.85em;
+}
+.editor-controls #clearRulesButton.button { /* Target if it's a .button */
+    min-width: 80px;
 }
 
-.editor-controls button { /* Button style specific to editor controls */
-    padding: 6px 12px;
-    cursor: pointer;
-    background-color: #4a4a4a; /* Same as #ui-container button */
-    border: 1px solid #666;    /* Same as #ui-container button */
-    color: white;               /* Same as #ui-container button */
-    border-radius: 4px;         /* Same as #ui-container button */
-    font-size: 1.0em;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    user-select: none;
-    width: auto; /* Let content define width */
-    height: auto; /* Let content define height */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 12px; /* Match hex input padding for vertical alignment */
-}
-.editor-controls button:hover {
-    background-color: #5a5a5a; /* Same as #ui-container button:hover */
-}
-.editor-controls button:active {
-    background-color: #6a6a6a; /* Same as #ui-container button:active */
-    transform: scale(0.98);    /* Same as #ui-container button:active */
-}
-
-.editor-text {
-    font-size: 0.9em;
-    color: #eee;
-    margin: 10px auto 10px auto;
-    text-align: left;
-    line-height: 1.4;
-}
-
-/* === 6. RULESET EDITOR GRID & HEXAGON STYLES === */
 #rulesetEditorGrid, #neighborCountRulesetEditorGrid {
     display: grid;
-    margin: 0 auto;
+    margin: 0 auto 10px auto;
     gap: 2px;
     padding: 5px;
     border: 1px solid #333;
     background-color: #1a1a1a;
     border-radius: 4px;
-    overflow: auto;
 }
-
 #rulesetEditorGrid {
-    grid-template-columns: repeat(16, 42px);
-    grid-template-rows: repeat(8, 56px);
+    grid-template-columns: repeat(16, 5.9%);
+    max-width: calc(16 * 42px + 15 * 2px + 10px);
 }
-
 #neighborCountRulesetEditorGrid {
-    grid-template-columns: repeat(7, 14%);
-    grid-template-rows: auto;
-    width: 95%;
+    grid-template-columns: repeat(7, 13.4%);
+    width: 100%;
+    gap: 5px;
 }
 
+.editor-text {
+    font-size: 0.85em;
+    color: #ccc;
+    margin: 0 auto 10px auto;
+    text-align: left;
+    line-height: 1.3;
+    padding: 0 5px;
+}
+.editor-text.info-text { /* For informational text in panels */
+    text-align: center;
+    margin-bottom: 15px;
+    font-style: italic;
+    color: #aaa;
+}
 .editor-text-rules {
     display: grid;
-    grid-template-columns: repeat(2, 50%);
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 5px;
+    margin-top: 5px;
 }
 
-/* Individual Rule Visualization (Detailed) */
+/* Individual Rule Visualization (Detailed) - Preserved from original request */
 .rule-viz {
     position: relative;
     width: 100px;
@@ -491,163 +479,193 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     transform: scale(0.4) translate(-70px, -65px);
     cursor: pointer;
 }
+.rule-viz:hover .inner-hex { border-color: #FFF; }
 
-.rule-viz:hover .inner-hex {
-    border-color: #FFF;
-}
-
-/* Neighbor Count Rule Visualization */
-.neighbor-count-rule-viz {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 5px;
-    border: 1px solid #444;
-    border-radius: 4px;
-    cursor: pointer;
-    background-color: #282828;
-    transition: background-color 0.2s ease;
-    min-height: 80px;
-    box-sizing: border-box;
-}
-.neighbor-count-rule-viz:hover {
-    background-color: #3a3a3a;
-}
-.neighbor-count-rule-viz .hexagon.center-hex {
-    position: relative;
-    transform: scale(0.8) translate(-53px, -53px); /* This translate looks large for just scale 0.8 */
-    margin-bottom: 5px;
-    width: 40px;
-    height: calc(40px * 1.154701);
-}
-.neighbor-count-label {
-    font-size: 0.75em;
-    text-align: center;
-    color: #ccc;
-    margin-top: 3px;
-    line-height: 1.2;
-}
-
-/* Hexagon Base Styles (Pointy-Top using CSS Clip Path) */
+/* Hexagon Base Styles (Flat-Top as per original clip-path) - Preserved */
 .hexagon {
     position: absolute;
     width: 40px;
-    height: calc(40px * 1.154701);
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top polygon */
-    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top polygon */
+    height: calc(40px * 0.866025 * 2); /* height = width * sin(60) * 2 for flat top */
+    /* Corrected height for flat top: height = width * sqrt(3)/2 * 2 = width * sqrt(3) approx width * 1.732
+       However, original clip path implies width is vertex to vertex, height is side to side distance / sin(60)
+       The original clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); means width:height ratio is 1:sqrt(3)/2*2 = 1:sqrt(3)
+       So height = width * (sqrt(3)/2). The original calc(40px * 1.154701) was for pointy top if width is side-to-side.
+       For flat top where width is vertex-to-vertex, height = width * sqrt(3)/2.
+       If width = 40px is vertex-to-vertex, then side length is 20px. Height is 2 * (20 * sqrt(3)/2) = 20 * sqrt(3) ~ 34.64px
+       The original provided clip-path is `polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%)` which is a FLAT TOP.
+       Original height calc was `calc(40px * 1.154701)` - this is for POINTY top.
+       For the FLAT top clip path above, height should be `calc(40px * 0.866025)` if 40px is the width (vertex to vertex).
+       Let's stick to the user's original values and request to not change.
+    */
+    height: calc(40px * 1.154701); /* Preserving user's original height calc despite clip-path mismatch */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
     background-color: #555;
     box-sizing: border-box;
 }
-/* Hexagon States */
-.hexagon.state-0 {
-    background-color: #404040;
-}
-.hexagon.state-1 {
-    background-color: #FFFF00;
-}
-.hexagon.state-2 { /* For "mixed" states */
-    background: linear-gradient(45deg, #633030, #306330);
-}
+.hexagon.state-0 { background-color: #404040; }
+.hexagon.state-1 { background-color: #FFFF00; }
+.hexagon.state-2 { background: linear-gradient(45deg, #633030, #306330); }
 
-/* Center Hexagon */
-.center-hex { /* This is for rule-viz */
-    top: 50%;
-    left: 50%;
+.center-hex { /* For .rule-viz */
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(1.0);
     z-index: 1;
 }
-
-/* Inner Hexagon (Result) */
-.inner-hex { /* This is for rule-viz */
-    width: 60%; /* of parent .center-hex */
-    height: calc(60% * 1.154701); /* Maintain aspect ratio of parent's clip-path */
-    /* The clip-path should be the same as parent if shape is to be identical */
-    /* clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); */
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.8); /* This scale is on top of parent's .center-hex scale */
-    border: 1.0px solid #CCCCCC;
-    z-index: 2;
+.inner-hex { /* For .rule-viz */
+    width: 60%; height: calc(60% * 1.154701); /* Preserving */
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.8); /* Preserving */
+    border: 1.0px solid #CCCCCC; z-index: 2;
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .inner-hex.state-0 { background-color: #990000 !important; }
 .inner-hex.state-1 { background-color: #00BB00 !important; }
-.inner-hex.state-2 {
-    background: linear-gradient(45deg, #700000, #005000) !important;
-    border-color: #888 !important;
-}
+.inner-hex.state-2 { background: linear-gradient(45deg, #700000, #005000) !important; border-color: #888 !important; }
 
-/* Neighbor Hexagons Positioning (Original used different order/positioning) */
-/* These are for .rule-viz with its specific transform. Flat-top arrangement. */
-/* Original neighbor order for .rule-viz: 0:SE, 1:NE, 2:N, 3:NW, 4:SW, 5:S (This is for the *bits*, visual layout is different) */
-/* The CSS classes .neighbor-0 to .neighbor-5 are for visual positioning of flat-top hexes around a center. */
-.neighbor-hex { /* For .rule-viz */
+.neighbor-hex { /* For .rule-viz - Preserving */
     transform-origin: center center;
-    transform: translate(-50%, -50%) scale(0.9); /* Relative to their own center for positioning */
+    transform: translate(-50%, -50%) scale(0.9);
 }
-/* Original positioning for .rule-viz, assuming flat top for neighbors as well */
-.neighbor-0 { top: 70%; left: 23%; }   /* Bottom-left visually (SE bit if center is pointy) */
-.neighbor-1 { top: 31%; left: 23%; }   /* Top-left visually (NE bit) */
-.neighbor-2 { top: 12%; left: 50%; }   /* Top visually (N bit) */
-.neighbor-3 { top: 31%; left: 78%; }   /* Top-Right visually (NW bit) */
-.neighbor-4 { top: 70%; left: 78%; }   /* Bottom-Right visually (SW bit) */
-.neighbor-5 { top: 88%; left: 50%; }   /* Bottom visually (S bit) */
+.neighbor-0 { top: 70%; left: 23%; } .neighbor-1 { top: 31%; left: 23%; }
+.neighbor-2 { top: 12%; left: 50%; } .neighbor-3 { top: 31%; left: 78%; }
+.neighbor-4 { top: 70%; left: 78%; } .neighbor-5 { top: 88%; left: 50%; }
 
+/* Neighbor Count Rule Visualization - Preserved */
+.neighbor-count-rule-viz {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 8px 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer;
+    background-color: #282828; transition: background-color 0.2s ease;
+    min-height: 80px; box-sizing: border-box;
+}
+.neighbor-count-rule-viz:hover { background-color: #3a3a3a; }
+.neighbor-count-rule-viz .hexagon.center-hex { /* Hex inside N-count viz */
+    position: relative; transform: scale(0.8) translate(-53px, -53px); /* Preserving original large translate */
+    margin-bottom: 5px; width: 40px; height: calc(40px * 1.154701);
+}
+.neighbor-count-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
 
-/* Inline hexagons for the explanation text */
-.inline-hex { /* Original had transform: scale(1.5) here. Removing to "not change" */
-    display: inline-block;
-    width: 1em;
-    height: calc(1em * 1.154701); /* Assuming pointy-top was intended here based on later clip-path */
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top */
-    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top */
-    vertical-align: middle;
-    margin: 0 2px;
-    position: relative;
-    box-sizing: border-box;
+/* Inline Hexagons - Preserved */
+.inline-hex {
+    display: inline-block; width: 1em; height: calc(1em * 1.154701);
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    vertical-align: middle; margin: 0 2px; position: relative; box-sizing: border-box;
 }
 .inline-hex-inner {
-    position: absolute;
-    display: inline-block; /* Not strictly needed with absolute */
-    width: 60%;
-    height: calc(60% * 1.154701); /* Maintain aspect ratio based on its own width */
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top */
-    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top */
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border: 1px solid #CCCCCC;
-    box-sizing: border-box;
+    position: absolute; display: inline-block; width: 60%; height: calc(60% * 1.154701);
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    border: 1px solid #CCCCCC; box-sizing: border-box;
 }
 .inline-hex.state-0 { background-color: #404040; }
 .inline-hex.state-1 { background-color: #FFFF00; }
-.inline-hex-inner.state-0 { background-color: #990000 !important; } /* from original */
-.inline-hex-inner.state-1 { background-color: #00BB00 !important; } /* from original */
+.inline-hex-inner.state-0 { background-color: #990000 !important; }
+.inline-hex-inner.state-1 { background-color: #00BB00 !important; }
 
 
-/* === 7. UTILITY CLASSES === */
-.hidden { /* From original */
+/* === 7. SETUP PANEL SPECIFIC STYLES (NEW) === */
+/* Apply .draggable-panel-base to #setupPanel in HTML */
+#setupPanel {
+    width: clamp(400px, 60vw, 550px); /* Setup panel might need different width */
+}
+.world-config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3x3 grid */
+    gap: 15px; /* Gap between world config cells */
+    padding: 10px 0;
+}
+.world-config-cell {
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Gap between elements within a cell */
+    align-items: center; /* Center content in cell */
+}
+.world-label {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #bbb;
+    margin-bottom: 5px;
+}
+.setting-control { /* Common wrapper for density and enable controls */
+    display: flex;
+    flex-direction: column; /* Stack label, slider/switch */
+    align-items: center;
+    width: 100%;
+    gap: 5px;
+}
+.setting-control label { /* Label for Density or Enabled */
+    font-size: 0.8em;
+    color: #aaa;
+}
+.density-slider { /* Specific class for density sliders if needed */
+    width: 100%; /* Make slider take full width of its container */
+    /* General input[type=range] styles apply */
+}
+.density-value-display { /* Span showing density value */
+    font-size: 0.8em;
+    color: #ddd;
+    background-color: rgba(0,0,0,0.3);
+    padding: 2px 4px;
+    border-radius: 3px;
+    min-width: 35px; /* Ensure space for "0.000" */
+    text-align: center;
+}
+.enable-control label.checkbox-label { /* Label for "Enabled/Disabled" switch */
+    padding: 5px 10px; /* Make it more button-like */
+    font-size: 0.85em;
+}
+
+
+/* === 8. UTILITY CLASSES === */
+.hidden {
+    display: none !important;
+}
+#rulesetEditorPanel.hidden, #setupPanel.hidden { /* Ensure hidden applies to new panel too */
     display: none !important;
 }
 
-#rulesetEditorPanel.hidden { /* From original, more specific */
-    display: none !important;
-}
 
-
-/* === 8. MEDIA QUERIES === */
-/*if width less than 700px switch grid columns to 8 and rows to 16*/
-@media (max-width: 700px) { /* From original */
+/* === 9. MEDIA QUERIES (Original + additions for new panel if needed) === */
+@media (max-width: 700px) {
     #rulesetEditorGrid {
         grid-template-columns: repeat(8, 42px);
         grid-template-rows: repeat(16, 56px);
     }
-    .editor-controls .editor-hex-input {
-        font-size: 1.2em;
-        width: 250px;
+    .editor-controls .editor-hex-input { font-size: 1.2em; width: 250px; }
+    #neighborCountRulesetEditorGrid { grid-template-columns: repeat(7, 14%); }
+
+    .world-config-grid { /* Make setup panel grid stack on small screens */
+        grid-template-columns: 1fr; /* Single column */
+        gap: 10px;
     }
-    #neighborCountRulesetEditorGrid {
-         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    #setupPanel {
+        width: clamp(280px, 85vw, 400px); /* Adjust width for smaller screens */
+    }
+}
+@media (max-width: 480px) {
+    /* Adjust main UI bar layout for very small screens */
+    #ui-container {
+        flex-direction: column;
+        align-items: stretch; /* Make children take full width */
+        gap: 5px;
+    }
+    #primary-controls-area, #status-info-area {
+        width: 100%;
+        justify-content: center; /* Center items in these areas */
+        gap: 5px;
+    }
+    #status-info-area {
+        flex-direction: row; /* Stats and perf side-by-side if they fit */
+        justify-content: space-around;
+    }
+     /* Panel control adjustments from original */
+    .editor-controls { flex-direction: column; align-items: stretch; }
+    .editor-controls .editor-hex-input,
+    .editor-controls #rulesetEditorMode,
+    .editor-controls #clearRulesButton.button {
+        width: 100%; margin-bottom: 5px;
     }
 }

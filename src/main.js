@@ -9,7 +9,8 @@ import * as Utils from './utils/utils.js';
 let gl; // WebGL Context
 let isInitialized = false;
 let lastTimestamp = 0;
-let neighborhoodSize = Config.DEFAULT_NEIGHBORHOOD_SIZE;
+// neighborhoodSize is now primarily managed and persisted by Simulation.js
+// main.js will get it from Simulation.js when needed.
 let pausedByVisibilityChange = false;
 
 // Performance Metrics
@@ -37,43 +38,57 @@ async function initialize() {
         return;
     }
 
+    // Simulation.initSimulation() now loads its own persisted settings (speed, ruleset, world settings)
+    // It also loads the brush size into its internal state, which we can retrieve.
     Simulation.initSimulation();
+    // const initialBrushSize = Simulation.loadBrushSize(); // No longer needed here, UI init will get it
 
     const simulationInterface = {
+        // Playback & Core State
         togglePause: () => {
             const nowPaused = !Simulation.isSimulationPaused();
-            pausedByVisibilityChange = false;
+            pausedByVisibilityChange = false; // Reset flag on manual toggle
             Simulation.setSimulationPaused(nowPaused);
             return nowPaused;
         },
+        isSimulationPaused: Simulation.isSimulationPaused,
+        getSelectedWorldIndex: Simulation.getSelectedWorldIndex,
+        loadWorldState: Simulation.loadWorldState, // Persists changes
+        getWorldStateForSave: Simulation.getWorldStateForSave,
+
+        // Speed & Brush (managed by Simulation.js for persistence)
         setSpeed: Simulation.setSimulationSpeed,
-        setNeighborhoodSize: (size) => { neighborhoodSize = size; },
-        generateRandomRuleset: (bias, symmetrical) => Simulation.generateRandomRuleset(bias, symmetrical),
+        getCurrentSimulationSpeed: Simulation.getCurrentSimulationSpeed,
+        setBrushSize: Simulation.setBrushSize,
+        getCurrentBrushSize: Simulation.getCurrentBrushSize,
+
+        // Ruleset Management (managed by Simulation.js for persistence)
+        generateRandomRuleset: Simulation.generateRandomRuleset,
         getCurrentRulesetHex: Simulation.getCurrentRulesetHex,
         getCurrentRulesetArray: Simulation.getCurrentRulesetArray,
         setRuleset: Simulation.setRuleset,
-        getWorldStateForSave: Simulation.getWorldStateForSave,
-        getSelectedWorldIndex: Simulation.getSelectedWorldIndex,
-        loadWorldState: Simulation.loadWorldState,
-        resetAllWorldStates: Simulation.resetAllWorldStates,
-        isSimulationPaused: Simulation.isSimulationPaused,
-        // Functions for editor interaction (used by RulesetEditor via ui.js)
         toggleRuleOutputState: Simulation.toggleRuleOutputState,
         setAllRulesState: Simulation.setAllRulesState,
         setRulesForNeighborCountCondition: Simulation.setRulesForNeighborCountCondition,
         getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount,
+
+        // World Setup & Reset (managed by Simulation.js for persistence)
+        getWorldSettings: Simulation.getWorldSettings,
+        setWorldInitialDensity: Simulation.setWorldInitialDensity,
+        setWorldEnabled: Simulation.setWorldEnabled,
+        resetAllWorldsToCurrentSettings: Simulation.resetAllWorldsToCurrentSettings,
     };
 
+    // UI.initUI will now use simulationInterface to get initial speed/brush for sliders
     if (!UI.initUI(simulationInterface)) {
         console.error("UI initialization failed.");
         return;
     }
 
-    // UI.refreshAllRulesetViews is called within UI.initUI or by editor itself now.
-    // However, an initial call after everything is set up might still be good.
-    UI.refreshAllRulesetViews(simulationInterface);
+    // UI.initUI calls loadAndApplyUISettings which sets up initial UI values
+    // including those fetched via simulationInterface (speed, brush size)
     UI.updatePauseButton(Simulation.isSimulationPaused());
-    UI.updateStatsDisplay(Simulation.getSelectedWorldStats()); // Initial stats display
+    UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
 
     setupCanvasListeners(canvas);
     window.addEventListener('resize', handleResize);
@@ -81,7 +96,6 @@ async function initialize() {
 
     isInitialized = true;
     lastTimestamp = performance.now();
-    // Initialize performance update timestamps
     lastFpsUpdateTime = lastTimestamp;
     lastTpsUpdateTime = lastTimestamp;
 
@@ -107,9 +121,10 @@ function handleCanvasClick(event) {
         Simulation.setSelectedWorldIndex(worldIndex);
 
         if (viewType === 'selected' && col !== null && row !== null) {
-            Simulation.applyBrush(worldIndex, col, row, neighborhoodSize);
+            // Get current brush size from simulation module for applying brush
+            Simulation.applyBrush(worldIndex, col, row, Simulation.getCurrentBrushSize());
         }
-        if (worldIndex !== previousSelectedWorld || viewType === 'selected') { // Update stats if selection changes or selected world is clicked
+        if (worldIndex !== previousSelectedWorld || viewType === 'selected') {
             UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
         }
     }
@@ -117,17 +132,13 @@ function handleCanvasClick(event) {
 
 function handleCanvasMouseMove(event) {
     if (!isInitialized) return;
-    const { worldIndex, col, row } // Removed viewType as it's not used here
-      = getCoordsFromMouseEvent(event);
-
-    // Clear hover for all worlds first
+    const { worldIndex, col, row } = getCoordsFromMouseEvent(event);
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        // Optimize: only clear if it was previously hovered or if worldIndex is different
-        Simulation.clearHoverState(i); // Simulation module can handle optimization if needed
+        Simulation.clearHoverState(i);
     }
-
     if (worldIndex !== null && col !== null && row !== null) {
-        Simulation.setHoverState(worldIndex, col, row, neighborhoodSize);
+        // Get current brush size from simulation module for hover
+        Simulation.setHoverState(worldIndex, col, row, Simulation.getCurrentBrushSize());
     }
 }
 
@@ -140,90 +151,73 @@ function handleCanvasMouseOut() {
 
 function handleCanvasMouseWheel(event) {
     if (!isInitialized) return;
-    event.preventDefault(); // Prevent page scroll
+    event.preventDefault();
 
-    const scrollAmount = Math.sign(event.deltaY); // -1 for up, 1 for down
-    let newSize = neighborhoodSize - scrollAmount; // Scroll up increases size, scroll down decreases
+    let currentBrush = Simulation.getCurrentBrushSize();
+    const scrollAmount = Math.sign(event.deltaY);
+    let newSize = currentBrush - scrollAmount; // Scroll up (negative deltaY) increases size
     newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, newSize));
 
-    if (newSize !== neighborhoodSize) {
-        neighborhoodSize = newSize;
-        UI.updateBrushSlider(newSize); // Update UI slider
+    if (newSize !== currentBrush) {
+        Simulation.setBrushSize(newSize); // Update in simulation (and persists to LS)
+        UI.updateBrushSlider(newSize);    // Update UI slider display
 
-        // Potentially re-evaluate hover state with new brush size
-        // Simulate a mouse move event at the current mouse position to update hover
-        // This requires knowing the last mouse position over the canvas.
-        // For simplicity, just clear and let next mousemove update it,
-        // or call handleCanvasMouseMove if event still has valid clientX/Y
-         if (event.clientX !== undefined && event.clientY !== undefined) {
-             handleCanvasMouseMove(event);
-         } else {
-            for (let i = 0; i < Config.NUM_WORLDS; i++) {
-                 Simulation.clearHoverState(i);
-            }
-         }
+        // Update hover state based on new brush size
+        if (event.clientX !== undefined && event.clientY !== undefined) {
+            handleCanvasMouseMove(event); // This will use the new currentBrushSize
+        } else {
+           for (let i = 0; i < Config.NUM_WORLDS; i++) {
+                Simulation.clearHoverState(i);
+           }
+        }
     }
 }
 
-
-function getCoordsFromMouseEvent(event) {
+function getCoordsFromMouseEvent(event) { /* ... unchanged from previous version ... */
     if (!gl || !gl.canvas) return { worldIndex: null, col: null, row: null, viewType: null };
-
     const rect = gl.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
-
     const isLandscape = canvasWidth >= canvasHeight;
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-    // Padding calculation should be consistent with renderer.js
-    const padding = Math.min(canvasWidth, canvasHeight) * 0.02; // Dynamic padding based on smaller dimension
-
+    const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
     if (isLandscape) {
         selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
         selectedViewHeight = canvasHeight - padding * 2;
-        selectedViewX = padding;
-        selectedViewY = padding;
-
+        selectedViewX = padding; selectedViewY = padding;
         miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
-        miniMapAreaHeight = selectedViewHeight; // Align height with selected view
+        miniMapAreaHeight = selectedViewHeight;
         miniMapAreaX = selectedViewX + selectedViewWidth + padding;
         miniMapAreaY = padding;
-    } else { // Portrait
+    } else {
         selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
         selectedViewWidth = canvasWidth - padding * 2;
-        selectedViewX = padding;
-        selectedViewY = padding;
-
+        selectedViewX = padding; selectedViewY = padding;
         miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
-        miniMapAreaWidth = selectedViewWidth; // Align width with selected view
+        miniMapAreaWidth = selectedViewWidth;
         miniMapAreaX = padding;
         miniMapAreaY = selectedViewY + selectedViewHeight + padding;
     }
-
     const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
     const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
     let gridContainerWidth, gridContainerHeight;
-    const miniMapContainerPaddingFactor = 0.95; // How much of the area the grid container uses
-
-    if (miniMapAreaRatio > miniMapGridRatio) { // Area is wider than grid aspect ratio
+    const miniMapContainerPaddingFactor = 0.95;
+    if (miniMapAreaRatio > miniMapGridRatio) {
         gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
         gridContainerWidth = gridContainerHeight * miniMapGridRatio;
-    } else { // Area is taller or equal aspect ratio
+    } else {
         gridContainerWidth = miniMapAreaWidth * miniMapContainerPaddingFactor;
         gridContainerHeight = gridContainerWidth / miniMapGridRatio;
     }
-
     const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
     const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
-    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01; // Small spacing relative to container
-
+    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
     const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
     const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
-    // Check selected view first
     if (mouseX >= selectedViewX && mouseX < selectedViewX + selectedViewWidth &&
         mouseY >= selectedViewY && mouseY < selectedViewY + selectedViewHeight) {
         const selWorldIdx = Simulation.getSelectedWorldIndex();
@@ -232,14 +226,11 @@ function getCoordsFromMouseEvent(event) {
         const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
         return { worldIndex: selWorldIdx, col, row, viewType: 'selected' };
     }
-
-    // Check mini-maps
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const c_map = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + c_map * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing);
-
         if (mouseX >= miniX && mouseX < miniX + miniMapW &&
             mouseY >= miniY && mouseY < miniY + miniMapH) {
             const texCoordX = (mouseX - miniX) / miniMapW;
@@ -251,51 +242,27 @@ function getCoordsFromMouseEvent(event) {
     return { worldIndex: null, col: null, row: null, viewType: null };
 }
 
-
-function textureCoordsToGridCoords(texX, texY) {
-    // Ensure texX and texY are within [0, 1] range
-    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) {
-        return { col: null, row: null };
-    }
-
+function textureCoordsToGridCoords(texX, texY) { /* ... unchanged from previous version ... */
+    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null };
     const pixelX = texX * Config.RENDER_TEXTURE_SIZE;
     const pixelY = texY * Config.RENDER_TEXTURE_SIZE;
-
-    // Get hex size and starting offsets as used in renderer.js setupHexBuffersAndVAO
     const textureHexSize = Utils.calculateHexSizeForTexture();
-    const startX = textureHexSize; // Initial offset from edge of texture
-    const startY = textureHexSize * Math.sqrt(3) / 2; // Initial offset for first row
-
+    const startX = textureHexSize;
+    const startY = textureHexSize * Math.sqrt(3) / 2;
     let minDistSq = Infinity;
-    let closestCol = null;
-    let closestRow = null;
-
-    // Iterate over a smaller search area if possible, or refine search later.
-    // For now, full scan is robust.
+    let closestCol = null; let closestRow = null;
     for (let r = 0; r < Config.GRID_ROWS; r++) {
         for (let c = 0; c < Config.GRID_COLS; c++) {
             const center = Utils.gridToPixelCoords(c, r, textureHexSize, startX, startY);
-            const dx = pixelX - center.x;
-            const dy = pixelY - center.y;
+            const dx = pixelX - center.x; const dy = pixelY - center.y;
             const distSq = dx * dx + dy * dy;
-
-            // Optimization: if distSq is already greater than a generous hex diameter squared,
-            // it's unlikely to be the closest, especially if not even in the bounding box.
-            // A simpler check is if point is inside the hexagon, then it's a candidate.
-            if (distSq < minDistSq) { // Check if potentially closer first
+            if (distSq < minDistSq) {
                  if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
-                    minDistSq = distSq;
-                    closestCol = c;
-                    closestRow = r;
+                    minDistSq = distSq; closestCol = c; closestRow = r;
                 }
-            } else if (minDistSq < (textureHexSize * textureHexSize) && distSq > (textureHexSize * 2 * textureHexSize * 2 ) ) {
-                // If we already found a hex and this one is much further than its diameter, skip detailed check
-                // This is a rough optimization, actual check is isPointInHexagon
             }
         }
     }
-    // If after checking all, closestCol/Row are still null, but mouse is on canvas,
-    // it means it's in the padding area of the texture.
     return { col: closestCol, row: closestRow };
 }
 
