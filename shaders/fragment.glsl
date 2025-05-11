@@ -7,8 +7,9 @@ in float v_hover_state;   // 0.0 (no hover) or 1.0 (hover)
 in float v_rule_index;    // Rule index (0-127)
 
 // Uniforms for hover effects (from config.js)
-uniform vec4 u_hoverEmptyFillColor;   // Color for hovering over an empty cell
+// uniform vec4 u_hoverEmptyFillColor; // This uniform is no longer strictly needed for this logic
 uniform float u_hoverFilledDarkenFactor; // Factor to darken active cells on hover
+uniform float u_hoverInactiveLightenFactor; // NEW uniform for lightening inactive cells
 
 out vec4 outColor;
 
@@ -43,7 +44,8 @@ void main() {
         if (v_state == 1.0) { // Hovering over an active cell
             base_color_rgb *= u_hoverFilledDarkenFactor; // Darken existing color
         } else { // Hovering over an inactive cell
-            base_color_rgb = u_hoverEmptyFillColor.rgb; // Use the specific hover color for empty
+            // MODIFIED BEHAVIOR: Lighten the original inactive cell color
+            base_color_rgb *= u_hoverInactiveLightenFactor; // Lighten existing color
         }
     }
 
