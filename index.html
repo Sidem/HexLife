@@ -20,11 +20,11 @@
                     <span class="rule-display-wrapper"><code id="rulesetDisplay">N/A</code></span>
                 </div>
                 <div class="ui-group" id="group-playback">
-                    <button id="playPauseButton">Play</button>
+                    <button id="playPauseButton" class="button">Play</button>
                     <label for="speedSlider">Speed:</label>
                     <div class="slider-container">
                         <input type="range" id="speedSlider" name="speedSlider" min="1" max="60" value="10" step="1">
-                        <span id="speedValue">10</span>
+                        <span id="speedValue" class="value-display">10</span>
                     </div>
                      tps
                 </div>
@@ -34,35 +34,36 @@
                     <div class="slider-container">
                         <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="20" value="1"
                             step="1">
-                        <span id="neighborhoodValue">1</span>
+                        <span id="neighborhoodValue" class="value-display">1</span>
                     </div>
                 </div>
 
                 <div class="ui-group" id="group-ruleset">
-                    <button id="randomRulesetButton">New Rules</button>
-                    <input type="checkbox" id="generateSymmetricalCheckbox" title="Generate rules symmetrically (based on neighbor count)" checked>
+                    <button id="randomRulesetButton" class="button">New Rules</button>
+                    <input type="checkbox" id="generateSymmetricalCheckbox" class="checkbox-input" title="Generate rules symmetrically (based on neighbor count)" checked>
                     <label for="generateSymmetricalCheckbox" class="checkbox-label sym-label">Symmetrical</label>
-                    <input type="checkbox" id="resetOnNewRuleCheckbox"
-                        title="Reset all world states when generating a new ruleset" checked>
-                    <div class="bias-controls"> <input type="checkbox" id="useCustomBiasCheckbox">
+
+                    <div class="bias-controls">
+                        <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
                         <div class="slider-container">
                             <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.001">
-                            <span id="biasValueSpan">0.50</span>
+                            <span id="biasValueSpan" class="value-display">0.50</span>
                         </div>
                     </div>
+                     <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input" title="Reset all world states when generating a new ruleset" checked>
+                     <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
                 </div>
                 <div class="ui-group" id="group-ruleset-input">
-                    <button id="copyRuleButton" title="Copy current ruleset hex code">Copy</button>
-                    <input type="text" id="rulesetInput" placeholder="32 hex chars">
-                    <button id="setRuleButton">Set</button>
-                    <button id="editRuleButton"
-                        title="Show visual editor for the current ruleset">Edit</button>
+                    <button id="copyRuleButton" class="button" title="Copy current ruleset hex code">Copy</button>
+                    <input type="text" id="rulesetInput" class="hex-input" placeholder="32 hex chars">
+                    <button id="setRuleButton" class="button">Set</button>
+                    <button id="editRuleButton" class="button" title="Show visual editor for the current ruleset">Edit</button>
                 </div>
                 <div class="ui-group" id="group-state">
-                    <button id="saveStateButton" title="Save current grid state">Save</button>
-                    <button id="loadStateButton" title="Load grid state from .json/.txt file">Load</button>
-                    <button id="resetStatesButton" title="Reset all worlds to initial densities">Reset All</button>
+                    <button id="saveStateButton" class="button" title="Save current grid state">Save</button>
+                    <button id="loadStateButton" class="button" title="Load grid state from .json/.txt file">Load</button>
+                    <button id="resetStatesButton" class="button" title="Reset all worlds to initial densities">Reset All</button>
                 </div>
                 <div class="ui-group" id="stats-content">
                     <div>Ratio: <span id="stat-ratio">--</span>%</div>
@@ -76,32 +77,27 @@
 
         </div>
 
-        <div id="rulesetEditorPanel" class="hidden">
-            <button id="closeEditorButton" title="Close Panel">&times;</button>
-            <h3>Ruleset Editor</h3>
-            <div class="editor-controls">
+        <div id="rulesetEditorPanel" class="hidden"> <button id="closeEditorButton" title="Close Panel">&times;</button> <h3>Ruleset Editor</h3> <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input" placeholder="32 hex chars (e.g., FFFFFF...000000)" title="Current ruleset hex code. Edit and press Enter or click away to apply.">
-                <button id="clearRulesButton" title="Set all rules to inactive, or active if all are already inactive">Clear</button>
-                <select id="rulesetEditorMode" title="Choose editor mode">
+                <button id="clearRulesButton" class="button" title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button> <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed" selected>Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 rules)</option>
                 </select>
             </div>
-            <div id="rulesetEditorGrid"></div>
-            <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
-            <div class="editor-text">
-                <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
-                <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
-                <p>Click on a rule visualization below to toggle its output state.</p>
-                <div class="editor-text-rules">
-                    <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive
-                    </p>
-                    <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active
-                    </p>
-                    <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes
-                        inactive</p>
-                    <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active
-                    </p>
+            <div class="editor-content-area"> <div id="rulesetEditorGrid"></div> <div id="neighborCountRulesetEditorGrid" class="hidden"></div> <div class="editor-text">
+                    <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
+                    <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
+                    <p>Click on a rule's inner hexagon (Detailed) or the whole visualization (Neighbor Count) to toggle its output state.</p>
+                    <div class="editor-text-rules">
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive
+                        </p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active
+                        </p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes
+                            inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

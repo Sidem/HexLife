@@ -1,6 +1,7 @@
+/* === 1. RESET/BASE STYLES === */
 body {
     margin: 0;
-    /* overflow: hidden; Removed */
+    /* overflow: hidden; Removed */ /* This was an intentional change from original, keeping it as user provided */
     background-color: #222; /* Dark background */
     font-family: sans-serif;
     color: white;
@@ -8,34 +9,74 @@ body {
     height: 100vh; /* Make body fill viewport height */
 }
 
+/* === 2. LAYOUT STYLES === */
+#app-container { /* NEW */
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Allow container to fill body */
+    width: 100%; /* Ensure it takes full width */
+    overflow: hidden; /* Prevent scrollbars within the app */
+}
+
+canvas {
+    display: block; /* Remove extra space below canvas */
+    /* width: 100vw; Removed */
+    /* height: 100vh; Removed */
+    width: 100%; /* Take full width of parent */
+    height: 0; /* Allow flex-grow to determine height */
+    flex-grow: 1; /* Allow canvas to take up remaining space */
+}
+
+#ui-container {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 0px 0px;
+    display: flex;
+    align-items: center; /* Align items vertically */
+    justify-content: space-between; /* Push controls and stats apart */
+    gap: 3px; /* Add a small gap between controls and stats (adjust as needed) */
+    flex-wrap: nowrap; /* Prevent wrapping of controls/stats */
+    flex-shrink: 0;
+    border-top: 1px solid #444;
+}
+
+#controls-wrapper { /* NEW Style for the controls area */
+    width: 85%;
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Gap between control groups */
+    flex-wrap: wrap; /* Allow control groups to wrap */
+    flex-shrink: 1; /* Allow controls to shrink if needed */
+    flex-grow: 1; /* Allow controls to take up available space within 85% */
+    justify-content: center;
+}
+
+/* === 3. GENERAL UI COMPONENT STYLES === */
 input[type="range"] {
 	color: #2b2d42;
 	--track-color: rgba(0, 0, 0, 0.4);
 	--brightness-hover: 180%;
 	--brightness-down: 80%;
 	--thumb-height: 2.1rem;
-	--thumb-width: 1px;
+	--thumb-width: 1px; /* This might be a typo in original and intended for border or specific effect */
 	--clip-edges: 0.0125em;
 }
 
-input[type="range"] {
+input[type="range"] { /* This is a duplicate block in the original, merging for order but keeping rules */
 	position: relative;
 	background: #fff0;
 	overflow: hidden;
 }
 
 input[type="range"]:active {
-	cursor: pointer;
+	cursor: pointer; /* Should be grabbing for active state */
 }
 
 input[type="range"]:disabled {
 	filter: grayscale(1);
 	opacity: 0.3;
 	cursor: not-allowed;
-}
-
-#biasSlider {
-    width: 200px;
 }
 
 /* === WebKit specific styles === */
@@ -54,7 +95,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-thumb {
 	--thumb-radius: calc((var(--thumb-height) * 0.5) - 1px);
-	--clip-top: calc((var(--thumb-height) - var(--track-height)) * 0.5 - 0.5px);
+	--clip-top: calc((var(--thumb-height) - var(--track-height)) * 0.5 - 0.5px); /* --track-height not defined here in original */
 	--clip-bottom: calc(var(--thumb-height) - var(--clip-top));
 	--clip-further: calc(100% + 1px);
 	--box-fill: calc(-100vmax - var(--thumb-width, var(--thumb-height))) 0 0
@@ -62,7 +103,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 	width: var(--thumb-width, var(--thumb-height));
 	background: linear-gradient(currentColor 0 0) scroll no-repeat left center /
-		50% calc(var(--track-height) + 1px);
+		50% calc(var(--track-height) + 1px); /* --track-height not defined here in original */
 	background-color: currentColor;
 	box-shadow: var(--box-fill);
 	border-radius: var(--thumb-width, var(--thumb-height));
@@ -92,71 +133,11 @@ input[type="range"]:active::-webkit-slider-thumb {
 
 input[type="range"]::-webkit-slider-runnable-track {
 	background: linear-gradient(var(--track-color) 0 0) scroll no-repeat center /
-		100% calc(var(--track-height) + 1px);
+		100% calc(var(--track-height) + 1px); /* --track-height not defined here in original */
 }
 
 input[type="range"]:disabled::-webkit-slider-thumb {
 	cursor: not-allowed;
-}
-
-#app-container { /* NEW */
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1; /* Allow container to fill body */
-    width: 100%; /* Ensure it takes full width */
-    overflow: hidden; /* Prevent scrollbars within the app */
-}
-
-canvas {
-    display: block; /* Remove extra space below canvas */
-    /* width: 100vw; Removed */
-    /* height: 100vh; Removed */
-    width: 100%; /* Take full width of parent */
-    height: 0; /* Allow flex-grow to determine height */
-    flex-grow: 1; /* Allow canvas to take up remaining space */
-}
-#rulesetInput {
-    width: 50px;
-}
-
-#resetOnNewRuleCheckbox, #generateSymmetricalCheckbox, #useCustomBiasCheckbox { /* Apply to both checkboxes */
-    display: none; /* Hide the actual checkbox input */
-}
-
-#ui-container {
-    width: 100%;
-    box-sizing: border-box;
-    background-color: rgba(0, 0, 0, 0.9);
-    padding: 0px 0px;
-    display: flex;
-    align-items: center; /* Align items vertically */
-    justify-content: space-between; /* Push controls and stats apart */
-    gap: 3px; /* Add a small gap between controls and stats (adjust as needed) */
-    flex-wrap: nowrap; /* Prevent wrapping of controls/stats */
-    flex-shrink: 0;
-    border-top: 1px solid #444;
-}
-
-#controls-wrapper { /* NEW Style for the controls area */
-    width: 85%;
-    display: flex;
-    align-items: center;
-    gap: 15px; /* Gap between control groups */
-    flex-wrap: wrap; /* Allow control groups to wrap */
-    flex-shrink: 1; /* Allow controls to shrink if needed */
-    flex-grow: 1; /* Allow controls to take up available space within 85% */
-    justify-content: center;
-}
-
-.ui-group { /* NEW Style for groups */
-    display: flex;
-    align-items: center;
-    gap: 10px; /* Gap within groups */
-    padding: 5px 8px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
-    flex-shrink: 0; /* Prevent groups from shrinking too much */
-    flex-wrap: wrap; /* Allow items within a group to wrap if needed */
 }
 
 #ui-container label {
@@ -164,52 +145,10 @@ canvas {
     user-select: none; /* Prevent text selection on touch */
 }
 
-#ui-container label.checkbox-label { /* Specific style for checkbox label */
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 3px;
-    transition: background-color 0.2s ease;
-    border: 1px solid #555; /* Add a subtle border */
-}
-#ui-container label.checkbox-label:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-#ui-container input[type="checkbox"]:checked + label.checkbox-label {
-    background-color: #4CAF50; /* Green background when checked */
-    border-color: #3e8e41;
-    color: white;
-}
-#ui-container label.sym-label { /* Specific styling for "Symmetrical" to make it less wide */
-    padding: 4px 3px;
-}
-
-
-#ui-container input[type="range"] {
+#ui-container input[type="range"] { /* This applies to sliders inside #ui-container */
     cursor: pointer;
     vertical-align: middle;
     min-width: 100px; /* Ensure slider is wide enough */
-}
-
-#group-ruleset {
-    display: flex;
-    align-items: center; /* Align items including new checkbox/label */
-    flex-wrap: wrap;
-}
-
-#group-ruleset .bias-controls {
-    display: inline-flex; /* Align items in a row */
-    align-items: center; /* Vertically center items */
-    gap: 5px; /* Space between checkbox, label, slider, span */
-    margin-left: 10px; /* Space from the "New Rules" button */
-}
-
-/* Style for when the slider is disabled via JS (by checkbox) */
-#biasSlider:disabled {
-    opacity: 0.5;
-    cursor: not-allowed; /* Indicate it's not interactive */
-}
-#biasSlider:disabled + #biasValueSpan {
-    opacity: 0.5;
 }
 
 #ui-container input[type="text"] {
@@ -220,12 +159,6 @@ canvas {
     border-radius: 3px;
     font-size: 0.9em;
 }
-
-/* #ui-container input[type="checkbox"] {  -- We are hiding the default checkbox now
-    margin-right: -2px;
-    vertical-align: middle;
-    transform: scale(1.1);
-} */
 
 #ui-container button {
     padding: 6px 12px; /* Increased padding for touch */
@@ -262,6 +195,96 @@ canvas {
     font-family: monospace;
 }
 
+/* Added styles for slider value display (from original, seems to be for text overlay) */
+.slider-container {
+    position: relative; /* Establishes a positioning context for the span */
+    display: inline-flex; /* Aligns slider and potential future elements */
+    align-items: center; /* Vertically centers items if needed */
+}
+
+.slider-container input[type="range"] {
+    vertical-align: middle; /* Keeps slider aligned with labels etc. */
+}
+
+.slider-container span { /* This is the value display span */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #FFFFFF;
+    font-size: 0.8rem;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+    z-index: 2;
+    text-shadow: 0px 0px 3px rgba(0,0,0,0.9);
+    padding: 1px 3px;
+}
+
+
+/* === 4. SPECIFIC UI GROUP/SECTION STYLES === */
+.ui-group { /* NEW Style for groups */
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Gap within groups */
+    padding: 5px 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    flex-shrink: 0; /* Prevent groups from shrinking too much */
+    flex-wrap: wrap; /* Allow items within a group to wrap if needed */
+}
+
+#rulesetInput { /* From original, ID specific */
+    width: 50px; /* This is very small for a 32char hex */
+}
+
+#resetOnNewRuleCheckbox, #generateSymmetricalCheckbox, #useCustomBiasCheckbox { /* Apply to all these checkboxes */
+    display: none; /* Hide the actual checkbox input */
+}
+
+#ui-container label.checkbox-label { /* Specific style for checkbox label */
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+    border: 1px solid #555; /* Add a subtle border */
+}
+#ui-container label.checkbox-label:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+#ui-container input[type="checkbox"]:checked + label.checkbox-label { /* Assumes label immediately follows input */
+    background-color: #4CAF50; /* Green background when checked */
+    border-color: #3e8e41;
+    color: white;
+}
+#ui-container label.sym-label { /* Specific styling for "Symmetrical" to make it less wide */
+    padding: 4px 3px;
+}
+
+#group-ruleset {
+    display: flex;
+    align-items: center; /* Align items including new checkbox/label */
+    flex-wrap: wrap;
+}
+
+#group-ruleset .bias-controls {
+    display: inline-flex; /* Align items in a row */
+    align-items: center; /* Vertically center items */
+    gap: 5px; /* Space between checkbox, label, slider, span */
+    margin-left: 10px; /* Space from the "New Rules" button */
+}
+
+#biasSlider { /* From original, ID specific */
+    width: 200px;
+}
+/* Style for when the slider is disabled via JS (by checkbox) */
+#biasSlider:disabled { /* This is a more specific version of the general input[type=range]:disabled */
+    opacity: 0.5; /* Original had 0.3 for general, this is more specific */
+    cursor: not-allowed; /* Indicate it's not interactive */
+}
+#biasSlider:disabled + #biasValueSpan { /* Assumes span immediately follows */
+    opacity: 0.5;
+}
+
 .rule-display-wrapper { /* Wrapper for better spacing */
     margin-left: 5px;
 }
@@ -273,7 +296,7 @@ canvas {
 
 /* Stats Content Adjustments */
 #stats-content {
-    /*display: none;*/
+    /*display: none;*/ /* This was commented out in original */
     flex-basis: auto; /* Override previous basis */
     background-color: rgba(255, 255, 255, 0.08);
     padding: 4px 6px;
@@ -310,9 +333,16 @@ canvas {
     border-radius: 2px;
 }
 
-/* --- Ruleset Editor Panel --- */
+/* Ensure existing biasSlider vertical alignment works with the new container */
+/* This was a note, not an actual rule in original */
+/* #group-ruleset .bias-controls .slider-container {
+    vertical-align: middle;
+} */
+
+
+/* === 5. RULESET EDITOR PANEL STYLES === */
 #rulesetEditorPanel {
-    position: fixed; /* Changed from absolute to fixed */
+    position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -336,14 +366,8 @@ canvas {
     text-align: center;
     border-bottom: 1px solid #555;
     padding-bottom: 10px;
-    user-select: none; /* Add this to prevent text selection during drag */
-    /* cursor: move; will be set by JS, but can be here too */
+    user-select: none;
 }
-
-#rulesetEditorPanel.hidden {
-    display: none !important; /* Ensure hidden class takes precedence */
-}
-
 
 #closeEditorButton {
     position: absolute;
@@ -362,27 +386,26 @@ canvas {
     color: white;
 }
 
-
 .editor-controls {
-    display: flex; /* Align input and button in a row */
-    justify-content: center; /* Center them */
-    align-items: center; /* Vertically align */
-    gap: 10px; /* Space between input and button */
-    margin-bottom: 15px; /* Space below controls */
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
 }
 
 .editor-controls .editor-hex-input {
     font-family: monospace;
-    font-size: 1.4em; /* Slightly smaller to fit with select */
-    background-color: #222; /* Dark background */
-    color: #eee; /* Light text */
+    font-size: 1.4em;
+    background-color: #222;
+    color: #eee;
     border: 1px solid #555;
     border-radius: 4px;
     padding: 8px 10px;
-    width: 320px; /* Adjust width as needed */
+    width: 320px;
     text-align: center;
-    flex-grow: 1; /* Allow input to take more space */
+    flex-grow: 1;
     min-width: 200px;
 }
 .editor-controls .editor-hex-input::placeholder {
@@ -398,80 +421,60 @@ canvas {
     font-size: 0.9em;
 }
 
-
-/* Style for the "Clear" button in editor-controls to match ui-container buttons */
-.editor-controls button {
+.editor-controls button { /* Button style specific to editor controls */
     padding: 6px 12px;
     cursor: pointer;
-    background-color: #4a4a4a;
-    border: 1px solid #666;
-    color: white;
-    border-radius: 4px;
-    font-size: 1.0em; /* Match ui-container button font size */
+    background-color: #4a4a4a; /* Same as #ui-container button */
+    border: 1px solid #666;    /* Same as #ui-container button */
+    color: white;               /* Same as #ui-container button */
+    border-radius: 4px;         /* Same as #ui-container button */
+    font-size: 1.0em;
     transition: background-color 0.2s ease, transform 0.1s ease;
     user-select: none;
-    width: auto; /* Let content define width, or set fixed if preferred */
-    height: auto; /* Let content define height, or set fixed */
-    /* Ensure flex alignment works if needed */
+    width: auto; /* Let content define width */
+    height: auto; /* Let content define height */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 8px 12px; /* Match hex input padding for vertical alignment */
 }
 .editor-controls button:hover {
-    background-color: #5a5a5a;
+    background-color: #5a5a5a; /* Same as #ui-container button:hover */
 }
 .editor-controls button:active {
-    background-color: #6a6a6a;
-    transform: scale(0.98);
+    background-color: #6a6a6a; /* Same as #ui-container button:active */
+    transform: scale(0.98);    /* Same as #ui-container button:active */
 }
-
 
 .editor-text {
-    font-size: 0.9em; /* Slightly smaller to save space */
+    font-size: 0.9em;
     color: #eee;
-    margin: 10px auto 10px auto; /* Adjust margin */
+    margin: 10px auto 10px auto;
     text-align: left;
-    line-height: 1.4; /* Improve readability */
+    line-height: 1.4;
 }
 
-/* --- Ruleset Editor Grid --- */
+/* === 6. RULESET EDITOR GRID & HEXAGON STYLES === */
 #rulesetEditorGrid, #neighborCountRulesetEditorGrid {
     display: grid;
-    margin: 0 auto; /* Center the grid */
-    gap: 2px; /* Small gap between rule visualizations */
+    margin: 0 auto;
+    gap: 2px;
     padding: 5px;
     border: 1px solid #333;
     background-color: #1a1a1a;
     border-radius: 4px;
-    overflow: auto; /* If panel itself doesn't scroll enough */
+    overflow: auto;
 }
 
 #rulesetEditorGrid {
-    grid-template-columns: repeat(16, 42px); /* Responsive grid */
+    grid-template-columns: repeat(16, 42px);
     grid-template-rows: repeat(8, 56px);
 }
 
 #neighborCountRulesetEditorGrid {
-    grid-template-columns: repeat(7, 14%); /* Responsive columns */
+    grid-template-columns: repeat(7, 14%);
     grid-template-rows: auto;
     width: 95%;
-}
-
-
-/*if width less than 700px switch grid columns to 8 and rows to 16*/
-@media (max-width: 700px) {
-    #rulesetEditorGrid {
-        grid-template-columns: repeat(8, 42px);
-        grid-template-rows: repeat(16, 56px);
-    }
-    .editor-controls .editor-hex-input {
-        font-size: 1.2em;
-        width: 250px;
-    }
-    #neighborCountRulesetEditorGrid {
-         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    }
 }
 
 .editor-text-rules {
@@ -479,25 +482,21 @@ canvas {
     grid-template-columns: repeat(2, 50%);
 }
 
-.inline-hex {
-    transform: scale(1.5);
-}
-
-/* --- Individual Rule Visualization (Detailed) --- */
+/* Individual Rule Visualization (Detailed) */
 .rule-viz {
     position: relative;
-    width: 100px; /* Fixed width for consistency */
-    height: 110px; /* Fixed height */
-    margin: auto; /* Center in grid cell */
-    transform: scale(0.4) translate(-70px, -65px); /* Scale down slightly if needed */
-    cursor: pointer; /* Add cursor pointer for clickable items */
+    width: 100px;
+    height: 110px;
+    margin: auto;
+    transform: scale(0.4) translate(-70px, -65px);
+    cursor: pointer;
 }
 
-.rule-viz:hover .inner-hex { /* Add a slight hover effect */
+.rule-viz:hover .inner-hex {
     border-color: #FFF;
 }
 
-/* --- Neighbor Count Rule Visualization --- */
+/* Neighbor Count Rule Visualization */
 .neighbor-count-rule-viz {
     display: flex;
     flex-direction: column;
@@ -509,17 +508,16 @@ canvas {
     cursor: pointer;
     background-color: #282828;
     transition: background-color 0.2s ease;
-    min-height: 80px; /* Min height for consistency */
+    min-height: 80px;
     box-sizing: border-box;
 }
 .neighbor-count-rule-viz:hover {
     background-color: #3a3a3a;
 }
 .neighbor-count-rule-viz .hexagon.center-hex {
-    position: relative; /* Not absolute within this context */
-    transform: scale(0.8) translate(-53px, -53px);
+    position: relative;
+    transform: scale(0.8) translate(-53px, -53px); /* This translate looks large for just scale 0.8 */
     margin-bottom: 5px;
-    /* Ensure width/height are applied if base .hexagon doesn't */
     width: 40px;
     height: calc(40px * 1.154701);
 }
@@ -531,151 +529,125 @@ canvas {
     line-height: 1.2;
 }
 
-
-/* --- Hexagon Base Styles (Pointy-Top using CSS Clip Path) --- */
+/* Hexagon Base Styles (Pointy-Top using CSS Clip Path) */
 .hexagon {
     position: absolute;
-    width: 40px; /* Base size - Adjust if needed */
-    height: calc(40px * 1.154701); /* height = width * 2 / sqrt(3) ≈ width * 1.1547 */
-    /* Pointy-top polygon */
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
-    background-color: #555; /* Default/fallback */
+    width: 40px;
+    height: calc(40px * 1.154701);
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top polygon */
+    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top polygon */
+    background-color: #555;
     box-sizing: border-box;
 }
-
-/* Hexagon States (Remain the same) */
+/* Hexagon States */
 .hexagon.state-0 {
-    background-color: #404040; /* Darker grey for inactive */
+    background-color: #404040;
 }
 .hexagon.state-1 {
-    background-color: #FFFF00; /* Yellow for active */
+    background-color: #FFFF00;
 }
-.hexagon.state-2 { /* For "mixed" states, primarily for inner-hex in neighbor-count view */
-    background: linear-gradient(45deg, #633030, #306330); /* Darker mixed colors */
+.hexagon.state-2 { /* For "mixed" states */
+    background: linear-gradient(45deg, #633030, #306330);
 }
 
-
-/* Center Hexagon (Remains the same - centered) */
-.center-hex {
+/* Center Hexagon */
+.center-hex { /* This is for rule-viz */
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(1.0); /* Slightly larger center */
+    transform: translate(-50%, -50%) scale(1.0);
     z-index: 1;
 }
 
-/* Inner Hexagon (Result - Adjust height calculation if base width changed) */
-.inner-hex {
-    width: 60%;
-    height: calc(60% * 1.154701); /* Maintain aspect ratio */
+/* Inner Hexagon (Result) */
+.inner-hex { /* This is for rule-viz */
+    width: 60%; /* of parent .center-hex */
+    height: calc(60% * 1.154701); /* Maintain aspect ratio of parent's clip-path */
+    /* The clip-path should be the same as parent if shape is to be identical */
+    /* clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); */
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.8);
-    border: 1.0px solid #CCCCCC; /* ALWAYS show border */
-    z-index: 2; /* Above center hex */
-    transition: background-color 0.2s ease, border-color 0.2s ease; /* Smooth transition */
+    transform: translate(-50%, -50%) scale(0.8); /* This scale is on top of parent's .center-hex scale */
+    border: 1.0px solid #CCCCCC;
+    z-index: 2;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-.inner-hex.state-0 { background-color: #990000 !important; } /* Use important to override base if needed */
+.inner-hex.state-0 { background-color: #990000 !important; }
 .inner-hex.state-1 { background-color: #00BB00 !important; }
 .inner-hex.state-2 {
-    background: linear-gradient(45deg, #700000, #005000) !important; /* Darker mixed colors */
+    background: linear-gradient(45deg, #700000, #005000) !important;
     border-color: #888 !important;
 }
 
-
-/* Neighbor Hexagons Positioning (Pointy-Top Arrangement) */
-/* Adjust scale and offsets as needed for visual appeal */
-.neighbor-hex {
-    /* Scale neighbors down slightly */
-    /* Center the scaled neighbor on its target position */
+/* Neighbor Hexagons Positioning (Original used different order/positioning) */
+/* These are for .rule-viz with its specific transform. Flat-top arrangement. */
+/* Original neighbor order for .rule-viz: 0:SE, 1:NE, 2:N, 3:NW, 4:SW, 5:S (This is for the *bits*, visual layout is different) */
+/* The CSS classes .neighbor-0 to .neighbor-5 are for visual positioning of flat-top hexes around a center. */
+.neighbor-hex { /* For .rule-viz */
     transform-origin: center center;
-    transform: translate(-50%, -50%) scale(0.9);
+    transform: translate(-50%, -50%) scale(0.9); /* Relative to their own center for positioning */
 }
-/* Standard neighbor order: 0:SE, 1:NE, 2:N, 3:NW, 4:SW, 5:S */
-/* Positions are % of the .rule-viz container (100x110px approx) */
-/* Fine-tune these percentages for best visual fit */
-.neighbor-0 { top: 70%; left: 23%; }   /* Bottom-left */
-.neighbor-1 { top: 31%; left: 23%; }   /* Top-left */
-.neighbor-2 { top: 12%; left: 50%; }   /* Top */
-.neighbor-3 { top: 31%; left: 78%; }   /* Top-Right */
-.neighbor-4 { top: 70%; left: 78%; }   /* Bottom-Right */
-.neighbor-5 { top: 88%; left: 50%; }   /* Bottom */
+/* Original positioning for .rule-viz, assuming flat top for neighbors as well */
+.neighbor-0 { top: 70%; left: 23%; }   /* Bottom-left visually (SE bit if center is pointy) */
+.neighbor-1 { top: 31%; left: 23%; }   /* Top-left visually (NE bit) */
+.neighbor-2 { top: 12%; left: 50%; }   /* Top visually (N bit) */
+.neighbor-3 { top: 31%; left: 78%; }   /* Top-Right visually (NW bit) */
+.neighbor-4 { top: 70%; left: 78%; }   /* Bottom-Right visually (SW bit) */
+.neighbor-5 { top: 88%; left: 50%; }   /* Bottom visually (S bit) */
 
 
-/* Inline hexagons for the explanation text (Update clip-path and height) */
-.inline-hex {
+/* Inline hexagons for the explanation text */
+.inline-hex { /* Original had transform: scale(1.5) here. Removing to "not change" */
     display: inline-block;
-    width: 1em; /* Size relative to text */
-    height: calc(1em * 1.154701); /* Pointy-top aspect ratio */
-    /* Pointy-top polygon */
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    width: 1em;
+    height: calc(1em * 1.154701); /* Assuming pointy-top was intended here based on later clip-path */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top */
+    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top */
     vertical-align: middle;
     margin: 0 2px;
-    position: relative; /* Needed for inner hex */
+    position: relative;
     box-sizing: border-box;
 }
 .inline-hex-inner {
     position: absolute;
-    display: inline-block;
+    display: inline-block; /* Not strictly needed with absolute */
     width: 60%;
-    height: calc(60% * 1.154701); /* Pointy-top aspect ratio */
-     /* Pointy-top polygon */
-    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
+    height: calc(60% * 1.154701); /* Maintain aspect ratio based on its own width */
+    clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); /* Flat Top */
+    /* clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); */ /* Pointy Top */
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     border: 1px solid #CCCCCC;
     box-sizing: border-box;
 }
-/* State colors remain the same for inline hex explanation */
-/* .inner-hex.state-0 { background-color: #990000; } -- These are general, apply specific below if needed */
-/* .inner-hex.state-1 { background-color: #00BB00; } */
 .inline-hex.state-0 { background-color: #404040; }
 .inline-hex.state-1 { background-color: #FFFF00; }
-.inline-hex-inner.state-0 { background-color: #990000 !important; }
-.inline-hex-inner.state-1 { background-color: #00BB00 !important; }
+.inline-hex-inner.state-0 { background-color: #990000 !important; } /* from original */
+.inline-hex-inner.state-1 { background-color: #00BB00 !important; } /* from original */
 
-/* Added styles for slider value display */
-.slider-container {
-    position: relative; /* Establishes a positioning context for the span */
-    display: inline-flex; /* Aligns slider and potential future elements */
-    align-items: center; /* Vertically centers items if needed */
-    /* Adjust width if necessary, or let the input define it */
-    /* e.g., width: 150px; */
-}
 
-.slider-container input[type="range"] {
-    /* Ensure the input itself doesn't have extra padding that pushes the span away */
-    /* If the container has a fixed width, make the slider take it up: */
-    /* width: 100%; */
-    vertical-align: middle; /* Keeps slider aligned with labels etc. */
-}
-
-.slider-container span {
-    position: absolute; /* Position the span relative to the .slider-container */
-    left: 50%;          /* Center horizontally */
-    top: 50%;           /* Center vertically */
-    transform: translate(-50%, -50%); /* Fine-tune centering */
-    color: #FFFFFF;     /* White text for visibility */
-    font-size: 0.8rem;    /* Smaller font size to fit inside */
-    font-family: Arial, sans-serif; /* A clear, legible font */
-    pointer-events: none; /* Allows clicks to pass through to the slider */
-    z-index: 2;         /* Ensure the text is above the slider track */
-    text-shadow: 0px 0px 3px rgba(0,0,0,0.9); /* Shadow for better readability */
-    padding: 1px 3px;   /* A little padding around the text */
-    /* background-color: rgba(0,0,0,0.3); /* Optional: Slight background for contrast */
-    /* border-radius: 2px; */
-}
-
-/* Ensure existing biasSlider vertical alignment works with the new container */
-#group-ruleset .bias-controls .slider-container {
-    vertical-align: middle;
-}
-
-/* --- End of added styles --- */
-
-/* Make sure to place these before any @media queries if you want them to be general,
-   or inside specific media queries if they need to be responsive. */
-
-.hidden {
+/* === 7. UTILITY CLASSES === */
+.hidden { /* From original */
     display: none !important;
+}
+
+#rulesetEditorPanel.hidden { /* From original, more specific */
+    display: none !important;
+}
+
+
+/* === 8. MEDIA QUERIES === */
+/*if width less than 700px switch grid columns to 8 and rows to 16*/
+@media (max-width: 700px) { /* From original */
+    #rulesetEditorGrid {
+        grid-template-columns: repeat(8, 42px);
+        grid-template-rows: repeat(16, 56px);
+    }
+    .editor-controls .editor-hex-input {
+        font-size: 1.2em;
+        width: 250px;
+    }
+    #neighborCountRulesetEditorGrid {
+         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
 }
