@@ -45,6 +45,10 @@ let tickDuration = 1.0 / currentSpeed;
 
 let selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
 
+let isEntropySamplingEnabled = false;
+let entropySampleRate = 10; // Default: sample every 10 ticks
+let globalTickCounter = 0; // Counter across all steps
+
 // --- Initialization ---
 export function initSimulation() {
     console.log("Initializing Simulation...");
@@ -59,6 +63,10 @@ export function initSimulation() {
     } else {
         generateRandomRuleset(); // This sets and saves
     }
+
+    isEntropySamplingEnabled = false;
+    entropySampleRate = 10;
+    globalTickCounter = 0;
 
     let worldSettings = _loadFromLocalStorage(Config.LS_KEY_WORLD_SETTINGS, []);
     if (!worldSettings || worldSettings.length !== Config.NUM_WORLDS) {
@@ -109,10 +117,12 @@ export function initSimulation() {
         }
 
         const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
+        const initialEntropy = calculateBinaryEntropy(initialRatio); // Calculate initial entropy
         const stats = {
             ratio: initialRatio,
             avgRatio: initialRatio,
-            history: new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio)
+            history: new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio),
+            entropyHistory: new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy)
         };
 
         worldsData.push({
@@ -136,10 +146,29 @@ function countSetBits(n) {
     return count;
 }
 
+// --- Entropy Calculation ---
+/**
+ * Calculates Shannon entropy for a binary distribution.
+ * @param {number} p1 Probability of state 1 (e.g., ratio of active cells).
+ * @returns {number} Shannon entropy (between 0 and 1).
+ */
+function calculateBinaryEntropy(p1) {
+    if (p1 <= 0 || p1 >= 1) {
+        return 0; // Entropy is 0 if the state is certain (all 0 or all 1)
+    }
+    const p0 = 1 - p1;
+    // Use Math.log2 if available, otherwise use log(base e) / log(2)
+    const log2 = Math.log2 || function(x) { return Math.log(x) / Math.LN2; };
+    const entropy = - (p1 * log2(p1) + p0 * log2(p0));
+    // Clamp result just in case of floating point inaccuracies near 0 or 1
+    return Math.max(0, Math.min(1, entropy));
+}
+
 // --- Simulation Step Logic ---
 function runSingleStepForAllWorlds() {
     const numCols = Config.GRID_COLS;
     const numRows = Config.GRID_ROWS;
+    globalTickCounter++; // Increment global counter
 
     for (let worldIdx = 0; worldIdx < worldsData.length; worldIdx++) {
         const world = worldsData[worldIdx];
@@ -173,6 +202,16 @@ function runSingleStepForAllWorlds() {
             if (nextState === 1) activeCount++;
         }
         updateWorldStats(world, activeCount);
+
+        if (isEntropySamplingEnabled && (globalTickCounter % entropySampleRate === 0)) {
+            // Calculate entropy based on the ratio that was just updated in updateWorldStats
+            const currentEntropy = calculateBinaryEntropy(world.stats.ratio);
+            world.stats.entropyHistory.push(currentEntropy);
+            if (world.stats.entropyHistory.length > Config.STATS_HISTORY_SIZE) {
+                world.stats.entropyHistory.shift();
+            }
+        }
+
         world.jsStateArray.set(world.jsNextStateArray);
         world.jsRuleIndexArray.set(world.jsNextRuleIndexArray);
     }
@@ -555,6 +594,7 @@ export function getWorldSettings() {
 export function resetAllWorldsToCurrentSettings() {
     console.log("Resetting all worlds to current settings...");
     if (!worldsData) return;
+    globalTickCounter = 0; // Reset tick counter on full reset
 
     for (let i = 0; i < worldsData.length; i++) {
         const world = worldsData[i];
@@ -584,15 +624,17 @@ export function resetAllWorldsToCurrentSettings() {
             world.jsStateArray.fill(0); // Disabled worlds are reset to empty
             activeCount = 0;
         }
-        world.jsRuleIndexArray.fill(0);
-        world.jsNextStateArray.fill(0);
-        world.jsNextRuleIndexArray.fill(0);
-        world.jsHoverStateArray.fill(0);
-
         const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
+        const initialEntropy = calculateBinaryEntropy(initialRatio);
         world.stats.ratio = initialRatio;
         world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
         world.stats.avgRatio = initialRatio;
+        world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy); // Reset entropy history
+
+         world.jsRuleIndexArray.fill(0);
+         world.jsNextStateArray.fill(0);
+         world.jsNextRuleIndexArray.fill(0);
+         world.jsHoverStateArray.fill(0);
     }
     console.log("All worlds reset based on their current settings.");
 }
@@ -630,9 +672,11 @@ export function loadWorldState(worldIndex, stateData) {
 
      // Reset and recalculate stats for the loaded world
      const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
+     const initialEntropy = calculateBinaryEntropy(initialRatio);
      world.stats.ratio = initialRatio;
      world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
      world.stats.avgRatio = initialRatio;
+     world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy); // Reset entropy history
      world.enabled = true; // Loading a state into a world implies enabling it
      setWorldEnabled(worldIndex, true); // Save this change
 
@@ -708,14 +752,67 @@ export function isSimulationPaused() { return isPaused; }
 export function getSelectedWorldIndex() { return selectedWorldIndex; }
 export function getCurrentSimulationSpeed() { return currentSpeed; } // For UI to init
 export function getCurrentBrushSize() { return currentBrushSize; } // For UI to init
+export function getEntropySamplingState() {
+    return {
+        enabled: isEntropySamplingEnabled,
+        rate: entropySampleRate
+    };
+}
 
+/**
+ * Sets the entropy sampling parameters.
+ * @param {boolean} enabled Whether to enable continuous sampling.
+ * @param {number} rate The sampling rate (sample every 'rate' ticks). Must be >= 1.
+ */
+export function setEntropySampling(enabled, rate) {
+    isEntropySamplingEnabled = !!enabled;
+    entropySampleRate = Math.max(1, Math.floor(rate)); // Ensure rate is at least 1
+    console.log(`Entropy Sampling: ${isEntropySamplingEnabled ? 'ON' : 'OFF'}, Rate: ${entropySampleRate}`);
+    // Optionally save these to LS_KEY_UI_SETTINGS here if persistence is desired
+    // _saveUISetting('entropySamplingEnabled', isEntropySamplingEnabled);
+    // _saveUISetting('entropySampleRate', entropySampleRate);
+}
+
+/**
+ * Gets statistics for the currently selected world, including calculated entropy.
+ * @returns {{ratio: number, avgRatio: number, history: number[], entropy: number}|null} Stats object or null if no world selected.
+ */
 export function getSelectedWorldStats() {
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
-        return worldsData[selectedWorldIndex].stats;
+        const stats = worldsData[selectedWorldIndex].stats;
+        // Return the last recorded entropy value from the history
+        const lastEntropy = stats.entropyHistory.length > 0
+            ? stats.entropyHistory[stats.entropyHistory.length - 1]
+            : 0; // Default if history is somehow empty
+
+        return {
+            ratio: stats.ratio,
+            avgRatio: stats.avgRatio,
+            history: stats.history, // Ratio history
+            entropy: lastEntropy   // Last sampled entropy
+        };
     }
-    // Return a default/empty stats object if selection is invalid or world disabled
-    return { ratio: 0, avgRatio: 0, history: new Array(Config.STATS_HISTORY_SIZE).fill(0) };
+    return { ratio: 0, avgRatio: 0, history: [], entropy: 0 }; // Ensure history is array
 }
 export function getCurrentRulesetArray() {
     return new Uint8Array(currentRuleset);
+}
+
+export function getSelectedWorldEntropyHistory() {
+    if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
+        return worldsData[selectedWorldIndex].stats.entropyHistory;
+    }
+    return null;
+}
+
+// --- New function to get stats history specifically for plotting ---
+/**
+ * Gets the ratio history for the selected world.
+ * @returns {number[]|null} Array of historical ratios or null.
+ */
+export function getSelectedWorldRatioHistory() {
+    if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
+        return worldsData[selectedWorldIndex].stats.history;
+    }
+    return null;
 }

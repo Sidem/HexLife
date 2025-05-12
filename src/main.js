@@ -77,6 +77,12 @@ async function initialize() {
         setWorldInitialDensity: Simulation.setWorldInitialDensity,
         setWorldEnabled: Simulation.setWorldEnabled,
         resetAllWorldsToCurrentSettings: Simulation.resetAllWorldsToCurrentSettings,
+        getSelectedWorldStats: Simulation.getSelectedWorldStats, // Gets ratio, avgRatio, history, and calculates current entropy
+        getSelectedWorldRatioHistory: Simulation.getSelectedWorldRatioHistory,
+        // New functions for sampling and entropy history
+        setEntropySampling: Simulation.setEntropySampling,
+        getEntropySamplingState: Simulation.getEntropySamplingState,
+        getSelectedWorldEntropyHistory: Simulation.getSelectedWorldEntropyHistory
     };
 
     // UI.initUI will now use simulationInterface to get initial speed/brush for sliders
@@ -121,11 +127,12 @@ function handleCanvasClick(event) {
         Simulation.setSelectedWorldIndex(worldIndex);
 
         if (viewType === 'selected' && col !== null && row !== null) {
-            // Get current brush size from simulation module for applying brush
             Simulation.applyBrush(worldIndex, col, row, Simulation.getCurrentBrushSize());
         }
-        if (worldIndex !== previousSelectedWorld || viewType === 'selected') {
-            UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
+        // Update stats display (Ratio/AvgRatio) AND analysis panel plots
+        if (worldIndex !== previousSelectedWorld || (viewType === 'selected' && col !== null)) {
+             UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
+             UI.updateAnalysisPanel(); // Update plots on selection change/interaction
         }
     }
 }
@@ -330,6 +337,7 @@ function renderLoop(timestamp) {
 
     // Update the performance display every frame with the latest calculated values
     UI.updatePerformanceDisplay(actualFps, actualTps);
+    UI.updateAnalysisPanel();
 
     requestAnimationFrame(renderLoop);
 }

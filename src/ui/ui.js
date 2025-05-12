@@ -3,6 +3,7 @@ import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js'; // Import the new SetupPanel
+import { DraggablePanel } from './components/DraggablePanel.js'; // Import the new SetupPanel
 
 // --- DOM Element References ---
 let uiElements;
@@ -11,6 +12,7 @@ let uiElements;
 let simulationInterfaceRef;
 let rulesetEditorComponent;
 let setupPanelComponent; // Reference to the SetupPanel instance
+let analysisPanelComponent; // Reference for the new DraggablePanel instance
 
 // --- localStorage Helper for UI settings ---
 function _saveUISetting(key, value) {
@@ -63,11 +65,21 @@ export function initUI(simulationInterface) {
         statAvgRatio: document.getElementById('stat-avg-ratio'),
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'), // New panel element
+        analysisPanel: document.getElementById('analysisPanel'), // New Panel Element
         useCustomBiasCheckbox: document.getElementById('useCustomBiasCheckbox'),
         biasSlider: document.getElementById('biasSlider'),
         biasValueSpan: document.getElementById('biasValueSpan'),
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
+        analysisPanelButton: document.getElementById('analysisPanelButton'), // Button to toggle panel
+        closeAnalysisPanelButton: document.getElementById('closeAnalysisPanelButton'),
+        //calculateEntropyButton: document.getElementById('calculateEntropyButton'),
+        statEntropy: document.getElementById('stat-entropy'), // Display for entropy value
+        ratioPlotCanvas: document.getElementById('ratioPlotCanvas'), // Canvas for plot
+        entropyPlotCanvas: document.getElementById('entropyPlotCanvas'),
+        enableEntropySamplingCheckbox: document.getElementById('enableEntropySamplingCheckbox'),
+        entropySampleRateSlider: document.getElementById('entropySampleRateSlider'),
+        entropySampleRateValue: document.getElementById('entropySampleRateValue')
     };
 
     if (!validateElements()) return false;
@@ -85,20 +97,64 @@ export function initUI(simulationInterface) {
         console.warn("Setup panel element not found. World setup functionality will be disabled.");
         if (uiElements.setupPanelButton) uiElements.setupPanelButton.disabled = true;
     }
+    // Instantiate DraggablePanel for the new Analysis Panel
+    if (uiElements.analysisPanel) {
+        analysisPanelComponent = new DraggablePanel(uiElements.analysisPanel, 'h3');
+        // Add listeners for its internal controls
+        if (uiElements.closeAnalysisPanelButton) {
+            uiElements.closeAnalysisPanelButton.addEventListener('click', () => analysisPanelComponent.hide());
+        }
+        if (uiElements.enableEntropySamplingCheckbox) {
+            uiElements.enableEntropySamplingCheckbox.addEventListener('change', handleSamplingControlsChange);
+        }
+        if (uiElements.entropySampleRateSlider) {
+            uiElements.entropySampleRateSlider.addEventListener('input', handleSamplingControlsChange);
+             uiElements.entropySampleRateSlider.addEventListener('wheel', (event) => {
+                 if (uiElements.entropySampleRateSlider.disabled) return;
+                 // Use generic handler, no direct sim update, update state via change handler
+                 handleSliderWheel(event, uiElements.entropySampleRateSlider, uiElements.entropySampleRateValue, null);
+                 // Manually trigger change after wheel event
+                 handleSamplingControlsChange();
+             }, { passive: false });
+        }
+    } else {
+        console.warn("Analysis panel element not found. Analysis functionality will be disabled.");
+        if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
+    }
 
     setupGeneralListeners(simulationInterface); // Renamed for clarity
     setupPanelToggleListeners();
     setupStateListeners(simulationInterface);
-
-    // Initial UI setup from localStorage or defaults
     loadAndApplyUISettings(simulationInterface);
-
+    loadAndApplyAnalysisSettings();
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     refreshAllRulesetViews(simulationInterfaceRef); // Initial display
+    updateBiasSliderDisabledState();
+    updateSamplingControlsState(); // Initialize slider disabled state
     console.log("UI Initialized.");
     return true;
 }
+
+function loadAndApplyAnalysisSettings() {
+    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !uiElements.entropySampleRateSlider) return;
+    const samplingState = simulationInterfaceRef.getEntropySamplingState();
+    uiElements.enableEntropySamplingCheckbox.checked = samplingState.enabled;
+    uiElements.entropySampleRateSlider.value = samplingState.rate;
+    if(uiElements.entropySampleRateValue) uiElements.entropySampleRateValue.textContent = samplingState.rate;
+    updateSamplingControlsState(); // Ensure slider disabled state matches checkbox
+}
+
+function updateSamplingControlsState() {
+    if (uiElements.enableEntropySamplingCheckbox && uiElements.entropySampleRateSlider) {
+       const isDisabled = !uiElements.enableEntropySamplingCheckbox.checked;
+       uiElements.entropySampleRateSlider.disabled = isDisabled;
+       if (uiElements.entropySampleRateValue) {
+           uiElements.entropySampleRateValue.style.opacity = isDisabled ? '0.5' : '1';
+       }
+    }
+}
+
 
 function loadAndApplyUISettings(sim) {
     // Speed
@@ -128,6 +184,7 @@ function loadAndApplyUISettings(sim) {
     uiElements.resetStatesButton.textContent = "[R]eset"; // Matched HTML more closely
     if (uiElements.editRuleButton) uiElements.editRuleButton.textContent = "[E]dit";
     if (uiElements.setupPanelButton) uiElements.setupPanelButton.textContent = "[S]etup";
+    if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.textContent = "[A]nalyse"; // Set button text
 }
 
 
@@ -175,6 +232,11 @@ function validateElements() {
             }
         }
     }
+    if (!uiElements.analysisPanel) {
+        if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
+        if (uiElements.calculateEntropyButton) uiElements.calculateEntropyButton.disabled = true;
+   }
+
     return allEssentialFound;
 }
 
@@ -195,7 +257,9 @@ function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpd
     if (isBias) { // Check if it's the bias slider
         currentValue = parseFloat(currentValue.toFixed(3));
     } else {
+        // Ensure integer steps for non-bias sliders like speed, brush, rate
         currentValue = Math.round(currentValue / step) * step;
+        currentValue = Math.max(min, Math.min(max, currentValue)); // Re-clamp after rounding
     }
     slider.value = currentValue;
 
@@ -205,6 +269,7 @@ function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpd
     if (simulationUpdateFunction) simulationUpdateFunction(currentValue);
     else if (isBias) _saveUISetting('biasValue', currentValue); // Save bias if no direct sim update
 
+    // Dispatch an 'input' event so other listeners (like handleSamplingControlsChange) are triggered
     const inputEvent = new Event('input', { bubbles: true, cancelable: true });
     slider.dispatchEvent(inputEvent);
 }
@@ -365,7 +430,154 @@ function setupPanelToggleListeners() { // Renamed from setupEditorListeners
             setupPanelComponent.show();
         });
     }
+    if (uiElements.analysisPanelButton && analysisPanelComponent) {
+        uiElements.analysisPanelButton.addEventListener('click', () => {
+             const panelNowVisible = analysisPanelComponent.toggle();
+             if (panelNowVisible) {
+                 updateAnalysisPanel(); // Update plot immediately when opened
+             }
+        });
+    }
 }
+
+/**
+ * Updates the entropy display and redraws the history plots
+ * in the analysis panel based on current simulation data.
+ */
+export function updateAnalysisPanel() {
+    // Check if panel exists and is visible
+    if (!analysisPanelComponent || !uiElements.analysisPanel || uiElements.analysisPanel.classList.contains('hidden') || !simulationInterfaceRef) {
+        return;
+    }
+
+    // Get latest stats (includes last sampled entropy)
+    const stats = simulationInterfaceRef.getSelectedWorldStats();
+    if (stats && uiElements.statEntropy) {
+        uiElements.statEntropy.textContent = stats.entropy.toFixed(4);
+    } else if (uiElements.statEntropy) {
+        uiElements.statEntropy.textContent = "N/A";
+    }
+
+    // Get histories
+    const ratioHistory = simulationInterfaceRef.getSelectedWorldRatioHistory();
+    const entropyHistory = simulationInterfaceRef.getSelectedWorldEntropyHistory();
+
+    // Draw plots
+    if (uiElements.ratioPlotCanvas) {
+        drawMinimalistPlot(uiElements.ratioPlotCanvas, ratioHistory, '#00FFFF'); // Cyan for ratio
+    }
+    if (uiElements.entropyPlotCanvas) {
+        drawMinimalistPlot(uiElements.entropyPlotCanvas, entropyHistory, '#FFA500'); // Orange for entropy
+    }
+}
+
+function handleSamplingControlsChange() {
+    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !uiElements.entropySampleRateSlider || !uiElements.entropySampleRateValue) return;
+    const enabled = uiElements.enableEntropySamplingCheckbox.checked;
+    const rate = parseInt(uiElements.entropySampleRateSlider.value, 10);
+    uiElements.entropySampleRateValue.textContent = rate;
+    updateSamplingControlsState(); // Update slider enabled state
+    simulationInterfaceRef.setEntropySampling(enabled, rate);
+    // Persist settings if desired (using _saveUISetting)
+    // _saveUISetting('entropySamplingEnabled', enabled);
+    // _saveUISetting('entropySampleRate', rate);
+}
+
+function handleCalculateAndPlot() {
+    if (!simulationInterfaceRef || !uiElements.statEntropy || !uiElements.ratioPlotCanvas) return;
+
+    // 1. Get current stats (which includes on-demand entropy calculation)
+    const stats = simulationInterfaceRef.getSelectedWorldStats();
+    if (!stats) {
+        uiElements.statEntropy.textContent = "N/A";
+        // Clear plot maybe?
+        const ctx = uiElements.ratioPlotCanvas.getContext('2d');
+        ctx.clearRect(0, 0, uiElements.ratioPlotCanvas.width, uiElements.ratioPlotCanvas.height);
+        return;
+    }
+
+    // 2. Update the entropy display
+    uiElements.statEntropy.textContent = stats.entropy.toFixed(4);
+
+    // 3. Get the ratio history for plotting
+    const history = stats.history; // Use the ratio history from the stats object
+    if (!history || history.length === 0) {
+        // Clear plot if no history
+        const ctx = uiElements.ratioPlotCanvas.getContext('2d');
+        ctx.clearRect(0, 0, uiElements.ratioPlotCanvas.width, uiElements.ratioPlotCanvas.height);
+        return;
+    }
+
+    // 4. Draw the plot
+    drawMinimalistPlot(uiElements.ratioPlotCanvas, history);
+}
+
+// --- Minimalistic Plotting Function (Updated) ---
+/**
+ * Draws a simple line graph. Assumes data values 0-1.
+ * @param {HTMLCanvasElement} canvas
+ * @param {number[]} dataHistory
+ * @param {string} color Line color
+ */
+function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
+    if (!canvas || !dataHistory ) { // Allow empty history, just clear canvas
+         if(canvas) {
+             const ctx = canvas.getContext('2d');
+             ctx.fillStyle = '#2a2a2a';
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
+         }
+         return;
+    }
+    if (dataHistory.length === 0) { // Explicitly handle empty history after check
+         const ctx = canvas.getContext('2d');
+         ctx.fillStyle = '#2a2a2a';
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+         return;
+    }
+
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 5;
+
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(0, 0, width, height);
+
+    const plotWidth = width - 2 * padding;
+    const plotHeight = height - 2 * padding;
+    const dataLength = dataHistory.length;
+
+    // Draw bounds
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padding, padding); ctx.lineTo(width - padding, padding); // Top (1.0)
+    ctx.moveTo(padding, height - padding); ctx.lineTo(width - padding, height - padding); // Bottom (0.0)
+    ctx.stroke();
+
+    // Draw data line
+    ctx.strokeStyle = color; // Use provided color
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+
+    for (let i = 0; i < dataLength; i++) {
+        const x = padding + (i / (dataLength - 1 || 1)) * plotWidth;
+        const yValue = Math.max(0, Math.min(1, dataHistory[i])); // Clamp data just in case
+        const y = padding + (1 - yValue) * plotHeight; // Map 0-1 to inverted canvas Y
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+     if (dataLength > 0) { // Only stroke if there's data
+        ctx.stroke();
+     }
+}
+
+
 
 // --- UI Update Functions ---
 
@@ -413,7 +625,6 @@ function handleGlobalKeyDown(event) {
         const isInputElement = tagName === 'input' || tagName === 'textarea' || tagName === 'select';
         const isContentEditable = activeEl.isContentEditable;
         if (event.key === 'Enter' && rulesetEditorComponent && activeEl === rulesetEditorComponent.uiElements.editorRulesetInput) {
-            // Let component handle
         } else if (isInputElement || isContentEditable) {
             return;
         }
@@ -424,6 +635,7 @@ function handleGlobalKeyDown(event) {
         case 'N': uiElements.randomRulesetButton?.click(); event.preventDefault(); break;
         case 'R': uiElements.resetStatesButton?.click(); event.preventDefault(); break;
         case 'E': rulesetEditorComponent?.toggle(); event.preventDefault(); break;
-        case 'S': setupPanelComponent?.toggle(); event.preventDefault(); break; // New hotkey for Setup Panel
+        case 'S': setupPanelComponent?.toggle(); event.preventDefault(); break;
+        case 'A': analysisPanelComponent?.toggle(); event.preventDefault(); break;
     }
 }

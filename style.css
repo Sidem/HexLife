@@ -619,6 +619,106 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     font-size: 0.85em;
 }
 
+#analysisPanel {
+    width: clamp(400px, 60vw, 550px); /* Increased default width slightly */
+}
+
+#analysisPanel.hidden {
+    display: none !important;
+}
+
+.analysis-controls {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 5px;
+    margin-bottom: 10px; /* Reduced margin */
+    border-bottom: 1px solid #333;
+    gap: 10px; /* Spacing between control groups */
+}
+.analysis-controls .button {
+    height: auto;
+    padding: 6px 12px;
+    min-width: 120px; /* Give button some width */
+    flex-shrink: 0;
+}
+
+.sampling-control {
+    display: inline-flex; /* Keep checkbox and label together */
+    align-items: center;
+}
+.sampling-control .checkbox-label {
+     padding: 5px 8px; /* Slightly smaller padding */
+     font-size: 0.9em;
+}
+
+.sampling-slider {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.sampling-slider label {
+    font-size: 0.85em;
+    color: #aaa;
+}
+#entropySampleRateSlider {
+    width: 120px; /* Adjust width */
+    min-width: 80px;
+    /* Inherits general range slider styles */
+}
+#entropySampleRateSlider:disabled {
+    /* General disabled styles apply */
+    opacity: 0.4;
+}
+#entropySampleRateSlider:disabled + span.value-display {
+    opacity: 0.5;
+}
+
+
+.entropy-display {
+    font-size: 0.95em;
+    color: #ddd;
+    margin-left: auto; /* Push to the right if space allows */
+    padding-left: 10px; /* Add some space */
+    white-space: nowrap; /* Prevent breaking */
+}
+
+.entropy-display span {
+    font-weight: bold;
+    margin-left: 5px;
+    background-color: rgba(0,0,0,0.2);
+    padding: 2px 5px;
+    border-radius: 3px;
+    display: inline-block;
+    min-width: 50px;
+    text-align: right;
+}
+
+.plot-container {
+    margin-top: 10px;
+    padding: 8px; /* Slightly more padding */
+    border: 1px solid #333;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.plot-container label { /* Applies to both plot labels */
+    font-size: 0.8em;
+    color: #aaa;
+    margin-bottom: 5px;
+    text-align: center;
+}
+#ratioPlotCanvas, #entropyPlotCanvas { /* Apply to both canvases */
+    display: block;
+    width: 100%;
+    height: 100px;
+    background-color: #2a2a2a;
+    border-radius: 2px; /* Optional slight rounding */
+}
+
 
 /* === 8. UTILITY CLASSES === */
 .hidden {
@@ -645,6 +745,18 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     #setupPanel {
         width: clamp(280px, 85vw, 400px); /* Adjust width for smaller screens */
     }
+    #analysisPanel {
+        width: clamp(300px, 80vw, 400px); /* Adjust analysis panel width */
+   }
+   .analysis-controls {
+        justify-content: center; /* Center controls when wrapping */
+    }
+    .entropy-display {
+    margin-left: 0; /* Reset margin */
+    width: 100%; /* Take full width if wrapping */
+    text-align: center;
+    margin-top: 5px;
+    }
 }
 @media (max-width: 480px) {
     /* Adjust main UI bar layout for very small screens */
@@ -669,4 +781,12 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     .editor-controls #clearRulesButton.button {
         width: 100%; margin-bottom: 5px;
     }
+    .analysis-controls {
+        flex-direction: column; /* Stack button and display */
+        align-items: center;
+        gap: 10px;
+     }
+     #analysisPanel {
+         width: clamp(250px, 90vw, 300px); /* Adjust analysis panel width */
+     }
 }

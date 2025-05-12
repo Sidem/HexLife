@@ -11,9 +11,7 @@
 <body>
     <div id="app-container">
         <canvas id="hexGridCanvas"></canvas>
-
         <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
-
         <div id="ui-container">
             <div id="primary-controls-area">
                 <div class="ui-group" id="group-title">
@@ -23,47 +21,52 @@
                     <button id="playPauseButton" class="button">Play</button>
                     <label for="speedSlider">Speed:</label>
                     <div class="slider-container">
-                        <input type="range" id="speedSlider" name="speedSlider" min="1" max="60" value="10" step="1">
-                        <span id="speedValue" class="value-display">10</span>
+                        <input type="range" id="speedSlider" name="speedSlider" min="1" max="120" value="20" step="1">
+                        <span id="speedValue" class="value-display">20</span>tps
                     </div>
-                     tps
                 </div>
 
                 <div class="ui-group" id="group-brush">
                     <label for="neighborhoodSize">Brush:</label>
                     <div class="slider-container">
-                        <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="20" value="1"
+                        <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="40" value="0"
                             step="1">
-                        <span id="neighborhoodValue" class="value-display">1</span>
+                        <span id="neighborhoodValue" class="value-display">0</span>
                     </div>
                 </div>
 
                 <div class="ui-group" id="group-ruleset">
-                    <button id="randomRulesetButton" class="button">New Rules</button>
-                    <input type="checkbox" id="generateSymmetricalCheckbox" class="checkbox-input" title="Generate rules symmetrically (based on neighbor count)" checked>
+                    <button id="randomRulesetButton" class="button">[N]ew Rules</button>
+                    <input type="checkbox" id="generateSymmetricalCheckbox" class="checkbox-input"
+                        title="Generate rules symmetrically (based on neighbor count)" checked>
                     <label for="generateSymmetricalCheckbox" class="checkbox-label sym-label">Symmetrical</label>
                     <div class="bias-controls">
                         <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
                         <div class="slider-container">
                             <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.001">
-                            <span id="biasValueSpan" class="value-display">0.50</span>
+                            <span id="biasValueSpan" class="value-display">0.500</span>
                         </div>
                     </div>
-                     <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input" title="Reset all world states when generating a new ruleset" checked>
-                     <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
+                    <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input"
+                        title="Reset all world states when generating a new ruleset" checked>
+                    <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
                 </div>
                 <div class="ui-group" id="group-ruleset-input">
                     <button id="copyRuleButton" class="button" title="Copy current ruleset hex code">Copy</button>
                     <input type="text" id="rulesetInput" class="hex-input" placeholder="32 hex chars">
                     <button id="setRuleButton" class="button">Set</button>
-                    <button id="editRuleButton" class="button" title="[E] Show visual editor for the current ruleset">Edit</button>
+                    <button id="editRuleButton" class="button"
+                        title="[E] Show visual editor for the current ruleset">[E]dit</button>
                 </div>
                 <div class="ui-group" id="group-state">
                     <button id="saveStateButton" class="button" title="Save current grid state">Save</button>
-                    <button id="loadStateButton" class="button" title="Load grid state from .json/.txt file">Load</button>
-                    <button id="resetStatesButton" class="button" title="[R] Reset all worlds to initial densities">Reset All</button>
+                    <button id="loadStateButton" class="button"
+                        title="Load grid state from .json/.txt file">Load</button>
+                    <button id="resetStatesButton" class="button"
+                        title="[R] Reset all worlds to initial densities">[R]eset All</button>
                     <button id="setupPanelButton" class="button" title="[S] Open world setup panel">[S]etup</button>
+                    <button id="analysisPanelButton" class="button" title="[A] Open analysis panel">Analyse</button>
                 </div>
             </div>
 
@@ -83,8 +86,11 @@
             <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>Ruleset Editor</h3>
             <div class="editor-controls">
-                <input type="text" id="editorRulesetInput" class="editor-hex-input" placeholder="32 hex chars (e.g., FFFFFF...000000)" title="Current ruleset hex code. Edit and press Enter or click away to apply.">
-                <button id="clearRulesButton" class="button" title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
+                <input type="text" id="editorRulesetInput" class="editor-hex-input"
+                    placeholder="32 hex chars (e.g., FFFFFF...000000)"
+                    title="Current ruleset hex code. Edit and press Enter or click away to apply.">
+                <button id="clearRulesButton" class="button"
+                    title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
                 <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed" selected>Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 rules)</option>
@@ -95,33 +101,67 @@
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
                 <div class="editor-text">
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
-                    <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.</p>
-                    <p>Click on a rule's inner hexagon (Detailed) or the whole visualization (Neighbor Count) to toggle its output state.</p>
+                    <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
+                    </p>
+                    <p>Click on a rule's inner hexagon (Detailed) or the whole visualization (Neighbor Count) to toggle
+                        its output state.</p>
                     <div class="editor-text-rules">
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
+                            inactive</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span>
+                            becomes active</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span>
+                            becomes inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays
+                            active</p>
                     </div>
                 </div>
             </div>
         </div>
-
         <div id="setupPanel" class="draggable-panel-base hidden">
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Changes are saved automatically. Click "Apply & Reset" to re-initialize all worlds with the current settings.</p>
-                <div id="worldSetupGrid" class="world-config-grid">
-                    </div>
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Changes
+                    are saved automatically. Click "Apply & Reset" to re-initialize all worlds with the current
+                    settings.</p>
+                <div id="worldSetupGrid" class="world-config-grid"></div>
                 <div class="panel-actions">
                     <button id="applySetupButton" class="button">Apply & Reset Worlds</button>
                 </div>
             </div>
         </div>
+        <div id="analysisPanel" class="draggable-panel-base hidden">
+            <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
+            <h3>Analysis Tools</h3>
+            <div class="panel-content-area">
+                <p class="editor-text info-text">Analysis for the currently selected world. Enable sampling for live plots.</p>
+                <div class="analysis-controls">
+                    <div class="sampling-control">
+                        <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
+                        <label for="enableEntropySamplingCheckbox" class="checkbox-label">Sample Continuously</label>
+                    </div>
+                     <div class="slider-container sampling-slider">
+                         <label for="entropySampleRateSlider">Rate (Ticks):</label>
+                         <input type="range" id="entropySampleRateSlider" min="1" max="500" value="10" step="1" disabled>
+                         <span id="entropySampleRateValue" class="value-display">10</span>
+                     </div>
+                     <div class="entropy-display">
+                         Current Entropy: <span id="stat-entropy">N/A</span>
+                     </div>
+                </div>
 
+                <div class="plot-container">
+                    <label for="ratioPlotCanvas">Activity Ratio History (0.0 to 1.0)</label>
+                    <canvas id="ratioPlotCanvas" width="400" height="100"></canvas>
+                </div>
+                 <div class="plot-container">
+                     <label for="entropyPlotCanvas">Sampled Entropy History (0.0 to 1.0)</label>
+                     <canvas id="entropyPlotCanvas" width="400" height="100"></canvas>
+                 </div>
+            </div>
+        </div>
     </div>
-
     <script type="module" src="src/main.js"></script>
 </body>
 
