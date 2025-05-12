@@ -39,7 +39,7 @@ export const MAX_NEIGHBORHOOD_SIZE = 40;
 export const STATS_HISTORY_SIZE = 100; // For moving average ratio
 
 // Rendering Defaults
-export const RENDER_TEXTURE_SIZE = 1024; // Increased from 512
+export const RENDER_TEXTURE_SIZE = 1280; // Increased from 512
 
 // Colors (Normalized RGBA 0-1)
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0];    // Yellow (No longer primary way cells are colored)
@@ -48,7 +48,7 @@ export const HOVER_BORDER_COLOR = [0.6, 0.6, 0.6, 1.0];    // Lighter Grey (Pote
 export const HOVER_FILLED_DARKEN_FACTOR = 0.66;
 export const HOVER_INACTIVE_LIGHTEN_FACTOR = 1.5;
 
-export const BACKGROUND_COLOR = [0.15, 0.15, 0.15, 1.0]; // Dark Grey bg
+export const BACKGROUND_COLOR = [0.10, 0.10, 0.10, 1.0]; // Dark Grey bg
 export const SELECTION_OUTLINE_COLOR = [1.0, 1.0, 0.0, 0.9]; // Yellow outline
 export const DISABLED_WORLD_OVERLAY_COLOR = [0.1, 0.1, 0.1, 0.7]; // For rendering disabled worlds
 

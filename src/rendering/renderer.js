@@ -286,7 +286,7 @@ function renderMainScene(worldsData, selectedWorldIndex) {
         // The outline should ideally only show for an *active* selection of an enabled world.
         // For now, let's keep outline logic tied to selectedWorldIndex, but an enabled world.
         if (i === selectedWorldIndex && worldsData[i] && worldsData[i].enabled) {
-            const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.03); // Dynamic thickness
+            const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02); // Dynamic thickness
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); // Don't use texture for outline
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
             drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);

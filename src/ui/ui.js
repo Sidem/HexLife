@@ -312,7 +312,12 @@ function setupStateListeners(sim) {
             alert("Could not get state data for selected world.");
             return;
         }
-        const jsonString = JSON.stringify(stateData, null, 2);
+        let jsonString = JSON.stringify(stateData, null, 2);
+        const stateArrayRegex = /("state"\s*:\s*)\[(\s*[\s\S]*?\s*)\]/m;
+        jsonString = jsonString.replace(stateArrayRegex, (match, prefix, arrayContent) => {
+            const compactArray = arrayContent.replace(/[\r\n]+/g, '').replace(/\s+/g, ' ').trim();
+            return `${prefix}[${compactArray}]`;
+        });
         const timestamp = new Date().toISOString().replace(/[:.-]/g, '').slice(0, -4);
         const filename = `hex_state_${sim.getCurrentRulesetHex()}_${timestamp}.json`;
         downloadFile(filename, jsonString, 'application/json');
