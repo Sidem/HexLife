@@ -1,6 +1,7 @@
 // src/ui/components/SetupPanel.js
-import * as Config from '../../core/config.js'; // For NUM_WORLDS and localStorage keys
+import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
+import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
 
 export class SetupPanel {
     constructor(panelElement, simulationInterface) {
@@ -14,7 +15,8 @@ export class SetupPanel {
         }
 
         this.panelElement = panelElement;
-        this.simInterface = simulationInterface;
+        this.simulationInterface = simulationInterface;
+        this.panelIdentifier = 'setup'; // Add this
         this.uiElements = {
             closeButton: this.panelElement.querySelector('#closeSetupPanelButton'),
             worldSetupGrid: this.panelElement.querySelector('#worldSetupGrid'),
@@ -31,7 +33,6 @@ export class SetupPanel {
             this.uiElements.closeButton = this.panelElement.querySelector('.close-panel-button');
         }
 
-
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
         this._loadPanelState(); // Load position and open/closed state
         this._setupInternalListeners();
@@ -47,16 +48,28 @@ export class SetupPanel {
 
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => {
-                this.simInterface.resetAllWorldsToCurrentSettings();
+                this.simulationInterface.resetAllWorldsToCurrentSettings();
                 // Optionally, give some feedback or close the panel
                 // alert("World settings applied and worlds have been reset!");
             });
         }
+        if (this.uiElements.resetAllButton) {
+            this.uiElements.resetAllButton.addEventListener('click', () => {
+                if (confirm("Are you sure you want to reset all worlds to their initial configurations? This will also reset their enabled/disabled states.")) {
+                    this.simulationInterface.resetAllWorldsToCurrentSettings(); // This function in simulation.js needs to handle its own state persistence
+                    this.refreshViews();
+                }
+            });
+        }
         // Listeners for dynamically created sliders/switches will be added in _populateWorldSetupGrid
+        // Listen for drag events on the DraggablePanel to save state
+        if (this.draggablePanel) {
+            this.draggablePanel.onDragEnd = () => this._savePanelState();
+        }
     }
 
     refreshViews() {
-        if (!this.simInterface || !this.uiElements.worldSetupGrid) return;
+        if (!this.simulationInterface || !this.uiElements.worldSetupGrid) return;
         this._populateWorldSetupGrid();
     }
 
@@ -64,7 +77,7 @@ export class SetupPanel {
         const grid = this.uiElements.worldSetupGrid;
         grid.innerHTML = ''; // Clear previous content
         const fragment = document.createDocumentFragment();
-        const worldSettings = this.simInterface.getWorldSettings();
+        const worldSettings = this.simulationInterface.getWorldSettings();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = worldSettings[i] || { initialDensity: 0.5, enabled: true }; // Fallback
@@ -125,7 +138,7 @@ export class SetupPanel {
             densitySlider.addEventListener('input', (event) => {
                 const newDensity = parseFloat(event.target.value);
                 densityValueDisplay.textContent = newDensity.toFixed(3);
-                this.simInterface.setWorldInitialDensity(i, newDensity);
+                this.simulationInterface.setWorldInitialDensity(i, newDensity);
             });
 
             densitySlider.addEventListener('wheel', (event) => { // Optional: Wheel support for sliders
@@ -136,14 +149,14 @@ export class SetupPanel {
                 currentValue = Math.max(parseFloat(densitySlider.min), Math.min(parseFloat(densitySlider.max), currentValue));
                 densitySlider.value = currentValue;
                 densityValueDisplay.textContent = currentValue.toFixed(3);
-                this.simInterface.setWorldInitialDensity(i, currentValue);
+                this.simulationInterface.setWorldInitialDensity(i, currentValue);
             }, { passive: false });
 
 
             enableSwitch.addEventListener('change', (event) => {
                 const isEnabled = event.target.checked;
                 enableLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
-                this.simInterface.setWorldEnabled(i, isEnabled);
+                this.simulationInterface.setWorldEnabled(i, isEnabled);
             });
 
             fragment.appendChild(cell);
@@ -158,60 +171,41 @@ export class SetupPanel {
             x: this.panelElement.style.left,
             y: this.panelElement.style.top,
         };
-        try {
-            localStorage.setItem(Config.LS_KEY_SETUP_PANEL_STATE, JSON.stringify(state));
-        } catch (e) {
-            console.error("Error saving setup panel state to localStorage:", e);
-        }
+        PersistenceService.savePanelState(this.panelIdentifier, state); // Use service
     }
 
     _loadPanelState() {
         if (!this.panelElement) return;
-        try {
-            const savedStateJSON = localStorage.getItem(Config.LS_KEY_SETUP_PANEL_STATE);
-            if (savedStateJSON) {
-                const savedState = JSON.parse(savedStateJSON);
-                if (savedState.isOpen) {
-                    this.show(false); // Show without re-saving state immediately
-                } else {
-                    this.hide(false); // Hide without re-saving state immediately
-                }
-                // Restore position if valid pixel values
-                if (savedState.x && savedState.x.endsWith('px')) {
-                     this.panelElement.style.left = savedState.x;
-                     // Ensure transform is none if position is set, DraggablePanel handles this on first drag
-                     if(this.panelElement.style.transform !== 'none' && parseFloat(savedState.x) > 0) {
-                        this.panelElement.style.transform = 'none';
-                     }
-                }
-                if (savedState.y && savedState.y.endsWith('px')) {
-                     this.panelElement.style.top = savedState.y;
-                     if(this.panelElement.style.transform !== 'none' && parseFloat(savedState.y) > 0) {
-                        this.panelElement.style.transform = 'none';
-                     }
-                }
-                 // If no explicit position, DraggablePanel default (CSS centering) will apply
-                 if ( (!savedState.x || !savedState.y ) && this.panelElement.style.transform === 'none' && savedState.isOpen) {
-                    // If it was open but had no position, re-center it via transform
-                    this.panelElement.style.left = '50%';
-                    this.panelElement.style.top = '50%';
-                    this.panelElement.style.transform = 'translate(-50%, -50%)';
-                 }
-
-            } else {
-                // Default to hidden if no saved state
-                this.hide(false);
+        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); // Use service
+        
+        if (savedState.isOpen) {
+            this.show(false); 
+        } else {
+            this.hide(false); 
+        }
+        if (savedState.x && savedState.x.endsWith('px')) {
+            this.panelElement.style.left = savedState.x;
+            if(this.panelElement.style.transform !== 'none' && parseFloat(savedState.x) > 0) {
+                this.panelElement.style.transform = 'none';
             }
-        } catch (e) {
-            console.error("Error loading setup panel state from localStorage:", e);
-            this.hide(false); // Default to hidden on error
+        }
+        if (savedState.y && savedState.y.endsWith('px')) {
+            this.panelElement.style.top = savedState.y;
+            if(this.panelElement.style.transform !== 'none' && parseFloat(savedState.y) > 0) {
+                this.panelElement.style.transform = 'none';
+            }
+        }
+        if ( (!savedState.x || !savedState.y ) && this.panelElement.style.transform === 'none' && savedState.isOpen) {
+            this.panelElement.style.left = '50%';
+            this.panelElement.style.top = '50%';
+            this.panelElement.style.transform = 'translate(-50%, -50%)';
         }
     }
 
     show(saveState = true) {
-        this.draggablePanel.show(); // DraggablePanel's show handles class and centering logic
+        this.draggablePanel.show(); 
         if (saveState) this._savePanelState();
-        this.refreshViews(); // Refresh content when shown
+        this.refreshViews(); 
     }
 
     hide(saveState = true) {
@@ -221,7 +215,7 @@ export class SetupPanel {
 
     toggle() {
         const nowVisible = this.draggablePanel.toggle();
-        this._savePanelState(); // Save state after toggle
+        this._savePanelState(); 
         if (nowVisible) {
             this.refreshViews();
         }
@@ -230,5 +224,9 @@ export class SetupPanel {
     destroy() {
         this.draggablePanel.destroy();
         // Any other cleanup
+    }
+
+    isHidden(){
+        return this.draggablePanel.isHidden();
     }
 }

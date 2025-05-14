@@ -1,6 +1,7 @@
 // src/core/simulation.js
 import * as Config from './config.js';
 import { indexToCoords, coordsToIndex } from '../utils/utils.js';
+import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
 
 const NEIGHBOR_DIRS_ODD_R = [
     [+1,  0], [+1, +1], [ 0, +1],
@@ -10,28 +11,6 @@ const NEIGHBOR_DIRS_EVEN_R = [
     [+1, -1], [+1,  0], [ 0, +1],
     [-1,  0], [-1, -1], [ 0, -1]
 ];
-
-// --- localStorage Helper Functions ---
-function _saveToLocalStorage(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-        console.error(`Error saving to localStorage (key: ${key}):`, e);
-    }
-}
-
-function _loadFromLocalStorage(key, defaultValue) {
-    try {
-        const value = localStorage.getItem(key);
-        if (value === null || value === undefined) {
-            return defaultValue;
-        }
-        return JSON.parse(value);
-    } catch (e) {
-        console.error(`Error loading from localStorage (key: ${key}):`, e);
-        return defaultValue;
-    }
-}
 
 // --- Module State ---
 let worldsData = []; // Each element: { jsStateArray, jsNextStateArray, jsHoverStateArray, jsRuleIndexArray, jsNextRuleIndexArray, stats, enabled, initialDensity }
@@ -49,40 +28,36 @@ let isEntropySamplingEnabled = false;
 let entropySampleRate = 10; // Default: sample every 10 ticks
 let globalTickCounter = 0; // Counter across all steps
 
+let currentBrushSize = Config.DEFAULT_NEIGHBORHOOD_SIZE; // Moved from bottom, needs to be initialized
+
 // --- Initialization ---
 export function initSimulation() {
     console.log("Initializing Simulation...");
 
-    // Load settings from localStorage or use defaults
-    currentSpeed = _loadFromLocalStorage(Config.LS_KEY_SIM_SPEED, Config.DEFAULT_SPEED);
+    // Load settings using PersistenceService
+    currentSpeed = PersistenceService.loadSimSpeed();
     setSimulationSpeed(currentSpeed); // This also sets tickDuration and saves
 
-    const loadedRulesetHex = _loadFromLocalStorage(Config.LS_KEY_RULESET, null);
+    const loadedRulesetHex = PersistenceService.loadRuleset();
     if (loadedRulesetHex) {
         setRuleset(loadedRulesetHex); // This sets currentRuleset and currentRulesetHex, and saves
     } else {
         generateRandomRuleset(); // This sets and saves
     }
 
-    isEntropySamplingEnabled = false;
-    entropySampleRate = 10;
+    currentBrushSize = PersistenceService.loadBrushSize(); // Load brush size
+
+    isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
+    entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
     globalTickCounter = 0;
 
-    let worldSettings = _loadFromLocalStorage(Config.LS_KEY_WORLD_SETTINGS, []);
-    if (!worldSettings || worldSettings.length !== Config.NUM_WORLDS) {
-        worldSettings = [];
-        for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            worldSettings.push({
-                initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0,
-                enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true
-            });
-        }
-        _saveToLocalStorage(Config.LS_KEY_WORLD_SETTINGS, worldSettings);
-    }
+    let worldSettings = PersistenceService.loadWorldSettings();
+    // loadWorldSettings in PersistenceService now returns a default if needed,
+    // so the complex fallback logic here can be simplified.
 
     worldsData = [];
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const settings = worldSettings[i];
+        const settings = worldSettings[i]; // worldSettings is guaranteed to be valid
         const jsStateArray = new Uint8Array(Config.NUM_CELLS);
         // Other arrays remain the same
         const jsNextStateArray = new Uint8Array(Config.NUM_CELLS).fill(0);
@@ -92,14 +67,13 @@ export function initSimulation() {
 
         let activeCount = 0;
         if (settings.enabled) {
-            // Initialize state based on density for enabled worlds
             const density = settings.initialDensity;
-            if (density === 0 && Config.NUM_CELLS > 0) { // Special case for 0 density: single cell
+            if (density === 0 && Config.NUM_CELLS > 0) {
                  jsStateArray.fill(0);
                  const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
                  if(middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 1;
                  activeCount = 1;
-            } else if (density === 1 && Config.NUM_CELLS > 0) { // Special case for 1 density: all but one
+            } else if (density === 1 && Config.NUM_CELLS > 0) {
                 jsStateArray.fill(1);
                 const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
                 if(middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 0;
@@ -142,7 +116,10 @@ export function initSimulation() {
 
 function countSetBits(n) {
     let count = 0;
-    for (let i = 0; i < 6; i++) { if ((n >> i) & 1) count++; }
+    while (n > 0) {
+        n &= (n - 1);
+        count++;
+    }
     return count;
 }
 
@@ -269,7 +246,7 @@ export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false)
         }
     }
     currentRulesetHex = rulesetToHex(currentRuleset);
-    _saveToLocalStorage(Config.LS_KEY_RULESET, currentRulesetHex);
+    PersistenceService.saveRuleset(currentRulesetHex);
     console.log("Generated random ruleset:", currentRulesetHex);
 }
 
@@ -290,7 +267,7 @@ function _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighb
 export function setRulesForNeighborCountCondition(centerState, numActiveNeighbors, outputState) {
     _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, outputState);
     currentRulesetHex = rulesetToHex(currentRuleset);
-    _saveToLocalStorage(Config.LS_KEY_RULESET, currentRulesetHex);
+    PersistenceService.saveRuleset(currentRulesetHex);
     console.log(`Rules set for C=${centerState}, N=${numActiveNeighbors} -> ${outputState}. New hex: ${currentRulesetHex}`);
 }
 
@@ -364,7 +341,7 @@ export function setRuleset(hexString) {
     if (newHex !== "Error" && newHex.toUpperCase() === hexString.toUpperCase()) {
         currentRuleset.set(newRuleset);
         currentRulesetHex = newHex;
-        _saveToLocalStorage(Config.LS_KEY_RULESET, currentRulesetHex);
+        PersistenceService.saveRuleset(currentRulesetHex);
         console.log("Ruleset updated to:", currentRulesetHex);
         return true;
     }
@@ -376,7 +353,7 @@ export function toggleRuleOutputState(ruleIndex) {
     if (ruleIndex >= 0 && ruleIndex < 128) {
         currentRuleset[ruleIndex] = 1 - currentRuleset[ruleIndex];
         currentRulesetHex = rulesetToHex(currentRuleset);
-        _saveToLocalStorage(Config.LS_KEY_RULESET, currentRulesetHex);
+        PersistenceService.saveRuleset(currentRulesetHex);
         console.log(`Rule ${ruleIndex} toggled. New hex: ${currentRulesetHex}`);
     }
 }
@@ -385,7 +362,7 @@ export function setAllRulesState(targetState) {
     if (targetState === 0 || targetState === 1) {
         currentRuleset.fill(targetState);
         currentRulesetHex = rulesetToHex(currentRuleset);
-        _saveToLocalStorage(Config.LS_KEY_RULESET, currentRulesetHex);
+        PersistenceService.saveRuleset(currentRulesetHex);
         console.log(`All rules set to ${targetState}. New hex: ${currentRulesetHex}`);
     }
 }
@@ -540,19 +517,18 @@ export function setSimulationPaused(paused) {
 export function setSimulationSpeed(speed) {
     currentSpeed = Math.max(0, Math.min(Config.MAX_SIM_SPEED, speed));
     tickDuration = currentSpeed > 0 ? 1.0 / currentSpeed : Infinity;
-    _saveToLocalStorage(Config.LS_KEY_SIM_SPEED, currentSpeed);
+    PersistenceService.saveSimSpeed(currentSpeed);
 }
 // BRUSH SIZE is managed by main.js and UI, but simulation needs to save/load it.
 // Let's add a setter here for main.js to call, which also saves it.
-let currentBrushSize = Config.DEFAULT_NEIGHBORHOOD_SIZE; // Local cache
 
 export function loadBrushSize() { // Called by main.js during its init
-    currentBrushSize = _loadFromLocalStorage(Config.LS_KEY_BRUSH_SIZE, Config.DEFAULT_NEIGHBORHOOD_SIZE);
+    currentBrushSize = PersistenceService.loadBrushSize();
     return currentBrushSize;
 }
 export function setBrushSize(size) { // Called by main.js when UI changes it
     currentBrushSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
-    _saveToLocalStorage(Config.LS_KEY_BRUSH_SIZE, currentBrushSize);
+    PersistenceService.saveBrushSize(currentBrushSize);
 }
 
 
@@ -567,7 +543,7 @@ export function setWorldInitialDensity(worldIndex, density) {
     density = Math.max(0, Math.min(1, density)); // Clamp density
     worldsData[worldIndex].initialDensity = density;
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
-    _saveToLocalStorage(Config.LS_KEY_WORLD_SETTINGS, allSettings);
+    PersistenceService.saveWorldSettings(allSettings);
     return true;
 }
 
@@ -580,7 +556,7 @@ export function setWorldEnabled(worldIndex, isEnabled) {
         updateWorldStats(worldsData[worldIndex], 0);
     }
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
-    _saveToLocalStorage(Config.LS_KEY_WORLD_SETTINGS, allSettings);
+    PersistenceService.saveWorldSettings(allSettings);
     return true;
 }
 
@@ -768,9 +744,8 @@ export function setEntropySampling(enabled, rate) {
     isEntropySamplingEnabled = !!enabled;
     entropySampleRate = Math.max(1, Math.floor(rate)); // Ensure rate is at least 1
     console.log(`Entropy Sampling: ${isEntropySamplingEnabled ? 'ON' : 'OFF'}, Rate: ${entropySampleRate}`);
-    // Optionally save these to LS_KEY_UI_SETTINGS here if persistence is desired
-    // _saveUISetting('entropySamplingEnabled', isEntropySamplingEnabled);
-    // _saveUISetting('entropySampleRate', entropySampleRate);
+    PersistenceService.saveUISetting('entropySamplingEnabled', isEntropySamplingEnabled);
+    PersistenceService.saveUISetting('entropySampleRate', entropySampleRate);
 }
 
 /**

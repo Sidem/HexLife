@@ -52,12 +52,4 @@ export const BACKGROUND_COLOR = [0.10, 0.10, 0.10, 1.0]; // Dark Grey bg
 export const SELECTION_OUTLINE_COLOR = [1.0, 1.0, 0.0, 0.9]; // Yellow outline
 export const DISABLED_WORLD_OVERLAY_COLOR = [0.1, 0.1, 0.1, 0.7]; // For rendering disabled worlds
 
-// localStorage Keys
-export const LS_KEY_PREFIX = 'hexLifeExplorer_';
-export const LS_KEY_RULESET = `${LS_KEY_PREFIX}ruleset`;
-export const LS_KEY_WORLD_SETTINGS = `${LS_KEY_PREFIX}worldSettings`; // For { initialDensity, enabled } array
-export const LS_KEY_SIM_SPEED = `${LS_KEY_PREFIX}simSpeed`;
-export const LS_KEY_BRUSH_SIZE = `${LS_KEY_PREFIX}brushSize`;
-export const LS_KEY_RULESET_PANEL_STATE = `${LS_KEY_PREFIX}rulesetPanelState`; // { isOpen, x, y }
-export const LS_KEY_SETUP_PANEL_STATE = `${LS_KEY_PREFIX}setupPanelState`;   // { isOpen, x, y }
-export const LS_KEY_UI_SETTINGS = `${LS_KEY_PREFIX}uiSettings`; // For other UI toggles like symmetrical generation, bias etc.
+// NOTE: LS_KEY constants have been removed and are now managed by PersistenceService.js

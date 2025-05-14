@@ -442,6 +442,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 }
 #rulesetEditorGrid {
     grid-template-columns: repeat(16, 5.9%);
+    grid-template-rows: repeat(8, 55px);
     max-width: calc(16 * 42px + 15 * 2px + 10px);
 }
 #neighborCountRulesetEditorGrid {

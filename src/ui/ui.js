@@ -4,6 +4,7 @@ import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js'; // Import the new SetupPanel
 import { DraggablePanel } from './components/DraggablePanel.js'; // Import the new SetupPanel
+import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
 
 // --- DOM Element References ---
 let uiElements;
@@ -13,30 +14,6 @@ let simulationInterfaceRef;
 let rulesetEditorComponent;
 let setupPanelComponent; // Reference to the SetupPanel instance
 let analysisPanelComponent; // Reference for the new DraggablePanel instance
-
-// --- localStorage Helper for UI settings ---
-function _saveUISetting(key, value) {
-    try {
-        const allUISettings = JSON.parse(localStorage.getItem(Config.LS_KEY_UI_SETTINGS)) || {};
-        allUISettings[key] = value;
-        localStorage.setItem(Config.LS_KEY_UI_SETTINGS, JSON.stringify(allUISettings));
-    } catch (e) {
-        console.error(`Error saving UI setting (key: ${key}):`, e);
-    }
-}
-
-function _loadUISetting(key, defaultValue) {
-    try {
-        const allUISettings = JSON.parse(localStorage.getItem(Config.LS_KEY_UI_SETTINGS));
-        if (allUISettings && allUISettings[key] !== undefined) {
-            return allUISettings[key];
-        }
-    } catch (e) {
-        console.error(`Error loading UI setting (key: ${key}):`, e);
-    }
-    return defaultValue;
-}
-
 
 // --- Initialization ---
 export function initUI(simulationInterface) {
@@ -100,9 +77,13 @@ export function initUI(simulationInterface) {
     // Instantiate DraggablePanel for the new Analysis Panel
     if (uiElements.analysisPanel) {
         analysisPanelComponent = new DraggablePanel(uiElements.analysisPanel, 'h3');
-        // Add listeners for its internal controls
+        _loadAnalysisPanelState(); // Load state for analysis panel
+
         if (uiElements.closeAnalysisPanelButton) {
-            uiElements.closeAnalysisPanelButton.addEventListener('click', () => analysisPanelComponent.hide());
+            uiElements.closeAnalysisPanelButton.addEventListener('click', () => {
+                analysisPanelComponent.hide();
+                _saveAnalysisPanelState();
+            });
         }
         if (uiElements.enableEntropySamplingCheckbox) {
             uiElements.enableEntropySamplingCheckbox.addEventListener('change', handleSamplingControlsChange);
@@ -136,6 +117,35 @@ export function initUI(simulationInterface) {
     return true;
 }
 
+function _loadAnalysisPanelState() {
+     if (!analysisPanelComponent || !uiElements.analysisPanel) return;
+     const savedState = PersistenceService.loadPanelState('analysis');
+     if (savedState.isOpen) {
+         analysisPanelComponent.show(); // DraggablePanel's show handles class
+     } else {
+         analysisPanelComponent.hide();
+     }
+     if (savedState.x && savedState.x.endsWith('px')) uiElements.analysisPanel.style.left = savedState.x;
+     if (savedState.y && savedState.y.endsWith('px')) uiElements.analysisPanel.style.top = savedState.y;
+     if ((savedState.x || savedState.y) && parseFloat(uiElements.analysisPanel.style.left) > 0 && parseFloat(uiElements.analysisPanel.style.top) > 0) {
+         uiElements.analysisPanel.style.transform = 'none';
+     } else if (savedState.isOpen) { // Re-center if open but no explicit position
+          uiElements.analysisPanel.style.left = '50%';
+          uiElements.analysisPanel.style.top = '50%';
+          uiElements.analysisPanel.style.transform = 'translate(-50%, -50%)';
+     }
+}
+
+function _saveAnalysisPanelState() {
+     if (!analysisPanelComponent || !uiElements.analysisPanel) return;
+     const state = {
+         isOpen: !uiElements.analysisPanel.classList.contains('hidden'),
+         x: uiElements.analysisPanel.style.left,
+         y: uiElements.analysisPanel.style.top,
+     };
+     PersistenceService.savePanelState('analysis', state);
+}
+
 function loadAndApplyAnalysisSettings() {
     if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !uiElements.entropySampleRateSlider) return;
     const samplingState = simulationInterfaceRef.getEntropySamplingState();
@@ -155,38 +165,36 @@ function updateSamplingControlsState() {
     }
 }
 
-
 function loadAndApplyUISettings(sim) {
     // Speed
-    const loadedSpeed = sim.getCurrentSimulationSpeed(); // Simulation now loads its own speed
+    const loadedSpeed = sim.getCurrentSimulationSpeed(); // Corrected function name
     uiElements.speedSlider.max = Config.MAX_SIM_SPEED;
     uiElements.speedSlider.value = loadedSpeed;
     uiElements.speedValueSpan.textContent = loadedSpeed;
 
     // Brush Size
-    const loadedBrushSize = sim.getCurrentBrushSize(); // Simulation now loads its own brush size
+    const loadedBrushSize = sim.getCurrentBrushSize();
     uiElements.neighborhoodSlider.max = Config.MAX_NEIGHBORHOOD_SIZE;
     uiElements.neighborhoodSlider.min = 0;
     uiElements.neighborhoodSlider.value = loadedBrushSize;
     uiElements.neighborhoodValueSpan.textContent = loadedBrushSize;
 
     // Checkboxes & Bias
-    uiElements.generateSymmetricalCheckbox.checked = _loadUISetting('generateSymmetrical', true);
-    uiElements.resetOnNewRuleCheckbox.checked = _loadUISetting('resetOnNewRule', true);
-    uiElements.useCustomBiasCheckbox.checked = _loadUISetting('useCustomBias', false);
-    uiElements.biasSlider.value = _loadUISetting('biasValue', 0.5);
+    uiElements.generateSymmetricalCheckbox.checked = PersistenceService.loadUISetting('generateSymmetrical', true);
+    uiElements.resetOnNewRuleCheckbox.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
+    uiElements.useCustomBiasCheckbox.checked = PersistenceService.loadUISetting('useCustomBias', false);
+    uiElements.biasSlider.value = PersistenceService.loadUISetting('biasValue', 0.5);
     uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(3);
     updateBiasSliderDisabledState();
 
     // Button texts (static, but set here for consistency)
-    uiElements.playPauseButton.textContent = "[P]lay"; // Will be updated by pause state
+    uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "Play" : "Pause";
     uiElements.randomRulesetButton.textContent = "[N]ew Rules";
     uiElements.resetStatesButton.textContent = "[R]eset"; // Matched HTML more closely
     if (uiElements.editRuleButton) uiElements.editRuleButton.textContent = "[E]dit";
     if (uiElements.setupPanelButton) uiElements.setupPanelButton.textContent = "[S]etup";
     if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.textContent = "[A]nalyse"; // Set button text
 }
-
 
 export function updatePerformanceDisplay(fps, actualTps) {
     if (uiElements) {
@@ -240,7 +248,6 @@ function validateElements() {
     return allEssentialFound;
 }
 
-
 function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpdateFunction, isBias = false) {
     event.preventDefault();
     const slider = sliderElement;
@@ -267,24 +274,23 @@ function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpd
         valueSpanElement.textContent = isBias ? currentValue.toFixed(3) : currentValue;
     }
     if (simulationUpdateFunction) simulationUpdateFunction(currentValue);
-    else if (isBias) _saveUISetting('biasValue', currentValue); // Save bias if no direct sim update
+    else if (isBias) PersistenceService.saveUISetting('biasValue', currentValue); // Save bias if no direct sim update
 
     // Dispatch an 'input' event so other listeners (like handleSamplingControlsChange) are triggered
     const inputEvent = new Event('input', { bubbles: true, cancelable: true });
     slider.dispatchEvent(inputEvent);
 }
 
-function setupGeneralListeners(sim) { // Renamed from setupControlListeners
+function setupGeneralListeners(sim) {
     uiElements.playPauseButton.addEventListener('click', () => {
         const nowPaused = sim.togglePause();
         updatePauseButton(nowPaused);
     });
 
-    // Checkbox Listeners for localStorage
-    uiElements.generateSymmetricalCheckbox.addEventListener('change', (e) => _saveUISetting('generateSymmetrical', e.target.checked));
-    uiElements.resetOnNewRuleCheckbox.addEventListener('change', (e) => _saveUISetting('resetOnNewRule', e.target.checked));
+    uiElements.generateSymmetricalCheckbox.addEventListener('change', (e) => PersistenceService.saveUISetting('generateSymmetrical', e.target.checked));
+    uiElements.resetOnNewRuleCheckbox.addEventListener('change', (e) => PersistenceService.saveUISetting('resetOnNewRule', e.target.checked));
     uiElements.useCustomBiasCheckbox.addEventListener('change', (e) => {
-        _saveUISetting('useCustomBias', e.target.checked);
+        PersistenceService.saveUISetting('useCustomBias', e.target.checked);
         updateBiasSliderDisabledState();
     });
 
@@ -292,11 +298,13 @@ function setupGeneralListeners(sim) { // Renamed from setupControlListeners
         uiElements.biasSlider.addEventListener('input', (event) => {
            const val = parseFloat(event.target.value);
            if(uiElements.biasValueSpan) uiElements.biasValueSpan.textContent = val.toFixed(3);
-           _saveUISetting('biasValue', val);
+           PersistenceService.saveUISetting('biasValue', val);
         });
         uiElements.biasSlider.addEventListener('wheel', (event) => {
             if (uiElements.biasSlider.disabled) return;
-            handleSliderWheel(event, uiElements.biasSlider, uiElements.biasValueSpan, null, true); // true for isBias
+            handleSliderWheel(event, uiElements.biasSlider, uiElements.biasValueSpan, (value) => {
+                PersistenceService.saveUISetting('biasValue', value);
+            }, true);
         });
     }
 
@@ -419,23 +427,24 @@ function setupStateListeners(sim) {
     uiElements.resetStatesButton.addEventListener('click', () => sim.resetAllWorldsToCurrentSettings());
 }
 
-function setupPanelToggleListeners() { // Renamed from setupEditorListeners
-    if (uiElements.editRuleButton && rulesetEditorComponent) {
-        uiElements.editRuleButton.addEventListener('click', () => {
-            rulesetEditorComponent.show();
-        });
-    }
-    if (uiElements.setupPanelButton && setupPanelComponent) { // Listener for the new Setup Panel button
-        uiElements.setupPanelButton.addEventListener('click', () => {
-            setupPanelComponent.show();
-        });
-    }
+function setupPanelToggleListeners() {
+     if (uiElements.editRuleButton && rulesetEditorComponent) {
+         uiElements.editRuleButton.addEventListener('click', () => {
+             rulesetEditorComponent.toggle(); // toggle method in component will handle saving its own state
+         });
+     }
+     if (uiElements.setupPanelButton && setupPanelComponent) {
+         uiElements.setupPanelButton.addEventListener('click', () => {
+             setupPanelComponent.toggle(); // toggle method in component will handle saving its own state
+         });
+     }
     if (uiElements.analysisPanelButton && analysisPanelComponent) {
         uiElements.analysisPanelButton.addEventListener('click', () => {
              const panelNowVisible = analysisPanelComponent.toggle();
              if (panelNowVisible) {
-                 updateAnalysisPanel(); // Update plot immediately when opened
+                 updateAnalysisPanel();
              }
+             _saveAnalysisPanelState(); // Save analysis panel state on toggle
         });
     }
 }
@@ -476,11 +485,8 @@ function handleSamplingControlsChange() {
     const enabled = uiElements.enableEntropySamplingCheckbox.checked;
     const rate = parseInt(uiElements.entropySampleRateSlider.value, 10);
     uiElements.entropySampleRateValue.textContent = rate;
-    updateSamplingControlsState(); // Update slider enabled state
-    simulationInterfaceRef.setEntropySampling(enabled, rate);
-    // Persist settings if desired (using _saveUISetting)
-    // _saveUISetting('entropySamplingEnabled', enabled);
-    // _saveUISetting('entropySampleRate', rate);
+    updateSamplingControlsState();
+    simulationInterfaceRef.setEntropySampling(enabled, rate); // This now saves to LS via simulation.js
 }
 
 function handleCalculateAndPlot() {
@@ -577,13 +583,11 @@ function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
      }
 }
 
-
-
 // --- UI Update Functions ---
 
 export function updatePauseButton(isPaused) {
     if (uiElements && uiElements.playPauseButton) {
-        uiElements.playPauseButton.textContent = isPaused ? "[P]lay" : "[P]ause";
+        uiElements.playPauseButton.textContent = isPaused ? "Play" : "Pause";
     }
 }
 

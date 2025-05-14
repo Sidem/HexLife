@@ -1,6 +1,7 @@
 // src/ui/components/RulesetEditor.js
-import * as Config from '../../core/config.js'; // For localStorage keys
+//import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
+import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
 
 export class RulesetEditor {
     constructor(panelElement, simulationInterface) {
@@ -15,6 +16,7 @@ export class RulesetEditor {
 
         this.panelElement = panelElement;
         this.simInterface = simulationInterface;
+        this.panelIdentifier = 'ruleset'; // Add this
         this.uiElements = {
             closeButton: this.panelElement.querySelector('#closeEditorButton') || this.panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: this.panelElement.querySelector('#editorRulesetInput'),
@@ -97,6 +99,41 @@ export class RulesetEditor {
                     }
                 }
             });
+        }
+
+        if (this.uiElements.setAllDeadButton) {
+            this.uiElements.setAllDeadButton.addEventListener('click', () => {
+                this.simInterface.setAllRulesState(0);
+                if (this.simInterface.getResetOnNewRule()) this.simInterface.resetAllWorldsToCurrentSettings();
+                this.refreshViews();
+                this.simInterface.refreshAllRulesetViews();
+            });
+        }
+
+        if (this.uiElements.setAllAliveButton) {
+            this.uiElements.setAllAliveButton.addEventListener('click', () => {
+                this.simInterface.setAllRulesState(1);
+                if (this.simInterface.getResetOnNewRule()) this.simInterface.resetAllWorldsToCurrentSettings();
+                this.refreshViews();
+                this.simInterface.refreshAllRulesetViews();
+            });
+        }
+
+        if (this.uiElements.invertAllButton) {
+            this.uiElements.invertAllButton.addEventListener('click', () => {
+                const currentRuleset = this.simInterface.getCurrentRuleset();
+                for(let i = 0; i < currentRuleset.length; i++) {
+                    this.simInterface.toggleRuleOutputState(i); // This will save each toggle, might be inefficient
+                } // Consider a batch toggle if performance is an issue.
+                if (this.simInterface.getResetOnNewRule()) this.simInterface.resetAllWorldsToCurrentSettings();
+                this.refreshViews();
+                this.simInterface.refreshAllRulesetViews();
+            });
+        }
+
+        // Listen for drag events on the DraggablePanel to save state
+        if (this.draggablePanel) {
+            this.draggablePanel.onDragEnd = () => this._savePanelState();
         }
     }
 
@@ -220,41 +257,27 @@ export class RulesetEditor {
             x: this.panelElement.style.left,
             y: this.panelElement.style.top,
         };
-         try {
-            localStorage.setItem(Config.LS_KEY_RULESET_PANEL_STATE, JSON.stringify(state));
-        } catch (e) {
-            console.error("Error saving ruleset panel state to localStorage:", e);
-        }
+        PersistenceService.savePanelState(this.panelIdentifier, state); // Use service
     }
 
     _loadPanelState() {
         if (!this.panelElement) return;
-        try {
-            const savedStateJSON = localStorage.getItem(Config.LS_KEY_RULESET_PANEL_STATE);
-            if (savedStateJSON) {
-                const savedState = JSON.parse(savedStateJSON);
-                if (savedState.isOpen) {
-                    this.show(false); // Show without re-saving state immediately
-                } else {
-                    this.hide(false); // Hide without re-saving state immediately
-                }
-                if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
-                if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
+        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); // Use service
 
-                if ((savedState.x || savedState.y) && parseFloat(this.panelElement.style.left) > 0 && parseFloat(this.panelElement.style.top) > 0) {
-                    this.panelElement.style.transform = 'none';
-                } else if (this.panelElement.style.transform === 'none' && savedState.isOpen) {
-                    // If it was open but had no specific position, re-center it
-                    this.panelElement.style.left = '50%';
-                    this.panelElement.style.top = '50%';
-                    this.panelElement.style.transform = 'translate(-50%, -50%)';
-                }
-            } else {
-                this.hide(false); // Default to hidden
-            }
-        } catch (e) {
-            console.error("Error loading ruleset panel state from localStorage:", e);
-            this.hide(false); // Default to hidden
+        if (savedState.isOpen) {
+            this.show(false); 
+        } else {
+            this.hide(false); 
+        }
+        if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
+        if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
+
+        if ((savedState.x || savedState.y) && parseFloat(this.panelElement.style.left) > 0 && parseFloat(this.panelElement.style.top) > 0) {
+            this.panelElement.style.transform = 'none';
+        } else if (this.panelElement.style.transform === 'none' && savedState.isOpen) {
+            this.panelElement.style.left = '50%';
+            this.panelElement.style.top = '50%';
+            this.panelElement.style.transform = 'translate(-50%, -50%)';
         }
     }
 
@@ -279,5 +302,12 @@ export class RulesetEditor {
 
     destroy() {
         this.draggablePanel.destroy();
+        this.panelElement = null;
+        this.simInterface = null;
+        this.draggablePanel = null;
+    }
+
+    isHidden() {
+        return this.draggablePanel.isHidden();
     }
 }
