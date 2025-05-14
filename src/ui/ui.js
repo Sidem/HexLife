@@ -1,26 +1,22 @@
-// hexlife00/src/ui/ui.js
+
 import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
-import { SetupPanel } from './components/SetupPanel.js'; // Import the new SetupPanel
-import { DraggablePanel } from './components/DraggablePanel.js'; // Import the new SetupPanel
-import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
-import { SliderComponent } from './components/SliderComponent.js'; // Import new component
-import { EventBus, EVENTS } from '../services/EventBus.js'; // Import EventBus
+import { SetupPanel } from './components/SetupPanel.js'; 
+import { DraggablePanel } from './components/DraggablePanel.js'; 
+import * as PersistenceService from '../services/PersistenceService.js'; 
+import { SliderComponent } from './components/SliderComponent.js'; 
+import { EventBus, EVENTS } from '../services/EventBus.js'; 
 
-// --- DOM Element References ---
+
 let uiElements;
-
-// Add a new structure for slider component instances
 let sliderComponents = {};
-
-// --- UI State ---
 let simulationInterfaceRef;
 let rulesetEditorComponent;
-let setupPanelComponent; // Reference to the SetupPanel instance
-let analysisPanelComponent; // Reference for the new DraggablePanel instance
+let setupPanelComponent; 
+let analysisPanelComponent; 
 
-// --- Initialization ---
+
 export function initUI(simulationInterface) {
     simulationInterfaceRef = simulationInterface;
     uiElements = {
@@ -54,15 +50,12 @@ export function initUI(simulationInterface) {
         entropyPlotCanvas: document.getElementById('entropyPlotCanvas'),
         enableEntropySamplingCheckbox: document.getElementById('enableEntropySamplingCheckbox'),
     };
-    // Mount points for sliders
+    
     uiElements.speedSliderMount = document.getElementById('speedSliderMount');
     uiElements.neighborhoodSizeSliderMount = document.getElementById('neighborhoodSizeSliderMount');
     uiElements.biasSliderMount = document.getElementById('biasSliderMount');
     uiElements.entropySampleRateSliderMount = document.getElementById('entropySampleRateSliderMount');
-
     if (!validateElements()) return false;
-
-    // Instantiate Components
     if (uiElements.rulesetEditorPanel) {
         rulesetEditorComponent = new RulesetEditor(uiElements.rulesetEditorPanel, simulationInterfaceRef);
     } else {
@@ -75,10 +68,10 @@ export function initUI(simulationInterface) {
         console.warn("Setup panel element not found. World setup functionality will be disabled.");
         if (uiElements.setupPanelButton) uiElements.setupPanelButton.disabled = true;
     }
-    // Instantiate DraggablePanel for the new Analysis Panel
+    
     if (uiElements.analysisPanel) {
         analysisPanelComponent = new DraggablePanel(uiElements.analysisPanel, 'h3');
-        _loadAnalysisPanelState(); // Load state for analysis panel
+        _loadAnalysisPanelState(); 
 
         if (uiElements.closeAnalysisPanelButton) {
             uiElements.closeAnalysisPanelButton.addEventListener('click', () => {
@@ -94,16 +87,16 @@ export function initUI(simulationInterface) {
         if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
     }
 
-    // Instantiate Slider Components
+    
     sliderComponents.speedSlider = new SliderComponent(uiElements.speedSliderMount, {
-        id: 'speedSlider', // For specific styling if needed & label association
+        id: 'speedSlider', 
         label: 'Speed:',
         min: 1,
         max: Config.MAX_SIM_SPEED,
         step: 1,
         value: simulationInterface.getCurrentSimulationSpeed(),
         unit: 'tps',
-        showValue: true, // Ensure value is shown
+        showValue: true, 
         onChange: (value) => {
             EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, value);
         }
@@ -155,25 +148,20 @@ export function initUI(simulationInterface) {
         }
     });
 
-    setupGeneralListeners(simulationInterface); // Renamed for clarity
+    setupGeneralListeners(simulationInterface); 
     setupPanelToggleListeners();
     setupStateListeners(simulationInterface);
     loadAndApplyUISettings(simulationInterface);
     loadAndApplyAnalysisSettings();
-
     window.addEventListener('keydown', handleGlobalKeyDown);
-    refreshAllRulesetViews(simulationInterfaceRef); // Initial display
+    refreshAllRulesetViews(simulationInterfaceRef); 
     updateBiasSliderDisabledState();
-    updateSamplingControlsState(); // Initialize slider disabled state
-
-    // Setup EventBus listeners for UI updates
+    updateSamplingControlsState(); 
     setupUIEventListeners(simulationInterface, uiElements, sliderComponents, rulesetEditorComponent, setupPanelComponent);
-
-    // Initial UI state based on current simulation state
     updatePauseButton(simulationInterface.isSimulationPaused());
     updateMainRulesetDisplay(simulationInterface.getCurrentRulesetHex());
     updateStatsDisplay(simulationInterface.getSelectedWorldStats());
-    // Slider components are already initialized with current values from simulationInterface
+    
 
     console.log("UI Initialized.");
     return true;
@@ -183,7 +171,7 @@ function _loadAnalysisPanelState() {
      if (!analysisPanelComponent || !uiElements.analysisPanel) return;
      const savedState = PersistenceService.loadPanelState('analysis');
      if (savedState.isOpen) {
-         analysisPanelComponent.show(); // DraggablePanel's show handles class
+         analysisPanelComponent.show(); 
      } else {
          analysisPanelComponent.hide();
      }
@@ -191,7 +179,7 @@ function _loadAnalysisPanelState() {
      if (savedState.y && savedState.y.endsWith('px')) uiElements.analysisPanel.style.top = savedState.y;
      if ((savedState.x || savedState.y) && parseFloat(uiElements.analysisPanel.style.left) > 0 && parseFloat(uiElements.analysisPanel.style.top) > 0) {
          uiElements.analysisPanel.style.transform = 'none';
-     } else if (savedState.isOpen) { // Re-center if open but no explicit position
+     } else if (savedState.isOpen) { 
           uiElements.analysisPanel.style.left = '50%';
           uiElements.analysisPanel.style.top = '50%';
           uiElements.analysisPanel.style.transform = 'translate(-50%, -50%)';
@@ -232,14 +220,12 @@ function loadAndApplyUISettings(sim) {
     uiElements.useCustomBiasCheckbox.checked = PersistenceService.loadUISetting('useCustomBias', false);
     sliderComponents.biasSlider.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
     updateBiasSliderDisabledState();
-
-    // Button texts (static, but set here for consistency)
     uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "[P]lay" : "[P]ause";
     uiElements.randomRulesetButton.textContent = "[N]ew Rules";
-    uiElements.resetStatesButton.textContent = "[R]eset"; // Matched HTML more closely
+    uiElements.resetStatesButton.textContent = "[R]eset"; 
     if (uiElements.editRuleButton) uiElements.editRuleButton.textContent = "[E]dit";
     if (uiElements.setupPanelButton) uiElements.setupPanelButton.textContent = "[S]etup";
-    if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.textContent = "[A]nalyse"; // Set button text
+    if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.textContent = "[A]nalyse"; 
 }
 
 export function updatePerformanceDisplay(fps, actualTps) {
@@ -258,7 +244,7 @@ export function refreshAllRulesetViews(sim) {
     const currentHex = sim.getCurrentRulesetHex();
     updateMainRulesetDisplay(currentHex);
     if (rulesetEditorComponent) rulesetEditorComponent.refreshViews();
-    // Setup panel doesn't typically need refresh on ruleset change, but on show.
+    
 }
 
 function updateBiasSliderDisabledState() {
@@ -272,7 +258,6 @@ function validateElements() {
     let allEssentialFound = true;
     for (const key in uiElements) {
         if (!uiElements[key]) {
-            // RulesetEditorPanel is handled separately now for component instantiation
             if (key === 'rulesetEditorPanel') {
                 console.warn(`UI Warning: Main panel element '${key}' not found. Editor feature will be disabled.`);
             } else {
@@ -297,28 +282,22 @@ function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpd
     const min = parseFloat(slider.min);
     const max = parseFloat(slider.max);
     let currentValue = parseFloat(slider.value);
-
     if (event.deltaY < 0) { currentValue += step; }
     else { currentValue -= step; }
-
     currentValue = Math.max(min, Math.min(max, currentValue));
 
-    if (isBias) { // Check if it's the bias slider
+    if (isBias) { 
         currentValue = parseFloat(currentValue.toFixed(3));
     } else {
-        // Ensure integer steps for non-bias sliders like speed, brush, rate
         currentValue = Math.round(currentValue / step) * step;
-        currentValue = Math.max(min, Math.min(max, currentValue)); // Re-clamp after rounding
+        currentValue = Math.max(min, Math.min(max, currentValue)); 
     }
     slider.value = currentValue;
-
     if (valueSpanElement) {
         valueSpanElement.textContent = isBias ? currentValue.toFixed(3) : currentValue;
     }
     if (simulationUpdateFunction) simulationUpdateFunction(currentValue);
-    else if (isBias) PersistenceService.saveUISetting('biasValue', currentValue); // Save bias if no direct sim update
-
-    // Dispatch an 'input' event so other listeners (like handleSamplingControlsChange) are triggered
+    else if (isBias) PersistenceService.saveUISetting('biasValue', currentValue); 
     const inputEvent = new Event('input', { bubbles: true, cancelable: true });
     slider.dispatchEvent(inputEvent);
 }
@@ -349,7 +328,6 @@ function setupGeneralListeners(sim) {
         });
     }
 
-    // --- Ruleset (non-editor) controls ---
     uiElements.randomRulesetButton.addEventListener('click', () => {
         let biasToUse = uiElements.useCustomBiasCheckbox.checked ? sliderComponents.biasSlider.getValue() : Math.random();
         const generateSymmetrically = uiElements.generateSymmetricalCheckbox.checked;
@@ -449,12 +427,12 @@ function setupStateListeners(sim) {
 function setupPanelToggleListeners() {
      if (uiElements.editRuleButton && rulesetEditorComponent) {
          uiElements.editRuleButton.addEventListener('click', () => {
-             rulesetEditorComponent.toggle(); // toggle method in component will handle saving its own state
+             rulesetEditorComponent.toggle();
          });
      }
      if (uiElements.setupPanelButton && setupPanelComponent) {
          uiElements.setupPanelButton.addEventListener('click', () => {
-             setupPanelComponent.toggle(); // toggle method in component will handle saving its own state
+             setupPanelComponent.toggle();
          });
      }
     if (uiElements.analysisPanelButton && analysisPanelComponent) {
@@ -463,39 +441,28 @@ function setupPanelToggleListeners() {
              if (panelNowVisible) {
                  updateAnalysisPanel();
              }
-             _saveAnalysisPanelState(); // Save analysis panel state on toggle
+             _saveAnalysisPanelState();
         });
     }
 }
 
-/**
- * Updates the entropy display and redraws the history plots
- * in the analysis panel based on current simulation data.
- */
 export function updateAnalysisPanel() {
-    // Check if panel exists and is visible
     if (!analysisPanelComponent || !uiElements.analysisPanel || uiElements.analysisPanel.classList.contains('hidden') || !simulationInterfaceRef) {
         return;
     }
-
-    // Get latest stats (includes last sampled entropy)
     const stats = simulationInterfaceRef.getSelectedWorldStats();
     if (stats && uiElements.statEntropy) {
         uiElements.statEntropy.textContent = stats.entropy.toFixed(4);
     } else if (uiElements.statEntropy) {
         uiElements.statEntropy.textContent = "N/A";
     }
-
-    // Get histories
     const ratioHistory = simulationInterfaceRef.getSelectedWorldRatioHistory();
     const entropyHistory = simulationInterfaceRef.getSelectedWorldEntropyHistory();
-
-    // Draw plots
     if (uiElements.ratioPlotCanvas) {
-        drawMinimalistPlot(uiElements.ratioPlotCanvas, ratioHistory, '#00FFFF'); // Cyan for ratio
+        drawMinimalistPlot(uiElements.ratioPlotCanvas, ratioHistory, '#00FFFF');
     }
     if (uiElements.entropyPlotCanvas) {
-        drawMinimalistPlot(uiElements.entropyPlotCanvas, entropyHistory, '#FFA500'); // Orange for entropy
+        drawMinimalistPlot(uiElements.entropyPlotCanvas, entropyHistory, '#FFA500');
     }
 }
 
@@ -504,40 +471,9 @@ function handleSamplingControlsChange() {
     const enabled = uiElements.enableEntropySamplingCheckbox.checked;
     const rate = sliderComponents.entropySampleRateSlider.getValue();
     
-    updateSamplingControlsState(); // Update slider enabled state based on checkbox
+    updateSamplingControlsState(); 
     EventBus.dispatch(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, { enabled, rate });
 }
-
-function handleCalculateAndPlot() {
-    if (!simulationInterfaceRef || !uiElements.statEntropy || !uiElements.ratioPlotCanvas) return;
-
-    // 1. Get current stats (which includes on-demand entropy calculation)
-    const stats = simulationInterfaceRef.getSelectedWorldStats();
-    if (!stats) {
-        uiElements.statEntropy.textContent = "N/A";
-        // Clear plot maybe?
-        const ctx = uiElements.ratioPlotCanvas.getContext('2d');
-        ctx.clearRect(0, 0, uiElements.ratioPlotCanvas.width, uiElements.ratioPlotCanvas.height);
-        return;
-    }
-
-    // 2. Update the entropy display
-    uiElements.statEntropy.textContent = stats.entropy.toFixed(4);
-
-    // 3. Get the ratio history for plotting
-    const history = stats.history; // Use the ratio history from the stats object
-    if (!history || history.length === 0) {
-        // Clear plot if no history
-        const ctx = uiElements.ratioPlotCanvas.getContext('2d');
-        ctx.clearRect(0, 0, uiElements.ratioPlotCanvas.width, uiElements.ratioPlotCanvas.height);
-        return;
-    }
-
-    // 4. Draw the plot
-    drawMinimalistPlot(uiElements.ratioPlotCanvas, history);
-}
-
-// --- Minimalistic Plotting Function (Updated) ---
 /**
  * Draws a simple line graph. Assumes data values 0-1.
  * @param {HTMLCanvasElement} canvas
@@ -545,7 +481,7 @@ function handleCalculateAndPlot() {
  * @param {string} color Line color
  */
 function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
-    if (!canvas || !dataHistory ) { // Allow empty history, just clear canvas
+    if (!canvas || !dataHistory ) {
          if(canvas) {
              const ctx = canvas.getContext('2d');
              ctx.fillStyle = '#2a2a2a';
@@ -553,43 +489,34 @@ function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
          }
          return;
     }
-    if (dataHistory.length === 0) { // Explicitly handle empty history after check
+    if (dataHistory.length === 0) {
          const ctx = canvas.getContext('2d');
          ctx.fillStyle = '#2a2a2a';
          ctx.fillRect(0, 0, canvas.width, canvas.height);
          return;
     }
-
-
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
     const padding = 5;
-
     ctx.fillStyle = '#2a2a2a';
     ctx.fillRect(0, 0, width, height);
-
     const plotWidth = width - 2 * padding;
     const plotHeight = height - 2 * padding;
     const dataLength = dataHistory.length;
-
-    // Draw bounds
     ctx.strokeStyle = '#555';
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(padding, padding); ctx.lineTo(width - padding, padding); // Top (1.0)
-    ctx.moveTo(padding, height - padding); ctx.lineTo(width - padding, height - padding); // Bottom (0.0)
+    ctx.moveTo(padding, padding); ctx.lineTo(width - padding, padding);
+    ctx.moveTo(padding, height - padding); ctx.lineTo(width - padding, height - padding);
     ctx.stroke();
-
-    // Draw data line
-    ctx.strokeStyle = color; // Use provided color
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.beginPath();
-
     for (let i = 0; i < dataLength; i++) {
         const x = padding + (i / (dataLength - 1 || 1)) * plotWidth;
-        const yValue = Math.max(0, Math.min(1, dataHistory[i])); // Clamp data just in case
-        const y = padding + (1 - yValue) * plotHeight; // Map 0-1 to inverted canvas Y
+        const yValue = Math.max(0, Math.min(1, dataHistory[i]));
+        const y = padding + (1 - yValue) * plotHeight;
 
         if (i === 0) {
             ctx.moveTo(x, y);
@@ -597,12 +524,10 @@ function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
             ctx.lineTo(x, y);
         }
     }
-     if (dataLength > 0) { // Only stroke if there's data
+     if (dataLength > 0) {
         ctx.stroke();
      }
 }
-
-// --- UI Update Functions ---
 
 export function updatePauseButton(isPaused) {
     if (uiElements && uiElements.playPauseButton) {
@@ -637,9 +562,7 @@ export function updateSpeedSlider(speed) {
     }
 }
 
-// --- Hotkey Handler ---
 function handleGlobalKeyDown(event) {
-    // ... (logic to check if input field is active, unchanged) ...
     const activeEl = document.activeElement;
     if (activeEl) {
         const tagName = activeEl.tagName.toLowerCase();
@@ -675,38 +598,32 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
     });
     EventBus.subscribe(EVENTS.RULESET_CHANGED, (newRulesetHex) => {
         updateMainRulesetDisplay(newRulesetHex);
-        if (rulesetEditorComponent) rulesetEditorComponent.refreshViews(); // Editor needs to know
+        if (rulesetEditorComponent) rulesetEditorComponent.refreshViews();
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (newBrushSize) => {
         if (sliderComponents.neighborhoodSlider) sliderComponents.neighborhoodSlider.setValue(newBrushSize);
     });
     EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (newWorldIndex) => {
-        // UI might want to highlight the selected world in a mini-map overview in the future
         console.log("UI: Selected world changed to", newWorldIndex);
-        // Stats update is handled by WORLD_STATS_UPDATED
     });
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (statsData) => {
         updateStatsDisplay(statsData);
-        updateAnalysisPanel(); // Analysis panel depends on selected world stats
+        updateAnalysisPanel();
     });
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-        // This event implies UI should re-fetch or know that worlds have reset
-        // For example, if SetupPanel is open, it might need to refresh.
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
             setupPanelComponent.refreshViews();
         }
-        // Ruleset editor might need refresh if reset also changes rules (not current behavior)
     });
     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
-        // If SetupPanel is open, refresh it
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
-            setupPanelComponent.refreshViews(); // It re-fetches settings
+            setupPanelComponent.refreshViews();
         }
     });
     EventBus.subscribe(EVENTS.ENTROPY_SAMPLING_CHANGED, (data) => {
         if (uiElements.enableEntropySamplingCheckbox) uiElements.enableEntropySamplingCheckbox.checked = data.enabled;
         if (sliderComponents.entropySampleRateSlider) sliderComponents.entropySampleRateSlider.setValue(data.rate);
-        updateSamplingControlsState(); // This updates disabled state of slider
+        updateSamplingControlsState();
     });
     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => {
         updatePerformanceDisplay(data.fps, data.tps);
@@ -720,13 +637,12 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
 
     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
-            setupPanelComponent.refreshViews(); // It re-fetches settings via simInterface
+            setupPanelComponent.refreshViews();
         }
     });
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
             setupPanelComponent.refreshViews();
         }
-        // RulesetEditor might refresh if RULESET_CHANGED is also part of a reset sequence.
     });
 }

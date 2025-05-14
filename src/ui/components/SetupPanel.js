@@ -1,8 +1,8 @@
-// src/ui/components/SetupPanel.js
-import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
+
+import * as Config from '../../core/config.js'; 
 import { DraggablePanel } from './DraggablePanel.js';
-import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
-import { SliderComponent } from './SliderComponent.js'; // Import new component
+import * as PersistenceService from '../../services/PersistenceService.js'; 
+import { SliderComponent } from './SliderComponent.js'; 
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class SetupPanel {
@@ -18,30 +18,28 @@ export class SetupPanel {
 
         this.panelElement = panelElement;
         this.simulationInterface = simulationInterface;
-        this.panelIdentifier = 'setup'; // Add this
+        this.panelIdentifier = 'setup'; 
         this.uiElements = {
             closeButton: this.panelElement.querySelector('#closeSetupPanelButton'),
             worldSetupGrid: this.panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: this.panelElement.querySelector('#applySetupButton'),
         };
-        this.worldSliderComponents = []; // To store references to density sliders
-        this.simInterface = simulationInterface; // Still used for GETs
-        this.worldSettingsCache = null; // To store initial settings for comparison
-
-        // Validate essential elements
+        this.worldSliderComponents = []; 
+        this.simInterface = simulationInterface; 
+        this.worldSettingsCache = null; 
         for (const key in this.uiElements) {
-            if (!this.uiElements[key] && key !== 'closeButton') { // Close button might be styled differently
+            if (!this.uiElements[key] && key !== 'closeButton') { 
                  console.warn(`SetupPanel: UI element '${key}' not found within the panel.`);
             }
         }
-        if (!this.uiElements.closeButton) { // Try common class if ID specific not found
+        if (!this.uiElements.closeButton) { 
             this.uiElements.closeButton = this.panelElement.querySelector('.close-panel-button');
         }
 
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-        this._loadPanelState(); // Load position and open/closed state
+        this._loadPanelState(); 
         this._setupInternalListeners();
-        this.refreshViews(); // Populate the grid
+        this.refreshViews(); 
     }
 
     _setupInternalListeners() {
@@ -53,21 +51,21 @@ export class SetupPanel {
 
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS); // DISPATCH
-                // Refreshing views will be handled by relevant events (ALL_WORLDS_RESET, WORLD_STATS_UPDATED)
-                // this.hide(); // Optionally hide panel after applying
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS); 
+                
+                
             });
         }
         if (this.uiElements.resetAllButton) {
             this.uiElements.resetAllButton.addEventListener('click', () => {
                 if (confirm("Are you sure you want to reset all worlds to their initial configurations? This will also reset their enabled/disabled states.")) {
-                    this.simulationInterface.resetAllWorldsToCurrentSettings(); // This function in simulation.js needs to handle its own state persistence
+                    this.simulationInterface.resetAllWorldsToCurrentSettings(); 
                     this.refreshViews();
                 }
             });
         }
-        // Listeners for dynamically created sliders/switches will be added in _populateWorldSetupGrid
-        // Listen for drag events on the DraggablePanel to save state
+        
+        
         if (this.draggablePanel) {
             this.draggablePanel.onDragEnd = () => this._savePanelState();
         }
@@ -76,14 +74,11 @@ export class SetupPanel {
     refreshViews() {
         if (!this.simulationInterface || !this.uiElements.worldSetupGrid) return;
         this._populateWorldSetupGrid();
-
-        // If world settings can change outside of this panel,
-        // you might need to update slider values here.
         const worldSettings = this.simulationInterface.getWorldSettings();
         this.worldSliderComponents.forEach((slider, i) => {
             if (worldSettings[i]) {
                 slider.setValue(worldSettings[i].initialDensity);
-                // Also update the 'enabled' checkbox state if it's managed here and can change elsewhere
+                
                 const enableSwitch = this.uiElements.worldSetupGrid.querySelector(`#enableSwitch_${i}`);
                 const enableLabel = this.uiElements.worldSetupGrid.querySelector(`label[for="enableSwitch_${i}"]`);
                 if (enableSwitch) {
@@ -97,29 +92,21 @@ export class SetupPanel {
     _populateWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
         grid.innerHTML = '';
-        this.worldSliderComponents = []; // Clear previous instances
+        this.worldSliderComponents = []; 
         const fragment = document.createDocumentFragment();
         const worldSettings = this.simulationInterface.getWorldSettings();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = worldSettings[i] || { initialDensity: 0.5, enabled: true };
-
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
-
             const label = document.createElement('div');
             label.className = 'world-label';
             label.textContent = `World ${i}`;
             cell.appendChild(label);
-
-            // Density Control using SliderComponent
             const densityControlDiv = document.createElement('div');
             densityControlDiv.className = 'density-control setting-control';
-            // The SliderComponent will create its own label if configured,
-            // or we can have a separate one here. Let's use its internal label.
-            // No need for densityLabel span or densityValueDisplay span explicitly here.
-
-            const sliderMountPoint = document.createElement('div'); // Mount point for this world's slider
+            const sliderMountPoint = document.createElement('div'); 
             densityControlDiv.appendChild(sliderMountPoint);
             cell.appendChild(densityControlDiv);
 
@@ -130,40 +117,33 @@ export class SetupPanel {
                 max: 1,
                 step: 0.001,
                 value: settings.initialDensity,
-                isBias: true, // Treat density like bias for 3 decimal places
+                isBias: true, 
                 unit: '',
-                showValue: true, // The component handles its value display
+                showValue: true, 
                 onChange: (newDensity) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
                 }
             });
             this.worldSliderComponents.push(densitySlider);
-
-
-            // Enable/Disable Control
             const enableControlDiv = document.createElement('div');
             enableControlDiv.className = 'enable-control setting-control';
-
             const enableSwitch = document.createElement('input');
             enableSwitch.type = 'checkbox';
             enableSwitch.id = `enableSwitch_${i}`;
             enableSwitch.className = 'enable-switch checkbox-input';
             enableSwitch.checked = settings.enabled;
             enableControlDiv.appendChild(enableSwitch);
-
             const enableLabelElement = document.createElement('label');
             enableLabelElement.htmlFor = `enableSwitch_${i}`;
             enableLabelElement.className = 'checkbox-label';
             enableLabelElement.textContent = settings.enabled ? 'Enabled' : 'Disabled';
             enableControlDiv.appendChild(enableLabelElement);
             cell.appendChild(enableControlDiv);
-            
             enableSwitch.addEventListener('change', (event) => {
                 const isEnabled = event.target.checked;
                 enableLabelElement.textContent = isEnabled ? 'Enabled' : 'Disabled';
                 EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
             });
-
             fragment.appendChild(cell);
         }
         grid.appendChild(fragment);
@@ -176,13 +156,12 @@ export class SetupPanel {
             x: this.panelElement.style.left,
             y: this.panelElement.style.top,
         };
-        PersistenceService.savePanelState(this.panelIdentifier, state); // Use service
+        PersistenceService.savePanelState(this.panelIdentifier, state); 
     }
 
     _loadPanelState() {
         if (!this.panelElement) return;
-        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); // Use service
-        
+        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); 
         if (savedState.isOpen) {
             this.show(false); 
         } else {

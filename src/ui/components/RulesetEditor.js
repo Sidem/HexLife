@@ -1,7 +1,5 @@
-// src/ui/components/RulesetEditor.js
-//import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
-import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
+import * as PersistenceService from '../../services/PersistenceService.js'; 
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesetEditor {
@@ -17,7 +15,7 @@ export class RulesetEditor {
 
         this.panelElement = panelElement;
         this.simInterface = simulationInterface;
-        this.panelIdentifier = 'ruleset'; // Add this
+        this.panelIdentifier = 'ruleset'; 
         this.uiElements = {
             closeButton: this.panelElement.querySelector('#closeEditorButton') || this.panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: this.panelElement.querySelector('#editorRulesetInput'),
@@ -32,11 +30,10 @@ export class RulesetEditor {
                 console.warn(`RulesetEditor: UI element '${key}' not found within the panel.`);
             }
         }
-
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-        this._loadPanelState(); // Load position and open/closed state
+        this._loadPanelState(); 
         this._setupInternalListeners();
-        // refreshViews will be called by show/toggle or explicitly if needed
+        
     }
 
     _setupInternalListeners() {
@@ -119,15 +116,15 @@ export class RulesetEditor {
             this.uiElements.invertAllButton.addEventListener('click', () => {
                 const currentRuleset = this.simInterface.getCurrentRuleset();
                 for(let i = 0; i < currentRuleset.length; i++) {
-                    this.simInterface.toggleRuleOutputState(i); // This will save each toggle, might be inefficient
-                } // Consider a batch toggle if performance is an issue.
+                    this.simInterface.toggleRuleOutputState(i); 
+                } 
                 if (this.simInterface.getResetOnNewRule()) this.simInterface.resetAllWorldsToCurrentSettings();
                 this.refreshViews();
                 this.simInterface.refreshAllRulesetViews();
             });
         }
 
-        // Listen for drag events on the DraggablePanel to save state
+        
         if (this.draggablePanel) {
             this.draggablePanel.onDragEnd = () => this._savePanelState();
         }
@@ -155,7 +152,7 @@ export class RulesetEditor {
             this.uiElements.rulesetEditorGrid.classList.remove('hidden');
             this.uiElements.neighborCountRulesetEditorGrid.classList.add('hidden');
             this._populateDetailedGrid(rulesetArray);
-        } else { // neighborCount
+        } else { 
             this.uiElements.rulesetEditorGrid.classList.add('hidden');
             this.uiElements.neighborCountRulesetEditorGrid.classList.remove('hidden');
             this._populateNeighborCountGrid();
@@ -255,12 +252,12 @@ export class RulesetEditor {
             x: this.panelElement.style.left,
             y: this.panelElement.style.top,
         };
-        PersistenceService.savePanelState(this.panelIdentifier, state); // Use service
+        PersistenceService.savePanelState(this.panelIdentifier, state); 
     }
 
     _loadPanelState() {
         if (!this.panelElement) return;
-        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); // Use service
+        const savedState = PersistenceService.loadPanelState(this.panelIdentifier); 
 
         if (savedState.isOpen) {
             this.show(false); 

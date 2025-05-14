@@ -1,8 +1,7 @@
-// src/core/simulation.js
 import * as Config from './config.js';
 import { indexToCoords, coordsToIndex } from '../utils/utils.js';
-import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
-import { EventBus, EVENTS } from '../services/EventBus.js'; // Import EventBus
+import * as PersistenceService from '../services/PersistenceService.js';
+import { EventBus, EVENTS } from '../services/EventBus.js';
 
 const NEIGHBOR_DIRS_ODD_R = [
     [+1,  0], [+1, +1], [ 0, +1],
@@ -13,54 +12,41 @@ const NEIGHBOR_DIRS_EVEN_R = [
     [-1,  0], [-1, -1], [ 0, -1]
 ];
 
-// --- Module State ---
-let worldsData = []; // Each element: { jsStateArray, jsNextStateArray, jsHoverStateArray, jsRuleIndexArray, jsNextRuleIndexArray, stats, enabled, initialDensity }
+let worldsData = [];
 let currentRuleset = new Uint8Array(128);
 let currentRulesetHex = "N/A";
-
 let isPaused = true;
 let tickTimer = 0;
-let currentSpeed = Config.DEFAULT_SPEED; // Will be loaded/set from LS
+let currentSpeed = Config.DEFAULT_SPEED;
 let tickDuration = 1.0 / currentSpeed;
-
 let selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
-
 let isEntropySamplingEnabled = false;
-let entropySampleRate = 10; // Default: sample every 10 ticks
-let globalTickCounter = 0; // Counter across all steps
+let entropySampleRate = 10; 
+let globalTickCounter = 0;
+let currentBrushSize = Config.DEFAULT_NEIGHBORHOOD_SIZE;
 
-let currentBrushSize = Config.DEFAULT_NEIGHBORHOOD_SIZE; // Moved from bottom, needs to be initialized
-
-// --- Initialization ---
 export function initSimulation() {
     console.log("Initializing Simulation...");
 
-    // Load settings using PersistenceService
     currentSpeed = PersistenceService.loadSimSpeed();
-    setSimulationSpeed(currentSpeed); // This also sets tickDuration and saves
+    setSimulationSpeed(currentSpeed);
 
     const loadedRulesetHex = PersistenceService.loadRuleset();
     if (loadedRulesetHex) {
-        setRuleset(loadedRulesetHex); // This sets currentRuleset and currentRulesetHex, and saves
+        setRuleset(loadedRulesetHex);
     } else {
-        generateRandomRuleset(); // This sets and saves
+        generateRandomRuleset();
     }
 
-    currentBrushSize = PersistenceService.loadBrushSize(); // Load brush size
-
+    currentBrushSize = PersistenceService.loadBrushSize();
     isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
     entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
     globalTickCounter = 0;
-
     let worldSettings = PersistenceService.loadWorldSettings();
-    // loadWorldSettings in PersistenceService now returns a default if needed,
-    // so the complex fallback logic here can be simplified.
-
     worldsData = [];
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const settings = worldSettings[i]; // worldSettings is guaranteed to be valid
+        const settings = worldSettings[i];
         const jsStateArray = new Uint8Array(Config.NUM_CELLS);
-        // Other arrays remain the same
         const jsNextStateArray = new Uint8Array(Config.NUM_CELLS).fill(0);
         const jsHoverStateArray = new Uint8Array(Config.NUM_CELLS).fill(0);
         const jsRuleIndexArray = new Uint8Array(Config.NUM_CELLS).fill(0);
@@ -87,12 +73,12 @@ export function initSimulation() {
                 }
             }
         } else {
-            jsStateArray.fill(0); // Disabled worlds start empty
+            jsStateArray.fill(0); 
             activeCount = 0;
         }
 
         const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-        const initialEntropy = calculateBinaryEntropy(initialRatio); // Calculate initial entropy
+        const initialEntropy = calculateBinaryEntropy(initialRatio); 
         const stats = {
             ratio: initialRatio,
             avgRatio: initialRatio,
@@ -108,29 +94,22 @@ export function initSimulation() {
         });
     }
 
-    isPaused = true; // Start paused
+    isPaused = true;
     tickTimer = 0;
     selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
 
-    // After all initial setup that might change state, dispatch initial state events
-    // Or rely on setters to dispatch. For now, let's make setters responsible.
-    // Call setters to ensure events are dispatched for initial loaded values if they have side effects.
     setSimulationSpeed(currentSpeed);
     if (loadedRulesetHex) setRuleset(loadedRulesetHex); else generateRandomRuleset();
-    // No specific "setBrushSize" call here as it's just a value, UI will fetch it.
-    // Same for entropy sampling state.
-
-    // Setup listeners for commands
+    
     setupSimulationEventListeners();
 
     console.log(`Simulation initialized with ${Config.NUM_WORLDS} worlds.`);
-    // Dispatch an event that initial world settings are ready
     EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
 }
 
 function setupSimulationEventListeners() {
     EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => {
-        setSimulationPaused(!isPaused); // The setter will dispatch SIMULATION_PAUSED
+        setSimulationPaused(!isPaused);
     });
     EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (newSpeed) => {
         setSimulationSpeed(newSpeed);
@@ -143,7 +122,6 @@ function setupSimulationEventListeners() {
     });
     EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (rulesetHex) => {
         const success = setRuleset(rulesetHex);
-        // Optionally, dispatch a success/failure event back to UI if needed
     });
     EventBus.subscribe(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, (ruleIndex) => {
         toggleRuleOutputState(ruleIndex);
@@ -155,17 +133,16 @@ function setupSimulationEventListeners() {
          setRulesForNeighborCountCondition(data.centerState, data.numActive, data.outputState);
      });
     EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS, () => {
-        resetAllWorldsToCurrentSettings(); // This function will dispatch ALL_WORLDS_RESET
+        resetAllWorldsToCurrentSettings();
     });
     EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => {
-        loadWorldState(data.worldIndex, data.loadedData); // This will dispatch relevant events internally
+        loadWorldState(data.worldIndex, data.loadedData);
     });
      EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
          applyBrush(data.worldIndex, data.col, data.row, data.brushSize);
      });
      EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
          setHoverState(data.worldIndex, data.col, data.row, data.brushSize);
-         // Hover state changes frequently, might not need a global event unless for specific UI feedback
      });
      EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
          clearHoverState(data.worldIndex);
@@ -193,7 +170,7 @@ function countSetBits(n) {
     return count;
 }
 
-// --- Entropy Calculation ---
+
 /**
  * Calculates Shannon entropy for a binary distribution.
  * @param {number} p1 Probability of state 1 (e.g., ratio of active cells).
@@ -201,25 +178,23 @@ function countSetBits(n) {
  */
 function calculateBinaryEntropy(p1) {
     if (p1 <= 0 || p1 >= 1) {
-        return 0; // Entropy is 0 if the state is certain (all 0 or all 1)
+        return 0;
     }
     const p0 = 1 - p1;
-    // Use Math.log2 if available, otherwise use log(base e) / log(2)
     const log2 = Math.log2 || function(x) { return Math.log(x) / Math.LN2; };
     const entropy = - (p1 * log2(p1) + p0 * log2(p0));
-    // Clamp result just in case of floating point inaccuracies near 0 or 1
     return Math.max(0, Math.min(1, entropy));
 }
 
-// --- Simulation Step Logic ---
+
 function runSingleStepForAllWorlds() {
     const numCols = Config.GRID_COLS;
     const numRows = Config.GRID_ROWS;
-    globalTickCounter++; // Increment global counter
+    globalTickCounter++;
 
     for (let worldIdx = 0; worldIdx < worldsData.length; worldIdx++) {
         const world = worldsData[worldIdx];
-        if (!world.enabled) continue; // Skip disabled worlds
+        if (!world.enabled) continue;
 
         const { jsStateArray, jsNextStateArray, jsNextRuleIndexArray } = world;
         let activeCount = 0;
@@ -251,7 +226,6 @@ function runSingleStepForAllWorlds() {
         updateWorldStats(world, activeCount);
 
         if (isEntropySamplingEnabled && (globalTickCounter % entropySampleRate === 0)) {
-            // Calculate entropy based on the ratio that was just updated in updateWorldStats
             const currentEntropy = calculateBinaryEntropy(world.stats.ratio);
             world.stats.entropyHistory.push(currentEntropy);
             if (world.stats.entropyHistory.length > Config.STATS_HISTORY_SIZE) {
@@ -297,11 +271,9 @@ export function stepSimulation(timeDelta) {
     return stepsTakenThisFrame;
 }
 
-// --- Ruleset Management ---
 export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false) {
     console.log(`Generating random ruleset with bias: ${bias}, symmetrical: ${generateSymmetrically}`);
     if (generateSymmetrically) {
-        // ... (original symmetrical logic) ...
         for (let centerState = 0; centerState <= 1; centerState++) {
             for (let numActiveNeighbors = 0; numActiveNeighbors <= 6; numActiveNeighbors++) {
                 const randomOutput = Math.random() < bias ? 1 : 0;
@@ -312,7 +284,6 @@ export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false)
         for (let i = 0; i < 128; i++) {
             currentRuleset[i] = Math.random() < bias ? 1 : 0;
         }
-        // ... (original anti-flicker logic) ...
         if (currentRuleset[0] === 1 && currentRuleset[127] === 0) {
             if (Math.random() < 0.5) currentRuleset[127] = 1; else currentRuleset[0] = 0;
         } else if (currentRuleset[0] === 0 && currentRuleset[127] === 1) {
@@ -321,12 +292,11 @@ export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false)
     }
     currentRulesetHex = rulesetToHex(currentRuleset);
     PersistenceService.saveRuleset(currentRulesetHex);
-    EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
+    EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
     console.log("Generated random ruleset:", currentRulesetHex);
 }
 
 function _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, outputState) {
-    // ... (original internal logic) ...
     if (centerState !== 0 && centerState !== 1) return;
     if (numActiveNeighbors < 0 || numActiveNeighbors > 6) return;
     if (outputState !== 0 && outputState !== 1) return;
@@ -348,9 +318,8 @@ export function setRulesForNeighborCountCondition(centerState, numActiveNeighbor
 }
 
 export function getEffectiveRuleForNeighborCount(centerState, numActiveNeighbors) {
-    // ... (original logic) ...
-    if (centerState !== 0 && centerState !== 1) return 2; // Invalid input
-    if (numActiveNeighbors < 0 || numActiveNeighbors > 6) return 2; // Invalid input
+    if (centerState !== 0 && centerState !== 1) return 2;
+    if (numActiveNeighbors < 0 || numActiveNeighbors > 6) return 2;
 
     let firstOutput = -1;
     let ruleFound = false;
@@ -364,7 +333,7 @@ export function getEffectiveRuleForNeighborCount(centerState, numActiveNeighbors
             if (firstOutput === -1) {
                 firstOutput = currentOutput;
             } else if (firstOutput !== currentOutput) {
-                return 2; // Mixed states
+                return 2;
             }
         }
     }
@@ -389,7 +358,7 @@ export function hexToRuleset(hexString) {
     const ruleset = new Uint8Array(128);
     if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
         console.error("Invalid hex string provided to hexToRuleset:", hexString);
-        ruleset.fill(0); // Return default (all off) on error
+        ruleset.fill(0);
         return ruleset;
     }
     try {
@@ -418,7 +387,7 @@ export function setRuleset(hexString) {
         currentRuleset.set(newRuleset);
         currentRulesetHex = newHex;
         PersistenceService.saveRuleset(currentRulesetHex);
-        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
         console.log("Ruleset updated to:", currentRulesetHex);
         return true;
     }
@@ -431,7 +400,7 @@ export function toggleRuleOutputState(ruleIndex) {
         currentRuleset[ruleIndex] = 1 - currentRuleset[ruleIndex];
         currentRulesetHex = rulesetToHex(currentRuleset);
         PersistenceService.saveRuleset(currentRulesetHex);
-        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
         console.log(`Rule ${ruleIndex} toggled. New hex: ${currentRulesetHex}`);
     }
 }
@@ -446,9 +415,6 @@ export function setAllRulesState(targetState) {
     }
 }
 
-
-// --- Neighbor Finding (Adapted from previous main.js / utils.js) ---
-
 /**
  * Gets potential neighbor coordinates for a given cell. (Flat-top, odd-r layout)
  * Uses precomputed direction arrays.
@@ -456,10 +422,10 @@ export function setAllRulesState(targetState) {
  * @param {number} row Row index.
  * @returns {Array<[number, number]>} Array of [col, row] pairs for neighbors.
  */
-function getNeighbors(col, row) { // This function is still used by findHexagonsInNeighborhood
+function getNeighbors(col, row) {
     const base_dirs = (col % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
-    const neighbors = []; // Array creation is necessary here
-    for (let i = 0; i < 6; i++) { // Loop 6 times explicitly
+    const neighbors = []; 
+    for (let i = 0; i < 6; i++) {
         neighbors.push([col + base_dirs[i][0], row + base_dirs[i][1]]);
     }
     return neighbors;
@@ -477,8 +443,8 @@ function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
     const startIndex = coordsToIndex(startCol, startRow);
     if (startIndex === undefined) return [];
 
-    const affectedIndices = new Set([startIndex]); // Include center cell
-    const queue = [[startCol, startRow, 0]]; // [col, row, distance]
+    const affectedIndices = new Set([startIndex]);
+    const queue = [[startCol, startRow, 0]];
     const visited = new Map([[startKey, 0]]);
 
     while (queue.length > 0) {
@@ -503,8 +469,6 @@ function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
     }
     return Array.from(affectedIndices);
 }
-
-// --- Interaction Functions ---
 
 /**
  * Updates the hover state for a specific world.
@@ -574,8 +538,8 @@ export function applyBrush(worldIndex, col, row, brushSize) {
 
     for (const index of affectedIndices) {
         if (index >= 0 && index < stateArray.length) {
-            stateArray[index] = 1 - stateArray[index]; // Toggle
-            ruleIndexArray[index] = 0; // Assign default rule for manual toggle
+            stateArray[index] = 1 - stateArray[index];
+            ruleIndexArray[index] = 0;
             changed = true;
         }
     }
@@ -583,18 +547,18 @@ export function applyBrush(worldIndex, col, row, brushSize) {
         let activeCount = 0;
         for(let i=0; i < stateArray.length; i++) { if(stateArray[i] === 1) activeCount++; }
         updateWorldStats(world, activeCount);
-        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats()); // If it's the selected world
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
     }
     return changed;
 }
 
-// --- Simulation Control & Settings ---
+
 export function setSimulationPaused(paused) {
     const oldPausedState = isPaused;
     isPaused = paused;
     if (!isPaused) tickTimer = 0;
     if (oldPausedState !== isPaused) {
-        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, isPaused); // Dispatch event
+        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, isPaused);
     }
 }
 
@@ -604,22 +568,20 @@ export function setSimulationSpeed(speed) {
     tickDuration = currentSpeed > 0 ? 1.0 / currentSpeed : Infinity;
     PersistenceService.saveSimSpeed(currentSpeed);
     if (oldSpeed !== currentSpeed) {
-        EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, currentSpeed); // Dispatch event
+        EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, currentSpeed);
     }
 }
-// BRUSH SIZE is managed by main.js and UI, but simulation needs to save/load it.
-// Let's add a setter here for main.js to call, which also saves it.
 
-export function loadBrushSize() { // Called by main.js during its init
+export function loadBrushSize() {
     currentBrushSize = PersistenceService.loadBrushSize();
     return currentBrushSize;
 }
-export function setBrushSize(size) { // Called by main.js when UI changes it
+export function setBrushSize(size) {
     const oldBrushSize = currentBrushSize;
     currentBrushSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
     PersistenceService.saveBrushSize(currentBrushSize);
     if (oldBrushSize !== currentBrushSize) {
-        EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, currentBrushSize); // Dispatch event
+        EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, currentBrushSize);
     }
 }
 
@@ -628,31 +590,31 @@ export function setSelectedWorldIndex(index) {
     if (index >= 0 && index < worldsData.length && selectedWorldIndex !== index) {
         selectedWorldIndex = index;
         EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, selectedWorldIndex);
-        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats()); // Update stats for new world
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
     }
 }
 
 export function setWorldInitialDensity(worldIndex, density) {
     if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
-    density = Math.max(0, Math.min(1, density)); // Clamp density
+    density = Math.max(0, Math.min(1, density));
     worldsData[worldIndex].initialDensity = density;
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
     PersistenceService.saveWorldSettings(allSettings);
-    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings); // Dispatch event
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings);
     return true;
 }
 
 export function setWorldEnabled(worldIndex, isEnabled) {
     if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
-    worldsData[worldIndex].enabled = !!isEnabled; // Ensure boolean
-    if (!worldsData[worldIndex].enabled) { // If disabling, clear its state
+    worldsData[worldIndex].enabled = !!isEnabled;
+    if (!worldsData[worldIndex].enabled) {
         worldsData[worldIndex].jsStateArray.fill(0);
         worldsData[worldIndex].jsRuleIndexArray.fill(0);
         updateWorldStats(worldsData[worldIndex], 0);
     }
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
     PersistenceService.saveWorldSettings(allSettings);
-    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings); // Dispatch event
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings);
     return true;
 }
 
@@ -666,7 +628,7 @@ export function getWorldSettings() {
 export function resetAllWorldsToCurrentSettings() {
     console.log("Resetting all worlds to current settings...");
     if (!worldsData) return;
-    globalTickCounter = 0; // Reset tick counter on full reset
+    globalTickCounter = 0;
 
     for (let i = 0; i < worldsData.length; i++) {
         const world = worldsData[i];
@@ -674,7 +636,6 @@ export function resetAllWorldsToCurrentSettings() {
 
         if (world.enabled) {
             const density = world.initialDensity;
-            // Apply density logic (copied from initSimulation for consistency)
             if (density === 0 && Config.NUM_CELLS > 0) {
                  world.jsStateArray.fill(0);
                  const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
@@ -693,7 +654,7 @@ export function resetAllWorldsToCurrentSettings() {
                 }
             }
         } else {
-            world.jsStateArray.fill(0); // Disabled worlds are reset to empty
+            world.jsStateArray.fill(0);
             activeCount = 0;
         }
         const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
@@ -701,7 +662,7 @@ export function resetAllWorldsToCurrentSettings() {
         world.stats.ratio = initialRatio;
         world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
         world.stats.avgRatio = initialRatio;
-        world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy); // Reset entropy history
+        world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy);
 
          world.jsRuleIndexArray.fill(0);
          world.jsNextStateArray.fill(0);
@@ -710,13 +671,11 @@ export function resetAllWorldsToCurrentSettings() {
     }
     console.log("All worlds reset based on their current settings.");
     EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
-    if (worldsData[selectedWorldIndex]) { // Dispatch stats for the currently selected world
+    if (worldsData[selectedWorldIndex]) {
          EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
     }
 }
 
-
-// --- State Load/Save (Per World) ---
 export function loadWorldState(worldIndex, stateData) {
      if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
      if (stateData.rows !== Config.GRID_ROWS || stateData.cols !== Config.GRID_COLS) {
@@ -736,25 +695,23 @@ export function loadWorldState(worldIndex, stateData) {
      world.jsNextRuleIndexArray.fill(0);
      world.jsHoverStateArray.fill(0);
 
-     // If loaded state implies a density, update the world's initialDensity setting
      let activeCount = 0;
      for(let i=0; i < world.jsStateArray.length; i++) { if(world.jsStateArray[i] === 1) activeCount++; }
      const newDensity = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-     setWorldInitialDensity(worldIndex, newDensity); // This will also save all world settings
+     setWorldInitialDensity(worldIndex, newDensity);
 
-     if (stateData.ruleset) { // Load and save ruleset globally
+     if (stateData.ruleset) {
          setRuleset(stateData.ruleset);
      }
 
-     // Reset and recalculate stats for the loaded world
      const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
      const initialEntropy = calculateBinaryEntropy(initialRatio);
      world.stats.ratio = initialRatio;
      world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
      world.stats.avgRatio = initialRatio;
-     world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy); // Reset entropy history
-     world.enabled = true; // Loading a state into a world implies enabling it
-     setWorldEnabled(worldIndex, true); // Save this change
+     world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy);
+     world.enabled = true;
+     setWorldEnabled(worldIndex, true);
 
      if (worldIndex === selectedWorldIndex) {
          EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
@@ -771,68 +728,17 @@ export function getWorldStateForSave(worldIndex) {
         rows: Config.GRID_ROWS,
         cols: Config.GRID_COLS,
         ruleset: currentRulesetHex,
-        state: Array.from(world.jsStateArray) // Convert to standard array for JSON
-        // Not saving jsRuleIndexArray as it's determined by the ruleset and state
+        state: Array.from(world.jsStateArray)
     };
 }
 
-/**
- * Resets all world states back to their initial densities.
- * Also pauses the simulation.
- */
-export function resetAllWorldStates() {
-    console.log("Resetting all world states...");
-    if (!worldsData) return;
 
-    for (let i = 0; i < worldsData.length; i++) {
-        const world = worldsData[i];
-        const density = Config.INITIAL_DENSITIES[i] ?? 0;
-        let activeCount = 0;
-
-        const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
-        if (density === 0) {
-            world.jsStateArray.fill(0);
-            world.jsStateArray[middleIndex] = 1;
-            activeCount = 1;
-        } else if (density === 1) {
-            world.jsStateArray.fill(1);
-            world.jsStateArray[middleIndex] = 0;
-            activeCount = Config.NUM_CELLS - 1;
-        } else {
-            for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
-                const state = Math.random() < density ? 1 : 0;
-                world.jsStateArray[cellIdx] = state;
-                if (state === 1) activeCount++;
-            }
-        }
-        world.jsRuleIndexArray.fill(0); // Reset rule indices
-        world.jsNextStateArray.fill(0); // Clear next state buffer
-        world.jsNextRuleIndexArray.fill(0); // Clear next rule index buffer
-        world.jsHoverStateArray.fill(0); // Clear hover state
-
-        // Reset statistics
-        const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-        world.stats.ratio = initialRatio;
-        world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
-        world.stats.avgRatio = initialRatio;
-    }
-
-    // Pause simulation after reset
-    //setSimulationPaused(true); // Use the exported setter
-
-    console.log("All world states reset.");
-    // Note: Need to ensure renderer updates buffers on next frame
-}
-
-
-// --- Getters ---
-export function getWorldsData() { return worldsData; } // Note: Now includes 'enabled' and 'initialDensity'
+export function getWorldsData() { return worldsData; }
 export function getCurrentRulesetHex() { return currentRulesetHex; }
 export function isSimulationPaused() { return isPaused; }
-// export function getTickDuration() { return tickDuration; } // Not typically needed externally
 export function getSelectedWorldIndex() { return selectedWorldIndex; }
-export function getCurrentSimulationSpeed() { return currentSpeed; } // For UI to init
-export function getCurrentBrushSize() { return currentBrushSize; } // For UI to init
+export function getCurrentSimulationSpeed() { return currentSpeed; }
+export function getCurrentBrushSize() { return currentBrushSize; }
 export function getEntropySamplingState() {
     return {
         enabled: isEntropySamplingEnabled,
@@ -865,19 +771,18 @@ export function setEntropySampling(enabled, rate) {
 export function getSelectedWorldStats() {
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
         const stats = worldsData[selectedWorldIndex].stats;
-        // Return the last recorded entropy value from the history
         const lastEntropy = stats.entropyHistory.length > 0
             ? stats.entropyHistory[stats.entropyHistory.length - 1]
-            : 0; // Default if history is somehow empty
+            : 0;
 
         return {
             ratio: stats.ratio,
             avgRatio: stats.avgRatio,
-            history: stats.history, // Ratio history
-            entropy: lastEntropy   // Last sampled entropy
+            history: stats.history,
+            entropy: lastEntropy
         };
     }
-    return { ratio: 0, avgRatio: 0, history: [], entropy: 0 }; // Ensure history is array
+    return { ratio: 0, avgRatio: 0, history: [], entropy: 0 }; 
 }
 export function getCurrentRulesetArray() {
     return new Uint8Array(currentRuleset);
@@ -890,7 +795,7 @@ export function getSelectedWorldEntropyHistory() {
     return null;
 }
 
-// --- New function to get stats history specifically for plotting ---
+
 /**
  * Gets the ratio history for the selected world.
  * @returns {number[]|null} Array of historical ratios or null.

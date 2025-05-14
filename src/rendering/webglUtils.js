@@ -1,5 +1,3 @@
-// webglUtils.js
-
 /**
  * Creates and compiles a shader.
  * @param {WebGL2RenderingContext} gl The WebGL Context.
@@ -35,7 +33,6 @@ export function createProgram(gl, vertexShader, fragmentShader) {
     gl.linkProgram(program);
     const success = gl.getProgramParameter(program, gl.LINK_STATUS);
     if (success) {
-        // Shaders no longer needed after linking
         gl.deleteShader(vertexShader);
         gl.deleteShader(fragmentShader);
         return program;
@@ -86,7 +83,7 @@ export function createBuffer(gl, target, data, usage) {
     const buffer = gl.createBuffer();
     gl.bindBuffer(target, buffer);
     gl.bufferData(target, data, usage);
-    gl.bindBuffer(target, null); // Unbind
+    gl.bindBuffer(target, null);
     return buffer;
 }
 
@@ -100,13 +97,12 @@ export function createBuffer(gl, target, data, usage) {
  */
 export function updateBuffer(gl, buffer, target, data, offset = 0) {
     gl.bindBuffer(target, buffer);
-    // Use bufferSubData for partial updates if needed, otherwise bufferData replaces the whole content
     if (offset > 0 || data.byteLength < gl.getBufferParameter(target, gl.BUFFER_SIZE)) {
          gl.bufferSubData(target, offset, data);
     } else {
-         gl.bufferData(target, data, gl.getBufferParameter(target, gl.BUFFER_USAGE)); // Use original usage hint
+         gl.bufferData(target, data, gl.getBufferParameter(target, gl.BUFFER_USAGE));
     }
-    gl.bindBuffer(target, null); // Unbind
+    gl.bindBuffer(target, null);
 }
 
 
@@ -120,25 +116,22 @@ export function updateBuffer(gl, buffer, target, data, offset = 0) {
 export function createFBOTexture(gl, width, height) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    // Define size and format of level 0
     const level = 0;
-    const internalFormat = gl.RGBA; // Standard color format
+    const internalFormat = gl.RGBA;
     const border = 0;
     const format = gl.RGBA;
-    const type = gl.UNSIGNED_BYTE; // Use bytes for color texture
-    const data = null; // No initial data needed, we render into it
+    const type = gl.UNSIGNED_BYTE;
+    const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   width, height, border, format, type, data);
 
-    // Set filtering so it renders correctly (important!)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // Sharp pixels when smaller
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); // Sharp pixels when larger (magnified)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    gl.bindTexture(gl.TEXTURE_2D, null); // Unbind
+    gl.bindTexture(gl.TEXTURE_2D, null);
     return texture;
 }
 
@@ -153,12 +146,11 @@ export function createFBO(gl, texture) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
 
-    // Check FBO status (optional but recommended)
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (status !== gl.FRAMEBUFFER_COMPLETE) {
         console.error("FBO creation failed:", status);
     }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Unbind
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return fbo;
 }
