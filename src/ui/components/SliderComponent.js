@@ -1,56 +1,39 @@
 // src/ui/components/SliderComponent.js
-export class SliderComponent {
-    constructor(mountPoint, options) {
-        if (!mountPoint) {
-            console.error("SliderComponent: mountPoint is required.");
-            return;
-        }
-        this.mountPoint = typeof mountPoint === 'string' ? document.getElementById(mountPoint) : mountPoint;
-        if (!this.mountPoint) {
-            console.error("SliderComponent: mountPoint element not found.");
-            return;
-        }
+import { BaseComponent } from './BaseComponent.js'; // Import BaseComponent
 
-        this.options = {
-            id: '',
-            label: '',
-            min: 0,
-            max: 100,
-            step: 1,
-            value: 50,
-            unit: '', // e.g., 'tps', '%', or empty
-            showValue: true, // Whether to display the value span
-            isBias: false, // Special formatting for bias slider
-            onChange: () => {}, // Callback when value changes
-            onInput: () => {},  // Callback during sliding
-            disabled: false,
-            ...options
-        };
+export class SliderComponent extends BaseComponent { // Extend BaseComponent
+    constructor(mountPoint, options) {
+        super(mountPoint, options); // Call BaseComponent constructor
+        // The original constructor logic of SliderComponent already uses this.options
+        // and this.mountPoint which are set by BaseComponent.
+
+        // No need to re-declare this.mountPoint or this.options
+        // this.mountPoint = ... (done by super)
+        // this.options = { ...options }; (done by super, merged by BaseComponent)
 
         this._createElement();
-        this._attachEventListeners();
-        this.setValue(this.options.value); // Initialize display
+        this._attachEventListenersToElements(); // Renamed to avoid conflict if super had _attachEventListeners
+        this.setValue(this.options.value);
         this.setDisabled(this.options.disabled);
     }
 
     _createElement() {
-        this.mountPoint.innerHTML = ''; // Clear the mount point
-
-        this.container = document.createElement('div');
-        this.container.className = 'slider-component-container';
+        // Create this.container as the root element for this component
+        this.element = document.createElement('div'); // Standardize on 'this.element' for the component's root
+        this.element.className = 'slider-component-container';
          if (this.options.id) {
-             this.container.id = `${this.options.id}-container`;
+             this.element.id = `${this.options.id}-container`;
          }
 
         if (this.options.label) {
             this.labelElement = document.createElement('label');
             this.labelElement.htmlFor = this.options.id || `slider-${Date.now()}`;
             this.labelElement.textContent = this.options.label;
-            this.container.appendChild(this.labelElement);
+            this.element.appendChild(this.labelElement);
         }
 
         this.sliderWrapper = document.createElement('div');
-        this.sliderWrapper.className = 'slider-wrapper'; // For positioning value span correctly
+        this.sliderWrapper.className = 'slider-wrapper';
 
         this.sliderElement = document.createElement('input');
         this.sliderElement.type = 'range';
@@ -59,7 +42,6 @@ export class SliderComponent {
         this.sliderElement.max = this.options.max;
         this.sliderElement.step = this.options.step;
         this.sliderElement.value = this.options.value;
-
         this.sliderWrapper.appendChild(this.sliderElement);
 
         if (this.options.showValue) {
@@ -67,19 +49,21 @@ export class SliderComponent {
             this.valueDisplayElement.className = 'value-display';
             this.sliderWrapper.appendChild(this.valueDisplayElement);
         }
-         this.container.appendChild(this.sliderWrapper);
+        this.element.appendChild(this.sliderWrapper);
 
          if (this.options.unit && this.options.showValue) {
              this.unitDisplayElement = document.createElement('span');
              this.unitDisplayElement.className = 'unit-display';
              this.unitDisplayElement.textContent = this.options.unit;
-             this.container.appendChild(this.unitDisplayElement);
+             this.element.appendChild(this.unitDisplayElement);
          }
-        this.mountPoint.appendChild(this.container);
+
+        this.mountPoint.appendChild(this.element); // Append the component's root to the mount point
     }
 
-    _attachEventListeners() {
-        this.sliderElement.addEventListener('input', (event) => {
+    _attachEventListenersToElements() { // Renamed
+        // Use the _addDOMListener helper from BaseComponent for cleanup
+        this._addDOMListener(this.sliderElement, 'input', (event) => {
             const value = this.options.isBias ? parseFloat(event.target.value) : parseInt(event.target.value, 10);
             this._updateValueDisplay(value);
             if (this.options.onInput) {
@@ -87,16 +71,15 @@ export class SliderComponent {
             }
         });
 
-        this.sliderElement.addEventListener('change', (event) => {
+        this._addDOMListener(this.sliderElement, 'change', (event) => {
             const value = this.options.isBias ? parseFloat(event.target.value) : parseInt(event.target.value, 10);
-            this._updateValueDisplay(value); // Ensure display is correct on final change
+            this._updateValueDisplay(value);
             if (this.options.onChange) {
                 this.options.onChange(value);
             }
         });
-
-        // Optional: Add wheel event listener if desired for all sliders globally
-         this.sliderElement.addEventListener('wheel', (event) => {
+        
+        this._addDOMListener(this.sliderElement, 'wheel', (event) => {
              if (this.sliderElement.disabled) return;
              event.preventDefault();
              const step = parseFloat(this.sliderElement.step) || 1;
@@ -112,24 +95,19 @@ export class SliderComponent {
                   currentValue = Math.max(parseFloat(this.sliderElement.min), Math.min(parseFloat(this.sliderElement.max), currentValue));
              }
 
-
              this.sliderElement.value = currentValue;
-             this._updateValueDisplay(this.options.isBias ? parseFloat(currentValue.toFixed(3)) : currentValue);
+             const finalValue = this.options.isBias ? parseFloat(currentValue.toFixed(3)) : currentValue;
+             this._updateValueDisplay(finalValue);
 
-             // Dispatch input and change events to trigger callbacks
              this.sliderElement.dispatchEvent(new Event('input', { bubbles: true }));
              this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));
-
-         }, { passive: false });
+        });
     }
 
     _updateValueDisplay(value) {
-        if (this.options.showValue && this.valueDisplayElement) {
-            if (this.options.isBias) {
-                this.valueDisplayElement.textContent = value.toFixed(3);
-            } else {
-                this.valueDisplayElement.textContent = value;
-            }
+        if (this.valueDisplayElement) {
+            const displayValue = this.options.isBias ? value.toFixed(3) : value;
+            this.valueDisplayElement.textContent = displayValue;
         }
     }
 
@@ -137,33 +115,26 @@ export class SliderComponent {
         return this.options.isBias ? parseFloat(this.sliderElement.value) : parseInt(this.sliderElement.value, 10);
     }
 
-    setValue(value, triggerCallbacks = false) {
-        const processedValue = this.options.isBias ? parseFloat(value) : parseInt(value, 10);
-        this.sliderElement.value = processedValue;
-        this._updateValueDisplay(processedValue);
-        if (triggerCallbacks) {
-             if (this.options.onInput) this.options.onInput(processedValue);
-             if (this.options.onChange) this.options.onChange(processedValue);
+    setValue(value, dispatchEvents = false) {
+        this.sliderElement.value = value;
+        this._updateValueDisplay(value);
+        if (dispatchEvents) {
+            this.sliderElement.dispatchEvent(new Event('input', { bubbles: true }));
+            this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
 
-    setDisabled(isDisabled) {
-         this.options.disabled = isDisabled;
-         this.sliderElement.disabled = isDisabled;
-         if (this.valueDisplayElement) {
-             this.valueDisplayElement.style.opacity = isDisabled ? '0.5' : '1';
-         }
-         if (this.unitDisplayElement) {
-             this.unitDisplayElement.style.opacity = isDisabled ? '0.5' : '1';
-         }
-         if (this.labelElement) {
-             this.labelElement.style.opacity = isDisabled ? '0.5' : '1';
-         }
+    setDisabled(disabled) {
+        this.sliderElement.disabled = disabled;
+        if (disabled) {
+            this.element.classList.add('disabled');
+        } else {
+            this.element.classList.remove('disabled');
+        }
     }
 
     destroy() {
-        // Remove event listeners if any were attached directly to document or window
-        // For now, listeners are on elements, so clearing innerHTML of mountPoint should suffice.
-        this.mountPoint.innerHTML = '';
+        super.destroy(); // Call BaseComponent's destroy for cleanup
+        // Any SliderComponent-specific cleanup (if any beyond DOM listeners and eventbus) would go here
     }
 } 

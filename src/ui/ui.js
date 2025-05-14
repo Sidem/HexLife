@@ -103,6 +103,7 @@ export function initUI(simulationInterface) {
         step: 1,
         value: simulationInterface.getCurrentSimulationSpeed(),
         unit: 'tps',
+        showValue: true, // Ensure value is shown
         onChange: (value) => {
             EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, value);
         }
@@ -116,6 +117,7 @@ export function initUI(simulationInterface) {
         step: 1,
         value: simulationInterface.getCurrentBrushSize(),
         unit: '',
+        showValue: true, // Ensure value is shown
         onChange: (value) => {
             EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, value);
         }
@@ -164,7 +166,7 @@ export function initUI(simulationInterface) {
     updateSamplingControlsState(); // Initialize slider disabled state
 
     // Setup EventBus listeners for UI updates
-    setupUIEventListeners();
+    setupUIEventListeners(simulationInterface, uiElements, sliderComponents, rulesetEditorComponent, setupPanelComponent);
 
     // Initial UI state based on current simulation state
     updatePauseButton(simulationInterface.isSimulationPaused());
@@ -658,7 +660,12 @@ function handleGlobalKeyDown(event) {
     }
 }
 
-function setupUIEventListeners() {
+function setupUIEventListeners(simulationInterface, uiElements, sliderComponents, rulesetEditorComponent, setupPanelComponent) {
+    EventBus.subscribe(EVENTS.SIMULATION_STARTED, () => {
+        uiElements.playPauseButton.textContent = 'Pause';
+        uiElements.playPauseButton.classList.remove('play-button');
+        uiElements.playPauseButton.classList.add('pause-button');
+    });
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
         updatePauseButton(isPaused);
     });
@@ -689,18 +696,41 @@ function setupUIEventListeners() {
         }
         // Ruleset editor might need refresh if reset also changes rules (not current behavior)
     });
-     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
-         // If SetupPanel is open, refresh it
-         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
-             setupPanelComponent.refreshViews(); // It re-fetches settings
-         }
-     });
-     EventBus.subscribe(EVENTS.ENTROPY_SAMPLING_CHANGED, (data) => {
-         if (uiElements.enableEntropySamplingCheckbox) uiElements.enableEntropySamplingCheckbox.checked = data.enabled;
-         if (sliderComponents.entropySampleRateSlider) sliderComponents.entropySampleRateSlider.setValue(data.rate);
-         updateSamplingControlsState(); // This updates disabled state of slider
-     });
-     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => {
-         updatePerformanceDisplay(data.fps, data.tps);
-     });
+    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
+        // If SetupPanel is open, refresh it
+        if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
+            setupPanelComponent.refreshViews(); // It re-fetches settings
+        }
+    });
+    EventBus.subscribe(EVENTS.ENTROPY_SAMPLING_CHANGED, (data) => {
+        if (uiElements.enableEntropySamplingCheckbox) uiElements.enableEntropySamplingCheckbox.checked = data.enabled;
+        if (sliderComponents.entropySampleRateSlider) sliderComponents.entropySampleRateSlider.setValue(data.rate);
+        updateSamplingControlsState(); // This updates disabled state of slider
+    });
+    EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => {
+        updatePerformanceDisplay(data.fps, data.tps);
+    });
+    EventBus.subscribe(EVENTS.RULESET_LOADED, (newRuleset) => {
+        if (rulesetEditorComponent) {
+            rulesetEditorComponent.loadRuleset(newRuleset);
+            rulesetEditorComponent.refreshViews(); 
+        }
+    });
+
+    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
+        if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
+            setupPanelComponent.refreshViews(); // It re-fetches settings via simInterface
+        }
+    });
+    EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
+        if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
+            setupPanelComponent.refreshViews();
+        }
+        // RulesetEditor might refresh if RULESET_CHANGED is also part of a reset sequence.
+    });
+
+    // Example: Listen for brush size changes from the slider and update the simulation
+    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (newBrushSize) => {
+        simulationInterface.setBrushSize(newBrushSize);
+    });
 }

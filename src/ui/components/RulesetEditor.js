@@ -146,7 +146,6 @@ export class RulesetEditor {
     }
 
     _updateEditorGrids(rulesetArray) {
-        // ... (rest of _updateEditorGrids, _populateDetailedGrid, _populateNeighborCountGrid unchanged from before)
         if (!this.uiElements.rulesetEditorMode || !this.uiElements.rulesetEditorGrid || !this.uiElements.neighborCountRulesetEditorGrid) {
             return;
         }
@@ -292,11 +291,9 @@ export class RulesetEditor {
     }
 
     toggle() {
-        const nowVisible = this.draggablePanel.toggle();
+        this.draggablePanel.toggle();
         this._savePanelState();
-        if (nowVisible) {
-            this.refreshViews();
-        }
+        this.refreshViews();
     }
 
     destroy() {
