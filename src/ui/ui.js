@@ -6,6 +6,7 @@ import { SetupPanel } from './components/SetupPanel.js'; // Import the new Setup
 import { DraggablePanel } from './components/DraggablePanel.js'; // Import the new SetupPanel
 import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
 import { SliderComponent } from './components/SliderComponent.js'; // Import new component
+import { EventBus, EVENTS } from '../services/EventBus.js'; // Import EventBus
 
 // --- DOM Element References ---
 let uiElements;
@@ -103,7 +104,7 @@ export function initUI(simulationInterface) {
         value: simulationInterface.getCurrentSimulationSpeed(),
         unit: 'tps',
         onChange: (value) => {
-            simulationInterface.setSpeed(value);
+            EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, value);
         }
     });
 
@@ -116,7 +117,7 @@ export function initUI(simulationInterface) {
         value: simulationInterface.getCurrentBrushSize(),
         unit: '',
         onChange: (value) => {
-            simulationInterface.setBrushSize(value);
+            EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, value);
         }
     });
 
@@ -136,17 +137,19 @@ export function initUI(simulationInterface) {
     });
 
     sliderComponents.entropySampleRateSlider = new SliderComponent(uiElements.entropySampleRateSliderMount, {
-         id: 'entropySampleRateSlider',
-         label: 'Rate (Ticks):',
-         min: 1,
-         max: 500, // Or a value from Config if preferred
-         step: 1,
-         value: simulationInterface.getEntropySamplingState().rate,
-         unit: '',
-         disabled: !uiElements.enableEntropySamplingCheckbox.checked,
-         onChange: (value) => {
-             handleSamplingControlsChange(); // This function will read from the component or be passed the value
-         }
+        id: 'entropySampleRateSlider',
+        label: 'Rate (Ticks):',
+        min: 1,
+        max: 100,
+        step: 1,
+        value: simulationInterface.getEntropySamplingState().rate,
+        disabled: !uiElements.enableEntropySamplingCheckbox.checked,
+        onChange: (value) => {
+            EventBus.dispatch(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, {
+                enabled: uiElements.enableEntropySamplingCheckbox.checked,
+                rate: value
+            });
+        }
     });
 
     setupGeneralListeners(simulationInterface); // Renamed for clarity
@@ -159,6 +162,16 @@ export function initUI(simulationInterface) {
     refreshAllRulesetViews(simulationInterfaceRef); // Initial display
     updateBiasSliderDisabledState();
     updateSamplingControlsState(); // Initialize slider disabled state
+
+    // Setup EventBus listeners for UI updates
+    setupUIEventListeners();
+
+    // Initial UI state based on current simulation state
+    updatePauseButton(simulationInterface.isSimulationPaused());
+    updateMainRulesetDisplay(simulationInterface.getCurrentRulesetHex());
+    updateStatsDisplay(simulationInterface.getSelectedWorldStats());
+    // Slider components are already initialized with current values from simulationInterface
+
     console.log("UI Initialized.");
     return true;
 }
@@ -309,8 +322,7 @@ function handleSliderWheel(event, sliderElement, valueSpanElement, simulationUpd
 
 function setupGeneralListeners(sim) {
     uiElements.playPauseButton.addEventListener('click', () => {
-        const nowPaused = sim.togglePause();
-        updatePauseButton(nowPaused);
+        EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
     });
 
     uiElements.generateSymmetricalCheckbox.addEventListener('change', (e) => PersistenceService.saveUISetting('generateSymmetrical', e.target.checked));
@@ -334,15 +346,14 @@ function setupGeneralListeners(sim) {
         });
     }
 
-
-
     // --- Ruleset (non-editor) controls ---
     uiElements.randomRulesetButton.addEventListener('click', () => {
-        let biasToUse = uiElements.useCustomBiasCheckbox.checked ? parseFloat(uiElements.biasSlider.value) : Math.random();
+        let biasToUse = uiElements.useCustomBiasCheckbox.checked ? sliderComponents.biasSlider.getValue() : Math.random();
         const generateSymmetrically = uiElements.generateSymmetricalCheckbox.checked;
-        sim.generateRandomRuleset(biasToUse, generateSymmetrically); // Saves LS in sim.js
-        refreshAllRulesetViews(sim);
-        if (uiElements.resetOnNewRuleCheckbox.checked) sim.resetAllWorldsToCurrentSettings();
+        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, { bias: biasToUse, symmetrical: generateSymmetrically });
+        if (uiElements.resetOnNewRuleCheckbox.checked) {
+            EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS);
+        }
     });
 
     uiElements.copyRuleButton.addEventListener('click', () => {
@@ -369,15 +380,9 @@ function setupGeneralListeners(sim) {
             uiElements.rulesetInput.select();
             return;
         }
-        const success = sim.setRuleset(hexString);
-        if (success) {
-            uiElements.rulesetInput.value = '';
-            uiElements.rulesetInput.blur();
-        } else {
-            alert("Error setting ruleset. Please check the code.");
-            uiElements.rulesetInput.select();
-        }
-        refreshAllRulesetViews(sim);
+        EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, hexString);
+        uiElements.rulesetInput.value = '';
+        uiElements.rulesetInput.blur();
     });
 
     uiElements.rulesetInput.addEventListener('keydown', (event) => {
@@ -422,11 +427,10 @@ function setupStateListeners(sim) {
                 if (!loadedData || typeof loadedData.rows !== 'number' || typeof loadedData.cols !== 'number' || !Array.isArray(loadedData.state)) {
                     throw new Error("Invalid state file format.");
                 }
-                const success = sim.loadWorldState(sim.getSelectedWorldIndex(), loadedData); // Sim handles LS updates
-                if (success) {
-                    updatePauseButton(sim.isSimulationPaused());
-                    refreshAllRulesetViews(sim);
-                }
+                EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, {
+                    worldIndex: sim.getSelectedWorldIndex(),
+                    loadedData: loadedData
+                });
             } catch (error) {
                 alert(`Error processing state file: ${error.message}`); console.error("File processing error:", error);
             } finally { event.target.value = null; }
@@ -434,7 +438,9 @@ function setupStateListeners(sim) {
         reader.onerror = (e) => { alert(`Error reading file: ${e.target.error}`); event.target.value = null; };
         reader.readAsText(file);
     });
-    uiElements.resetStatesButton.addEventListener('click', () => sim.resetAllWorldsToCurrentSettings());
+    uiElements.resetStatesButton.addEventListener('click', () => {
+        EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS);
+    });
 }
 
 function setupPanelToggleListeners() {
@@ -491,12 +497,12 @@ export function updateAnalysisPanel() {
 }
 
 function handleSamplingControlsChange() {
-    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
+    if (!uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
     const enabled = uiElements.enableEntropySamplingCheckbox.checked;
-    const rate = sliderComponents.entropySampleRateSlider.getValue(); // Get value from component
+    const rate = sliderComponents.entropySampleRateSlider.getValue();
     
     updateSamplingControlsState(); // Update slider enabled state based on checkbox
-    simulationInterfaceRef.setEntropySampling(enabled, rate);
+    EventBus.dispatch(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, { enabled, rate });
 }
 
 function handleCalculateAndPlot() {
@@ -650,4 +656,51 @@ function handleGlobalKeyDown(event) {
         case 'S': setupPanelComponent?.toggle(); event.preventDefault(); break;
         case 'A': analysisPanelComponent?.toggle(); event.preventDefault(); break;
     }
+}
+
+function setupUIEventListeners() {
+    EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
+        updatePauseButton(isPaused);
+    });
+    EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, (newSpeed) => {
+        if (sliderComponents.speedSlider) sliderComponents.speedSlider.setValue(newSpeed);
+    });
+    EventBus.subscribe(EVENTS.RULESET_CHANGED, (newRulesetHex) => {
+        updateMainRulesetDisplay(newRulesetHex);
+        if (rulesetEditorComponent) rulesetEditorComponent.refreshViews(); // Editor needs to know
+    });
+    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (newBrushSize) => {
+        if (sliderComponents.neighborhoodSlider) sliderComponents.neighborhoodSlider.setValue(newBrushSize);
+    });
+    EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (newWorldIndex) => {
+        // UI might want to highlight the selected world in a mini-map overview in the future
+        console.log("UI: Selected world changed to", newWorldIndex);
+        // Stats update is handled by WORLD_STATS_UPDATED
+    });
+    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (statsData) => {
+        updateStatsDisplay(statsData);
+        updateAnalysisPanel(); // Analysis panel depends on selected world stats
+    });
+    EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
+        // This event implies UI should re-fetch or know that worlds have reset
+        // For example, if SetupPanel is open, it might need to refresh.
+        if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
+            setupPanelComponent.refreshViews();
+        }
+        // Ruleset editor might need refresh if reset also changes rules (not current behavior)
+    });
+     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, (worldSettings) => {
+         // If SetupPanel is open, refresh it
+         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
+             setupPanelComponent.refreshViews(); // It re-fetches settings
+         }
+     });
+     EventBus.subscribe(EVENTS.ENTROPY_SAMPLING_CHANGED, (data) => {
+         if (uiElements.enableEntropySamplingCheckbox) uiElements.enableEntropySamplingCheckbox.checked = data.enabled;
+         if (sliderComponents.entropySampleRateSlider) sliderComponents.entropySampleRateSlider.setValue(data.rate);
+         updateSamplingControlsState(); // This updates disabled state of slider
+     });
+     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => {
+         updatePerformanceDisplay(data.fps, data.tps);
+     });
 }

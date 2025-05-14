@@ -2,6 +2,7 @@
 //import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesetEditor {
     constructor(panelElement, simulationInterface) {
@@ -54,8 +55,7 @@ export class RulesetEditor {
                 const currentArr = this.simInterface.getCurrentRulesetArray();
                 const isCurrentlyAllInactive = currentArr.every(state => state === 0);
                 const targetState = isCurrentlyAllInactive ? 1 : 0;
-                this.simInterface.setAllRulesState(targetState);
-                this.refreshViews();
+                EventBus.dispatch(EVENTS.COMMAND_SET_ALL_RULES_STATE, targetState);
             });
         }
 
@@ -69,10 +69,7 @@ export class RulesetEditor {
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
                 alert("Invalid Hex Code in Editor: Must be 32 hexadecimal characters (0-9, A-F).\nReverting to current ruleset.");
             } else {
-                const success = this.simInterface.setRuleset(hexString);
-                if (!success) {
-                     alert("Error setting ruleset from editor. The ruleset might have been rejected.\nReverting to current ruleset.");
-                }
+                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, hexString);
             }
             this.refreshViews();
         };
@@ -94,8 +91,7 @@ export class RulesetEditor {
                 if (ruleVizElement && ruleVizElement.dataset.ruleIndex !== undefined) {
                     const ruleIndex = parseInt(ruleVizElement.dataset.ruleIndex, 10);
                     if (!isNaN(ruleIndex)) {
-                        this.simInterface.toggleRuleOutputState(ruleIndex);
-                        this.refreshViews();
+                        EventBus.dispatch(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, ruleIndex);
                     }
                 }
             });
@@ -241,8 +237,11 @@ export class RulesetEditor {
                     const na = parseInt(ruleViz.dataset.numActive, 10);
                     const currentEffOutput = this.simInterface.getEffectiveRuleForNeighborCount(cs, na);
                     const newOutput = (currentEffOutput === 1 || currentEffOutput === 2) ? 0 : 1;
-                    this.simInterface.setRulesForNeighborCountCondition(cs, na, newOutput);
-                    this.refreshViews();
+                    EventBus.dispatch(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, {
+                        centerState: cs,
+                        numActive: na,
+                        outputState: newOutput
+                    });
                 });
                 fragment.appendChild(ruleViz);
             }

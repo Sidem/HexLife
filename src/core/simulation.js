@@ -2,6 +2,7 @@
 import * as Config from './config.js';
 import { indexToCoords, coordsToIndex } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
+import { EventBus, EVENTS } from '../services/EventBus.js'; // Import EventBus
 
 const NEIGHBOR_DIRS_ODD_R = [
     [+1,  0], [+1, +1], [ 0, +1],
@@ -111,7 +112,76 @@ export function initSimulation() {
     tickTimer = 0;
     selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
 
+    // After all initial setup that might change state, dispatch initial state events
+    // Or rely on setters to dispatch. For now, let's make setters responsible.
+    // Call setters to ensure events are dispatched for initial loaded values if they have side effects.
+    setSimulationSpeed(currentSpeed);
+    if (loadedRulesetHex) setRuleset(loadedRulesetHex); else generateRandomRuleset();
+    // No specific "setBrushSize" call here as it's just a value, UI will fetch it.
+    // Same for entropy sampling state.
+
+    // Setup listeners for commands
+    setupSimulationEventListeners();
+
     console.log(`Simulation initialized with ${Config.NUM_WORLDS} worlds.`);
+    // Dispatch an event that initial world settings are ready
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
+}
+
+function setupSimulationEventListeners() {
+    EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => {
+        setSimulationPaused(!isPaused); // The setter will dispatch SIMULATION_PAUSED
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (newSpeed) => {
+        setSimulationSpeed(newSpeed);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, (newSize) => {
+        setBrushSize(newSize);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
+        generateRandomRuleset(data.bias, data.symmetrical);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (rulesetHex) => {
+        const success = setRuleset(rulesetHex);
+        // Optionally, dispatch a success/failure event back to UI if needed
+    });
+    EventBus.subscribe(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, (ruleIndex) => {
+        toggleRuleOutputState(ruleIndex);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_ALL_RULES_STATE, (targetState) => {
+        setAllRulesState(targetState);
+    });
+     EventBus.subscribe(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, (data) => {
+         setRulesForNeighborCountCondition(data.centerState, data.numActive, data.outputState);
+     });
+    EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS, () => {
+        resetAllWorldsToCurrentSettings(); // This function will dispatch ALL_WORLDS_RESET
+    });
+    EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => {
+        loadWorldState(data.worldIndex, data.loadedData); // This will dispatch relevant events internally
+    });
+     EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
+         applyBrush(data.worldIndex, data.col, data.row, data.brushSize);
+     });
+     EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
+         setHoverState(data.worldIndex, data.col, data.row, data.brushSize);
+         // Hover state changes frequently, might not need a global event unless for specific UI feedback
+     });
+     EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
+         clearHoverState(data.worldIndex);
+     });
+     EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
+         setWorldInitialDensity(data.worldIndex, data.density);
+     });
+     EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_ENABLED, (data) => {
+         setWorldEnabled(data.worldIndex, data.isEnabled);
+     });
+     EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
+         setEntropySampling(data.enabled, data.rate);
+     });
+     EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (worldIndex) => {
+         setSelectedWorldIndex(worldIndex);
+     });
 }
 
 function countSetBits(n) {
@@ -192,6 +262,10 @@ function runSingleStepForAllWorlds() {
         world.jsStateArray.set(world.jsNextStateArray);
         world.jsRuleIndexArray.set(world.jsNextRuleIndexArray);
     }
+
+    if (worldsData[selectedWorldIndex]) {
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
+    }
 }
 
 function updateWorldStats(world, activeCount) {
@@ -247,6 +321,7 @@ export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false)
     }
     currentRulesetHex = rulesetToHex(currentRuleset);
     PersistenceService.saveRuleset(currentRulesetHex);
+    EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
     console.log("Generated random ruleset:", currentRulesetHex);
 }
 
@@ -268,6 +343,7 @@ export function setRulesForNeighborCountCondition(centerState, numActiveNeighbor
     _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, outputState);
     currentRulesetHex = rulesetToHex(currentRuleset);
     PersistenceService.saveRuleset(currentRulesetHex);
+    EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
     console.log(`Rules set for C=${centerState}, N=${numActiveNeighbors} -> ${outputState}. New hex: ${currentRulesetHex}`);
 }
 
@@ -342,6 +418,7 @@ export function setRuleset(hexString) {
         currentRuleset.set(newRuleset);
         currentRulesetHex = newHex;
         PersistenceService.saveRuleset(currentRulesetHex);
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
         console.log("Ruleset updated to:", currentRulesetHex);
         return true;
     }
@@ -354,6 +431,7 @@ export function toggleRuleOutputState(ruleIndex) {
         currentRuleset[ruleIndex] = 1 - currentRuleset[ruleIndex];
         currentRulesetHex = rulesetToHex(currentRuleset);
         PersistenceService.saveRuleset(currentRulesetHex);
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex); // Dispatch event
         console.log(`Rule ${ruleIndex} toggled. New hex: ${currentRulesetHex}`);
     }
 }
@@ -363,6 +441,7 @@ export function setAllRulesState(targetState) {
         currentRuleset.fill(targetState);
         currentRulesetHex = rulesetToHex(currentRuleset);
         PersistenceService.saveRuleset(currentRulesetHex);
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
         console.log(`All rules set to ${targetState}. New hex: ${currentRulesetHex}`);
     }
 }
@@ -504,20 +583,29 @@ export function applyBrush(worldIndex, col, row, brushSize) {
         let activeCount = 0;
         for(let i=0; i < stateArray.length; i++) { if(stateArray[i] === 1) activeCount++; }
         updateWorldStats(world, activeCount);
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats()); // If it's the selected world
     }
     return changed;
 }
 
 // --- Simulation Control & Settings ---
 export function setSimulationPaused(paused) {
+    const oldPausedState = isPaused;
     isPaused = paused;
     if (!isPaused) tickTimer = 0;
+    if (oldPausedState !== isPaused) {
+        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, isPaused); // Dispatch event
+    }
 }
 
 export function setSimulationSpeed(speed) {
+    const oldSpeed = currentSpeed;
     currentSpeed = Math.max(0, Math.min(Config.MAX_SIM_SPEED, speed));
     tickDuration = currentSpeed > 0 ? 1.0 / currentSpeed : Infinity;
     PersistenceService.saveSimSpeed(currentSpeed);
+    if (oldSpeed !== currentSpeed) {
+        EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, currentSpeed); // Dispatch event
+    }
 }
 // BRUSH SIZE is managed by main.js and UI, but simulation needs to save/load it.
 // Let's add a setter here for main.js to call, which also saves it.
@@ -527,14 +615,20 @@ export function loadBrushSize() { // Called by main.js during its init
     return currentBrushSize;
 }
 export function setBrushSize(size) { // Called by main.js when UI changes it
+    const oldBrushSize = currentBrushSize;
     currentBrushSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
     PersistenceService.saveBrushSize(currentBrushSize);
+    if (oldBrushSize !== currentBrushSize) {
+        EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, currentBrushSize); // Dispatch event
+    }
 }
 
 
 export function setSelectedWorldIndex(index) {
-    if (index >= 0 && index < worldsData.length) {
+    if (index >= 0 && index < worldsData.length && selectedWorldIndex !== index) {
         selectedWorldIndex = index;
+        EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, selectedWorldIndex);
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats()); // Update stats for new world
     }
 }
 
@@ -544,6 +638,7 @@ export function setWorldInitialDensity(worldIndex, density) {
     worldsData[worldIndex].initialDensity = density;
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
     PersistenceService.saveWorldSettings(allSettings);
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings); // Dispatch event
     return true;
 }
 
@@ -557,6 +652,7 @@ export function setWorldEnabled(worldIndex, isEnabled) {
     }
     const allSettings = worldsData.map(w => ({ initialDensity: w.initialDensity, enabled: w.enabled }));
     PersistenceService.saveWorldSettings(allSettings);
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, allSettings); // Dispatch event
     return true;
 }
 
@@ -613,6 +709,10 @@ export function resetAllWorldsToCurrentSettings() {
          world.jsHoverStateArray.fill(0);
     }
     console.log("All worlds reset based on their current settings.");
+    EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+    if (worldsData[selectedWorldIndex]) { // Dispatch stats for the currently selected world
+         EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
+    }
 }
 
 
@@ -655,6 +755,11 @@ export function loadWorldState(worldIndex, stateData) {
      world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy); // Reset entropy history
      world.enabled = true; // Loading a state into a world implies enabling it
      setWorldEnabled(worldIndex, true); // Save this change
+
+     if (worldIndex === selectedWorldIndex) {
+         EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
+     }
+     EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
 
      return true;
 }
@@ -741,11 +846,16 @@ export function getEntropySamplingState() {
  * @param {number} rate The sampling rate (sample every 'rate' ticks). Must be >= 1.
  */
 export function setEntropySampling(enabled, rate) {
+    const oldEnabled = isEntropySamplingEnabled;
+    const oldRate = entropySampleRate;
     isEntropySamplingEnabled = !!enabled;
-    entropySampleRate = Math.max(1, Math.floor(rate)); // Ensure rate is at least 1
-    console.log(`Entropy Sampling: ${isEntropySamplingEnabled ? 'ON' : 'OFF'}, Rate: ${entropySampleRate}`);
+    entropySampleRate = Math.max(1, Math.floor(rate));
     PersistenceService.saveUISetting('entropySamplingEnabled', isEntropySamplingEnabled);
     PersistenceService.saveUISetting('entropySampleRate', entropySampleRate);
+    if (oldEnabled !== isEntropySamplingEnabled || oldRate !== entropySampleRate) {
+        EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: isEntropySamplingEnabled, rate: entropySampleRate });
+    }
+    console.log(`Entropy Sampling: ${isEntropySamplingEnabled ? 'ON' : 'OFF'}, Rate: ${entropySampleRate}`);
 }
 
 /**

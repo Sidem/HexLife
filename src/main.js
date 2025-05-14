@@ -4,6 +4,7 @@ import * as Simulation from './core/simulation.js';
 import * as Renderer from './rendering/renderer.js';
 import * as UI from './ui/ui.js';
 import * as Utils from './utils/utils.js';
+import { EventBus, EVENTS } from './services/EventBus.js'; // Import EventBus
 
 // --- Global State ---
 let gl; // WebGL Context
@@ -43,58 +44,35 @@ async function initialize() {
     Simulation.initSimulation();
     // const initialBrushSize = Simulation.loadBrushSize(); // No longer needed here, UI init will get it
 
-    const simulationInterface = {
-        // Playback & Core State
-        togglePause: () => {
-            const nowPaused = !Simulation.isSimulationPaused();
-            pausedByVisibilityChange = false; // Reset flag on manual toggle
-            Simulation.setSimulationPaused(nowPaused);
-            return nowPaused;
-        },
+    // The simulationInterface can be slimmed down if methods are replaced by events.
+    // For now, keep getters that UI uses for initialization.
+    // UI interaction methods like togglePause, setSpeed etc. will now be via EventBus.
+    const simulationInterfaceForUI = {
+        // Getters for initial state
         isSimulationPaused: Simulation.isSimulationPaused,
-        getSelectedWorldIndex: Simulation.getSelectedWorldIndex,
-        loadWorldState: Simulation.loadWorldState, // Persists changes
-        getWorldStateForSave: Simulation.getWorldStateForSave,
-
-        // Speed & Brush (managed by Simulation.js for persistence)
-        setSpeed: Simulation.setSimulationSpeed,
-        getCurrentSimulationSpeed: Simulation.getCurrentSimulationSpeed,
-        setBrushSize: Simulation.setBrushSize,
-        getCurrentBrushSize: Simulation.getCurrentBrushSize,
-
-        // Ruleset Management (managed by Simulation.js for persistence)
-        generateRandomRuleset: Simulation.generateRandomRuleset,
         getCurrentRulesetHex: Simulation.getCurrentRulesetHex,
-        getCurrentRulesetArray: Simulation.getCurrentRulesetArray,
-        setRuleset: Simulation.setRuleset,
-        toggleRuleOutputState: Simulation.toggleRuleOutputState,
-        setAllRulesState: Simulation.setAllRulesState,
-        setRulesForNeighborCountCondition: Simulation.setRulesForNeighborCountCondition,
-        getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount,
-
-        // World Setup & Reset (managed by Simulation.js for persistence)
+        getCurrentSimulationSpeed: Simulation.getCurrentSimulationSpeed,
+        getCurrentBrushSize: Simulation.getCurrentBrushSize,
+        getSelectedWorldIndex: Simulation.getSelectedWorldIndex,
+        getWorldStateForSave: Simulation.getWorldStateForSave, // For save button
+        getSelectedWorldStats: Simulation.getSelectedWorldStats, // For initial stats
+        getEntropySamplingState: Simulation.getEntropySamplingState, // For initial state
         getWorldSettings: Simulation.getWorldSettings,
-        setWorldInitialDensity: Simulation.setWorldInitialDensity,
-        setWorldEnabled: Simulation.setWorldEnabled,
-        resetAllWorldsToCurrentSettings: Simulation.resetAllWorldsToCurrentSettings,
-        getSelectedWorldStats: Simulation.getSelectedWorldStats, // Gets ratio, avgRatio, history, and calculates current entropy
         getSelectedWorldRatioHistory: Simulation.getSelectedWorldRatioHistory,
-        // New functions for sampling and entropy history
-        setEntropySampling: Simulation.setEntropySampling,
-        getEntropySamplingState: Simulation.getEntropySamplingState,
-        getSelectedWorldEntropyHistory: Simulation.getSelectedWorldEntropyHistory
+        getSelectedWorldEntropyHistory: Simulation.getSelectedWorldEntropyHistory,
+        getCurrentRulesetArray: Simulation.getCurrentRulesetArray,
+        getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount,
     };
 
-    // UI.initUI will now use simulationInterface to get initial speed/brush for sliders
-    if (!UI.initUI(simulationInterface)) {
+    if (!UI.initUI(simulationInterfaceForUI)) {
         console.error("UI initialization failed.");
         return;
     }
 
     // UI.initUI calls loadAndApplyUISettings which sets up initial UI values
     // including those fetched via simulationInterface (speed, brush size)
-    UI.updatePauseButton(Simulation.isSimulationPaused());
-    UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
+    // UI.updatePauseButton(Simulation.isSimulationPaused()); // Done in UI.initUI
+    // UI.updateStatsDisplay(Simulation.getSelectedWorldStats()); // Done in UI.initUI
 
     setupCanvasListeners(canvas);
     window.addEventListener('resize', handleResize);
@@ -124,16 +102,20 @@ function handleCanvasClick(event) {
 
     if (worldIndex !== null) {
         const previousSelectedWorld = Simulation.getSelectedWorldIndex();
-        Simulation.setSelectedWorldIndex(worldIndex);
+        // Simulation.setSelectedWorldIndex(worldIndex); // Dispatch event instead
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
 
         if (viewType === 'selected' && col !== null && row !== null) {
-            Simulation.applyBrush(worldIndex, col, row, Simulation.getCurrentBrushSize());
+            // Simulation.applyBrush(worldIndex, col, row, Simulation.getCurrentBrushSize()); // Dispatch event
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, {
+                worldIndex: worldIndex,
+                col: col,
+                row: row,
+                brushSize: Simulation.getCurrentBrushSize() // Get current size
+            });
         }
-        // Update stats display (Ratio/AvgRatio) AND analysis panel plots
-        if (worldIndex !== previousSelectedWorld || (viewType === 'selected' && col !== null)) {
-             UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
-             UI.updateAnalysisPanel(); // Update plots on selection change/interaction
-        }
+        // Stats display update is now handled by EventBus subscription in UI
+        // to WORLD_STATS_UPDATED which is dispatched by simulation after selection/brush
     }
 }
 
@@ -141,40 +123,46 @@ function handleCanvasMouseMove(event) {
     if (!isInitialized) return;
     const { worldIndex, col, row } = getCoordsFromMouseEvent(event);
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        Simulation.clearHoverState(i);
+        // Simulation.clearHoverState(i); // Dispatch event
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
     }
     if (worldIndex !== null && col !== null && row !== null) {
-        // Get current brush size from simulation module for hover
-        Simulation.setHoverState(worldIndex, col, row, Simulation.getCurrentBrushSize());
+        // Simulation.setHoverState(worldIndex, col, row, Simulation.getCurrentBrushSize()); // Dispatch
+        EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, {
+            worldIndex: worldIndex,
+            col: col,
+            row: row,
+            brushSize: Simulation.getCurrentBrushSize()
+        });
     }
 }
 
 function handleCanvasMouseOut() {
     if (!isInitialized) return;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        Simulation.clearHoverState(i);
+        // Simulation.clearHoverState(i); // Dispatch event
+         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
     }
 }
 
 function handleCanvasMouseWheel(event) {
     if (!isInitialized) return;
     event.preventDefault();
-
     let currentBrush = Simulation.getCurrentBrushSize();
     const scrollAmount = Math.sign(event.deltaY);
     let newSize = currentBrush - scrollAmount; // Scroll up (negative deltaY) increases size
     newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, newSize));
 
     if (newSize !== currentBrush) {
-        Simulation.setBrushSize(newSize); // Update in simulation (and persists to LS)
-        UI.updateBrushSlider(newSize);    // Update UI slider display
-
-        // Update hover state based on new brush size
+        // Simulation.setBrushSize(newSize); // Dispatch event
+        EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
+        // UI.updateBrushSlider(newSize); // UI will update via BRUSH_SIZE_CHANGED event
+        // ... (update hover state by re-triggering mouse move or clearing) ...
         if (event.clientX !== undefined && event.clientY !== undefined) {
-            handleCanvasMouseMove(event); // This will use the new currentBrushSize
+            handleCanvasMouseMove(event); // This will dispatch new hover events
         } else {
            for (let i = 0; i < Config.NUM_WORLDS; i++) {
-                Simulation.clearHoverState(i);
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
            }
         }
     }
@@ -286,14 +274,14 @@ function handleVisibilityChange() {
         if (!Simulation.isSimulationPaused()) {
             Simulation.setSimulationPaused(true);
             pausedByVisibilityChange = true; // Remember we paused it due to visibility
-            UI.updatePauseButton(true);
+            // UI.updatePauseButton(true); // Done in UI.initUI
         }
     } else {
         // Only resume if we were the ones who paused it due to visibility
         if (pausedByVisibilityChange) {
             Simulation.setSimulationPaused(false);
             pausedByVisibilityChange = false;
-            UI.updatePauseButton(false);
+            // UI.updatePauseButton(false); // Done in UI.initUI
             lastTimestamp = performance.now(); // Reset timestamp to avoid large jump
         }
     }
@@ -319,25 +307,15 @@ function renderLoop(timestamp) {
     frameCount++;
 
     // --- Update Stats and Performance Indicators ---
-    UI.updateStatsDisplay(Simulation.getSelectedWorldStats());
-
-    // Calculate and update FPS (once per second)
-    if (timestamp - lastFpsUpdateTime >= 1000) { // Use >= to ensure it runs at least once a second
-        actualFps = frameCount;
-        frameCount = 0;
-        lastFpsUpdateTime = timestamp;
+    // UI.updateStatsDisplay(Simulation.getSelectedWorldStats()); // Now updated via EventBus
+    
+    if (timestamp - lastFpsUpdateTime >= 1000) {
+        actualFps = frameCount; frameCount = 0; lastFpsUpdateTime = timestamp;
+        actualTps = accumulatedTicks; accumulatedTicks = 0; lastTpsUpdateTime = timestamp;
+        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: actualTps });
     }
-
-    // Calculate and update actual TPS (once per second)
-    if (timestamp - lastTpsUpdateTime >= 1000) {
-        actualTps = accumulatedTicks;
-        accumulatedTicks = 0;
-        lastTpsUpdateTime = timestamp;
-    }
-
-    // Update the performance display every frame with the latest calculated values
-    UI.updatePerformanceDisplay(actualFps, actualTps);
-    UI.updateAnalysisPanel();
+    // UI.updatePerformanceDisplay(actualFps, actualTps); // Now updated via EventBus
+    // UI.updateAnalysisPanel(); // Now updated via EventBus (WORLD_STATS_UPDATED)
 
     requestAnimationFrame(renderLoop);
 }

@@ -3,6 +3,7 @@ import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
 import { SliderComponent } from './SliderComponent.js'; // Import new component
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class SetupPanel {
     constructor(panelElement, simulationInterface) {
@@ -24,6 +25,8 @@ export class SetupPanel {
             applySetupButton: this.panelElement.querySelector('#applySetupButton'),
         };
         this.worldSliderComponents = []; // To store references to density sliders
+        this.simInterface = simulationInterface; // Still used for GETs
+        this.worldSettingsCache = null; // To store initial settings for comparison
 
         // Validate essential elements
         for (const key in this.uiElements) {
@@ -50,9 +53,9 @@ export class SetupPanel {
 
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => {
-                this.simulationInterface.resetAllWorldsToCurrentSettings();
-                // Optionally, give some feedback or close the panel
-                // alert("World settings applied and worlds have been reset!");
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS); // DISPATCH
+                // Refreshing views will be handled by relevant events (ALL_WORLDS_RESET, WORLD_STATS_UPDATED)
+                // this.hide(); // Optionally hide panel after applying
             });
         }
         if (this.uiElements.resetAllButton) {
@@ -122,7 +125,7 @@ export class SetupPanel {
 
             const densitySlider = new SliderComponent(sliderMountPoint, {
                 id: `densitySlider_${i}`,
-                label: 'Density:', // SliderComponent will create this label
+                label: 'Density:',
                 min: 0,
                 max: 1,
                 step: 0.001,
@@ -131,7 +134,7 @@ export class SetupPanel {
                 unit: '',
                 showValue: true, // The component handles its value display
                 onChange: (newDensity) => {
-                    this.simulationInterface.setWorldInitialDensity(i, newDensity);
+                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
                 }
             });
             this.worldSliderComponents.push(densitySlider);
@@ -158,7 +161,7 @@ export class SetupPanel {
             enableSwitch.addEventListener('change', (event) => {
                 const isEnabled = event.target.checked;
                 enableLabelElement.textContent = isEnabled ? 'Enabled' : 'Disabled';
-                this.simulationInterface.setWorldEnabled(i, isEnabled);
+                EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
             });
 
             fragment.appendChild(cell);
