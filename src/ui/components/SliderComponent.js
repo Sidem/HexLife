@@ -4,17 +4,36 @@ import { BaseComponent } from './BaseComponent.js'; // Import BaseComponent
 export class SliderComponent extends BaseComponent { // Extend BaseComponent
     constructor(mountPoint, options) {
         super(mountPoint, options); // Call BaseComponent constructor
-        // The original constructor logic of SliderComponent already uses this.options
-        // and this.mountPoint which are set by BaseComponent.
-
-        // No need to re-declare this.mountPoint or this.options
-        // this.mountPoint = ... (done by super)
-        // this.options = { ...options }; (done by super, merged by BaseComponent)
+        // Default step if not provided, affects parsing and precision
+        this.options.step = this.options.step === undefined ? 1 : parseFloat(this.options.step);
+        this.options.min = this.options.min === undefined ? 0 : parseFloat(this.options.min);
+        this.options.max = this.options.max === undefined ? 100 : parseFloat(this.options.max);
+        this.options.value = this.options.value === undefined ? (this.options.min + this.options.max) / 2 : parseFloat(this.options.value);
 
         this._createElement();
         this._attachEventListenersToElements(); // Renamed to avoid conflict if super had _attachEventListeners
         this.setValue(this.options.value);
         this.setDisabled(this.options.disabled);
+    }
+
+    _getStepPrecision() {
+        const stepStr = String(this.options.step);
+        if (stepStr.includes('.')) {
+            const parts = stepStr.split('.');
+            return parts[1] ? parts[1].length : 0;
+        }
+        return 0; // Integer step
+    }
+
+    _parseValue(valueStr) {
+        const precision = this._getStepPrecision();
+        // Always parse as float initially, then format or parseInt if precision is 0 for callbacks.
+        // For internal consistency when reading sliderElement.value, parseFloat is safer.
+        const numValue = parseFloat(valueStr);
+        // For callbacks and getValue(), we might want to return int if step is an integer
+        // However, let's keep it simple: callbacks receive what parseFloat gives.
+        // The display will be formatted.
+        return precision > 0 ? numValue : parseInt(valueStr, 10); // Return int if step is an integer
     }
 
     _createElement() {
@@ -38,10 +57,10 @@ export class SliderComponent extends BaseComponent { // Extend BaseComponent
         this.sliderElement = document.createElement('input');
         this.sliderElement.type = 'range';
         if (this.options.id) this.sliderElement.id = this.options.id;
-        this.sliderElement.min = this.options.min;
-        this.sliderElement.max = this.options.max;
-        this.sliderElement.step = this.options.step;
-        this.sliderElement.value = this.options.value;
+        this.sliderElement.min = String(this.options.min);
+        this.sliderElement.max = String(this.options.max);
+        this.sliderElement.step = String(this.options.step);
+        this.sliderElement.value = String(this.options.value); // Initial value
         this.sliderWrapper.appendChild(this.sliderElement);
 
         if (this.options.showValue) {
@@ -64,40 +83,47 @@ export class SliderComponent extends BaseComponent { // Extend BaseComponent
     _attachEventListenersToElements() { // Renamed
         // Use the _addDOMListener helper from BaseComponent for cleanup
         this._addDOMListener(this.sliderElement, 'input', (event) => {
-            const value = this.options.isBias ? parseFloat(event.target.value) : parseInt(event.target.value, 10);
-            this._updateValueDisplay(value);
+            const value = this._parseValue(event.target.value);
+            this._updateValueDisplay(value); // value is a number
             if (this.options.onInput) {
-                this.options.onInput(value);
+                this.options.onInput(value); // Pass number
             }
         });
 
         this._addDOMListener(this.sliderElement, 'change', (event) => {
-            const value = this.options.isBias ? parseFloat(event.target.value) : parseInt(event.target.value, 10);
-            this._updateValueDisplay(value);
+            const value = this._parseValue(event.target.value);
+            this._updateValueDisplay(value); // value is a number
             if (this.options.onChange) {
-                this.options.onChange(value);
+                this.options.onChange(value); // Pass number
             }
         });
         
         this._addDOMListener(this.sliderElement, 'wheel', (event) => {
              if (this.sliderElement.disabled) return;
              event.preventDefault();
-             const step = parseFloat(this.sliderElement.step) || 1;
-             let currentValue = parseFloat(this.sliderElement.value);
+             
+             const step = this.options.step; // this.options.step is a number
+             let currentValue = parseFloat(this.sliderElement.value); // Current value from slider
 
              if (event.deltaY < 0) { currentValue += step; }
              else { currentValue -= step; }
 
-             currentValue = Math.max(parseFloat(this.sliderElement.min), Math.min(parseFloat(this.sliderElement.max), currentValue));
-             
-             if (!this.options.isBias) {
+             const precision = this._getStepPrecision();
+             if (precision > 0) {
+                // Round to the step's precision to avoid floating point inaccuracies accumulation
+                currentValue = parseFloat(currentValue.toFixed(precision));
+             } else { 
+                 // For integer steps, effectively round to the nearest step multiple.
+                 // This also handles cases where step is e.g. 2, 5, 10.
                  currentValue = Math.round(currentValue / step) * step;
-                  currentValue = Math.max(parseFloat(this.sliderElement.min), Math.min(parseFloat(this.sliderElement.max), currentValue));
              }
+             
+             // Clamp
+             currentValue = Math.max(this.options.min, Math.min(this.options.max, currentValue));
 
-             this.sliderElement.value = currentValue;
-             const finalValue = this.options.isBias ? parseFloat(currentValue.toFixed(3)) : currentValue;
-             this._updateValueDisplay(finalValue);
+             this.sliderElement.value = String(currentValue);
+             
+             this._updateValueDisplay(currentValue); // Pass the processed number
 
              this.sliderElement.dispatchEvent(new Event('input', { bubbles: true }));
              this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));
@@ -106,18 +132,37 @@ export class SliderComponent extends BaseComponent { // Extend BaseComponent
 
     _updateValueDisplay(value) {
         if (this.valueDisplayElement) {
-            const displayValue = this.options.isBias ? value.toFixed(3) : value;
+            const precision = this._getStepPrecision();
+            const displayValue = precision > 0 ? value.toFixed(precision) : String(value);
             this.valueDisplayElement.textContent = displayValue;
         }
     }
 
     getValue() {
-        return this.options.isBias ? parseFloat(this.sliderElement.value) : parseInt(this.sliderElement.value, 10);
+        return this._parseValue(this.sliderElement.value); // Returns a number
     }
 
-    setValue(value, dispatchEvents = false) {
-        this.sliderElement.value = value;
-        this._updateValueDisplay(value);
+    setValue(value, dispatchEvents = false) { // value is a number
+        let valueToSet = parseFloat(value); // Ensure it's a float for calculations
+        const precision = this._getStepPrecision();
+
+        if (precision > 0) {
+            valueToSet = parseFloat(valueToSet.toFixed(precision));
+        } else {
+            // For integer steps, ensure value is a multiple of step if possible, then round.
+            // Or simply round it if direct set. Let's round to nearest integer for integer steps.
+            valueToSet = Math.round(valueToSet);
+        }
+        
+        // Clamp the value before setting
+        valueToSet = Math.max(this.options.min, Math.min(this.options.max, valueToSet));
+        // If integer step, ensure it's an integer after clamping.
+        if (precision === 0) {
+            valueToSet = Math.round(valueToSet);
+        }
+
+        this.sliderElement.value = String(valueToSet);
+        this._updateValueDisplay(valueToSet); // Pass the processed number
         if (dispatchEvents) {
             this.sliderElement.dispatchEvent(new Event('input', { bubbles: true }));
             this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));

@@ -117,7 +117,7 @@ export function initUI(simulationInterface) {
         step: 1,
         value: simulationInterface.getCurrentBrushSize(),
         unit: '',
-        showValue: true, // Ensure value is shown
+        showValue: true, 
         onChange: (value) => {
             EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, value);
         }
@@ -129,8 +129,7 @@ export function initUI(simulationInterface) {
         max: 1,
         step: 0.001,
         value: PersistenceService.loadUISetting('biasValue', 0.5),
-        isBias: true,
-        showValue: true, // Explicitly show value
+        showValue: true,
         unit: '',
         disabled: !uiElements.useCustomBiasCheckbox.checked,
         onChange: (value) => {
@@ -140,10 +139,12 @@ export function initUI(simulationInterface) {
 
     sliderComponents.entropySampleRateSlider = new SliderComponent(uiElements.entropySampleRateSliderMount, {
         id: 'entropySampleRateSlider',
-        label: 'Rate (Ticks):',
+        label: 'Rate:',
         min: 1,
         max: 100,
         step: 1,
+        showValue: true,
+        unit: '/tps',
         value: simulationInterface.getEntropySamplingState().rate,
         disabled: !uiElements.enableEntropySamplingCheckbox.checked,
         onChange: (value) => {
@@ -233,7 +234,7 @@ function loadAndApplyUISettings(sim) {
     updateBiasSliderDisabledState();
 
     // Button texts (static, but set here for consistency)
-    uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "Play" : "Pause";
+    uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "[P]lay" : "[P]ause";
     uiElements.randomRulesetButton.textContent = "[N]ew Rules";
     uiElements.resetStatesButton.textContent = "[R]eset"; // Matched HTML more closely
     if (uiElements.editRuleButton) uiElements.editRuleButton.textContent = "[E]dit";
@@ -605,7 +606,7 @@ function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
 
 export function updatePauseButton(isPaused) {
     if (uiElements && uiElements.playPauseButton) {
-        uiElements.playPauseButton.textContent = isPaused ? "Play" : "Pause";
+        uiElements.playPauseButton.textContent = isPaused ? "[P]lay" : "[P]ause";
     }
 }
 
@@ -662,7 +663,7 @@ function handleGlobalKeyDown(event) {
 
 function setupUIEventListeners(simulationInterface, uiElements, sliderComponents, rulesetEditorComponent, setupPanelComponent) {
     EventBus.subscribe(EVENTS.SIMULATION_STARTED, () => {
-        uiElements.playPauseButton.textContent = 'Pause';
+        uiElements.playPauseButton.textContent = '[P]ause';
         uiElements.playPauseButton.classList.remove('play-button');
         uiElements.playPauseButton.classList.add('pause-button');
     });
@@ -727,10 +728,5 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
             setupPanelComponent.refreshViews();
         }
         // RulesetEditor might refresh if RULESET_CHANGED is also part of a reset sequence.
-    });
-
-    // Example: Listen for brush size changes from the slider and update the simulation
-    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (newBrushSize) => {
-        simulationInterface.setBrushSize(newBrushSize);
     });
 }
