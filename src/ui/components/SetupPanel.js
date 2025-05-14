@@ -2,6 +2,7 @@
 import * as Config from '../../core/config.js'; // No longer needed for LS_KEYs
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js'; // Import new service
+import { SliderComponent } from './SliderComponent.js'; // Import new component
 
 export class SetupPanel {
     constructor(panelElement, simulationInterface) {
@@ -22,6 +23,7 @@ export class SetupPanel {
             worldSetupGrid: this.panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: this.panelElement.querySelector('#applySetupButton'),
         };
+        this.worldSliderComponents = []; // To store references to density sliders
 
         // Validate essential elements
         for (const key in this.uiElements) {
@@ -71,16 +73,33 @@ export class SetupPanel {
     refreshViews() {
         if (!this.simulationInterface || !this.uiElements.worldSetupGrid) return;
         this._populateWorldSetupGrid();
+
+        // If world settings can change outside of this panel,
+        // you might need to update slider values here.
+        const worldSettings = this.simulationInterface.getWorldSettings();
+        this.worldSliderComponents.forEach((slider, i) => {
+            if (worldSettings[i]) {
+                slider.setValue(worldSettings[i].initialDensity);
+                // Also update the 'enabled' checkbox state if it's managed here and can change elsewhere
+                const enableSwitch = this.uiElements.worldSetupGrid.querySelector(`#enableSwitch_${i}`);
+                const enableLabel = this.uiElements.worldSetupGrid.querySelector(`label[for="enableSwitch_${i}"]`);
+                if (enableSwitch) {
+                    enableSwitch.checked = worldSettings[i].enabled;
+                    if(enableLabel) enableLabel.textContent = worldSettings[i].enabled ? 'Enabled' : 'Disabled';
+                }
+            }
+        });
     }
 
     _populateWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
-        grid.innerHTML = ''; // Clear previous content
+        grid.innerHTML = '';
+        this.worldSliderComponents = []; // Clear previous instances
         const fragment = document.createDocumentFragment();
         const worldSettings = this.simulationInterface.getWorldSettings();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const settings = worldSettings[i] || { initialDensity: 0.5, enabled: true }; // Fallback
+            const settings = worldSettings[i] || { initialDensity: 0.5, enabled: true };
 
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
@@ -90,31 +109,33 @@ export class SetupPanel {
             label.textContent = `World ${i}`;
             cell.appendChild(label);
 
-            // Density Control
+            // Density Control using SliderComponent
             const densityControlDiv = document.createElement('div');
             densityControlDiv.className = 'density-control setting-control';
+            // The SliderComponent will create its own label if configured,
+            // or we can have a separate one here. Let's use its internal label.
+            // No need for densityLabel span or densityValueDisplay span explicitly here.
 
-            const densityLabel = document.createElement('label');
-            densityLabel.htmlFor = `densitySlider_${i}`;
-            densityLabel.textContent = 'Density:';
-            densityControlDiv.appendChild(densityLabel);
-
-            const densitySlider = document.createElement('input');
-            densitySlider.type = 'range';
-            densitySlider.id = `densitySlider_${i}`;
-            densitySlider.className = 'density-slider';
-            densitySlider.min = 0;
-            densitySlider.max = 1;
-            densitySlider.step = 0.001; // Finer control for density
-            densitySlider.value = settings.initialDensity;
-            densityControlDiv.appendChild(densitySlider);
-
-            const densityValueDisplay = document.createElement('span');
-            densityValueDisplay.id = `densityValue_${i}`;
-            densityValueDisplay.className = 'value-display density-value-display'; // Use common class
-            densityValueDisplay.textContent = parseFloat(settings.initialDensity).toFixed(3);
-            densityControlDiv.appendChild(densityValueDisplay);
+            const sliderMountPoint = document.createElement('div'); // Mount point for this world's slider
+            densityControlDiv.appendChild(sliderMountPoint);
             cell.appendChild(densityControlDiv);
+
+            const densitySlider = new SliderComponent(sliderMountPoint, {
+                id: `densitySlider_${i}`,
+                label: 'Density:', // SliderComponent will create this label
+                min: 0,
+                max: 1,
+                step: 0.001,
+                value: settings.initialDensity,
+                isBias: true, // Treat density like bias for 3 decimal places
+                unit: '',
+                showValue: true, // The component handles its value display
+                onChange: (newDensity) => {
+                    this.simulationInterface.setWorldInitialDensity(i, newDensity);
+                }
+            });
+            this.worldSliderComponents.push(densitySlider);
+
 
             // Enable/Disable Control
             const enableControlDiv = document.createElement('div');
@@ -123,39 +144,20 @@ export class SetupPanel {
             const enableSwitch = document.createElement('input');
             enableSwitch.type = 'checkbox';
             enableSwitch.id = `enableSwitch_${i}`;
-            enableSwitch.className = 'enable-switch checkbox-input'; // Use common class
+            enableSwitch.className = 'enable-switch checkbox-input';
             enableSwitch.checked = settings.enabled;
             enableControlDiv.appendChild(enableSwitch);
 
-            const enableLabel = document.createElement('label');
-            enableLabel.htmlFor = `enableSwitch_${i}`;
-            enableLabel.className = 'checkbox-label'; // Use common class
-            enableLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';
-            enableControlDiv.appendChild(enableLabel);
+            const enableLabelElement = document.createElement('label');
+            enableLabelElement.htmlFor = `enableSwitch_${i}`;
+            enableLabelElement.className = 'checkbox-label';
+            enableLabelElement.textContent = settings.enabled ? 'Enabled' : 'Disabled';
+            enableControlDiv.appendChild(enableLabelElement);
             cell.appendChild(enableControlDiv);
-
-            // Event Listeners for this world's controls
-            densitySlider.addEventListener('input', (event) => {
-                const newDensity = parseFloat(event.target.value);
-                densityValueDisplay.textContent = newDensity.toFixed(3);
-                this.simulationInterface.setWorldInitialDensity(i, newDensity);
-            });
-
-            densitySlider.addEventListener('wheel', (event) => { // Optional: Wheel support for sliders
-                event.preventDefault();
-                const step = parseFloat(densitySlider.step) || 0.01;
-                let currentValue = parseFloat(densitySlider.value);
-                currentValue += event.deltaY < 0 ? step : -step;
-                currentValue = Math.max(parseFloat(densitySlider.min), Math.min(parseFloat(densitySlider.max), currentValue));
-                densitySlider.value = currentValue;
-                densityValueDisplay.textContent = currentValue.toFixed(3);
-                this.simulationInterface.setWorldInitialDensity(i, currentValue);
-            }, { passive: false });
-
-
+            
             enableSwitch.addEventListener('change', (event) => {
                 const isEnabled = event.target.checked;
-                enableLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
+                enableLabelElement.textContent = isEnabled ? 'Enabled' : 'Disabled';
                 this.simulationInterface.setWorldEnabled(i, isEnabled);
             });
 
@@ -223,7 +225,8 @@ export class SetupPanel {
 
     destroy() {
         this.draggablePanel.destroy();
-        // Any other cleanup
+        this.worldSliderComponents.forEach(slider => slider.destroy());
+        this.worldSliderComponents = [];
     }
 
     isHidden(){

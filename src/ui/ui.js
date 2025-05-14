@@ -5,9 +5,13 @@ import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js'; // Import the new SetupPanel
 import { DraggablePanel } from './components/DraggablePanel.js'; // Import the new SetupPanel
 import * as PersistenceService from '../services/PersistenceService.js'; // Import new service
+import { SliderComponent } from './components/SliderComponent.js'; // Import new component
 
 // --- DOM Element References ---
 let uiElements;
+
+// Add a new structure for slider component instances
+let sliderComponents = {};
 
 // --- UI State ---
 let simulationInterfaceRef;
@@ -22,10 +26,6 @@ export function initUI(simulationInterface) {
         canvas: document.getElementById('hexGridCanvas'),
         fileInput: document.getElementById('fileInput'),
         playPauseButton: document.getElementById('playPauseButton'),
-        speedSlider: document.getElementById('speedSlider'),
-        speedValueSpan: document.getElementById('speedValue'),
-        neighborhoodSlider: document.getElementById('neighborhoodSize'),
-        neighborhoodValueSpan: document.getElementById('neighborhoodValue'),
         randomRulesetButton: document.getElementById('randomRulesetButton'),
         generateSymmetricalCheckbox: document.getElementById('generateSymmetricalCheckbox'),
         copyRuleButton: document.getElementById('copyRuleButton'),
@@ -37,27 +37,27 @@ export function initUI(simulationInterface) {
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
         resetStatesButton: document.getElementById('resetStatesButton'),
-        setupPanelButton: document.getElementById('setupPanelButton'), // New button
+        setupPanelButton: document.getElementById('setupPanelButton'),
         statRatio: document.getElementById('stat-ratio'),
         statAvgRatio: document.getElementById('stat-avg-ratio'),
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
-        setupPanel: document.getElementById('setupPanel'), // New panel element
-        analysisPanel: document.getElementById('analysisPanel'), // New Panel Element
+        setupPanel: document.getElementById('setupPanel'),
+        analysisPanel: document.getElementById('analysisPanel'),
         useCustomBiasCheckbox: document.getElementById('useCustomBiasCheckbox'),
-        biasSlider: document.getElementById('biasSlider'),
-        biasValueSpan: document.getElementById('biasValueSpan'),
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
-        analysisPanelButton: document.getElementById('analysisPanelButton'), // Button to toggle panel
+        analysisPanelButton: document.getElementById('analysisPanelButton'),
         closeAnalysisPanelButton: document.getElementById('closeAnalysisPanelButton'),
-        //calculateEntropyButton: document.getElementById('calculateEntropyButton'),
-        statEntropy: document.getElementById('stat-entropy'), // Display for entropy value
-        ratioPlotCanvas: document.getElementById('ratioPlotCanvas'), // Canvas for plot
+        statEntropy: document.getElementById('stat-entropy'),
+        ratioPlotCanvas: document.getElementById('ratioPlotCanvas'),
         entropyPlotCanvas: document.getElementById('entropyPlotCanvas'),
         enableEntropySamplingCheckbox: document.getElementById('enableEntropySamplingCheckbox'),
-        entropySampleRateSlider: document.getElementById('entropySampleRateSlider'),
-        entropySampleRateValue: document.getElementById('entropySampleRateValue')
     };
+    // Mount points for sliders
+    uiElements.speedSliderMount = document.getElementById('speedSliderMount');
+    uiElements.neighborhoodSizeSliderMount = document.getElementById('neighborhoodSizeSliderMount');
+    uiElements.biasSliderMount = document.getElementById('biasSliderMount');
+    uiElements.entropySampleRateSliderMount = document.getElementById('entropySampleRateSliderMount');
 
     if (!validateElements()) return false;
 
@@ -88,20 +88,66 @@ export function initUI(simulationInterface) {
         if (uiElements.enableEntropySamplingCheckbox) {
             uiElements.enableEntropySamplingCheckbox.addEventListener('change', handleSamplingControlsChange);
         }
-        if (uiElements.entropySampleRateSlider) {
-            uiElements.entropySampleRateSlider.addEventListener('input', handleSamplingControlsChange);
-             uiElements.entropySampleRateSlider.addEventListener('wheel', (event) => {
-                 if (uiElements.entropySampleRateSlider.disabled) return;
-                 // Use generic handler, no direct sim update, update state via change handler
-                 handleSliderWheel(event, uiElements.entropySampleRateSlider, uiElements.entropySampleRateValue, null);
-                 // Manually trigger change after wheel event
-                 handleSamplingControlsChange();
-             }, { passive: false });
-        }
     } else {
         console.warn("Analysis panel element not found. Analysis functionality will be disabled.");
         if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
     }
+
+    // Instantiate Slider Components
+    sliderComponents.speedSlider = new SliderComponent(uiElements.speedSliderMount, {
+        id: 'speedSlider', // For specific styling if needed & label association
+        label: 'Speed:',
+        min: 1,
+        max: Config.MAX_SIM_SPEED,
+        step: 1,
+        value: simulationInterface.getCurrentSimulationSpeed(),
+        unit: 'tps',
+        onChange: (value) => {
+            simulationInterface.setSpeed(value);
+        }
+    });
+
+    sliderComponents.neighborhoodSlider = new SliderComponent(uiElements.neighborhoodSizeSliderMount, {
+        id: 'neighborhoodSize',
+        label: 'Brush:',
+        min: 0,
+        max: Config.MAX_NEIGHBORHOOD_SIZE,
+        step: 1,
+        value: simulationInterface.getCurrentBrushSize(),
+        unit: '',
+        onChange: (value) => {
+            simulationInterface.setBrushSize(value);
+        }
+    });
+
+    sliderComponents.biasSlider = new SliderComponent(uiElements.biasSliderMount, {
+        id: 'biasSlider',
+        min: 0,
+        max: 1,
+        step: 0.001,
+        value: PersistenceService.loadUISetting('biasValue', 0.5),
+        isBias: true,
+        showValue: true, // Explicitly show value
+        unit: '',
+        disabled: !uiElements.useCustomBiasCheckbox.checked,
+        onChange: (value) => {
+            PersistenceService.saveUISetting('biasValue', value);
+        }
+    });
+
+    sliderComponents.entropySampleRateSlider = new SliderComponent(uiElements.entropySampleRateSliderMount, {
+         id: 'entropySampleRateSlider',
+         label: 'Rate (Ticks):',
+         min: 1,
+         max: 500, // Or a value from Config if preferred
+         step: 1,
+         value: simulationInterface.getEntropySamplingState().rate,
+         unit: '',
+         disabled: !uiElements.enableEntropySamplingCheckbox.checked,
+         onChange: (value) => {
+             handleSamplingControlsChange(); // This function will read from the component or be passed the value
+         }
+    });
 
     setupGeneralListeners(simulationInterface); // Renamed for clarity
     setupPanelToggleListeners();
@@ -147,44 +193,28 @@ function _saveAnalysisPanelState() {
 }
 
 function loadAndApplyAnalysisSettings() {
-    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !uiElements.entropySampleRateSlider) return;
+    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
     const samplingState = simulationInterfaceRef.getEntropySamplingState();
     uiElements.enableEntropySamplingCheckbox.checked = samplingState.enabled;
-    uiElements.entropySampleRateSlider.value = samplingState.rate;
-    if(uiElements.entropySampleRateValue) uiElements.entropySampleRateValue.textContent = samplingState.rate;
-    updateSamplingControlsState(); // Ensure slider disabled state matches checkbox
+    sliderComponents.entropySampleRateSlider.setValue(samplingState.rate);
+    updateSamplingControlsState();
 }
 
 function updateSamplingControlsState() {
-    if (uiElements.enableEntropySamplingCheckbox && uiElements.entropySampleRateSlider) {
+    if (uiElements.enableEntropySamplingCheckbox && sliderComponents.entropySampleRateSlider) {
        const isDisabled = !uiElements.enableEntropySamplingCheckbox.checked;
-       uiElements.entropySampleRateSlider.disabled = isDisabled;
-       if (uiElements.entropySampleRateValue) {
-           uiElements.entropySampleRateValue.style.opacity = isDisabled ? '0.5' : '1';
-       }
+       sliderComponents.entropySampleRateSlider.setDisabled(isDisabled);
     }
 }
 
 function loadAndApplyUISettings(sim) {
-    // Speed
-    const loadedSpeed = sim.getCurrentSimulationSpeed(); // Corrected function name
-    uiElements.speedSlider.max = Config.MAX_SIM_SPEED;
-    uiElements.speedSlider.value = loadedSpeed;
-    uiElements.speedValueSpan.textContent = loadedSpeed;
+    sliderComponents.speedSlider.setValue(sim.getCurrentSimulationSpeed());
+    sliderComponents.neighborhoodSlider.setValue(sim.getCurrentBrushSize());
 
-    // Brush Size
-    const loadedBrushSize = sim.getCurrentBrushSize();
-    uiElements.neighborhoodSlider.max = Config.MAX_NEIGHBORHOOD_SIZE;
-    uiElements.neighborhoodSlider.min = 0;
-    uiElements.neighborhoodSlider.value = loadedBrushSize;
-    uiElements.neighborhoodValueSpan.textContent = loadedBrushSize;
-
-    // Checkboxes & Bias
     uiElements.generateSymmetricalCheckbox.checked = PersistenceService.loadUISetting('generateSymmetrical', true);
     uiElements.resetOnNewRuleCheckbox.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
     uiElements.useCustomBiasCheckbox.checked = PersistenceService.loadUISetting('useCustomBias', false);
-    uiElements.biasSlider.value = PersistenceService.loadUISetting('biasValue', 0.5);
-    uiElements.biasValueSpan.textContent = parseFloat(uiElements.biasSlider.value).toFixed(3);
+    sliderComponents.biasSlider.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
     updateBiasSliderDisabledState();
 
     // Button texts (static, but set here for consistency)
@@ -216,13 +246,9 @@ export function refreshAllRulesetViews(sim) {
 }
 
 function updateBiasSliderDisabledState() {
-    if (uiElements.useCustomBiasCheckbox && uiElements.biasSlider) {
+    if (uiElements.useCustomBiasCheckbox && sliderComponents.biasSlider) {
         const isDisabled = !uiElements.useCustomBiasCheckbox.checked;
-        uiElements.biasSlider.disabled = isDisabled;
-        // Also visually indicate disabled state for the span if desired
-        if (uiElements.biasValueSpan) {
-            uiElements.biasValueSpan.style.opacity = isDisabled ? '0.5' : '1';
-        }
+        sliderComponents.biasSlider.setDisabled(isDisabled);
     }
 }
 
@@ -234,16 +260,16 @@ function validateElements() {
             if (key === 'rulesetEditorPanel') {
                 console.warn(`UI Warning: Main panel element '${key}' not found. Editor feature will be disabled.`);
             } else {
-                console.error(`UI Initialization Error: Element with ID '${key}' not found.`);
-            alert(`UI Error: Element '${key}' not found. Check index.html.`);
-            allEssentialFound = false;
-            }
+             console.error(`UI Initialization Error: Element with ID '${key}' not found.`);
+             alert(`UI Error: Element '${key}' not found. Check index.html.`);
+             allEssentialFound = false;
         }
+    }
     }
     if (!uiElements.analysisPanel) {
         if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
         if (uiElements.calculateEntropyButton) uiElements.calculateEntropyButton.disabled = true;
-   }
+    }
 
     return allEssentialFound;
 }
@@ -308,23 +334,7 @@ function setupGeneralListeners(sim) {
         });
     }
 
-    uiElements.speedSlider.addEventListener('input', (event) => {
-        const speed = parseInt(event.target.value, 10);
-        sim.setSpeed(speed); // This now saves to LS via simulation.js
-        uiElements.speedValueSpan.textContent = speed;
-    });
-    uiElements.speedSlider.addEventListener('wheel', (event) => {
-        handleSliderWheel(event, uiElements.speedSlider, uiElements.speedValueSpan, sim.setSpeed);
-    });
 
-    uiElements.neighborhoodSlider.addEventListener('input', (event) => {
-        const size = parseInt(event.target.value, 10);
-        sim.setBrushSize(size); // This now saves to LS via simulation.js
-        uiElements.neighborhoodValueSpan.textContent = size;
-    });
-    uiElements.neighborhoodSlider.addEventListener('wheel', (event) => {
-        handleSliderWheel(event, uiElements.neighborhoodSlider, uiElements.neighborhoodValueSpan, sim.setBrushSize);
-    });
 
     // --- Ruleset (non-editor) controls ---
     uiElements.randomRulesetButton.addEventListener('click', () => {
@@ -481,12 +491,12 @@ export function updateAnalysisPanel() {
 }
 
 function handleSamplingControlsChange() {
-    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !uiElements.entropySampleRateSlider || !uiElements.entropySampleRateValue) return;
+    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
     const enabled = uiElements.enableEntropySamplingCheckbox.checked;
-    const rate = parseInt(uiElements.entropySampleRateSlider.value, 10);
-    uiElements.entropySampleRateValue.textContent = rate;
-    updateSamplingControlsState();
-    simulationInterfaceRef.setEntropySampling(enabled, rate); // This now saves to LS via simulation.js
+    const rate = sliderComponents.entropySampleRateSlider.getValue(); // Get value from component
+    
+    updateSamplingControlsState(); // Update slider enabled state based on checkbox
+    simulationInterfaceRef.setEntropySampling(enabled, rate);
 }
 
 function handleCalculateAndPlot() {
@@ -608,15 +618,13 @@ export function updateStatsDisplay(statsData) {
 }
 
 export function updateBrushSlider(size) {
-    if (uiElements && uiElements.neighborhoodSlider) {
-        uiElements.neighborhoodSlider.value = size;
-        if(uiElements.neighborhoodValueSpan) uiElements.neighborhoodValueSpan.textContent = size;
+    if (sliderComponents.neighborhoodSlider) {
+        sliderComponents.neighborhoodSlider.setValue(size);
     }
 }
 export function updateSpeedSlider(speed) {
-    if (uiElements && uiElements.speedSlider) {
-        uiElements.speedSlider.value = speed;
-        if(uiElements.speedValueSpan) uiElements.speedValueSpan.textContent = speed;
+    if (sliderComponents.speedSlider) {
+        sliderComponents.speedSlider.setValue(speed);
     }
 }
 

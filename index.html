@@ -19,20 +19,11 @@
                 </div>
                 <div class="ui-group" id="group-playback">
                     <button id="playPauseButton" class="button">Play</button>
-                    <label for="speedSlider">Speed:</label>
-                    <div class="slider-container">
-                        <input type="range" id="speedSlider" name="speedSlider" min="1" max="120" value="20" step="1">
-                        <span id="speedValue" class="value-display">20</span>tps
-                    </div>
+                    <div id="speedSliderMount"></div>
                 </div>
 
                 <div class="ui-group" id="group-brush">
-                    <label for="neighborhoodSize">Brush:</label>
-                    <div class="slider-container">
-                        <input type="range" id="neighborhoodSize" name="neighborhoodSize" min="0" max="40" value="0"
-                            step="1">
-                        <span id="neighborhoodValue" class="value-display">0</span>
-                    </div>
+                    <div id="neighborhoodSizeSliderMount"></div>
                 </div>
 
                 <div class="ui-group" id="group-ruleset">
@@ -43,10 +34,7 @@
                     <div class="bias-controls">
                         <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
-                        <div class="slider-container">
-                            <input type="range" id="biasSlider" min="0" max="1" value="0.5" step="0.001">
-                            <span id="biasValueSpan" class="value-display">0.500</span>
-                        </div>
+                        <div id="biasSliderMount"></div>
                     </div>
                     <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input"
                         title="Reset all world states when generating a new ruleset" checked>
@@ -141,14 +129,10 @@
                         <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
                         <label for="enableEntropySamplingCheckbox" class="checkbox-label">Sample Continuously</label>
                     </div>
-                     <div class="slider-container sampling-slider">
-                         <label for="entropySampleRateSlider">Rate (Ticks):</label>
-                         <input type="range" id="entropySampleRateSlider" min="1" max="500" value="10" step="1" disabled>
-                         <span id="entropySampleRateValue" class="value-display">10</span>
-                     </div>
-                     <div class="entropy-display">
-                         Current Entropy: <span id="stat-entropy">N/A</span>
-                     </div>
+                    <div id="entropySampleRateSliderMount"></div>
+                    <div class="entropy-display">
+                        Current Entropy: <span id="stat-entropy">N/A</span>
+                    </div>
                 </div>
 
                 <div class="plot-container">

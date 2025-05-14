@@ -185,29 +185,53 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-family: monospace;
 }
 
-/* Slider value display (text overlay on slider) */
-.slider-container {
-    position: relative;
-    display: inline-flex;
+/* Slider Component Styling */
+.slider-component-container {
+    display: flex; /* Aligns label, slider, unit in a row */
+    align-items: center;
+    gap: 5px; /* Space between label, slider, and unit */
+    /* margin: 5px 0; Optional margin for spacing in UI groups */
+}
+
+.slider-component-container label {
+    margin-right: 3px; /* Keep some space if label exists */
+    user-select: none;
+    font-size: 0.9em; /* Consistent label size */
+}
+
+.slider-wrapper {
+    position: relative; /* Crucial for positioning the value display */
+    display: inline-flex; /* Or flex, to contain the input and span */
     align-items: center;
 }
-.slider-container input[type="range"] { /* Sliders within this container */
+
+.slider-component-container input[type="range"] {
+    /* Inherits general input[type="range"] styles from above */
     vertical-align: middle;
-    min-width: 100px;
+    min-width: 100px; /* Default min-width, can be overridden by specific slider IDs if needed */
+    /* margin: 0; Remove default margins if any */
 }
-.slider-container span.value-display { /* For the text value on the slider */
+
+.slider-wrapper span.value-display {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
     color: #FFFFFF;
-    font-size: 0.8rem;
+    font-size: 0.8rem; /* Consistent with previous styling */
     font-family: Arial, sans-serif;
     pointer-events: none;
-    z-index: 2;
+    z-index: 2; /* Above the slider track */
     text-shadow: 0px 0px 3px rgba(0,0,0,0.9);
     padding: 1px 3px;
+    white-space: nowrap; /* Prevent wrapping of the number */
 }
+ .slider-component-container span.unit-display {
+     font-size: 0.9em;
+     color: #ccc;
+     margin-left: 2px; /* Small space after the slider input or wrapper */
+     user-select: none;
+ }
 
 /* Checkbox custom styling */
 input.checkbox-input { /* The actual hidden checkbox */
@@ -790,4 +814,18 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
      #analysisPanel {
          width: clamp(250px, 90vw, 300px); /* Adjust analysis panel width */
      }
+}
+
+/* Ensure specific sliders can still have their widths adjusted if needed via their ID */
+#speedSlider, #neighborhoodSize, #biasSlider, #entropySampleRateSlider {
+    min-width: 120px; /* Example, adjust as needed or remove if default is fine */
+}
+#biasSlider {
+    min-width: 150px; /* Bias might need more space */
+}
+
+/* Ensure sliders in SetupPanel also get consistent styling */
+.density-control .slider-component-container input[type="range"] {
+     width: 100%; /* Make density sliders take full width of their cell's component container */
+     min-width: 0; /* Override any other min-width for density sliders */
 }
