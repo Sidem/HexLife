@@ -43,6 +43,10 @@
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
                         <div id="biasSliderMount"></div>
                     </div>
+                    <div class="ruleset-scope-switch" title="Scope for new/set ruleset">
+                        <input type="checkbox" id="rulesetScopeSwitch" class="checkbox-input" checked>
+                        <label for="rulesetScopeSwitch" class="checkbox-label scope-label" data-on-text="All Worlds" data-off-text="Selected World">All Worlds</label>
+                    </div>
                     <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input"
                         title="Reset all world states when generating a new ruleset" checked>
                     <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
@@ -58,8 +62,12 @@
                     <button id="saveStateButton" class="button" title="Save current grid state">Save</button>
                     <button id="loadStateButton" class="button"
                         title="Load grid state from .json/.txt file">Load</button>
-                    <button id="resetStatesButton" class="button"
-                        title="[R] Reset all worlds to initial densities">[R]eset All</button>
+                    <button id="resetCurrentButton" class="button"
+                        title="[R] Reset current world to initial density">[R]eset Current</button>
+                    <button id="resetAllButtonNew" class="button" title="Reset all worlds to initial densities">Reset All</button>
+                    <button id="clearCurrentButton" class="button"
+                        title="[C] Clear current world (0s or 1s)">[C]lear Current</button>
+                    <button id="clearAllButton" class="button" title="Clear all enabled worlds (0s or 1s)">Clear All</button>
                     <button id="setupPanelButton" class="button" title="[S] Open world setup panel">[S]etup</button>
                     <button id="analysisPanelButton" class="button" title="[A] Open analysis panel">Analyse</button>
                 </div>
@@ -89,10 +97,23 @@
                 <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
-                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option> </select>
+                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option> 
+                </select>
             </div>
-            <div class="editor-content-area"> <div id="rulesetEditorGrid" class="hidden"></div> <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
-                <div id="rotationalSymmetryRulesetEditorGrid"></div> <div class="editor-text">
+            <div class="editor-apply-scope-controls">
+                <label>Apply Changes To:</label>
+                <div class="radio-group">
+                    <input type="radio" id="editorApplyScopeSelected" name="editorApplyScope" value="selected" class="radio-switch-input" checked>
+                    <label for="editorApplyScopeSelected" class="radio-switch-label">Selected World</label>
+                    <input type="radio" id="editorApplyScopeAll" name="editorApplyScope" value="all" class="radio-switch-input">
+                    <label for="editorApplyScopeAll" class="radio-switch-label">All Worlds</label>
+                </div>
+            </div>
+            <div class="panel-content-area"> 
+                <div id="rulesetEditorGrid" class="hidden"></div> 
+                <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
+                <div id="rotationalSymmetryRulesetEditorGrid"></div> 
+                <div class="editor-text">
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                     <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
                     </p>
@@ -116,12 +137,11 @@
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Changes
-                    are saved automatically. Click "Apply & Reset" to re-initialize all worlds with the current
-                    settings.</p>
-                <div id="worldSetupGrid" class="world-config-grid"></div>
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Set Current Ruleset" to apply the main ruleset to a specific world and reset it. Changes to density and enabled state are saved automatically. Click "Apply & Reset All" to re-initialize all worlds with their current density/enabled settings using the main ruleset.</p>
+                <div id="worldSetupGrid" class="world-config-grid">
+                    </div>
                 <div class="panel-actions">
-                    <button id="applySetupButton" class="button">Apply & Reset Worlds</button>
+                    <button id="applySetupButton" class="button">Apply & Reset All Worlds</button>
                 </div>
             </div>
         </div>

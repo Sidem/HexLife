@@ -6,10 +6,8 @@ export const EventBus = {
             subscriptions[eventType] = [];
         }
         subscriptions[eventType].push(callback);
-        console.log(`EventBus: Subscribed to ${eventType}`);
         return () => {
             subscriptions[eventType] = subscriptions[eventType].filter(cb => cb !== callback);
-            console.log(`EventBus: Unsubscribed from ${eventType}`);
         };
     },
 
@@ -29,35 +27,42 @@ export const EventBus = {
     }
 };
 
-
 export const EVENTS = {
-    SIMULATION_PAUSED: 'simulation:paused', 
-    SIMULATION_SPEED_CHANGED: 'simulation:speedChanged', 
-    RULESET_CHANGED: 'simulation:rulesetChanged', 
-    BRUSH_SIZE_CHANGED: 'simulation:brushSizeChanged', 
-    SELECTED_WORLD_CHANGED: 'simulation:selectedWorldChanged', 
-    WORLD_STATS_UPDATED: 'simulation:worldStatsUpdated', 
-    ALL_WORLDS_RESET: 'simulation:allWorldsReset', 
-    WORLD_SETTINGS_CHANGED: 'simulation:worldSettingsChanged', 
-    ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged', 
-    PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated', 
+    SIMULATION_PAUSED: 'simulation:paused',
+    SIMULATION_SPEED_CHANGED: 'simulation:speedChanged',
+    RULESET_CHANGED: 'simulation:rulesetChanged',
+    BRUSH_SIZE_CHANGED: 'simulation:brushSizeChanged',
+    SELECTED_WORLD_CHANGED: 'simulation:selectedWorldChanged',
+    WORLD_STATS_UPDATED: 'simulation:worldStatsUpdated',
+    ALL_WORLDS_RESET: 'simulation:allWorldsReset',
+    WORLD_SETTINGS_CHANGED: 'simulation:worldSettingsChanged',
+    ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged',
+    PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated',
+
     COMMAND_TOGGLE_PAUSE: 'command:togglePause',
-    COMMAND_SET_SPEED: 'command:setSpeed', 
-    COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize', 
-    COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', 
-    COMMAND_SET_RULESET: 'command:setRuleset', 
-    COMMAND_TOGGLE_RULE_OUTPUT: 'command:toggleRuleOutput', 
-    COMMAND_SET_ALL_RULES_STATE: 'command:setAllRulesState', 
-    COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:setRulesForNeighborCount', 
-    COMMAND_RESET_ALL_WORLDS: 'command:resetAllWorldsToCurrentSettings',
+    COMMAND_SET_SPEED: 'command:setSpeed',
+    COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize',
+    COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', // payload: { bias, generationMode, resetScopeForThisChange: 'all' | 'selected' | 'none' }
+    COMMAND_SET_RULESET: 'command:setRuleset', // payload: { hexString, resetScopeForThisChange: 'all' | 'selected' | 'none' }
+    COMMAND_TOGGLE_RULE_OUTPUT: 'command:toggleRuleOutput', // payload: { ruleIndex, resetScopeForThisChange: 'all' | 'selected' }
+    COMMAND_SET_ALL_RULES_STATE: 'command:setAllRulesState', // payload: { targetState, resetScopeForThisChange: 'all' | 'selected' }
+    COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:setRulesForNeighborCount', // payload: { centerState, numActive, outputState, resetScopeForThisChange: 'all' | 'selected' }
+    COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:setRulesForCanonicalRepresentative', // payload: { canonicalBitmask, centerState, outputState, resetScopeForThisChange: 'all' | 'selected' }
+
+    COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES: 'command:resetAllWorldsToInitialDensities',
+    COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET: 'command:resetWorldsWithCurrentRuleset', // payload: { scope: 'all' | 'selected' | worldIndex }
+    COMMAND_CLEAR_WORLDS: 'command:clearWorlds', // payload: { scope: 'all' | 'selected' }
+
     COMMAND_SAVE_SELECTED_WORLD_STATE: 'command:saveSelectedWorldState',
-    COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState', 
-    COMMAND_APPLY_BRUSH: 'command:applyBrush', 
-    COMMAND_SET_HOVER_STATE: 'command:setHoverState', 
-    COMMAND_CLEAR_HOVER_STATE: 'command:clearHoverState', 
-    COMMAND_SET_WORLD_INITIAL_DENSITY: 'command:setWorldInitialDensity', 
-    COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled', 
-    COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
-    COMMAND_SELECT_WORLD: 'command:selectWorld', 
-    COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:setRulesForCanonicalRepresentative',
-}; 
+    COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState',
+    COMMAND_APPLY_BRUSH: 'command:applyBrush',
+    COMMAND_SET_HOVER_STATE: 'command:setHoverState',
+    COMMAND_CLEAR_HOVER_STATE: 'command:clearHoverState',
+    COMMAND_SET_WORLD_INITIAL_DENSITY: 'command:setWorldInitialDensity',
+    COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled',
+    COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling',
+    COMMAND_SELECT_WORLD: 'command:selectWorld',
+
+    UI_RULESET_SCOPE_CHANGED: 'ui:rulesetScopeChanged',
+    UI_EDITOR_RULESET_SCOPE_CHANGED: 'ui:editorRulesetScopeChanged',
+};

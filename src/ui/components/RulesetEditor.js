@@ -1,401 +1,215 @@
-// src/ui/components/RulesetEditor.js
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesetEditor {
     constructor(panelElement, simulationInterface) {
-        if (!panelElement) {
-            console.error('RulesetEditor: panelElement is null or undefined.');
+        if (!panelElement || !simulationInterface) {
+            console.error('RulesetEditor: panelElement or simulationInterface is null or undefined.');
             return;
         }
-        if (!simulationInterface) {
-            console.error('RulesetEditor: simulationInterface is null or undefined.');
-            return;
-        }
-
         this.panelElement = panelElement;
-        this.simInterface = simulationInterface; // Will have getCanonicalRuleDetails, etc.
+        this.simInterface = simulationInterface; // Provides getCurrentRulesetArray/Hex for the SELECTED world
         this.panelIdentifier = 'ruleset';
         this.uiElements = {
-            closeButton: this.panelElement.querySelector('#closeEditorButton') || this.panelElement.querySelector('.close-panel-button'),
-            editorRulesetInput: this.panelElement.querySelector('#editorRulesetInput'),
-            clearRulesButton: this.panelElement.querySelector('#clearRulesButton'),
-            rulesetEditorMode: this.panelElement.querySelector('#rulesetEditorMode'),
-            rulesetEditorGrid: this.panelElement.querySelector('#rulesetEditorGrid'),
-            neighborCountRulesetEditorGrid: this.panelElement.querySelector('#neighborCountRulesetEditorGrid'),
-            rotationalSymmetryRulesetEditorGrid: this.panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'), // Added
+            closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
+            editorRulesetInput: panelElement.querySelector('#editorRulesetInput'), // Edits selected world's ruleset
+            clearRulesButton: panelElement.querySelector('#clearRulesButton'),
+            rulesetEditorMode: panelElement.querySelector('#rulesetEditorMode'),
+            rulesetEditorGrid: panelElement.querySelector('#rulesetEditorGrid'),
+            neighborCountRulesetEditorGrid: panelElement.querySelector('#neighborCountRulesetEditorGrid'),
+            rotationalSymmetryRulesetEditorGrid: panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'),
+            editorApplyScopeSelectedRadio: panelElement.querySelector('#editorApplyScopeSelected'), // "Selected" means current world being edited
+            editorApplyScopeAllRadio: panelElement.querySelector('#editorApplyScopeAll'), // "All" means copy this edit to all other worlds
+            editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'),
         };
-
-        for (const key in this.uiElements) {
-            if (!this.uiElements[key]) {
-                console.warn(`RulesetEditor: UI element '${key}' not found within the panel.`);
-            }
-        }
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-        this._loadPanelState(); // This also calls show/hide which might trigger refreshViews
+        this._loadPanelState();
         this._setupInternalListeners();
-        // Initial refresh if panel is loaded visible
-        if (!this.panelElement.classList.contains('hidden')) {
-            this.refreshViews();
-        }
+        if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
+    }
+
+    // This scope now determines if the edit is applied to just the selected world (being edited)
+    // or if the change is propagated to all worlds.
+    _getEditorApplyChangesScope() {
+        return this.uiElements.editorApplyScopeAllRadio?.checked ? 'all' : 'selected';
     }
 
     _setupInternalListeners() {
-        if (this.uiElements.closeButton) {
-            this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        }
-
+        if (this.uiElements.closeButton) this.uiElements.closeButton.addEventListener('click', () => this.hide());
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
-                this.refreshViews(); // This will now handle the new mode
+                this.refreshViews();
+                PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
+            });
+        }
+        if (this.uiElements.editorApplyScopeControls) {
+            this.uiElements.editorApplyScopeControls.querySelectorAll('input[name="editorApplyScope"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    if (radio.checked) PersistenceService.saveUISetting('editorRulesetApplyScope', radio.value);
+                });
             });
         }
 
         if (this.uiElements.clearRulesButton) {
             this.uiElements.clearRulesButton.addEventListener('click', () => {
-                const currentArr = this.simInterface.getCurrentRulesetArray();
-                const isCurrentlyAllInactive = currentArr.every(state => state === 0);
-                const targetState = isCurrentlyAllInactive ? 1 : 0;
-                EventBus.dispatch(EVENTS.COMMAND_SET_ALL_RULES_STATE, targetState);
-                // Ruleset_changed event will trigger refreshViews if panel is open
+                // Clears/fills the ruleset of the world(s) indicated by the editor's scope.
+                const currentArr = this.simInterface.getCurrentRulesetArray(); // Ruleset of selected world
+                const targetState = currentArr.every(state => state === 0) ? 1 : 0;
+                EventBus.dispatch(EVENTS.COMMAND_SET_ALL_RULES_STATE, {
+                    targetState,
+                    resetScopeForThisChange: this._getEditorApplyChangesScope()
+                });
             });
         }
 
         const handleEditorInputChange = () => {
             if (!this.uiElements.editorRulesetInput) return;
             const hexString = this.uiElements.editorRulesetInput.value.trim().toUpperCase();
-            if (!hexString) { // If input is cleared, refresh to show current ruleset hex
-                const currentHex = this.simInterface.getCurrentRulesetHex();
-                this.uiElements.editorRulesetInput.value = (currentHex === "Error" || currentHex === "N/A") ? "" : currentHex;
-                // No need to dispatch an event here, just visual refresh of input
+            const currentSelectedWorldHex = this.simInterface.getCurrentRulesetHex(); // For fallback
+            if (!hexString) {
+                this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
                 return;
             }
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
-                alert("Invalid Hex Code in Editor: Must be 32 hexadecimal characters (0-9, A-F).\nReverting to current ruleset.");
-                const currentHex = this.simInterface.getCurrentRulesetHex(); // Revert display
-                this.uiElements.editorRulesetInput.value = (currentHex === "Error" || currentHex === "N/A") ? "" : currentHex;
+                alert("Invalid Hex Code: Must be 32 hex chars.\nReverting.");
+                this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
             } else {
-                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, hexString);
+                // This command will set the ruleset for the world(s) indicated by editor scope.
+                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
+                    hexString,
+                    resetScopeForThisChange: this._getEditorApplyChangesScope()
+                });
             }
-            // EventBus dispatch for RULESET_CHANGED will call refreshViews if successful
         };
-
         if (this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.addEventListener('change', handleEditorInputChange);
             this.uiElements.editorRulesetInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    handleEditorInputChange();
-                    this.uiElements.editorRulesetInput.blur();
-                }
+                if (event.key === 'Enter') { event.preventDefault(); handleEditorInputChange(); this.uiElements.editorRulesetInput.blur(); }
             });
         }
 
-        if (this.uiElements.rulesetEditorGrid) {
-            this.uiElements.rulesetEditorGrid.addEventListener('click', (event) => {
-                const ruleVizElement = event.target.closest('.rule-viz');
-                if (ruleVizElement && ruleVizElement.dataset.ruleIndex !== undefined) {
-                    const ruleIndex = parseInt(ruleVizElement.dataset.ruleIndex, 10);
-                    if (!isNaN(ruleIndex)) {
-                        EventBus.dispatch(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, ruleIndex);
-                    }
-                }
-            });
-        }
-        
-        if (this.uiElements.neighborCountRulesetEditorGrid) {
-             this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', (event) => {
-                const ruleViz = event.target.closest('.neighbor-count-rule-viz');
-                if (ruleViz && ruleViz.dataset.centerState !== undefined && ruleViz.dataset.numActive !== undefined) {
-                    const cs = parseInt(ruleViz.dataset.centerState, 10);
-                    const na = parseInt(ruleViz.dataset.numActive, 10);
-                    const currentEffOutput = this.simInterface.getEffectiveRuleForNeighborCount(cs, na);
-                    const newOutput = (currentEffOutput === 1 || currentEffOutput === 2) ? 0 : 1; // Toggle logic
-                    EventBus.dispatch(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, {
-                        centerState: cs,
-                        numActive: na,
-                        outputState: newOutput
+        const createRuleInteractionHandler = (commandType, detailExtractor) => (event) => {
+            const vizElement = event.target.closest(detailExtractor.selector);
+            if (vizElement) {
+                // Details are extracted based on the selected world's ruleset (displayed in editor)
+                const details = detailExtractor.getDetails(vizElement, this.simInterface);
+                if (details) {
+                    EventBus.dispatch(commandType, {
+                        ...details,
+                        resetScopeForThisChange: this._getEditorApplyChangesScope()
                     });
                 }
-            });
+            }
+        };
+
+        if (this.uiElements.rulesetEditorGrid) {
+            this.uiElements.rulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, {
+                selector: '.rule-viz',
+                getDetails: (el) => ({ ruleIndex: parseInt(el.dataset.ruleIndex, 10) })
+            }));
         }
-
-        // Listener for Rotational Symmetry Grid
-        if (this.uiElements.rotationalSymmetryRulesetEditorGrid) {
-            this.uiElements.rotationalSymmetryRulesetEditorGrid.addEventListener('click', (event) => {
-                const rSymRuleVizElement = event.target.closest('.r-sym-rule-viz');
-                if (rSymRuleVizElement) {
-                    const canonicalBitmask = parseInt(rSymRuleVizElement.dataset.canonicalBitmask, 10);
-                    const centerState = parseInt(rSymRuleVizElement.dataset.centerState, 10);
-
-                    if (!isNaN(canonicalBitmask) && !isNaN(centerState)) {
-                        const currentEffectiveOutput = this.simInterface.getEffectiveRuleForCanonicalRepresentative(canonicalBitmask, centerState);
-                        // Toggle logic: if ON or MIXED, turn OFF. If OFF, turn ON.
-                        const newOutputState = (currentEffectiveOutput === 1 || currentEffectiveOutput === 2) ? 0 : 1;
-                        EventBus.dispatch(EVENTS.COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
-                            canonicalBitmask,
-                            centerState,
-                            outputState: newOutputState
-                        });
-                    }
+        if (this.uiElements.neighborCountRulesetEditorGrid) {
+            this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, {
+                selector: '.neighbor-count-rule-viz',
+                getDetails: (el, sim) => {
+                    const cs = parseInt(el.dataset.centerState, 10);
+                    const na = parseInt(el.dataset.numActive, 10);
+                    const currentOut = sim.getEffectiveRuleForNeighborCount(cs, na); // Uses selected world's ruleset
+                    return { centerState: cs, numActive: na, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
                 }
-            });
+            }));
         }
-
-        if (this.draggablePanel) {
-            this.draggablePanel.onDragEnd = () => this._savePanelState();
+        if (this.uiElements.rotationalSymmetryRulesetEditorGrid) {
+            this.uiElements.rotationalSymmetryRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
+                selector: '.r-sym-rule-viz',
+                getDetails: (el, sim) => {
+                    const cb = parseInt(el.dataset.canonicalBitmask, 10);
+                    const cs = parseInt(el.dataset.centerState, 10);
+                    const currentOut = sim.getEffectiveRuleForCanonicalRepresentative(cb, cs); // Uses selected world's ruleset
+                    return { canonicalBitmask: cb, centerState: cs, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
+                }
+            }));
         }
+        if (this.draggablePanel) this.draggablePanel.onDragEnd = () => this._savePanelState();
     }
 
-    refreshViews() {
+    refreshViews() { // Called when editor is shown or when selected world/ruleset changes
         if (!this.simInterface || this.panelElement.classList.contains('hidden')) return;
-
-        const currentHex = this.simInterface.getCurrentRulesetHex();
-        const currentArr = this.simInterface.getCurrentRulesetArray();
-
+        // Load and display the ruleset of the CURRENTLY SELECTED world
+        const currentSelectedWorldHex = this.simInterface.getCurrentRulesetHex();
         if (this.uiElements.editorRulesetInput) {
-            this.uiElements.editorRulesetInput.value = (currentHex === "Error" || currentHex === "N/A") ? "" : currentHex;
+            this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
         }
-        this._updateEditorGrids(currentArr); // Pass current ruleset array for detailed view
+        this._updateEditorGrids(); // Grids will use selected world's ruleset via simInterface
     }
 
-    _updateEditorGrids(rulesetArray) { // rulesetArray is for detailed view
-        if (!this.uiElements.rulesetEditorMode || !this.uiElements.rulesetEditorGrid || !this.uiElements.neighborCountRulesetEditorGrid || !this.uiElements.rotationalSymmetryRulesetEditorGrid) {
-            console.warn("RulesetEditor: One or more grid elements are missing.");
-            return;
-        }
+    _updateEditorGrids() {
+        if (!this.uiElements.rulesetEditorMode) return;
         const currentMode = this.uiElements.rulesetEditorMode.value;
+        const grids = { detailed: this.uiElements.rulesetEditorGrid, neighborCount: this.uiElements.neighborCountRulesetEditorGrid, rotationalSymmetry: this.uiElements.rotationalSymmetryRulesetEditorGrid };
+        for (const key in grids) grids[key]?.classList.add('hidden');
+        const activeGrid = grids[currentMode] || grids.detailed;
+        activeGrid.classList.remove('hidden');
 
-        this.uiElements.rulesetEditorGrid.classList.add('hidden');
-        this.uiElements.neighborCountRulesetEditorGrid.classList.add('hidden');
-        this.uiElements.rotationalSymmetryRulesetEditorGrid.classList.add('hidden');
-
-        if (currentMode === 'detailed') {
-            this.uiElements.rulesetEditorGrid.classList.remove('hidden');
-            this._populateDetailedGrid(rulesetArray);
-        } else if (currentMode === 'neighborCount') {
-            this.uiElements.neighborCountRulesetEditorGrid.classList.remove('hidden');
-            this._populateNeighborCountGrid();
-        } else if (currentMode === 'rotationalSymmetry') {
-            this.uiElements.rotationalSymmetryRulesetEditorGrid.classList.remove('hidden');
-            this._populateRotationalSymmetryGrid();
-        } else { // Default or fallback
-            this.uiElements.rulesetEditorGrid.classList.remove('hidden');
-            this._populateDetailedGrid(rulesetArray);
-        }
+        // All population methods now use simInterface which gets selected world's ruleset
+        if (currentMode === 'detailed') this._populateDetailedGrid(this.simInterface.getCurrentRulesetArray());
+        else if (currentMode === 'neighborCount') this._populateNeighborCountGrid();
+        else if (currentMode === 'rotationalSymmetry') this._populateRotationalSymmetryGrid();
+        else this._populateDetailedGrid(this.simInterface.getCurrentRulesetArray());
     }
 
-    _populateDetailedGrid(rulesetArray) {
+    _populateDetailedGrid(rulesetArray) { // rulesetArray is from selected world
         const grid = this.uiElements.rulesetEditorGrid;
-        if (!grid || !rulesetArray || rulesetArray.length !== 128) {
-            // console.warn("Cannot update detailed ruleset editor grid - missing element or invalid ruleset array.");
-            if (grid) grid.innerHTML = '<p style="color:red; text-align:center;">Error loading detailed editor.</p>';
-            return;
-        }
-
-        grid.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        for (let i = 0; i < 128; i++) {
-            const centerState = (i >> 6) & 1;
-            const neighborMask = i & 0x3F; // Corrected to 0x3F (6 bits)
-            const outputState = rulesetArray[i];
-            const ruleViz = document.createElement('div');
-            ruleViz.className = 'rule-viz';
-            ruleViz.title = `Rule ${i}: Input C=${centerState} N=${neighborMask.toString(2).padStart(6, '0')} -> Output C=${outputState}\n(Click inner hex to toggle output)`;
-            ruleViz.dataset.ruleIndex = i;
-
-            const centerHex = document.createElement('div');
-            centerHex.className = `hexagon center-hex state-${centerState}`;
-            const innerHex = document.createElement('div');
-            innerHex.className = `hexagon inner-hex state-${outputState}`;
-            centerHex.appendChild(innerHex);
-            ruleViz.appendChild(centerHex);
-
-            for (let n = 0; n < 6; n++) {
-                const neighborState = (neighborMask >> n) & 1;
-                const neighborHex = document.createElement('div');
-                neighborHex.className = `hexagon neighbor-hex neighbor-${n} state-${neighborState}`;
-                ruleViz.appendChild(neighborHex);
-            }
-            fragment.appendChild(ruleViz);
-        }
-        grid.appendChild(fragment);
+        if (!grid || !rulesetArray) { if (grid) grid.innerHTML = '<p>Error loading.</p>'; return; }
+        grid.innerHTML = ''; const frag = document.createDocumentFragment();
+        for (let i=0; i<128; i++) {
+            const cs=(i>>6)&1, mask=i&0x3F, os=rulesetArray[i];
+            const v=document.createElement('div'); v.className='rule-viz'; v.title=`R${i}: C${cs} N${mask.toString(2).padStart(6,'0')}->O${os}`; v.dataset.ruleIndex=i;
+            v.innerHTML=`<div class="hexagon center-hex state-${cs}"><div class="hexagon inner-hex state-${os}"></div></div>`+Array.from({length:6},(_,n)=>`<div class="hexagon neighbor-hex neighbor-${n} state-${(mask>>n)&1}"></div>`).join('');
+            frag.appendChild(v);
+        } grid.appendChild(frag);
     }
-
-    _populateNeighborCountGrid() {
-        const grid = this.uiElements.neighborCountRulesetEditorGrid;
-        if (!grid || !this.simInterface) {
-            // console.warn("Cannot update N-count editor grid - missing element or sim interface.");
-            if (grid) grid.innerHTML = '<p style="color:red; text-align:center;">Error loading N-count editor.</p>';
-            return;
-        }
-        grid.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        for (let centerState = 0; centerState <= 1; centerState++) {
-            for (let numActive = 0; numActive <= 6; numActive++) {
-                const effectiveOutput = this.simInterface.getEffectiveRuleForNeighborCount(centerState, numActive);
-                const ruleViz = document.createElement('div');
-                ruleViz.className = 'neighbor-count-rule-viz';
-                ruleViz.dataset.centerState = centerState;
-                ruleViz.dataset.numActive = numActive;
-
-                let outputDescription = 'OFF';
-                if (effectiveOutput === 1) outputDescription = 'ON';
-                else if (effectiveOutput === 2) outputDescription = 'MIXED';
-
-                ruleViz.title = `Center ${centerState === 1 ? 'ON' : 'OFF'}, ${numActive} Neighbors ON -> Result ${outputDescription}\n(Click to toggle output batch)`;
-
-                const vizCenterHex = document.createElement('div');
-                vizCenterHex.className = `hexagon center-hex state-${centerState}`; // Center cell's input state
-                const vizInnerHex = document.createElement('div');
-                vizInnerHex.className = `hexagon inner-hex state-${effectiveOutput}`; // Output state (0, 1, or 2 for mixed)
-                vizCenterHex.appendChild(vizInnerHex);
-
-                const label = document.createElement('div');
-                label.className = 'neighbor-count-label';
-                label.innerHTML = `Center: ${centerState === 1 ? '<b>ON</b>' : 'OFF'}<br>${numActive}/6 N-ON &rarr; ${outputDescription}`;
-
-                ruleViz.appendChild(label);
-                ruleViz.appendChild(vizCenterHex);
-                // Click listener is now in _setupInternalListeners using event delegation
-                fragment.appendChild(ruleViz);
-            }
-        }
-        grid.appendChild(fragment);
+    _populateNeighborCountGrid() { // Uses selected world's ruleset via simInterface
+        const grid=this.uiElements.neighborCountRulesetEditorGrid; if(!grid||!this.simInterface){if(grid)grid.innerHTML='<p>Error.</p>';return;}
+        grid.innerHTML=''; const frag=document.createDocumentFragment();
+        for(let cs=0;cs<=1;cs++)for(let na=0;na<=6;na++){
+            const effOut=this.simInterface.getEffectiveRuleForNeighborCount(cs,na); const outD=effOut===1?'ON':(effOut===0?'OFF':'MIXED');
+            const v=document.createElement('div');v.className='neighbor-count-rule-viz';v.dataset.centerState=cs;v.dataset.numActive=na; v.title=`C${cs?'ON':'OFF'},${na}N->${outD}`;
+            v.innerHTML=`<div class="neighbor-count-label">C:${cs?'<b>ON</b>':'OFF'}<br>${na}/6 N&rarr;${outD}</div>`+`<div class="hexagon center-hex state-${cs}"><div class="hexagon inner-hex state-${effOut}"></div></div>`;
+            frag.appendChild(v);
+        } grid.appendChild(frag);
     }
-
-    _populateRotationalSymmetryGrid() {
-        const grid = this.uiElements.rotationalSymmetryRulesetEditorGrid;
-        if (!grid || !this.simInterface || typeof this.simInterface.getCanonicalRuleDetails !== 'function') {
-            if (grid) grid.innerHTML = '<p style="color:red; text-align:center;">Error loading R-Sym editor.</p>';
-            console.warn("R-Sym editor: Missing grid, simInterface, or getCanonicalRuleDetails function.");
-            return;
-        }
-
-        const canonicalDetails = this.simInterface.getCanonicalRuleDetails();
-        grid.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-
-        for (const detail of canonicalDetails) {
-            const rSymRuleViz = document.createElement('div');
-            rSymRuleViz.className = 'r-sym-rule-viz';
-            rSymRuleViz.dataset.canonicalBitmask = detail.canonicalBitmask;
-            rSymRuleViz.dataset.centerState = detail.centerState;
-
-            let outputDescription = 'OFF';
-            if (detail.effectiveOutput === 1) outputDescription = 'ON';
-            else if (detail.effectiveOutput === 2) outputDescription = 'MIXED';
-            
-            rSymRuleViz.title = `Center: ${detail.centerState === 1 ? 'ON' : 'OFF'}, N-Canon: ${detail.canonicalBitmask.toString(2).padStart(6, '0')}\nOrbit: ${detail.orbitSize} -> Result: ${outputDescription}\n(Click to toggle output for this group)`;
-
-            // Label for C= and N_canon=
-            const ruleLabel = document.createElement('div');
-            ruleLabel.className = 'rule-label';
-            ruleLabel.innerHTML = `C=${detail.centerState}, N<sub>c</sub>=${detail.canonicalBitmask.toString(2).padStart(6, '0')}`;
-            rSymRuleViz.appendChild(ruleLabel);
-
-            // Hex display container
-            const hexDisplayWrapper = document.createElement('div');
-            hexDisplayWrapper.className = 'rule-viz-hex-display'; // Styled in CSS for scaling
-
-            const centerHex = document.createElement('div');
-            centerHex.className = `hexagon center-hex state-${detail.centerState}`;
-            const innerHex = document.createElement('div');
-            // Use detail.effectiveOutput for the inner hex state (0, 1, or 2 for mixed)
-            innerHex.className = `hexagon inner-hex state-${detail.effectiveOutput}`;
-            centerHex.appendChild(innerHex);
-            hexDisplayWrapper.appendChild(centerHex);
-
-            // Display neighbors based on canonicalBitmask
-            for (let n = 0; n < 6; n++) {
-                const neighborState = (detail.canonicalBitmask >> n) & 1;
-                const neighborHex = document.createElement('div');
-                neighborHex.className = `hexagon neighbor-hex neighbor-${n} state-${neighborState}`;
-                hexDisplayWrapper.appendChild(neighborHex);
-            }
-            rSymRuleViz.appendChild(hexDisplayWrapper);
-
-            // Orbit size display
-            const orbitDisplay = document.createElement('div');
-            orbitDisplay.className = 'orbit-size-display';
-            orbitDisplay.textContent = `Orbit: ${detail.orbitSize}`;
-            rSymRuleViz.appendChild(orbitDisplay);
-
-            fragment.appendChild(rSymRuleViz);
-        }
-        grid.appendChild(fragment);
+    _populateRotationalSymmetryGrid() { // Uses selected world's ruleset via simInterface
+        const grid=this.uiElements.rotationalSymmetryRulesetEditorGrid; if(!grid||!this.simInterface?.getCanonicalRuleDetails){if(grid)grid.innerHTML='<p>Error.</p>';return;}
+        grid.innerHTML=''; const frag=document.createDocumentFragment();
+        this.simInterface.getCanonicalRuleDetails().forEach(d=>{
+            const outD=d.effectiveOutput===1?'ON':(d.effectiveOutput===0?'OFF':'MIXED');
+            const v=document.createElement('div');v.className='r-sym-rule-viz';v.dataset.canonicalBitmask=d.canonicalBitmask;v.dataset.centerState=d.centerState; v.title=`C${d.centerState?'ON':'OFF'},Nc${d.canonicalBitmask.toString(2).padStart(6,'0')}(O:${d.orbitSize})->${outD}`;
+            v.innerHTML=`<div class="rule-label">C=${d.centerState},N<sub>c</sub>=${d.canonicalBitmask.toString(2).padStart(6,'0')}</div>`+
+            `<div class="rule-viz-hex-display"><div class="hexagon center-hex state-${d.centerState}"><div class="hexagon inner-hex state-${d.effectiveOutput}"></div></div>`+Array.from({length:6},(_,n)=>`<div class="hexagon neighbor-hex neighbor-${n} state-${(d.canonicalBitmask>>n)&1}"></div>`).join('')+`</div>`+
+            `<div class="orbit-size-display">Orbit:${d.orbitSize}</div>`;
+            frag.appendChild(v);
+        }); grid.appendChild(frag);
     }
-
 
     _savePanelState() {
         if (!this.panelElement) return;
-        const state = {
-            isOpen: !this.panelElement.classList.contains('hidden'),
-            x: this.panelElement.style.left,
-            y: this.panelElement.style.top,
-            // mode: this.uiElements.rulesetEditorMode ? this.uiElements.rulesetEditorMode.value : 'detailed' // Persist mode
-        };
-        PersistenceService.savePanelState(this.panelIdentifier, state);
-         if (this.uiElements.rulesetEditorMode) { // Persist editor mode separately
-            PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
-        }
+        PersistenceService.savePanelState(this.panelIdentifier, {isOpen:!this.panelElement.classList.contains('hidden'),x:this.panelElement.style.left,y:this.panelElement.style.top});
+        if (this.uiElements.rulesetEditorMode) PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
+        if (this.uiElements.editorApplyScopeControls) PersistenceService.saveUISetting('editorRulesetApplyScope', this._getEditorApplyChangesScope());
     }
-
     _loadPanelState() {
-        if (!this.panelElement) return;
-        const savedState = PersistenceService.loadPanelState(this.panelIdentifier);
-
-        if (this.uiElements.rulesetEditorMode) { // Load and apply editor mode
-            const savedMode = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry'); // Default to r-sym
-            this.uiElements.rulesetEditorMode.value = savedMode;
-        }
-
-        if (savedState.isOpen) {
-            this.show(false); // show will call refreshViews
-        } else {
-            this.hide(false);
-        }
-
-        // Restore position
-        if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
-        if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
-
-        if ((savedState.x || savedState.y) && parseFloat(this.panelElement.style.left) > 0 && parseFloat(this.panelElement.style.top) > 0) {
-            this.panelElement.style.transform = 'none';
-        } else if (this.panelElement.style.transform === 'none' && savedState.isOpen) { // If no pos but should be open, center it
-            this.panelElement.style.left = '50%';
-            this.panelElement.style.top = '50%';
-            this.panelElement.style.transform = 'translate(-50%, -50%)';
-        }
+        if(!this.panelElement)return; const s=PersistenceService.loadPanelState(this.panelIdentifier);
+        if(this.uiElements.rulesetEditorMode)this.uiElements.rulesetEditorMode.value=PersistenceService.loadUISetting('rulesetEditorMode','rotationalSymmetry');
+        if(this.uiElements.editorApplyScopeControls){const sc=PersistenceService.loadUISetting('editorRulesetApplyScope','selected'); if(sc==='all'&&this.uiElements.editorApplyScopeAllRadio)this.uiElements.editorApplyScopeAllRadio.checked=true;else if(this.uiElements.editorApplyScopeSelectedRadio)this.uiElements.editorApplyScopeSelectedRadio.checked=true;}
+        if(s.isOpen)this.show(false);else this.hide(false); if(s.x)this.panelElement.style.left=s.x;if(s.y)this.panelElement.style.top=s.y;
+        if((s.x||s.y)&&parseFloat(this.panelElement.style.left)>0&&parseFloat(this.panelElement.style.top)>0)this.panelElement.style.transform='none';
+        else if(this.panelElement.style.transform==='none'&&s.isOpen){this.panelElement.style.left='50%';this.panelElement.style.top='50%';this.panelElement.style.transform='translate(-50%,-50%)';}
     }
-
-    show(saveState = true) {
-        this.draggablePanel.show();
-        this.refreshViews();
-        if (saveState) this._savePanelState();
-    }
-
-    hide(saveState = true) {
-        this.draggablePanel.hide();
-        if (saveState) this._savePanelState();
-    }
-
-    toggle() {
-        const isNowVisible = this.draggablePanel.toggle(); 
-        this.refreshViews();
-        this._savePanelState();
-        return isNowVisible;
-    }
-
-    destroy() {
-        if (this.draggablePanel) this.draggablePanel.destroy();
-        this.panelElement = null;
-        this.simInterface = null;
-        this.draggablePanel = null;
-    }
-
-    isHidden(){
-        return this.draggablePanel.isHidden();
-    }
+    show(s=true){this.draggablePanel.show();this.refreshViews();if(s)this._savePanelState();}
+    hide(s=true){this.draggablePanel.hide();if(s)this._savePanelState();}
+    toggle(){const v=this.draggablePanel.toggle();this.refreshViews();this._savePanelState();return v;}
+    destroy(){if(this.draggablePanel)this.draggablePanel.destroy();}
+    isHidden(){return this.draggablePanel.isHidden();}
 }

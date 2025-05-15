@@ -1,4 +1,3 @@
-
 import * as Config from '../../core/config.js'; 
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js'; 
@@ -26,7 +25,7 @@ export class SetupPanel {
         };
         this.worldSliderComponents = []; 
         this.simInterface = simulationInterface; 
-        this.worldSettingsCache = null; 
+        
         for (const key in this.uiElements) {
             if (!this.uiElements[key] && key !== 'closeButton') { 
                  console.warn(`SetupPanel: UI element '${key}' not found within the panel.`);
@@ -51,48 +50,44 @@ export class SetupPanel {
 
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS); 
-                
-                
+                // This button now resets ALL worlds using their current density settings and the global ruleset.
+                EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'all' });
             });
         }
-        if (this.uiElements.resetAllButton) {
-            this.uiElements.resetAllButton.addEventListener('click', () => {
-                if (confirm("Are you sure you want to reset all worlds to their initial configurations? This will also reset their enabled/disabled states.")) {
-                    this.simulationInterface.resetAllWorldsToCurrentSettings(); 
-                    this.refreshViews();
-                }
-            });
-        }
-        
         
         if (this.draggablePanel) {
             this.draggablePanel.onDragEnd = () => this._savePanelState();
         }
+
+        // Event delegation for "Set Current Ruleset" buttons
+        if (this.uiElements.worldSetupGrid) {
+            this.uiElements.worldSetupGrid.addEventListener('click', (event) => {
+                if (event.target.classList.contains('set-ruleset-button')) {
+                    const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
+                    if (!isNaN(worldIndex)) {
+                        console.log(`SetupPanel: Applying current ruleset to world ${worldIndex}`);
+                        EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: worldIndex });
+                    }
+                }
+            });
+        }
     }
 
     refreshViews() {
-        if (!this.simulationInterface || !this.uiElements.worldSetupGrid) return;
-        this._populateWorldSetupGrid();
+        if (!this.simulationInterface || !this.uiElements.worldSetupGrid || this.isHidden()) return;
+        this._populateWorldSetupGrid(); // This will re-add listeners correctly due to innerHTML clear
         const worldSettings = this.simulationInterface.getWorldSettings();
-        this.worldSliderComponents.forEach((slider, i) => {
-            if (worldSettings[i]) {
-                slider.setValue(worldSettings[i].initialDensity);
-                
-                const enableSwitch = this.uiElements.worldSetupGrid.querySelector(`#enableSwitch_${i}`);
-                const enableLabel = this.uiElements.worldSetupGrid.querySelector(`label[for="enableSwitch_${i}"]`);
-                if (enableSwitch) {
-                    enableSwitch.checked = worldSettings[i].enabled;
-                    if(enableLabel) enableLabel.textContent = worldSettings[i].enabled ? 'Enabled' : 'Disabled';
-                }
-            }
-        });
+        
+        // This loop is now part of _populateWorldSetupGrid's value setting
+        // this.worldSliderComponents.forEach((slider, i) => { ... });
     }
 
     _populateWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
-        grid.innerHTML = '';
+        grid.innerHTML = ''; // Clear existing grid and listeners
+        this.worldSliderComponents.forEach(slider => slider.destroy()); // Destroy old slider components
         this.worldSliderComponents = []; 
+        
         const fragment = document.createDocumentFragment();
         const worldSettings = this.simulationInterface.getWorldSettings();
 
@@ -100,10 +95,12 @@ export class SetupPanel {
             const settings = worldSettings[i] || { initialDensity: 0.5, enabled: true };
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
+            
             const label = document.createElement('div');
             label.className = 'world-label';
             label.textContent = `World ${i}`;
             cell.appendChild(label);
+            
             const densityControlDiv = document.createElement('div');
             densityControlDiv.className = 'density-control setting-control';
             const sliderMountPoint = document.createElement('div'); 
@@ -117,7 +114,6 @@ export class SetupPanel {
                 max: 1,
                 step: 0.001,
                 value: settings.initialDensity,
-                isBias: true, 
                 unit: '',
                 showValue: true, 
                 onChange: (newDensity) => {
@@ -125,6 +121,7 @@ export class SetupPanel {
                 }
             });
             this.worldSliderComponents.push(densitySlider);
+            
             const enableControlDiv = document.createElement('div');
             enableControlDiv.className = 'enable-control setting-control';
             const enableSwitch = document.createElement('input');
@@ -133,17 +130,29 @@ export class SetupPanel {
             enableSwitch.className = 'enable-switch checkbox-input';
             enableSwitch.checked = settings.enabled;
             enableControlDiv.appendChild(enableSwitch);
+            
             const enableLabelElement = document.createElement('label');
             enableLabelElement.htmlFor = `enableSwitch_${i}`;
             enableLabelElement.className = 'checkbox-label';
             enableLabelElement.textContent = settings.enabled ? 'Enabled' : 'Disabled';
             enableControlDiv.appendChild(enableLabelElement);
             cell.appendChild(enableControlDiv);
+            
             enableSwitch.addEventListener('change', (event) => {
                 const isEnabled = event.target.checked;
                 enableLabelElement.textContent = isEnabled ? 'Enabled' : 'Disabled';
                 EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
             });
+
+            // Add "Set Current Ruleset" button
+            const setRulesetButton = document.createElement('button');
+            setRulesetButton.className = 'button set-ruleset-button';
+            setRulesetButton.textContent = 'Use Main Ruleset';
+            setRulesetButton.dataset.worldIndex = i;
+            setRulesetButton.title = `Apply the current main ruleset to World ${i} and reset it.`;
+            // Event listener for this button is handled by delegation in _setupInternalListeners
+            cell.appendChild(setRulesetButton);
+            
             fragment.appendChild(cell);
         }
         grid.appendChild(fragment);
@@ -188,8 +197,8 @@ export class SetupPanel {
 
     show(saveState = true) {
         this.draggablePanel.show(); 
-        if (saveState) this._savePanelState();
         this.refreshViews(); 
+        if (saveState) this._savePanelState();
     }
 
     hide(saveState = true) {
@@ -199,16 +208,17 @@ export class SetupPanel {
 
     toggle() {
         const nowVisible = this.draggablePanel.toggle();
+        this.refreshViews();
         this._savePanelState(); 
-        if (nowVisible) {
-            this.refreshViews();
-        }
+        return nowVisible;
     }
 
     destroy() {
         this.draggablePanel.destroy();
         this.worldSliderComponents.forEach(slider => slider.destroy());
         this.worldSliderComponents = [];
+        // Remove delegated event listener if panel itself is removed from DOM elsewhere
+        // For now, assuming panelElement persists and is only hidden/shown
     }
 
     isHidden(){
