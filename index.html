@@ -48,7 +48,7 @@
                         <label for="rulesetScopeSwitch" class="checkbox-label scope-label" data-on-text="All Worlds" data-off-text="Selected World">All Worlds</label>
                     </div>
                     <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input"
-                        title="Reset all world states when generating a new ruleset" checked>
+                        title="Reset world(s) when generating or setting a new ruleset from this bar" checked>
                     <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
                 </div>
                 <div class="ui-group" id="group-ruleset-input">
@@ -108,12 +108,17 @@
                     <input type="radio" id="editorApplyScopeAll" name="editorApplyScope" value="all" class="radio-switch-input">
                     <label for="editorApplyScopeAll" class="radio-switch-label">All Worlds</label>
                 </div>
+                <div class="editor-auto-reset-control">
+                    <input type="checkbox" id="editorAutoResetCheckbox" class="checkbox-input" checked>
+                    <label for="editorAutoResetCheckbox" class="checkbox-label">Auto-Reset on Change</label>
+                </div>
             </div>
             <div class="panel-content-area"> 
                 <div id="rulesetEditorGrid" class="hidden"></div> 
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
                 <div id="rotationalSymmetryRulesetEditorGrid"></div> 
                 <div class="editor-text">
+                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to propagate these changes to all worlds.</p>
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                     <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
                     </p>
@@ -133,11 +138,12 @@
                 </div>
             </div>
         </div>
+        
         <div id="setupPanel" class="draggable-panel-base hidden">
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Set Current Ruleset" to apply the main ruleset to a specific world and reset it. Changes to density and enabled state are saved automatically. Click "Apply & Reset All" to re-initialize all worlds with their current density/enabled settings using the main ruleset.</p>
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and reset it. "Apply & Reset All Worlds" re-initializes all worlds with their current density/enabled settings using their respective current rulesets.</p>
                 <div id="worldSetupGrid" class="world-config-grid">
                     </div>
                 <div class="panel-actions">

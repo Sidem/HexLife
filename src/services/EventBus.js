@@ -1,3 +1,4 @@
+// src/services/EventBus.js
 const subscriptions = {};
 
 export const EventBus = {
@@ -42,16 +43,22 @@ export const EVENTS = {
     COMMAND_TOGGLE_PAUSE: 'command:togglePause',
     COMMAND_SET_SPEED: 'command:setSpeed',
     COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize',
+    
+    // Ruleset modification commands from UI Bar (already include resetScopeForThisChange)
     COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', // payload: { bias, generationMode, resetScopeForThisChange: 'all' | 'selected' | 'none' }
     COMMAND_SET_RULESET: 'command:setRuleset', // payload: { hexString, resetScopeForThisChange: 'all' | 'selected' | 'none' }
-    COMMAND_TOGGLE_RULE_OUTPUT: 'command:toggleRuleOutput', // payload: { ruleIndex, resetScopeForThisChange: 'all' | 'selected' }
-    COMMAND_SET_ALL_RULES_STATE: 'command:setAllRulesState', // payload: { targetState, resetScopeForThisChange: 'all' | 'selected' }
-    COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:setRulesForNeighborCount', // payload: { centerState, numActive, outputState, resetScopeForThisChange: 'all' | 'selected' }
-    COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:setRulesForCanonicalRepresentative', // payload: { canonicalBitmask, centerState, outputState, resetScopeForThisChange: 'all' | 'selected' }
+    
+    // Editor-specific commands: modificationScope + conditionalResetScope
+    COMMAND_EDITOR_TOGGLE_RULE_OUTPUT: 'command:editorToggleRuleOutput', // payload: { ruleIndex, modificationScope: 'all' | 'selected', conditionalResetScope: 'all' | 'selected' | 'none' }
+    COMMAND_EDITOR_SET_ALL_RULES_STATE: 'command:editorSetAllRulesState', // payload: { targetState, modificationScope: 'all' | 'selected', conditionalResetScope: 'all' | 'selected' | 'none' }
+    COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:editorSetRulesForNeighborCount', // payload: { centerState, numActive, outputState, modificationScope: 'all' | 'selected', conditionalResetScope: 'all' | 'selected' | 'none' }
+    COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:editorSetRulesForCanonicalRep', // payload: { canonicalBitmask, centerState, outputState, modificationScope: 'all' | 'selected', conditionalResetScope: 'all' | 'selected' | 'none' }
+    COMMAND_EDITOR_SET_RULESET_HEX: 'command:editorSetRulesetHex', // payload: { hexString, modificationScope: 'all' | 'selected', conditionalResetScope: 'all' | 'selected' | 'none' }
+
 
     COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES: 'command:resetAllWorldsToInitialDensities',
-    COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET: 'command:resetWorldsWithCurrentRuleset', // payload: { scope: 'all' | 'selected' | worldIndex }
-    COMMAND_CLEAR_WORLDS: 'command:clearWorlds', // payload: { scope: 'all' | 'selected' }
+    COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET: 'command:resetWorldsWithCurrentRuleset', 
+    COMMAND_CLEAR_WORLDS: 'command:clearWorlds', 
 
     COMMAND_SAVE_SELECTED_WORLD_STATE: 'command:saveSelectedWorldState',
     COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState',

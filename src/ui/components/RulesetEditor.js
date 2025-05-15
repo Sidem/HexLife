@@ -9,19 +9,20 @@ export class RulesetEditor {
             return;
         }
         this.panelElement = panelElement;
-        this.simInterface = simulationInterface; // Provides getCurrentRulesetArray/Hex for the SELECTED world
+        this.simInterface = simulationInterface;
         this.panelIdentifier = 'ruleset';
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
-            editorRulesetInput: panelElement.querySelector('#editorRulesetInput'), // Edits selected world's ruleset
+            editorRulesetInput: panelElement.querySelector('#editorRulesetInput'),
             clearRulesButton: panelElement.querySelector('#clearRulesButton'),
             rulesetEditorMode: panelElement.querySelector('#rulesetEditorMode'),
             rulesetEditorGrid: panelElement.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: panelElement.querySelector('#neighborCountRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'),
-            editorApplyScopeSelectedRadio: panelElement.querySelector('#editorApplyScopeSelected'), // "Selected" means current world being edited
-            editorApplyScopeAllRadio: panelElement.querySelector('#editorApplyScopeAll'), // "All" means copy this edit to all other worlds
+            editorApplyScopeSelectedRadio: panelElement.querySelector('#editorApplyScopeSelected'),
+            editorApplyScopeAllRadio: panelElement.querySelector('#editorApplyScopeAll'),
             editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'),
+            editorAutoResetCheckbox: panelElement.querySelector('#editorAutoResetCheckbox'),
         };
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
         this._loadPanelState();
@@ -29,13 +30,19 @@ export class RulesetEditor {
         if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
     }
 
-    // This scope now determines if the edit is applied to just the selected world (being edited)
-    // or if the change is propagated to all worlds.
-    _getEditorApplyChangesScope() {
+    _getEditorModificationScope() { // This is from "Apply Changes To:" radios
         return this.uiElements.editorApplyScopeAllRadio?.checked ? 'all' : 'selected';
     }
 
+    _getConditionalResetScopeForEditor() { // This depends on "Auto-Reset" checkbox
+        if (this.uiElements.editorAutoResetCheckbox?.checked) {
+            return this._getEditorModificationScope(); // Reset whatever was modified
+        }
+        return 'none'; // No reset if auto-reset is off
+    }
+
     _setupInternalListeners() {
+        // ... (listeners for close, mode, scope radios, auto-reset checkbox save to persistence) ...
         if (this.uiElements.closeButton) this.uiElements.closeButton.addEventListener('click', () => this.hide());
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
@@ -50,15 +57,20 @@ export class RulesetEditor {
                 });
             });
         }
+        if (this.uiElements.editorAutoResetCheckbox) {
+            this.uiElements.editorAutoResetCheckbox.addEventListener('change', (e) => {
+                PersistenceService.saveUISetting('editorAutoReset', e.target.checked);
+            });
+        }
 
         if (this.uiElements.clearRulesButton) {
             this.uiElements.clearRulesButton.addEventListener('click', () => {
-                // Clears/fills the ruleset of the world(s) indicated by the editor's scope.
-                const currentArr = this.simInterface.getCurrentRulesetArray(); // Ruleset of selected world
+                const currentArr = this.simInterface.getCurrentRulesetArray();
                 const targetState = currentArr.every(state => state === 0) ? 1 : 0;
-                EventBus.dispatch(EVENTS.COMMAND_SET_ALL_RULES_STATE, {
+                EventBus.dispatch(EVENTS.COMMAND_EDITOR_SET_ALL_RULES_STATE, {
                     targetState,
-                    resetScopeForThisChange: this._getEditorApplyChangesScope()
+                    modificationScope: this._getEditorModificationScope(),
+                    conditionalResetScope: this._getConditionalResetScopeForEditor()
                 });
             });
         }
@@ -66,19 +78,19 @@ export class RulesetEditor {
         const handleEditorInputChange = () => {
             if (!this.uiElements.editorRulesetInput) return;
             const hexString = this.uiElements.editorRulesetInput.value.trim().toUpperCase();
-            const currentSelectedWorldHex = this.simInterface.getCurrentRulesetHex(); // For fallback
+            const currentSelectedWorldHex = this.simInterface.getCurrentRulesetHex();
             if (!hexString) {
                 this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
                 return;
             }
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
-                alert("Invalid Hex Code: Must be 32 hex chars.\nReverting.");
+                alert("Invalid Hex Code in Editor: Must be 32 chars.\nReverting.");
                 this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
             } else {
-                // This command will set the ruleset for the world(s) indicated by editor scope.
-                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
+                EventBus.dispatch(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, {
                     hexString,
-                    resetScopeForThisChange: this._getEditorApplyChangesScope()
+                    modificationScope: this._getEditorModificationScope(),
+                    conditionalResetScope: this._getConditionalResetScopeForEditor()
                 });
             }
         };
@@ -92,41 +104,38 @@ export class RulesetEditor {
         const createRuleInteractionHandler = (commandType, detailExtractor) => (event) => {
             const vizElement = event.target.closest(detailExtractor.selector);
             if (vizElement) {
-                // Details are extracted based on the selected world's ruleset (displayed in editor)
                 const details = detailExtractor.getDetails(vizElement, this.simInterface);
                 if (details) {
                     EventBus.dispatch(commandType, {
                         ...details,
-                        resetScopeForThisChange: this._getEditorApplyChangesScope()
+                        modificationScope: this._getEditorModificationScope(),
+                        conditionalResetScope: this._getConditionalResetScopeForEditor()
                     });
                 }
             }
         };
 
         if (this.uiElements.rulesetEditorGrid) {
-            this.uiElements.rulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_TOGGLE_RULE_OUTPUT, {
-                selector: '.rule-viz',
-                getDetails: (el) => ({ ruleIndex: parseInt(el.dataset.ruleIndex, 10) })
+            this.uiElements.rulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, {
+                selector: '.rule-viz', getDetails: (el) => ({ ruleIndex: parseInt(el.dataset.ruleIndex, 10) })
             }));
         }
         if (this.uiElements.neighborCountRulesetEditorGrid) {
-            this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, {
+            this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT, {
                 selector: '.neighbor-count-rule-viz',
                 getDetails: (el, sim) => {
-                    const cs = parseInt(el.dataset.centerState, 10);
-                    const na = parseInt(el.dataset.numActive, 10);
-                    const currentOut = sim.getEffectiveRuleForNeighborCount(cs, na); // Uses selected world's ruleset
+                    const cs = parseInt(el.dataset.centerState, 10); const na = parseInt(el.dataset.numActive, 10);
+                    const currentOut = sim.getEffectiveRuleForNeighborCount(cs, na);
                     return { centerState: cs, numActive: na, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
                 }
             }));
         }
         if (this.uiElements.rotationalSymmetryRulesetEditorGrid) {
-            this.uiElements.rotationalSymmetryRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
+            this.uiElements.rotationalSymmetryRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
                 selector: '.r-sym-rule-viz',
                 getDetails: (el, sim) => {
-                    const cb = parseInt(el.dataset.canonicalBitmask, 10);
-                    const cs = parseInt(el.dataset.centerState, 10);
-                    const currentOut = sim.getEffectiveRuleForCanonicalRepresentative(cb, cs); // Uses selected world's ruleset
+                    const cb = parseInt(el.dataset.canonicalBitmask, 10); const cs = parseInt(el.dataset.centerState, 10);
+                    const currentOut = sim.getEffectiveRuleForCanonicalRepresentative(cb, cs);
                     return { canonicalBitmask: cb, centerState: cs, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
                 }
             }));
@@ -134,14 +143,13 @@ export class RulesetEditor {
         if (this.draggablePanel) this.draggablePanel.onDragEnd = () => this._savePanelState();
     }
 
-    refreshViews() { // Called when editor is shown or when selected world/ruleset changes
+    refreshViews() {
         if (!this.simInterface || this.panelElement.classList.contains('hidden')) return;
-        // Load and display the ruleset of the CURRENTLY SELECTED world
         const currentSelectedWorldHex = this.simInterface.getCurrentRulesetHex();
         if (this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
         }
-        this._updateEditorGrids(); // Grids will use selected world's ruleset via simInterface
+        this._updateEditorGrids();
     }
 
     _updateEditorGrids() {
@@ -152,16 +160,14 @@ export class RulesetEditor {
         const activeGrid = grids[currentMode] || grids.detailed;
         activeGrid.classList.remove('hidden');
 
-        // All population methods now use simInterface which gets selected world's ruleset
         if (currentMode === 'detailed') this._populateDetailedGrid(this.simInterface.getCurrentRulesetArray());
         else if (currentMode === 'neighborCount') this._populateNeighborCountGrid();
         else if (currentMode === 'rotationalSymmetry') this._populateRotationalSymmetryGrid();
         else this._populateDetailedGrid(this.simInterface.getCurrentRulesetArray());
     }
 
-    _populateDetailedGrid(rulesetArray) { // rulesetArray is from selected world
-        const grid = this.uiElements.rulesetEditorGrid;
-        if (!grid || !rulesetArray) { if (grid) grid.innerHTML = '<p>Error loading.</p>'; return; }
+    _populateDetailedGrid(rulesetArray) {
+        const grid = this.uiElements.rulesetEditorGrid; if (!grid || !rulesetArray) { if (grid) grid.innerHTML = '<p>Error.</p>'; return; }
         grid.innerHTML = ''; const frag = document.createDocumentFragment();
         for (let i=0; i<128; i++) {
             const cs=(i>>6)&1, mask=i&0x3F, os=rulesetArray[i];
@@ -170,7 +176,7 @@ export class RulesetEditor {
             frag.appendChild(v);
         } grid.appendChild(frag);
     }
-    _populateNeighborCountGrid() { // Uses selected world's ruleset via simInterface
+    _populateNeighborCountGrid() {
         const grid=this.uiElements.neighborCountRulesetEditorGrid; if(!grid||!this.simInterface){if(grid)grid.innerHTML='<p>Error.</p>';return;}
         grid.innerHTML=''; const frag=document.createDocumentFragment();
         for(let cs=0;cs<=1;cs++)for(let na=0;na<=6;na++){
@@ -180,7 +186,7 @@ export class RulesetEditor {
             frag.appendChild(v);
         } grid.appendChild(frag);
     }
-    _populateRotationalSymmetryGrid() { // Uses selected world's ruleset via simInterface
+    _populateRotationalSymmetryGrid() {
         const grid=this.uiElements.rotationalSymmetryRulesetEditorGrid; if(!grid||!this.simInterface?.getCanonicalRuleDetails){if(grid)grid.innerHTML='<p>Error.</p>';return;}
         grid.innerHTML=''; const frag=document.createDocumentFragment();
         this.simInterface.getCanonicalRuleDetails().forEach(d=>{
@@ -193,22 +199,29 @@ export class RulesetEditor {
         }); grid.appendChild(frag);
     }
 
+    _getEditorApplyChangesScope() {
+        return this.uiElements.editorApplyScopeAllRadio?.checked ? 'all' : 'selected';
+    }
+
     _savePanelState() {
         if (!this.panelElement) return;
         PersistenceService.savePanelState(this.panelIdentifier, {isOpen:!this.panelElement.classList.contains('hidden'),x:this.panelElement.style.left,y:this.panelElement.style.top});
         if (this.uiElements.rulesetEditorMode) PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
         if (this.uiElements.editorApplyScopeControls) PersistenceService.saveUISetting('editorRulesetApplyScope', this._getEditorApplyChangesScope());
+        if (this.uiElements.editorAutoResetCheckbox) PersistenceService.saveUISetting('editorAutoReset', this.uiElements.editorAutoResetCheckbox.checked);
     }
     _loadPanelState() {
         if(!this.panelElement)return; const s=PersistenceService.loadPanelState(this.panelIdentifier);
         if(this.uiElements.rulesetEditorMode)this.uiElements.rulesetEditorMode.value=PersistenceService.loadUISetting('rulesetEditorMode','rotationalSymmetry');
         if(this.uiElements.editorApplyScopeControls){const sc=PersistenceService.loadUISetting('editorRulesetApplyScope','selected'); if(sc==='all'&&this.uiElements.editorApplyScopeAllRadio)this.uiElements.editorApplyScopeAllRadio.checked=true;else if(this.uiElements.editorApplyScopeSelectedRadio)this.uiElements.editorApplyScopeSelectedRadio.checked=true;}
+        if (this.uiElements.editorAutoResetCheckbox) this.uiElements.editorAutoResetCheckbox.checked = PersistenceService.loadUISetting('editorAutoReset', true); // Default to true
+
         if(s.isOpen)this.show(false);else this.hide(false); if(s.x)this.panelElement.style.left=s.x;if(s.y)this.panelElement.style.top=s.y;
         if((s.x||s.y)&&parseFloat(this.panelElement.style.left)>0&&parseFloat(this.panelElement.style.top)>0)this.panelElement.style.transform='none';
         else if(this.panelElement.style.transform==='none'&&s.isOpen){this.panelElement.style.left='50%';this.panelElement.style.top='50%';this.panelElement.style.transform='translate(-50%,-50%)';}
     }
-    show(s=true){this.draggablePanel.show();this.refreshViews();if(s)this._savePanelState();}
-    hide(s=true){this.draggablePanel.hide();if(s)this._savePanelState();}
+    show(save=true){this.draggablePanel.show();this.refreshViews();if(save)this._savePanelState();}
+    hide(save=true){this.draggablePanel.hide();if(save)this._savePanelState();}
     toggle(){const v=this.draggablePanel.toggle();this.refreshViews();this._savePanelState();return v;}
     destroy(){if(this.draggablePanel)this.draggablePanel.destroy();}
     isHidden(){return this.draggablePanel.isHidden();}

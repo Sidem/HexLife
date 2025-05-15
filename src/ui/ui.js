@@ -1,3 +1,4 @@
+// src/ui/ui.js
 import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
@@ -23,7 +24,7 @@ export function initUI(simInterface) {
         copyRuleButton: document.getElementById('copyRuleButton'),
         rulesetInput: document.getElementById('rulesetInput'),
         setRuleButton: document.getElementById('setRuleButton'),
-        rulesetDisplay: document.getElementById('rulesetDisplay'),
+        rulesetDisplay: document.getElementById('rulesetDisplay'), // Shows selected world's ruleset
         resetOnNewRuleCheckbox: document.getElementById('resetOnNewRuleCheckbox'),
         editRuleButton: document.getElementById('editRuleButton'),
         saveStateButton: document.getElementById('saveStateButton'),
@@ -42,7 +43,7 @@ export function initUI(simInterface) {
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
         analysisPanelButton: document.getElementById('analysisPanelButton'),
-        rulesetScopeSwitch: document.getElementById('rulesetScopeSwitch'),
+        rulesetScopeSwitch: document.getElementById('rulesetScopeSwitch'), // For main UI ruleset operations
         rulesetScopeLabel: document.querySelector('label[for="rulesetScopeSwitch"]'),
         speedSliderMount: document.getElementById('speedSliderMount'),
         neighborhoodSizeSliderMount: document.getElementById('neighborhoodSizeSliderMount'),
@@ -76,12 +77,15 @@ export function initUI(simInterface) {
     setupStateListeners(simInterface);
     loadAndApplyUISettings(simInterface);
     window.addEventListener('keydown', handleGlobalKeyDown);
-    refreshAllRulesetViews(simInterface);
     updateBiasSliderDisabledState();
-    setupUIEventListeners(simInterface);
+    setupUIEventListeners(simInterface); // Setup after all elements are potentially modified by loadAndApplyUISettings
+    
+    // Initial UI state based on simulation
     updatePauseButton(simInterface.isSimulationPaused());
-    updateMainRulesetDisplay(simInterface.getCurrentRulesetHex());
+    updateMainRulesetDisplay(simInterface.getCurrentRulesetHex()); // Will show selected world's ruleset
     updateStatsDisplay(simInterface.getSelectedWorldStats());
+    
+    console.log("UI Initialized with per-world ruleset considerations.");
     return true;
 }
 
@@ -95,7 +99,6 @@ function _updateRulesetScopeSwitchLabel() {
 function loadAndApplyUISettings(sim) {
     sliderComponents.speedSlider?.setValue(sim.getCurrentSimulationSpeed());
     sliderComponents.neighborhoodSlider?.setValue(sim.getCurrentBrushSize());
-
     const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
     uiElements.generateModeSwitch.querySelectorAll('input[name="generateMode"]').forEach(r => r.checked = r.value === genMode);
     uiElements.resetOnNewRuleCheckbox.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
@@ -105,9 +108,10 @@ function loadAndApplyUISettings(sim) {
         uiElements.rulesetScopeSwitch.checked = PersistenceService.loadUISetting('globalRulesetScopeAll', true);
         _updateRulesetScopeSwitchLabel();
     }
-    updateBiasSliderDisabledState();
-    uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "[P]lay" : "[P]ause";
-    uiElements.randomRulesetButton.textContent = "[N]ew Rules";
+    updateBiasSliderDisabledState(); // Call after useCustomBiasCheckbox is set
+    // Button texts
+    if(uiElements.playPauseButton) uiElements.playPauseButton.textContent = sim.isSimulationPaused() ? "[P]lay" : "[P]ause";
+    if(uiElements.randomRulesetButton) uiElements.randomRulesetButton.textContent = "[N]ew Rules";
     if(uiElements.resetCurrentButton) uiElements.resetCurrentButton.textContent = "[R]eset Current";
     if(uiElements.resetAllButtonNew) uiElements.resetAllButtonNew.textContent = "Reset All";
     if(uiElements.clearCurrentButton) uiElements.clearCurrentButton.textContent = "[C]lear Current";
@@ -122,10 +126,12 @@ export function updatePerformanceDisplay(fps, tps) {
     if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tps;
 }
 
+// This function is primarily for the RulesetEditor to refresh if it's open
+// The main display is updated by the RULESET_CHANGED event handler
 export function refreshAllRulesetViews(sim) {
     if (!sim) return;
-    updateMainRulesetDisplay(sim.getCurrentRulesetHex());
-    rulesetEditorComponent?.refreshViews();
+    // Main display is handled by RULESET_CHANGED event
+    rulesetEditorComponent?.refreshViews(); // Will load selected world's ruleset
 }
 
 function updateBiasSliderDisabledState() {
@@ -160,15 +166,16 @@ function setupGeneralListeners(sim) {
     uiElements.randomRulesetButton.addEventListener('click', () => {
         const bias = uiElements.useCustomBiasCheckbox.checked ? sliderComponents.biasSlider.getValue() : Math.random();
         const mode = uiElements.generateModeSwitch.querySelector('input[name="generateMode"]:checked')?.value || 'random';
-        const resetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
+        const targetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
+        
         EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
             bias, generationMode: mode,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? resetScope : 'none'
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? targetScope : 'none'
         });
     });
 
     uiElements.copyRuleButton.addEventListener('click', () => {
-        const hex = sim.getCurrentRulesetHex();
+        const hex = sim.getCurrentRulesetHex(); // Gets selected world's ruleset
         if (!hex || hex === "N/A" || hex === "Error") { alert("No ruleset to copy."); return; }
         navigator.clipboard.writeText(hex).then(() => {
             const oldTxt = uiElements.copyRuleButton.textContent;
@@ -182,10 +189,10 @@ function setupGeneralListeners(sim) {
         if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
             alert("Invalid Hex: Must be 32 hex chars."); uiElements.rulesetInput.select(); return;
         }
-        const resetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
+        const targetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
             hexString: hex,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? resetScope : 'none'
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? targetScope : 'none'
         });
         uiElements.rulesetInput.value = ''; uiElements.rulesetInput.blur();
     });
@@ -194,11 +201,11 @@ function setupGeneralListeners(sim) {
 
 function setupStateListeners(sim) {
     uiElements.saveStateButton.addEventListener('click', () => {
-        const data = sim.getWorldStateForSave(sim.getSelectedWorldIndex());
+        const data = sim.getWorldStateForSave(sim.getSelectedWorldIndex()); // Saves selected world's state + its rulesetHex
         if (!data) { alert("Could not get state data."); return; }
         let json = JSON.stringify(data, null, 2);
         json = json.replace(/("state"\s*:\s*)\[(\s*[\s\S]*?\s*)\]/m, (_, p, arr) => `${p}[${arr.replace(/[\r\n\s]+/g,' ').trim()}]`);
-        downloadFile(`hex_state_${sim.getCurrentRulesetHex()}_${new Date().toISOString().slice(0,-4).replace(/[:.-]/g,'')}.json`, json, 'application/json');
+        downloadFile(`hex_state_world${sim.getSelectedWorldIndex()}_${data.rulesetHex}_${new Date().toISOString().slice(0,-4).replace(/[:.-]/g,'')}.json`, json, 'application/json');
     });
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.fileInput.addEventListener('change', e => {
@@ -208,7 +215,8 @@ function setupStateListeners(sim) {
         reader.onload = re => {
             try {
                 const data = JSON.parse(re.target.result);
-                if (!data?.rows || !data?.cols || !Array.isArray(data.state)) throw new Error("Invalid format.");
+                if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
+                // COMMAND_LOAD_WORLD_STATE will make simulation.js load this state and rulesetHex into the target world.
                 EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: sim.getSelectedWorldIndex(), loadedData: data });
             } catch (err) { alert(`Error processing file: ${err.message}`); }
             finally { e.target.value = null; }
@@ -258,15 +266,18 @@ function handleGlobalKeyDown(event) {
 function setupUIEventListeners(simInterface) {
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, updatePauseButton);
     EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => sliderComponents.speedSlider?.setValue(speed, false));
-    EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => {
+    EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => { // This is now fired when SELECTED world's ruleset changes
         updateMainRulesetDisplay(hex);
-        rulesetEditorComponent?.refreshViews();
+        rulesetEditorComponent?.refreshViews(); // Ensure editor updates if it's showing this ruleset
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSlider?.setValue(size, false));
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay);
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
         setupPanelComponent?.refreshViews();
         if (simInterface) updateStatsDisplay(simInterface.getSelectedWorldStats());
+        // When all worlds reset, the selected world's ruleset might have changed if it was part of a global ruleset application.
+        // So, ensure the main ruleset display is also updated.
+        if (simInterface) updateMainRulesetDisplay(simInterface.getCurrentRulesetHex());
     });
     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => setupPanelComponent?.refreshViews());
     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, data => updatePerformanceDisplay(data.fps, data.tps));
