@@ -59,4 +59,5 @@ export const EVENTS = {
     COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled', 
     COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
     COMMAND_SELECT_WORLD: 'command:selectWorld', 
+    COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:setRulesForCanonicalRepresentative',
 }; 

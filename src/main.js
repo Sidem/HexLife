@@ -47,6 +47,8 @@ async function initialize() {
         getSelectedWorldEntropyHistory: Simulation.getSelectedWorldEntropyHistory,
         getCurrentRulesetArray: Simulation.getCurrentRulesetArray,
         getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount,
+        getCanonicalRuleDetails: Simulation.getCanonicalRuleDetails,
+        getEffectiveRuleForCanonicalRepresentative: Simulation.getEffectiveRuleForCanonicalRepresentative,
     };
 
     if (!UI.initUI(simulationInterfaceForUI)) {

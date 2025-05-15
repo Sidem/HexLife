@@ -28,9 +28,16 @@
 
                 <div class="ui-group" id="group-ruleset">
                     <button id="randomRulesetButton" class="button">[N]ew Rules</button>
-                    <input type="checkbox" id="generateSymmetricalCheckbox" class="checkbox-input"
-                        title="Generate rules symmetrically (based on neighbor count)" checked>
-                    <label for="generateSymmetricalCheckbox" class="checkbox-label sym-label">Symmetrical</label>
+                    <div id="generateModeSwitch" class="three-way-switch" title="Select ruleset generation mode">
+                        <input type="radio" id="genModeRandom" name="generateMode" value="random" class="radio-switch-input">
+                        <label for="genModeRandom" class="radio-switch-label">Random</label>
+
+                        <input type="radio" id="genModeNCount" name="generateMode" value="n_count" class="radio-switch-input">
+                        <label for="genModeNCount" class="radio-switch-label">N-Count</label>
+
+                        <input type="radio" id="genModeRSym" name="generateMode" value="r_sym" class="radio-switch-input" checked>
+                        <label for="genModeRSym" class="radio-switch-label">R-Sym</label>
+                    </div>
                     <div class="bias-controls">
                         <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
                         <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
@@ -80,19 +87,18 @@
                 <button id="clearRulesButton" class="button"
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
                 <select id="rulesetEditorMode" title="Choose editor mode">
-                    <option value="detailed" selected>Detailed (128 rules)</option>
-                    <option value="neighborCount">Neighbor Count (14 rules)</option>
-                </select>
+                    <option value="detailed">Detailed (128 rules)</option>
+                    <option value="neighborCount">Neighbor Count (14 groups)</option>
+                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option> </select>
             </div>
-            <div class="editor-content-area">
-                <div id="rulesetEditorGrid"></div>
-                <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
-                <div class="editor-text">
+            <div class="editor-content-area"> <div id="rulesetEditorGrid" class="hidden"></div> <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
+                <div id="rotationalSymmetryRulesetEditorGrid"></div> <div class="editor-text">
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
                     <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
                     </p>
-                    <p>Click on a rule's inner hexagon (Detailed) or the whole visualization (Neighbor Count) to toggle
-                        its output state.</p>
+                    <p>Click on a rule's inner hexagon (Detailed), the whole visualization (Neighbor Count), or the canonical pattern (Rotational Symmetry) to toggle its output state(s).
+                       For Rotational Symmetry mode, you define rules for 14 canonical neighborhood shapes (plus center cell state). The "Orbit Size" shown indicates how many of the 128 fundamental rules are affected by that single setting.
+                    </p>
                     <div class="editor-text-rules">
                         <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
                             inactive</p>
@@ -122,16 +128,12 @@
         <div id="analysisPanel" class="draggable-panel-base hidden">
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>Analysis Tools</h3>
-            <div class="panel-content-area">
-                <div class="settings-group">
-                    <label for="enableEntropySamplingCheckbox">Enable Entropy Sampling:</label>
+            <div class="panel-content-area"> <div class="settings-group"> <label for="enableEntropySamplingCheckbox">Enable Entropy Sampling:</label>
                     <input type="checkbox" id="enableEntropySamplingCheckbox">
                 </div>
                 <div class="settings-group" id="entropySampleRateSliderMount">
-                    <!-- SliderComponent will be mounted here by AnalysisPanel.js -->
-                </div>
-                <div class="stats-display">
-                    Current Sampled Entropy: <span id="stat-entropy">N/A</span>
+                    </div>
+                <div class="stats-display"> Current Sampled Entropy: <span id="stat-entropy">N/A</span>
                 </div>
 
                 <div class="plugins-mount-area">

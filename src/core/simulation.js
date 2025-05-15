@@ -1,15 +1,16 @@
 import * as Config from './config.js';
-import { indexToCoords, coordsToIndex } from '../utils/utils.js';
+import { coordsToIndex } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
+import * as Symmetry from './Symmetry.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
 const NEIGHBOR_DIRS_ODD_R = [
-    [+1,  0], [+1, +1], [ 0, +1],
-    [-1, +1], [-1,  0], [ 0, -1]
+    [+1, 0], [+1, +1], [0, +1],
+    [-1, +1], [-1, 0], [0, -1]
 ];
 const NEIGHBOR_DIRS_EVEN_R = [
-    [+1, -1], [+1,  0], [ 0, +1],
-    [-1,  0], [-1, -1], [ 0, -1]
+    [+1, -1], [+1, 0], [0, +1],
+    [-1, 0], [-1, -1], [0, -1]
 ];
 
 let worldsData = [];
@@ -21,13 +22,14 @@ let currentSpeed = Config.DEFAULT_SPEED;
 let tickDuration = 1.0 / currentSpeed;
 let selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
 let isEntropySamplingEnabled = false;
-let entropySampleRate = 10; 
+let entropySampleRate = 10;
 let globalTickCounter = 0;
 let currentBrushSize = Config.DEFAULT_NEIGHBORHOOD_SIZE;
+let symmetryData = null;
 
 export function initSimulation() {
     console.log("Initializing Simulation...");
-
+    symmetryData = Symmetry.precomputeSymmetryGroups();
     currentSpeed = PersistenceService.loadSimSpeed();
     setSimulationSpeed(currentSpeed);
 
@@ -35,7 +37,7 @@ export function initSimulation() {
     if (loadedRulesetHex) {
         setRuleset(loadedRulesetHex);
     } else {
-        generateRandomRuleset();
+        generateRandomRuleset(0.5, 'r_sym');
     }
 
     currentBrushSize = PersistenceService.loadBrushSize();
@@ -56,15 +58,15 @@ export function initSimulation() {
         if (settings.enabled) {
             const density = settings.initialDensity;
             if (density === 0 && Config.NUM_CELLS > 0) {
-                 jsStateArray.fill(0);
-                 const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
-                 if(middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 1;
-                 activeCount = 1;
+                jsStateArray.fill(0);
+                const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
+                if (middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 1;
+                activeCount = 1;
             } else if (density === 1 && Config.NUM_CELLS > 0) {
                 jsStateArray.fill(1);
                 const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
-                if(middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 0;
-                activeCount = Config.NUM_CELLS -1;
+                if (middleIndex < Config.NUM_CELLS) jsStateArray[middleIndex] = 0;
+                activeCount = Config.NUM_CELLS - 1;
             } else {
                 for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
                     const state = Math.random() < density ? 1 : 0;
@@ -73,12 +75,12 @@ export function initSimulation() {
                 }
             }
         } else {
-            jsStateArray.fill(0); 
+            jsStateArray.fill(0);
             activeCount = 0;
         }
 
         const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-        const initialEntropy = calculateBinaryEntropy(initialRatio); 
+        const initialEntropy = calculateBinaryEntropy(initialRatio);
         const stats = {
             ratio: initialRatio,
             avgRatio: initialRatio,
@@ -100,7 +102,7 @@ export function initSimulation() {
 
     setSimulationSpeed(currentSpeed);
     if (loadedRulesetHex) setRuleset(loadedRulesetHex); else generateRandomRuleset();
-    
+
     setupSimulationEventListeners();
 
     console.log(`Simulation initialized with ${Config.NUM_WORLDS} worlds.`);
@@ -118,7 +120,7 @@ function setupSimulationEventListeners() {
         setBrushSize(newSize);
     });
     EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
-        generateRandomRuleset(data.bias, data.symmetrical);
+        generateRandomRuleset(data.bias, data.generationMode);
     });
     EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (rulesetHex) => {
         const success = setRuleset(rulesetHex);
@@ -129,36 +131,39 @@ function setupSimulationEventListeners() {
     EventBus.subscribe(EVENTS.COMMAND_SET_ALL_RULES_STATE, (targetState) => {
         setAllRulesState(targetState);
     });
-     EventBus.subscribe(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, (data) => {
-         setRulesForNeighborCountCondition(data.centerState, data.numActive, data.outputState);
-     });
+    EventBus.subscribe(EVENTS.COMMAND_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, (data) => {
+        setRulesForCanonicalRepresentative(data.canonicalBitmask, data.centerState, data.outputState);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_RULES_FOR_NEIGHBOR_COUNT, (data) => {
+        setRulesForNeighborCountCondition(data.centerState, data.numActive, data.outputState);
+    });
     EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS, () => {
         resetAllWorldsToCurrentSettings();
     });
     EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => {
         loadWorldState(data.worldIndex, data.loadedData);
     });
-     EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
-         applyBrush(data.worldIndex, data.col, data.row, data.brushSize);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-         setHoverState(data.worldIndex, data.col, data.row, data.brushSize);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
-         clearHoverState(data.worldIndex);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
-         setWorldInitialDensity(data.worldIndex, data.density);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_ENABLED, (data) => {
-         setWorldEnabled(data.worldIndex, data.isEnabled);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
-         setEntropySampling(data.enabled, data.rate);
-     });
-     EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (worldIndex) => {
-         setSelectedWorldIndex(worldIndex);
-     });
+    EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
+        applyBrush(data.worldIndex, data.col, data.row, data.brushSize);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
+        setHoverState(data.worldIndex, data.col, data.row, data.brushSize);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
+        clearHoverState(data.worldIndex);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
+        setWorldInitialDensity(data.worldIndex, data.density);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_ENABLED, (data) => {
+        setWorldEnabled(data.worldIndex, data.isEnabled);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
+        setEntropySampling(data.enabled, data.rate);
+    });
+    EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (worldIndex) => {
+        setSelectedWorldIndex(worldIndex);
+    });
 }
 
 function countSetBits(n) {
@@ -181,7 +186,7 @@ function calculateBinaryEntropy(p1) {
         return 0;
     }
     const p0 = 1 - p1;
-    const log2 = Math.log2 || function(x) { return Math.log(x) / Math.LN2; };
+    const log2 = Math.log2 || function (x) { return Math.log(x) / Math.LN2; };
     const entropy = - (p1 * log2(p1) + p0 * log2(p0));
     return Math.max(0, Math.min(1, entropy));
 }
@@ -266,21 +271,21 @@ export function stepSimulation(timeDelta) {
         if (isPaused) break;
     }
     if (tickTimer >= tickDuration && stepsTakenThisFrame >= maxStepsPerFrame) {
-         tickTimer = tickDuration + (tickTimer % tickDuration);
+        tickTimer = tickDuration + (tickTimer % tickDuration);
     }
     return stepsTakenThisFrame;
 }
 
-export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false) {
-    console.log(`Generating random ruleset with bias: ${bias}, symmetrical: ${generateSymmetrically}`);
-    if (generateSymmetrically) {
+export function generateRandomRuleset(bias = 0.5, generationMode = 'random') {
+    console.log(`Generating random ruleset with bias: ${bias}, Mode: ${generationMode}`);
+    if (generationMode === 'n_count') {
         for (let centerState = 0; centerState <= 1; centerState++) {
             for (let numActiveNeighbors = 0; numActiveNeighbors <= 6; numActiveNeighbors++) {
                 const randomOutput = Math.random() < bias ? 1 : 0;
                 _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighbors, randomOutput);
             }
         }
-    } else {
+    } else if (generationMode === 'random') {
         for (let i = 0; i < 128; i++) {
             currentRuleset[i] = Math.random() < bias ? 1 : 0;
         }
@@ -288,6 +293,24 @@ export function generateRandomRuleset(bias = 0.5, generateSymmetrically = false)
             if (Math.random() < 0.5) currentRuleset[127] = 1; else currentRuleset[0] = 0;
         } else if (currentRuleset[0] === 0 && currentRuleset[127] === 1) {
             if (Math.random() < 0.5) currentRuleset[127] = 0; else currentRuleset[0] = 1;
+        }
+    } else if (generationMode === 'r_sym') {
+        if (!symmetryData) {
+            console.error("Symmetry data not initialized. Cannot generate rotationally symmetrical ruleset.");
+            for (let i = 0; i < 128; i++) {
+                currentRuleset[i] = Math.random() < bias ? 1 : 0;
+            }
+        } else {
+            currentRuleset.fill(0);
+            for (const group of symmetryData.canonicalRepresentatives) {
+                for (let centerState = 0; centerState <= 1; centerState++) {
+                    const randomOutput = Math.random() < bias ? 1 : 0;
+                    for (const memberBitmask of group.members) {
+                        const ruleIndex = (centerState << 6) | memberBitmask;
+                        currentRuleset[ruleIndex] = randomOutput;
+                    }
+                }
+            }
         }
     }
     currentRulesetHex = rulesetToHex(currentRuleset);
@@ -307,6 +330,75 @@ function _setRulesForNeighborCountConditionInternal(centerState, numActiveNeighb
             currentRuleset[ruleIndex] = outputState;
         }
     }
+}
+
+export function setRulesForCanonicalRepresentative(canonicalBitmask, centerState, outputState) {
+    if (!symmetryData || typeof outputState !== 'number' || outputState < 0 || outputState > 1) return;
+    if (centerState !== 0 && centerState !== 1) return;
+
+    const group = symmetryData.canonicalRepresentatives.find(g => g.representative === canonicalBitmask);
+    if (!group) {
+        console.warn(`Canonical group for representative ${canonicalBitmask} not found.`);
+        return;
+    }
+
+    let changed = false;
+    for (const memberBitmask of group.members) {
+        const ruleIndex = (centerState << 6) | memberBitmask;
+        if (currentRuleset[ruleIndex] !== outputState) {
+            currentRuleset[ruleIndex] = outputState;
+            changed = true;
+        }
+    }
+
+    if (changed) {
+        currentRulesetHex = rulesetToHex(currentRuleset);
+        PersistenceService.saveRuleset(currentRulesetHex);
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
+        console.log(`Rules set for C=<span class="math-inline">\{centerState\}, N\_canonical\=</span>{canonicalBitmask.toString(2).padStart(6, '0')} -> ${outputState}. Orbit size: ${group.orbitSize}. New hex: ${currentRulesetHex}`);
+    }
+}
+
+// Can be internal if only used by getCanonicalRuleDetails, or exported
+export function getEffectiveRuleForCanonicalRepresentative(canonicalBitmask, centerState) {
+    if (!symmetryData || !symmetryData.bitmaskToCanonical.has(canonicalBitmask)) return 2; // Invalid or not ready
+
+    // Find the group; since canonicalBitmask is already canonical, it's the key for its own group.
+    const group = symmetryData.canonicalRepresentatives.find(g => g.representative === canonicalBitmask);
+    if (!group) return 2; // Should not happen if symmetryData is correct
+
+    let firstOutput = -1;
+    let ruleFound = false;
+
+    for (const memberBitmask of group.members) {
+        ruleFound = true;
+        const ruleIndex = (centerState << 6) | memberBitmask;
+        const currentOutput = currentRuleset[ruleIndex];
+
+        if (firstOutput === -1) {
+            firstOutput = currentOutput;
+        } else if (firstOutput !== currentOutput) {
+            return 2; // Mixed
+        }
+    }
+    return ruleFound ? firstOutput : 2; // Return 2 if no rules somehow (empty group, should not happen)
+}
+
+export function getCanonicalRuleDetails() {
+    if (!symmetryData) return [];
+    const details = [];
+    for (const group of symmetryData.canonicalRepresentatives) {
+        for (let centerState = 0; centerState <= 1; centerState++) {
+            details.push({
+                canonicalBitmask: group.representative,
+                centerState: centerState,
+                orbitSize: group.orbitSize,
+                effectiveOutput: getEffectiveRuleForCanonicalRepresentative(group.representative, centerState),
+                members: group.members // Optional: for debug or more detailed UI
+            });
+        }
+    }
+    return details;
 }
 
 export function setRulesForNeighborCountCondition(centerState, numActiveNeighbors, outputState) {
@@ -424,7 +516,7 @@ export function setAllRulesState(targetState) {
  */
 function getNeighbors(col, row) {
     const base_dirs = (col % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
-    const neighbors = []; 
+    const neighbors = [];
     for (let i = 0; i < 6; i++) {
         neighbors.push([col + base_dirs[i][0], row + base_dirs[i][1]]);
     }
@@ -448,7 +540,7 @@ function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
     const visited = new Map([[startKey, 0]]);
 
     while (queue.length > 0) {
-        const [ currentCol, currentRow, currentDistance ] = queue.shift();
+        const [currentCol, currentRow, currentDistance] = queue.shift();
         if (currentDistance >= maxDistance) continue;
 
         const potentialNeighbors = getNeighbors(currentCol, currentRow);
@@ -491,7 +583,7 @@ export function setHoverState(worldIndex, col, row, brushSize) {
     }
 
     let currentHoverCount = 0;
-     for(let i=0; i< hoverState.length; i++) { if(hoverState[i] === 1) currentHoverCount++; }
+    for (let i = 0; i < hoverState.length; i++) { if (hoverState[i] === 1) currentHoverCount++; }
 
     if (newHoverIndices.size !== currentHoverCount) {
         changed = true;
@@ -506,9 +598,9 @@ export function setHoverState(worldIndex, col, row, brushSize) {
     if (changed) {
         hoverState.fill(0);
         for (const index of newHoverIndices) {
-             if (index >= 0 && index < hoverState.length) {
-                 hoverState[index] = 1;
-             }
+            if (index >= 0 && index < hoverState.length) {
+                hoverState[index] = 1;
+            }
         }
     }
     return changed;
@@ -516,15 +608,15 @@ export function setHoverState(worldIndex, col, row, brushSize) {
 
 export function clearHoverState(worldIndex) {
     if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
-     const hoverState = worldsData[worldIndex].jsHoverStateArray;
-     let changed = false;
-     for(let i=0; i<hoverState.length; i++) {
-         if (hoverState[i] === 1) {
-             hoverState[i] = 0;
-             changed = true;
-         }
-     }
-     return changed;
+    const hoverState = worldsData[worldIndex].jsHoverStateArray;
+    let changed = false;
+    for (let i = 0; i < hoverState.length; i++) {
+        if (hoverState[i] === 1) {
+            hoverState[i] = 0;
+            changed = true;
+        }
+    }
+    return changed;
 }
 
 export function applyBrush(worldIndex, col, row, brushSize) {
@@ -543,9 +635,9 @@ export function applyBrush(worldIndex, col, row, brushSize) {
             changed = true;
         }
     }
-    if(changed) {
+    if (changed) {
         let activeCount = 0;
-        for(let i=0; i < stateArray.length; i++) { if(stateArray[i] === 1) activeCount++; }
+        for (let i = 0; i < stateArray.length; i++) { if (stateArray[i] === 1) activeCount++; }
         updateWorldStats(world, activeCount);
         EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
     }
@@ -637,15 +729,15 @@ export function resetAllWorldsToCurrentSettings() {
         if (world.enabled) {
             const density = world.initialDensity;
             if (density === 0 && Config.NUM_CELLS > 0) {
-                 world.jsStateArray.fill(0);
-                 const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
-                 if(middleIndex < Config.NUM_CELLS) world.jsStateArray[middleIndex] = 1;
-                 activeCount = 1;
+                world.jsStateArray.fill(0);
+                const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
+                if (middleIndex < Config.NUM_CELLS) world.jsStateArray[middleIndex] = 1;
+                activeCount = 1;
             } else if (density === 1 && Config.NUM_CELLS > 0) {
                 world.jsStateArray.fill(1);
                 const middleIndex = Math.floor(Config.NUM_CELLS / 2) + Math.floor(Config.GRID_COLS / 2);
-                if(middleIndex < Config.NUM_CELLS) world.jsStateArray[middleIndex] = 0;
-                activeCount = Config.NUM_CELLS -1;
+                if (middleIndex < Config.NUM_CELLS) world.jsStateArray[middleIndex] = 0;
+                activeCount = Config.NUM_CELLS - 1;
             } else {
                 for (let cellIdx = 0; cellIdx < Config.NUM_CELLS; cellIdx++) {
                     const state = Math.random() < density ? 1 : 0;
@@ -664,61 +756,61 @@ export function resetAllWorldsToCurrentSettings() {
         world.stats.avgRatio = initialRatio;
         world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy);
 
-         world.jsRuleIndexArray.fill(0);
-         world.jsNextStateArray.fill(0);
-         world.jsNextRuleIndexArray.fill(0);
-         world.jsHoverStateArray.fill(0);
+        world.jsRuleIndexArray.fill(0);
+        world.jsNextStateArray.fill(0);
+        world.jsNextRuleIndexArray.fill(0);
+        world.jsHoverStateArray.fill(0);
     }
     console.log("All worlds reset based on their current settings.");
     EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
     if (worldsData[selectedWorldIndex]) {
-         EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
     }
 }
 
 export function loadWorldState(worldIndex, stateData) {
-     if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
-     if (stateData.rows !== Config.GRID_ROWS || stateData.cols !== Config.GRID_COLS) {
-         console.error(`Dimension mismatch! File: ${stateData.cols}x${stateData.rows}, Grid: ${Config.GRID_COLS}x${Config.GRID_ROWS}.`);
-         alert(`Dimension mismatch! Cannot load state for ${stateData.cols}x${stateData.rows} grid into current ${Config.GRID_COLS}x${Config.GRID_ROWS} setup.`);
-         return false;
-     }
-     if (stateData.state.length !== Config.NUM_CELLS) {
-         console.error("State data length mismatch.");
-         return false;
-     }
+    if (worldIndex < 0 || worldIndex >= worldsData.length) return false;
+    if (stateData.rows !== Config.GRID_ROWS || stateData.cols !== Config.GRID_COLS) {
+        console.error(`Dimension mismatch! File: ${stateData.cols}x${stateData.rows}, Grid: ${Config.GRID_COLS}x${Config.GRID_ROWS}.`);
+        alert(`Dimension mismatch! Cannot load state for ${stateData.cols}x${stateData.rows} grid into current ${Config.GRID_COLS}x${Config.GRID_ROWS} setup.`);
+        return false;
+    }
+    if (stateData.state.length !== Config.NUM_CELLS) {
+        console.error("State data length mismatch.");
+        return false;
+    }
 
-     const world = worldsData[worldIndex];
-     world.jsStateArray = Uint8Array.from(stateData.state);
-     world.jsRuleIndexArray.fill(0);
-     world.jsNextStateArray.fill(0);
-     world.jsNextRuleIndexArray.fill(0);
-     world.jsHoverStateArray.fill(0);
+    const world = worldsData[worldIndex];
+    world.jsStateArray = Uint8Array.from(stateData.state);
+    world.jsRuleIndexArray.fill(0);
+    world.jsNextStateArray.fill(0);
+    world.jsNextRuleIndexArray.fill(0);
+    world.jsHoverStateArray.fill(0);
 
-     let activeCount = 0;
-     for(let i=0; i < world.jsStateArray.length; i++) { if(world.jsStateArray[i] === 1) activeCount++; }
-     const newDensity = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-     setWorldInitialDensity(worldIndex, newDensity);
+    let activeCount = 0;
+    for (let i = 0; i < world.jsStateArray.length; i++) { if (world.jsStateArray[i] === 1) activeCount++; }
+    const newDensity = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
+    setWorldInitialDensity(worldIndex, newDensity);
 
-     if (stateData.ruleset) {
-         setRuleset(stateData.ruleset);
-     }
+    if (stateData.ruleset) {
+        setRuleset(stateData.ruleset);
+    }
 
-     const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
-     const initialEntropy = calculateBinaryEntropy(initialRatio);
-     world.stats.ratio = initialRatio;
-     world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
-     world.stats.avgRatio = initialRatio;
-     world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy);
-     world.enabled = true;
-     setWorldEnabled(worldIndex, true);
+    const initialRatio = Config.NUM_CELLS > 0 ? activeCount / Config.NUM_CELLS : 0;
+    const initialEntropy = calculateBinaryEntropy(initialRatio);
+    world.stats.ratio = initialRatio;
+    world.stats.history = new Array(Config.STATS_HISTORY_SIZE).fill(initialRatio);
+    world.stats.avgRatio = initialRatio;
+    world.stats.entropyHistory = new Array(Config.STATS_HISTORY_SIZE).fill(initialEntropy);
+    world.enabled = true;
+    setWorldEnabled(worldIndex, true);
 
-     if (worldIndex === selectedWorldIndex) {
-         EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
-     }
-     EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
+    if (worldIndex === selectedWorldIndex) {
+        EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, getSelectedWorldStats());
+    }
+    EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
 
-     return true;
+    return true;
 }
 
 export function getWorldStateForSave(worldIndex) {
@@ -773,7 +865,7 @@ export function getSelectedWorldStats() {
         const stats = worldsData[selectedWorldIndex].stats;
         const lastEntropy = stats.entropyHistory.length > 0
             ? stats.entropyHistory[stats.entropyHistory.length - 1]
-            : 0;
+            : calculateBinaryEntropy(stats.ratio); // Calculate if history is empty
 
         return {
             ratio: stats.ratio,
@@ -782,7 +874,7 @@ export function getSelectedWorldStats() {
             entropy: lastEntropy
         };
     }
-    return { ratio: 0, avgRatio: 0, history: [], entropy: 0 }; 
+    return { ratio: 0, avgRatio: 0, history: [], entropy: 0 };
 }
 export function getCurrentRulesetArray() {
     return new Uint8Array(currentRuleset);
@@ -792,17 +884,16 @@ export function getSelectedWorldEntropyHistory() {
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
         return worldsData[selectedWorldIndex].stats.entropyHistory;
     }
-    return null;
+    return [];
 }
 
-
-/**
- * Gets the ratio history for the selected world.
- * @returns {number[]|null} Array of historical ratios or null.
- */
 export function getSelectedWorldRatioHistory() {
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldsData.length) {
         return worldsData[selectedWorldIndex].stats.history;
     }
-    return null;
+    return [];
+}
+
+export function getSymmetryData() {
+    return symmetryData;
 }

@@ -104,6 +104,9 @@ export class DraggablePanel {
         return !isHidden; 
     }
 
+    isHidden() {
+        return this.panelElement.classList.contains('hidden');
+    }
     
     destroy() {
         if (this.handleElement && this.boundOnMouseDown) {

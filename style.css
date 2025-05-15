@@ -1,15 +1,15 @@
-/* === 1. RESET/BASE STYLES === */
+
 body {
     margin: 0;
-    /* overflow: hidden; Removed */
-    background-color: #222; /* Dark background */
+   
+    background-color: #222;
     font-family: sans-serif;
     color: white;
-    display: flex; /* Use flexbox for body */
-    height: 100vh; /* Make body fill viewport height */
+    display: flex;
+    height: 100vh;
 }
 
-/* === 2. LAYOUT STYLES === */
+
 #app-container {
     display: flex;
     flex-direction: column;
@@ -25,16 +25,16 @@ canvas#hexGridCanvas {
     flex-grow: 1;
 }
 
-/* Main UI Bar - Assuming split structure based on last HTML update */
+
 #ui-container {
     width: 100%;
     box-sizing: border-box;
     background-color: rgba(0, 0, 0, 0.9);
-    padding: 5px 10px; /* Padding for the whole bar */
+    padding: 5px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 15px; /* Gap between primary controls and status info */
+    gap: 15px;
     flex-wrap: nowrap;
     flex-shrink: 0;
     border-top: 1px solid #444;
@@ -46,7 +46,7 @@ canvas#hexGridCanvas {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: center; /* Or flex-start */
+    justify-content: center;
 }
 
 #status-info-area {
@@ -58,7 +58,7 @@ canvas#hexGridCanvas {
 }
 
 
-/* === 3. GENERAL UI COMPONENT STYLES === */
+
 input[type="range"] {
 	color: #2b2d42;
 	--track-color: rgba(0, 0, 0, 0.4);
@@ -74,7 +74,7 @@ input[type="range"] {
 	overflow: hidden;
 }
 input[type="range"]:active {
-	cursor: grabbing; /* Corrected from 'pointer' */
+	cursor: grabbing;
 }
 input[type="range"]:disabled {
 	filter: grayscale(1);
@@ -82,7 +82,7 @@ input[type="range"]:disabled {
 	cursor: not-allowed;
 }
 
-/* WebKit specific styles for range slider */
+
 input[type="range"],
 input[type="range"]::-webkit-slider-runnable-track,
 input[type="range"]::-webkit-slider-thumb {
@@ -96,8 +96,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 input[type="range"]::-webkit-slider-thumb {
 	--thumb-radius: calc((var(--thumb-height) * 0.5) - 1px);
-	/* Assuming --track-height would be defined if these clip-paths are to work perfectly */
-	/* For now, it might rely on browser defaults or other CSS if --track-height is not set */
+
+
 	--clip-top: calc((var(--thumb-height) - var(--track-height, 0.5rem)) * 0.5 - 0.5px);
 	--clip-bottom: calc(var(--thumb-height) - var(--clip-top));
 	--clip-further: calc(100% + 1px);
@@ -131,13 +131,13 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 	cursor: not-allowed;
 }
 
-/* Labels in UI bar */
-#primary-controls-area label, #status-info-area label { /* Target labels within these areas */
+
+#primary-controls-area label, #status-info-area label {
     margin-right: 3px;
     user-select: none;
 }
 
-/* Text Inputs in UI bar */
+
 #primary-controls-area input[type="text"].hex-input {
     padding: 6px 8px;
     border: 1px solid #555;
@@ -147,7 +147,7 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-size: 0.9em;
 }
 
-/* Buttons in UI bar */
+
 #primary-controls-area button.button, #status-info-area button.button {
     padding: 6px 12px;
     cursor: pointer;
@@ -158,14 +158,14 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-size: 1.0em;
     transition: background-color 0.2s ease, transform 0.1s ease;
     user-select: none;
-    width: auto; /* Let content or min-width define */
+    width: auto;
     min-width: 70px;
     height: 50px;
     text-align: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0; /* Removed margin: 0 auto */
+    margin: 0;
 }
 #primary-controls-area button.button:hover, #status-info-area button.button:hover {
     background-color: #5a5a5a;
@@ -175,7 +175,7 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     transform: scale(0.98);
 }
 
-/* Code display in UI bar */
+
 #primary-controls-area code#rulesetDisplay {
     background-color: #333;
     padding: 4px 6px;
@@ -185,31 +185,31 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     font-family: monospace;
 }
 
-/* Slider Component Styling */
+
 .slider-component-container {
-    display: flex; /* Aligns label, slider, unit in a row */
+    display: flex;
     align-items: center;
-    gap: 5px; /* Space between label, slider, and unit */
-    /* margin: 5px 0; Optional margin for spacing in UI groups */
+    gap: 5px;
+   
 }
 
 .slider-component-container label {
-    margin-right: 3px; /* Keep some space if label exists */
+    margin-right: 3px;
     user-select: none;
-    font-size: 0.9em; /* Consistent label size */
+    font-size: 0.9em;
 }
 
 .slider-wrapper {
-    position: relative; /* Crucial for positioning the value display */
-    display: inline-flex; /* Or flex, to contain the input and span */
+    position: relative;
+    display: inline-flex;
     align-items: center;
 }
 
 .slider-component-container input[type="range"] {
-    /* Inherits general input[type="range"] styles from above */
+   
     vertical-align: middle;
-    min-width: 100px; /* Default min-width, can be overridden by specific slider IDs if needed */
-    /* margin: 0; Remove default margins if any */
+    min-width: 100px;
+   
 }
 
 .slider-wrapper span.value-display {
@@ -218,26 +218,26 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     top: 50%;
     transform: translate(-50%, -50%);
     color: #FFFFFF;
-    font-size: 0.8rem; /* Consistent with previous styling */
+    font-size: 0.8rem;
     font-family: Arial, sans-serif;
     pointer-events: none;
-    z-index: 2; /* Above the slider track */
+    z-index: 2;
     text-shadow: 0px 0px 3px rgba(0,0,0,0.9);
     padding: 1px 3px;
-    white-space: nowrap; /* Prevent wrapping of the number */
+    white-space: nowrap;
 }
  .slider-component-container span.unit-display {
      font-size: 0.9em;
      color: #ccc;
-     margin-left: 2px; /* Small space after the slider input or wrapper */
+     margin-left: 2px;
      user-select: none;
  }
 
-/* Checkbox custom styling */
-input.checkbox-input { /* The actual hidden checkbox */
+
+input.checkbox-input {
     display: none;
 }
-label.checkbox-label { /* The visible part for the checkbox */
+label.checkbox-label {
     cursor: pointer;
     padding: 4px 6px;
     border-radius: 3px;
@@ -245,7 +245,7 @@ label.checkbox-label { /* The visible part for the checkbox */
     border: 1px solid #555;
     user-select: none;
     display: inline-block;
-    line-height: normal; /* Adjust if needed */
+    line-height: normal;
 }
 label.checkbox-label:hover {
     background-color: rgba(255, 255, 255, 0.1);
@@ -255,12 +255,12 @@ input.checkbox-input:checked + label.checkbox-label {
     border-color: #3e8e41;
     color: white;
 }
-label.sym-label { /* Specific for "Symmetrical" checkbox label if less width needed */
+label.sym-label {
     padding: 4px 3px;
 }
 
 
-/* === 4. SPECIFIC UI GROUP/SECTION STYLES === */
+
 .ui-group {
     display: flex;
     align-items: center;
@@ -269,11 +269,11 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     background-color: rgba(255, 255, 255, 0.05);
     border-radius: 4px;
     flex-shrink: 0;
-    flex-wrap: wrap; /* Allow items within a group to wrap */
+    flex-wrap: wrap;
 }
 
-#rulesetInput { /* ID specific for main UI hex input */
-    width: 150px; /* Adjusted width from original 50px */
+#rulesetInput {
+    width: 150px;
     text-align: center;
 }
 
@@ -283,10 +283,10 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     gap: 5px;
     margin-left: 10px;
 }
-#biasSlider { /* ID specific slider width */
+#biasSlider {
     width: 200px;
 }
-#biasSlider:disabled + span.value-display { /* More specific selector for value display */
+#biasSlider:disabled + span.value-display {
     opacity: 0.5;
 }
 
@@ -299,28 +299,28 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     margin: 0 8px;
 }
 
-/* Stats Content Styling */
-#stats-content { /* This is now a .ui-group itself */
-    /* flex-basis: auto; */ /* flex-basis is on flex items, .ui-group is already one */
-    /* background-color, padding, border-radius inherited from .ui-group */
+
+#stats-content {
+   
+   
     font-size: 0.9em;
-    /* display: flex; inherited from .ui-group, default row */
-    flex-direction: column; /* Stack stat lines vertically */
+   
+    flex-direction: column;
     box-sizing: border-box;
 }
-#stats-content h4 { /* If you re-add a title inside stats */
+#stats-content h4 {
     margin: 0 0 5px 0;
-    font-size: 0.9em; /* Relative to parent .ui-group */
+    font-size: 0.9em;
     font-weight: normal;
     border-bottom: 1px solid #555;
     padding-bottom: 3px;
     text-align: center;
 }
-#stats-content div { /* Each stat line */
+#stats-content div {
     margin-bottom: 3px;
-    font-size: 0.9em; /* Relative to parent .ui-group */
+    font-size: 0.9em;
 }
-#stats-content span { /* The value part of the stat */
+#stats-content span {
     font-weight: bold;
     min-width: 45px;
     display: inline-block;
@@ -330,13 +330,13 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     padding: 1px 4px;
     border-radius: 2px;
 }
-/* #group-performance would also be a .ui-group and styled similarly if containing text */
+
 #group-performance div {
     font-size: 0.9em;
 }
 #group-performance span {
     font-weight: bold;
-    min-width: 30px; /* Adjusted for FPS/TPS */
+    min-width: 30px;
     display: inline-block;
     text-align: right;
     margin-left: 5px;
@@ -346,27 +346,27 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 }
 
 
-/* === 5. COMMON PANEL STYLES (Ruleset Editor & Setup Panel) === */
-/* Base styles for panels like Ruleset Editor and Setup Panel */
-.draggable-panel-base { /* Apply this class to #rulesetEditorPanel and #setupPanel in HTML */
+
+
+.draggable-panel-base {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    max-width: 90vw; /* Use viewport units for better responsiveness */
+    max-width: 90vw;
     max-height: 90vh;
-    background-color: rgba(15, 15, 15, 0.98); /* Consistent background */
-    border: 1px solid #555; /* Consistent border */
+    background-color: rgba(15, 15, 15, 0.98);
+    border: 1px solid #555;
     border-radius: 8px;
-    padding: 15px; /* Consistent padding */
+    padding: 15px;
     box-sizing: border-box;
     z-index: 1000;
     color: #eee;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Panel manages internal scroll via .panel-content-area */
+    overflow: hidden;
 }
-.draggable-panel-base h3 { /* Common style for panel titles (drag handles) */
+.draggable-panel-base h3 {
     margin-top: 0;
     margin-bottom: 10px;
     text-align: center;
@@ -374,9 +374,9 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     padding-bottom: 8px;
     user-select: none;
     font-size: 1.2em;
-    cursor: move; /* Indicate draggable */
+    cursor: move;
 }
-.close-panel-button { /* Common style for close buttons */
+.close-panel-button {
     position: absolute;
     top: 8px;
     right: 12px;
@@ -392,32 +392,32 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .close-panel-button:hover {
     color: white;
 }
-.panel-content-area { /* Wrapper for scrollable content within panels */
+.panel-content-area {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 5px; /* Padding for the content area itself */
-    border-top: 1px solid #333; /* Optional separator */
-    margin-top: 5px; /* Optional separator */
+    padding: 5px;
+    border-top: 1px solid #333;
+    margin-top: 5px;
 }
-.panel-actions { /* For buttons at the bottom of a panel */
+.panel-actions {
     margin-top: 15px;
     padding-top: 10px;
     border-top: 1px solid #444;
     display: flex;
-    justify-content: center; /* Or flex-end */
+    justify-content: center;
     gap: 10px;
 }
-.panel-actions .button { /* Buttons inside panel actions */
-    height: auto; /* Let padding define height */
+.panel-actions .button {
+    height: auto;
     padding: 8px 15px;
 }
 
-/* === 6. RULESET EDITOR PANEL SPECIFIC STYLES === */
-/* Apply .draggable-panel-base to #rulesetEditorPanel in HTML */
+
+
 #rulesetEditorPanel {
-    width: clamp(320px, 90vw, 700px); /* Specific width constraints if needed */
+    width: clamp(320px, 90vw, 700px);
 }
-/* #rulesetEditorPanel.hidden inherited from .hidden */
+
 
 .editor-controls {
     display: flex;
@@ -451,7 +451,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     border-radius: 4px;
     font-size: 0.85em;
 }
-.editor-controls #clearRulesButton.button { /* Target if it's a .button */
+.editor-controls #clearRulesButton.button {
     min-width: 80px;
 }
 
@@ -483,7 +483,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     line-height: 1.3;
     padding: 0 5px;
 }
-.editor-text.info-text { /* For informational text in panels */
+.editor-text.info-text {
     text-align: center;
     margin-bottom: 15px;
     font-style: italic;
@@ -496,7 +496,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     margin-top: 5px;
 }
 
-/* Individual Rule Visualization (Detailed) - Preserved from original request */
+
 .rule-viz {
     position: relative;
     width: 100px;
@@ -507,23 +507,13 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 }
 .rule-viz:hover .inner-hex { border-color: #FFF; }
 
-/* Hexagon Base Styles (Flat-Top as per original clip-path) - Preserved */
+
 .hexagon {
     position: absolute;
     width: 40px;
-    height: calc(40px * 0.866025 * 2); /* height = width * sin(60) * 2 for flat top */
-    /* Corrected height for flat top: height = width * sqrt(3)/2 * 2 = width * sqrt(3) approx width * 1.732
-       However, original clip path implies width is vertex to vertex, height is side to side distance / sin(60)
-       The original clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%); means width:height ratio is 1:sqrt(3)/2*2 = 1:sqrt(3)
-       So height = width * (sqrt(3)/2). The original calc(40px * 1.154701) was for pointy top if width is side-to-side.
-       For flat top where width is vertex-to-vertex, height = width * sqrt(3)/2.
-       If width = 40px is vertex-to-vertex, then side length is 20px. Height is 2 * (20 * sqrt(3)/2) = 20 * sqrt(3) ~ 34.64px
-       The original provided clip-path is `polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%)` which is a FLAT TOP.
-       Original height calc was `calc(40px * 1.154701)` - this is for POINTY top.
-       For the FLAT top clip path above, height should be `calc(40px * 0.866025)` if 40px is the width (vertex to vertex).
-       Let's stick to the user's original values and request to not change.
-    */
-    height: calc(40px * 1.154701); /* Preserving user's original height calc despite clip-path mismatch */
+    height: calc(40px * 0.866025 * 2);
+   
+    height: calc(40px * 1.154701);
     clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
     background-color: #555;
     box-sizing: border-box;
@@ -532,15 +522,15 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .hexagon.state-1 { background-color: #FFFF00; }
 .hexagon.state-2 { background: linear-gradient(45deg, #633030, #306330); }
 
-.center-hex { /* For .rule-viz */
+.center-hex {
     top: 50%; left: 50%;
     transform: translate(-50%, -50%) scale(1.0);
     z-index: 1;
 }
-.inner-hex { /* For .rule-viz */
-    width: 60%; height: calc(60% * 1.154701); /* Preserving */
+.inner-hex {
+    width: 60%; height: calc(60% * 1.154701);
     top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.8); /* Preserving */
+    transform: translate(-50%, -50%) scale(0.8);
     border: 1.0px solid #CCCCCC; z-index: 2;
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
@@ -548,7 +538,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .inner-hex.state-1 { background-color: #00BB00 !important; }
 .inner-hex.state-2 { background: linear-gradient(45deg, #700000, #005000) !important; border-color: #888 !important; }
 
-.neighbor-hex { /* For .rule-viz - Preserving */
+.neighbor-hex {
     transform-origin: center center;
     transform: translate(-50%, -50%) scale(0.9);
 }
@@ -556,7 +546,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .neighbor-2 { top: 12%; left: 50%; } .neighbor-3 { top: 31%; left: 78%; }
 .neighbor-4 { top: 70%; left: 78%; } .neighbor-5 { top: 88%; left: 50%; }
 
-/* Neighbor Count Rule Visualization - Preserved */
+
 .neighbor-count-rule-viz {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 8px 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer;
@@ -564,13 +554,13 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     min-height: 80px; box-sizing: border-box;
 }
 .neighbor-count-rule-viz:hover { background-color: #3a3a3a; }
-.neighbor-count-rule-viz .hexagon.center-hex { /* Hex inside N-count viz */
-    position: relative; transform: scale(0.8) translate(-53px, -53px); /* Preserving original large translate */
+.neighbor-count-rule-viz .hexagon.center-hex {
+    position: relative; transform: scale(0.8) translate(-53px, -53px);
     margin-bottom: 5px; width: 40px; height: calc(40px * 1.154701);
 }
 .neighbor-count-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
 
-/* Inline Hexagons - Preserved */
+
 .inline-hex {
     display: inline-block; width: 1em; height: calc(1em * 1.154701);
     clip-path: polygon(0% 50%, 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%);
@@ -588,15 +578,15 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .inline-hex-inner.state-1 { background-color: #00BB00 !important; }
 
 
-/* === 7. SETUP PANEL SPECIFIC STYLES (NEW) === */
-/* Apply .draggable-panel-base to #setupPanel in HTML */
+
+
 #setupPanel {
-    width: clamp(400px, 60vw, 550px); /* Setup panel might need different width */
+    width: clamp(400px, 60vw, 550px);
 }
 .world-config-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* 3x3 grid */
-    gap: 15px; /* Gap between world config cells */
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
     padding: 10px 0;
 }
 .world-config-cell {
@@ -606,8 +596,8 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     background-color: rgba(255, 255, 255, 0.03);
     display: flex;
     flex-direction: column;
-    gap: 8px; /* Gap between elements within a cell */
-    align-items: center; /* Center content in cell */
+    gap: 8px;
+    align-items: center;
 }
 .world-label {
     font-weight: bold;
@@ -615,37 +605,37 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     color: #bbb;
     margin-bottom: 5px;
 }
-.setting-control { /* Common wrapper for density and enable controls */
+.setting-control {
     display: flex;
-    flex-direction: column; /* Stack label, slider/switch */
+    flex-direction: column;
     align-items: center;
     width: 100%;
     gap: 5px;
 }
-.setting-control label { /* Label for Density or Enabled */
+.setting-control label {
     font-size: 0.8em;
     color: #aaa;
 }
-.density-slider { /* Specific class for density sliders if needed */
-    width: 100%; /* Make slider take full width of its container */
-    /* General input[type=range] styles apply */
+.density-slider {
+    width: 100%;
+   
 }
-.density-value-display { /* Span showing density value */
+.density-value-display {
     font-size: 0.8em;
     color: #ddd;
     background-color: rgba(0,0,0,0.3);
     padding: 2px 4px;
     border-radius: 3px;
-    min-width: 35px; /* Ensure space for "0.000" */
+    min-width: 35px;
     text-align: center;
 }
-.enable-control label.checkbox-label { /* Label for "Enabled/Disabled" switch */
-    padding: 5px 10px; /* Make it more button-like */
+.enable-control label.checkbox-label {
+    padding: 5px 10px;
     font-size: 0.85em;
 }
 
 #analysisPanel {
-    width: clamp(400px, 60vw, 550px); /* Increased default width slightly */
+    width: clamp(400px, 60vw, 550px);
 }
 
 #analysisPanel.hidden {
@@ -654,27 +644,27 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 
 .analysis-controls {
     display: flex;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     padding: 10px 5px;
-    margin-bottom: 10px; /* Reduced margin */
+    margin-bottom: 10px;
     border-bottom: 1px solid #333;
-    gap: 10px; /* Spacing between control groups */
+    gap: 10px;
 }
 .analysis-controls .button {
     height: auto;
     padding: 6px 12px;
-    min-width: 120px; /* Give button some width */
+    min-width: 120px;
     flex-shrink: 0;
 }
 
 .sampling-control {
-    display: inline-flex; /* Keep checkbox and label together */
+    display: inline-flex;
     align-items: center;
 }
 .sampling-control .checkbox-label {
-     padding: 5px 8px; /* Slightly smaller padding */
+     padding: 5px 8px;
      font-size: 0.9em;
 }
 
@@ -688,12 +678,12 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     color: #aaa;
 }
 #entropySampleRateSlider {
-    width: 120px; /* Adjust width */
+    width: 120px;
     min-width: 80px;
-    /* Inherits general range slider styles */
+   
 }
 #entropySampleRateSlider:disabled {
-    /* General disabled styles apply */
+   
     opacity: 0.4;
 }
 #entropySampleRateSlider:disabled + span.value-display {
@@ -704,9 +694,9 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 .entropy-display {
     font-size: 0.95em;
     color: #ddd;
-    margin-left: auto; /* Push to the right if space allows */
-    padding-left: 10px; /* Add some space */
-    white-space: nowrap; /* Prevent breaking */
+    margin-left: auto;
+    padding-left: 10px;
+    white-space: nowrap;
 }
 
 .entropy-display span {
@@ -722,7 +712,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 
 .plot-container {
     margin-top: 10px;
-    padding: 8px; /* Slightly more padding */
+    padding: 8px;
     border: 1px solid #333;
     background-color: rgba(0,0,0,0.2);
     border-radius: 4px;
@@ -730,31 +720,31 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     flex-direction: column;
     align-items: center;
 }
-.plot-container label { /* Applies to both plot labels */
+.plot-container label {
     font-size: 0.8em;
     color: #aaa;
     margin-bottom: 5px;
     text-align: center;
 }
-#ratioPlotCanvas, #entropyPlotCanvas { /* Apply to both canvases */
+#ratioPlotCanvas, #entropyPlotCanvas {
     display: block;
     width: 100%;
     height: 100px;
     background-color: #2a2a2a;
-    border-radius: 2px; /* Optional slight rounding */
+    border-radius: 2px;
 }
 
 
-/* === 8. UTILITY CLASSES === */
+
 .hidden {
     display: none !important;
 }
-#rulesetEditorPanel.hidden, #setupPanel.hidden { /* Ensure hidden applies to new panel too */
+#rulesetEditorPanel.hidden, #setupPanel.hidden {
     display: none !important;
 }
 
 
-/* === 9. MEDIA QUERIES (Original + additions for new panel if needed) === */
+
 @media (max-width: 700px) {
     #rulesetEditorGrid {
         grid-template-columns: repeat(8, 42px);
@@ -763,43 +753,43 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     .editor-controls .editor-hex-input { font-size: 1.2em; width: 250px; }
     #neighborCountRulesetEditorGrid { grid-template-columns: repeat(7, 14%); }
 
-    .world-config-grid { /* Make setup panel grid stack on small screens */
-        grid-template-columns: 1fr; /* Single column */
+    .world-config-grid {
+        grid-template-columns: 1fr;
         gap: 10px;
     }
     #setupPanel {
-        width: clamp(280px, 85vw, 400px); /* Adjust width for smaller screens */
+        width: clamp(280px, 85vw, 400px);
     }
     #analysisPanel {
-        width: clamp(300px, 80vw, 400px); /* Adjust analysis panel width */
+        width: clamp(300px, 80vw, 400px);
    }
    .analysis-controls {
-        justify-content: center; /* Center controls when wrapping */
+        justify-content: center;
     }
     .entropy-display {
-    margin-left: 0; /* Reset margin */
-    width: 100%; /* Take full width if wrapping */
+    margin-left: 0;
+    width: 100%;
     text-align: center;
     margin-top: 5px;
     }
 }
 @media (max-width: 480px) {
-    /* Adjust main UI bar layout for very small screens */
+   
     #ui-container {
         flex-direction: column;
-        align-items: stretch; /* Make children take full width */
+        align-items: stretch;
         gap: 5px;
     }
     #primary-controls-area, #status-info-area {
         width: 100%;
-        justify-content: center; /* Center items in these areas */
+        justify-content: center;
         gap: 5px;
     }
     #status-info-area {
-        flex-direction: row; /* Stats and perf side-by-side if they fit */
+        flex-direction: row;
         justify-content: space-around;
     }
-     /* Panel control adjustments from original */
+    
     .editor-controls { flex-direction: column; align-items: stretch; }
     .editor-controls .editor-hex-input,
     .editor-controls #rulesetEditorMode,
@@ -807,33 +797,33 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
         width: 100%; margin-bottom: 5px;
     }
     .analysis-controls {
-        flex-direction: column; /* Stack button and display */
+        flex-direction: column;
         align-items: center;
         gap: 10px;
      }
      #analysisPanel {
-         width: clamp(250px, 90vw, 300px); /* Adjust analysis panel width */
+         width: clamp(250px, 90vw, 300px);
      }
 }
 
-/* Ensure specific sliders can still have their widths adjusted if needed via their ID */
+
 #speedSlider, #neighborhoodSize, #biasSlider, #entropySampleRateSlider {
-    min-width: 120px; /* Example, adjust as needed or remove if default is fine */
+    min-width: 120px;
 }
 #biasSlider {
-    min-width: 150px; /* Bias might need more space */
+    min-width: 150px;
 }
 
-/* Ensure sliders in SetupPanel also get consistent styling */
+
 .density-control .slider-component-container input[type="range"] {
-     width: 100%; /* Make density sliders take full width of their cell's component container */
-     min-width: 0; /* Override any other min-width for density sliders */
+     width: 100%;
+     min-width: 0;
 }
 
 .plugins-mount-area {
     display: flex;
     flex-direction: column;
-    gap: 15px; /* Space between plugins */
+    gap: 15px;
     margin-top: 10px;
 }
 
@@ -844,7 +834,7 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
     background-color: rgba(0,0,0,0.1);
 }
 
-.analysis-plugin-container h4 { /* If plugins add their own titles */
+.analysis-plugin-container h4 {
     margin-top: 0;
     margin-bottom: 8px;
     font-size: 0.9em;
@@ -854,15 +844,208 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
 }
 
 .analysis-plugin-container .plot-container {
-    margin-top: 0; /* Reset margin if used directly by plugin */
-    padding: 0; /* Reset padding if used directly by plugin */
-    border: none; /* Reset border if used directly by plugin */
+    margin-top: 0;
+    padding: 0;
+    border: none;
 }
 
 .analysis-plugin-container .plugin-canvas {
     display: block;
-    width: 100%; /* Make canvas responsive within plugin container */
-    height: 100px; /* Or determined by plugin */
-    background-color: #2a2a2a; /* Copied from old style */
+    width: 100%;
+    height: 100px;
+    background-color: #2a2a2a;
     border-radius: 2px;
 }
+
+
+.three-way-switch {
+    display: inline-flex;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #555;
+    background-color: #333;
+}
+
+.radio-switch-input {
+    display: none;
+}
+
+.radio-switch-label {
+    padding: 6px 10px;
+    cursor: pointer;
+    color: #ccc;
+    background-color: #4a4a4a;
+    font-size: 0.85em;
+    user-select: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    border-right: 1px solid #555;
+}
+.three-way-switch .radio-switch-label:last-of-type {
+    border-right: none;
+}
+
+.radio-switch-input:checked + .radio-switch-label {
+    background-color: #4CAF50;
+    color: white;
+    font-weight: bold;
+}
+
+.radio-switch-label:hover {
+    background-color: #5a5a5a;
+}
+.radio-switch-input:checked + .radio-switch-label:hover {
+    background-color: #45a049;
+}
+
+
+
+#rotationalSymmetryRulesetEditorGrid {
+    display: grid;
+    margin: 10px auto;
+    gap: 0px;
+    padding: 10px;
+    border: 1px solid #333;
+    background-color: #1c1c1c;
+    border-radius: 4px;
+    grid-template-columns: repeat(7, 14.3%);
+    max-width: 900px;
+}
+
+
+.r-sym-rule-viz {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #282828;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    min-height: 100px;
+}
+
+.r-sym-rule-viz:hover {
+    background-color: #3a3a3a;
+}
+
+
+.r-sym-rule-viz .rule-viz-hex-display {
+    position: relative;
+    width: 100px;
+    height: 110px;
+    transform: scale(0.45) translate(0px, -45px);
+    margin-bottom: -25px;
+}
+
+
+
+.r-sym-rule-viz .orbit-size-display {
+    font-size: 0.70em;
+    color: #b0b0b0;
+    margin-top: 2px;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 1px 4px;
+    border-radius: 2px;
+    text-align: center;
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+.r-sym-rule-viz .rule-label {
+    font-size: 0.7em;
+    color: #ccc;
+    text-align: center;
+    margin-bottom: 2px;
+    width: 100%;
+}
+#analysisPanel .settings-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+#analysisPanel .settings-group label {
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+#analysisPanel .stats-display {
+    font-size: 0.95em;
+    color: #ddd;
+    margin: 10px 0;
+    padding: 5px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 3px;
+    text-align: center;
+}
+#analysisPanel .stats-display span {
+    font-weight: bold;
+    margin-left: 5px;
+    background-color: rgba(0,0,0,0.2);
+    padding: 2px 5px;
+    border-radius: 3px;
+    display: inline-block;
+    min-width: 50px;
+    text-align: right;
+}
+
+
+
+#rulesetEditorGrid.hidden,
+#neighborCountRulesetEditorGrid.hidden,
+#rotationalSymmetryRulesetEditorGrid.hidden {
+    display: none !important;
+}
+
+
+
+@media (max-width: 920px) {
+    #rotationalSymmetryRulesetEditorGrid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0px;
+    }
+    .r-sym-rule-viz .rule-viz-hex-display {
+        transform: scale(0.55) translate(-32px, -35px);
+         margin-bottom: -30px;
+    }
+}
+
+@media (max-width: 600px) {
+    #rotationalSymmetryRulesetEditorGrid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0px;
+    }
+     .r-sym-rule-viz .rule-viz-hex-display {
+        transform: scale(0.5) translate(-35px, -40px);
+         margin-bottom: -35px;
+    }
+    .r-sym-rule-viz {
+        min-height: 85px;
+    }
+}
+
+@media (max-width: 480px) {
+    #rotationalSymmetryRulesetEditorGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+   
+    .three-way-switch {
+       
+    }
+}
+
+
+#group-ruleset {
+    flex-wrap: wrap;
+    justify-content: center;
+}
+#generateModeSwitch {
+    margin-bottom: 5px;
+}
+
