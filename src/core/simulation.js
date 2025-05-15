@@ -355,7 +355,7 @@ export function setRulesForCanonicalRepresentative(canonicalBitmask, centerState
         currentRulesetHex = rulesetToHex(currentRuleset);
         PersistenceService.saveRuleset(currentRulesetHex);
         EventBus.dispatch(EVENTS.RULESET_CHANGED, currentRulesetHex);
-        console.log(`Rules set for C=<span class="math-inline">\{centerState\}, N\_canonical\=</span>{canonicalBitmask.toString(2).padStart(6, '0')} -> ${outputState}. Orbit size: ${group.orbitSize}. New hex: ${currentRulesetHex}`);
+        console.log(`Rules set for C=${centerState}, N_canonical=${canonicalBitmask.toString(2).padStart(6, '0')} -> ${outputState}. Orbit size: ${group.orbitSize}. New hex: ${currentRulesetHex}`);
     }
 }
 

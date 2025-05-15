@@ -372,7 +372,7 @@ export class RulesetEditor {
 
     show(saveState = true) {
         this.draggablePanel.show();
-        this.refreshViews(); // Refresh content when shown
+        this.refreshViews();
         if (saveState) this._savePanelState();
     }
 
@@ -382,17 +382,14 @@ export class RulesetEditor {
     }
 
     toggle() {
-        const isNowVisible = this.draggablePanel.toggle(); // toggle returns new visibility state
-        if (isNowVisible) {
-            this.refreshViews();
-        }
-        this._savePanelState(); // Save state after toggle
-        return isNowVisible; // Return the new state
+        const isNowVisible = this.draggablePanel.toggle(); 
+        this.refreshViews();
+        this._savePanelState();
+        return isNowVisible;
     }
 
     destroy() {
         if (this.draggablePanel) this.draggablePanel.destroy();
-        // DOM listeners are removed by DraggablePanel's destroy or should be if added directly
         this.panelElement = null;
         this.simInterface = null;
         this.draggablePanel = null;
