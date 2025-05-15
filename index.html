@@ -123,26 +123,19 @@
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>Analysis Tools</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Analysis for the currently selected world. Enable sampling for live plots.</p>
-                <div class="analysis-controls">
-                    <div class="sampling-control">
-                        <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
-                        <label for="enableEntropySamplingCheckbox" class="checkbox-label">Sample Continuously</label>
-                    </div>
-                    <div id="entropySampleRateSliderMount"></div>
-                    <div class="entropy-display">
-                        Current Entropy: <span id="stat-entropy">N/A</span>
-                    </div>
+                <div class="settings-group">
+                    <label for="enableEntropySamplingCheckbox">Enable Entropy Sampling:</label>
+                    <input type="checkbox" id="enableEntropySamplingCheckbox">
+                </div>
+                <div class="settings-group" id="entropySampleRateSliderMount">
+                    <!-- SliderComponent will be mounted here by AnalysisPanel.js -->
+                </div>
+                <div class="stats-display">
+                    Current Sampled Entropy: <span id="stat-entropy">N/A</span>
                 </div>
 
-                <div class="plot-container">
-                    <label for="ratioPlotCanvas">Activity Ratio History (0.0 to 1.0)</label>
-                    <canvas id="ratioPlotCanvas" width="400" height="100"></canvas>
+                <div class="plugins-mount-area">
                 </div>
-                 <div class="plot-container">
-                     <label for="entropyPlotCanvas">Sampled Entropy History (0.0 to 1.0)</label>
-                     <canvas id="entropyPlotCanvas" width="400" height="100"></canvas>
-                 </div>
             </div>
         </div>
     </div>

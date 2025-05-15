@@ -829,3 +829,40 @@ label.sym-label { /* Specific for "Symmetrical" checkbox label if less width nee
      width: 100%; /* Make density sliders take full width of their cell's component container */
      min-width: 0; /* Override any other min-width for density sliders */
 }
+
+.plugins-mount-area {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Space between plugins */
+    margin-top: 10px;
+}
+
+.analysis-plugin-container {
+    border: 1px solid #383838;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.1);
+}
+
+.analysis-plugin-container h4 { /* If plugins add their own titles */
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: #ccc;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.analysis-plugin-container .plot-container {
+    margin-top: 0; /* Reset margin if used directly by plugin */
+    padding: 0; /* Reset padding if used directly by plugin */
+    border: none; /* Reset border if used directly by plugin */
+}
+
+.analysis-plugin-container .plugin-canvas {
+    display: block;
+    width: 100%; /* Make canvas responsive within plugin container */
+    height: 100px; /* Or determined by plugin */
+    background-color: #2a2a2a; /* Copied from old style */
+    border-radius: 2px;
+}

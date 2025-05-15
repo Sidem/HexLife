@@ -1,4 +1,3 @@
-
 import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
@@ -6,7 +5,8 @@ import { SetupPanel } from './components/SetupPanel.js';
 import { DraggablePanel } from './components/DraggablePanel.js'; 
 import * as PersistenceService from '../services/PersistenceService.js'; 
 import { SliderComponent } from './components/SliderComponent.js'; 
-import { EventBus, EVENTS } from '../services/EventBus.js'; 
+import { EventBus, EVENTS } from '../services/EventBus.js';
+import { AnalysisPanel } from './components/AnalysisPanel.js';
 
 
 let uiElements;
@@ -14,7 +14,7 @@ let sliderComponents = {};
 let simulationInterfaceRef;
 let rulesetEditorComponent;
 let setupPanelComponent; 
-let analysisPanelComponent; 
+let analysisPanelInstance;
 
 
 export function initUI(simulationInterface) {
@@ -46,8 +46,6 @@ export function initUI(simulationInterface) {
         analysisPanelButton: document.getElementById('analysisPanelButton'),
         closeAnalysisPanelButton: document.getElementById('closeAnalysisPanelButton'),
         statEntropy: document.getElementById('stat-entropy'),
-        ratioPlotCanvas: document.getElementById('ratioPlotCanvas'),
-        entropyPlotCanvas: document.getElementById('entropyPlotCanvas'),
         enableEntropySamplingCheckbox: document.getElementById('enableEntropySamplingCheckbox'),
     };
     
@@ -70,18 +68,7 @@ export function initUI(simulationInterface) {
     }
     
     if (uiElements.analysisPanel) {
-        analysisPanelComponent = new DraggablePanel(uiElements.analysisPanel, 'h3');
-        _loadAnalysisPanelState(); 
-
-        if (uiElements.closeAnalysisPanelButton) {
-            uiElements.closeAnalysisPanelButton.addEventListener('click', () => {
-                analysisPanelComponent.hide();
-                _saveAnalysisPanelState();
-            });
-        }
-        if (uiElements.enableEntropySamplingCheckbox) {
-            uiElements.enableEntropySamplingCheckbox.addEventListener('change', handleSamplingControlsChange);
-        }
+        analysisPanelInstance = new AnalysisPanel(uiElements.analysisPanel, simulationInterfaceRef, { /* uiManager: this */ });
     } else {
         console.warn("Analysis panel element not found. Analysis functionality will be disabled.");
         if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
@@ -130,33 +117,13 @@ export function initUI(simulationInterface) {
         }
     });
 
-    sliderComponents.entropySampleRateSlider = new SliderComponent(uiElements.entropySampleRateSliderMount, {
-        id: 'entropySampleRateSlider',
-        label: 'Rate:',
-        min: 1,
-        max: 100,
-        step: 1,
-        showValue: true,
-        unit: '/tps',
-        value: simulationInterface.getEntropySamplingState().rate,
-        disabled: !uiElements.enableEntropySamplingCheckbox.checked,
-        onChange: (value) => {
-            EventBus.dispatch(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, {
-                enabled: uiElements.enableEntropySamplingCheckbox.checked,
-                rate: value
-            });
-        }
-    });
-
     setupGeneralListeners(simulationInterface); 
     setupPanelToggleListeners();
     setupStateListeners(simulationInterface);
     loadAndApplyUISettings(simulationInterface);
-    loadAndApplyAnalysisSettings();
     window.addEventListener('keydown', handleGlobalKeyDown);
     refreshAllRulesetViews(simulationInterfaceRef); 
     updateBiasSliderDisabledState();
-    updateSamplingControlsState(); 
     setupUIEventListeners(simulationInterface, uiElements, sliderComponents, rulesetEditorComponent, setupPanelComponent);
     updatePauseButton(simulationInterface.isSimulationPaused());
     updateMainRulesetDisplay(simulationInterface.getCurrentRulesetHex());
@@ -165,50 +132,6 @@ export function initUI(simulationInterface) {
 
     console.log("UI Initialized.");
     return true;
-}
-
-function _loadAnalysisPanelState() {
-     if (!analysisPanelComponent || !uiElements.analysisPanel) return;
-     const savedState = PersistenceService.loadPanelState('analysis');
-     if (savedState.isOpen) {
-         analysisPanelComponent.show(); 
-     } else {
-         analysisPanelComponent.hide();
-     }
-     if (savedState.x && savedState.x.endsWith('px')) uiElements.analysisPanel.style.left = savedState.x;
-     if (savedState.y && savedState.y.endsWith('px')) uiElements.analysisPanel.style.top = savedState.y;
-     if ((savedState.x || savedState.y) && parseFloat(uiElements.analysisPanel.style.left) > 0 && parseFloat(uiElements.analysisPanel.style.top) > 0) {
-         uiElements.analysisPanel.style.transform = 'none';
-     } else if (savedState.isOpen) { 
-          uiElements.analysisPanel.style.left = '50%';
-          uiElements.analysisPanel.style.top = '50%';
-          uiElements.analysisPanel.style.transform = 'translate(-50%, -50%)';
-     }
-}
-
-function _saveAnalysisPanelState() {
-     if (!analysisPanelComponent || !uiElements.analysisPanel) return;
-     const state = {
-         isOpen: !uiElements.analysisPanel.classList.contains('hidden'),
-         x: uiElements.analysisPanel.style.left,
-         y: uiElements.analysisPanel.style.top,
-     };
-     PersistenceService.savePanelState('analysis', state);
-}
-
-function loadAndApplyAnalysisSettings() {
-    if (!simulationInterfaceRef || !uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
-    const samplingState = simulationInterfaceRef.getEntropySamplingState();
-    uiElements.enableEntropySamplingCheckbox.checked = samplingState.enabled;
-    sliderComponents.entropySampleRateSlider.setValue(samplingState.rate);
-    updateSamplingControlsState();
-}
-
-function updateSamplingControlsState() {
-    if (uiElements.enableEntropySamplingCheckbox && sliderComponents.entropySampleRateSlider) {
-       const isDisabled = !uiElements.enableEntropySamplingCheckbox.checked;
-       sliderComponents.entropySampleRateSlider.setDisabled(isDisabled);
-    }
 }
 
 function loadAndApplyUISettings(sim) {
@@ -269,7 +192,6 @@ function validateElements() {
     }
     if (!uiElements.analysisPanel) {
         if (uiElements.analysisPanelButton) uiElements.analysisPanelButton.disabled = true;
-        if (uiElements.calculateEntropyButton) uiElements.calculateEntropyButton.disabled = true;
     }
 
     return allEssentialFound;
@@ -435,98 +357,11 @@ function setupPanelToggleListeners() {
              setupPanelComponent.toggle();
          });
      }
-    if (uiElements.analysisPanelButton && analysisPanelComponent) {
+    if (uiElements.analysisPanelButton && analysisPanelInstance) {
         uiElements.analysisPanelButton.addEventListener('click', () => {
-             const panelNowVisible = analysisPanelComponent.toggle();
-             if (panelNowVisible) {
-                 updateAnalysisPanel();
-             }
-             _saveAnalysisPanelState();
+             analysisPanelInstance.toggle();
         });
     }
-}
-
-export function updateAnalysisPanel() {
-    if (!analysisPanelComponent || !uiElements.analysisPanel || uiElements.analysisPanel.classList.contains('hidden') || !simulationInterfaceRef) {
-        return;
-    }
-    const stats = simulationInterfaceRef.getSelectedWorldStats();
-    if (stats && uiElements.statEntropy) {
-        uiElements.statEntropy.textContent = stats.entropy.toFixed(4);
-    } else if (uiElements.statEntropy) {
-        uiElements.statEntropy.textContent = "N/A";
-    }
-    const ratioHistory = simulationInterfaceRef.getSelectedWorldRatioHistory();
-    const entropyHistory = simulationInterfaceRef.getSelectedWorldEntropyHistory();
-    if (uiElements.ratioPlotCanvas) {
-        drawMinimalistPlot(uiElements.ratioPlotCanvas, ratioHistory, '#00FFFF');
-    }
-    if (uiElements.entropyPlotCanvas) {
-        drawMinimalistPlot(uiElements.entropyPlotCanvas, entropyHistory, '#FFA500');
-    }
-}
-
-function handleSamplingControlsChange() {
-    if (!uiElements.enableEntropySamplingCheckbox || !sliderComponents.entropySampleRateSlider) return;
-    const enabled = uiElements.enableEntropySamplingCheckbox.checked;
-    const rate = sliderComponents.entropySampleRateSlider.getValue();
-    
-    updateSamplingControlsState(); 
-    EventBus.dispatch(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, { enabled, rate });
-}
-/**
- * Draws a simple line graph. Assumes data values 0-1.
- * @param {HTMLCanvasElement} canvas
- * @param {number[]} dataHistory
- * @param {string} color Line color
- */
-function drawMinimalistPlot(canvas, dataHistory, color = '#FFFFFF') {
-    if (!canvas || !dataHistory ) {
-         if(canvas) {
-             const ctx = canvas.getContext('2d');
-             ctx.fillStyle = '#2a2a2a';
-             ctx.fillRect(0, 0, canvas.width, canvas.height);
-         }
-         return;
-    }
-    if (dataHistory.length === 0) {
-         const ctx = canvas.getContext('2d');
-         ctx.fillStyle = '#2a2a2a';
-         ctx.fillRect(0, 0, canvas.width, canvas.height);
-         return;
-    }
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-    const padding = 5;
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(0, 0, width, height);
-    const plotWidth = width - 2 * padding;
-    const plotHeight = height - 2 * padding;
-    const dataLength = dataHistory.length;
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(padding, padding); ctx.lineTo(width - padding, padding);
-    ctx.moveTo(padding, height - padding); ctx.lineTo(width - padding, height - padding);
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let i = 0; i < dataLength; i++) {
-        const x = padding + (i / (dataLength - 1 || 1)) * plotWidth;
-        const yValue = Math.max(0, Math.min(1, dataHistory[i]));
-        const y = padding + (1 - yValue) * plotHeight;
-
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    }
-     if (dataLength > 0) {
-        ctx.stroke();
-     }
 }
 
 export function updatePauseButton(isPaused) {
@@ -580,7 +415,7 @@ function handleGlobalKeyDown(event) {
         case 'R': uiElements.resetStatesButton?.click(); event.preventDefault(); break;
         case 'E': rulesetEditorComponent?.toggle(); event.preventDefault(); break;
         case 'S': setupPanelComponent?.toggle(); event.preventDefault(); break;
-        case 'A': analysisPanelComponent?.toggle(); event.preventDefault(); break;
+        case 'A': analysisPanelInstance?.toggle(); event.preventDefault(); break;
     }
 }
 
@@ -608,7 +443,6 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
     });
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (statsData) => {
         updateStatsDisplay(statsData);
-        updateAnalysisPanel();
     });
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
@@ -619,11 +453,6 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
         if (setupPanelComponent && !setupPanelComponent.panelElement.classList.contains('hidden')) {
             setupPanelComponent.refreshViews();
         }
-    });
-    EventBus.subscribe(EVENTS.ENTROPY_SAMPLING_CHANGED, (data) => {
-        if (uiElements.enableEntropySamplingCheckbox) uiElements.enableEntropySamplingCheckbox.checked = data.enabled;
-        if (sliderComponents.entropySampleRateSlider) sliderComponents.entropySampleRateSlider.setValue(data.rate);
-        updateSamplingControlsState();
     });
     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => {
         updatePerformanceDisplay(data.fps, data.tps);
@@ -645,4 +474,12 @@ function setupUIEventListeners(simulationInterface, uiElements, sliderComponents
             setupPanelComponent.refreshViews();
         }
     });
+}
+
+export function getUIElements() {
+    return uiElements;
+}
+
+export function getAnalysisPanelInstance() {
+    return analysisPanelInstance;
 }
