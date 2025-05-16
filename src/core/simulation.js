@@ -112,6 +112,7 @@ export function initSimulation() {
     console.log(`Simulation initialized with ${Config.NUM_WORLDS} worlds.`);
     EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, getWorldSettings());
     EventBus.dispatch(EVENTS.RULESET_CHANGED, getPrimaryRulesetHex()); // Dispatch initial ruleset of selected world
+    EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, currentSpeed);
 }
 
 function _getAffectedWorldIndices(scope) {
@@ -596,7 +597,15 @@ export function applyBrush(worldIndex, col, row, brushSize) {
 }
 
 export function setSimulationPaused(p) { if(isPaused===p)return; isPaused=p; if(!isPaused)tickTimer=0; EventBus.dispatch(EVENTS.SIMULATION_PAUSED,isPaused); }
-export function setSimulationSpeed(s) { s=Math.max(0,Math.min(Config.MAX_SIM_SPEED,s)); if(currentSpeed===s)return; currentSpeed=s; tickDuration=s>0?1.0/s:Infinity; PersistenceService.saveSimSpeed(s); EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED,s); }
+export function setSimulationSpeed(s) { 
+    s = Math.max(0,Math.min(Config.MAX_SIM_SPEED,s));
+    if(currentSpeed===s)
+        return; 
+    currentSpeed = s;
+    tickDuration = s>0 ? 1.0/s : Infinity; 
+    PersistenceService.saveSimSpeed(s); 
+    EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED,s);
+ }
 export function setBrushSize(s) { s=Math.max(0,Math.min(Config.MAX_NEIGHBORHOOD_SIZE,s)); if(currentBrushSize===s)return; currentBrushSize=s; PersistenceService.saveBrushSize(s); EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED,s); }
 export function setSelectedWorldIndex(idx) {
     if (idx<0||idx>=worldsData.length||selectedWorldIndex===idx)return;
@@ -625,8 +634,13 @@ function _resetWorldsInternal({ scope='all', useInitialDensities=true }) {
     for(const idx of affected){
         const w=worldsData[idx]; let ac=0;
         if(w.enabled && useInitialDensities){
-            const d=w.initialDensity; if(d===0)w.jsStateArray.fill(0); else if(d===1){w.jsStateArray.fill(1);ac=Config.NUM_CELLS;}
-            else for(let i=0;i<Config.NUM_CELLS;i++)if((w.jsStateArray[i]=Math.random()<d?1:0)===1)ac++;
+            const d = w.initialDensity;
+            if (d % 1 === 0) {
+                w.jsStateArray.fill(d);
+                const centerIdx = Math.floor((Config.NUM_CELLS / 2)+Config.GRID_COLS/2);
+                w.jsStateArray[centerIdx] = (w.jsStateArray[centerIdx]+1) % 2;
+                ac = 1;
+            } else for(let i=0;i<Config.NUM_CELLS;i++)if((w.jsStateArray[i]=Math.random()<d?1:0)===1)ac++;
         } else w.jsStateArray.fill(0);
         w.jsRuleIndexArray.fill(0); w.jsNextStateArray.fill(0); w.jsNextRuleIndexArray.fill(0); w.jsHoverStateArray.fill(0);
         updateWorldStats(w,ac);
