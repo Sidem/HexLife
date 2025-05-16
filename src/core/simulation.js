@@ -18,7 +18,7 @@ let worldsData = [];
 
 let isPaused = true;
 let tickTimer = 0;
-let currentSpeed = Config.DEFAULT_SPEED;
+let currentSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
 let tickDuration = 1.0 / currentSpeed;
 let selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
 let isEntropySamplingEnabled = false;
@@ -48,8 +48,6 @@ function getPrimaryRulesetHex() {
 export function initSimulation() {
     console.log("Initializing Simulation...");
     symmetryData = Symmetry.precomputeSymmetryGroups();
-    currentSpeed = PersistenceService.loadSimSpeed();
-    setSimulationSpeed(currentSpeed);
 
     currentBrushSize = PersistenceService.loadBrushSize();
     isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
@@ -72,8 +70,6 @@ export function initSimulation() {
             worldRuleset.set(hexToRuleset(loadedPrimaryRulesetHex));
             worldRulesetHex = loadedPrimaryRulesetHex;
         } else {
-            // Generate a default random one if nothing else is available
-            // This initial random ruleset will be the same for all if no primary is loaded
             const tempRandomRuleset = new Uint8Array(128);
             for (let j = 0; j < 128; j++) tempRandomRuleset[j] = Math.random() < 0.5 ? 1 : 0;
             worldRuleset.set(tempRandomRuleset);
