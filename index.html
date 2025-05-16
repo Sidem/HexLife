@@ -4,85 +4,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Explorer (Worker)</title>
+    <title>HexLife Explorer (Toolbar UI)</title>
     <link rel="stylesheet" href="style.css">
-</head>
+    </head>
 
 <body>
     <div id="app-container">
-        <canvas id="hexGridCanvas"></canvas>
-        <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
-        <div id="ui-container">
-            <div id="primary-controls-area">
-                <div class="ui-group" id="group-title">
-                    <span class="rule-display-wrapper"><code id="rulesetDisplay">N/A</code></span>
-                </div>
-                <div class="ui-group" id="group-playback">
-                    <button id="playPauseButton" class="button">Play</button>
-                    <div id="speedSliderMount"></div>
-                </div>
+        <div id="top-info-bar">
+            <div id="rulesetDisplayContainer">
+                <span>Ruleset: </span><code id="rulesetDisplay">N/A</code>
+            </div>
+            <div id="statsDisplayContainer">
+                <span>Tick: <span id="stat-tick">--</span></span>
+                <span>Ratio: <span id="stat-ratio">--</span>%</span>
+                <span>FPS: <span id="stat-fps">--</span></span>
+                <span>TPS: <span id="stat-actual-tps">--</span></span>
+            </div>
+        </div>
 
-                <div class="ui-group" id="group-brush">
-                    <div id="neighborhoodSizeSliderMount"></div>
-                </div>
+        <div id="main-content-area">
+            <div id="vertical-toolbar">
+                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button> <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button> <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button> <div class="toolbar-separator"></div>
 
-                <div class="ui-group" id="group-ruleset">
-                    <button id="randomRulesetButton" class="button">[N]ew Rules</button>
-                    <div id="generateModeSwitch" class="three-way-switch" title="Select ruleset generation mode">
-                        <input type="radio" id="genModeRandom" name="generateMode" value="random" class="radio-switch-input">
-                        <label for="genModeRandom" class="radio-switch-label">Random</label>
+                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button> <div class="toolbar-separator"></div>
 
-                        <input type="radio" id="genModeNCount" name="generateMode" value="n_count" class="radio-switch-input">
-                        <label for="genModeNCount" class="radio-switch-label">N-Count</label>
+                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button> <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button> <div class="toolbar-separator"></div>
 
-                        <input type="radio" id="genModeRSym" name="generateMode" value="r_sym" class="radio-switch-input" checked>
-                        <label for="genModeRSym" class="radio-switch-label">R-Sym</label>
-                    </div>
-                    <div class="bias-controls">
-                        <input type="checkbox" id="useCustomBiasCheckbox" class="checkbox-input">
-                        <label for="useCustomBiasCheckbox" class="checkbox-label">Bias:</label>
-                        <div id="biasSliderMount"></div>
-                    </div>
-                    <div class="ruleset-scope-switch" title="Scope for new/set ruleset">
-                        <input type="checkbox" id="rulesetScopeSwitch" class="checkbox-input" checked>
-                        <label for="rulesetScopeSwitch" class="checkbox-label scope-label" data-on-text="All Worlds" data-off-text="Selected World">All Worlds</label>
-                    </div>
-                    <input type="checkbox" id="resetOnNewRuleCheckbox" class="checkbox-input"
-                        title="Reset world(s) when generating or setting a new ruleset from this bar" checked>
-                    <label for="resetOnNewRuleCheckbox" class="checkbox-label">Auto-Reset</label>
-                </div>
-                <div class="ui-group" id="group-ruleset-input">
-                    <button id="copyRuleButton" class="button" title="Copy current ruleset hex code">Copy</button>
-                    <input type="text" id="rulesetInput" class="hex-input" placeholder="32 hex chars">
-                    <button id="setRuleButton" class="button">Set</button>
-                    <button id="editRuleButton" class="button"
-                        title="[E] Show visual editor for the current ruleset">[E]dit</button>
-                </div>
-                <div class="ui-group" id="group-state">
-                    <button id="saveStateButton" class="button" title="Save current grid state">Save</button>
-                    <button id="loadStateButton" class="button"
-                        title="Load grid state from .json/.txt file">Load</button>
-                    <button id="resetCurrentButton" class="button"
-                        title="[R] Reset current world to initial density">[R]eset Current</button>
-                    <button id="resetAllButtonNew" class="button" title="Reset all worlds to initial densities">Reset All</button>
-                    <button id="clearCurrentButton" class="button"
-                        title="[C] Clear current world (0s or 1s)">[C]lear Current</button>
-                    <button id="clearAllButton" class="button" title="Clear all enabled worlds (0s or 1s)">Clear All</button>
-                    <button id="setupPanelButton" class="button" title="[S] Open world setup panel">[S]etup</button>
-                    <button id="analysisPanelButton" class="button" title="[A] Open analysis panel">Analyse</button>
+                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button> <div class="toolbar-separator"></div>
+                
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button> </div>
+            <canvas id="hexGridCanvas"></canvas>
+        </div>
+
+        <div id="speedPopout" class="popout-panel hidden">
+            <label for="speedSliderPopout">Speed:</label>
+            <div id="speedSliderMountPopout"></div>
+        </div>
+        <div id="brushPopout" class="popout-panel hidden">
+            <label for="brushSliderPopout">Brush Size:</label>
+            <div id="neighborhoodSizeSliderMountPopout"></div>
+        </div>
+        <div id="newRulesPopout" class="popout-panel hidden">
+            <h4>Generate New Ruleset</h4>
+            <div class="form-group">
+                <label>Mode:</label>
+                <div id="generateModeSwitchPopout" class="three-way-switch">
+                    <input type="radio" id="genModeRandomPopout" name="generateModePopout" value="random" class="radio-switch-input">
+                    <label for="genModeRandomPopout" class="radio-switch-label">Random</label>
+                    <input type="radio" id="genModeNCountPopout" name="generateModePopout" value="n_count" class="radio-switch-input">
+                    <label for="genModeNCountPopout" class="radio-switch-label">N-Count</label>
+                    <input type="radio" id="genModeRSymPopout" name="generateModePopout" value="r_sym" class="radio-switch-input" checked>
+                    <label for="genModeRSymPopout" class="radio-switch-label">R-Sym</label>
                 </div>
             </div>
-
-            <div id="status-info-area">
-                <div class="ui-group" id="stats-content">
-                    <div>Tick: <span id="stat-tick">--</span></div> <div>Ratio: <span id="stat-ratio">--</span>%</div>
-                    <div>Avg: <span id="stat-avg-ratio">--</span>%</div>
-                </div>
-                <div class="ui-group" id="group-performance">
-                    <div>FPS: <span id="stat-fps">--</span></div>
-                    <div>TPS: <span id="stat-actual-tps">--</span></div>
+            <div class="form-group bias-controls">
+                <input type="checkbox" id="useCustomBiasCheckboxPopout" class="checkbox-input">
+                <label for="useCustomBiasCheckboxPopout" class="checkbox-label">Custom Bias:</label>
+                <div id="biasSliderMountPopout"></div>
+            </div>
+            <div class="form-group">
+                <label>Apply to:</label>
+                <div id="rulesetScopeSwitchPopout" class="three-way-switch">
+                     <input type="radio" id="scopeSelectedPopout" name="rulesetScopePopout" value="selected" class="radio-switch-input" checked>
+                     <label for="scopeSelectedPopout" class="radio-switch-label">Selected</label>
+                     <input type="radio" id="scopeAllPopout" name="rulesetScopePopout" value="all" class="radio-switch-input">
+                     <label for="scopeAllPopout" class="radio-switch-label">All</label>
                 </div>
             </div>
+            <div class="form-group">
+                <input type="checkbox" id="resetOnNewRuleCheckboxPopout" class="checkbox-input" checked>
+                <label for="resetOnNewRuleCheckboxPopout" class="checkbox-label">Auto-Reset World(s)</label>
+            </div>
+            <button id="generateRulesetFromPopoutButton" class="button">Generate</button>
+        </div>
+        <div id="setHexPopout" class="popout-panel hidden">
+            <h4>Set/Copy Ruleset Hex</h4>
+            <div class="form-group">
+                <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars">
+            </div>
+            <div class="form-group-buttons">
+                 <button id="setRuleFromPopoutButton" class="button">Set</button>
+                 <button id="copyRuleFromPopoutButton" class="button">Copy Current</button>
+            </div>
+        </div>
+        <div id="resetClearPopout" class="popout-panel hidden">
+            <h4>Reset / Clear</h4>
+            <button id="resetCurrentButtonPopout" class="button">Reset Selected</button>
+            <button id="resetAllButtonPopout" class="button">Reset All</button>
+            <div class="popout-separator"></div>
+            <button id="clearCurrentButtonPopout" class="button">Clear Selected</button>
+            <button id="clearAllButtonPopout" class="button">Clear All</button>
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden">
@@ -117,23 +128,14 @@
                 <div id="rulesetEditorGrid" class="hidden"></div>
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
                 <div id="rotationalSymmetryRulesetEditorGrid"></div>
-                <div class="editor-text">
-                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to propagate these changes to all worlds.</p>
-                    <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
-                    <p>The smaller inner hexagon shows the resulting state of the center cell in the <em>next</em> step.
-                    </p>
-                    <p>Click on a rule's inner hexagon (Detailed), the whole visualization (Neighbor Count), or the canonical pattern (Rotational Symmetry) to toggle its output state(s).
-                       For Rotational Symmetry mode, you define rules for 14 canonical neighborhood shapes (plus center cell state). The "Orbit Size" shown indicates how many of the 128 fundamental rules are affected by that single setting.
-                    </p>
+                 <div class="editor-text">
+                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to propagate these changes.</p>
+                    <p>Click rule visualizations to toggle output states.</p>
                     <div class="editor-text-rules">
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
-                            inactive</p>
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span>
-                            becomes active</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span>
-                            becomes inactive</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays
-                            active</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
                     </div>
                 </div>
             </div>
@@ -143,32 +145,32 @@
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and reset it. "Apply & Reset All Worlds" re-initializes all worlds with their current density/enabled settings using their respective current rulesets.</p>
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and reset it.</p>
                 <div id="worldSetupGrid" class="world-config-grid">
                     </div>
                 <div class="panel-actions">
-                    <button id="applySetupButton" class="button">Apply & Reset All Worlds</button>
+                    <button id="applySetupButton" class="button">Apply & Reset All Enabled Worlds</button>
                 </div>
             </div>
         </div>
+
         <div id="analysisPanel" class="draggable-panel-base hidden">
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>Analysis Tools</h3>
-            <div class="panel-content-area"> <div class="settings-group"> <label for="enableEntropySamplingCheckbox">Enable Entropy Sampling:</label>
+            <div class="panel-content-area">
+                <div class="settings-group">
+                    <label for="enableEntropySamplingCheckbox">Entropy Sampling:</label>
                     <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
-                     <label for="enableEntropySamplingCheckbox" class="checkbox-label">Enabled</label>
+                    <label for="enableEntropySamplingCheckbox" class="checkbox-label">Enabled</label>
                 </div>
                 <div class="settings-group" id="entropySampleRateSliderMount">
-                    </div>
-                <div class="stats-display"> Current Sampled Entropy: <span id="stat-entropy">N/A</span>
                 </div>
-
+                <div class="stats-display">Current Sampled Entropy: <span id="stat-entropy">N/A</span></div>
                 <div class="plugins-mount-area">
                 </div>
             </div>
         </div>
-    </div>
-    <script type="module" src="src/main.js"></script>
-</body>
 
+    </div> <input type="file" id="fileInput" accept=".txt,.json" style="display: none;"> <script type="module" src="src/main.js"></script>
+</body>
 </html>

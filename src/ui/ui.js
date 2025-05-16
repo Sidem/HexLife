@@ -3,198 +3,252 @@ import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js';
+import { AnalysisPanel } from './components/AnalysisPanel.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { AnalysisPanel } from './components/AnalysisPanel.js';
+import { PopoutPanel } from './components/PopoutPanel.js'; // New PopoutPanel component
 
 let uiElements;
-let sliderComponents = {};
+let sliderComponents = {}; // For sliders within popouts
+let popoutPanels = {};    // To manage all popout instances
 let worldManagerInterfaceRef;
 let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance;
 
+// Store references to all active popouts to close others when one opens
+let activePopouts = [];
+
+function closeAllPopouts(excludePanel = null) {
+    activePopouts.forEach(popout => {
+        if (popout !== excludePanel) {
+            popout.hide();
+        }
+    });
+}
+document.addEventListener('popoutinteraction', (event) => {
+    closeAllPopouts(event.detail.panel);
+});
+
+
 export function initUI(worldManagerInterface) {
     worldManagerInterfaceRef = worldManagerInterface;
+    
     uiElements = {
-        canvas: document.getElementById('hexGridCanvas'),
-        fileInput: document.getElementById('fileInput'),
-        playPauseButton: document.getElementById('playPauseButton'),
-        randomRulesetButton: document.getElementById('randomRulesetButton'),
-        generateModeSwitch: document.getElementById('generateModeSwitch'),
-        copyRuleButton: document.getElementById('copyRuleButton'),
-        rulesetInput: document.getElementById('rulesetInput'),
-        setRuleButton: document.getElementById('setRuleButton'),
+        // Top Info Bar
         rulesetDisplay: document.getElementById('rulesetDisplay'),
-        resetOnNewRuleCheckbox: document.getElementById('resetOnNewRuleCheckbox'),
-        editRuleButton: document.getElementById('editRuleButton'),
+        statTick: document.getElementById('stat-tick'),
+        statRatio: document.getElementById('stat-ratio'),
+        // statAvgRatio: document.getElementById('stat-avg-ratio'), // Removed for now for brevity
+        statFps: document.getElementById('stat-fps'),
+        statActualTps: document.getElementById('stat-actual-tps'),
+
+        // Vertical Toolbar Buttons
+        playPauseButton: document.getElementById('playPauseButton'),
+        speedControlButton: document.getElementById('speedControlButton'),
+        brushToolButton: document.getElementById('brushToolButton'),
+        newRulesButton: document.getElementById('newRulesButton'),
+        setRulesetButton: document.getElementById('setRulesetButton'), // Toolbar button for hex input popout
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
-        resetCurrentButton: document.getElementById('resetCurrentButton'),
-        resetAllButtonNew: document.getElementById('resetAllButtonNew'),
-        clearCurrentButton: document.getElementById('clearCurrentButton'),
-        clearAllButton: document.getElementById('clearAllButton'),
-        setupPanelButton: document.getElementById('setupPanelButton'),
-        statRatio: document.getElementById('stat-ratio'),
-        statAvgRatio: document.getElementById('stat-avg-ratio'),
-        statTick: document.getElementById('stat-tick'), // Ensure this exists in HTML
+        resetClearButton: document.getElementById('resetClearButton'), // Toolbar button for reset/clear popout
+        editRuleButton: document.getElementById('editRuleButton'), // Toggles RulesetEditor panel
+        setupPanelButton: document.getElementById('setupPanelButton'), // Toggles SetupPanel
+        analysisPanelButton: document.getElementById('analysisPanelButton'), // Toggles AnalysisPanel
+
+        // Popout Panel Roots
+        speedPopout: document.getElementById('speedPopout'),
+        brushPopout: document.getElementById('brushPopout'),
+        newRulesPopout: document.getElementById('newRulesPopout'),
+        setHexPopout: document.getElementById('setHexPopout'),
+        resetClearPopout: document.getElementById('resetClearPopout'),
+
+        // Controls within Popouts
+        speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
+        neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
+        generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
+        useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
+        biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
+        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'), // Radio group
+        resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
+        generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
+        rulesetInputPopout: document.getElementById('rulesetInputPopout'),
+        setRuleFromPopoutButton: document.getElementById('setRuleFromPopoutButton'),
+        copyRuleFromPopoutButton: document.getElementById('copyRuleFromPopoutButton'),
+        resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
+        resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
+        clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
+        clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
+        
+        // Main Draggable Panels
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
-        useCustomBiasCheckbox: document.getElementById('useCustomBiasCheckbox'),
-        statFps: document.getElementById('stat-fps'),
-        statActualTps: document.getElementById('stat-actual-tps'),
-        analysisPanelButton: document.getElementById('analysisPanelButton'),
-        rulesetScopeSwitch: document.getElementById('rulesetScopeSwitch'),
-        rulesetScopeLabel: document.querySelector('label[for="rulesetScopeSwitch"]'),
-        speedSliderMount: document.getElementById('speedSliderMount'),
-        neighborhoodSizeSliderMount: document.getElementById('neighborhoodSizeSliderMount'),
-        biasSliderMount: document.getElementById('biasSliderMount'),
+
+        // Misc
+        fileInput: document.getElementById('fileInput'), // For load state
+        canvas: document.getElementById('hexGridCanvas'), // Still needed for interactions
     };
 
     if (!validateElements()) return false;
 
+    // Initialize main draggable panels
     if (uiElements.rulesetEditorPanel) rulesetEditorComponent = new RulesetEditor(uiElements.rulesetEditorPanel, worldManagerInterfaceRef);
     if (uiElements.setupPanel) setupPanelComponent = new SetupPanel(uiElements.setupPanel, worldManagerInterfaceRef);
     if (uiElements.analysisPanel) analysisPanelInstance = new AnalysisPanel(uiElements.analysisPanel, worldManagerInterfaceRef, {});
 
-    sliderComponents.speedSlider = new SliderComponent(uiElements.speedSliderMount, {
-        id: 'speedSlider', label: 'Speed:', min: 1, max: Config.MAX_SIM_SPEED, step: 1,
-        value: worldManagerInterfaceRef.getCurrentSimulationSpeed(), unit: 'tps', showValue: true,
-        onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val)
-    });
-    sliderComponents.neighborhoodSlider = new SliderComponent(uiElements.neighborhoodSizeSliderMount, {
-        id: 'neighborhoodSize', label: 'Brush:', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1,
-        value: worldManagerInterfaceRef.getCurrentBrushSize(), unit: '', showValue: true,
-        onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
-    });
-    sliderComponents.biasSlider = new SliderComponent(uiElements.biasSliderMount, {
-        id: 'biasSlider', min: 0, max: 1, step: 0.001, value: PersistenceService.loadUISetting('biasValue', 0.5),
-        showValue: true, unit: '', disabled: !uiElements.useCustomBiasCheckbox.checked,
-        onChange: val => PersistenceService.saveUISetting('biasValue', val)
-    });
+    _initPopoutPanels();
+    _initPopoutControls();
+    _setupToolbarButtonListeners();
+    _setupStateListeners(); // For file input, save/load buttons (now on toolbar)
+    
+    loadAndApplyUISettings(); // Load general UI settings (bias, modes etc.)
+    window.addEventListener('keydown', handleGlobalKeyDown); // Global hotkeys
+    setupUIEventListeners(); // EventBus subscriptions
 
-    setupGeneralListeners();
-    setupPanelToggleListeners();
-    setupStateListeners();
-    loadAndApplyUISettings();
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    updateBiasSliderDisabledState();
-    setupUIEventListeners();
-
-    updatePauseButton(worldManagerInterfaceRef.isSimulationPaused());
+    updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
 
-    console.log("UI Initialized (Worker Architecture).");
+    console.log("New Toolbar UI Initialized.");
     return true;
 }
 
-function _updateRulesetScopeSwitchLabel() {
-    if (uiElements.rulesetScopeSwitch && uiElements.rulesetScopeLabel) {
-        const label = uiElements.rulesetScopeLabel;
-        label.textContent = uiElements.rulesetScopeSwitch.checked ? (label.dataset.onText || "All Worlds") : (label.dataset.offText || "Selected World");
-    }
-}
-
-function loadAndApplyUISettings() {
-    sliderComponents.speedSlider?.setValue(worldManagerInterfaceRef.getCurrentSimulationSpeed());
-    sliderComponents.neighborhoodSlider?.setValue(worldManagerInterfaceRef.getCurrentBrushSize());
-    const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
-    uiElements.generateModeSwitch.querySelectorAll('input[name="generateMode"]').forEach(r => r.checked = r.value === genMode);
-    uiElements.resetOnNewRuleCheckbox.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
-    uiElements.useCustomBiasCheckbox.checked = PersistenceService.loadUISetting('useCustomBias', false);
-    sliderComponents.biasSlider?.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
-    if (uiElements.rulesetScopeSwitch) {
-        uiElements.rulesetScopeSwitch.checked = PersistenceService.loadUISetting('globalRulesetScopeAll', true);
-        _updateRulesetScopeSwitchLabel();
-    }
-    updateBiasSliderDisabledState();
-    if(uiElements.playPauseButton) uiElements.playPauseButton.textContent = worldManagerInterfaceRef.isSimulationPaused() ? "[P]lay" : "[P]ause";
-}
-
-function updatePerformanceDisplay(fps, tpsOfSelectedWorld) {
-    if (uiElements?.statFps) uiElements.statFps.textContent = fps !== undefined ? String(fps) : '--';
-    if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(tpsOfSelectedWorld) : '--';
-}
-
-function refreshAllRulesetViewsIfOpen() {
-    if (worldManagerInterfaceRef) {
-        rulesetEditorComponent?.refreshViews();
-    }
-}
-
-function updateBiasSliderDisabledState() {
-    sliderComponents.biasSlider?.setDisabled(!uiElements.useCustomBiasCheckbox.checked);
-}
-
 function validateElements() {
-    const critical = ['canvas', 'playPauseButton', 'randomRulesetButton', 'rulesetDisplay', 'statRatio', 'statTick', 'rulesetEditorPanel', 'setupPanel', 'analysisPanel', 'speedSliderMount', 'neighborhoodSizeSliderMount'];
-    return critical.every(key => {
-        if (!uiElements[key]) console.error(`UI Error: Element '${key}' not found.`);
-        return !!uiElements[key];
+    const critical = [
+        'rulesetDisplay', 'statTick', 'statRatio', 'statFps', 'statActualTps',
+        'playPauseButton', 'speedControlButton', 'brushToolButton', 'newRulesButton',
+        'setRulesetButton', 'saveStateButton', 'loadStateButton', 'resetClearButton',
+        'editRuleButton', 'setupPanelButton', 'analysisPanelButton',
+        'speedPopout', 'brushPopout', 'newRulesPopout', 'setHexPopout', 'resetClearPopout',
+        'rulesetEditorPanel', 'setupPanel', 'analysisPanel', 'fileInput', 'canvas'
+    ];
+    let allFound = true;
+    critical.forEach(key => {
+        if (!uiElements[key]) {
+            console.error(`UI Rework Error: Critical Element '${key}' not found in HTML.`);
+            allFound = false;
+        }
     });
+    // Also check elements within popouts if they are essential for init
+    const popoutControls = [
+        'speedSliderMountPopout', 'neighborhoodSizeSliderMountPopout', 'generateModeSwitchPopout',
+        'useCustomBiasCheckboxPopout', 'biasSliderMountPopout', 'rulesetScopeSwitchPopout',
+        'resetOnNewRuleCheckboxPopout', 'generateRulesetFromPopoutButton', 'rulesetInputPopout',
+        'setRuleFromPopoutButton', 'copyRuleFromPopoutButton', 'resetCurrentButtonPopout',
+        'resetAllButtonPopout', 'clearCurrentButtonPopout', 'clearAllButtonPopout'
+    ];
+     popoutControls.forEach(key => {
+        if (!uiElements[key]) {
+            console.warn(`UI Rework Warning: Popout control Element '${key}' not found. Might affect functionality.`);
+            // allFound = false; // Don't make these critical for initial validation if some popouts are optional
+        }
+    });
+    return allFound;
 }
 
-function setupGeneralListeners() {
-    uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
-    uiElements.generateModeSwitch.querySelectorAll('input[name="generateMode"]').forEach(r => {
+function _initPopoutPanels() {
+    popoutPanels.speed = new PopoutPanel(uiElements.speedPopout, uiElements.speedControlButton, { position: 'right', alignment: 'start'});
+    popoutPanels.brush = new PopoutPanel(uiElements.brushPopout, uiElements.brushToolButton, { position: 'right', alignment: 'start'});
+    popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5});
+    popoutPanels.setHex = new PopoutPanel(uiElements.setHexPopout, uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
+    popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
+    
+    activePopouts = Object.values(popoutPanels);
+}
+
+function _initPopoutControls() {
+    // Speed Slider in Popout
+    sliderComponents.speedSliderPopout = new SliderComponent(uiElements.speedSliderMountPopout, {
+        id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1,
+        value: worldManagerInterfaceRef.getCurrentSimulationSpeed(), unit: 'tps', showValue: true,
+        onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val)
+    });
+
+    // Brush Slider in Popout
+    sliderComponents.neighborhoodSliderPopout = new SliderComponent(uiElements.neighborhoodSizeSliderMountPopout, {
+        id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1,
+        value: worldManagerInterfaceRef.getCurrentBrushSize(), unit: '', showValue: true,
+        onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
+    });
+
+    // New Rules Popout Controls
+    uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => {
         r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('rulesetGenerationMode', r.value); });
     });
-    uiElements.resetOnNewRuleCheckbox.addEventListener('change', e => PersistenceService.saveUISetting('resetOnNewRule', e.target.checked));
-    uiElements.useCustomBiasCheckbox.addEventListener('change', e => {
+    uiElements.useCustomBiasCheckboxPopout.addEventListener('change', e => {
         PersistenceService.saveUISetting('useCustomBias', e.target.checked);
-        updateBiasSliderDisabledState();
+        updateBiasSliderDisabledStatePopout();
     });
-    if (uiElements.rulesetScopeSwitch) {
-        uiElements.rulesetScopeSwitch.addEventListener('change', e => {
-            PersistenceService.saveUISetting('globalRulesetScopeAll', e.target.checked);
-            _updateRulesetScopeSwitchLabel();
-            EventBus.dispatch(EVENTS.UI_RULESET_SCOPE_CHANGED, { scope: e.target.checked ? 'all' : 'selected' });
-        });
-    }
+    sliderComponents.biasSliderPopout = new SliderComponent(uiElements.biasSliderMountPopout, {
+        id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, value: PersistenceService.loadUISetting('biasValue', 0.5),
+        showValue: true, unit: '', disabled: !uiElements.useCustomBiasCheckboxPopout.checked,
+        onChange: val => PersistenceService.saveUISetting('biasValue', val)
+    });
+    uiElements.rulesetScopeSwitchPopout.querySelectorAll('input[name="rulesetScopePopout"]').forEach(r => {
+        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('globalRulesetScopeAll', r.value === 'all'); });
+    });
+    uiElements.resetOnNewRuleCheckboxPopout.addEventListener('change', e => PersistenceService.saveUISetting('resetOnNewRule', e.target.checked));
+    uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => {
+        const bias = uiElements.useCustomBiasCheckboxPopout.checked ? sliderComponents.biasSliderPopout.getValue() : Math.random();
+        const mode = uiElements.generateModeSwitchPopout.querySelector('input[name="generateModePopout"]:checked')?.value || 'random';
+        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked');
+        const targetScope = targetScopeRadio ? targetScopeRadio.value : 'selected';
 
-    uiElements.randomRulesetButton.addEventListener('click', () => {
-        const bias = uiElements.useCustomBiasCheckbox.checked ? sliderComponents.biasSlider.getValue() : Math.random();
-        const mode = uiElements.generateModeSwitch.querySelector('input[name="generateMode"]:checked')?.value || 'random';
-        const targetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
 
         EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
             bias,
             generationMode: mode,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? targetScope : 'none'
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
         });
+        popoutPanels.newRules.hide();
     });
 
-    uiElements.copyRuleButton.addEventListener('click', () => {
+    // Set Hex Popout Controls
+    uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
+        const hex = uiElements.rulesetInputPopout.value.trim().toUpperCase();
+        if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
+            alert("Invalid Hex: Must be 32 hex chars."); uiElements.rulesetInputPopout.select(); return;
+        }
+        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked'); // Using the same scope switch for consistency
+        const targetScope = targetScopeRadio ? targetScopeRadio.value : 'selected';
+
+        EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
+            hexString: hex,
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' // And same reset logic
+        });
+        uiElements.rulesetInputPopout.value = ''; 
+        popoutPanels.setHex.hide();
+    });
+    uiElements.rulesetInputPopout.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); uiElements.setRuleFromPopoutButton.click(); }});
+    uiElements.copyRuleFromPopoutButton.addEventListener('click', () => {
         const hex = worldManagerInterfaceRef.getCurrentRulesetHex();
         if (!hex || hex === "N/A" || hex === "Error") { alert("No ruleset for selected world to copy."); return; }
         navigator.clipboard.writeText(hex).then(() => {
-            const oldTxt = uiElements.copyRuleButton.textContent;
-            uiElements.copyRuleButton.textContent = "Copied!";
-            setTimeout(() => uiElements.copyRuleButton.textContent = oldTxt, 1500);
-        }).catch(err => alert('Failed to copy.'));
+            const oldTxt = uiElements.copyRuleFromPopoutButton.textContent;
+            uiElements.copyRuleFromPopoutButton.textContent = "Copied!";
+            setTimeout(() => uiElements.copyRuleFromPopoutButton.textContent = oldTxt, 1500);
+        }).catch(err => alert('Failed to copy ruleset hex.'));
     });
-
-    uiElements.setRuleButton.addEventListener('click', () => {
-        const hex = uiElements.rulesetInput.value.trim().toUpperCase();
-        if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
-            alert("Invalid Hex: Must be 32 hex chars."); uiElements.rulesetInput.select(); return;
-        }
-        const targetScope = uiElements.rulesetScopeSwitch.checked ? 'all' : 'selected';
-        EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
-            hexString: hex,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckbox.checked ? targetScope : 'none'
-        });
-        uiElements.rulesetInput.value = ''; uiElements.rulesetInput.blur();
-    });
-    uiElements.rulesetInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); uiElements.setRuleButton.click(); }});
+    
+    // Reset/Clear Popout Controls
+    uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
+    uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); popoutPanels.resetClear.hide(); });
+    uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
+    uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); popoutPanels.resetClear.hide(); });
 }
 
-function setupStateListeners() {
-    uiElements.saveStateButton.addEventListener('click', () => {
-        EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
-    });
+function _setupToolbarButtonListeners() {
+    uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+    // Panel toggle buttons
+    uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
+    uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
+    uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
+    // Load state still needs fileInput
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
+    uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
+}
+
+function _setupStateListeners() { // For file input primarily
     uiElements.fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) { e.target.value = null; return; }
@@ -213,52 +267,120 @@ function setupStateListeners() {
         reader.onerror = () => { alert(`Error reading file.`); e.target.value = null; };
         reader.readAsText(file);
     });
-
-    uiElements.resetCurrentButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }));
-    uiElements.resetAllButtonNew?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES));
-    uiElements.clearCurrentButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }));
-    uiElements.clearAllButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }));
 }
 
-function setupPanelToggleListeners() {
-    uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
-    uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
-    uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
+function loadAndApplyUISettings() {
+    // Load settings for popout controls
+    sliderComponents.speedSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentSimulationSpeed());
+    sliderComponents.neighborhoodSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentBrushSize());
+    
+    const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
+    uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => r.checked = r.value === genMode);
+    
+    uiElements.useCustomBiasCheckboxPopout.checked = PersistenceService.loadUISetting('useCustomBias', false);
+    sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
+    updateBiasSliderDisabledStatePopout();
+
+    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', false); // Default to 'selected' for popout
+    uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
+    
+    uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
+
+    updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
 }
 
-function updatePauseButton(isPaused) { if (uiElements?.playPauseButton) uiElements.playPauseButton.textContent = isPaused ? "[P]lay" : "[P]ause"; }
-function updateMainRulesetDisplay(hex) { if (uiElements?.rulesetDisplay) uiElements.rulesetDisplay.textContent = formatHexCode(hex); }
+function updateBiasSliderDisabledStatePopout() {
+    sliderComponents.biasSliderPopout?.setDisabled(!uiElements.useCustomBiasCheckboxPopout.checked);
+}
+
+function updatePauseButtonVisual(isPaused) { 
+    if (uiElements?.playPauseButton) {
+        uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚"; // Placeholder icons
+        uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
+    }
+}
+function updateMainRulesetDisplay(hex) { 
+    if (uiElements?.rulesetDisplay) {
+        uiElements.rulesetDisplay.textContent = formatHexCode(hex); 
+    }
+}
 
 function updateStatsDisplay(stats) {
-    if (!stats || !uiElements || stats.worldIndex !== worldManagerInterfaceRef.getSelectedWorldIndex()) {
-        // If stats are for a different world or null, clear/default the display for selected world
-        if (uiElements.statTick) uiElements.statTick.textContent = '--';
-        if (uiElements.statRatio) uiElements.statRatio.textContent = '--';
-        if (uiElements.statAvgRatio) uiElements.statAvgRatio.textContent = '--'; // Or keep last known for selected
-        return;
+    if (!stats || !uiElements) return;
+
+    if (stats.worldIndex !== undefined && stats.worldIndex !== worldManagerInterfaceRef.getSelectedWorldIndex()) {
+      // Stats are for a non-selected world, don't update the main display from these.
+      // The selected world's stats will come through its own update.
+      return;
     }
-    if (uiElements.statTick) uiElements.statTick.textContent = stats.tick !== undefined ? String(stats.tick) : '--';
-    if (uiElements.statRatio) uiElements.statRatio.textContent = stats.ratio !== undefined ? (stats.ratio * 100).toFixed(2) : '--';
-    if (uiElements.statAvgRatio) uiElements.statAvgRatio.textContent = stats.avgRatio !== undefined ? (stats.avgRatio * 100).toFixed(2) : '--'; // avgRatio needs to be calculated and provided in stats
-    else if (uiElements.statAvgRatio) uiElements.statAvgRatio.textContent = 'N/A'; // Placeholder if avgRatio is removed/reworked
+    
+    uiElements.statTick.textContent = stats.tick !== undefined ? String(stats.tick) : '--';
+    uiElements.statRatio.textContent = stats.ratio !== undefined ? (stats.ratio * 100).toFixed(2) : '--';
+    // uiElements.statAvgRatio.textContent = stats.avgRatio !== undefined ? (stats.avgRatio * 100).toFixed(2) : '--'; 
+    // FPS and TPS are updated by a different event (PERFORMANCE_METRICS_UPDATED)
+}
+
+function updatePerformanceDisplay(fps, tpsOfSelectedWorld) {
+    if (uiElements?.statFps) uiElements.statFps.textContent = fps !== undefined ? String(fps) : '--';
+    if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(tpsOfSelectedWorld) : '--';
 }
 
 
 function handleGlobalKeyDown(event) {
     const activeEl = document.activeElement;
-    const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable);
-    if (isInputFocused && activeEl !== uiElements.rulesetInput) return;
+    const isInputFocused = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.tagName === 'SELECT' || 
+        activeEl.isContentEditable
+    );
+    // Allow hotkeys if focus is on a popout input unless it's the main hex input
+    if (isInputFocused && activeEl !== uiElements.rulesetInputPopout && activeEl !== uiElements.editorRulesetInput) {
+         // Check if the focused element is inside a popout or draggable panel. If so, maybe allow some hotkeys.
+        if (activeEl.closest('.popout-panel') || activeEl.closest('.draggable-panel-base')) {
+            // For now, let's assume most inputs in panels/popouts should prevent global hotkeys
+             if (event.key === "Escape") { // Universal escape for popouts/panels
+                closeAllPopouts();
+                // Potentially also close the active draggable panel if one is open and not an input field within it
+                if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
+                else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
+                else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
+             }
+            return;
+        }
+    }
+
+
+    // If an input within a draggable panel or specific popout input is focused, generally block hotkeys
+    // except for Escape.
+    if (isInputFocused && (activeEl === uiElements.rulesetInputPopout || activeEl === uiElements.editorRulesetInput)) {
+        if (event.key === "Escape") {
+            activeEl.blur(); // Lose focus
+            // Find which popout it belongs to and hide it
+            if (activeEl === uiElements.rulesetInputPopout) popoutPanels.setHex.hide();
+        }
+        return; // Don't process other hotkeys if these specific inputs are focused
+    }
+
 
     const keyMap = {
         'P': () => uiElements.playPauseButton?.click(),
-        'N': () => uiElements.randomRulesetButton?.click(),
-        'R': () => uiElements.resetCurrentButton?.click(),
-        'C': () => uiElements.clearCurrentButton?.click(),
-        'E': () => rulesetEditorComponent?.toggle(),
-        'S': () => setupPanelComponent?.toggle(),
-        'A': () => analysisPanelInstance?.toggle(),
+        'N': () => { closeAllPopouts(); popoutPanels.newRules?.toggle(); },
+        'E': () => { closeAllPopouts(); rulesetEditorComponent?.toggle(); },
+        'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },
+        'A': () => { closeAllPopouts(); analysisPanelInstance?.toggle(); },
+        'Escape': () => { // Universal Escape
+            let aPopoutWasOpen = false;
+            activePopouts.forEach(p => { if (!p.isHidden()) { p.hide(); aPopoutWasOpen = true; }});
+            if (!aPopoutWasOpen) { // If no popouts were open, try closing draggable panels
+                if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
+                else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
+                else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
+            }
+        }
+        // Add more hotkeys for other toolbar buttons if desired e.g. R for Reset/Clear popout
     };
-    const action = keyMap[event.key.toUpperCase()];
+    const action = keyMap[event.key.toUpperCase()] || keyMap[event.key]; // Check for 'Escape' directly
     if (action) {
         action();
         event.preventDefault();
@@ -266,28 +388,41 @@ function handleGlobalKeyDown(event) {
 }
 
 function setupUIEventListeners() {
-    EventBus.subscribe(EVENTS.SIMULATION_PAUSED, updatePauseButton);
-    EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => sliderComponents.speedSlider?.setValue(speed, false));
+    EventBus.subscribe(EVENTS.SIMULATION_PAUSED, updatePauseButtonVisual);
+    EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => sliderComponents.speedSliderPopout?.setValue(speed, false));
     EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => {
         updateMainRulesetDisplay(hex);
-        refreshAllRulesetViewsIfOpen();
+        // If editor is open, it should also update its internal hex input if it's not focused
+        if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) {
+            if (document.activeElement !== uiElements.editorRulesetInput) {
+                uiElements.editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
+            }
+            rulesetEditorComponent.refreshViews(); // Ensure grids update
+        }
+        if (uiElements.rulesetInputPopout && document.activeElement !== uiElements.rulesetInputPopout) {
+             uiElements.rulesetInputPopout.value = (hex === "Error" || hex === "N/A") ? "" : hex;
+        }
     });
-    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSlider?.setValue(size, false));
-    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay);
+    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
+    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay); // For selected world primarily
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-        setupPanelComponent?.refreshViews();
+        setupPanelComponent?.refreshViews(); // Setup panel shows densities
         if (worldManagerInterfaceRef) updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     });
-    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => {
+    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => { // When densities or enabled states change
         setupPanelComponent?.refreshViews();
-        if (worldManagerInterfaceRef) updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
+        if (worldManagerInterfaceRef) { // Update top bar display if selected world's ruleset was part of settings change
+             updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
+        }
     });
     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, data => updatePerformanceDisplay(data.fps, data.tps));
     EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (newIndex) => {
         if (worldManagerInterfaceRef) {
             updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
             updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
-            refreshAllRulesetViewsIfOpen();
+            if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.refreshViews();
+            if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.refreshViews();
+
         }
     });
     EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => {
@@ -295,4 +430,5 @@ function setupUIEventListeners() {
     });
 }
 
+// Expose elements if needed by main.js for canvas interactions (though canvas is passed directly now)
 export function getUIElements() { return uiElements; }
