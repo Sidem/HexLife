@@ -1,3 +1,8 @@
+// src/rendering/webglUtils.js
+// This file contains utility functions for WebGL setup and operations.
+// It's not expected to change significantly with the worker refactor,
+// as it deals with WebGL API interactions on the main thread.
+
 /**
  * Creates and compiles a shader.
  * @param {WebGL2RenderingContext} gl The WebGL Context.
@@ -33,8 +38,9 @@ export function createProgram(gl, vertexShader, fragmentShader) {
     gl.linkProgram(program);
     const success = gl.getProgramParameter(program, gl.LINK_STATUS);
     if (success) {
-        gl.deleteShader(vertexShader);
-        gl.deleteShader(fragmentShader);
+        // It's good practice to delete shaders after linking the program
+        // gl.deleteShader(vertexShader); // Renderer.js does this in its current form after getting program
+        // gl.deleteShader(fragmentShader);
         return program;
     }
     console.error("Shader program linking error:", gl.getProgramInfoLog(program));
@@ -60,8 +66,13 @@ export async function loadShaderProgram(gl, vsPath, fsPath) {
 
         const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
         const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+        const program = createProgram(gl, vertexShader, fragmentShader);
 
-        return createProgram(gl, vertexShader, fragmentShader);
+        if (program) { // Clean up shaders if program linking was successful
+            gl.deleteShader(vertexShader);
+            gl.deleteShader(fragmentShader);
+        }
+        return program;
 
     } catch (e) {
         console.error("Failed to load or compile shaders:", e);
@@ -83,7 +94,7 @@ export function createBuffer(gl, target, data, usage) {
     const buffer = gl.createBuffer();
     gl.bindBuffer(target, buffer);
     gl.bufferData(target, data, usage);
-    gl.bindBuffer(target, null);
+    // gl.bindBuffer(target, null); // Good practice to unbind, but renderer often rebinds immediately.
     return buffer;
 }
 
@@ -97,12 +108,15 @@ export function createBuffer(gl, target, data, usage) {
  */
 export function updateBuffer(gl, buffer, target, data, offset = 0) {
     gl.bindBuffer(target, buffer);
+    // Check if data is smaller than buffer size for subdata, or full data replacement
     if (offset > 0 || data.byteLength < gl.getBufferParameter(target, gl.BUFFER_SIZE)) {
          gl.bufferSubData(target, offset, data);
     } else {
+        // If replacing all data and size is same or larger, bufferData might be more appropriate
+        // or if usage pattern changes. Current renderer logic uses DYNAMIC_DRAW.
          gl.bufferData(target, data, gl.getBufferParameter(target, gl.BUFFER_USAGE));
     }
-    gl.bindBuffer(target, null);
+    // gl.bindBuffer(target, null);
 }
 
 
@@ -117,17 +131,17 @@ export function createFBOTexture(gl, width, height) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     const level = 0;
-    const internalFormat = gl.RGBA;
+    const internalFormat = gl.RGBA; // Or gl.RGBA8 for explicit sizing
     const border = 0;
     const format = gl.RGBA;
     const type = gl.UNSIGNED_BYTE;
-    const data = null;
+    const data = null; // No initial data for FBO texture
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   width, height, border, format, type, data);
 
+    // Set texture parameters for FBOs (typically NEAREST, CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -148,7 +162,7 @@ export function createFBO(gl, texture) {
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (status !== gl.FRAMEBUFFER_COMPLETE) {
-        console.error("FBO creation failed:", status);
+        console.error("FBO creation failed: " + status.toString());
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);

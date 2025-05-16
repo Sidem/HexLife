@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Explorer</title>
+    <title>HexLife Explorer (Worker)</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -75,7 +75,7 @@
 
             <div id="status-info-area">
                 <div class="ui-group" id="stats-content">
-                    <div>Ratio: <span id="stat-ratio">--</span>%</div>
+                    <div>Tick: <span id="stat-tick">--</span></div> <div>Ratio: <span id="stat-ratio">--</span>%</div>
                     <div>Avg: <span id="stat-avg-ratio">--</span>%</div>
                 </div>
                 <div class="ui-group" id="group-performance">
@@ -97,7 +97,7 @@
                 <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
-                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option> 
+                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
                 </select>
             </div>
             <div class="editor-apply-scope-controls">
@@ -113,10 +113,10 @@
                     <label for="editorAutoResetCheckbox" class="checkbox-label">Auto-Reset on Change</label>
                 </div>
             </div>
-            <div class="panel-content-area"> 
-                <div id="rulesetEditorGrid" class="hidden"></div> 
+            <div class="panel-content-area">
+                <div id="rulesetEditorGrid" class="hidden"></div>
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
-                <div id="rotationalSymmetryRulesetEditorGrid"></div> 
+                <div id="rotationalSymmetryRulesetEditorGrid"></div>
                 <div class="editor-text">
                     <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to propagate these changes to all worlds.</p>
                     <p>Each group shows a possible neighborhood configuration (center hex + 6 neighbors).</p>
@@ -138,7 +138,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div id="setupPanel" class="draggable-panel-base hidden">
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
@@ -155,7 +155,8 @@
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>Analysis Tools</h3>
             <div class="panel-content-area"> <div class="settings-group"> <label for="enableEntropySamplingCheckbox">Enable Entropy Sampling:</label>
-                    <input type="checkbox" id="enableEntropySamplingCheckbox">
+                    <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
+                     <label for="enableEntropySamplingCheckbox" class="checkbox-label">Enabled</label>
                 </div>
                 <div class="settings-group" id="entropySampleRateSliderMount">
                     </div>

@@ -4,28 +4,28 @@ import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { formatHexCode } from '../../utils/utils.js'; // Import formatHexCode
 
 export class SetupPanel {
-    constructor(panelElement, worldManagerInterface) { // Changed to worldManagerInterface
+    constructor(panelElement, worldManagerInterface) { 
         if (!panelElement || !worldManagerInterface) {
             console.error('SetupPanel: panelElement or worldManagerInterface is null.');
             return;
         }
         this.panelElement = panelElement;
-        this.worldManager = worldManagerInterface; // Store the interface
+        this.worldManager = worldManagerInterface; 
         this.panelIdentifier = 'setup';
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeSetupPanelButton') || panelElement.querySelector('.close-panel-button'),
             worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: panelElement.querySelector('#applySetupButton'),
         };
-        this.worldSliderComponents = []; // For density sliders
+        this.worldSliderComponents = []; 
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
         this._loadPanelState();
         this._setupInternalListeners();
         if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
 
-        // Subscribe to changes that might affect this panel's display
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refreshViews());
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refreshViews());
     }
@@ -35,9 +35,6 @@ export class SetupPanel {
             this.uiElements.closeButton.addEventListener('click', () => this.hide());
         }
         if (this.uiElements.applySetupButton) {
-            // This button in the UI is "Apply & Reset All Worlds".
-            // It implies taking the current density/enabled settings from this panel
-            // and re-initializing all worlds. The rulesets for each world are whatever they currently are.
             this.uiElements.applySetupButton.addEventListener('click', () => {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
             });
@@ -49,7 +46,7 @@ export class SetupPanel {
                     if (!isNaN(worldIndex)) {
                         EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, {
                             scope: worldIndex,
-                            copyPrimaryRuleset: true // Signal to copy selected world's (main view) ruleset
+                            copyPrimaryRuleset: true 
                         });
                     }
                 }
@@ -65,19 +62,23 @@ export class SetupPanel {
 
     _populateWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
-        grid.innerHTML = ''; // Clear previous
+        grid.innerHTML = ''; 
         this.worldSliderComponents.forEach(slider => slider.destroy());
         this.worldSliderComponents = [];
 
         const fragment = document.createDocumentFragment();
-        const currentWorldSettings = this.worldManager.getWorldSettingsForUI(); // Get settings from WorldManager
+        const currentWorldSettings = this.worldManager.getWorldSettingsForUI(); 
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
+            
+            const formattedFullHex = formatHexCode(settings.rulesetHex); // Format the full hex code
+            const shortHex = settings.rulesetHex && settings.rulesetHex !== "Error" ? settings.rulesetHex.substring(0,4) : "ERR";
+
             cell.innerHTML =
-                `<div class="world-label">World ${i} (Rules: ${settings.rulesetHex.substring(0,4)}...)</div>` +
+                `<div class="world-label" title="${formattedFullHex}">World ${i} (Rules: ${shortHex}...)</div>` + // Added title attribute
                 `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
                 `<div class="setting-control enable-control">` +
                     `<input type="checkbox" id="enableSwitch_${i}" class="enable-switch checkbox-input" ${settings.enabled ? 'checked' : ''} data-world-index="${i}">` +
@@ -137,7 +138,6 @@ export class SetupPanel {
         this.draggablePanel.destroy();
         this.worldSliderComponents.forEach(s=>s.destroy());
         this.worldSliderComponents=[];
-        // Unsubscribe from events if any direct subscriptions were made here (BaseComponent handles its own)
     }
     isHidden(){return this.draggablePanel.isHidden();}
 }

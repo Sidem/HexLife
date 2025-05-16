@@ -1,12 +1,13 @@
 // src/main.js
 import * as Config from './core/config.js';
-import * as Simulation from './core/simulation.js';
+import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
 import * as UI from './ui/ui.js';
 import * as Utils from './utils/utils.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 
 let gl;
+let worldManager;
 let isInitialized = false;
 let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
@@ -15,12 +16,9 @@ let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
 
-let accumulatedTicks = 0;
-let lastTpsUpdateTime = 0;
-let actualTps = 0;
 
 async function initialize() {
-    console.log("Starting Initialization...");
+    console.log("Starting Initialization (Worker Architecture)...");
     const canvas = document.getElementById('hexGridCanvas');
     if (!canvas) {
         console.error("Canvas element not found!");
@@ -33,40 +31,49 @@ async function initialize() {
         return;
     }
 
-    Simulation.initSimulation(); // This now initializes per-world rulesets
+    worldManager = new WorldManager();
 
-    // This interface remains largely the same, but the underlying Simulation functions
-    // like getCurrentRulesetHex now refer to the selected world's ruleset.
-    const simulationInterfaceForUI = {
-        isSimulationPaused: Simulation.isSimulationPaused,
-        getCurrentRulesetHex: Simulation.getCurrentRulesetHex, // Now gets selected world's ruleset hex
-        getCurrentRulesetArray: Simulation.getCurrentRulesetArray, // Now gets selected world's ruleset array
-        getCurrentSimulationSpeed: Simulation.getCurrentSimulationSpeed,
-        getCurrentBrushSize: Simulation.getCurrentBrushSize,
-        getSelectedWorldIndex: Simulation.getSelectedWorldIndex,
-        getWorldStateForSave: Simulation.getWorldStateForSave,  // Now saves selected world's state including its rulesetHex
-        getSelectedWorldStats: Simulation.getSelectedWorldStats,
-        getEntropySamplingState: Simulation.getEntropySamplingState,
-        getWorldSettings: Simulation.getWorldSettings, // May need to include per-world ruleset hex if we want to save/load them with world settings
-        getSelectedWorldRatioHistory: Simulation.getSelectedWorldRatioHistory,
-        getSelectedWorldEntropyHistory: Simulation.getSelectedWorldEntropyHistory,
-        getEffectiveRuleForNeighborCount: Simulation.getEffectiveRuleForNeighborCount, // Uses selected world's ruleset
-        getCanonicalRuleDetails: Simulation.getCanonicalRuleDetails, // Uses selected world's ruleset
-        getEffectiveRuleForCanonicalRepresentative: Simulation.getEffectiveRuleForCanonicalRepresentative, // Uses selected world's ruleset
+    const worldManagerInterfaceForUI = {
+        isSimulationPaused: worldManager.isSimulationPaused,
+        getCurrentRulesetHex: worldManager.getCurrentRulesetHex,
+        getCurrentRulesetArray: worldManager.getCurrentRulesetArray,
+        getCurrentSimulationSpeed: worldManager.getCurrentSimulationSpeed,
+        getCurrentBrushSize: worldManager.getCurrentBrushSize,
+        getSelectedWorldIndex: worldManager.getSelectedWorldIndex,
+        getSelectedWorldStats: worldManager.getSelectedWorldStats,
+        getWorldSettingsForUI: worldManager.getWorldSettingsForUI,
+        getEffectiveRuleForNeighborCount: worldManager.getEffectiveRuleForNeighborCount,
+        getCanonicalRuleDetails: worldManager.getCanonicalRuleDetails,
+        getSymmetryData: worldManager.getSymmetryData,
+        rulesetToHex: worldManager.rulesetToHex,
+        hexToRuleset: worldManager.hexToRuleset,
+        // Add methods for analysis history if AnalysisPanel requires them directly
+        getSelectedWorldRatioHistory: () => { // Example placeholder
+            const stats = worldManager.getSelectedWorldStats();
+            return stats?.ratioHistory || [];
+        },
+        getSelectedWorldEntropyHistory: () => { // Example placeholder
+            const stats = worldManager.getSelectedWorldStats();
+            return stats?.entropyHistory || [];
+        },
+        getEntropySamplingState: () => worldManager.getEntropySamplingState(), // Assuming WorldManager has this
     };
 
-    if (!UI.initUI(simulationInterfaceForUI)) {
+    if (!UI.initUI(worldManagerInterfaceForUI)) {
         console.error("UI initialization failed.");
         return;
     }
     setupCanvasListeners(canvas);
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', () => {
+        worldManager.terminateAllWorkers();
+    });
+
 
     isInitialized = true;
     lastTimestamp = performance.now();
     lastFpsUpdateTime = lastTimestamp;
-    lastTpsUpdateTime = lastTimestamp;
 
     console.log("Initialization Complete. Starting Render Loop.");
     requestAnimationFrame(renderLoop);
@@ -80,95 +87,108 @@ function setupCanvasListeners(canvas) {
 }
 
 function handleCanvasClick(event) {
-    if (!isInitialized) return;
-    const { worldIndex, col, row, viewType } = getCoordsFromMouseEvent(event);
+    if (!isInitialized || !worldManager) return;
+    const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
 
-    if (worldIndex !== null) {
-        const previousSelectedWorld = Simulation.getSelectedWorldIndex();
-        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex); // This will trigger RULESET_CHANGED if selection changes
+    if (worldIndexAtCursor !== null) {
+        const previousSelectedWorld = worldManager.getSelectedWorldIndex();
+        if (worldIndexAtCursor !== previousSelectedWorld) {
+            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
+        }
 
         if (viewType === 'selected' && col !== null && row !== null) {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, {
-                worldIndex: worldIndex, // Should be current selected world index after COMMAND_SELECT_WORLD
+                worldIndex: worldIndexAtCursor,
                 col: col,
                 row: row,
-                brushSize: Simulation.getCurrentBrushSize()
             });
         }
     }
 }
 
 function handleCanvasMouseMove(event) {
-    if (!isInitialized) return;
-    const { worldIndex, col, row } = getCoordsFromMouseEvent(event);
-    for (let i = 0; i < Config.NUM_WORLDS; i++) { // Clear all hover states
-        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
+    if (!isInitialized || !worldManager) return;
+    const { worldIndexAtCursor, col, row } = getCoordsFromMouseEvent(event);
+
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        if (i !== worldIndexAtCursor || col == null) {
+             EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
+        }
     }
-    if (worldIndex !== null && col !== null && row !== null) { // Set hover for the specific world under mouse
+
+    if (worldIndexAtCursor !== null && col !== null && row !== null) {
         EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, {
-            worldIndex: worldIndex,
+            worldIndex: worldIndexAtCursor,
             col: col,
             row: row,
-            brushSize: Simulation.getCurrentBrushSize()
         });
     }
 }
 
 function handleCanvasMouseOut() {
-    if (!isInitialized) return;
+    if (!isInitialized || !worldManager) return;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
          EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
     }
 }
 
 function handleCanvasMouseWheel(event) {
-    if (!isInitialized) return;
+    if (!isInitialized || !worldManager) return;
     event.preventDefault();
-    let currentBrush = Simulation.getCurrentBrushSize();
+    let currentBrush = worldManager.getCurrentBrushSize();
     const scrollAmount = Math.sign(event.deltaY);
     let newSize = currentBrush - scrollAmount;
     newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, newSize));
 
     if (newSize !== currentBrush) {
         EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
-        // Re-trigger mouse move to update hover with new brush size if mouse is over canvas
-        if (event.clientX !== undefined && event.clientY !== undefined) {
-            // Need to check if mouse is actually over the canvas for safety
-            const rect = gl.canvas.getBoundingClientRect();
-            if (event.clientX >= rect.left && event.clientX <= rect.right &&
-                event.clientY >= rect.top && event.clientY <= rect.bottom) {
-                handleCanvasMouseMove(event);
-            }
+        const rect = gl.canvas.getBoundingClientRect();
+        if (event.clientX >= rect.left && event.clientX <= rect.right &&
+            event.clientY >= rect.top && event.clientY <= rect.bottom) {
+            handleCanvasMouseMove(event);
         }
     }
 }
 
 function getCoordsFromMouseEvent(event) {
-    if (!gl || !gl.canvas) return { worldIndex: null, col: null, row: null, viewType: null };
+    if (!gl || !gl.canvas || !worldManager) return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
     const rect = gl.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
+
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
     const isLandscape = canvasWidth >= canvasHeight;
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
+
     if (isLandscape) {
-        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5; selectedViewHeight = canvasHeight - padding * 2;
-        selectedViewX = padding; selectedViewY = padding;
-        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5; miniMapAreaHeight = selectedViewHeight;
-        miniMapAreaX = selectedViewX + selectedViewWidth + padding; miniMapAreaY = padding;
+        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
+        selectedViewHeight = canvasHeight - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
+        miniMapAreaHeight = selectedViewHeight;
+        miniMapAreaX = selectedViewX + selectedViewWidth + padding;
+        miniMapAreaY = padding;
     } else {
-        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5; selectedViewWidth = canvasWidth - padding * 2;
-        selectedViewX = padding; selectedViewY = padding;
-        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5; miniMapAreaWidth = selectedViewWidth;
-        miniMapAreaX = padding; miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
+        selectedViewWidth = canvasWidth - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
+        miniMapAreaWidth = selectedViewWidth;
+        miniMapAreaX = padding;
+        miniMapAreaY = selectedViewY + selectedViewHeight + padding;
     }
+
     const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
     const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
     let gridContainerWidth, gridContainerHeight;
     const miniMapContainerPaddingFactor = 0.95;
+
     if (miniMapAreaRatio > miniMapGridRatio) {
         gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
         gridContainerWidth = gridContainerHeight * miniMapGridRatio;
@@ -179,56 +199,75 @@ function getCoordsFromMouseEvent(event) {
     const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
     const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
     const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
+
     const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
     const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
+    const currentSelectedWorldIdx = worldManager.getSelectedWorldIndex();
     if (mouseX >= selectedViewX && mouseX < selectedViewX + selectedViewWidth &&
         mouseY >= selectedViewY && mouseY < selectedViewY + selectedViewHeight) {
-        const selWorldIdx = Simulation.getSelectedWorldIndex();
         const texCoordX = (mouseX - selectedViewX) / selectedViewWidth;
         const texCoordY = (mouseY - selectedViewY) / selectedViewHeight;
         const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
-        return { worldIndex: selWorldIdx, col, row, viewType: 'selected' };
+        return { worldIndexAtCursor: currentSelectedWorldIdx, col, row, viewType: 'selected' };
     }
+
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const c_map = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + c_map * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing);
+
         if (mouseX >= miniX && mouseX < miniX + miniMapW &&
             mouseY >= miniY && mouseY < miniY + miniMapH) {
             const texCoordX = (mouseX - miniX) / miniMapW;
             const texCoordY = (mouseY - miniY) / miniMapH;
             const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY);
-            return { worldIndex: i, col, row, viewType: 'mini' };
+            return { worldIndexAtCursor: i, col, row, viewType: 'mini' };
         }
     }
-    return { worldIndex: null, col: null, row: null, viewType: null };
+    return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
 }
+
 
 function textureCoordsToGridCoords(texX, texY) {
     if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null };
     const pixelX = texX * Config.RENDER_TEXTURE_SIZE;
     const pixelY = texY * Config.RENDER_TEXTURE_SIZE;
+
     const textureHexSize = Utils.calculateHexSizeForTexture();
     const startX = textureHexSize;
     const startY = textureHexSize * Math.sqrt(3) / 2;
+
     let minDistSq = Infinity;
-    let closestCol = null; let closestRow = null;
-    for (let r = 0; r < Config.GRID_ROWS; r++) {
-        for (let c = 0; c < Config.GRID_COLS; c++) {
+    let closestCol = null;
+    let closestRow = null;
+
+    const searchRadius = 2;
+    const estimatedColRough = (pixelX - startX) / (textureHexSize * 1.5);
+    const estimatedRowRough = (pixelY - startY) / (textureHexSize * Math.sqrt(3));
+
+    for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
+        for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
+            const c = Math.round(estimatedColRough + cOffset);
+            const r = Math.round(estimatedRowRough + rOffset);
+
+            if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
+
             const center = Utils.gridToPixelCoords(c, r, textureHexSize, startX, startY);
-            const dx = pixelX - center.x; const dy = pixelY - center.y;
+            const dx = pixelX - center.x;
+            const dy = pixelY - center.y;
             const distSq = dx * dx + dy * dy;
+
             if (distSq < minDistSq) {
-                 if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
-                    minDistSq = distSq; closestCol = c; closestRow = r;
+                 // Check if point is within this hexagon before declaring it closest.
+                 // A simpler check might be if distSq < (textureHexSize * textureHexSize * 0.75) or so.
+                 // For perfect accuracy, use isPointInHexagon.
+                if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
+                    minDistSq = distSq;
+                    closestCol = c;
+                    closestRow = r;
                 }
-            }
-             // Optimization: if distSq is already greater than a quarter of hex area, likely not the closest one if it's outside the immediate vicinity.
-            if (distSq > (textureHexSize * textureHexSize) && closestCol !== null) {
-                 // This simple optimization might not be universally safe for all hex sizes and densities.
-                 // A more robust check might be based on axial distance or cube distance if performance here is critical.
             }
         }
     }
@@ -237,27 +276,27 @@ function textureCoordsToGridCoords(texX, texY) {
 
 function handleResize() {
     if (!isInitialized || !gl) return;
-    Renderer.resizeRenderer(); 
+    Renderer.resizeRenderer();
 }
 
 function handleVisibilityChange() {
-    if (!isInitialized) return;
+    if (!isInitialized || !worldManager) return;
     if (document.hidden) {
-        if (!Simulation.isSimulationPaused()) {
-            Simulation.setSimulationPaused(true);
+        if (!worldManager.isSimulationPaused()) {
+            worldManager.setGlobalPause(true);
             pausedByVisibilityChange = true;
         }
     } else {
         if (pausedByVisibilityChange) {
-            Simulation.setSimulationPaused(false);
+            worldManager.setGlobalPause(false);
             pausedByVisibilityChange = false;
-            lastTimestamp = performance.now(); // Reset timestamp to avoid large jump
+            lastTimestamp = performance.now();
         }
     }
 }
 
 function renderLoop(timestamp) {
-    if (!isInitialized) {
+    if (!isInitialized || !worldManager) {
         requestAnimationFrame(renderLoop);
         return;
     }
@@ -265,16 +304,17 @@ function renderLoop(timestamp) {
     const timeDelta = (timestamp - lastTimestamp) / 1000.0;
     lastTimestamp = timestamp;
 
-    const ticksProcessedThisFrame = Simulation.stepSimulation(timeDelta);
-    accumulatedTicks += ticksProcessedThisFrame;
+    const allWorldsData = worldManager.getWorldsRenderData();
+    Renderer.renderFrame(allWorldsData, worldManager.getSelectedWorldIndex());
 
-    Renderer.renderFrame(Simulation.getWorldsData(), Simulation.getSelectedWorldIndex());
     frameCount++;
-    
-    if (timestamp - lastFpsUpdateTime >= 1000) { // Update FPS and TPS every second
-        actualFps = frameCount; frameCount = 0; lastFpsUpdateTime = timestamp;
-        actualTps = accumulatedTicks; accumulatedTicks = 0; lastTpsUpdateTime = timestamp; // Reset TPS counter at same interval
-        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: actualTps });
+    if (timestamp - lastFpsUpdateTime >= 1000) {
+        actualFps = frameCount;
+        frameCount = 0;
+        lastFpsUpdateTime = timestamp;
+
+        const selectedStats = worldManager.getSelectedWorldStats();
+        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0 });
     }
 
     requestAnimationFrame(renderLoop);

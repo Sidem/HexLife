@@ -5,14 +5,14 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
-const NEIGHBOR_DIRS_ODD_R = [
-    [+1, 0], [+1, +1], [0, +1],
-    [-1, +1], [-1, 0], [0, -1]
-];
-const NEIGHBOR_DIRS_EVEN_R = [
-    [+1, -1], [+1, 0], [0, +1],
-    [-1, 0], [-1, -1], [0, -1]
-];
+// const NEIGHBOR_DIRS_ODD_R = [
+//     [+1, 0], [+1, +1], [0, +1],
+//     [-1, +1], [-1, 0], [0, -1]
+// ];
+// const NEIGHBOR_DIRS_EVEN_R = [
+//     [+1, -1], [+1, 0], [0, +1],
+//     [-1, 0], [-1, -1], [0, -1]
+// ];
 
 let worldsData = [];
 
@@ -340,7 +340,7 @@ function runSingleStepForAllWorlds() {
         for (let i = 0; i < Config.NUM_CELLS; i++) {
             const cCol = i % numCols, cRow = Math.floor(i/numCols), cState = jsStateArray[i];
             let neighborMask = 0;
-            const dirs = (cCol % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
+            const dirs = (cCol % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
             for (let nOrder = 0; nOrder < 6; nOrder++) {
                 const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
                 const nRow = (cRow + dirs[nOrder][1] + Config.GRID_ROWS) % Config.GRID_ROWS;
@@ -538,7 +538,7 @@ export function hexToRuleset(hexString) {
 }
 
 function getNeighbors(col, row) {
-    const dirs = (col % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
+    const dirs = (col % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
     return dirs.map(d => [col + d[0], row + d[1]]);
 }
 

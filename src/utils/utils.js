@@ -1,3 +1,4 @@
+
 import * as Config from '../core/config.js'; 
 
 /**
@@ -14,35 +15,39 @@ export function indexToCoords(index) {
 
 /**
  * Gets the index for given coordinates using direct arithmetic.
- * Returns undefined if coordinates are out of bounds or invalid,
- * mimicking Map.get behavior for non-existent keys.
+ * Returns undefined if coordinates are out of bounds or invalid.
  * @param {number} col Column index.
  * @param {number} row Row index.
  * @returns {number|undefined} The index or undefined if not found/invalid.
  */
 export function coordsToIndex(col, row) {
-    
-    if (typeof col !== 'number' || typeof row !== 'number' || 
-        isNaN(col) || isNaN(row) || 
+    if (typeof col !== 'number' || typeof row !== 'number' ||
+        isNaN(col) || isNaN(row) ||
         col < 0 || col >= Config.GRID_COLS ||
         row < 0 || row >= Config.GRID_ROWS) {
-        return undefined; 
+        return undefined;
     }
     return row * Config.GRID_COLS + col;
 }
 
 /**
  * Generates vertices for a flat-top hexagon centered at (0,0) with radius 1.
- * @returns {Float32Array} Array of vertex coordinates (x, y).
+ * Order: Starts from right-middle, goes counter-clockwise.
+ * @returns {Float32Array} Array of vertex coordinates (x, y), 6 vertices for TRIANGLE_FAN.
  */
 export function createFlatTopHexagonVertices() {
     const vertices = [];
+    
+    
     for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 180 * (60 * i);
-        vertices.push(Math.cos(angle), Math.sin(angle));
+        
+        const angle_deg = 60 * i; 
+        const angle_rad = Math.PI / 180 * angle_deg;
+        vertices.push(Math.cos(angle_rad), Math.sin(angle_rad));
     }
     return new Float32Array(vertices);
 }
+
 
 /**
  * Calculates the screen pixel center for a hexagon based on its grid coordinates.
@@ -55,12 +60,15 @@ export function createFlatTopHexagonVertices() {
  * @returns {{x: number, y: number}} Pixel coordinates of the center.
  */
 export function gridToPixelCoords(col, row, hexSize, startX = 0, startY = 0) {
-    const hexWidth = 2 * hexSize;
-    const hexHeight = Math.sqrt(3) * hexSize;
+    const hexWidth = 2 * hexSize; 
+    const hexHeight = Math.sqrt(3) * hexSize; 
     const horizSpacing = hexWidth * 3 / 4;
     const vertSpacing = hexHeight;
 
-    const yOffset = (col % 2 !== 0) ? vertSpacing / 2 : 0;
+    let yOffset = 0;
+    if (col % 2 !== 0) { 
+        yOffset = vertSpacing / 2;
+    }
     const x = startX + col * horizSpacing;
     const y = startY + row * vertSpacing + yOffset;
     return { x, y };
@@ -72,25 +80,43 @@ export function gridToPixelCoords(col, row, hexSize, startX = 0, startY = 0) {
  * @param {number} pointY Pixel Y of the point.
  * @param {number} hexCenterX Pixel X of the hexagon center.
  * @param {number} hexCenterY Pixel Y of the hexagon center.
- * @param {number} hexSize Hexagon radius.
+ * @param {number} hexSize Hexagon radius (distance from center to vertex).
  * @returns {boolean} True if the point is inside.
  */
 export function isPointInHexagon(pointX, pointY, hexCenterX, hexCenterY, hexSize) {
-    const hexWidth = 2 * hexSize;
-    const hexHeight = Math.sqrt(3) * hexSize;
-    const halfWidth = hexWidth / 2;
-    const halfHeight = hexHeight / 2;
+    
     const localX = pointX - hexCenterX;
     const localY = pointY - hexCenterY;
     const absX = Math.abs(localX);
     const absY = Math.abs(localY);
+    const hexWidth = 2 * hexSize;
+    const hexVertRadius = Math.sqrt(3)/2 * hexSize; 
 
-    if (absX > halfWidth || absY > halfHeight) return false;
-    if (absX <= halfWidth / 2) return true;
+    if (absY > hexSize) return false; 
+    if (absX > hexVertRadius) return false; 
+    if (absX <= hexVertRadius && absY <= hexSize / 2) return true; 
 
-    const slopeHeightAtX = halfHeight * (halfWidth - absX) / (halfWidth / 2);
-    return absY <= slopeHeightAtX;
+    const q = localX;
+    const r = localY;
+    
+    if (Math.abs(r) > hexSize) return false;
+
+    const innerRadius = hexSize * Math.sqrt(3) / 2;
+    if (Math.abs(q) > innerRadius) return false;
+    const halfHexVertRadius = hexSize * Math.sqrt(3) / 2; 
+    if (absY > hexSize || absX > halfHexVertRadius) return false; 
+    const s = hexSize;
+    if (Math.abs(localX) * Math.sqrt(3) + Math.abs(localY) <= s * Math.sqrt(3)) {
+        return Math.abs(localY) <= s; 
+    } 
+      
+    const hexInnerRadius = hexSize * Math.sqrt(3) / 2; 
+    if (absY > hexSize * 0.5 && absX > hexInnerRadius - ( (hexSize - absY) / Math.sqrt(3) ) ) return false;
+    if (absX > hexInnerRadius) return false;
+    if (absY > hexSize) return false; 
+    return true; 
 }
+
 
 /**
  * Triggers a browser download for the given content.
@@ -117,10 +143,15 @@ export function downloadFile(filename, content, mimeType = 'text/plain') {
  * @returns {boolean} True if the canvas was resized.
  */
 export function resizeCanvasToDisplaySize(canvas, gl) {
+    
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
+
+    
     const needResize = canvas.width !== displayWidth || canvas.height !== displayHeight;
+
     if (needResize) {
+        
         canvas.width = displayWidth;
         canvas.height = displayHeight;
         if (gl) { 
@@ -133,17 +164,17 @@ export function resizeCanvasToDisplaySize(canvas, gl) {
 /**
  * Formats a 32-char hex ruleset code for display.
  * @param {string} hexCode The 32-char uppercase hex string.
- * @returns {string} Formatted string.
+ * @returns {string} Formatted string (e.g., "FFFF FFFF ...") or original if invalid.
  */
 export function formatHexCode(hexCode) {
-    if (!hexCode || hexCode.length !== 32) return hexCode; 
-    if (hexCode === "Error" || hexCode === "N/A") return hexCode;
+    if (!hexCode || typeof hexCode !== 'string' || hexCode === "N/A" || hexCode === "Error") return hexCode;
+    if (hexCode.length !== 32) return hexCode; 
 
     let formatted = "";
     for (let i = 0; i < 32; i += 4) {
         formatted += hexCode.substring(i, i + 4);
-        if (i < 28) {
-             formatted += " "; 
+        if (i < 28) { 
+             formatted += " ";
         }
     }
     return formatted;
@@ -155,11 +186,11 @@ export function formatHexCode(hexCode) {
  * @returns {number} The calculated hex size (radius) in pixels for texture rendering.
  */
 export function calculateHexSizeForTexture() {
-    const approxGridPixelWidth = Config.GRID_COLS * Config.HEX_WIDTH * 0.75; 
-    const approxGridPixelHeight = Config.GRID_ROWS * Config.HEX_HEIGHT;
+    const approxGridPixelWidth = Config.GRID_COLS * (Config.HEX_WIDTH * 3 / 4) + (Config.HEX_WIDTH / 4);
+    const approxGridPixelHeight = Config.GRID_ROWS * Config.HEX_HEIGHT + (Config.HEX_HEIGHT / 2);
     if (approxGridPixelWidth === 0 || approxGridPixelHeight === 0) return Config.HEX_SIZE;
     const scaleX = Config.RENDER_TEXTURE_SIZE / approxGridPixelWidth;
     const scaleY = Config.RENDER_TEXTURE_SIZE / approxGridPixelHeight;
-    const scale = Math.min(scaleX, scaleY) * 0.95;
+    const scale = Math.min(scaleX, scaleY) * 0.98; 
     return Config.HEX_SIZE * scale;
 }

@@ -14,7 +14,8 @@ export class WorldProxy {
             ratio: 0,
             entropy: 0,
             isEnabled: initialSettings.enabled,
-            tps: 0, // Add tps field
+            tps: 0,
+            rulesetHex: initialSettings.rulesetHex || "0".repeat(32) // Initialize with initial ruleset hex
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -32,7 +33,7 @@ export class WorldProxy {
             NUM_CELLS: initialSettings.config.NUM_CELLS,
         };
         const initialStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
-        const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0);
+        const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0); // rulesetArray should be Uint8Array
         const initialHoverStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
 
         this.worker.postMessage({
@@ -54,15 +55,15 @@ export class WorldProxy {
         switch (data.type) {
             case 'INIT_ACK':
                 this.isInitialized = true;
-                this.lastTickUpdateTimeForTPS = performance.now(); // Reset for first stats update
-                this.lastTickCountForTPS = 0; // Reset for first stats update
+                this.lastTickUpdateTimeForTPS = performance.now();
+                this.lastTickCountForTPS = 0;
                 this.onInitialized(this.worldIndex);
                 break;
             case 'STATE_UPDATE':
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
                 this.latestHoverStateArray = new Uint8Array(data.hoverStateBuffer);
-                this.onUpdate(this.worldIndex, 'state');
+                this.onUpdate(this.worldIndex, 'state'); // Notify manager about state change
                 break;
             case 'STATS_UPDATE':
                 const currentTime = performance.now();
@@ -71,12 +72,11 @@ export class WorldProxy {
                 let currentTPS = 0;
                 if (elapsedTimeSeconds > 0 && ticksSinceLastUpdate > 0) {
                     currentTPS = parseFloat((ticksSinceLastUpdate / elapsedTimeSeconds).toFixed(1));
-                } else if (ticksSinceLastUpdate === 0 && elapsedTimeSeconds > 0){ // No ticks, but time passed
+                } else if (ticksSinceLastUpdate === 0 && elapsedTimeSeconds > 0){
                     currentTPS = 0;
-                } else { // First update or no time elapsed
-                    currentTPS = this.latestStats.tps; // Keep previous or default
+                } else {
+                    currentTPS = this.latestStats.tps;
                 }
-
 
                 this.latestStats = {
                     tick: data.tick,
@@ -85,43 +85,52 @@ export class WorldProxy {
                     entropy: data.entropy,
                     isEnabled: data.isEnabled,
                     tps: currentTPS,
+                    rulesetHex: data.rulesetHex || this.latestStats.rulesetHex // Update rulesetHex
                 };
 
                 this.lastTickCountForTPS = data.tick;
                 this.lastTickUpdateTimeForTPS = currentTime;
 
-                this.onUpdate(this.worldIndex, 'stats');
+                this.onUpdate(this.worldIndex, 'stats'); // Notify manager about stats (and potentially ruleset) change
                 break;
         }
     }
 
-    sendCommand(commandType, commandData) {
+    sendCommand(commandType, commandData, transferList = []) {
         if (!this.isInitialized && commandType !== 'INIT') {
-            console.warn(`WorldProxy ${this.worldIndex}: Worker not ready for command ${commandType}.`);
+            //console.warn(`WorldProxy ${this.worldIndex}: Worker not ready for command ${commandType}.`);
             return;
         }
-        this.worker.postMessage({ type: commandType, data: commandData });
+        if (transferList.length > 0) {
+            this.worker.postMessage({ type: commandType, data: commandData }, transferList);
+        } else {
+            this.worker.postMessage({ type: commandType, data: commandData });
+        }
     }
 
     startSimulation() { this.sendCommand('START_SIMULATION', {}); }
     stopSimulation() { this.sendCommand('STOP_SIMULATION', {}); }
     setSpeed(speed) { this.sendCommand('SET_SPEED_TARGET', { speed }); }
-    setEnabled(enabled) { this.sendCommand('SET_ENABLED', { enabled }); }
+    setEnabled(enabled) {
+        this.latestStats.isEnabled = enabled; // Optimistically update
+        this.sendCommand('SET_ENABLED', { enabled });
+    }
 
-    setRuleset(rulesetArrayBuffer) {
-        this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer });
+    setRuleset(rulesetArrayBuffer) { // Expects ArrayBuffer
+        this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
+        // Optimistically update local rulesetHex if we could convert here, but better to wait for worker's ack via STATS_UPDATE
     }
     resetWorld(initialDensity) {
-        this.lastTickCountForTPS = 0; // Reset TPS calculation on world reset
+        this.lastTickCountForTPS = 0;
         this.lastTickUpdateTimeForTPS = performance.now();
-        this.latestStats.tps = 0; // Reset displayed TPS immediately
+        this.latestStats.tps = 0;
         this.sendCommand('RESET_WORLD', { initialDensity });
     }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
     }
-    setHoverState(hoverAffectedIndices) {
-        this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices });
+    setHoverState(hoverAffectedIndices) { // Expects Array or Set
+        this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices: Array.from(hoverAffectedIndices) });
     }
     clearHoverState() {
         this.sendCommand('CLEAR_HOVER_STATE', {});
@@ -137,7 +146,8 @@ export class WorldProxy {
     }
 
     getLatestStats() {
-        return this.latestStats;
+        // Ensure rulesetHex is part of the returned stats
+        return { ...this.latestStats };
     }
 
     terminate() {
