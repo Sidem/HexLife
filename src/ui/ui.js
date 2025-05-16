@@ -200,7 +200,7 @@ function _initPopoutControls() {
             generationMode: mode,
             resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
         });
-        popoutPanels.newRules.hide();
+        // popoutPanels.newRules.hide(); // Keep the popout open
     });
 
     // Set Hex Popout Controls
