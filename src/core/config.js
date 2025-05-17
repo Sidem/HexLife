@@ -1,9 +1,9 @@
 // src/core/config.js
-export const GRID_ROWS = 186;
-export const GRID_COLS = 198;
+export const GRID_ROWS = 32*6;//192;
+export const GRID_COLS = 37*6;//222; ~ 192*(sqrt(3)/2)
 export const NUM_CELLS = GRID_ROWS * GRID_COLS;
 
-export const HEX_SIZE = 20; // Base hex size for calculations if not scaled for texture
+export const HEX_SIZE = 50; // Base hex size for calculations if not scaled for texture
 export const HEX_WIDTH = 2 * HEX_SIZE;
 export const HEX_HEIGHT = Math.sqrt(3) * HEX_SIZE;
 // export const HORIZ_SPACING = HEX_WIDTH * 3 / 4; // These are relevant for pixel conversion logic

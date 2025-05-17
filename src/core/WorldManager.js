@@ -159,7 +159,7 @@ export class WorldManager {
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, (data) => {
-             this._applyRulesetToWorlds(data.hexString, data.modificationScope, false, data.conditionalResetScope);
+            this._applyRulesetToWorlds(data.hexString, data.modificationScope, false, data.conditionalResetScope);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {

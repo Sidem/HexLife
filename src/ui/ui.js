@@ -79,6 +79,9 @@ export function initUI(worldManagerInterface) {
         clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
         clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
         
+        //controls within the ruleset editor panel
+        editorRulesetInput: document.getElementById('editorRulesetInput'),
+
         // Main Draggable Panels
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'),

@@ -239,12 +239,12 @@ label.sym-label {
 
 .popout-panel {
     position: absolute;
-    background-color: #383838;
+    background-color: #383838cc;
     border: 1px solid #555;
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     padding: 15px;
-    min-width: 220px;
+    min-width: 200px;
     color: #e0e0e0;
     z-index: 1010;
 }
