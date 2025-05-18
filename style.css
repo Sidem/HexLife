@@ -186,10 +186,12 @@ input[type="range"]:disabled::-webkit-slider-thumb {
     position: relative;
     display: inline-flex;
     align-items: center;
+    width: 100%;
 }
 .slider-component-container input[type="range"] {
     vertical-align: middle;
     min-width: 100px;
+    width: 100%;
 }
 .slider-wrapper span.value-display {
     position: absolute;
@@ -315,7 +317,7 @@ label.sym-label {
 
 .three-way-switch {
     display: inline-flex; border-radius: 4px;
-    overflow: hidden; border: 1px solid #555;
+    
 }
 .radio-switch-input { display: none; }
 .radio-switch-label {

@@ -202,7 +202,26 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_WORLDS, (data) => {
             const indicesToClear = this._getAffectedWorldIndices(data.scope);
             indicesToClear.forEach(idx => {
-                this.worlds[idx].resetWorld(0);
+                const proxy = this.worlds[idx];
+                if (proxy) {
+                    let targetStateForClear = 0; // Default to clearing to 0 (inactive)
+                    if (proxy.latestStateArray) { // Check if worker has provided its state
+                        const currentState = proxy.latestStateArray;
+                        let allCurrentlyInactive = true;
+                        for (let i = 0; i < currentState.length; i++) {
+                            if (currentState[i] !== 0) {
+                                allCurrentlyInactive = false;
+                                break;
+                            }
+                        }
+                        if (allCurrentlyInactive) {
+                            targetStateForClear = 1; // If all are inactive, clear to active
+                        }
+                    }
+                    // Pass density (as targetStateForClear) and isClearOperation flag
+                    proxy.resetWorld({ density: targetStateForClear, isClearOperation: true });
+                }
+
                 if (this.worldSettings[idx] && !this.isGloballyPaused && this.worldSettings[idx].enabled) {
                      this.worlds[idx].startSimulation();
                 }

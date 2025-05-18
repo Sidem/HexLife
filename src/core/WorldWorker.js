@@ -90,6 +90,7 @@ function setHoverStateLogic(hoverAffectedIndicesSet) {
 function processCommandQueue() {
     let needsStateUpdate = false;
     let rulesetChangedInQueue = false;
+    let activeCount = 0; // Ensure activeCount is scoped correctly if needed by multiple commands
 
     for (const command of commandQueue) {
         switch (command.type) {
@@ -99,37 +100,42 @@ function processCommandQueue() {
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
-                const density = command.data.initialDensity;
-                let activeCount = 0;
+                const density = command.data.density;
+                const isClearOp = command.data.isClearOperation || false;
+                activeCount = 0; // Reset activeCount for this operation
+
                 if (jsStateArray) {
-                    if(density % 1 === 0) { // Fill with 0 or 1
+                    if (isClearOp) {
+                        // New "clear" logic: fill uniformly with the density (0 or 1)
+                        // The density here is the target state (0 or 1) determined by WorldManager
                         jsStateArray.fill(density);
-                        if (density === 0 || density === 1) { // Only make a single cell different if the whole grid is uniform
-                             const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2);
-                             if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) {
-                                jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
-                                activeCount = jsStateArray[centerIdx] === 1 ? 1 : 0;
-                                if (density === 1 && jsStateArray[centerIdx] === 0) activeCount = workerConfig.NUM_CELLS -1;
-                                else if (density === 0 && jsStateArray[centerIdx] === 1) activeCount = 1;
-                                else activeCount = density === 1 ? workerConfig.NUM_CELLS : 0; // Should not happen with the flip
-                             } else {
-                                activeCount = density === 1 ? workerConfig.NUM_CELLS : 0;
-                             }
-                        } else { // Should not happen if density % 1 === 0
-                             activeCount = density === 1 ? workerConfig.NUM_CELLS : 0;
-                        }
-                    } else { // Random density
-                        activeCount = 0; // Reset for random count
-                        for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
-                            jsStateArray[i] = Math.random() < density ? 1 : 0;
-                            if (jsStateArray[i] === 1) activeCount++;
+                        activeCount = (density === 1) ? workerConfig.NUM_CELLS : 0;
+                    } else {
+                        // Original "reset" logic
+                        if (density === 0 || density === 1) { // Fill with 0 or 1 for reset
+                            jsStateArray.fill(density);
+                            // Only flip center for actual resets, not clears
+                            const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + (workerConfig.GRID_COLS / 2));
+                            if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
+                                jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
+                            }
+                            // Recalculate activeCount after potential flip for reset
+                            for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
+                                if (jsStateArray[i] === 1) activeCount++;
+                            }
+                        } else { // Random density for reset
+                            for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
+                                jsStateArray[i] = Math.random() < density ? 1 : 0;
+                                if (jsStateArray[i] === 1) activeCount++;
+                            }
                         }
                     }
                 }
+                // Common reset actions for both clear and reset
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
-                if(jsNextStateArray) jsNextStateArray.fill(0);
-                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
-                if(jsHoverStateArray) jsHoverStateArray.fill(0);
+                if(jsNextStateArray) jsNextStateArray.fill(0); // Clear buffer for next state
+                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0); // Clear buffer for next rule indices
+                if(jsHoverStateArray) jsHoverStateArray.fill(0); // Clear hover states
                 needsStateUpdate = true;
                 break;
             case 'APPLY_BRUSH':
@@ -171,7 +177,11 @@ function processCommandQueue() {
                 break;
         }
     }
-    commandQueue = [];
+    commandQueue = []; // Clear the queue after processing
+    // Return value might need to include activeCount if it's used by the caller of processCommandQueue
+    // For now, assuming needsStateUpdate and rulesetChangedInQueue are sufficient.
+    // If runTick needs activeCount, it calculates it after simulation step.
+    // For immediate feedback after RESET_WORLD, it's calculated above and sendStateUpdate will use it.
     return { needsStateUpdate, rulesetChangedInQueue };
 }
 
@@ -376,7 +386,21 @@ self.onmessage = function(event) {
 
         default: // APPLY_BRUSH, SET_HOVER_STATE, CLEAR_HOVER_STATE, RESET_WORLD
             commandQueue.push(command);
-            if (command.type === 'SET_HOVER_STATE' || command.type === 'CLEAR_HOVER_STATE' || command.type === 'APPLY_BRUSH' || command.type === 'RESET_WORLD') {
+            // For RESET_WORLD, the state update is now handled within processCommandQueue if needsStateUpdate is true.
+            // We need to ensure sendStateUpdate is called with correct parameters.
+            if (command.type === 'RESET_WORLD') {
+                const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
+                if (inducedUpdate) {
+                    // activeCount for reset/clear is calculated inside the RESET_WORLD case now
+                    // We need to retrieve it or re-calculate it here if processCommandQueue doesn't return it
+                    // For simplicity, let's assume activeCount is correctly handled and passed to sendStateUpdate
+                    // or sendStateUpdate itself calculates it from jsStateArray if activeCount is undefined.
+                    const currentActiveCount = jsStateArray.reduce((sum, val) => sum + val, 0);
+                    const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
+                    const currentEntropy = calculateBinaryEntropy(currentRatio);
+                    sendStateUpdate(currentActiveCount, currentRatio, currentEntropy, rsChangedByQueue);
+                }
+            } else if (command.type === 'SET_HOVER_STATE' || command.type === 'CLEAR_HOVER_STATE' || command.type === 'APPLY_BRUSH') {
                 const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
                 if (inducedUpdate) {
                     const active = jsStateArray.reduce((s, c) => s + c, 0);

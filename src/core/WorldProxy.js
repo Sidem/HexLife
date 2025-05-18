@@ -120,11 +120,26 @@ export class WorldProxy {
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
         // Optimistically update local rulesetHex if we could convert here, but better to wait for worker's ack via STATS_UPDATE
     }
-    resetWorld(initialDensity) {
+    resetWorld(optionsOrDensity) {
         this.lastTickCountForTPS = 0;
         this.lastTickUpdateTimeForTPS = performance.now();
         this.latestStats.tps = 0;
-        this.sendCommand('RESET_WORLD', { initialDensity });
+
+        let commandPayload;
+        if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {
+            // New format: optionsOrDensity is an object like { density: number, isClearOperation?: boolean }
+            commandPayload = {
+                density: optionsOrDensity.density,
+                isClearOperation: optionsOrDensity.isClearOperation || false
+            };
+        } else {
+            // Old format: optionsOrDensity is just the density number, assume it's a regular reset
+            commandPayload = {
+                density: optionsOrDensity,
+                isClearOperation: false
+            };
+        }
+        this.sendCommand('RESET_WORLD', commandPayload);
     }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });

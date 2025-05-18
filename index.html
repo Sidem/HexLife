@@ -7,7 +7,7 @@
     <title>HexLife Explorer</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    </head>
+</head>
 
 <body>
     <div id="app-container">
@@ -25,15 +25,26 @@
 
         <div id="main-content-area">
             <div id="vertical-toolbar">
-                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button> <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button> <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button> <div class="toolbar-separator"></div>
+                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button>
+                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button>
+                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button>
+                <div class="toolbar-separator"></div>
 
-                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button> <div class="toolbar-separator"></div>
+                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> 
+                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button>
+                <div class="toolbar-separator"></div>
 
-                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button> <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button> <div class="toolbar-separator"></div>
+                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button>
+                <div class="toolbar-separator"></div>
 
-                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button> <div class="toolbar-separator"></div>
-                
-                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button> </div>
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> 
+                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> 
+                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button>
+                <div class="toolbar-separator"></div>
+
+                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
+                <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
+            </div>
             <canvas id="hexGridCanvas"></canvas>
         </div>
 
@@ -52,8 +63,10 @@
                 <div id="generateModeSwitchPopout" class="three-way-switch">
                     <input type="radio" id="genModeRandomPopout" name="generateModePopout" value="random" class="radio-switch-input">
                     <label for="genModeRandomPopout" class="radio-switch-label">Random</label>
+
                     <input type="radio" id="genModeNCountPopout" name="generateModePopout" value="n_count" class="radio-switch-input">
                     <label for="genModeNCountPopout" class="radio-switch-label">N-Count</label>
+
                     <input type="radio" id="genModeRSymPopout" name="generateModePopout" value="r_sym" class="radio-switch-input" checked>
                     <label for="genModeRSymPopout" class="radio-switch-label">R-Sym</label>
                 </div>
@@ -66,10 +79,10 @@
             <div class="form-group">
                 <label>Apply to:</label>
                 <div id="rulesetScopeSwitchPopout" class="three-way-switch">
-                     <input type="radio" id="scopeSelectedPopout" name="rulesetScopePopout" value="selected" class="radio-switch-input" checked>
-                     <label for="scopeSelectedPopout" class="radio-switch-label">Selected</label>
-                     <input type="radio" id="scopeAllPopout" name="rulesetScopePopout" value="all" class="radio-switch-input">
-                     <label for="scopeAllPopout" class="radio-switch-label">All</label>
+                    <input type="radio" id="scopeSelectedPopout" name="rulesetScopePopout" value="selected" class="radio-switch-input" checked>
+                    <label for="scopeSelectedPopout" class="radio-switch-label">Selected</label>
+                    <input type="radio" id="scopeAllPopout" name="rulesetScopePopout" value="all" class="radio-switch-input">
+                    <label for="scopeAllPopout" class="radio-switch-label">All</label>
                 </div>
             </div>
             <div class="form-group">
@@ -84,8 +97,8 @@
                 <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars">
             </div>
             <div class="form-group-buttons">
-                 <button id="setRuleFromPopoutButton" class="button">Set</button>
-                 <button id="copyRuleFromPopoutButton" class="button">Copy Current</button>
+                <button id="setRuleFromPopoutButton" class="button">Set</button>
+                <button id="copyRuleFromPopoutButton" class="button">Copy Current</button>
             </div>
         </div>
         <div id="resetClearPopout" class="popout-panel hidden">
@@ -115,9 +128,11 @@
             <div class="editor-apply-scope-controls">
                 <label>Apply Changes To:</label>
                 <div class="radio-group">
-                    <input type="radio" id="editorApplyScopeSelected" name="editorApplyScope" value="selected" class="radio-switch-input" checked>
+                    <input type="radio" id="editorApplyScopeSelected" name="editorApplyScope" value="selected"
+                        class="radio-switch-input" checked>
                     <label for="editorApplyScopeSelected" class="radio-switch-label">Selected World</label>
-                    <input type="radio" id="editorApplyScopeAll" name="editorApplyScope" value="all" class="radio-switch-input">
+                    <input type="radio" id="editorApplyScopeAll" name="editorApplyScope" value="all"
+                        class="radio-switch-input">
                     <label for="editorApplyScopeAll" class="radio-switch-label">All Worlds</label>
                 </div>
                 <div class="editor-auto-reset-control">
@@ -129,14 +144,19 @@
                 <div id="rulesetEditorGrid" class="hidden"></div>
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
                 <div id="rotationalSymmetryRulesetEditorGrid"></div>
-                 <div class="editor-text">
-                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to propagate these changes.</p>
+                <div class="editor-text">
+                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to
+                        propagate these changes.</p>
                     <p>Click rule visualizations to toggle output states.</p>
                     <div class="editor-text-rules">
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays inactive</p>
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span> becomes active</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span> becomes inactive</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays active</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
+                            inactive</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span>
+                            becomes active</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span>
+                            becomes inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays
+                            active</p>
                     </div>
                 </div>
             </div>
@@ -146,9 +166,11 @@
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3>World Setup</h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and reset it.</p>
+                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click
+                    "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and
+                    reset it.</p>
                 <div id="worldSetupGrid" class="world-config-grid">
-                    </div>
+                </div>
                 <div class="panel-actions">
                     <button id="applySetupButton" class="button">Apply & Reset All Enabled Worlds</button>
                 </div>
@@ -172,6 +194,8 @@
             </div>
         </div>
 
-    </div> <input type="file" id="fileInput" accept=".txt,.json" style="display: none;"> <script type="module" src="src/main.js"></script>
+    </div> <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
+    <script type="module" src="src/main.js"></script>
 </body>
+
 </html>
