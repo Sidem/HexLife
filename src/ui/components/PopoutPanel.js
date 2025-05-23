@@ -1,15 +1,15 @@
-// src/ui/components/PopoutPanel.js
+
 import { BaseComponent } from './BaseComponent.js';
 
 export class PopoutPanel extends BaseComponent {
     constructor(popoutElement, triggerElement, options = {}) {
-        super(popoutElement, options); // popoutElement is the actual panel to show/hide
+        super(popoutElement, options); 
         this.triggerElement = triggerElement;
-        this.popoutElement = this.mountPoint; // Renaming for clarity within this class
+        this.popoutElement = this.mountPoint; 
         this.options = {
-            position: 'right', // 'right', 'bottom', 'top', 'left', or a function
-            alignment: 'start', // 'start', 'center', 'end'
-            offset: 8, // px
+            position: 'right', 
+            alignment: 'start', 
+            offset: 8, 
             closeOnOutsideClick: true,
             ...options
         };
@@ -20,8 +20,8 @@ export class PopoutPanel extends BaseComponent {
         }
 
         this.popoutElement.style.position = 'absolute';
-        this.popoutElement.style.zIndex = '1050'; // Ensure it's above other elements
-        this.hide(false); // Start hidden, without saving state (if state saving were part of BaseComponent)
+        this.popoutElement.style.zIndex = '1050'; 
+        this.hide(false); 
 
         this._addDOMListener(this.triggerElement, 'click', (event) => {
             event.stopPropagation();
@@ -45,11 +45,11 @@ export class PopoutPanel extends BaseComponent {
         if (!this.popoutElement || !this.triggerElement) return;
 
         const triggerRect = this.triggerElement.getBoundingClientRect();
-        const popoutRect = this.popoutElement.getBoundingClientRect(); // May need to show it briefly to get dimensions if hidden with display:none
+        const popoutRect = this.popoutElement.getBoundingClientRect(); 
 
         let top, left;
 
-        // Temporarily show to measure if it was 'display: none'
+        
         const wasHidden = this.popoutElement.classList.contains('hidden');
         if (wasHidden) {
             this.popoutElement.style.visibility = 'hidden';
@@ -102,7 +102,7 @@ export class PopoutPanel extends BaseComponent {
                 break;
         }
 
-        // Basic viewport collision detection (can be improved)
+        
         if (left + actualPopoutRect.width > window.innerWidth) {
             left = window.innerWidth - actualPopoutRect.width - this.options.offset;
         }
@@ -123,10 +123,10 @@ export class PopoutPanel extends BaseComponent {
             this.popoutElement.classList.remove('hidden');
             this.triggerElement.classList.add('active');
             if (this.options.closeOnOutsideClick) {
-                // Add listener with a slight delay to prevent immediate closing if triggered by the same click
+                
                 setTimeout(() => document.addEventListener('click', this.boundHandleOutsideClick), 0);
             }
-            // Dispatch an event that this popout is shown, so others can hide
+            
             const event = new CustomEvent('popoutshown', { bubbles: true, detail: { panel: this } });
             this.triggerElement.dispatchEvent(event);
         }
@@ -145,7 +145,7 @@ export class PopoutPanel extends BaseComponent {
     toggle() {
         if (this.popoutElement) {
             if (this.popoutElement.classList.contains('hidden')) {
-                // Before showing this one, tell others to hide
+                
                 const event = new CustomEvent('popoutinteraction', { bubbles: true, detail: { panel: this } });
                 this.triggerElement.dispatchEvent(event);
                 this.show();
@@ -163,6 +163,6 @@ export class PopoutPanel extends BaseComponent {
         if (this.options.closeOnOutsideClick) {
             document.removeEventListener('click', this.boundHandleOutsideClick);
         }
-        super.destroy(); // Handles removing listeners added via _addDOMListener
+        super.destroy(); 
     }
 }

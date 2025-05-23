@@ -1,4 +1,4 @@
-// src/main.js
+
 import * as Config from './core/config.js';
 import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
@@ -47,16 +47,16 @@ async function initialize() {
         getSymmetryData: worldManager.getSymmetryData,
         rulesetToHex: worldManager.rulesetToHex,
         hexToRuleset: worldManager.hexToRuleset,
-        // Add methods for analysis history if AnalysisPanel requires them directly
-        getSelectedWorldRatioHistory: () => { // Example placeholder
+        
+        getSelectedWorldRatioHistory: () => { 
             const stats = worldManager.getSelectedWorldStats();
             return stats?.ratioHistory || [];
         },
-        getSelectedWorldEntropyHistory: () => { // Example placeholder
+        getSelectedWorldEntropyHistory: () => { 
             const stats = worldManager.getSelectedWorldStats();
             return stats?.entropyHistory || [];
         },
-        getEntropySamplingState: () => worldManager.getEntropySamplingState(), // Assuming WorldManager has this
+        getEntropySamplingState: () => worldManager.getEntropySamplingState(), 
     };
 
     if (!UI.initUI(worldManagerInterfaceForUI)) {
@@ -260,9 +260,9 @@ function textureCoordsToGridCoords(texX, texY) {
             const distSq = dx * dx + dy * dy;
 
             if (distSq < minDistSq) {
-                 // Check if point is within this hexagon before declaring it closest.
-                 // A simpler check might be if distSq < (textureHexSize * textureHexSize * 0.75) or so.
-                 // For perfect accuracy, use isPointInHexagon.
+                 
+                 
+                 
                 if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
                     minDistSq = distSq;
                     closestCol = c;

@@ -8,7 +8,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
     }
 
     init(mountPoint, simulationInterface) {
-        super.init(mountPoint, simulationInterface); // Calls IAnalysisPlugin.init
+        super.init(mountPoint, simulationInterface); 
 
         this.mountPoint.innerHTML = `
             <div class="plot-container">
@@ -16,7 +16,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
             </div>
         `;
         this.plotCanvas = this.mountPoint.querySelector('.plugin-canvas');
-        this.updatePlot(); // Initial draw
+        this.updatePlot(); 
     }
 
     onDataUpdate(data) {
@@ -27,7 +27,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
             } else {
                 this.lastFitnessValue = 0;
             }
-        } else if (data && data.type === 'allWorldsReset') { // Handle reset explicitly
+        } else if (data && data.type === 'allWorldsReset') { 
             this.currentRatioHistory = [];
              this.lastFitnessValue = 0;
         }
@@ -35,12 +35,12 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
     }
 
     getFitnessValue() {
-        // Example: Return the average ratio over the history, or the latest ratio
+        
         if (this.currentRatioHistory && this.currentRatioHistory.length > 0) {
-            // return this.currentRatioHistory.reduce((a, b) => a + b, 0) / this.currentRatioHistory.length;
-            return this.lastFitnessValue; // Or latest value
+            
+            return this.lastFitnessValue; 
         }
-        return 0; // Default if no data
+        return 0; 
     }
 
     getPluginConfig() {

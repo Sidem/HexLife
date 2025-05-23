@@ -1,4 +1,3 @@
-// Helper function (often part of Symmetry or general utils)
 export function countSetBits(n) {
     let count = 0;
     while (n > 0) {
@@ -7,7 +6,6 @@ export function countSetBits(n) {
     }
     return count;
 }
-
 
 /**
  * Rotates a 6-bit neighborhood mask one step clockwise.
@@ -18,10 +16,10 @@ export function countSetBits(n) {
  */
 export function rotateBitmaskClockwise(bitmask) {
     const N = 6;
-    const msbSet = (bitmask >> (N - 1)) & 1; // Check if MSB (neighbor 5) is set
-    let rotated = (bitmask << 1) & ((1 << N) - 1); // Shift left, mask to N bits
+    const msbSet = (bitmask >> (N - 1)) & 1; 
+    let rotated = (bitmask << 1) & ((1 << N) - 1); 
     if (msbSet) {
-        rotated |= 1; // If MSB was set, set LSB (neighbor 0)
+        rotated |= 1; 
     }
     return rotated;
 }
@@ -78,26 +76,22 @@ export function precomputeSymmetryGroups() {
     const bitmaskToCanonical = new Map();
     const bitmaskToOrbitSize = new Map();
 
-    for (let i = 0; i < 64; i++) { // For each of the 2^6 possible neighbor bitmasks
+    for (let i = 0; i < 64; i++) { 
         const canonical = getCanonicalRepresentative(i);
-        const orbit = getOrbitSize(i); // Orbit size of the current member 'i'
+        const orbit = getOrbitSize(i); 
         bitmaskToCanonical.set(i, canonical);
         bitmaskToOrbitSize.set(i, orbit);
 
         if (!allCanonicalReps.has(canonical)) {
-            // Store the orbit size of the canonical form itself
+            
             allCanonicalReps.set(canonical, { representative: canonical, orbitSize: getOrbitSize(canonical), members: [] });
         }
         allCanonicalReps.get(canonical).members.push(i);
     }
 
-    // Sort members within each group (optional, but nice for consistency)
     allCanonicalReps.forEach(group => group.members.sort((a, b) => a - b));
-
-    // Convert map to array and sort by representative value
     const canonicalRepresentativesArray = Array.from(allCanonicalReps.values())
         .sort((a, b) => a.representative - b.representative);
-
     console.log(`Precomputed ${canonicalRepresentativesArray.length} canonical symmetry groups.`);
 
     return {

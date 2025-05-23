@@ -1,15 +1,15 @@
 import { BaseComponent } from '../BaseComponent.js';
-import { EventBus } from '../../../services/EventBus.js'; // For potential direct subscriptions
+import { EventBus } from '../../../services/EventBus.js'; 
 
 export class IAnalysisPlugin extends BaseComponent {
     constructor(pluginId, pluginName) {
-        super(); // BaseComponent constructor for mountPoint and options
+        super(); 
         this.id = pluginId;
         this.name = pluginName;
-        this.mountPoint = null; // DOM element provided by AnalysisPanel
-        this.simulationInterface = null; // Interface to access simulation data
-        this.currentResults = {}; // Store various results if needed
-        this.lastFitnessValue = null; // Store the primary fitness value
+        this.mountPoint = null; 
+        this.simulationInterface = null; 
+        this.currentResults = {}; 
+        this.lastFitnessValue = null; 
     }
 
     /**
@@ -28,8 +28,6 @@ export class IAnalysisPlugin extends BaseComponent {
             console.error(`Plugin ${this.id}: Simulation interface not provided during init.`);
             return;
         }
-        // Example: Basic structure
-        // this.mountPoint.innerHTML = `<h4>${this.name}</h4><div class="plugin-content"></div>`;
     }
 
     /**
@@ -38,8 +36,8 @@ export class IAnalysisPlugin extends BaseComponent {
      * @param {object} data - The data payload from the simulation (e.g., { type: 'worldStats', payload: statsData }).
      */
     onDataUpdate(data) {
-        // Abstract method - to be implemented by subclasses
-        // console.log(`Plugin ${this.id} received data:`, data);
+        
+        
     }
 
     /**
@@ -48,7 +46,7 @@ export class IAnalysisPlugin extends BaseComponent {
      * @returns {number|null} The fitness value or null if not applicable/available.
      */
     getFitnessValue() {
-        // Abstract method - to be implemented by subclasses
+        
         return this.lastFitnessValue;
     }
 
@@ -59,7 +57,7 @@ export class IAnalysisPlugin extends BaseComponent {
      */
     getPluginConfig() {
         return {
-            requiredDataTypes: [] // e.g., ['worldStats', 'ratioHistory', 'entropyHistory']
+            requiredDataTypes: [] 
         };
     }
 
@@ -68,12 +66,12 @@ export class IAnalysisPlugin extends BaseComponent {
      */
     destroy() {
         if (this.mountPoint) {
-            this.mountPoint.innerHTML = ''; // Clear UI
+            this.mountPoint.innerHTML = ''; 
         }
         this.mountPoint = null;
         this.simulationInterface = null;
-        super.destroy(); // Calls BaseComponent's destroy for event listeners etc.
-        // console.log(`Plugin ${this.id} destroyed.`);
+        super.destroy(); 
+        
     }
 
     /**
@@ -90,14 +88,14 @@ export class IAnalysisPlugin extends BaseComponent {
         const height = canvas.height;
         const padding = 5;
 
-        ctx.fillStyle = '#2a2a2a'; // Background
+        ctx.fillStyle = '#2a2a2a'; 
         ctx.fillRect(0, 0, width, height);
 
         if (label) {
             ctx.fillStyle = '#aaa';
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(label, width / 2, 12); // Adjust y-offset for label
+            ctx.fillText(label, width / 2, 12); 
         }
 
         if (!dataHistory || dataHistory.length === 0) {
@@ -105,16 +103,16 @@ export class IAnalysisPlugin extends BaseComponent {
         }
 
         const plotWidth = width - 2 * padding;
-        const plotHeight = height - 2 * padding - (label ? 10 : 0); // Adjust plot height if label is present
+        const plotHeight = height - 2 * padding - (label ? 10 : 0); 
         const plotYStart = padding + (label ? 10 : 0);
 
 
         const dataLength = dataHistory.length;
-        ctx.strokeStyle = '#555'; // Grid lines
+        ctx.strokeStyle = '#555'; 
         ctx.lineWidth = 0.5;
         ctx.beginPath();
-        ctx.moveTo(padding, plotYStart); ctx.lineTo(width - padding, plotYStart); // Top line (0.0)
-        ctx.moveTo(padding, plotYStart + plotHeight); ctx.lineTo(width - padding, plotYStart + plotHeight); // Bottom line (1.0)
+        ctx.moveTo(padding, plotYStart); ctx.lineTo(width - padding, plotYStart); 
+        ctx.moveTo(padding, plotYStart + plotHeight); ctx.lineTo(width - padding, plotYStart + plotHeight); 
         ctx.stroke();
 
         ctx.strokeStyle = color;
@@ -123,7 +121,6 @@ export class IAnalysisPlugin extends BaseComponent {
 
         for (let i = 0; i < dataLength; i++) {
             const x = padding + (i / (dataLength - 1 || 1)) * plotWidth;
-            // Ensure yValue is clamped between 0 and 1 for plotting
             const yValue = Math.max(0, Math.min(1, dataHistory[i] === null || dataHistory[i] === undefined ? 0 : dataHistory[i]));
             const y = plotYStart + (1 - yValue) * plotHeight;
 

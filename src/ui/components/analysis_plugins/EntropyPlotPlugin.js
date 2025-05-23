@@ -16,11 +16,11 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             </div>
         `;
         this.plotCanvas = this.mountPoint.querySelector('.plugin-canvas');
-        this.updatePlot(); // Initial draw
+        this.updatePlot(); 
     }
 
     onDataUpdate(data) {
-        // Entropy history is typically updated alongside worldStats or due to sampling changes
+        
         if (data && (data.type === 'worldStats' || data.type === 'entropySamplingChanged') && data.payload) {
             this.currentEntropyHistory = this.simulationInterface.getSelectedWorldEntropyHistory() || [];
              if (this.currentEntropyHistory.length > 0) {
@@ -28,7 +28,7 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             } else {
                 this.lastFitnessValue = 0;
             }
-        } else if (data && data.type === 'allWorldsReset') { // Handle reset explicitly
+        } else if (data && data.type === 'allWorldsReset') { 
             this.currentEntropyHistory = [];
             this.lastFitnessValue = 0;
         }
@@ -37,8 +37,6 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
 
     getFitnessValue() {
         if (this.currentEntropyHistory && this.currentEntropyHistory.length > 0) {
-            // Example: return average entropy or latest entropy
-            // return this.currentEntropyHistory.reduce((a, b) => a + b, 0) / this.currentEntropyHistory.length;
             return this.lastFitnessValue;
         }
         return 0;

@@ -1,16 +1,16 @@
-// src/services/PersistenceService.js
-import * as Config from '../core/config.js'; // Used for default values and NUM_WORLDS
+
+import * as Config from '../core/config.js'; 
 
 const LS_KEY_PREFIX = 'hexLifeExplorer_';
 const KEYS = {
-    RULESET: `${LS_KEY_PREFIX}ruleset`, // Stores the "primary" or last globally set/generated ruleset
-    WORLD_SETTINGS: `${LS_KEY_PREFIX}worldSettings`, // Array of {initialDensity, enabled, rulesetHex (for each world)}
+    RULESET: `${LS_KEY_PREFIX}ruleset`, 
+    WORLD_SETTINGS: `${LS_KEY_PREFIX}worldSettings`, 
     SIM_SPEED: `${LS_KEY_PREFIX}simSpeed`,
     BRUSH_SIZE: `${LS_KEY_PREFIX}brushSize`,
     RULESET_PANEL_STATE: `${LS_KEY_PREFIX}rulesetPanelState`,
     SETUP_PANEL_STATE: `${LS_KEY_PREFIX}setupPanelState`,
     ANALYSIS_PANEL_STATE: `${LS_KEY_PREFIX}analysisPanelState`,
-    UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings` // General bucket for misc UI (bias, generation mode, checkboxes)
+    UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings` 
 };
 
 function _getItem(key) {
@@ -31,10 +31,10 @@ function _setItem(key, value) {
     }
 }
 
-export function loadRuleset() { // This loads the "default/primary" ruleset hex
+export function loadRuleset() { 
     return _getItem(KEYS.RULESET);
 }
-export function saveRuleset(rulesetHex) { // This saves the "default/primary" ruleset hex
+export function saveRuleset(rulesetHex) { 
     _setItem(KEYS.RULESET, rulesetHex);
 }
 
@@ -44,25 +44,25 @@ export function loadWorldSettings() {
         const isValid = loaded.every(s =>
             typeof s.initialDensity === 'number' &&
             typeof s.enabled === 'boolean' &&
-            (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex)) // Validate rulesetHex
+            (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex)) 
         );
         if (isValid) return loaded;
         console.warn("Loaded world settings format error or missing rulesetHex, reverting to defaults.");
     }
 
     const defaultSettings = [];
-    const defaultRuleset = loadRuleset() || "0".repeat(32); // Fallback if no primary ruleset
+    const defaultRuleset = loadRuleset() || "0".repeat(32); 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         defaultSettings.push({
             initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
             enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
-            rulesetHex: defaultRuleset // Each world defaults to the primary saved ruleset
+            rulesetHex: defaultRuleset 
         });
     }
     return defaultSettings;
 }
 
-export function saveWorldSettings(worldSettingsArray) { // Expects array of {initialDensity, enabled, rulesetHex}
+export function saveWorldSettings(worldSettingsArray) { 
     if (Array.isArray(worldSettingsArray) && worldSettingsArray.length === Config.NUM_WORLDS) {
         const isValid = worldSettingsArray.every(s =>
             typeof s.initialDensity === 'number' &&
@@ -105,14 +105,14 @@ export function loadPanelState(panelKey) {
     if (state && typeof state.isOpen === 'boolean') {
         return {
             isOpen: state.isOpen,
-            x: typeof state.x === 'string' ? state.x : null, // Expect 'px' values
+            x: typeof state.x === 'string' ? state.x : null, 
             y: typeof state.y === 'string' ? state.y : null,
         };
     }
-    return { isOpen: false, x: null, y: null }; // Default if no valid state found
+    return { isOpen: false, x: null, y: null }; 
 }
 
-export function savePanelState(panelKey, state) { // state: { isOpen, x, y }
+export function savePanelState(panelKey, state) { 
     const keyToSave = KEYS[`${panelKey.toUpperCase()}_PANEL_STATE`];
      if (!keyToSave) {
         console.warn(`PersistenceService: Unknown panel key "${panelKey}" for savePanelState.`);

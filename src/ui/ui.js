@@ -1,4 +1,4 @@
-// src/ui/ui.js
+
 import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
@@ -7,15 +7,15 @@ import { AnalysisPanel } from './components/AnalysisPanel.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { PopoutPanel } from './components/PopoutPanel.js'; // New PopoutPanel component
+import { PopoutPanel } from './components/PopoutPanel.js'; 
 
 let uiElements;
-let sliderComponents = {}; // For sliders within popouts
-let popoutPanels = {};    // To manage all popout instances
+let sliderComponents = {}; 
+let popoutPanels = {};    
 let worldManagerInterfaceRef;
 let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance;
 
-// Store references to all active popouts to close others when one opens
+
 let activePopouts = [];
 
 function closeAllPopouts(excludePanel = null) {
@@ -34,41 +34,41 @@ export function initUI(worldManagerInterface) {
     worldManagerInterfaceRef = worldManagerInterface;
     
     uiElements = {
-        // Top Info Bar
+        
         rulesetDisplay: document.getElementById('rulesetDisplay'),
         statTick: document.getElementById('stat-tick'),
         statRatio: document.getElementById('stat-ratio'),
-        // statAvgRatio: document.getElementById('stat-avg-ratio'), // Removed for now for brevity
+        
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
 
-        // Vertical Toolbar Buttons
+        
         playPauseButton: document.getElementById('playPauseButton'),
         speedControlButton: document.getElementById('speedControlButton'),
         brushToolButton: document.getElementById('brushToolButton'),
         newRulesButton: document.getElementById('newRulesButton'),
-        setRulesetButton: document.getElementById('setRulesetButton'), // Toolbar button for hex input popout
+        setRulesetButton: document.getElementById('setRulesetButton'), 
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
-        resetClearButton: document.getElementById('resetClearButton'), // Toolbar button for reset/clear popout
-        editRuleButton: document.getElementById('editRuleButton'), // Toggles RulesetEditor panel
-        setupPanelButton: document.getElementById('setupPanelButton'), // Toggles SetupPanel
-        analysisPanelButton: document.getElementById('analysisPanelButton'), // Toggles AnalysisPanel
+        resetClearButton: document.getElementById('resetClearButton'), 
+        editRuleButton: document.getElementById('editRuleButton'), 
+        setupPanelButton: document.getElementById('setupPanelButton'), 
+        analysisPanelButton: document.getElementById('analysisPanelButton'), 
 
-        // Popout Panel Roots
+        
         speedPopout: document.getElementById('speedPopout'),
         brushPopout: document.getElementById('brushPopout'),
         newRulesPopout: document.getElementById('newRulesPopout'),
         setHexPopout: document.getElementById('setHexPopout'),
         resetClearPopout: document.getElementById('resetClearPopout'),
 
-        // Controls within Popouts
+        
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
         generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
         useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
         biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
-        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'), // Radio group
+        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'), 
         resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
         generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
         rulesetInputPopout: document.getElementById('rulesetInputPopout'),
@@ -79,22 +79,22 @@ export function initUI(worldManagerInterface) {
         clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
         clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
         
-        //controls within the ruleset editor panel
+        
         editorRulesetInput: document.getElementById('editorRulesetInput'),
 
-        // Main Draggable Panels
+        
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
 
-        // Misc
-        fileInput: document.getElementById('fileInput'), // For load state
-        canvas: document.getElementById('hexGridCanvas'), // Still needed for interactions
+        
+        fileInput: document.getElementById('fileInput'), 
+        canvas: document.getElementById('hexGridCanvas'), 
     };
 
     if (!validateElements()) return false;
 
-    // Initialize main draggable panels
+    
     if (uiElements.rulesetEditorPanel) rulesetEditorComponent = new RulesetEditor(uiElements.rulesetEditorPanel, worldManagerInterfaceRef);
     if (uiElements.setupPanel) setupPanelComponent = new SetupPanel(uiElements.setupPanel, worldManagerInterfaceRef);
     if (uiElements.analysisPanel) analysisPanelInstance = new AnalysisPanel(uiElements.analysisPanel, worldManagerInterfaceRef, {});
@@ -102,11 +102,11 @@ export function initUI(worldManagerInterface) {
     _initPopoutPanels();
     _initPopoutControls();
     _setupToolbarButtonListeners();
-    _setupStateListeners(); // For file input, save/load buttons (now on toolbar)
+    _setupStateListeners(); 
     
-    loadAndApplyUISettings(); // Load general UI settings (bias, modes etc.)
-    window.addEventListener('keydown', handleGlobalKeyDown); // Global hotkeys
-    setupUIEventListeners(); // EventBus subscriptions
+    loadAndApplyUISettings(); 
+    window.addEventListener('keydown', handleGlobalKeyDown); 
+    setupUIEventListeners(); 
 
     updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
@@ -132,7 +132,7 @@ function validateElements() {
             allFound = false;
         }
     });
-    // Also check elements within popouts if they are essential for init
+    
     const popoutControls = [
         'speedSliderMountPopout', 'neighborhoodSizeSliderMountPopout', 'generateModeSwitchPopout',
         'useCustomBiasCheckboxPopout', 'biasSliderMountPopout', 'rulesetScopeSwitchPopout',
@@ -143,7 +143,7 @@ function validateElements() {
      popoutControls.forEach(key => {
         if (!uiElements[key]) {
             console.warn(`UI Rework Warning: Popout control Element '${key}' not found. Might affect functionality.`);
-            // allFound = false; // Don't make these critical for initial validation if some popouts are optional
+            
         }
     });
     return allFound;
@@ -160,21 +160,21 @@ function _initPopoutPanels() {
 }
 
 function _initPopoutControls() {
-    // Speed Slider in Popout
+    
     sliderComponents.speedSliderPopout = new SliderComponent(uiElements.speedSliderMountPopout, {
         id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1,
         value: worldManagerInterfaceRef.getCurrentSimulationSpeed(), unit: 'tps', showValue: true,
         onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val)
     });
 
-    // Brush Slider in Popout
+    
     sliderComponents.neighborhoodSliderPopout = new SliderComponent(uiElements.neighborhoodSizeSliderMountPopout, {
         id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1,
         value: worldManagerInterfaceRef.getCurrentBrushSize(), unit: '', showValue: true,
         onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
     });
 
-    // New Rules Popout Controls
+    
     uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => {
         r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('rulesetGenerationMode', r.value); });
     });
@@ -203,21 +203,21 @@ function _initPopoutControls() {
             generationMode: mode,
             resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
         });
-        // popoutPanels.newRules.hide(); // Keep the popout open
+        
     });
 
-    // Set Hex Popout Controls
+    
     uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
         const hex = uiElements.rulesetInputPopout.value.trim().toUpperCase();
         if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
             alert("Invalid Hex: Must be 32 hex chars."); uiElements.rulesetInputPopout.select(); return;
         }
-        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked'); // Using the same scope switch for consistency
+        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked'); 
         const targetScope = targetScopeRadio ? targetScopeRadio.value : 'selected';
 
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
             hexString: hex,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' // And same reset logic
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' 
         });
         uiElements.rulesetInputPopout.value = ''; 
         popoutPanels.setHex.hide();
@@ -233,7 +233,7 @@ function _initPopoutControls() {
         }).catch(err => alert('Failed to copy ruleset hex.'));
     });
     
-    // Reset/Clear Popout Controls
+    
     uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
     uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); popoutPanels.resetClear.hide(); });
     uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
@@ -242,16 +242,16 @@ function _initPopoutControls() {
 
 function _setupToolbarButtonListeners() {
     uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
-    // Panel toggle buttons
+    
     uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
     uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
     uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
-    // Load state still needs fileInput
+    
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
 }
 
-function _setupStateListeners() { // For file input primarily
+function _setupStateListeners() { 
     uiElements.fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) { e.target.value = null; return; }
@@ -273,7 +273,7 @@ function _setupStateListeners() { // For file input primarily
 }
 
 function loadAndApplyUISettings() {
-    // Load settings for popout controls
+    
     sliderComponents.speedSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentSimulationSpeed());
     sliderComponents.neighborhoodSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentBrushSize());
     
@@ -284,7 +284,7 @@ function loadAndApplyUISettings() {
     sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
     updateBiasSliderDisabledStatePopout();
 
-    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', false); // Default to 'selected' for popout
+    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', false); 
     uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
     
     uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
@@ -298,7 +298,7 @@ function updateBiasSliderDisabledStatePopout() {
 
 function updatePauseButtonVisual(isPaused) { 
     if (uiElements?.playPauseButton) {
-        uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚"; // Placeholder icons
+        uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚"; 
         uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
     }
 }
@@ -312,15 +312,15 @@ function updateStatsDisplay(stats) {
     if (!stats || !uiElements) return;
 
     if (stats.worldIndex !== undefined && stats.worldIndex !== worldManagerInterfaceRef.getSelectedWorldIndex()) {
-      // Stats are for a non-selected world, don't update the main display from these.
-      // The selected world's stats will come through its own update.
+      
+      
       return;
     }
     
     uiElements.statTick.textContent = stats.tick !== undefined ? String(stats.tick) : '--';
     uiElements.statRatio.textContent = stats.ratio !== undefined ? (stats.ratio * 100).toFixed(2) : '--';
-    // uiElements.statAvgRatio.textContent = stats.avgRatio !== undefined ? (stats.avgRatio * 100).toFixed(2) : '--'; 
-    // FPS and TPS are updated by a different event (PERFORMANCE_METRICS_UPDATED)
+    
+    
 }
 
 function updatePerformanceDisplay(fps, tpsOfSelectedWorld) {
@@ -337,14 +337,14 @@ function handleGlobalKeyDown(event) {
         activeEl.tagName === 'SELECT' || 
         activeEl.isContentEditable
     );
-    // Allow hotkeys if focus is on a popout input unless it's the main hex input
+    
     if (isInputFocused && activeEl !== uiElements.rulesetInputPopout && activeEl !== uiElements.editorRulesetInput) {
-         // Check if the focused element is inside a popout or draggable panel. If so, maybe allow some hotkeys.
+         
         if (activeEl.closest('.popout-panel') || activeEl.closest('.draggable-panel-base')) {
-            // For now, let's assume most inputs in panels/popouts should prevent global hotkeys
-             if (event.key === "Escape") { // Universal escape for popouts/panels
+            
+             if (event.key === "Escape") { 
                 closeAllPopouts();
-                // Potentially also close the active draggable panel if one is open and not an input field within it
+                
                 if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
                 else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
                 else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
@@ -354,15 +354,15 @@ function handleGlobalKeyDown(event) {
     }
 
 
-    // If an input within a draggable panel or specific popout input is focused, generally block hotkeys
-    // except for Escape.
+    
+    
     if (isInputFocused && (activeEl === uiElements.rulesetInputPopout || activeEl === uiElements.editorRulesetInput)) {
         if (event.key === "Escape") {
-            activeEl.blur(); // Lose focus
-            // Find which popout it belongs to and hide it
+            activeEl.blur(); 
+            
             if (activeEl === uiElements.rulesetInputPopout) popoutPanels.setHex.hide();
         }
-        return; // Don't process other hotkeys if these specific inputs are focused
+        return; 
     }
 
 
@@ -372,18 +372,18 @@ function handleGlobalKeyDown(event) {
         'E': () => { closeAllPopouts(); rulesetEditorComponent?.toggle(); },
         'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },
         'A': () => { closeAllPopouts(); analysisPanelInstance?.toggle(); },
-        'Escape': () => { // Universal Escape
+        'Escape': () => { 
             let aPopoutWasOpen = false;
             activePopouts.forEach(p => { if (!p.isHidden()) { p.hide(); aPopoutWasOpen = true; }});
-            if (!aPopoutWasOpen) { // If no popouts were open, try closing draggable panels
+            if (!aPopoutWasOpen) { 
                 if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
                 else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
                 else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
             }
         }
-        // Add more hotkeys for other toolbar buttons if desired e.g. R for Reset/Clear popout
+        
     };
-    const action = keyMap[event.key.toUpperCase()] || keyMap[event.key]; // Check for 'Escape' directly
+    const action = keyMap[event.key.toUpperCase()] || keyMap[event.key]; 
     if (action) {
         action();
         event.preventDefault();
@@ -395,26 +395,26 @@ function setupUIEventListeners() {
     EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => sliderComponents.speedSliderPopout?.setValue(speed, false));
     EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => {
         updateMainRulesetDisplay(hex);
-        // If editor is open, it should also update its internal hex input if it's not focused
+        
         if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) {
             if (document.activeElement !== uiElements.editorRulesetInput) {
                 uiElements.editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
             }
-            rulesetEditorComponent.refreshViews(); // Ensure grids update
+            rulesetEditorComponent.refreshViews(); 
         }
         if (uiElements.rulesetInputPopout && document.activeElement !== uiElements.rulesetInputPopout) {
              uiElements.rulesetInputPopout.value = (hex === "Error" || hex === "N/A") ? "" : hex;
         }
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
-    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay); // For selected world primarily
+    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay); 
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-        setupPanelComponent?.refreshViews(); // Setup panel shows densities
+        setupPanelComponent?.refreshViews(); 
         if (worldManagerInterfaceRef) updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     });
-    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => { // When densities or enabled states change
+    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => { 
         setupPanelComponent?.refreshViews();
-        if (worldManagerInterfaceRef) { // Update top bar display if selected world's ruleset was part of settings change
+        if (worldManagerInterfaceRef) { 
              updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
         }
     });
@@ -433,5 +433,5 @@ function setupUIEventListeners() {
     });
 }
 
-// Expose elements if needed by main.js for canvas interactions (though canvas is passed directly now)
+
 export function getUIElements() { return uiElements; }

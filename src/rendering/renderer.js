@@ -1,4 +1,4 @@
-// src/rendering/renderer.js
+
 import * as Config from '../core/config.js';
 import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
@@ -12,11 +12,9 @@ let hexAttributeLocations;
 let hexUniformLocations;
 let quadAttributeLocations;
 let quadUniformLocations;
-
 let worldFBOs = [];
-
-let hexBuffers; // positionBuffer, offsetBuffer, stateBuffer, hoverBuffer, ruleIndexBuffer
-let quadBuffers; // positionBuffer, texCoordBuffer
+let hexBuffers; 
+let quadBuffers; 
 let hexVAO;
 let quadVAO;
 
@@ -69,17 +67,17 @@ export async function initRenderer(canvasElement) {
 
 function setupHexBuffersAndVAO() {
     hexBuffers = {};
-    const hexVertices = Utils.createFlatTopHexagonVertices(); // Should be 6 vertices (x,y pairs)
+    const hexVertices = Utils.createFlatTopHexagonVertices(); 
     hexBuffers.positionBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, hexVertices, gl.STATIC_DRAW);
 
-    // Instance offsets (static, based on grid layout within the FBO texture)
+    
     const instanceOffsets = new Float32Array(Config.NUM_CELLS * 2);
     const textureHexSize = Utils.calculateHexSizeForTexture();
     const startX = textureHexSize;
     const startY = textureHexSize * Math.sqrt(3) / 2;
 
     for (let i = 0; i < Config.NUM_CELLS; i++) {
-        const coords = Utils.indexToCoords(i); // From flat index to {col, row}
+        const coords = Utils.indexToCoords(i); 
         if (coords) {
             const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize, startX, startY);
             instanceOffsets[i * 2] = pixelCoords.x;
@@ -88,8 +86,8 @@ function setupHexBuffersAndVAO() {
     }
     hexBuffers.offsetBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, instanceOffsets, gl.STATIC_DRAW);
 
-    // Dynamic per-instance data (state, hover, ruleIndex)
-    // Initialize with empty data; will be updated each frame per world
+    
+    
     const initialZerosFloat = new Float32Array(Config.NUM_CELLS).fill(0.0);
     hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosFloat, gl.DYNAMIC_DRAW);
     hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosFloat, gl.DYNAMIC_DRAW);
@@ -127,23 +125,20 @@ function setupHexBuffersAndVAO() {
 
 function setupQuadBuffersAndVAO() {
     quadBuffers = {};
-    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]); // Full quad
-    const texCoords = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]); // Standard texture coords
+    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]); 
+    const texCoords = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]); 
 
     quadBuffers.positionBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
     quadBuffers.texCoordBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
 
     quadVAO = gl.createVertexArray();
     gl.bindVertexArray(quadVAO);
-
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
     gl.enableVertexAttribArray(quadAttributeLocations.position);
     gl.vertexAttribPointer(quadAttributeLocations.position, 2, gl.FLOAT, false, 0, 0);
-
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.texCoordBuffer);
     gl.enableVertexAttribArray(quadAttributeLocations.texCoord);
     gl.vertexAttribPointer(quadAttributeLocations.texCoord, 2, gl.FLOAT, false, 0, 0);
-
     gl.bindVertexArray(null);
 }
 
@@ -161,7 +156,7 @@ function renderWorldsToTextures(allWorldsData) {
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const worldData = allWorldsData[i]; // Data from WorldProxy's latest snapshot
+        const worldData = allWorldsData[i]; 
         const fboData = worldFBOs[i];
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
 
@@ -170,9 +165,6 @@ function renderWorldsToTextures(allWorldsData) {
 
         if (worldData && worldData.enabled) {
             if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
-                // Data might not be available yet from worker, or world is just initialized
-                // Render a clear state or placeholder, or skip update for this FBO
-                // For now, it will just be the cleared background.
                 continue;
             }
             if (!hexShaderProgram || !hexVAO) continue;
@@ -185,9 +177,6 @@ function renderWorldsToTextures(allWorldsData) {
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
-
-            // Convert Uint8Array to Float32Array for shader attributes if needed, or ensure shader handles int/uint
-            // Assuming shader expects float for state/hover/ruleIndex
             const gpuState = new Float32Array(worldData.jsStateArray);
             const gpuHover = new Float32Array(worldData.jsHoverStateArray);
             const gpuRuleIndex = new Float32Array(worldData.jsRuleIndexArray);
@@ -196,16 +185,16 @@ function renderWorldsToTextures(allWorldsData) {
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, gpuHover);
             WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, gpuRuleIndex);
 
-            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS); // 6 vertices per hexagon
+            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS); 
 
-        } else { // World is disabled or data is null
+        } else { 
             if (!quadShaderProgram || !quadVAO) continue;
             gl.useProgram(quadShaderProgram);
             gl.bindVertexArray(quadVAO);
 
-            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); // false
+            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); 
             gl.uniform4fv(quadUniformLocations.u_color, Config.DISABLED_WORLD_OVERLAY_COLOR);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); // Draw a quad
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
         }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -213,10 +202,10 @@ function renderWorldsToTextures(allWorldsData) {
 }
 
 
-function renderMainScene(selectedWorldIndex) { // allWorldsData is no longer passed here, FBOs are already updated
+function renderMainScene(selectedWorldIndex) { 
     if (!quadShaderProgram || !quadVAO) return;
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Render to canvas
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); 
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(...Config.BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -271,18 +260,15 @@ function renderMainScene(selectedWorldIndex) { // allWorldsData is no longer pas
     const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
     const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
-    // Draw mini-maps
+    
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
-
-        // Draw selection outline if this is the selected world
-        // The allWorldsData[i].enabled check would be implicit if FBO is just background for disabled
         if (i === selectedWorldIndex) {
             const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
-            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); // false
+            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); 
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
             drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);
         }
@@ -290,16 +276,16 @@ function renderMainScene(selectedWorldIndex) { // allWorldsData is no longer pas
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); // true
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); 
         drawQuad(miniX, miniY, miniMapW, miniMapH);
     }
 
-    // Draw selected world in main view
+    
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); // true
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); 
         drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight);
     }
 
@@ -309,39 +295,32 @@ function renderMainScene(selectedWorldIndex) { // allWorldsData is no longer pas
 function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
-
-    // Convert pixel coordinates to clip space
     const clipX = (pixelX / canvasWidth) * 2 - 1;
-    const clipY = (pixelY / canvasHeight) * -2 + 1; // Invert Y
+    const clipY = (pixelY / canvasHeight) * -2 + 1; 
     const clipW = (pixelW / canvasWidth) * 2;
     const clipH = (pixelH / canvasHeight) * 2;
-
-    // Define quad vertices in clip space for this specific draw call
-    // Order: bottom-left, bottom-right, top-left, top-right (for TRIANGLE_STRIP)
     const positions = new Float32Array([
-        clipX, clipY - clipH,         // Top-left in screen space (bottom-left in clip if Y up)
-        clipX + clipW, clipY - clipH, // Top-right
-        clipX, clipY,                 // Bottom-left
-        clipX + clipW, clipY          // Bottom-right
+        clipX, clipY - clipH,         
+        clipX + clipW, clipY - clipH, 
+        clipX, clipY,                 
+        clipX + clipW, clipY          
     ]);
-    // Note: If your quad VAO is set up for -1 to 1, you transform it.
-    // The current setup uses a static -1 to 1 quad and modifies it.
+    
+    
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions); // Update vertex positions for this quad
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions); 
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-// allWorldsData is passed from WorldManager containing { jsStateArray, jsRuleIndexArray, jsHoverStateArray, enabled }
+
 export function renderFrame(allWorldsData, selectedWorldIndex) {
     if (!gl) return;
-    renderWorldsToTextures(allWorldsData); // Update all FBOs based on latest data
-    renderMainScene(selectedWorldIndex);   // Composite FBOs to canvas
+    renderWorldsToTextures(allWorldsData); 
+    renderMainScene(selectedWorldIndex);   
 }
 
 export function resizeRenderer() {
     if (!gl || !canvas) return;
     Utils.resizeCanvasToDisplaySize(canvas, gl);
-    // FBOs don't need resizing as they are fixed size, but main viewport changes.
-    // The renderMainScene will adapt to new canvas dimensions.
 }

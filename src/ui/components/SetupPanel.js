@@ -1,10 +1,10 @@
-// src/ui/components/SetupPanel.js
+
 import * as Config from '../../core/config.js';
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { formatHexCode } from '../../utils/utils.js'; // Import formatHexCode
+import { formatHexCode } from '../../utils/utils.js'; 
 
 export class SetupPanel {
     constructor(panelElement, worldManagerInterface) { 
@@ -74,11 +74,11 @@ export class SetupPanel {
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
             
-            const formattedFullHex = formatHexCode(settings.rulesetHex); // Format the full hex code
+            const formattedFullHex = formatHexCode(settings.rulesetHex); 
             const shortHex = settings.rulesetHex && settings.rulesetHex !== "Error" ? settings.rulesetHex.substring(0,4) : "ERR";
 
             cell.innerHTML =
-                `<div class="world-label" title="${formattedFullHex}">World ${i} (Rules: ${shortHex}...)</div>` + // Added title attribute
+                `<div class="world-label" title="${formattedFullHex}">World ${i} (Rules: ${shortHex}...)</div>` + 
                 `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
                 `<div class="setting-control enable-control">` +
                     `<input type="checkbox" id="enableSwitch_${i}" class="enable-switch checkbox-input" ${settings.enabled ? 'checked' : ''} data-world-index="${i}">` +

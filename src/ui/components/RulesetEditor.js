@@ -1,16 +1,16 @@
-// src/ui/components/RulesetEditor.js
+
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesetEditor {
-    constructor(panelElement, worldManagerInterface) { // Changed to worldManagerInterface
+    constructor(panelElement, worldManagerInterface) { 
         if (!panelElement || !worldManagerInterface) {
             console.error('RulesetEditor: panelElement or worldManagerInterface is null.');
             return;
         }
         this.panelElement = panelElement;
-        this.worldManager = worldManagerInterface; // Store the interface
+        this.worldManager = worldManagerInterface; 
         this.panelIdentifier = 'ruleset';
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
@@ -22,7 +22,7 @@ export class RulesetEditor {
             rotationalSymmetryRulesetEditorGrid: panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'),
             editorApplyScopeSelectedRadio: panelElement.querySelector('#editorApplyScopeSelected'),
             editorApplyScopeAllRadio: panelElement.querySelector('#editorApplyScopeAll'),
-            editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'), // Ensure correct selector
+            editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'), 
             editorAutoResetCheckbox: panelElement.querySelector('#editorAutoResetCheckbox'),
         };
         this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
@@ -68,8 +68,8 @@ export class RulesetEditor {
 
         if (this.uiElements.clearRulesButton) {
             this.uiElements.clearRulesButton.addEventListener('click', () => {
-                const currentArr = this.worldManager.getCurrentRulesetArray(); // Uses selected world's ruleset
-                const targetState = currentArr.every(state => state === 0) ? 1 : 0; // Toggle between all 0s and all 1s
+                const currentArr = this.worldManager.getCurrentRulesetArray(); 
+                const targetState = currentArr.every(state => state === 0) ? 1 : 0; 
                 EventBus.dispatch(EVENTS.COMMAND_EDITOR_SET_ALL_RULES_STATE, {
                     targetState,
                     modificationScope: this._getEditorModificationScope(),
@@ -83,7 +83,7 @@ export class RulesetEditor {
             const hexString = this.uiElements.editorRulesetInput.value.trim().toUpperCase();
             const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex();
 
-            if (!hexString) { // If empty, revert to current selected world's hex
+            if (!hexString) { 
                 this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
                 return;
             }
@@ -105,7 +105,7 @@ export class RulesetEditor {
                 if (event.key === 'Enter') {
                     event.preventDefault();
                     handleEditorInputChange();
-                    this.uiElements.editorRulesetInput.blur(); // Lose focus
+                    this.uiElements.editorRulesetInput.blur(); 
                 }
             });
         }
@@ -113,8 +113,8 @@ export class RulesetEditor {
         const createRuleInteractionHandler = (commandType, detailExtractor) => (event) => {
             const vizElement = event.target.closest(detailExtractor.selector);
             if (vizElement) {
-                const details = detailExtractor.getDetails(vizElement, this.worldManager); // Pass worldManager
-                if (details) { // Ensure details could be extracted
+                const details = detailExtractor.getDetails(vizElement, this.worldManager); 
+                if (details) { 
                     EventBus.dispatch(commandType, {
                         ...details,
                         modificationScope: this._getEditorModificationScope(),
@@ -132,10 +132,10 @@ export class RulesetEditor {
         if (this.uiElements.neighborCountRulesetEditorGrid) {
             this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT, {
                 selector: '.neighbor-count-rule-viz',
-                getDetails: (el, wm) => { // wm is worldManager
+                getDetails: (el, wm) => { 
                     const cs = parseInt(el.dataset.centerState, 10);
                     const na = parseInt(el.dataset.numActive, 10);
-                    const currentOut = wm.getEffectiveRuleForNeighborCount(cs, na); // Uses selected world's ruleset
+                    const currentOut = wm.getEffectiveRuleForNeighborCount(cs, na); 
                     return { centerState: cs, numActive: na, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
                 }
             }));
@@ -143,14 +143,14 @@ export class RulesetEditor {
         if (this.uiElements.rotationalSymmetryRulesetEditorGrid) {
             this.uiElements.rotationalSymmetryRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
                 selector: '.r-sym-rule-viz',
-                getDetails: (el, wm) => { // wm is worldManager
+                getDetails: (el, wm) => { 
                     const cb = parseInt(el.dataset.canonicalBitmask, 10);
                     const cs = parseInt(el.dataset.centerState, 10);
-                    // To get effective output for a canonical group, we need the full ruleset details
-                    // This is slightly more complex than neighbor count. We need to find the specific group.
+                    
+                    
                     const canonicalDetails = wm.getCanonicalRuleDetails();
                     const detail = canonicalDetails.find(d => d.canonicalBitmask === cb && d.centerState === cs);
-                    const currentOut = detail ? detail.effectiveOutput : 2; // Default to mixed if not found
+                    const currentOut = detail ? detail.effectiveOutput : 2; 
                     return { canonicalBitmask: cb, centerState: cs, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
                 }
             }));
@@ -161,7 +161,7 @@ export class RulesetEditor {
 
     refreshViews() {
         if (!this.worldManager || this.panelElement.classList.contains('hidden')) return;
-        const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex(); // From selected world
+        const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex(); 
         if (this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
         }
@@ -178,15 +178,15 @@ export class RulesetEditor {
         };
         for (const key in grids) grids[key]?.classList.add('hidden');
 
-        const activeGrid = grids[currentMode] || grids.detailed; // Default to detailed
+        const activeGrid = grids[currentMode] || grids.detailed; 
         activeGrid.classList.remove('hidden');
 
         if (currentMode === 'detailed') {
-            this._populateDetailedGrid(this.worldManager.getCurrentRulesetArray()); // Uses selected world
+            this._populateDetailedGrid(this.worldManager.getCurrentRulesetArray()); 
         } else if (currentMode === 'neighborCount') {
-            this._populateNeighborCountGrid(); // Uses selected world via worldManager methods
+            this._populateNeighborCountGrid(); 
         } else if (currentMode === 'rotationalSymmetry') {
-            this._populateRotationalSymmetryGrid(); // Uses selected world via worldManager methods
+            this._populateRotationalSymmetryGrid(); 
         } else {
             this._populateDetailedGrid(this.worldManager.getCurrentRulesetArray());
         }
@@ -218,8 +218,8 @@ export class RulesetEditor {
         if (!grid || !this.worldManager) { if (grid) grid.innerHTML = '<p>Error loading data for neighbor count view.</p>'; return; }
         grid.innerHTML = '';
         const frag = document.createDocumentFragment();
-        for (let cs = 0; cs <= 1; cs++) { // Center State
-            for (let na = 0; na <= 6; na++) { // Number of Active Neighbors
+        for (let cs = 0; cs <= 1; cs++) { 
+            for (let na = 0; na <= 6; na++) { 
                 const effectiveOutput = this.worldManager.getEffectiveRuleForNeighborCount(cs, na);
                 const outputDisplay = effectiveOutput === 1 ? 'ON' : (effectiveOutput === 0 ? 'OFF' : 'MIXED');
                 const viz = document.createElement('div');
@@ -240,7 +240,7 @@ export class RulesetEditor {
         const grid = this.uiElements.rotationalSymmetryRulesetEditorGrid;
         if (!grid || !this.worldManager?.getCanonicalRuleDetails) { if (grid) grid.innerHTML = '<p>Error loading data for symmetry view.</p>'; return; }
         grid.innerHTML = '';
-        const canonicalDetails = this.worldManager.getCanonicalRuleDetails(); // This uses selected world's ruleset
+        const canonicalDetails = this.worldManager.getCanonicalRuleDetails(); 
         if (!canonicalDetails) { grid.innerHTML = '<p>Symmetry data unavailable.</p>'; return; }
 
         const frag = document.createDocumentFragment();
@@ -296,7 +296,7 @@ export class RulesetEditor {
         const hasPosition = (s.x && s.x.endsWith('px')) || (s.y && s.y.endsWith('px'));
         if (hasPosition && (parseFloat(this.panelElement.style.left) > 0 || parseFloat(this.panelElement.style.top) > 0 || this.panelElement.style.left !== '50%' || this.panelElement.style.top !== '50%')) {
             this.panelElement.style.transform = 'none';
-        } else if (!hasPosition && s.isOpen) { // If no specific position saved, but panel is open, center it.
+        } else if (!hasPosition && s.isOpen) { 
              this.panelElement.style.left = '50%';
              this.panelElement.style.top = '50%';
              this.panelElement.style.transform = 'translate(-50%, -50%)';

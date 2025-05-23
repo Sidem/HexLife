@@ -1,4 +1,4 @@
-// src/core/WorldProxy.js
+
 
 export class WorldProxy {
     constructor(worldIndex, initialSettings, worldManagerCallbacks) {
@@ -15,13 +15,13 @@ export class WorldProxy {
             entropy: 0,
             isEnabled: initialSettings.enabled,
             tps: 0,
-            rulesetHex: initialSettings.rulesetHex || "0".repeat(32) // Initialize with initial ruleset hex
+            rulesetHex: initialSettings.rulesetHex || "0".repeat(32) 
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
         this.onInitialized = worldManagerCallbacks.onInitialized;
 
-        // For TPS calculation
+        
         this.lastTickCountForTPS = 0;
         this.lastTickUpdateTimeForTPS = performance.now();
 
@@ -33,7 +33,7 @@ export class WorldProxy {
             NUM_CELLS: initialSettings.config.NUM_CELLS,
         };
         const initialStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
-        const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0); // rulesetArray should be Uint8Array
+        const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0); 
         const initialHoverStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
 
         this.worker.postMessage({
@@ -63,7 +63,7 @@ export class WorldProxy {
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
                 this.latestHoverStateArray = new Uint8Array(data.hoverStateBuffer);
-                this.onUpdate(this.worldIndex, 'state'); // Notify manager about state change
+                this.onUpdate(this.worldIndex, 'state'); 
                 break;
             case 'STATS_UPDATE':
                 const currentTime = performance.now();
@@ -85,20 +85,20 @@ export class WorldProxy {
                     entropy: data.entropy,
                     isEnabled: data.isEnabled,
                     tps: currentTPS,
-                    rulesetHex: data.rulesetHex || this.latestStats.rulesetHex // Update rulesetHex
+                    rulesetHex: data.rulesetHex || this.latestStats.rulesetHex 
                 };
 
                 this.lastTickCountForTPS = data.tick;
                 this.lastTickUpdateTimeForTPS = currentTime;
 
-                this.onUpdate(this.worldIndex, 'stats'); // Notify manager about stats (and potentially ruleset) change
+                this.onUpdate(this.worldIndex, 'stats'); 
                 break;
         }
     }
 
     sendCommand(commandType, commandData, transferList = []) {
         if (!this.isInitialized && commandType !== 'INIT') {
-            //console.warn(`WorldProxy ${this.worldIndex}: Worker not ready for command ${commandType}.`);
+            
             return;
         }
         if (transferList.length > 0) {
@@ -112,13 +112,12 @@ export class WorldProxy {
     stopSimulation() { this.sendCommand('STOP_SIMULATION', {}); }
     setSpeed(speed) { this.sendCommand('SET_SPEED_TARGET', { speed }); }
     setEnabled(enabled) {
-        this.latestStats.isEnabled = enabled; // Optimistically update
+        this.latestStats.isEnabled = enabled; 
         this.sendCommand('SET_ENABLED', { enabled });
     }
 
-    setRuleset(rulesetArrayBuffer) { // Expects ArrayBuffer
+    setRuleset(rulesetArrayBuffer) { 
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
-        // Optimistically update local rulesetHex if we could convert here, but better to wait for worker's ack via STATS_UPDATE
     }
     resetWorld(optionsOrDensity) {
         this.lastTickCountForTPS = 0;
@@ -127,13 +126,11 @@ export class WorldProxy {
 
         let commandPayload;
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {
-            // New format: optionsOrDensity is an object like { density: number, isClearOperation?: boolean }
             commandPayload = {
                 density: optionsOrDensity.density,
                 isClearOperation: optionsOrDensity.isClearOperation || false
             };
         } else {
-            // Old format: optionsOrDensity is just the density number, assume it's a regular reset
             commandPayload = {
                 density: optionsOrDensity,
                 isClearOperation: false
@@ -144,7 +141,7 @@ export class WorldProxy {
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
     }
-    setHoverState(hoverAffectedIndices) { // Expects Array or Set
+    setHoverState(hoverAffectedIndices) { 
         this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices: Array.from(hoverAffectedIndices) });
     }
     clearHoverState() {
@@ -161,7 +158,7 @@ export class WorldProxy {
     }
 
     getLatestStats() {
-        // Ensure rulesetHex is part of the returned stats
+        
         return { ...this.latestStats };
     }
 

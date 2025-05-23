@@ -1,21 +1,21 @@
-// src/core/WorldManager.js
+
 import * as Config from './config.js';
 import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
-import * as Symmetry from './Symmetry.js'; // For ruleset generation
+import * as Symmetry from './Symmetry.js'; 
 
 export class WorldManager {
     constructor() {
-        this.worlds = []; // Array of WorldProxy instances
+        this.worlds = []; 
         this.selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
-        this.isGloballyPaused = true; // Master pause state
+        this.isGloballyPaused = true; 
         this.currentGlobalSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
         this.currentBrushSize = PersistenceService.loadBrushSize() || Config.DEFAULT_NEIGHBORHOOD_SIZE;
         
-        // Initialize properties that might be accessed by methods converted to arrow functions
+        
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
-        this.worldSettings = PersistenceService.loadWorldSettings(); // Array of {initialDensity, enabled, rulesetHex}
+        this.worldSettings = PersistenceService.loadWorldSettings(); 
         this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || this._generateRandomRulesetHex(0.5, 'r_sym');
 
         this._initWorlds();
@@ -99,13 +99,13 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => this.setGlobalPause(!this.isGloballyPaused));
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
         
-        // Listener for COMMAND_SET_BRUSH_SIZE
+        
         EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, (size) => {
-            const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size)); // Validate size
+            const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size)); 
             if (this.currentBrushSize !== newSizeValidated) {
                 this.currentBrushSize = newSizeValidated;
-                PersistenceService.saveBrushSize(this.currentBrushSize); // Persist the change
-                EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, this.currentBrushSize); // Notify listeners
+                PersistenceService.saveBrushSize(this.currentBrushSize); 
+                EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, this.currentBrushSize); 
             }
         });
 
@@ -204,8 +204,8 @@ export class WorldManager {
             indicesToClear.forEach(idx => {
                 const proxy = this.worlds[idx];
                 if (proxy) {
-                    let targetStateForClear = 0; // Default to clearing to 0 (inactive)
-                    if (proxy.latestStateArray) { // Check if worker has provided its state
+                    let targetStateForClear = 0; 
+                    if (proxy.latestStateArray) { 
                         const currentState = proxy.latestStateArray;
                         let allCurrentlyInactive = true;
                         for (let i = 0; i < currentState.length; i++) {
@@ -215,10 +215,9 @@ export class WorldManager {
                             }
                         }
                         if (allCurrentlyInactive) {
-                            targetStateForClear = 1; // If all are inactive, clear to active
+                            targetStateForClear = 1; 
                         }
                     }
-                    // Pass density (as targetStateForClear) and isClearOperation flag
                     proxy.resetWorld({ density: targetStateForClear, isClearOperation: true });
                 }
 
@@ -484,7 +483,7 @@ export class WorldManager {
                     }
                 }
             }
-        } else { // random
+        } else { 
             for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
         }
         return this.rulesetToHex(tempRuleset); 

@@ -1,35 +1,32 @@
-// src/core/WorldWorker.js
+
 import * as Config from './config.js';
 
 let worldIndex = -1;
 let workerConfig = {};
-
 let jsStateArray = null;
 let jsNextStateArray = null;
 let jsRuleIndexArray = null;
 let jsNextRuleIndexArray = null;
 let jsHoverStateArray = null;
-let ruleset = null; // Uint8Array
-
+let ruleset = null; 
 let commandQueue = [];
 let isRunning = false;
 let isEnabled = true;
 let tickIntervalId = null;
-let currentSpeedTarget = Config.DEFAULT_SPEED; // Store the target TPS
+let currentSpeedTarget = Config.DEFAULT_SPEED; 
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
 
 const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
 const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
 
-// --- Utility function for converting ruleset to hex (duplicated for worker context) ---
 function rulesetToHex(rulesetArray) {
     if (!rulesetArray || rulesetArray.length !== 128) return "Error";
     let bin = ""; for (let i = 0; i < 128; i++) bin += rulesetArray[i];
     try { return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); }
-    catch (e) { return "Error"; } // Should not happen with Uint8Array
+    catch (e) { return "Error"; } 
 }
-// --- End utility function ---
+
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
@@ -90,40 +87,37 @@ function setHoverStateLogic(hoverAffectedIndicesSet) {
 function processCommandQueue() {
     let needsStateUpdate = false;
     let rulesetChangedInQueue = false;
-    let activeCount = 0; // Ensure activeCount is scoped correctly if needed by multiple commands
+    let activeCount = 0; 
 
     for (const command of commandQueue) {
         switch (command.type) {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
-                rulesetChangedInQueue = true; // Mark that ruleset changed
+                rulesetChangedInQueue = true; 
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
-                activeCount = 0; // Reset activeCount for this operation
-
+                activeCount = 0; 
                 if (jsStateArray) {
                     if (isClearOp) {
-                        // New "clear" logic: fill uniformly with the density (0 or 1)
-                        // The density here is the target state (0 or 1) determined by WorldManager
                         jsStateArray.fill(density);
                         activeCount = (density === 1) ? workerConfig.NUM_CELLS : 0;
                     } else {
-                        // Original "reset" logic
-                        if (density === 0 || density === 1) { // Fill with 0 or 1 for reset
+                        
+                        if (density === 0 || density === 1) { 
                             jsStateArray.fill(density);
-                            // Only flip center for actual resets, not clears
+                            
                             const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + (workerConfig.GRID_COLS / 2));
                             if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
                                 jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
                             }
-                            // Recalculate activeCount after potential flip for reset
+                            
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                                 if (jsStateArray[i] === 1) activeCount++;
                             }
-                        } else { // Random density for reset
+                        } else { 
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                                 jsStateArray[i] = Math.random() < density ? 1 : 0;
                                 if (jsStateArray[i] === 1) activeCount++;
@@ -131,11 +125,11 @@ function processCommandQueue() {
                         }
                     }
                 }
-                // Common reset actions for both clear and reset
+                
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
-                if(jsNextStateArray) jsNextStateArray.fill(0); // Clear buffer for next state
-                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0); // Clear buffer for next rule indices
-                if(jsHoverStateArray) jsHoverStateArray.fill(0); // Clear hover states
+                if(jsNextStateArray) jsNextStateArray.fill(0); 
+                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0); 
+                if(jsHoverStateArray) jsHoverStateArray.fill(0); 
                 needsStateUpdate = true;
                 break;
             case 'APPLY_BRUSH':
@@ -165,7 +159,7 @@ function processCommandQueue() {
                 break;
             case 'LOAD_STATE':
                 jsStateArray = new Uint8Array(command.data.newStateBuffer);
-                ruleset = new Uint8Array(command.data.newRulesetBuffer); // ruleset updated here
+                ruleset = new Uint8Array(command.data.newRulesetBuffer); 
                 worldTickCounter = command.data.worldTick || 0;
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
@@ -173,15 +167,11 @@ function processCommandQueue() {
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 isEnabled = true;
                 needsStateUpdate = true;
-                rulesetChangedInQueue = true; // Mark that ruleset changed
+                rulesetChangedInQueue = true; 
                 break;
         }
     }
-    commandQueue = []; // Clear the queue after processing
-    // Return value might need to include activeCount if it's used by the caller of processCommandQueue
-    // For now, assuming needsStateUpdate and rulesetChangedInQueue are sufficient.
-    // If runTick needs activeCount, it calculates it after simulation step.
-    // For immediate feedback after RESET_WORLD, it's calculated above and sendStateUpdate will use it.
+    commandQueue = []; 
     return { needsStateUpdate, rulesetChangedInQueue };
 }
 
@@ -206,7 +196,6 @@ function runTick() {
         const cState = jsStateArray[i];
         let neighborMask = 0;
         const dirs = (cCol % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
-
         for (let nOrder = 0; nOrder < 6; nOrder++) {
             const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
             const nRow = (cRow + dirs[nOrder][1] + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS;
@@ -263,15 +252,15 @@ function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false)
             activeCount: activeCount,
             ratio: ratio,
             entropy: entropy,
-            rulesetHex: currentRulesetHex, // Send current ruleset hex
+            rulesetHex: currentRulesetHex, 
             isEnabled: isEnabled
         });
-    } else if (rulesetHasChanged || !isEnabled) { // If only ruleset changed, or disabled, send stats update
+    } else if (rulesetHasChanged || !isEnabled) { 
         self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
             tick: worldTickCounter,
-            activeCount: jsStateArray.reduce((s, c) => s + c, 0), // Recalculate if not provided
+            activeCount: jsStateArray.reduce((s, c) => s + c, 0), 
             ratio: workerConfig.NUM_CELLS > 0 ? jsStateArray.reduce((s, c) => s + c, 0) / workerConfig.NUM_CELLS : 0,
             entropy: calculateBinaryEntropy(workerConfig.NUM_CELLS > 0 ? jsStateArray.reduce((s, c) => s + c, 0) / workerConfig.NUM_CELLS : 0),
             rulesetHex: currentRulesetHex,
@@ -295,7 +284,7 @@ function updateSimulationInterval() {
 
 self.onmessage = function(event) {
     const command = event.data;
-    let rulesetChangedByCommand = false; // Track if ruleset changed in this message cycle
+    let rulesetChangedByCommand = false; 
 
     switch (command.type) {
         case 'INIT':
@@ -305,7 +294,7 @@ self.onmessage = function(event) {
             targetTickDurationMs = 1000 / currentSpeedTarget;
 
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
-            ruleset = new Uint8Array(command.data.initialRulesetBuffer); // Initial ruleset
+            ruleset = new Uint8Array(command.data.initialRulesetBuffer); 
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
 
             jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS);
@@ -336,11 +325,11 @@ self.onmessage = function(event) {
             jsHoverStateArray.fill(0);
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
-            // Send initial state and stats, including rulesetHex
+            
             const initialActiveCount = isEnabled ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
             const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
             const initialEntropy = isEnabled ? calculateBinaryEntropy(initialRatio) : 0;
-            sendStateUpdate(initialActiveCount, initialRatio, initialEntropy, true); // true indicates ruleset is "new" here
+            sendStateUpdate(initialActiveCount, initialRatio, initialEntropy, true); 
             break;
 
         case 'START_SIMULATION':
@@ -364,15 +353,15 @@ self.onmessage = function(event) {
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 sendUpdateForSetEnabled = true;
             } else if (isEnabled && !prevEnabled && jsStateArray) {
-                sendUpdateForSetEnabled = true; // Send update to reflect current (possibly zeroed) state
+                sendUpdateForSetEnabled = true; 
             }
             updateSimulationInterval();
             if (sendUpdateForSetEnabled) {
-                 sendStateUpdate(0,0,0, false); // Ruleset itself didn't change by this command
+                 sendStateUpdate(0,0,0, false); 
             }
             break;
 
-        // Commands that might change ruleset or require immediate state feedback
+        
         case 'SET_RULESET':
         case 'LOAD_STATE':
             commandQueue.push(command);
@@ -384,17 +373,13 @@ self.onmessage = function(event) {
             }
             break;
 
-        default: // APPLY_BRUSH, SET_HOVER_STATE, CLEAR_HOVER_STATE, RESET_WORLD
+        default: 
             commandQueue.push(command);
-            // For RESET_WORLD, the state update is now handled within processCommandQueue if needsStateUpdate is true.
-            // We need to ensure sendStateUpdate is called with correct parameters.
+            
+            
             if (command.type === 'RESET_WORLD') {
                 const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
                 if (inducedUpdate) {
-                    // activeCount for reset/clear is calculated inside the RESET_WORLD case now
-                    // We need to retrieve it or re-calculate it here if processCommandQueue doesn't return it
-                    // For simplicity, let's assume activeCount is correctly handled and passed to sendStateUpdate
-                    // or sendStateUpdate itself calculates it from jsStateArray if activeCount is undefined.
                     const currentActiveCount = jsStateArray.reduce((sum, val) => sum + val, 0);
                     const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
                     const currentEntropy = calculateBinaryEntropy(currentRatio);
