@@ -1,4 +1,3 @@
-
 import * as Config from '../core/config.js';
 import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
@@ -38,7 +37,7 @@ export function initUI(worldManagerInterface) {
         rulesetDisplay: document.getElementById('rulesetDisplay'),
         statTick: document.getElementById('stat-tick'),
         statRatio: document.getElementById('stat-ratio'),
-        
+        statBrushSize: document.getElementById('stat-brush-size'),
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
 
@@ -111,6 +110,7 @@ export function initUI(worldManagerInterface) {
     updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
+    updateBrushSizeDisplay(worldManagerInterfaceRef.getCurrentBrushSize());
 
     console.log("New Toolbar UI Initialized.");
     return true;
@@ -118,7 +118,7 @@ export function initUI(worldManagerInterface) {
 
 function validateElements() {
     const critical = [
-        'rulesetDisplay', 'statTick', 'statRatio', 'statFps', 'statActualTps',
+        'rulesetDisplay', 'statTick', 'statRatio', 'statBrushSize', 'statFps', 'statActualTps',
         'playPauseButton', 'speedControlButton', 'brushToolButton', 'newRulesButton',
         'setRulesetButton', 'saveStateButton', 'loadStateButton', 'resetClearButton',
         'editRuleButton', 'setupPanelButton', 'analysisPanelButton',
@@ -328,6 +328,11 @@ function updatePerformanceDisplay(fps, tpsOfSelectedWorld) {
     if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(tpsOfSelectedWorld) : '--';
 }
 
+function updateBrushSizeDisplay(brushSize) {
+    if (uiElements?.statBrushSize) {
+        uiElements.statBrushSize.textContent = brushSize !== undefined ? String(brushSize) : '--';
+    }
+}
 
 function handleGlobalKeyDown(event) {
     const activeEl = document.activeElement;
@@ -372,6 +377,25 @@ function handleGlobalKeyDown(event) {
         'E': () => { closeAllPopouts(); rulesetEditorComponent?.toggle(); },
         'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },
         'A': () => { closeAllPopouts(); analysisPanelInstance?.toggle(); },
+        'C': () => {
+            // Clear All Worlds
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' });
+        },
+        'R': () => {
+            // Reset All Worlds
+            EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+        },
+        'G': () => {
+            // Generate new ruleset - open popout if closed, then click generate
+            if (popoutPanels.newRules && popoutPanels.newRules.isHidden()) {
+                closeAllPopouts();
+                popoutPanels.newRules.show();
+            }
+            // Small delay to ensure popout is rendered before clicking button
+            setTimeout(() => {
+                uiElements.generateRulesetFromPopoutButton?.click();
+            }, 10);
+        },
         'Escape': () => { 
             let aPopoutWasOpen = false;
             activePopouts.forEach(p => { if (!p.isHidden()) { p.hide(); aPopoutWasOpen = true; }});
@@ -381,8 +405,94 @@ function handleGlobalKeyDown(event) {
                 else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
             }
         }
-        
     };
+
+    // Handle Shift+R (Reset Selected) and Shift+C (Clear Selected)
+    if (event.shiftKey) {
+        if (event.key.toUpperCase() === 'R') {
+            EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
+            event.preventDefault();
+            return;
+        }
+        if (event.key.toUpperCase() === 'C') {
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
+            event.preventDefault();
+            return;
+        }
+        
+        // Handle Shift+Numpad 1-9 (Enable/Disable World 1-9)
+        // Only process number keys, not the shift key itself
+        if (event.key !== 'Shift' && event.code !== 'ShiftLeft' && event.code !== 'ShiftRight') {
+            // Check for both numpad and regular digit keys, and also event.key
+            const numpadMatch = event.code.match(/^Numpad(\d)$/);
+            const digitMatch = event.code.match(/^Digit(\d)$/);
+            const keyMatch = event.key.match(/^(\d)$/); // Also check event.key
+            
+            let keyNum = null;
+            if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
+            else if (digitMatch) keyNum = parseInt(digitMatch[1]);
+            else if (keyMatch) keyNum = parseInt(keyMatch[1]);
+            
+            if (keyNum && keyNum >= 1 && keyNum <= 9) {
+                // Map numpad layout to world indices (upside down)
+                const worldMapping = {
+                    1: 6, // bottom-left
+                    2: 7, // bottom-center  
+                    3: 8, // bottom-right
+                    4: 3, // middle-left
+                    5: 4, // middle-center
+                    6: 5, // middle-right
+                    7: 0, // top-left
+                    8: 1, // top-center
+                    9: 2  // top-right
+                };
+                const worldIndex = worldMapping[keyNum];
+                
+                const currentSettings = worldManagerInterfaceRef.getWorldSettingsForUI();
+                if (currentSettings[worldIndex]) {
+                    const currentEnabled = currentSettings[worldIndex].enabled;
+                    console.log(`World ${worldIndex} current state: ${currentEnabled}, toggling to: ${!currentEnabled}`); // Debug log
+                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, {
+                        worldIndex: worldIndex,
+                        isEnabled: !currentEnabled
+                    });
+                }
+                event.preventDefault();
+                return;
+            }
+        }
+    } else {
+        // Handle Numpad 1-9 (Select World 1-9)
+        const numpadMatch = event.code.match(/^Numpad(\d)$/);
+        const digitMatch = event.code.match(/^Digit(\d)$/);
+        const keyMatch = event.key.match(/^(\d)$/); // Also check event.key
+        
+        let keyNum = null;
+        if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
+        else if (digitMatch) keyNum = parseInt(digitMatch[1]);
+        else if (keyMatch) keyNum = parseInt(keyMatch[1]);
+        
+        if (keyNum && keyNum >= 1 && keyNum <= 9) {
+            // Map numpad layout to world indices (upside down)
+            const worldMapping = {
+                1: 6, // bottom-left
+                2: 7, // bottom-center
+                3: 8, // bottom-right
+                4: 3, // middle-left
+                5: 4, // middle-center
+                6: 5, // middle-right
+                7: 0, // top-left
+                8: 1, // top-center
+                9: 2  // top-right
+            };
+            const worldIndex = worldMapping[keyNum];
+            
+            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
+            event.preventDefault();
+            return;
+        }
+    }
+
     const action = keyMap[event.key.toUpperCase()] || keyMap[event.key]; 
     if (action) {
         action();
@@ -407,6 +517,7 @@ function setupUIEventListeners() {
         }
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
+    EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, updateBrushSizeDisplay);
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay); 
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
         setupPanelComponent?.refreshViews(); 

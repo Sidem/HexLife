@@ -1,4 +1,3 @@
-
 const subscriptions = {};
 
 export const EventBus = {
@@ -60,6 +59,7 @@ export const EVENTS = {
     COMMAND_SAVE_SELECTED_WORLD_STATE: 'command:saveSelectedWorldState', 
     COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState', 
     COMMAND_APPLY_BRUSH: 'command:applyBrush', 
+    COMMAND_APPLY_SELECTIVE_BRUSH: 'command:applySelectiveBrush',
     COMMAND_SET_HOVER_STATE: 'command:setHoverState', 
     COMMAND_CLEAR_HOVER_STATE: 'command:clearHoverState', 
     COMMAND_SET_WORLD_INITIAL_DENSITY: 'command:setWorldInitialDensity', 

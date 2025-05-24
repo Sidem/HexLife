@@ -1,4 +1,3 @@
-
 import * as Config from './config.js';
 import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
@@ -231,6 +230,9 @@ export class WorldManager {
 
         EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.currentBrushSize);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
+            this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
             const affectedIndices = this._findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize);

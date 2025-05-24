@@ -1,4 +1,3 @@
-
 import * as Config from './config.js';
 
 let worldIndex = -1;
@@ -71,6 +70,20 @@ function applyBrushLogic(col, row, brushSize) {
     return changed;
 }
 
+function applySelectiveBrushLogic(cellIndices) {
+    if (!jsStateArray || !cellIndices || cellIndices.length === 0) return false;
+    let changed = false;
+    
+    for (const idx of cellIndices) {
+        if (idx >= 0 && idx < workerConfig.NUM_CELLS) {
+            jsStateArray[idx] = 1 - jsStateArray[idx];
+            if(jsRuleIndexArray) jsRuleIndexArray[idx] = 0;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
 function setHoverStateLogic(hoverAffectedIndicesSet) {
     if (!jsHoverStateArray) return false;
     let changed = false;
@@ -134,6 +147,11 @@ function processCommandQueue() {
                 break;
             case 'APPLY_BRUSH':
                 if (applyBrushLogic(command.data.col, command.data.row, command.data.brushSize)) {
+                    needsStateUpdate = true;
+                }
+                break;
+            case 'APPLY_SELECTIVE_BRUSH':
+                if (applySelectiveBrushLogic(command.data.cellIndices)) {
                     needsStateUpdate = true;
                 }
                 break;

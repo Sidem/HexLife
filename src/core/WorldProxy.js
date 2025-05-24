@@ -1,5 +1,3 @@
-
-
 export class WorldProxy {
     constructor(worldIndex, initialSettings, worldManagerCallbacks) {
         this.worldIndex = worldIndex;
@@ -140,6 +138,9 @@ export class WorldProxy {
     }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
+    }
+    applySelectiveBrush(cellIndices) {
+        this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices });
     }
     setHoverState(hoverAffectedIndices) { 
         this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices: Array.from(hoverAffectedIndices) });

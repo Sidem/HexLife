@@ -1,4 +1,3 @@
-
 import * as Config from './core/config.js';
 import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
@@ -16,6 +15,14 @@ let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
 
+// Mouse drawing state
+let isMouseDrawing = false;
+let lastDrawnCellIndex = null;
+let strokeAffectedCells = new Set(); // Track cells affected by current stroke
+let wasSimulationRunningBeforeStroke = false;
+let justFinishedDrawing = false; // Prevent click after drawing
+let initialWorldState = null; // Store initial cell states when stroke begins
+let cellsShouldBeToggled = new Set(); // Track which cells should be in toggled state
 
 async function initialize() {
     console.log("Starting Initialization (Worker Architecture)...");
@@ -81,13 +88,22 @@ async function initialize() {
 
 function setupCanvasListeners(canvas) {
     canvas.addEventListener('click', handleCanvasClick);
+    canvas.addEventListener('mousedown', handleCanvasMouseDown);
     canvas.addEventListener('mousemove', handleCanvasMouseMove);
+    canvas.addEventListener('mouseup', handleCanvasMouseUp);
     canvas.addEventListener('mouseout', handleCanvasMouseOut);
     canvas.addEventListener('wheel', handleCanvasMouseWheel, { passive: false });
 }
 
 function handleCanvasClick(event) {
     if (!isInitialized || !worldManager) return;
+    
+    // Prevent click if we just finished drawing
+    if (justFinishedDrawing) {
+        justFinishedDrawing = false;
+        return;
+    }
+    
     const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
 
     if (worldIndexAtCursor !== null) {
@@ -96,7 +112,8 @@ function handleCanvasClick(event) {
             EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
         }
 
-        if (viewType === 'selected' && col !== null && row !== null) {
+        // Only apply brush if not in continuous drawing mode (to avoid double-clicking)
+        if (!isMouseDrawing && viewType === 'selected' && col !== null && row !== null) {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, {
                 worldIndex: worldIndexAtCursor,
                 col: col,
@@ -106,10 +123,148 @@ function handleCanvasClick(event) {
     }
 }
 
+function handleCanvasMouseDown(event) {
+    if (!isInitialized || !worldManager) return;
+    
+    // Only start drawing with left mouse button
+    if (event.button !== 0) return;
+    
+    const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
+    
+    if (worldIndexAtCursor !== null && viewType === 'selected' && col !== null && row !== null) {
+        isMouseDrawing = true;
+        strokeAffectedCells.clear(); // Clear previous stroke data
+        cellsShouldBeToggled.clear(); // Clear cells that should be toggled
+        lastDrawnCellIndex = row * Config.GRID_COLS + col;
+        
+        // Pause simulation if it's running
+        wasSimulationRunningBeforeStroke = !worldManager.isSimulationPaused();
+        if (wasSimulationRunningBeforeStroke) {
+            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+        }
+        
+        // Get initial world state from the selected world
+        const selectedWorldData = worldManager.getWorldsRenderData()[worldIndexAtCursor];
+        if (selectedWorldData && selectedWorldData.jsStateArray) {
+            initialWorldState = new Uint8Array(selectedWorldData.jsStateArray);
+        } else {
+            initialWorldState = null;
+        }
+        
+        // Track all cells in brush area as should be toggled
+        const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
+        brushCells.forEach(cellIndex => {
+            cellsShouldBeToggled.add(cellIndex);
+            strokeAffectedCells.add(cellIndex);
+        });
+        
+        // Use selective brush to only toggle the specific cells
+        EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+            worldIndex: worldIndexAtCursor,
+            cellIndices: brushCells
+        });
+        
+        event.preventDefault();
+    }
+}
+
+function handleCanvasMouseUp(event) {
+    if (!isInitialized || !worldManager) return;
+    
+    // Only handle left mouse button
+    if (event.button !== 0) return;
+    
+    // Set flag to prevent click event if we were drawing
+    if (isMouseDrawing) {
+        justFinishedDrawing = true;
+        // Clear the flag after a short delay to allow normal clicks
+        setTimeout(() => { justFinishedDrawing = false; }, 50);
+    }
+    
+    isMouseDrawing = false;
+    lastDrawnCellIndex = null;
+    
+    // Unpause simulation if it was running before the stroke
+    if (wasSimulationRunningBeforeStroke) {
+        EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+        wasSimulationRunningBeforeStroke = false;
+    }
+    
+    strokeAffectedCells.clear();
+    cellsShouldBeToggled.clear();
+    initialWorldState = null;
+}
+
+// Function to find hexagons within brush radius (similar to WorldManager's method)
+function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
+    const affected = new Set();
+    if (startCol === null || startRow === null) return Array.from(affected);
+
+    const q = [[startCol, startRow, 0]];
+    const visited = new Map([[`${startCol},${startRow}`, 0]]);
+    const startIndex = startRow * Config.GRID_COLS + startCol;
+    if (startIndex !== undefined && startIndex >= 0 && startIndex < Config.NUM_CELLS) affected.add(startIndex);
+
+    while (q.length > 0) {
+        const [cc, cr, cd] = q.shift();
+        if (cd >= maxDistance) continue;
+
+        const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
+        for (const [dx, dy] of dirs) {
+            const nc = cc + dx;
+            const nr = cr + dy;
+            const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
+            const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
+
+            if (!visited.has(`${wc},${wr}`)) {
+                const ni = wr * Config.GRID_COLS + wc;
+                if (ni !== undefined && ni >= 0 && ni < Config.NUM_CELLS) {
+                    visited.set(`${wc},${wr}`, cd + 1);
+                    affected.add(ni);
+                    q.push([wc, wr, cd + 1]);
+                }
+            }
+        }
+    }
+    return Array.from(affected);
+}
+
 function handleCanvasMouseMove(event) {
     if (!isInitialized || !worldManager) return;
-    const { worldIndexAtCursor, col, row } = getCoordsFromMouseEvent(event);
+    const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
 
+    // Handle continuous drawing if mouse is pressed
+    if (isMouseDrawing && worldIndexAtCursor !== null && viewType === 'selected' && col !== null && row !== null) {
+        const currentCellIndex = row * Config.GRID_COLS + col;
+        
+        // Only apply brush if we've moved to a different cell to avoid excessive events
+        if (currentCellIndex !== lastDrawnCellIndex) {
+            lastDrawnCellIndex = currentCellIndex;
+            
+            // Get all cells that would be affected by the brush at this position
+            const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
+            
+            // Check which cells in the brush area should be newly toggled
+            const newCellsToToggle = brushCells.filter(cellIndex => !cellsShouldBeToggled.has(cellIndex));
+            
+            // Only apply brush if there are new cells that should be toggled
+            if (newCellsToToggle.length > 0) {
+                // Add new cells to the "should be toggled" set
+                newCellsToToggle.forEach(cellIndex => {
+                    cellsShouldBeToggled.add(cellIndex);
+                    strokeAffectedCells.add(cellIndex);
+                });
+                
+                // Use selective brush to only toggle the new cells
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+                    worldIndex: worldIndexAtCursor,
+                    cellIndices: newCellsToToggle
+                });
+            }
+        }
+    }
+
+    // Handle hover state for all worlds
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         if (i !== worldIndexAtCursor || col == null) {
              EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
@@ -127,6 +282,23 @@ function handleCanvasMouseMove(event) {
 
 function handleCanvasMouseOut() {
     if (!isInitialized || !worldManager) return;
+    
+    // Stop drawing when mouse leaves canvas and unpause if needed
+    if (isMouseDrawing) {
+        isMouseDrawing = false;
+        lastDrawnCellIndex = null;
+        
+        // Unpause simulation if it was running before the stroke
+        if (wasSimulationRunningBeforeStroke) {
+            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+            wasSimulationRunningBeforeStroke = false;
+        }
+        
+        strokeAffectedCells.clear();
+        cellsShouldBeToggled.clear();
+        initialWorldState = null;
+    }
+    
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
          EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i });
     }

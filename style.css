@@ -29,9 +29,31 @@ body {
     font-size: 0.85em;
     box-sizing: border-box;
 }
+
+#appTitleContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+#appLogo {
+    font-size: 1.2em;
+    color: #FFFF00;
+    text-shadow: 0 0 3px rgba(255, 255, 0, 0.3);
+}
+
+#appTitle {
+    font-size: 1em;
+    color: #f0f0f0;
+    white-space: nowrap;
+}
+
 #rulesetDisplayContainer {
     font-family: monospace;
 }
+
 #rulesetDisplayContainer code {
     background-color: #3c3c3c;
     padding: 2px 5px;
@@ -964,6 +986,8 @@ label.sym-label {
     .toolbar-button { width: 35px; height: 35px; font-size: 1em; }
     #top-info-bar { padding: 0 10px; font-size: 0.8em; height: 30px; }
     #statsDisplayContainer { gap: 8px; }
+    #appTitle { font-size: 0.9em; }
+    #appLogo { font-size: 1.1em; }
     .popout-panel { min-width: 200px; padding: 10px; }
     .draggable-panel-base { max-width: 95vw; max-height: 85vh; }
 
@@ -1017,6 +1041,9 @@ label.sym-label {
     }
     .toolbar-button { margin: 5px 2px; }
     .toolbar-separator { display: none; }
+
+    #appTitle { display: none; }
+    #statsDisplayContainer { gap: 5px; }
 
     .popout-panel {
         left: 5% !important;
