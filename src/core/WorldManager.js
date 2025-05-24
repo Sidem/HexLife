@@ -12,6 +12,9 @@ export class WorldManager {
         this.currentGlobalSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
         this.currentBrushSize = PersistenceService.loadBrushSize() || Config.DEFAULT_NEIGHBORHOOD_SIZE;
         
+        // Initialize entropy sampling settings
+        this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
+        this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
         
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
         this.worldSettings = PersistenceService.loadWorldSettings(); 
@@ -42,7 +45,9 @@ export class WorldManager {
                 enabled: settings.enabled,
                 rulesetArray: rulesetArray,
                 rulesetHex: settings.rulesetHex,
-                speed: this.currentGlobalSpeed
+                speed: this.currentGlobalSpeed,
+                initialEntropySamplingEnabled: this.isEntropySamplingEnabled,
+                initialEntropySampleRate: this.entropySampleRate,
             }, worldManagerCallbacks);
             this.worlds.push(proxy);
         }
@@ -278,6 +283,16 @@ export class WorldManager {
             this.entropySampleRate = data.rate;
             PersistenceService.saveUISetting('entropySamplingEnabled', data.enabled);
             PersistenceService.saveUISetting('entropySampleRate', data.rate);
+
+            // New: Send command to all world proxies to update their workers
+            this.worlds.forEach(proxy => {
+                proxy.sendCommand('SET_ENTROPY_SAMPLING_PARAMS', {
+                    enabled: this.isEntropySamplingEnabled,
+                    rate: this.entropySampleRate
+                });
+            });
+            // Dispatch an event so the UI (like AnalysisPanel plugins) can react if needed
+            EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
         });
     }
 

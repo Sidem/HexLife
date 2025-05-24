@@ -16,6 +16,15 @@ let currentSpeedTarget = Config.DEFAULT_SPEED;
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
 
+// History arrays for analysis
+let ratioHistory = [];
+let entropyHistory = [];
+const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
+
+// Worker-specific entropy sampling settings
+let workerIsEntropySamplingEnabled = false;
+let workerEntropySampleRate = 10; // Default, will be overwritten by INIT
+
 const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
 const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
 
@@ -110,9 +119,11 @@ function processCommandQueue() {
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
+                ratioHistory = [];
+                entropyHistory = [];
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
-                activeCount = 0; 
+                activeCount = 0;
                 if (jsStateArray) {
                     if (isClearOp) {
                         jsStateArray.fill(density);
@@ -179,6 +190,8 @@ function processCommandQueue() {
                 jsStateArray = new Uint8Array(command.data.newStateBuffer);
                 ruleset = new Uint8Array(command.data.newRulesetBuffer); 
                 worldTickCounter = command.data.worldTick || 0;
+                ratioHistory = [];
+                entropyHistory = [];
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
@@ -238,7 +251,29 @@ function runTick() {
     simulationPerformedUpdate = true;
 
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
-    const currentEntropy = calculateBinaryEntropy(ratio);
+    
+    // Only calculate entropy when sampling is enabled and it's a sampling tick
+    let currentEntropy = undefined;
+    const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
+    if (shouldSampleEntropy) {
+        currentEntropy = calculateBinaryEntropy(ratio);
+    }
+
+    // Record history if simulation is active
+    if (isEnabled && isRunning) {
+        ratioHistory.push(ratio); // Ratio history is still recorded every tick
+        if (ratioHistory.length > MAX_HISTORY_SIZE) {
+            ratioHistory.shift();
+        }
+
+        // Record entropy history only when we calculated it
+        if (shouldSampleEntropy && currentEntropy !== undefined) {
+            entropyHistory.push(currentEntropy);
+            if (entropyHistory.length > MAX_HISTORY_SIZE) {
+                entropyHistory.shift();
+            }
+        }
+    }
 
     if (simulationPerformedUpdate || commandInducedUpdate) {
         sendStateUpdate(activeCount, ratio, currentEntropy, rulesetChangedInQueue);
@@ -274,13 +309,22 @@ function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false)
             isEnabled: isEnabled
         });
     } else if (rulesetHasChanged || !isEnabled) { 
+        const currentActiveCount = jsStateArray.reduce((s, c) => s + c, 0);
+        const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
+        
+        // Only calculate entropy if sampling is enabled
+        let currentEntropy = undefined;
+        if (workerIsEntropySamplingEnabled) {
+            currentEntropy = calculateBinaryEntropy(currentRatio);
+        }
+        
         self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
             tick: worldTickCounter,
-            activeCount: jsStateArray.reduce((s, c) => s + c, 0), 
-            ratio: workerConfig.NUM_CELLS > 0 ? jsStateArray.reduce((s, c) => s + c, 0) / workerConfig.NUM_CELLS : 0,
-            entropy: calculateBinaryEntropy(workerConfig.NUM_CELLS > 0 ? jsStateArray.reduce((s, c) => s + c, 0) / workerConfig.NUM_CELLS : 0),
+            activeCount: currentActiveCount,
+            ratio: currentRatio,
+            entropy: currentEntropy,
             rulesetHex: currentRulesetHex,
             isEnabled: isEnabled
         });
@@ -311,6 +355,10 @@ self.onmessage = function(event) {
             currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED;
             targetTickDurationMs = 1000 / currentSpeedTarget;
 
+            // Initialize history arrays
+            ratioHistory = [];
+            entropyHistory = [];
+
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
             ruleset = new Uint8Array(command.data.initialRulesetBuffer); 
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
@@ -320,6 +368,8 @@ self.onmessage = function(event) {
             jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
 
             isEnabled = command.data.initialIsEnabled;
+            workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
+            workerEntropySampleRate = command.data.initialEntropySampleRate || 10;
 
             if (isEnabled) {
                 const density = command.data.initialDensity;
@@ -346,7 +396,19 @@ self.onmessage = function(event) {
             
             const initialActiveCount = isEnabled ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
             const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
-            const initialEntropy = isEnabled ? calculateBinaryEntropy(initialRatio) : 0;
+            
+            // Only calculate initial entropy if sampling is enabled
+            let initialEntropy = undefined;
+            if (isEnabled && workerIsEntropySamplingEnabled) {
+                initialEntropy = calculateBinaryEntropy(initialRatio);
+                // Record initial values in history
+                ratioHistory.push(initialRatio);
+                entropyHistory.push(initialEntropy);
+            } else if (isEnabled) {
+                // Still record ratio history even if entropy sampling is disabled
+                ratioHistory.push(initialRatio);
+            }
+            
             sendStateUpdate(initialActiveCount, initialRatio, initialEntropy, true); 
             break;
 
@@ -379,7 +441,16 @@ self.onmessage = function(event) {
             }
             break;
 
-        
+        case 'SET_ENTROPY_SAMPLING_PARAMS':
+            workerIsEntropySamplingEnabled = command.data.enabled;
+            workerEntropySampleRate = command.data.rate || 10; // Ensure rate is at least 1 if needed, or handle 0
+            // Optional: If sampling is disabled, clear existing entropy history
+            if (!workerIsEntropySamplingEnabled) {
+                entropyHistory = [];
+                // If you send a STATS_UPDATE here, ensure plugins expect potentially empty history
+            }
+            break;
+
         case 'SET_RULESET':
         case 'LOAD_STATE':
             commandQueue.push(command);
@@ -387,7 +458,14 @@ self.onmessage = function(event) {
             if (updateAfterComplexCmd) {
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
-                sendStateUpdate(active, ratio, calculateBinaryEntropy(ratio), rsChanged);
+                
+                // Only calculate entropy if sampling is enabled
+                let entropy = undefined;
+                if (workerIsEntropySamplingEnabled) {
+                    entropy = calculateBinaryEntropy(ratio);
+                }
+                
+                sendStateUpdate(active, ratio, entropy, rsChanged);
             }
             break;
 
@@ -400,7 +478,13 @@ self.onmessage = function(event) {
                 if (inducedUpdate) {
                     const currentActiveCount = jsStateArray.reduce((sum, val) => sum + val, 0);
                     const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
-                    const currentEntropy = calculateBinaryEntropy(currentRatio);
+                    
+                    // Only calculate entropy if sampling is enabled
+                    let currentEntropy = undefined;
+                    if (workerIsEntropySamplingEnabled) {
+                        currentEntropy = calculateBinaryEntropy(currentRatio);
+                    }
+                    
                     sendStateUpdate(currentActiveCount, currentRatio, currentEntropy, rsChangedByQueue);
                 }
             } else if (command.type === 'SET_HOVER_STATE' || command.type === 'CLEAR_HOVER_STATE' || command.type === 'APPLY_BRUSH') {
@@ -408,7 +492,14 @@ self.onmessage = function(event) {
                 if (inducedUpdate) {
                     const active = jsStateArray.reduce((s, c) => s + c, 0);
                     const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
-                    sendStateUpdate(active, ratio, calculateBinaryEntropy(ratio), rsChangedByQueue);
+                    
+                    // Only calculate entropy if sampling is enabled
+                    let entropy = undefined;
+                    if (workerIsEntropySamplingEnabled) {
+                        entropy = calculateBinaryEntropy(ratio);
+                    }
+                    
+                    sendStateUpdate(active, ratio, entropy, rsChangedByQueue);
                 }
             }
             break;

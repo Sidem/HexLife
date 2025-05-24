@@ -768,33 +768,6 @@ label.sym-label {
     font-size: 0.85em;
     color: #aaa;
 }
-#entropySampleRateSlider {
-    width: 120px;
-    min-width: 80px;
-}
-#entropySampleRateSlider:disabled {
-    opacity: 0.4;
-}
-#entropySampleRateSlider:disabled + span.value-display {
-    opacity: 0.5;
-}
-.entropy-display {
-    font-size: 0.95em;
-    color: #ddd;
-    margin-left: auto;
-    padding-left: 10px;
-    white-space: nowrap;
-}
-.entropy-display span {
-    font-weight: bold;
-    margin-left: 5px;
-    background-color: rgba(0,0,0,0.2);
-    padding: 2px 5px;
-    border-radius: 3px;
-    display: inline-block;
-    min-width: 50px;
-    text-align: right;
-}
 .plot-container {
     margin-top: 10px;
     padding: 8px;
@@ -819,7 +792,7 @@ label.sym-label {
     border-radius: 2px;
 }
 
-#speedSlider, #neighborhoodSize, #biasSlider, #entropySampleRateSlider {
+#speedSlider, #neighborhoodSize, #biasSlider {
     min-width: 120px;
 }
 #biasSlider {
@@ -857,6 +830,61 @@ label.sym-label {
     height: 100px;
     background-color: #2a2a2a;
     border-radius: 2px;
+}
+
+/* Entropy Plugin Specific Styling */
+.entropy-plugin-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.entropy-controls-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+.entropy-display-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9em;
+}
+
+.entropy-display-section label {
+    color: #ccc;
+}
+
+.entropy-value {
+    font-weight: bold;
+    padding: 2px 6px;
+    background-color: rgba(0,0,0,0.3);
+    border-radius: 3px;
+    color: #fff;
+    min-width: 60px;
+    text-align: center;
+}
+
+.entropy-sampling-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sampling-enable-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sampling-enable-control .checkbox-label {
+    font-size: 0.85em;
+    color: #bbb;
 }
 
 #rotationalSymmetryRulesetEditorGrid {

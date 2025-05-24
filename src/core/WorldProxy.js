@@ -1,3 +1,5 @@
+import * as Config from './config.js';
+
 export class WorldProxy {
     constructor(worldIndex, initialSettings, worldManagerCallbacks) {
         this.worldIndex = worldIndex;
@@ -13,11 +15,14 @@ export class WorldProxy {
             entropy: 0,
             isEnabled: initialSettings.enabled,
             tps: 0,
-            rulesetHex: initialSettings.rulesetHex || "0".repeat(32) 
+            rulesetHex: initialSettings.rulesetHex || "0".repeat(32),
+            ratioHistory: [],
+            entropyHistory: []
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
         this.onInitialized = worldManagerCallbacks.onInitialized;
+        this.MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 
         
         this.lastTickCountForTPS = 0;
@@ -45,6 +50,8 @@ export class WorldProxy {
                 initialDensity: initialSettings.density,
                 initialIsEnabled: initialSettings.enabled,
                 initialSpeed: initialSettings.speed,
+                initialEntropySamplingEnabled: initialSettings.initialEntropySamplingEnabled,
+                initialEntropySampleRate: initialSettings.initialEntropySampleRate,
             }
         }, [initialStateBuffer, initialRulesetBuffer, initialHoverStateBuffer]);
     }
@@ -55,6 +62,8 @@ export class WorldProxy {
                 this.isInitialized = true;
                 this.lastTickUpdateTimeForTPS = performance.now();
                 this.lastTickCountForTPS = 0;
+                this.latestStats.ratioHistory = [];
+                this.latestStats.entropyHistory = [];
                 this.onInitialized(this.worldIndex);
                 break;
             case 'STATE_UPDATE':
@@ -76,6 +85,20 @@ export class WorldProxy {
                     currentTPS = this.latestStats.tps;
                 }
 
+                // Update history if enabled and data exists
+                if (data.isEnabled && data.ratio !== undefined) {
+                    this.latestStats.ratioHistory.push(data.ratio);
+                    if (this.latestStats.ratioHistory.length > this.MAX_HISTORY_SIZE) {
+                        this.latestStats.ratioHistory.shift();
+                    }
+                }
+                if (data.isEnabled && data.entropy !== undefined) {
+                    this.latestStats.entropyHistory.push(data.entropy);
+                    if (this.latestStats.entropyHistory.length > this.MAX_HISTORY_SIZE) {
+                        this.latestStats.entropyHistory.shift();
+                    }
+                }
+
                 this.latestStats = {
                     tick: data.tick,
                     activeCount: data.activeCount,
@@ -83,7 +106,9 @@ export class WorldProxy {
                     entropy: data.entropy,
                     isEnabled: data.isEnabled,
                     tps: currentTPS,
-                    rulesetHex: data.rulesetHex || this.latestStats.rulesetHex 
+                    rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
+                    ratioHistory: this.latestStats.ratioHistory,
+                    entropyHistory: this.latestStats.entropyHistory
                 };
 
                 this.lastTickCountForTPS = data.tick;
@@ -121,6 +146,8 @@ export class WorldProxy {
         this.lastTickCountForTPS = 0;
         this.lastTickUpdateTimeForTPS = performance.now();
         this.latestStats.tps = 0;
+        this.latestStats.ratioHistory = [];
+        this.latestStats.entropyHistory = [];
 
         let commandPayload;
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {
