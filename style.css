@@ -586,9 +586,10 @@ label.sym-label {
     background-color: #555;
     box-sizing: border-box;
 }
-.hexagon.state-0 { background-color: #404040; }
-.hexagon.state-1 { background-color: #FFFF00; }
-.hexagon.state-2 { background: linear-gradient(45deg, #633030, #306330); }
+/* Only apply static colors for hexagons when not overridden by inline styles */
+.hexagon:not([style*="background-color"]).state-0 { background-color: #404040; }
+.hexagon:not([style*="background-color"]).state-1 { background-color: #FFFF00; }
+.hexagon:not([style*="background-color"]).state-2 { background: linear-gradient(45deg, #633030, #306330); }
 
 .center-hex {
     top: 50%; left: 50%;
@@ -602,9 +603,10 @@ label.sym-label {
     border: 1.0px solid #CCCCCC; z-index: 2;
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-.inner-hex.state-0 { background-color: #990000 !important; }
-.inner-hex.state-1 { background-color: #00BB00 !important; }
-.inner-hex.state-2 { background: linear-gradient(45deg, #700000, #005000) !important; border-color: #888 !important; }
+/* Only apply static colors for inner-hex when not overridden by inline styles */
+.inner-hex:not([style*="background-color"]).state-0 { background-color: #990000 !important; }
+.inner-hex:not([style*="background-color"]).state-1 { background-color: #00BB00 !important; }
+.inner-hex:not([style*="background-color"]).state-2 { background: linear-gradient(45deg, #700000, #005000) !important; border-color: #888 !important; }
 
 .neighbor-hex {
     transform-origin: center center;
