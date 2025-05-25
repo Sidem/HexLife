@@ -19,6 +19,7 @@ let worldTickCounter = 0;
 // History arrays for analysis
 let ratioHistory = [];
 let entropyHistory = [];
+let hexBlockEntropyHistory = []; // New: History for hexagonal block entropy
 const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 
 // Worker-specific entropy sampling settings
@@ -35,8 +36,63 @@ function rulesetToHex(rulesetArray) {
     catch (e) { return "Error"; } 
 }
 
-
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
+
+/**
+ * Calculates the block entropy for 7-cell hexagonal patterns.
+ * A block consists of a center cell and its 6 immediate neighbors.
+ * The pattern is a 7-bit number (0-127).
+ * @param {Uint8Array} currentStateArray - The array of current cell states.
+ * @param {object} config - The worker's configuration (GRID_ROWS, GRID_COLS, NUM_CELLS).
+ * @param {Array<Array<number>>} N_DIRS_ODD - Neighbor directions for odd columns.
+ * @param {Array<Array<number>>} N_DIRS_EVEN - Neighbor directions for even columns.
+ * @returns {number} The calculated block entropy. Max entropy is log2(128) = 7.
+ */
+function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_EVEN) {
+    if (!currentStateArray || !config || !config.NUM_CELLS || config.NUM_CELLS === 0) {
+        return 0;
+    }
+
+    const blockCounts = new Map();
+    let totalBlocks = 0;
+    const numCols = config.GRID_COLS;
+    const numRows = config.GRID_ROWS;
+
+    for (let i = 0; i < config.NUM_CELLS; i++) {
+        totalBlocks++;
+        const cCol = i % numCols;
+        const cRow = Math.floor(i / numCols);
+        const cState = currentStateArray[i];
+
+        let neighborMask = 0;
+        const dirs = (cCol % 2 !== 0) ? N_DIRS_ODD : N_DIRS_EVEN;
+
+        for (let nOrder = 0; nOrder < 6; nOrder++) {
+            const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
+            const nRow = (cRow + dirs[nOrder][1] + numRows) % numRows;
+            if (currentStateArray[nRow * numCols + nCol] === 1) {
+                neighborMask |= (1 << nOrder);
+            }
+        }
+
+        const blockPattern = (cState << 6) | neighborMask; // 7-bit pattern
+        blockCounts.set(blockPattern, (blockCounts.get(blockPattern) || 0) + 1);
+    }
+
+    if (totalBlocks === 0) {
+        return 0;
+    }
+
+    let entropy = 0;
+    for (const count of blockCounts.values()) {
+        const probability = count / totalBlocks;
+        if (probability > 0) {
+            entropy -= probability * Math.log2(probability);
+        }
+    }
+
+    return entropy / 7.0;
+}
 
 function applyBrushLogic(col, row, brushSize) {
     if (!jsStateArray) return false;
@@ -121,6 +177,7 @@ function processCommandQueue() {
                 worldTickCounter = 0;
                 ratioHistory = [];
                 entropyHistory = [];
+                hexBlockEntropyHistory = []; // New: Clear block entropy history
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
                 activeCount = 0;
@@ -192,6 +249,7 @@ function processCommandQueue() {
                 worldTickCounter = command.data.worldTick || 0;
                 ratioHistory = [];
                 entropyHistory = [];
+                hexBlockEntropyHistory = []; // New: Clear block entropy history
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
@@ -212,7 +270,7 @@ function runTick() {
 
     if (!isEnabled || !isRunning || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) {
         if (commandInducedUpdate) {
-            sendStateUpdate(undefined, undefined, undefined, rulesetChangedInQueue);
+            sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue);
         }
         return;
     }
@@ -253,10 +311,13 @@ function runTick() {
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
     
     // Only calculate entropy when sampling is enabled and it's a sampling tick
-    let currentEntropy = undefined;
+    let currentBinaryEntropy = undefined;
+    let currentBlockEntropy = undefined; // New: Block entropy calculation
     const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
     if (shouldSampleEntropy) {
-        currentEntropy = calculateBinaryEntropy(ratio);
+        currentBinaryEntropy = calculateBinaryEntropy(ratio);
+        // Calculate hex block entropy using the new state (jsStateArray now points to the result of the tick)
+        currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
     }
 
     // Record history if simulation is active
@@ -267,20 +328,28 @@ function runTick() {
         }
 
         // Record entropy history only when we calculated it
-        if (shouldSampleEntropy && currentEntropy !== undefined) {
-            entropyHistory.push(currentEntropy);
-            if (entropyHistory.length > MAX_HISTORY_SIZE) {
-                entropyHistory.shift();
+        if (shouldSampleEntropy) {
+            if (currentBinaryEntropy !== undefined) {
+                entropyHistory.push(currentBinaryEntropy);
+                if (entropyHistory.length > MAX_HISTORY_SIZE) {
+                    entropyHistory.shift();
+                }
+            }
+            if (currentBlockEntropy !== undefined) { // New: Record block entropy history
+                hexBlockEntropyHistory.push(currentBlockEntropy);
+                if (hexBlockEntropyHistory.length > MAX_HISTORY_SIZE) {
+                    hexBlockEntropyHistory.shift();
+                }
             }
         }
     }
 
     if (simulationPerformedUpdate || commandInducedUpdate) {
-        sendStateUpdate(activeCount, ratio, currentEntropy, rulesetChangedInQueue);
+        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue);
     }
 }
 
-function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false) {
+function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulesetHasChanged = false) {
     if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray || !ruleset) {
         console.warn(`Worker ${worldIndex}: Attempted to send state update with invalid buffers.`);
         return;
@@ -304,7 +373,8 @@ function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false)
             tick: worldTickCounter,
             activeCount: activeCount,
             ratio: ratio,
-            entropy: entropy,
+            binaryEntropy: binaryEntropy, // Renamed for clarity
+            blockEntropy: blockEntropy,   // New: Block entropy
             rulesetHex: currentRulesetHex, 
             isEnabled: isEnabled
         });
@@ -313,9 +383,11 @@ function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false)
         const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
         
         // Only calculate entropy if sampling is enabled
-        let currentEntropy = undefined;
+        let currentBinaryEntropy = undefined;
+        let currentBlockEntropy = undefined;
         if (workerIsEntropySamplingEnabled) {
-            currentEntropy = calculateBinaryEntropy(currentRatio);
+            currentBinaryEntropy = calculateBinaryEntropy(currentRatio);
+            currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
         }
         
         self.postMessage({
@@ -324,7 +396,8 @@ function sendStateUpdate(activeCount, ratio, entropy, rulesetHasChanged = false)
             tick: worldTickCounter,
             activeCount: currentActiveCount,
             ratio: currentRatio,
-            entropy: currentEntropy,
+            binaryEntropy: currentBinaryEntropy, // Renamed for clarity
+            blockEntropy: currentBlockEntropy,   // New: Block entropy
             rulesetHex: currentRulesetHex,
             isEnabled: isEnabled
         });
@@ -358,6 +431,7 @@ self.onmessage = function(event) {
             // Initialize history arrays
             ratioHistory = [];
             entropyHistory = [];
+            hexBlockEntropyHistory = []; // New: Initialize block entropy history
 
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
             ruleset = new Uint8Array(command.data.initialRulesetBuffer); 
@@ -398,18 +472,21 @@ self.onmessage = function(event) {
             const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
             
             // Only calculate initial entropy if sampling is enabled
-            let initialEntropy = undefined;
+            let initialBinaryEntropy = undefined;
+            let initialBlockEntropy = undefined; // New
             if (isEnabled && workerIsEntropySamplingEnabled) {
-                initialEntropy = calculateBinaryEntropy(initialRatio);
+                initialBinaryEntropy = calculateBinaryEntropy(initialRatio);
+                initialBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R); // New
                 // Record initial values in history
                 ratioHistory.push(initialRatio);
-                entropyHistory.push(initialEntropy);
+                entropyHistory.push(initialBinaryEntropy);
+                hexBlockEntropyHistory.push(initialBlockEntropy); // New
             } else if (isEnabled) {
                 // Still record ratio history even if entropy sampling is disabled
                 ratioHistory.push(initialRatio);
             }
             
-            sendStateUpdate(initialActiveCount, initialRatio, initialEntropy, true); 
+            sendStateUpdate(initialActiveCount, initialRatio, initialBinaryEntropy, initialBlockEntropy, true); 
             break;
 
         case 'START_SIMULATION':
@@ -437,7 +514,14 @@ self.onmessage = function(event) {
             }
             updateSimulationInterval();
             if (sendUpdateForSetEnabled) {
-                 sendStateUpdate(0,0,0, false); 
+                const activeAfterEnable = jsStateArray.reduce((s, c) => s + c, 0);
+                const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0;
+                let binEntropyAfterEnable, blkEntropyAfterEnable;
+                if (workerIsEntropySamplingEnabled) {
+                    binEntropyAfterEnable = calculateBinaryEntropy(ratioAfterEnable);
+                    blkEntropyAfterEnable = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+                }
+                sendStateUpdate(activeAfterEnable, ratioAfterEnable, binEntropyAfterEnable, blkEntropyAfterEnable, false); 
             }
             break;
 
@@ -447,6 +531,7 @@ self.onmessage = function(event) {
             // Optional: If sampling is disabled, clear existing entropy history
             if (!workerIsEntropySamplingEnabled) {
                 entropyHistory = [];
+                hexBlockEntropyHistory = []; // New: Clear block entropy history too
                 // If you send a STATS_UPDATE here, ensure plugins expect potentially empty history
             }
             break;
@@ -460,12 +545,13 @@ self.onmessage = function(event) {
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
                 
                 // Only calculate entropy if sampling is enabled
-                let entropy = undefined;
+                let binEntropy, blkEntropy;
                 if (workerIsEntropySamplingEnabled) {
-                    entropy = calculateBinaryEntropy(ratio);
+                    binEntropy = calculateBinaryEntropy(ratio);
+                    blkEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                 }
                 
-                sendStateUpdate(active, ratio, entropy, rsChanged);
+                sendStateUpdate(active, ratio, binEntropy, blkEntropy, rsChanged);
             }
             break;
 
@@ -480,12 +566,13 @@ self.onmessage = function(event) {
                     const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
                     
                     // Only calculate entropy if sampling is enabled
-                    let currentEntropy = undefined;
+                    let currentBinaryEntropyCalc, currentBlockEntropyCalc;
                     if (workerIsEntropySamplingEnabled) {
-                        currentEntropy = calculateBinaryEntropy(currentRatio);
+                        currentBinaryEntropyCalc = calculateBinaryEntropy(currentRatio);
+                        currentBlockEntropyCalc = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                     }
                     
-                    sendStateUpdate(currentActiveCount, currentRatio, currentEntropy, rsChangedByQueue);
+                    sendStateUpdate(currentActiveCount, currentRatio, currentBinaryEntropyCalc, currentBlockEntropyCalc, rsChangedByQueue);
                 }
             } else if (command.type === 'SET_HOVER_STATE' || command.type === 'CLEAR_HOVER_STATE' || command.type === 'APPLY_BRUSH') {
                 const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
@@ -494,12 +581,13 @@ self.onmessage = function(event) {
                     const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
                     
                     // Only calculate entropy if sampling is enabled
-                    let entropy = undefined;
+                    let binaryEntropyCalc, blockEntropyCalc;
                     if (workerIsEntropySamplingEnabled) {
-                        entropy = calculateBinaryEntropy(ratio);
+                        binaryEntropyCalc = calculateBinaryEntropy(ratio);
+                        blockEntropyCalc = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                     }
                     
-                    sendStateUpdate(active, ratio, entropy, rsChangedByQueue);
+                    sendStateUpdate(active, ratio, binaryEntropyCalc, blockEntropyCalc, rsChangedByQueue);
                 }
             }
             break;

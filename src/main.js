@@ -68,6 +68,10 @@ async function initialize() {
             const stats = worldManager.getSelectedWorldStats();
             return stats?.entropyHistory || [];
         },
+        getSelectedWorldBlockEntropyHistory: () => { 
+            const stats = worldManager.getSelectedWorldStats();
+            return stats?.hexBlockEntropyHistory || [];
+        },
         getEntropySamplingState: () => worldManager.getEntropySamplingState(), 
     };
 

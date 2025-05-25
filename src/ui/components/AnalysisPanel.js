@@ -58,6 +58,10 @@ export class AnalysisPanel {
                 const stats = this.worldManager.getSelectedWorldStats();
                 return (stats && stats.entropyHistory) ? [...stats.entropyHistory] : [];
             },
+            getSelectedWorldBlockEntropyHistory: () => {
+                const stats = this.worldManager.getSelectedWorldStats();
+                return (stats && stats.hexBlockEntropyHistory) ? [...stats.hexBlockEntropyHistory] : [];
+            },
             getEntropySamplingState: () => this.worldManager.getEntropySamplingState()
         };
 

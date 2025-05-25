@@ -12,12 +12,14 @@ export class WorldProxy {
             tick: 0,
             activeCount: 0,
             ratio: 0,
-            entropy: 0,
+            binaryEntropy: 0, // Renamed for clarity
+            blockEntropy: 0,  // New: Block entropy
             isEnabled: initialSettings.enabled,
             tps: 0,
             rulesetHex: initialSettings.rulesetHex || "0".repeat(32),
             ratioHistory: [],
-            entropyHistory: []
+            entropyHistory: [],
+            hexBlockEntropyHistory: [] // New: Block entropy history
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -64,6 +66,7 @@ export class WorldProxy {
                 this.lastTickCountForTPS = 0;
                 this.latestStats.ratioHistory = [];
                 this.latestStats.entropyHistory = [];
+                this.latestStats.hexBlockEntropyHistory = []; // New: Initialize block entropy history
                 this.onInitialized(this.worldIndex);
                 break;
             case 'STATE_UPDATE':
@@ -92,10 +95,16 @@ export class WorldProxy {
                         this.latestStats.ratioHistory.shift();
                     }
                 }
-                if (data.isEnabled && data.entropy !== undefined) {
-                    this.latestStats.entropyHistory.push(data.entropy);
+                if (data.isEnabled && data.binaryEntropy !== undefined) {
+                    this.latestStats.entropyHistory.push(data.binaryEntropy);
                     if (this.latestStats.entropyHistory.length > this.MAX_HISTORY_SIZE) {
                         this.latestStats.entropyHistory.shift();
+                    }
+                }
+                if (data.isEnabled && data.blockEntropy !== undefined) { // New: Handle block entropy history
+                    this.latestStats.hexBlockEntropyHistory.push(data.blockEntropy);
+                    if (this.latestStats.hexBlockEntropyHistory.length > this.MAX_HISTORY_SIZE) {
+                        this.latestStats.hexBlockEntropyHistory.shift();
                     }
                 }
 
@@ -103,12 +112,14 @@ export class WorldProxy {
                     tick: data.tick,
                     activeCount: data.activeCount,
                     ratio: data.ratio,
-                    entropy: data.entropy,
+                    binaryEntropy: data.binaryEntropy, // Renamed for clarity
+                    blockEntropy: data.blockEntropy,   // New: Block entropy
                     isEnabled: data.isEnabled,
                     tps: currentTPS,
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
                     ratioHistory: this.latestStats.ratioHistory,
-                    entropyHistory: this.latestStats.entropyHistory
+                    entropyHistory: this.latestStats.entropyHistory,
+                    hexBlockEntropyHistory: this.latestStats.hexBlockEntropyHistory // New: Block entropy history
                 };
 
                 this.lastTickCountForTPS = data.tick;
@@ -148,6 +159,7 @@ export class WorldProxy {
         this.latestStats.tps = 0;
         this.latestStats.ratioHistory = [];
         this.latestStats.entropyHistory = [];
+        this.latestStats.hexBlockEntropyHistory = []; // New: Clear block entropy history
 
         let commandPayload;
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {

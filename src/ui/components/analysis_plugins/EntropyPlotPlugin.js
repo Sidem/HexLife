@@ -7,14 +7,19 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
     constructor() {
         super('entropyPlot', 'Sampled Entropy History');
         this.plotCanvas = null;
-        this.currentEntropyHistory = [];
-        this.lastKnownEntropy = null;
+        this.currentBinaryEntropyHistory = [];
+        this.currentBlockEntropyHistory = [];
+        this.lastKnownBinaryEntropy = null;
+        this.lastKnownBlockEntropy = null;
         this.entropySampleRateSlider = null;
         this.isInitialized = false;
+        this.selectedEntropyType = 'binary'; // 'binary' or 'block'
         this.uiElements = {
             enableEntropySamplingCheckbox: null,
             entropySampleRateSliderMount: null,
-            statEntropy: null
+            statBinaryEntropy: null,
+            statBlockEntropy: null,
+            entropyTypeSelector: null
         };
     }
 
@@ -25,8 +30,23 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             <div class="entropy-plugin-container">
                 <div class="entropy-controls-section">
                     <div class="entropy-display-section">
-                        <label>Current Sampled Entropy:</label>
-                        <span id="stat-entropy-plugin" class="entropy-value">Disabled</span>
+                        <div class="entropy-type-selector">
+                            <label for="entropyTypeSelector">Entropy Type:</label>
+                            <select id="entropyTypeSelector" class="entropy-type-select">
+                                <option value="binary">Binary Entropy</option>
+                                <option value="block">Block Entropy</option>
+                            </select>
+                        </div>
+                        <div class="entropy-values">
+                            <div class="entropy-value-row">
+                                <label>Binary Entropy:</label>
+                                <span id="stat-binary-entropy-plugin" class="entropy-value">Disabled</span>
+                            </div>
+                            <div class="entropy-value-row">
+                                <label>Block Entropy:</label>
+                                <span id="stat-block-entropy-plugin" class="entropy-value">Disabled</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="entropy-sampling-controls">
                         <div class="sampling-enable-control">
@@ -45,12 +65,15 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         // Get references to UI elements
         this.uiElements.enableEntropySamplingCheckbox = this.mountPoint.querySelector('#enableEntropySamplingCheckbox');
         this.uiElements.entropySampleRateSliderMount = this.mountPoint.querySelector('#entropySampleRateSliderMount');
-        this.uiElements.statEntropy = this.mountPoint.querySelector('#stat-entropy-plugin');
+        this.uiElements.statBinaryEntropy = this.mountPoint.querySelector('#stat-binary-entropy-plugin');
+        this.uiElements.statBlockEntropy = this.mountPoint.querySelector('#stat-block-entropy-plugin');
+        this.uiElements.entropyTypeSelector = this.mountPoint.querySelector('#entropyTypeSelector');
 
         this.plotCanvas = this.mountPoint.querySelector('.plugin-canvas');
 
         this._setupEventSubscriptions();
         this._setupEntropyControls();
+        this._setupEntropyTypeSelector();
         this._syncWithCurrentState();
         this.isInitialized = true;
         this.updatePlot();
@@ -86,6 +109,21 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         }
     }
 
+    _setupEntropyTypeSelector() {
+        if (this.uiElements.entropyTypeSelector) {
+            // Load saved preference
+            const savedType = PersistenceService.loadUISetting('selectedEntropyType', 'binary');
+            this.selectedEntropyType = savedType;
+            this.uiElements.entropyTypeSelector.value = savedType;
+
+            this.uiElements.entropyTypeSelector.addEventListener('change', (e) => {
+                this.selectedEntropyType = e.target.value;
+                PersistenceService.saveUISetting('selectedEntropyType', this.selectedEntropyType);
+                this.updatePlot();
+            });
+        }
+    }
+
     _setupEventSubscriptions() {
         // Subscribe to entropy sampling changes
         this._subscribeToEvent(EVENTS.ENTROPY_SAMPLING_CHANGED, (samplingData) => {
@@ -93,7 +131,8 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             
             // Clear last known entropy when sampling is disabled
             if (!samplingData.enabled) {
-                this.lastKnownEntropy = null;
+                this.lastKnownBinaryEntropy = null;
+                this.lastKnownBlockEntropy = null;
             }
             
             this._updateCurrentEntropyDisplay();
@@ -101,12 +140,14 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
 
         // Subscribe to world events that should clear entropy
         this._subscribeToEvent(EVENTS.ALL_WORLDS_RESET, () => {
-            this.lastKnownEntropy = null;
+            this.lastKnownBinaryEntropy = null;
+            this.lastKnownBlockEntropy = null;
             this._updateCurrentEntropyDisplay();
         });
 
         this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, () => {
-            this.lastKnownEntropy = null;
+            this.lastKnownBinaryEntropy = null;
+            this.lastKnownBlockEntropy = null;
             this._updateCurrentEntropyDisplay();
         });
     }
@@ -139,48 +180,59 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
     }
 
     _updateCurrentEntropyDisplay(statsData = null) {
-        if (!this.uiElements.statEntropy) return;
+        if (!this.uiElements.statBinaryEntropy || !this.uiElements.statBlockEntropy) return;
 
         const samplingState = this.simulationInterface.getEntropySamplingState();
         
-        if (statsData && statsData.entropy !== undefined) {
-            // Update last known entropy when we have a new value
-            this.lastKnownEntropy = statsData.entropy;
-            this.uiElements.statEntropy.textContent = statsData.entropy.toFixed(4);
-        } else if (samplingState.enabled && this.lastKnownEntropy !== null) {
-            // Show last known entropy when sampling is enabled but no current value
-            this.uiElements.statEntropy.textContent = this.lastKnownEntropy.toFixed(4);
+        // Update binary entropy display
+        if (statsData && statsData.binaryEntropy !== undefined) {
+            this.lastKnownBinaryEntropy = statsData.binaryEntropy;
+            this.uiElements.statBinaryEntropy.textContent = statsData.binaryEntropy.toFixed(4);
+        } else if (samplingState.enabled && this.lastKnownBinaryEntropy !== null) {
+            this.uiElements.statBinaryEntropy.textContent = this.lastKnownBinaryEntropy.toFixed(4);
         } else if (samplingState.enabled) {
-            // Sampling enabled but no entropy value yet
-            this.uiElements.statEntropy.textContent = "Pending...";
+            this.uiElements.statBinaryEntropy.textContent = "Pending...";
         } else {
-            // Sampling is disabled
-            this.uiElements.statEntropy.textContent = "Disabled";
+            this.uiElements.statBinaryEntropy.textContent = "Disabled";
+        }
+
+        // Update block entropy display
+        if (statsData && statsData.blockEntropy !== undefined) {
+            this.lastKnownBlockEntropy = statsData.blockEntropy;
+            this.uiElements.statBlockEntropy.textContent = statsData.blockEntropy.toFixed(4);
+        } else if (samplingState.enabled && this.lastKnownBlockEntropy !== null) {
+            this.uiElements.statBlockEntropy.textContent = this.lastKnownBlockEntropy.toFixed(4);
+        } else if (samplingState.enabled) {
+            this.uiElements.statBlockEntropy.textContent = "Pending...";
+        } else {
+            this.uiElements.statBlockEntropy.textContent = "Disabled";
         }
     }
 
     onDataUpdate(data) {
         if (!this.isInitialized) return;
 
-        if (data && (data.type === 'worldStats' || data.type === 'entropySamplingChanged') && data.payload && data.payload.entropyHistory) {
-            // Use data directly from payload if available
-            this.currentEntropyHistory = [...data.payload.entropyHistory];
-            if (this.currentEntropyHistory.length > 0) {
-                this.lastFitnessValue = this.currentEntropyHistory[this.currentEntropyHistory.length - 1];
+        if (data && (data.type === 'worldStats' || data.type === 'entropySamplingChanged') && data.payload) {
+            // Update binary entropy history
+            if (data.payload.entropyHistory) {
+                this.currentBinaryEntropyHistory = [...data.payload.entropyHistory];
             } else {
-                this.lastFitnessValue = 0;
+                this.currentBinaryEntropyHistory = this.simulationInterface.getSelectedWorldEntropyHistory() || [];
             }
-        } else if (data && (data.type === 'worldStats' || data.type === 'entropySamplingChanged') && data.payload) {
-            // Fallback: retrieve from simulationInterface
-            this.currentEntropyHistory = this.simulationInterface.getSelectedWorldEntropyHistory() || [];
-            if (this.currentEntropyHistory.length > 0) {
-                this.lastFitnessValue = this.currentEntropyHistory[this.currentEntropyHistory.length - 1];
+
+            // Update block entropy history
+            if (data.payload.hexBlockEntropyHistory) {
+                this.currentBlockEntropyHistory = [...data.payload.hexBlockEntropyHistory];
             } else {
-                this.lastFitnessValue = 0;
+                this.currentBlockEntropyHistory = this.simulationInterface.getSelectedWorldBlockEntropyHistory() || [];
             }
+
+            // Update fitness value based on selected entropy type
+            this._updateFitnessValue();
         } else if (data && data.type === 'allWorldsReset') { 
-            this.currentEntropyHistory = (data.payload && data.payload.entropyHistory) ? [...data.payload.entropyHistory] : [];
-            this.lastFitnessValue = this.currentEntropyHistory.length > 0 ? this.currentEntropyHistory[this.currentEntropyHistory.length - 1] : 0;
+            this.currentBinaryEntropyHistory = (data.payload && data.payload.entropyHistory) ? [...data.payload.entropyHistory] : [];
+            this.currentBlockEntropyHistory = (data.payload && data.payload.hexBlockEntropyHistory) ? [...data.payload.hexBlockEntropyHistory] : [];
+            this._updateFitnessValue();
         }
         
         // Update current entropy display
@@ -189,8 +241,14 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         this.updatePlot();
     }
 
+    _updateFitnessValue() {
+        const currentHistory = this.selectedEntropyType === 'binary' ? this.currentBinaryEntropyHistory : this.currentBlockEntropyHistory;
+        this.lastFitnessValue = currentHistory.length > 0 ? currentHistory[currentHistory.length - 1] : 0;
+    }
+
     getFitnessValue() {
-        if (this.currentEntropyHistory && this.currentEntropyHistory.length > 0) {
+        const currentHistory = this.selectedEntropyType === 'binary' ? this.currentBinaryEntropyHistory : this.currentBlockEntropyHistory;
+        if (currentHistory && currentHistory.length > 0) {
             return this.lastFitnessValue;
         }
         return 0;
@@ -204,7 +262,10 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
 
     updatePlot() {
         if (this.plotCanvas) {
-            super.drawPlot(this.plotCanvas, this.currentEntropyHistory, '#FFA500', 'Sampled Entropy (0.0-1.0)');
+            const currentHistory = this.selectedEntropyType === 'binary' ? this.currentBinaryEntropyHistory : this.currentBlockEntropyHistory;
+            const label = this.selectedEntropyType === 'binary' ? 'Binary Entropy (0.0-1.0)' : 'Block Entropy (0.0-1.0)';
+            const color = this.selectedEntropyType === 'binary' ? '#FFA500' : '#00CED1';
+            super.drawPlot(this.plotCanvas, currentHistory, color, label);
         }
     }
 
