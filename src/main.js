@@ -1,6 +1,7 @@
 import * as Config from './core/config.js';
 import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
+import * as CanvasLoader from './rendering/canvasLoader.js';
 import * as UI from './ui/ui.js';
 import * as Utils from './utils/utils.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
@@ -32,9 +33,13 @@ async function initialize() {
         return;
     }
 
+    // Start the loader immediately
+    CanvasLoader.startCanvasLoader(canvas);
+
     gl = await Renderer.initRenderer(canvas);
     if (!gl) {
         console.error("Renderer initialization failed.");
+        CanvasLoader.stopCanvasLoader();
         return;
     }
 
@@ -447,8 +452,16 @@ function textureCoordsToGridCoords(texX, texY) {
 }
 
 function handleResize() {
-    if (!isInitialized || !gl) return;
-    Renderer.resizeRenderer();
+    // Handle Canvas 2D loader resize if active
+    const mainCanvas = document.getElementById('hexGridCanvas');
+    if (mainCanvas) {
+        CanvasLoader.handleLoaderResize(mainCanvas);
+    }
+    
+    // Handle WebGL renderer resize if initialized
+    if (isInitialized && gl) {
+        Renderer.resizeRenderer();
+    }
 }
 
 function handleVisibilityChange() {
@@ -477,7 +490,17 @@ function renderLoop(timestamp) {
     lastTimestamp = timestamp;
 
     const allWorldsData = worldManager.getWorldsRenderData();
-    Renderer.renderFrame(allWorldsData, worldManager.getSelectedWorldIndex());
+    const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
+    
+    // Stop the Canvas 2D loader once all workers are ready
+    if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
+        CanvasLoader.stopCanvasLoader();
+    }
+    
+    // Only start WebGL rendering after workers are initialized
+    if (areAllWorkersInitialized) {
+        Renderer.renderFrameOrLoader(allWorldsData, worldManager.getSelectedWorldIndex(), areAllWorkersInitialized);
+    }
 
     frameCount++;
     if (timestamp - lastFpsUpdateTime >= 1000) {
