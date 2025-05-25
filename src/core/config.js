@@ -24,7 +24,7 @@ export const DEFAULT_SPEED = 20;
 export const MAX_SIM_SPEED = 120;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 0; 
 export const MAX_NEIGHBORHOOD_SIZE = Math.floor(GRID_ROWS/2);
-export const STATS_HISTORY_SIZE = 100; 
+export const STATS_HISTORY_SIZE = 1000; 
 export const RENDER_TEXTURE_SIZE = 1280; 
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0]; 
 export const HOVER_BORDER_COLOR = [0.6, 0.6, 0.6, 1.0]; 
@@ -32,22 +32,22 @@ export const HOVER_FILLED_DARKEN_FACTOR = 0.66;
 export const HOVER_INACTIVE_LIGHTEN_FACTOR = 1.5; 
 export const BACKGROUND_COLOR = [0.10, 0.10, 0.10, 1.0];
 export const SELECTION_OUTLINE_COLOR = [1.0, 1.0, 0.0, 0.9];
-export const DISABLED_WORLD_OVERLAY_COLOR = [0.1, 0.1, 0.1, 0.7];
+export const DISABLED_WORLD_OVERLAY_COLOR = [0.25, 0.25, 0.25, 1.0]; // A solid, slightly lighter, distinct gray
 
 
 export const NEIGHBOR_DIRS_ODD_R = [ 
-    [+1, 0],  
-    [+1, +1], 
-    [0, +1],  
-    [-1, +1], 
-    [-1, 0],  
-    [0, -1]   
+    [-1, +1],  // SW (Visual slot 0 - Bottom-left for odd cells)
+    [-1, 0],   // NW (Visual slot 1 - Top-left for odd cells)
+    [0, -1],   // N  (Visual slot 2 - Top center for odd cells)
+    [+1, 0],   // NE (Visual slot 3 - Top-right for odd cells)
+    [+1, +1],  // SE (Visual slot 4 - Bottom-right for odd cells)
+    [0, +1]    // S  (Visual slot 5 - Bottom center for odd cells)
 ];
 export const NEIGHBOR_DIRS_EVEN_R = [ 
-    [+1, -1], 
-    [+1, 0],  
-    [0, +1],  
-    [-1, 0],  
-    [-1, -1], 
-    [0, -1]   
+    [-1, 0],   // SW (Visual slot 0 - Bottom-left)
+    [-1, -1],  // NW (Visual slot 1 - Top-left)
+    [0, -1],   // N  (Visual slot 2 - Top center)
+    [+1, -1],  // NE (Visual slot 3 - Top-right)
+    [+1, 0],   // SE (Visual slot 4 - Bottom-right, using E as closest)
+    [0, +1]    // S  (Visual slot 5 - Bottom center)
 ];

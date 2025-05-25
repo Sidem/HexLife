@@ -16,6 +16,7 @@ let hexBuffers;
 let quadBuffers; 
 let hexVAO;
 let quadVAO;
+let disabledTextTexture = null;
 
 export async function initRenderer(canvasElement) {
     canvas = canvasElement;
@@ -54,6 +55,49 @@ export async function initRenderer(canvasElement) {
         u_color: gl.getUniformLocation(quadShaderProgram, "u_color"),
         u_useTexture: gl.getUniformLocation(quadShaderProgram, "u_useTexture"),
     };
+
+    // Create the "DISABLED" text texture
+    try {
+        const tempCanvas = document.createElement('canvas');
+        const texQualityMultiplier = 2; // Render text texture at higher res for clarity
+        const texSize = 128 * texQualityMultiplier; // e.g., 256x256 texture
+        tempCanvas.width = texSize;
+        tempCanvas.height = texSize;
+        const ctx2d = tempCanvas.getContext('2d');
+
+        // Transparent background for the text texture itself
+        ctx2d.clearRect(0, 0, texSize, texSize);
+
+        // Flip the coordinate system to match WebGL (Y increases upward)
+        ctx2d.translate(0, texSize);
+        ctx2d.scale(1, -1);
+
+        // Style the text
+        ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)'; // Light gray, slightly transparent
+        const fontSize = texSize / 5.5; // Adjust for desired size
+        ctx2d.font = `bold ${fontSize}px sans-serif`;
+        ctx2d.textAlign = 'center';
+        ctx2d.textBaseline = 'middle';
+
+        // Draw the text (centered properly)
+        ctx2d.fillText('DISABLED', texSize / 2, texSize / 2);
+
+        // Create WebGL texture from this 2D canvas
+        disabledTextTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
+        // Upload the canvas to the texture
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
+        // Set texture parameters
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null); // Unbind
+
+    } catch (e) {
+        console.error("Failed to create disabledTextTexture:", e);
+        disabledTextTexture = null;
+    }
 
     setupHexBuffersAndVAO();
     setupQuadBuffersAndVAO();
@@ -152,6 +196,10 @@ function setupFBOs() {
 
 
 function renderWorldsToTextures(allWorldsData) {
+    // Add these lines to unbind any lingering texture from texture unit 0
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
@@ -159,7 +207,11 @@ function renderWorldsToTextures(allWorldsData) {
         const fboData = worldFBOs[i];
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
 
-        gl.clearColor(...Config.BACKGROUND_COLOR);
+        // Always clear with a base color first
+        // For disabled worlds, this will be their main background.
+        // For active worlds, this prevents artifacts if not all cells are drawn.
+        const clearColor = (worldData && worldData.enabled) ? Config.BACKGROUND_COLOR : Config.DISABLED_WORLD_OVERLAY_COLOR;
+        gl.clearColor(...clearColor);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         if (worldData && worldData.enabled) {
@@ -186,14 +238,27 @@ function renderWorldsToTextures(allWorldsData) {
 
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS); 
 
-        } else { 
-            if (!quadShaderProgram || !quadVAO) continue;
-            gl.useProgram(quadShaderProgram);
-            gl.bindVertexArray(quadVAO);
+        } else { // World is disabled - FBO already cleared with DISABLED_WORLD_OVERLAY_COLOR
+            if (disabledTextTexture) { // Check if texture was successfully created
+                if (!quadShaderProgram || !quadVAO) continue;
 
-            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); 
-            gl.uniform4fv(quadUniformLocations.u_color, Config.DISABLED_WORLD_OVERLAY_COLOR);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
+                gl.useProgram(quadShaderProgram);
+                gl.bindVertexArray(quadVAO);
+
+                gl.activeTexture(gl.TEXTURE0); // Ensure texture unit 0 is active
+                gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
+                gl.uniform1i(quadUniformLocations.texture, 0); // Tell shader to use texture unit 0
+                gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); // Enable texture sampling
+
+                // Enable blending to draw text (with alpha) over the background
+                gl.enable(gl.BLEND);
+                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); // Draw full FBO quad, text texture maps to it
+
+                gl.disable(gl.BLEND); // Disable blending after drawing
+            }
+            // If disabledTextTexture is null (failed to create), it will just show the solid overlay color
         }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);

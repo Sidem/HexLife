@@ -9,19 +9,28 @@ export function countSetBits(n) {
 
 /**
  * Rotates a 6-bit neighborhood mask one step clockwise.
- * Example: 000001 (neighbor 0) -> 000010 (neighbor 1)
- * Bit order: 543210 (neighbor 5, neighbor 4, ..., neighbor 0)
+ * Bit mapping: 0=SW, 1=NW, 2=N, 3=NE, 4=SE, 5=S
+ * Clockwise rotation: SW->NW->N->NE->SE->S->SW
  * @param {number} bitmask - The 6-bit integer representing neighbor states.
  * @returns {number} The rotated bitmask.
  */
 export function rotateBitmaskClockwise(bitmask) {
-    const N = 6;
-    const msbSet = (bitmask >> (N - 1)) & 1; 
-    let rotated = (bitmask << 1) & ((1 << N) - 1); 
-    if (msbSet) {
-        rotated |= 1; 
-    }
-    return rotated;
+    // Extract each bit: 0=SW, 1=NW, 2=N, 3=NE, 4=SE, 5=S
+    const sw = (bitmask >> 0) & 1;
+    const nw = (bitmask >> 1) & 1;
+    const n = (bitmask >> 2) & 1;
+    const ne = (bitmask >> 3) & 1;
+    const se = (bitmask >> 4) & 1;
+    const s = (bitmask >> 5) & 1;
+    
+    // Clockwise rotation: SW->NW->N->NE->SE->S->SW
+    // So: new_NW = old_SW, new_N = old_NW, new_NE = old_N, new_SE = old_NE, new_S = old_SE, new_SW = old_S
+    return (s << 0) |     // new SW = old S
+           (sw << 1) |    // new NW = old SW
+           (nw << 2) |    // new N = old NW
+           (n << 3) |     // new NE = old N
+           (ne << 4) |    // new SE = old NE
+           (se << 5);     // new S = old SE
 }
 
 
