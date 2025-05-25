@@ -863,6 +863,17 @@ label.sym-label {
     color: #ccc;
 }
 
+.entropy-value-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.entropy-value-row:last-child {
+    margin-bottom: 0;
+}
+
 .entropy-value {
     font-weight: bold;
     padding: 2px 6px;
@@ -870,7 +881,7 @@ label.sym-label {
     border-radius: 3px;
     color: #fff;
     min-width: 60px;
-    text-align: center;
+    text-align: right;
 }
 
 .entropy-sampling-controls {
