@@ -69,15 +69,15 @@ export async function initRenderer(canvasElement) {
         ctx2d.clearRect(0, 0, texSize, texSize);
 
         // Flip the coordinate system to match WebGL (Y increases upward)
-        ctx2d.translate(0, texSize);
+        ctx2d.translate(-texSize / 2, texSize / 1.95);
         ctx2d.scale(1, -1);
 
         // Style the text
         ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)'; // Light gray, slightly transparent
-        const fontSize = texSize / 5.5; // Adjust for desired size
+        const fontSize = texSize / 12; // Adjust for desired size
         ctx2d.font = `bold ${fontSize}px sans-serif`;
-        ctx2d.textAlign = 'center';
-        ctx2d.textBaseline = 'middle';
+        //ctx2d.textAlign = 'center';
+        //ctx2d.textBaseline = 'middle';
 
         // Draw the text (centered properly)
         ctx2d.fillText('DISABLED', texSize / 2, texSize / 2);

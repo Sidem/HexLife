@@ -18,7 +18,8 @@ body {
 }
 
 #top-info-bar {
-    height: 35px;
+    height: 2.5rem;
+    line-height: 2.5rem;
     background-color: #2a2a2a;
     border-bottom: 1px solid #444;
     display: flex;
@@ -39,9 +40,10 @@ body {
 }
 
 #appLogo {
-    font-size: 1.2em;
+    font-size: 2.0rem;
     color: #FFFF00;
     text-shadow: 0 0 3px rgba(255, 255, 0, 0.3);
+    font-weight: bolder;
 }
 
 #appTitle {
