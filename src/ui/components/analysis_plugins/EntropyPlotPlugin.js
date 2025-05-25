@@ -19,6 +19,8 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             entropySampleRateSliderMount: null,
             statBinaryEntropy: null,
             statBlockEntropy: null,
+            statActivityRatio: null,
+            statEntropyDifference: null,
             entropyTypeSelector: null
         };
     }
@@ -46,6 +48,14 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
                                 <label>Block Entropy:</label>
                                 <span id="stat-block-entropy-plugin" class="entropy-value">Disabled</span>
                             </div>
+                            <div class="entropy-value-row">
+                                <label>Activity Ratio:</label>
+                                <span id="stat-activity-ratio-plugin" class="entropy-value">--</span>
+                            </div>
+                            <div class="entropy-value-row">
+                                <label>Entropy Difference:</label>
+                                <span id="stat-entropy-difference-plugin" class="entropy-value">--</span>
+                            </div>
                         </div>
                     </div>
                     <div class="entropy-sampling-controls">
@@ -67,6 +77,8 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         this.uiElements.entropySampleRateSliderMount = this.mountPoint.querySelector('#entropySampleRateSliderMount');
         this.uiElements.statBinaryEntropy = this.mountPoint.querySelector('#stat-binary-entropy-plugin');
         this.uiElements.statBlockEntropy = this.mountPoint.querySelector('#stat-block-entropy-plugin');
+        this.uiElements.statActivityRatio = this.mountPoint.querySelector('#stat-activity-ratio-plugin');
+        this.uiElements.statEntropyDifference = this.mountPoint.querySelector('#stat-entropy-difference-plugin');
         this.uiElements.entropyTypeSelector = this.mountPoint.querySelector('#entropyTypeSelector');
 
         this.plotCanvas = this.mountPoint.querySelector('.plugin-canvas');
@@ -206,6 +218,42 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
             this.uiElements.statBlockEntropy.textContent = "Pending...";
         } else {
             this.uiElements.statBlockEntropy.textContent = "Disabled";
+        }
+
+        // Update activity ratio display
+        if (statsData && statsData.ratio !== undefined) {
+            this.uiElements.statActivityRatio.textContent = (statsData.ratio * 100).toFixed(2) + '%';
+        } else {
+            const currentStats = this.simulationInterface.getSelectedWorldStats();
+            if (currentStats && currentStats.ratio !== undefined) {
+                this.uiElements.statActivityRatio.textContent = (currentStats.ratio * 100).toFixed(2) + '%';
+            } else {
+                this.uiElements.statActivityRatio.textContent = '--';
+            }
+        }
+
+        // Update entropy difference display (percentage difference between binary and block entropy)
+        const binaryEntropy = statsData?.binaryEntropy ?? this.lastKnownBinaryEntropy;
+        const blockEntropy = statsData?.blockEntropy ?? this.lastKnownBlockEntropy;
+        
+        if (binaryEntropy !== null && blockEntropy !== null && binaryEntropy !== undefined && blockEntropy !== undefined) {
+            // Calculate percentage difference: ((block - binary) / binary) * 100
+            // Handle edge case where binary entropy is 0
+            if (binaryEntropy === 0) {
+                if (blockEntropy === 0) {
+                    this.uiElements.statEntropyDifference.textContent = '0.00%';
+                } else {
+                    this.uiElements.statEntropyDifference.textContent = '+∞%';
+                }
+            } else {
+                const percentDiff = ((blockEntropy - binaryEntropy) / binaryEntropy) * 100;
+                const sign = percentDiff >= 0 ? '+' : '';
+                this.uiElements.statEntropyDifference.textContent = sign + percentDiff.toFixed(2) + '%';
+            }
+        } else if (samplingState.enabled) {
+            this.uiElements.statEntropyDifference.textContent = "Pending...";
+        } else {
+            this.uiElements.statEntropyDifference.textContent = "Disabled";
         }
     }
 
