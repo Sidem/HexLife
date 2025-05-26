@@ -10,7 +10,7 @@ HexLife Explorer is an interactive web-based cellular automaton simulator that o
   * **Cellular Automata:** Each cell can be in one of two states: active (alive) or inactive (dead). The state of a cell in the next generation (tick) is determined by its current state and the states of its six neighbors, according to a defined ruleset.
   * **Rulesets:**
       * The behavior of the automaton is defined by a ruleset consisting of 128 individual rules.
-      * Each rule corresponds to a unique configuration: 1 bit for the center cell's current state and 6 bits for the states of its six neighbors (2\<sup\>(1+6)\</sup\> = 128 possibilities).
+      * Each rule corresponds to a unique configuration: 1 bit for the center cell's current state and 6 bits for the states of its six neighbors (2<sup>(1+6)</sup> = 128 possibilities).
       * The output of each rule is a single bit, determining the center cell's state in the next generation.
       * Rulesets are represented and can be manipulated as a 32-character hexadecimal string (128 bits).
 
