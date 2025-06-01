@@ -513,7 +513,8 @@ function renderLoop(timestamp) {
         lastFpsUpdateTime = timestamp;
 
         const selectedStats = worldManager.getSelectedWorldStats();
-        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0 });
+        const targetTps = worldManager.getCurrentSimulationSpeed();
+        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
     }
 
     requestAnimationFrame(renderLoop);

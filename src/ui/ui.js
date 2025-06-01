@@ -40,6 +40,7 @@ export function initUI(worldManagerInterface) {
         statBrushSize: document.getElementById('stat-brush-size'),
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
+        statTargetTps: document.getElementById('stat-target-tps'),
 
         
         playPauseButton: document.getElementById('playPauseButton'),
@@ -111,6 +112,11 @@ export function initUI(worldManagerInterface) {
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     updateBrushSizeDisplay(worldManagerInterfaceRef.getCurrentBrushSize());
+    
+    // Initialize target TPS display
+    if (uiElements?.statTargetTps) {
+        uiElements.statTargetTps.textContent = String(worldManagerInterfaceRef.getCurrentSimulationSpeed());
+    }
 
     console.log("New Toolbar UI Initialized.");
     return true;
@@ -118,7 +124,7 @@ export function initUI(worldManagerInterface) {
 
 function validateElements() {
     const critical = [
-        'rulesetDisplay', 'statTick', 'statRatio', 'statBrushSize', 'statFps', 'statActualTps',
+        'rulesetDisplay', 'statTick', 'statRatio', 'statBrushSize', 'statFps', 'statActualTps', 'statTargetTps',
         'playPauseButton', 'speedControlButton', 'brushToolButton', 'newRulesButton',
         'setRulesetButton', 'saveStateButton', 'loadStateButton', 'resetClearButton',
         'editRuleButton', 'setupPanelButton', 'analysisPanelButton',
@@ -323,9 +329,10 @@ function updateStatsDisplay(stats) {
     
 }
 
-function updatePerformanceDisplay(fps, tpsOfSelectedWorld) {
+function updatePerformanceDisplay(fps, tpsOfSelectedWorld, targetTps) {
     if (uiElements?.statFps) uiElements.statFps.textContent = fps !== undefined ? String(fps) : '--';
-    if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(tpsOfSelectedWorld) : '--';
+    if (uiElements?.statActualTps) uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(Math.round(tpsOfSelectedWorld)) : '--';
+    if (uiElements?.statTargetTps) uiElements.statTargetTps.textContent = targetTps !== undefined ? String(targetTps) : '--';
 }
 
 function updateBrushSizeDisplay(brushSize) {
@@ -502,7 +509,10 @@ function handleGlobalKeyDown(event) {
 
 function setupUIEventListeners() {
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, updatePauseButtonVisual);
-    EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => sliderComponents.speedSliderPopout?.setValue(speed, false));
+    EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, speed => {
+        sliderComponents.speedSliderPopout?.setValue(speed, false);
+        if (uiElements?.statTargetTps) uiElements.statTargetTps.textContent = String(speed);
+    });
     EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => {
         updateMainRulesetDisplay(hex);
         
@@ -529,7 +539,7 @@ function setupUIEventListeners() {
              updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
         }
     });
-    EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, data => updatePerformanceDisplay(data.fps, data.tps));
+    EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, data => updatePerformanceDisplay(data.fps, data.tps, data.targetTps));
     EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (newIndex) => {
         if (worldManagerInterfaceRef) {
             updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());

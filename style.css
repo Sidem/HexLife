@@ -67,6 +67,10 @@ body {
     display: flex;
     gap: 15px;
 }
+#statsDisplayContainer > span {
+    min-width: 60px;
+    white-space: nowrap;
+}
 #statsDisplayContainer span span {
     font-weight: bold;
     color: #f0f0f0;
