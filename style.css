@@ -1073,8 +1073,17 @@ label.sym-label {
 }
 
 @media (max-width: 480px) {
+    body {
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+    }
+    
+    #app-container {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    
     #main-content-area {
-        flex-direction: column-reverse;
+        flex-direction: column;
+        padding-bottom: 10px;
     }
     #vertical-toolbar {
         width: 100%;
@@ -1082,16 +1091,60 @@ label.sym-label {
         flex-direction: row;
         justify-content: space-around;
         border-right: none;
-        border-top: 1px solid #444;
+        border-bottom: 1px solid #444;
+        border-top: none;
         padding: 0 5px;
         overflow-x: auto;
         overflow-y: hidden;
+        order: -1;
     }
     .toolbar-button { margin: 5px 2px; }
     .toolbar-separator { display: none; }
 
-    #appTitle { display: none; }
-    #statsDisplayContainer { gap: 5px; }
+    #top-info-bar {
+        flex-direction: column;
+        height: auto;
+        line-height: 1.3;
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    
+    #appTitleContainer {
+        justify-content: center;
+        order: 1;
+    }
+    
+    #rulesetDisplayContainer {
+        order: 2;
+        text-align: center;
+    }
+    
+    #statsDisplayContainer {
+        order: 3;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    #statsDisplayContainer > span {
+        min-width: auto;
+        font-size: 0.75em;
+    }
+
+    #appTitle { display: inline; }
+    
+    #githubLink {
+        font-size: 0.8em !important;
+    }
+    
+    #githubLink svg {
+        width: 12px;
+        height: 12px;
+    }
+    
+    canvas#hexGridCanvas {
+        margin-bottom: 10px;
+    }
 
     .popout-panel {
         left: 5% !important;
