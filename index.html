@@ -4,10 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="google-site-verification" content="61Y9kjxqcAt7TYpyxqaFIaPjGP3IktL46ohSLVOZY4c" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Explorer - Interactive Hexagonal Cellular Automata</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+        <title>HexLife Explorer - Interactive Hexagonal Cellular Automata</title>
     <meta name="description" content="Explore complex emergent behaviors with HexLife Explorer, an interactive web-based cellular automaton simulator on a hexagonal grid, powered by WebGL2 and Web Workers. Define custom rulesets and observe intricate patterns unfold in multiple concurrent simulations.">
-
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sidem.github.io/HexLife/">
     <meta property="og:title" content="HexLife Explorer - Interactive Hexagonal Cellular Automata">
@@ -16,6 +15,7 @@
     <meta property="twitter:url" content="https://sidem.github.io/HexLife/">
     <meta property="twitter:title" content="HexLife Explorer - Interactive Hexagonal Cellular Automata">
     <meta property="twitter:description" content="Discover emergent complexity with HexLife Explorer, a WebGL2 & Web Worker powered cellular automaton on a hexagonal grid.">
+
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -36,18 +36,77 @@
       "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
     }
     </script>
-
+    <link rel="preload" href="style.css?v=1.1" as="style">
+    <link rel="preload" href="src/main.js" as="script" crossorigin="">
     <link rel="stylesheet" href="style.css?v=1.1">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+    <link rel="apple-touch-icon" href="favicon.ico">
+    <style>
+        .toolbar-button, .button, .checkbox-label, .radio-switch-label {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        @media (hover: none) and (pointer: coarse) {
+            .toolbar-button, .button, .checkbox-label, .radio-switch-label {
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
+        
+        @supports (-webkit-overflow-scrolling: touch) {
+            input[type="text"], input[type="range"], select, textarea {
+                font-size: 16px !important;
+            }
+        }
+        
+        body {
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        
+        #top-info-bar {
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        * {
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .toolbar-button, .button {
+            touch-action: manipulation;
+        }
+        
+        #hexGridCanvas {
+            touch-action: manipulation;
+        }
+        
+        /* Allow horizontal scrolling on mobile toolbar */
+        #vertical-toolbar {
+            touch-action: pan-x;
+        }
+    </style>
 </head>
 
 <body>
+    <!-- Loading indicator for mobile -->
+    <div id="loading-indicator" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1e1e1e; display: flex; align-items: center; justify-content: center; z-index: 10000; color: #e0e0e0; font-size: 1.2em;">
+        <div style="text-align: center;">
+            <div style="font-size: 2em; margin-bottom: 10px;">⬡</div>
+            <div>Loading HexLife Explorer...</div>
+        </div>
+    </div>
+
     <div id="app-container">
         <div id="top-info-bar">
             <div id="appTitleContainer">
                 <div id="appLogo">⬡</div>
                 <span id="appTitle">HexLife Explorer</span>
-                <a href="https://github.com/Sidem/HexLife/" target="_blank" title="View on GitHub" id="githubLink" style="margin-left: 10px; color: #ccc; text-decoration: none; font-size:0.9em;">
+                <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" title="View on GitHub" id="githubLink" style="margin-left: 10px; color: #ccc; text-decoration: none; font-size:0.9em;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-github" viewBox="0 0 16 16" style="vertical-align: middle;">
                         <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
                     </svg>
@@ -67,28 +126,28 @@
         </div>
 
         <div id="main-content-area">
-            <div id="vertical-toolbar">
-                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button>
-                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button>
-                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button>
-                <div class="toolbar-separator"></div>
+            <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
+                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" aria-label="Play or pause simulation">▶</button>
+                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed" aria-label="Adjust simulation speed">SPD</button>
+                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size" aria-label="Brush tool and size adjustment">BRS</button>
+                <div class="toolbar-separator" role="separator"></div>
 
-                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> 
-                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button>
-                <div class="toolbar-separator"></div>
+                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" aria-label="Generate new ruleset">NEW</button> 
+                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" aria-label="Set or copy ruleset">HEX</button>
+                <div class="toolbar-separator" role="separator"></div>
 
-                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button>
-                <div class="toolbar-separator"></div>
+                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" aria-label="Reset or clear worlds">R/C</button>
+                <div class="toolbar-separator" role="separator"></div>
 
-                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> 
-                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> 
-                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button>
-                <div class="toolbar-separator"></div>
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" aria-label="Open ruleset editor">EDT</button> 
+                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" aria-label="Open world setup panel">SET</button> 
+                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" aria-label="Open analysis panel">ANL</button>
+                <div class="toolbar-separator" role="separator"></div>
 
-                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
-                <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
+                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" aria-label="Save current world state">SAV</button>
+                <button id="loadStateButton" class="toolbar-button" title="Load World State" aria-label="Load world state from file">LOD</button>
             </div>
-            <canvas id="hexGridCanvas"></canvas>
+            <canvas id="hexGridCanvas" role="img" aria-label="Hexagonal cellular automaton simulation display"></canvas>
         </div>
 
         <div id="speedPopout" class="popout-panel hidden">
@@ -137,7 +196,7 @@
         <div id="setHexPopout" class="popout-panel hidden">
             <h4>Set/Copy Ruleset Hex</h4>
             <div class="form-group">
-                <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars">
+                <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
             <div class="form-group-buttons">
                 <button id="setRuleFromPopoutButton" class="button">Set</button>
@@ -153,16 +212,17 @@
             <button id="clearAllButtonPopout" class="button">Clear All</button>
         </div>
 
-        <div id="rulesetEditorPanel" class="draggable-panel-base hidden">
-            <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3>Ruleset Editor</h3>
+        <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true">
+            <button id="closeEditorButton" class="close-panel-button" title="Close Panel" aria-label="Close ruleset editor">&times;</button>
+            <h3 id="rulesetEditorTitle">Ruleset Editor</h3>
             <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input"
                     placeholder="32 hex chars (e.g., FFFFFF...000000)"
-                    title="Current ruleset hex code. Edit and press Enter or click away to apply.">
+                    title="Current ruleset hex code. Edit and press Enter or click away to apply."
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                 <button id="clearRulesButton" class="button"
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
-                <select id="rulesetEditorMode" title="Choose editor mode">
+                <select id="rulesetEditorMode" title="Choose editor mode" aria-label="Editor mode selection">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
@@ -170,7 +230,7 @@
             </div>
             <div class="editor-apply-scope-controls">
                 <label>Apply Changes To:</label>
-                <div class="radio-group">
+                <div class="radio-group" role="radiogroup" aria-label="Apply changes scope">
                     <input type="radio" id="editorApplyScopeSelected" name="editorApplyScope" value="selected"
                         class="radio-switch-input" checked>
                     <label for="editorApplyScopeSelected" class="radio-switch-label">Selected World</label>
@@ -205,9 +265,9 @@
             </div>
         </div>
 
-        <div id="setupPanel" class="draggable-panel-base hidden">
-            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3>World Setup</h3>
+        <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true">
+            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close setup panel">&times;</button>
+            <h3 id="setupPanelTitle">World Setup</h3>
             <div class="panel-content-area">
                 <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click
                     "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and
@@ -220,16 +280,65 @@
             </div>
         </div>
 
-        <div id="analysisPanel" class="draggable-panel-base hidden">
-            <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3>Analysis Tools</h3>
+        <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" aria-modal="true">
+            <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close analysis panel">&times;</button>
+            <h3 id="analysisPanelTitle">Analysis Tools</h3>
             <div class="panel-content-area">
                 <div class="plugins-mount-area">
                 </div>
             </div>
         </div>
 
-    </div> <input type="file" id="fileInput" accept=".txt,.json" style="display: none;">
+    </div> 
+    
+    <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
+    
+    <!-- Critical loading and mobile optimization script -->
+    <script>
+        // Hide loading indicator once DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const loadingIndicator = document.getElementById('loading-indicator');
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+            }, 100); // Small delay to ensure smooth transition
+        });
+        
+        // Minimal touch optimization - only prevent what's necessary
+        document.addEventListener('touchstart', function(e) {
+            // Allow all touch interactions - no prevention
+        }, { passive: true });
+        
+        // Only prevent pull-to-refresh on the main app container
+        document.addEventListener('touchmove', function(e) {
+            // Only prevent pull-to-refresh if touching at the very top
+            if (e.touches.length === 1 && e.touches[0].clientY > 50) {
+                return; // Allow all normal scrolling and interactions
+            }
+            
+            // Only prevent if we're at the top and pulling down
+            if (document.documentElement.scrollTop === 0 && e.touches[0].clientY > e.touches[0].clientY) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Optimize viewport for better mobile experience
+        if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            document.addEventListener('DOMContentLoaded', function() {
+                // Add mobile-specific optimizations
+                document.body.style.webkitTapHighlightColor = 'transparent';
+                document.body.style.webkitTouchCallout = 'none';
+            });
+        }
+        
+        // Performance optimization: lazy load non-critical resources
+        window.addEventListener('load', function() {
+            // Any additional mobile-specific initialization can go here
+            console.log('HexLife Explorer loaded and optimized for mobile');
+        });
+    </script>
+    
     <script type="module" src="src/main.js"></script>
 </body>
 

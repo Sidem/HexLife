@@ -31,7 +31,6 @@ export const EventBus = {
 };
 
 export const EVENTS = {
-    
     SIMULATION_PAUSED: 'simulation:paused', 
     SIMULATION_SPEED_CHANGED: 'simulation:speedChanged', 
     RULESET_CHANGED: 'simulation:rulesetChanged', 

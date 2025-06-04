@@ -25,6 +25,12 @@ let justFinishedDrawing = false; // Prevent click after drawing
 let initialWorldState = null; // Store initial cell states when stroke begins
 let cellsShouldBeToggled = new Set(); // Track which cells should be in toggled state
 
+// Touch tracking state
+let touchStartX = null;
+let touchStartY = null;
+let hasTouchMoved = false;
+let touchStartTime = null;
+
 async function initialize() {
     console.log("Starting Initialization (Worker Architecture)...");
     const canvas = document.getElementById('hexGridCanvas');
@@ -102,6 +108,12 @@ function setupCanvasListeners(canvas) {
     canvas.addEventListener('mouseup', handleCanvasMouseUp);
     canvas.addEventListener('mouseout', handleCanvasMouseOut);
     canvas.addEventListener('wheel', handleCanvasMouseWheel, { passive: false });
+    
+    // Add touch event handlers for mobile support
+    canvas.addEventListener('touchstart', handleCanvasTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleCanvasTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleCanvasTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleCanvasTouchEnd, { passive: false });
 }
 
 function handleCanvasClick(event) {
@@ -518,6 +530,93 @@ function renderLoop(timestamp) {
     }
 
     requestAnimationFrame(renderLoop);
+}
+
+// Touch event handlers that translate to mouse events
+function handleCanvasTouchStart(event) {
+    event.preventDefault(); // Prevent scrolling and default touch behavior
+    
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        
+        // Track touch start position and time
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartTime = Date.now();
+        hasTouchMoved = false;
+        
+        // Don't start drawing immediately - wait to see if it's a tap or drag
+        // We'll handle this in touchmove or touchend
+    }
+}
+
+function handleCanvasTouchMove(event) {
+    event.preventDefault(); // Prevent scrolling
+    
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        
+        // Check if touch has moved significantly (more than 5 pixels)
+        if (touchStartX !== null && touchStartY !== null) {
+            const deltaX = Math.abs(touch.clientX - touchStartX);
+            const deltaY = Math.abs(touch.clientY - touchStartY);
+            
+            if (deltaX > 5 || deltaY > 5) {
+                hasTouchMoved = true;
+                
+                // Start drawing mode if not already started
+                if (!isMouseDrawing) {
+                    const startMouseEvent = createMouseEventFromTouch({
+                        clientX: touchStartX,
+                        clientY: touchStartY,
+                        target: touch.target
+                    }, 'mousedown');
+                    handleCanvasMouseDown(startMouseEvent);
+                }
+                
+                // Continue with drag
+                const mouseEvent = createMouseEventFromTouch(touch, 'mousemove');
+                handleCanvasMouseMove(mouseEvent);
+            }
+        }
+    }
+}
+
+function handleCanvasTouchEnd(event) {
+    event.preventDefault();
+    
+    // Create a mouse event from the last touch position
+    if (event.changedTouches.length === 1) {
+        const touch = event.changedTouches[0];
+        const touchDuration = Date.now() - (touchStartTime || 0);
+        
+        if (hasTouchMoved) {
+            // This was a drag operation - end the drawing
+            const mouseEvent = createMouseEventFromTouch(touch, 'mouseup');
+            handleCanvasMouseUp(mouseEvent);
+        } else {
+            // This was a tap (no significant movement) - treat as click
+            const clickEvent = createMouseEventFromTouch(touch, 'click');
+            handleCanvasClick(clickEvent);
+        }
+        
+        // Reset touch tracking
+        touchStartX = null;
+        touchStartY = null;
+        hasTouchMoved = false;
+        touchStartTime = null;
+    }
+}
+
+function createMouseEventFromTouch(touch, type) {
+    return {
+        type: type,
+        button: 0, // Left button
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        target: touch.target,
+        preventDefault: function() {}
+    };
 }
 
 initialize().catch(err => {

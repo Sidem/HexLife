@@ -549,8 +549,8 @@ label.sym-label {
     max-width: calc(16 * 42px + 15 * 2px + 10px);
 }
 #neighborCountRulesetEditorGrid {
-    grid-template-columns: repeat(7, 13.4%);
-    width: 100%;
+    grid-template-columns: repeat(7, 13.6%);
+    width: 98%;
     gap: 5px;
 }
 
@@ -573,6 +573,9 @@ label.sym-label {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
     gap: 5px;
     margin-top: 5px;
+}
+.editor-text-rules > p, .editor-text > p {
+    margin: 0;
 }
 
 .rule-viz {
@@ -634,6 +637,7 @@ label.sym-label {
     position: relative; transform: scale(0.8) translate(-53px, -53px);
     margin-bottom: 5px; width: 40px; height: calc(40px * 1.154701);
 }
+
 .neighbor-count-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
 
 .inline-hex {
@@ -958,7 +962,7 @@ label.sym-label {
     font-size: 0.7em;
     color: #ccc;
     text-align: center;
-    margin-bottom: 2px;
+    margin-bottom: 0px;
     width: 100%;
 }
 #analysisPanel .settings-group {
@@ -1018,18 +1022,43 @@ label.sym-label {
     font-size: 0.85em;
 }
 
-@media (max-width: 920px) {
-    #rotationalSymmetryRulesetEditorGrid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0px;
+#fileInput { display: none; }
+
+/* Force portrait orientation on mobile devices */
+@media screen and (hover: none) and (pointer: coarse) and (orientation: landscape) {
+    body::before {
+        content: "Please rotate your device to portrait mode for the best experience.";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 1.2em;
+        z-index: 9999;
+        padding: 20px;
+        box-sizing: border-box;
     }
-    .r-sym-rule-viz .rule-viz-hex-display {
-        transform: scale(0.55) translate(-32px, -35px);
-         margin-bottom: -30px;
+    
+    #app-container {
+        display: none;
     }
 }
 
-@media (max-width: 768px) {
+/* Mobile device detection OR small screens - larger mobile devices/tablets */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (min-height: 600px)), (max-width: 920px) and (min-height: 600px) {
+    .neighbor-count-rule-viz .hexagon.center-hex {
+        position: relative; transform: scale(0.75) translate(-25px, -53px);
+    }
+}
+
+/* Mobile device detection OR small screens - standard mobile */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
     #vertical-toolbar { width: 45px; }
     .toolbar-button { width: 35px; height: 35px; font-size: 1em; }
     #top-info-bar { padding: 0 10px; font-size: 0.8em; height: 30px; }
@@ -1044,7 +1073,7 @@ label.sym-label {
         grid-template-rows: repeat(16, 56px);
     }
     .editor-controls .editor-hex-input { font-size: 1.2em; width: 250px; }
-    #neighborCountRulesetEditorGrid { grid-template-columns: repeat(7, 14%); }
+    #neighborCountRulesetEditorGrid { grid-template-columns: repeat(7, 13.6%); }
 
     .world-config-grid { gap: 10px; }
     #setupPanel { width: clamp(280px, 85vw, 400px); }
@@ -1058,13 +1087,26 @@ label.sym-label {
     }
 }
 
-@media (max-width: 600px) {
+/* Mobile device detection OR small screens - medium mobile screens */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 700px)), (max-width: 600px) {
+    #rotationalSymmetryRulesetEditorGrid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0px;
+    }
+    .r-sym-rule-viz .rule-viz-hex-display {
+        transform: scale(0.45) translate(0px, -35px);
+         margin-bottom: -30px;
+    }
+}
+
+/* Mobile device detection OR small screens - smaller mobile screens */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 600px)), (max-width: 500px) {
     #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(3, 1fr);
         gap: 0px;
     }
      .r-sym-rule-viz .rule-viz-hex-display {
-        transform: scale(0.5) translate(-35px, -40px);
+        transform: scale(0.45) translate(0px, -40px);
          margin-bottom: -35px;
     }
     .r-sym-rule-viz {
@@ -1072,7 +1114,8 @@ label.sym-label {
     }
 }
 
-@media (max-width: 480px) {
+/* Mobile device detection OR very small screens - horizontal toolbar layout */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
     body {
         padding-bottom: env(safe-area-inset-bottom, 10px);
     }
@@ -1134,12 +1177,12 @@ label.sym-label {
     #appTitle { display: inline; }
     
     #githubLink {
-        font-size: 0.8em !important;
+        font-size: 0.9em !important;
     }
     
     #githubLink svg {
-        width: 12px;
-        height: 12px;
+        width: 16px;
+        height: 16px;
     }
     
     canvas#hexGridCanvas {
@@ -1176,5 +1219,3 @@ label.sym-label {
         grid-template-columns: repeat(2, 1fr);
     }
 }
-
-#fileInput { display: none; }

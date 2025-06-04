@@ -28,6 +28,28 @@ document.addEventListener('popoutinteraction', (event) => {
     closeAllPopouts(event.detail.panel);
 });
 
+// Add click/touch outside to close popouts
+function handleClickOutside(event) {
+    // Check if any popout is currently open
+    const hasOpenPopout = activePopouts.some(popout => !popout.isHidden());
+    
+    if (!hasOpenPopout) return;
+    
+    // Check if the click/touch is inside any popout or trigger button
+    const clickedInsidePopout = event.target.closest('.popout-panel');
+    const clickedTriggerButton = activePopouts.some(popout => {
+        return popout.triggerElement && popout.triggerElement.contains(event.target);
+    });
+    
+    // If clicked outside both popout and trigger button, close all popouts
+    if (!clickedInsidePopout && !clickedTriggerButton) {
+        closeAllPopouts();
+    }
+}
+
+// Add listeners for both mouse and touch events
+document.addEventListener('click', handleClickOutside);
+document.addEventListener('touchend', handleClickOutside);
 
 export function initUI(worldManagerInterface) {
     worldManagerInterfaceRef = worldManagerInterface;
