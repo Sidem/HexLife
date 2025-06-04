@@ -1,16 +1,18 @@
-import { DraggablePanel } from './DraggablePanel.js';
+import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-export class RulesetEditor {
+export class RulesetEditor extends BasePanel {
     constructor(panelElement, worldManagerInterface) { 
-        if (!panelElement || !worldManagerInterface) {
-            console.error('RulesetEditor: panelElement or worldManagerInterface is null.');
+        // Call the BasePanel constructor with element, handle selector, and identifier
+        super(panelElement, 'h3', 'ruleset');
+
+        if (!worldManagerInterface) {
+            console.error('RulesetEditor: worldManagerInterface is null.');
             return;
         }
-        this.panelElement = panelElement;
-        this.worldManager = worldManagerInterface; 
-        this.panelIdentifier = 'ruleset';
+        // this.panelElement is already set by the super constructor
+        this.worldManager = worldManagerInterface;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: panelElement.querySelector('#editorRulesetInput'),
@@ -24,10 +26,15 @@ export class RulesetEditor {
             editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'), 
             editorAutoResetCheckbox: panelElement.querySelector('#editorAutoResetCheckbox'),
         };
-        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-        this._loadPanelState();
+        this._loadEditorSettings();
         this._setupInternalListeners();
-        if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
+        if (!this.isHidden()) this.refreshViews();
+        
+        // Override the default onDragEnd to also save editor settings
+        this.onDragEnd = () => {
+            this._savePanelState();
+            this._saveEditorSettings();
+        };
     }
 
     /**
@@ -207,12 +214,10 @@ export class RulesetEditor {
                 }
             }));
         }
-
-        if (this.draggablePanel) this.draggablePanel.onDragEnd = () => this._savePanelState();
     }
 
     refreshViews() {
-        if (!this.worldManager || this.panelElement.classList.contains('hidden')) return;
+        if (!this.worldManager || this.isHidden()) return;
         const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex(); 
         if (this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
@@ -325,21 +330,13 @@ export class RulesetEditor {
         grid.appendChild(frag);
     }
 
-    _savePanelState() {
-        if (!this.panelElement) return;
-        PersistenceService.savePanelState(this.panelIdentifier, {
-            isOpen: !this.panelElement.classList.contains('hidden'),
-            x: this.panelElement.style.left, y: this.panelElement.style.top,
-        });
+    _saveEditorSettings() {
         if (this.uiElements.rulesetEditorMode) PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
         if (this.uiElements.editorApplyScopeControls) PersistenceService.saveUISetting('editorRulesetApplyScope', this._getEditorModificationScope());
         if (this.uiElements.editorAutoResetCheckbox) PersistenceService.saveUISetting('editorAutoReset', this.uiElements.editorAutoResetCheckbox.checked);
     }
 
-    _loadPanelState() {
-        if(!this.panelElement) return;
-        const s = PersistenceService.loadPanelState(this.panelIdentifier);
-
+    _loadEditorSettings() {
         if(this.uiElements.rulesetEditorMode) this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
         if(this.uiElements.editorApplyScopeControls) {
             const scopeSetting = PersistenceService.loadUISetting('editorRulesetApplyScope', 'selected');
@@ -347,24 +344,29 @@ export class RulesetEditor {
             else if(this.uiElements.editorApplyScopeSelectedRadio) this.uiElements.editorApplyScopeSelectedRadio.checked = true;
         }
         if (this.uiElements.editorAutoResetCheckbox) this.uiElements.editorAutoResetCheckbox.checked = PersistenceService.loadUISetting('editorAutoReset', true);
-
-
-        if(s.isOpen) this.show(false); else this.hide(false);
-        if(s.x && s.x.endsWith('px')) this.panelElement.style.left = s.x;
-        if(s.y && s.y.endsWith('px')) this.panelElement.style.top = s.y;
-
-        const hasPosition = (s.x && s.x.endsWith('px')) || (s.y && s.y.endsWith('px'));
-        if (hasPosition && (parseFloat(this.panelElement.style.left) > 0 || parseFloat(this.panelElement.style.top) > 0 || this.panelElement.style.left !== '50%' || this.panelElement.style.top !== '50%')) {
-            this.panelElement.style.transform = 'none';
-        } else if (!hasPosition && s.isOpen) { 
-             this.panelElement.style.left = '50%';
-             this.panelElement.style.top = '50%';
-             this.panelElement.style.transform = 'translate(-50%, -50%)';
-        }
     }
-    show(save=true){this.draggablePanel.show();this.refreshViews();if(save)this._savePanelState();}
-    hide(save=true){this.draggablePanel.hide();if(save)this._savePanelState();}
-    toggle(){const v=this.draggablePanel.toggle(); this.refreshViews(); this._savePanelState();return v;}
-    destroy(){if(this.draggablePanel)this.draggablePanel.destroy();}
-    isHidden(){return this.draggablePanel.isHidden();}
+
+    show(save = true) {
+        super.show(save);
+        this.refreshViews();
+        if (save) this._saveEditorSettings();
+    }
+
+    hide(save = true) {
+        super.hide(save);
+        if (save) this._saveEditorSettings();
+    }
+
+    toggle() {
+        const isVisible = super.toggle();
+        if (isVisible) {
+            this.refreshViews();
+        }
+        this._saveEditorSettings();
+        return isVisible;
+    }
+
+    destroy() {
+        super.destroy();
+    }
 }

@@ -1,17 +1,17 @@
-import { DraggablePanel } from './DraggablePanel.js';
+import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { createRuleVizElement, getRuleIndexColor } from '../../utils/ruleVizUtils.js';
 
-export class RuleRankPanel {
+export class RuleRankPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface) {
-        this.panelElement = panelElement;
+        // Call the BasePanel constructor with element, handle selector, and identifier
+        super(panelElement, 'h3', 'ruleRank');
+
         this.worldManager = worldManagerInterface;
-        this.panelIdentifier = 'ruleRank';
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeRankPanelButton'),
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };
-        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
         
         // Throttling and caching for performance
         this.lastUpdateTime = 0;
@@ -24,14 +24,13 @@ export class RuleRankPanel {
         this.headerElement = null;
         this.lastDisplayedRuleCount = 0;
         
-        this._loadPanelState();
         this._setupInternalListeners();
-        if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
+        if (!this.isHidden()) this.refreshViews();
     }
 
     _setupInternalListeners() {
         this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        this.draggablePanel.onDragEnd = () => this._savePanelState();
+        // The onDragEnd callback is already set by BasePanel constructor
     }
 
     _createRuleItemElement() {
@@ -276,55 +275,24 @@ export class RuleRankPanel {
         }
     }
     
-    _savePanelState() {
-        if (!this.panelElement) return;
-        PersistenceService.savePanelState(this.panelIdentifier, {
-            isOpen: !this.panelElement.classList.contains('hidden'),
-            x: this.panelElement.style.left,
-            y: this.panelElement.style.top,
-        });
+    show(saveState = true) {
+        super.show(saveState);
+        this.refreshViews();
     }
-
-    _loadPanelState() {
-        if (!this.panelElement) return;
-        const savedState = PersistenceService.loadPanelState(this.panelIdentifier);
-        if (savedState.isOpen) this.show(false); else this.hide(false);
-        if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
-        if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
-
-        const hasPosition = (savedState.x && savedState.x.endsWith('px')) || (savedState.y && savedState.y.endsWith('px'));
-        if (hasPosition && (parseFloat(this.panelElement.style.left) > 0 || parseFloat(this.panelElement.style.top) > 0 || this.panelElement.style.left !== '50%' || this.panelElement.style.top !== '50%')) {
-            this.panelElement.style.transform = 'none';
-        } else if (!hasPosition && savedState.isOpen) {
-            this.panelElement.style.left = '50%'; 
-            this.panelElement.style.top = '50%'; 
-            this.panelElement.style.transform = 'translate(-50%, -50%)';
+    
+    hide(saveState = true) {
+        super.hide(saveState);
+    }
+    
+    toggle() {
+        const isVisible = super.toggle();
+        if (isVisible) {
+            this.refreshViews();
         }
-    }
-
-    show(saveState = true) { 
-        this.draggablePanel.show(); 
-        if (saveState) this._savePanelState(); 
-        this.refreshViews(); 
+        return isVisible;
     }
     
-    hide(saveState = true) { 
-        this.draggablePanel.hide(); 
-        if (saveState) this._savePanelState(); 
-    }
-    
-    toggle() { 
-        const v = this.draggablePanel.toggle(); 
-        this._savePanelState(); 
-        if (v) this.refreshViews(); 
-        return v; 
-    }
-    
-    isHidden() { 
-        return this.panelElement.classList.contains('hidden'); 
-    }
-    
-    destroy() { 
-        this.draggablePanel.destroy(); 
+    destroy() {
+        super.destroy();
     }
 } 

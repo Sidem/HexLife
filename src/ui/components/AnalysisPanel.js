@@ -1,5 +1,5 @@
 import * as Config from '../../core/config.js';
-import { DraggablePanel } from './DraggablePanel.js';
+import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
@@ -7,17 +7,19 @@ import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 
-export class AnalysisPanel {
+export class AnalysisPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface, uiManagerRef) {
-        if (!panelElement || !worldManagerInterface) {
-            console.error('AnalysisPanel: panelElement or worldManagerInterface is null.');
+        // Call the BasePanel constructor with element, handle selector, and identifier
+        super(panelElement, 'h3', 'analysis');
+
+        if (!worldManagerInterface) {
+            console.error('AnalysisPanel: worldManagerInterface is null.');
             return;
         }
 
-        this.panelElement = panelElement;
+        // this.panelElement is already set by the super constructor
         this.worldManager = worldManagerInterface;
         this.uiManager = uiManagerRef;
-        this.panelIdentifier = 'analysis';
         this.plugins = [];
 
         this.uiElements = {
@@ -29,9 +31,6 @@ export class AnalysisPanel {
             console.error('AnalysisPanel: .plugins-mount-area not found in panel HTML.');
         }
 
-        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-
-        this._loadPanelState(); 
         this._setupInternalListeners();
         this._registerPlugins();
         this._initializePluginsUI();
@@ -80,10 +79,7 @@ export class AnalysisPanel {
         if (this.uiElements.closeButton) {
             this.uiElements.closeButton.addEventListener('click', () => this.hide());
         }
-
-        if (this.draggablePanel) {
-            this.draggablePanel.onDragEnd = () => this._savePanelState();
-        }
+        // The onDragEnd callback is already set by BasePanel constructor
     }
 
     _setupEventSubscriptions() {
@@ -116,35 +112,28 @@ export class AnalysisPanel {
         this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: currentSelectedStats }));
     }
 
-    _savePanelState() {
-        if (!this.panelElement) return;
-        PersistenceService.savePanelState(this.panelIdentifier, {
-            isOpen: !this.panelElement.classList.contains('hidden'),
-            x: this.panelElement.style.left,
-            y: this.panelElement.style.top,
-        });
-        
+    show(saveState = true) {
+        super.show(saveState);
+        this.refreshViews();
     }
 
-    _loadPanelState() {
-        if (!this.panelElement) return;
-        const savedState = PersistenceService.loadPanelState(this.panelIdentifier);
-        if (savedState.isOpen) this.show(false); else this.hide(false);
-        if (savedState.x && savedState.x.endsWith('px')) this.panelElement.style.left = savedState.x;
-        if (savedState.y && savedState.y.endsWith('px')) this.panelElement.style.top = savedState.y;
+    hide(saveState = true) {
+        super.hide(saveState);
+    }
 
-        const hasPosition = (savedState.x && savedState.x.endsWith('px')) || (savedState.y && savedState.y.endsWith('px'));
-        if (hasPosition && (parseFloat(this.panelElement.style.left) > 0 || parseFloat(this.panelElement.style.top) > 0 || this.panelElement.style.left !== '50%' || this.panelElement.style.top !== '50%')) {
-            this.panelElement.style.transform = 'none';
-        } else if (!hasPosition && savedState.isOpen) {
-            this.panelElement.style.left = '50%'; this.panelElement.style.top = '50%'; this.panelElement.style.transform = 'translate(-50%, -50%)';
+    toggle() {
+        const isVisible = super.toggle();
+        if (isVisible) {
+            this.refreshViews();
         }
-        
+        return isVisible;
     }
 
-    show(saveState = true) { this.draggablePanel.show(); if (saveState) this._savePanelState(); this.refreshViews(); }
-    hide(saveState = true) { this.draggablePanel.hide(); if (saveState) this._savePanelState(); }
-    toggle() { const v = this.draggablePanel.toggle(); this._savePanelState(); if (v) this.refreshViews(); return v; }
-    isHidden() { return this.panelElement.classList.contains('hidden'); }
-    destroy() { this.plugins.forEach(plugin => plugin.destroy()); this.plugins = []; this.draggablePanel.destroy(); }
+    destroy() {
+        this.plugins.forEach(plugin => plugin.destroy());
+        this.plugins = [];
+        super.destroy();
+    }
+
+    // isHidden() is now inherited from DraggablePanel, so this method is removed
 }

@@ -1,30 +1,27 @@
-
 import * as Config from '../../core/config.js';
-import { DraggablePanel } from './DraggablePanel.js';
+import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js'; 
 
-export class SetupPanel {
+export class SetupPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface) { 
-        if (!panelElement || !worldManagerInterface) {
-            console.error('SetupPanel: panelElement or worldManagerInterface is null.');
+        super(panelElement, 'h3', 'setup');
+
+        if (!worldManagerInterface) {
+            console.error('SetupPanel: worldManagerInterface is null.');
             return;
         }
-        this.panelElement = panelElement;
-        this.worldManager = worldManagerInterface; 
-        this.panelIdentifier = 'setup';
+        this.worldManager = worldManagerInterface;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeSetupPanelButton') || panelElement.querySelector('.close-panel-button'),
             worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: panelElement.querySelector('#applySetupButton'),
         };
-        this.worldSliderComponents = []; 
-        this.draggablePanel = new DraggablePanel(this.panelElement, 'h3');
-        this._loadPanelState();
+        this.worldSliderComponents = [];
         this._setupInternalListeners();
-        if (!this.panelElement.classList.contains('hidden')) this.refreshViews();
+        if (!this.isHidden()) this.refreshViews();
 
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refreshViews());
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refreshViews());
@@ -52,7 +49,6 @@ export class SetupPanel {
                 }
             });
         }
-        if (this.draggablePanel) this.draggablePanel.onDragEnd = () => this._savePanelState();
     }
 
     refreshViews() {
@@ -108,36 +104,22 @@ export class SetupPanel {
         grid.appendChild(fragment);
     }
 
-    _savePanelState() {
-        if (!this.panelElement) return;
-        PersistenceService.savePanelState(this.panelIdentifier, {
-            isOpen: !this.panelElement.classList.contains('hidden'),
-            x: this.panelElement.style.left, y: this.panelElement.style.top,
-        });
+    show(save = true) {
+        super.show(save);
+        this.refreshViews();
     }
-    _loadPanelState() {
-        if(!this.panelElement) return;
-        const s = PersistenceService.loadPanelState(this.panelIdentifier);
-        if(s.isOpen) this.show(false); else this.hide(false);
-        if(s.x && s.x.endsWith('px')) this.panelElement.style.left = s.x;
-        if(s.y && s.y.endsWith('px')) this.panelElement.style.top = s.y;
 
-        const hasPosition = (s.x && s.x.endsWith('px')) || (s.y && s.y.endsWith('px'));
-         if (hasPosition && (parseFloat(this.panelElement.style.left) > 0 || parseFloat(this.panelElement.style.top) > 0 || this.panelElement.style.left !== '50%' || this.panelElement.style.top !== '50%')) {
-            this.panelElement.style.transform = 'none';
-        } else if (!hasPosition && s.isOpen) {
-             this.panelElement.style.left = '50%';
-             this.panelElement.style.top = '50%';
-             this.panelElement.style.transform = 'translate(-50%, -50%)';
+    toggle() {
+        const isVisible = super.toggle();
+        if (isVisible) {
+            this.refreshViews();
         }
+        return isVisible;
     }
-    show(save=true){this.draggablePanel.show();this.refreshViews();if(save)this._savePanelState();}
-    hide(save=true){this.draggablePanel.hide();if(save)this._savePanelState();}
-    toggle(){const v=this.draggablePanel.toggle();this.refreshViews();this._savePanelState();return v;}
-    destroy(){
-        this.draggablePanel.destroy();
-        this.worldSliderComponents.forEach(s=>s.destroy());
-        this.worldSliderComponents=[];
+
+    destroy() {
+        super.destroy();
+        this.worldSliderComponents.forEach(s => s.destroy());
+        this.worldSliderComponents = [];
     }
-    isHidden(){return this.draggablePanel.isHidden();}
 }

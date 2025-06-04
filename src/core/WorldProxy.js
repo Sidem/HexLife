@@ -81,7 +81,7 @@ export class WorldProxy {
                 const elapsedTimeSeconds = (currentTime - this.lastTickUpdateTimeForTPS) / 1000;
                 const ticksSinceLastUpdate = data.tick - this.lastTickCountForTPS;
                 let currentTPS = 0;
-                if (elapsedTimeSeconds > 0 && ticksSinceLastUpdate > 0) {
+                if (elapsedTimeSeconds > 0.003 && ticksSinceLastUpdate > 0) {
                     currentTPS = parseFloat((ticksSinceLastUpdate / elapsedTimeSeconds).toFixed(1));
                 } else if (ticksSinceLastUpdate === 0 && elapsedTimeSeconds > 0){
                     currentTPS = 0;
