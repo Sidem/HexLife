@@ -15,6 +15,8 @@ let tickIntervalId = null;
 let currentSpeedTarget = Config.DEFAULT_SPEED; 
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
+// Add rule usage counter
+let ruleUsageCounters = null;
 
 // History arrays for analysis
 let ratioHistory = [];
@@ -171,7 +173,8 @@ function processCommandQueue() {
         switch (command.type) {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
-                rulesetChangedInQueue = true; 
+                rulesetChangedInQueue = true;
+                needsStateUpdate = true;
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
@@ -181,6 +184,9 @@ function processCommandQueue() {
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
                 activeCount = 0;
+                // Reset rule usage counters
+                if (ruleUsageCounters) ruleUsageCounters.fill(0);
+                
                 if (jsStateArray) {
                     if (isClearOp) {
                         jsStateArray.fill(density);
@@ -250,6 +256,9 @@ function processCommandQueue() {
                 ratioHistory = [];
                 entropyHistory = [];
                 hexBlockEntropyHistory = []; // New: Clear block entropy history
+                // Reset rule usage counters
+                if (ruleUsageCounters) ruleUsageCounters.fill(0);
+                
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
@@ -293,6 +302,10 @@ function runTick() {
             }
         }
         const ruleIdx = (cState << 6) | neighborMask;
+        
+        // Increment rule usage counter during active simulation
+        if (isRunning && ruleUsageCounters) ruleUsageCounters[ruleIdx]++;
+        
         const nextStateValue = ruleset[ruleIdx];
         jsNextStateArray[i] = nextStateValue;
         jsNextRuleIndexArray[i] = ruleIdx;
@@ -367,7 +380,10 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
     const currentRulesetHex = rulesetToHex(ruleset);
 
     if (activeCount !== undefined) {
-         self.postMessage({
+        const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
+        const transferList = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
+        
+        self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
             tick: worldTickCounter,
@@ -376,8 +392,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             binaryEntropy: binaryEntropy, // Renamed for clarity
             blockEntropy: blockEntropy,   // New: Block entropy
             rulesetHex: currentRulesetHex, 
-            isEnabled: isEnabled
-        });
+            isEnabled: isEnabled,
+            ruleUsageCounters: ruleUsageCountersBuffer
+        }, transferList);
     } else if (rulesetHasChanged || !isEnabled) { 
         const currentActiveCount = jsStateArray.reduce((s, c) => s + c, 0);
         const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
@@ -390,6 +407,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
         }
         
+        const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
+        const transferList = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
+        
         self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
@@ -399,8 +419,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             binaryEntropy: currentBinaryEntropy, // Renamed for clarity
             blockEntropy: currentBlockEntropy,   // New: Block entropy
             rulesetHex: currentRulesetHex,
-            isEnabled: isEnabled
-        });
+            isEnabled: isEnabled,
+            ruleUsageCounters: ruleUsageCountersBuffer
+        }, transferList);
     }
 }
 
@@ -440,6 +461,9 @@ self.onmessage = function(event) {
             jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS);
             jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
             jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
+            
+            // Initialize rule usage counters
+            ruleUsageCounters = new Uint32Array(128);
 
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;

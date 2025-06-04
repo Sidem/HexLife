@@ -70,7 +70,27 @@ body {
 #statsDisplayContainer > span {
     min-width: 60px;
     white-space: nowrap;
+    display: inline-block;
+    text-align: left;
 }
+
+/* Fixed widths for each stat to prevent layout shifts */
+#statsDisplayContainer > span:nth-child(1) { /* Tick */
+    width: 80px;
+}
+#statsDisplayContainer > span:nth-child(2) { /* Ratio */
+    width: 85px;
+}
+#statsDisplayContainer > span:nth-child(3) { /* Brush */
+    width: 65px;
+}
+#statsDisplayContainer > span:nth-child(4) { /* FPS */
+    width: 65px;
+}
+#statsDisplayContainer > span:nth-child(5) { /* TPS */
+    width: 90px;
+}
+
 #statsDisplayContainer span span {
     font-weight: bold;
     color: #f0f0f0;
@@ -1217,5 +1237,133 @@ label.sym-label {
      }
     #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Rule Rank Panel Specific Styles */
+#ruleRankPanel {
+    width: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+#ruleRankContent .empty-state-text {
+    text-align: center;
+    color: #888;
+    padding-top: 20px;
+    font-style: italic;
+}
+
+.rank-list-header, .rank-list-item {
+    display: grid;
+    grid-template-columns: 50px 1fr 120px;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+    font-size: 0.9em;
+}
+
+.rank-list-header {
+    font-weight: bold;
+    color: #ccc;
+    border-bottom: 2px solid #555;
+    background-color: rgba(255, 255, 255, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.rank-list-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.rank-list-rank {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #aaa;
+    text-align: center;
+}
+
+.rank-list-item .rule-viz.rank-list-viz {
+    transform: scale(0.5);
+    width: 100px;
+    height: 110px;
+    margin: -25px 0;
+    position: relative;
+}
+
+.rank-list-usage {
+    font-family: monospace;
+    text-align: right;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.usage-percent {
+    font-size: 1.1em;
+    color: #fff;
+}
+
+.usage-count {
+    font-size: 0.8em;
+    color: #aaa;
+    margin-top: 2px;
+}
+
+/* Rule usage overlay for highlighting frequently used rules */
+.rule-usage-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 0, 0.3);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Mobile adjustments for Rule Rank Panel */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
+    #ruleRankPanel {
+        width: clamp(300px, 85vw, 400px);
+        max-height: 80vh;
+    }
+    
+    .rank-list-header, .rank-list-item {
+        grid-template-columns: 40px 1fr 100px;
+        padding: 6px 8px;
+        font-size: 0.85em;
+    }
+    
+    .rank-list-item .rule-viz.rank-list-viz {
+        transform: scale(0.35) translate(-85px, -65px);
+        margin: -30px 0;
+    }
+    
+    .usage-percent {
+        font-size: 1em;
+    }
+    
+    .usage-count {
+        font-size: 0.75em;
+    }
+}
+
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+    #ruleRankPanel {
+        width: 100%;
+        max-height: 100vh;
+    }
+    
+    .rank-list-header, .rank-list-item {
+        grid-template-columns: 35px 1fr 90px;
+        padding: 5px 6px;
+        font-size: 0.8em;
+    }
+    
+    .rank-list-item .rule-viz.rank-list-viz {
+        transform: scale(0.3) translate(-95px, -75px);
+        margin: -35px 0;
     }
 }

@@ -3,6 +3,7 @@ import { formatHexCode, downloadFile } from '../utils/utils.js';
 import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js';
 import { AnalysisPanel } from './components/AnalysisPanel.js';
+import { RuleRankPanel } from './components/RuleRankPanel.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
@@ -12,7 +13,7 @@ let uiElements;
 let sliderComponents = {}; 
 let popoutPanels = {};    
 let worldManagerInterfaceRef;
-let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance;
+let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance, ruleRankPanelComponent;
 
 
 let activePopouts = [];
@@ -75,7 +76,8 @@ export function initUI(worldManagerInterface) {
         resetClearButton: document.getElementById('resetClearButton'), 
         editRuleButton: document.getElementById('editRuleButton'), 
         setupPanelButton: document.getElementById('setupPanelButton'), 
-        analysisPanelButton: document.getElementById('analysisPanelButton'), 
+        analysisPanelButton: document.getElementById('analysisPanelButton'),
+        rankPanelButton: document.getElementById('rankPanelButton'),
 
         
         speedPopout: document.getElementById('speedPopout'),
@@ -108,6 +110,7 @@ export function initUI(worldManagerInterface) {
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
+        ruleRankPanel: document.getElementById('ruleRankPanel'),
 
         
         fileInput: document.getElementById('fileInput'), 
@@ -120,6 +123,7 @@ export function initUI(worldManagerInterface) {
     if (uiElements.rulesetEditorPanel) rulesetEditorComponent = new RulesetEditor(uiElements.rulesetEditorPanel, worldManagerInterfaceRef);
     if (uiElements.setupPanel) setupPanelComponent = new SetupPanel(uiElements.setupPanel, worldManagerInterfaceRef);
     if (uiElements.analysisPanel) analysisPanelInstance = new AnalysisPanel(uiElements.analysisPanel, worldManagerInterfaceRef, {});
+    if (uiElements.ruleRankPanel) ruleRankPanelComponent = new RuleRankPanel(uiElements.ruleRankPanel, worldManagerInterfaceRef);
 
     _initPopoutPanels();
     _initPopoutControls();
@@ -274,6 +278,7 @@ function _setupToolbarButtonListeners() {
     uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
     uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
     uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
+    uiElements.rankPanelButton?.addEventListener('click', () => ruleRankPanelComponent?.toggle());
     
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
@@ -550,9 +555,11 @@ function setupUIEventListeners() {
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, updateBrushSizeDisplay);
-    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay); 
+    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay);
+    EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, () => ruleRankPanelComponent?.refreshViews());
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
         setupPanelComponent?.refreshViews(); 
+        ruleRankPanelComponent?.refreshViews();
         if (worldManagerInterfaceRef) updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     });
     EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => { 
@@ -568,6 +575,7 @@ function setupUIEventListeners() {
             updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
             if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.refreshViews();
             if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.refreshViews();
+            if (ruleRankPanelComponent && !ruleRankPanelComponent.isHidden()) ruleRankPanelComponent.refreshViews();
 
         }
     });

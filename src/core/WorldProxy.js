@@ -19,7 +19,8 @@ export class WorldProxy {
             rulesetHex: initialSettings.rulesetHex || "0".repeat(32),
             ratioHistory: [],
             entropyHistory: [],
-            hexBlockEntropyHistory: [] // New: Block entropy history
+            hexBlockEntropyHistory: [], // New: Block entropy history
+            ruleUsage: new Uint32Array(128) // New: Rule usage counters
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -88,6 +89,11 @@ export class WorldProxy {
                     currentTPS = this.latestStats.tps;
                 }
 
+                // Update rule usage counters if provided
+                if (data.ruleUsageCounters) {
+                    this.latestStats.ruleUsage = new Uint32Array(data.ruleUsageCounters);
+                }
+
                 // Update history if enabled and data exists
                 if (data.isEnabled && data.ratio !== undefined) {
                     this.latestStats.ratioHistory.push(data.ratio);
@@ -119,7 +125,8 @@ export class WorldProxy {
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
                     ratioHistory: this.latestStats.ratioHistory,
                     entropyHistory: this.latestStats.entropyHistory,
-                    hexBlockEntropyHistory: this.latestStats.hexBlockEntropyHistory // New: Block entropy history
+                    hexBlockEntropyHistory: this.latestStats.hexBlockEntropyHistory, // New: Block entropy history
+                    ruleUsage: this.latestStats.ruleUsage // New: Rule usage counters
                 };
 
                 this.lastTickCountForTPS = data.tick;
@@ -160,6 +167,7 @@ export class WorldProxy {
         this.latestStats.ratioHistory = [];
         this.latestStats.entropyHistory = [];
         this.latestStats.hexBlockEntropyHistory = []; // New: Clear block entropy history
+        this.latestStats.ruleUsage.fill(0); // New: Clear rule usage counters
 
         let commandPayload;
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {

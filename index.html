@@ -142,6 +142,7 @@
                 <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" aria-label="Open ruleset editor">EDT</button> 
                 <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" aria-label="Open world setup panel">SET</button> 
                 <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" aria-label="Open analysis panel">ANL</button>
+                <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" aria-label="Open rule rank panel">RNK</button>
                 <div class="toolbar-separator" role="separator"></div>
 
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" aria-label="Save current world state">SAV</button>
@@ -286,6 +287,13 @@
             <div class="panel-content-area">
                 <div class="plugins-mount-area">
                 </div>
+            </div>
+        </div>
+
+        <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" aria-modal="true">
+            <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close rule rank panel">&times;</button>
+            <h3 id="rankPanelTitle">Rule Usage Ranking</h3>
+            <div id="ruleRankContent" class="panel-content-area">
             </div>
         </div>
 

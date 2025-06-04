@@ -1,4 +1,3 @@
-
 import * as Config from '../core/config.js'; 
 
 const LS_KEY_PREFIX = 'hexLifeExplorer_';
@@ -10,6 +9,7 @@ const KEYS = {
     RULESET_PANEL_STATE: `${LS_KEY_PREFIX}rulesetPanelState`,
     SETUP_PANEL_STATE: `${LS_KEY_PREFIX}setupPanelState`,
     ANALYSIS_PANEL_STATE: `${LS_KEY_PREFIX}analysisPanelState`,
+    RULERANK_PANEL_STATE: `${LS_KEY_PREFIX}ruleRankPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings` 
 };
 
