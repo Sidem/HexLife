@@ -1,6 +1,7 @@
 import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { getRuleIndexColor } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditor extends BasePanel {
     constructor(panelElement, worldManagerInterface) { 
@@ -35,58 +36,7 @@ export class RulesetEditor extends BasePanel {
         };
     }
 
-    /**
-     * Converts HSV color to RGB, matching the fragment shader's hsv2rgb function.
-     * @param {number} h Hue (0-1)
-     * @param {number} s Saturation (0-1) 
-     * @param {number} v Value/Brightness (0-1)
-     * @returns {{r: number, g: number, b: number}} RGB values (0-1)
-     */
-    _hsvToRgb(h, s, v) {
-        
-        const K = [1.0, 2.0/3.0, 1.0/3.0, 3.0];
-        const p = [
-            Math.abs((h + K[0]) % 1.0 * 6.0 - K[3]),
-            Math.abs((h + K[1]) % 1.0 * 6.0 - K[3]),
-            Math.abs((h + K[2]) % 1.0 * 6.0 - K[3])
-        ].map(val => Math.max(0, Math.min(1, val - 1)));
-        
-        return {
-            r: v * (K[0] * (1 - s) + p[0] * s),
-            g: v * (K[0] * (1 - s) + p[1] * s),
-            b: v * (K[0] * (1 - s) + p[2] * s)
-        };
-    }
 
-    /**
-     * Calculates the color for a hexagon based on rule index and state, matching the fragment shader logic.
-     * @param {number} ruleIndex The rule index (0-127)
-     * @param {number} state The cell state (0 or 1)
-     * @returns {string} CSS color string
-     */
-    _getRuleIndexColor(ruleIndex, state) {
-        const hueOffset = 0.1667; 
-        const calculatedHue = ruleIndex / 128.0;
-        const hue = (calculatedHue + hueOffset) % 1.0;
-        
-        let saturation, value;
-        if (state === 1) {
-            saturation = 1.0;
-            value = 1.0;
-        } else {
-            saturation = 0.5;
-            value = 0.15;
-        }
-        
-        const rgb = this._hsvToRgb(hue, saturation, value);
-        
-        
-        const r = Math.round(rgb.r * 255);
-        const g = Math.round(rgb.g * 255);
-        const b = Math.round(rgb.b * 255);
-        
-        return `rgb(${r}, ${g}, ${b})`;
-    }
 
     _getEditorModificationScope() {
         return this.uiElements.editorApplyScopeAllRadio?.checked ? 'all' : 'selected';
@@ -263,7 +213,7 @@ export class RulesetEditor extends BasePanel {
             
             
             const centerColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-            const outputColor = this._getRuleIndexColor(i, outputState);
+            const outputColor = getRuleIndexColor(i, outputState);
             
             viz.innerHTML =
                 `<div class="hexagon center-hex" style="background-color: ${centerColor};"><div class="hexagon inner-hex" style="background-color: ${outputColor};"></div></div>` +
