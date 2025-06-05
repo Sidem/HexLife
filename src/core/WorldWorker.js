@@ -1,5 +1,3 @@
-// HexLife/src/core/WorldWorker.js
-
 import * as Config from './config.js';
 
 let worldIndex = -1;
@@ -30,10 +28,10 @@ let workerEntropySampleRate = 10;
 const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
 const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
 
-// Optimization: State change detection
-let lastSentChecksum = null; // Checksum of the last state sent to the main thread
-let stateHistoryChecksums = new Set(); // For internal cycle detection awareness
-let stateChecksumQueue = []; // Manages the window for stateHistoryChecksums
+
+let lastSentChecksum = null;
+let stateHistoryChecksums = new Set();
+let stateChecksumQueue = [];
 
 /**
  * Calculates a simple checksum for a Uint8Array.
@@ -41,10 +39,10 @@ let stateChecksumQueue = []; // Manages the window for stateHistoryChecksums
  * @returns {number} A 32-bit integer checksum.
  */
 function calculateChecksum(arr) {
-    if (!arr) return 0; // Should not happen with Uint8Array, but good practice
+    if (!arr) return 0;
     let checksum = 0;
     for (let i = 0; i < arr.length; i++) {
-        checksum = (checksum * 31 + arr[i]) | 0; // Keep it a 32-bit integer
+        checksum = (checksum * 31 + arr[i]) | 0;
     }
     return checksum;
 }
@@ -170,7 +168,7 @@ function processCommandQueue() {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
-                needsStateUpdate = true; // Ruleset change implies potential visual change even if grid is same
+                needsStateUpdate = true;
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
@@ -207,23 +205,20 @@ function processCommandQueue() {
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
-                
-                // Reset checksum tracking
                 stateHistoryChecksums.clear();
                 stateChecksumQueue = [];
-                lastSentChecksum = null; // Force next update
+                lastSentChecksum = null;
                 needsStateUpdate = true;
                 break;
             case 'APPLY_BRUSH':
-                if (applyBrushLogic(command.data.col, command.data.row, command.data.brushSize)) {
-                    stateHistoryChecksums.clear();
-                    stateChecksumQueue = [];
-                    lastSentChecksum = null;
-                    needsStateUpdate = true;
-                }
-                break;
             case 'APPLY_SELECTIVE_BRUSH':
-                if (applySelectiveBrushLogic(command.data.cellIndices)) {
+                let brushChanged = false;
+                if (command.type === 'APPLY_BRUSH') {
+                    brushChanged = applyBrushLogic(command.data.col, command.data.row, command.data.brushSize);
+                } else {
+                    brushChanged = applySelectiveBrushLogic(command.data.cellIndices);
+                }
+                if (brushChanged) {
                     stateHistoryChecksums.clear();
                     stateChecksumQueue = [];
                     lastSentChecksum = null;
@@ -233,26 +228,26 @@ function processCommandQueue() {
             case 'SET_HOVER_STATE':
                 const hoverIndicesSet = new Set(command.data.hoverAffectedIndices);
                 if (setHoverStateLogic(hoverIndicesSet)) {
-                    needsStateUpdate = true; // This only affects hover buffer, not grid state checksum
+                    needsStateUpdate = true;
                 }
                 break;
             case 'CLEAR_HOVER_STATE':
                 if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
                     jsHoverStateArray.fill(0);
-                    needsStateUpdate = true; // Affects hover buffer
+                    needsStateUpdate = true;
                 }
                 break;
-            case 'SET_ENABLED': // Handled in onmessage directly
+            case 'SET_ENABLED':
                 isEnabled = command.data.enabled;
-                 if (!isEnabled && jsStateArray) { // If disabling, clear state
+                 if (!isEnabled && jsStateArray) {
                     jsStateArray.fill(0);
                     if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                     stateHistoryChecksums.clear();
                     stateChecksumQueue = [];
-                    lastSentChecksum = null; // Force update of cleared state
+                    lastSentChecksum = null;
                     needsStateUpdate = true;
-                } else if (isEnabled && jsStateArray) { // If enabling, ensure current state is sent
-                    lastSentChecksum = null; // Force update of current state
+                } else if (isEnabled && jsStateArray) {
+                    lastSentChecksum = null;
                     needsStateUpdate = true;
                 }
                 break;
@@ -269,10 +264,9 @@ function processCommandQueue() {
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 isEnabled = true;
-                
                 stateHistoryChecksums.clear();
                 stateChecksumQueue = [];
-                lastSentChecksum = null; // Will be set when sendStateUpdate is called after this command
+                lastSentChecksum = null;
                 needsStateUpdate = true;
                 rulesetChangedInQueue = true;
                 break;
@@ -284,27 +278,32 @@ function processCommandQueue() {
 
 function runTick() {
     const { needsStateUpdate: commandInducedUpdate, rulesetChangedInQueue } = processCommandQueue();
-    let simulationPerformedUpdate = false;
+    let simulationPerformedUpdate = false; 
 
-    if (!isEnabled || !isRunning || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) {
-        if (commandInducedUpdate) { // e.g. SET_HOVER_STATE on a paused world
-            // If command induced an update (like hover), send it.
-            // Checksum logic mostly applies to simulation ticks.
-            // If it was a state-altering command, lastSentChecksum would be null.
-            const currentChecksum = calculateChecksum(jsStateArray);
-            if (currentChecksum !== lastSentChecksum || rulesetChangedInQueue || commandInducedUpdate ) { // Ensure hover updates still go through even if grid is same
-                 if (jsStateArray) lastSentChecksum = currentChecksum; // Update if we are about to send due to command
-                 sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, commandInducedUpdate);
+    if (!isEnabled || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) { 
+        if (commandInducedUpdate) { 
+            const currentGridChecksum = calculateChecksum(jsStateArray);
+            if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || commandInducedUpdate) { 
+                lastSentChecksum = currentGridChecksum; 
+                sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, true); 
             }
         }
         return;
     }
 
+    if (!isRunning) { 
+        if (commandInducedUpdate) { 
+            sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, false);
+        }
+        return;
+    }
+
+    
     worldTickCounter++;
     let activeCount = 0;
-    const numCols = workerConfig.GRID_COLS;
+    const numCols = workerConfig.GRID_COLS; 
 
-    for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
+    for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
         const cCol = i % numCols;
         const cRow = Math.floor(i / numCols);
         const cState = jsStateArray[i];
@@ -312,7 +311,7 @@ function runTick() {
         const dirs = (cCol % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
         for (let nOrder = 0; nOrder < 6; nOrder++) {
             const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
-            const nRow = (cRow + dirs[nOrder][1] + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS;
+            const nRow = (cRow + dirs[nOrder][1] + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS; 
             if (jsStateArray[nRow * numCols + nCol] === 1) {
                 neighborMask |= (1 << nOrder);
             }
@@ -327,13 +326,12 @@ function runTick() {
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
 
-    // Internal tracking for cycle detection awareness
     if (!stateHistoryChecksums.has(newStateChecksum)) {
         stateHistoryChecksums.add(newStateChecksum);
         stateChecksumQueue.push(newStateChecksum);
-        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
+        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) { 
             const oldestChecksum = stateChecksumQueue.shift();
-            if (!stateChecksumQueue.includes(oldestChecksum)) { // Avoid removing if still in recent queue window
+            if (!stateChecksumQueue.includes(oldestChecksum)) {
                 stateHistoryChecksums.delete(oldestChecksum);
             }
         }
@@ -351,7 +349,7 @@ function runTick() {
         simulationPerformedUpdate = true;
     }
 
-    const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
+    const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0; 
     let currentBinaryEntropy = undefined;
     let currentBlockEntropy = undefined;
     const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
@@ -375,11 +373,12 @@ function runTick() {
         }
     }
 
-    if (simulationPerformedUpdate || commandInducedUpdate) {
-        lastSentChecksum = calculateChecksum(jsStateArray); // Update with the checksum of the state *being sent*
-        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, commandInducedUpdate);
+    if (simulationPerformedUpdate || commandInducedUpdate) { 
+        lastSentChecksum = calculateChecksum(jsStateArray);
+        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, commandInducedUpdate || simulationPerformedUpdate);
     }
 }
+
 
 function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulesetHasChanged = false, commandInducedGridChange = false) {
     if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray || !ruleset) {
@@ -390,7 +389,7 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
     const statePayload = {
         type: 'STATE_UPDATE',
         worldIndex: worldIndex,
-        stateBuffer: jsStateArray.buffer.slice(0), // Always send a fresh copy
+        stateBuffer: jsStateArray.buffer.slice(0),
         ruleIndexBuffer: jsRuleIndexArray.buffer.slice(0),
         hoverStateBuffer: jsHoverStateArray.buffer.slice(0),
     };
@@ -399,8 +398,7 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
 
     const currentRulesetHex = rulesetToHex(ruleset);
 
-    // Stats are usually tied to simulation ticks or significant state changes.
-    if (activeCount !== undefined) { // Indicates a simulation tick or a command that recalculated activeCount
+    if (activeCount !== undefined) {
         const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
         const transferListStats = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
         self.postMessage({
@@ -416,11 +414,10 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             ruleUsageCounters: ruleUsageCountersBuffer
         }, transferListStats);
     } else if (rulesetHasChanged || !isEnabled || commandInducedGridChange) {
-        // Fallback for commands that change ruleset or enabled state, or directly alter grid
-        const currentActiveCount = jsStateArray.reduce((s, c) => s + c, 0);
-        const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
+        const currentActiveCount = jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
+        const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0; 
         let currentBinaryEntropyStats, currentBlockEntropyStats;
-        if (workerIsEntropySamplingEnabled) {
+        if (workerIsEntropySamplingEnabled && jsStateArray) { 
             currentBinaryEntropyStats = calculateBinaryEntropy(currentRatio);
             currentBlockEntropyStats = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
         }
@@ -441,7 +438,6 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
     }
 }
 
-
 function updateSimulationInterval() {
     if (tickIntervalId) {
         clearInterval(tickIntervalId);
@@ -455,13 +451,13 @@ function updateSimulationInterval() {
 
 self.onmessage = function(event) {
     const command = event.data;
-    let commandCausedGridChange = false; // Flag if command directly altered jsStateArray
+    let processQueueAndForceTickForPausedState = false;
 
     switch (command.type) {
         case 'INIT':
             worldIndex = command.data.worldIndex;
             workerConfig = command.data.config;
-            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED;
+            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED; 
             targetTickDurationMs = 1000 / currentSpeedTarget;
             ratioHistory = [];
             entropyHistory = [];
@@ -469,9 +465,9 @@ self.onmessage = function(event) {
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
             ruleset = new Uint8Array(command.data.initialRulesetBuffer);
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
-            jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS);
-            jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
-            jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
+            jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS); 
+            jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
+            jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
             ruleUsageCounters = new Uint32Array(128);
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
@@ -479,18 +475,18 @@ self.onmessage = function(event) {
 
             stateHistoryChecksums.clear();
             stateChecksumQueue = [];
-            lastSentChecksum = null; // Will be set by the first sendStateUpdate
+            lastSentChecksum = null;
 
             if (isEnabled) {
                 const density = command.data.initialDensity;
                 if(density % 1 === 0) {
                     jsStateArray.fill(density);
-                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2);
-                    if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) {
+                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2); 
+                    if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) { 
                        jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
                     }
                 } else {
-                    for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
+                    for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
                         jsStateArray[i] = Math.random() < density ? 1 : 0;
                     }
                 }
@@ -504,11 +500,11 @@ self.onmessage = function(event) {
             const initialChecksum = calculateChecksum(jsStateArray);
             stateHistoryChecksums.add(initialChecksum);
             stateChecksumQueue.push(initialChecksum);
-            lastSentChecksum = initialChecksum; // Set for the initial state being sent
+            lastSentChecksum = initialChecksum;
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
-            const initialActiveCount = isEnabled ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
-            const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
+            const initialActiveCount = isEnabled && jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
+            const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0; 
             let initialBinaryEntropy, initialBlockEntropy;
             if (isEnabled && workerIsEntropySamplingEnabled) {
                 initialBinaryEntropy = calculateBinaryEntropy(initialRatio);
@@ -537,22 +533,23 @@ self.onmessage = function(event) {
         case 'SET_ENABLED':
             const prevEnabled = isEnabled;
             isEnabled = command.data.enabled;
-            commandCausedGridChange = false;
+            let sendUpdateForSetEnabled = false;
             if (!isEnabled && jsStateArray) {
                 jsStateArray.fill(0);
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 stateHistoryChecksums.clear();
                 stateChecksumQueue = [];
-                commandCausedGridChange = true; // Grid content changed to all 0s
+                
+                sendUpdateForSetEnabled = true;
             } else if (isEnabled && !prevEnabled && jsStateArray) {
-                 // No direct grid change, but we want to send current state if it wasn't sending before
-                 commandCausedGridChange = true; // Treat as if grid content might be "new" to main thread
+                 lastSentChecksum = null; 
+                 sendUpdateForSetEnabled = true;
             }
-            updateSimulationInterval();
-            if (commandCausedGridChange) {
-                lastSentChecksum = calculateChecksum(jsStateArray);
+            updateSimulationInterval(); 
+            if (sendUpdateForSetEnabled) {
+                lastSentChecksum = calculateChecksum(jsStateArray); 
                 const activeAfterEnable = jsStateArray.reduce((s, c) => s + c, 0);
-                const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0;
+                const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0; 
                 let binEntropyAfterEnable, blkEntropyAfterEnable;
                 if (workerIsEntropySamplingEnabled) {
                     binEntropyAfterEnable = calculateBinaryEntropy(ratioAfterEnable);
@@ -571,17 +568,16 @@ self.onmessage = function(event) {
             }
             break;
 
-        // Commands that directly modify state and need immediate update handling
         case 'RESET_WORLD':
         case 'APPLY_BRUSH':
         case 'APPLY_SELECTIVE_BRUSH':
         case 'LOAD_STATE':
             commandQueue.push(command);
             const { needsStateUpdate: inducedUpdateOnGrid, rulesetChangedInQueue: rsChangedByGridCmd } = processCommandQueue();
-            if (inducedUpdateOnGrid) { // processCommandQueue already cleared checksums if needed
+            if (inducedUpdateOnGrid) {
                 lastSentChecksum = calculateChecksum(jsStateArray);
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
-                const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
+                const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0; 
                 let binEntropy, blkEntropy;
                 if (workerIsEntropySamplingEnabled) {
                     binEntropy = calculateBinaryEntropy(ratio);
@@ -591,17 +587,19 @@ self.onmessage = function(event) {
             }
             break;
 
-        // Commands that might not change grid state but queue for processing
+        case 'SET_HOVER_STATE':
+        case 'CLEAR_HOVER_STATE':
+        case 'SET_RULESET':
+            commandQueue.push(command);
+            processQueueAndForceTickForPausedState = true;
+            break;
+
         default:
             commandQueue.push(command);
-            // For non-grid-altering commands that queue, runTick will handle updates.
-            // Example: SET_RULESET (if grid doesn't change, but rules do, runTick will send)
-            // Example: SET_HOVER_STATE (processCommandQueue handles hover, runTick might send if grid also changes)
-            // If a command like SET_HOVER_STATE needs an immediate visual update for hover only,
-            // it should ideally send a specific hover-only message or be handled by processCommandQueue
-            // and runTick's logic for commandInducedUpdate.
-            // The current processCommandQueue handles SET_HOVER_STATE and returns needsStateUpdate=true for hover buffer.
-            // This will trigger sendStateUpdate in runTick, which is fine as it sends all buffers.
             break;
+    }
+
+    if (processQueueAndForceTickForPausedState && (!isRunning || !isEnabled)) {
+        runTick();
     }
 };
