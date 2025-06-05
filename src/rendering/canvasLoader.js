@@ -1,4 +1,4 @@
-// Canvas loader state
+
 let loaderCanvas = null;
 let canvas2DContext = null;
 let loaderAnimationId = null;
@@ -13,7 +13,7 @@ export function startCanvasLoader(mainCanvas) {
     
     isShowingLoader = true;
     
-    // Create a separate canvas element for the loader overlay
+    
     loaderCanvas = document.createElement('canvas');
     loaderCanvas.style.position = 'absolute';
     loaderCanvas.style.top = '0';
@@ -23,12 +23,11 @@ export function startCanvasLoader(mainCanvas) {
     loaderCanvas.style.pointerEvents = 'none';
     loaderCanvas.style.zIndex = '1000';
     
-    // Set canvas size to match main canvas
+    
     const rect = mainCanvas.getBoundingClientRect();
     loaderCanvas.width = rect.width;
     loaderCanvas.height = rect.height;
     
-    // Add the loader canvas to the main canvas's parent
     mainCanvas.parentElement.style.position = 'relative';
     mainCanvas.parentElement.appendChild(loaderCanvas);
     
@@ -41,25 +40,25 @@ export function startCanvasLoader(mainCanvas) {
         const width = loaderCanvas.width;
         const height = loaderCanvas.height;
         
-        // Clear canvas with dark background
-        ctx.fillStyle = '#1a1a1a'; // Match Config.BACKGROUND_COLOR
+        
+        ctx.fillStyle = '#1a1a1a'; 
         ctx.fillRect(0, 0, width, height);
         
-        // Calculate center and animation parameters
+        
         const centerX = width / 2;
         const centerY = height / 2;
-        const time = performance.now() * 0.002; // Slower rotation
+        const time = performance.now() * 0.002; 
         const radius = Math.min(width, height) * 0.1;
         const dotSize = Math.min(width, height) * 0.01;
         
-        // Draw rotating dots
+        
         const numDots = 8;
         for (let i = 0; i < numDots; i++) {
             const angle = (i / numDots) * Math.PI * 2 + time;
             const dotX = centerX + Math.cos(angle) * radius;
             const dotY = centerY + Math.sin(angle) * radius;
             
-            // Fade dots based on position for trailing effect
+            
             const alpha = 0.3 + 0.7 * (Math.sin(angle - time) + 1) / 2;
             
             ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
@@ -68,7 +67,7 @@ export function startCanvasLoader(mainCanvas) {
             ctx.fill();
         }
         
-        // Draw "Initializing..." text
+        
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.font = `${Math.min(width, height) * 0.03}px Arial`;
         ctx.textAlign = 'center';
@@ -90,7 +89,7 @@ export function stopCanvasLoader() {
         loaderAnimationId = null;
     }
     
-    // Remove the loader canvas element
+    
     if (loaderCanvas && loaderCanvas.parentElement) {
         loaderCanvas.parentElement.removeChild(loaderCanvas);
     }

@@ -29,26 +29,21 @@ document.addEventListener('popoutinteraction', (event) => {
     closeAllPopouts(event.detail.panel);
 });
 
-// Add click/touch outside to close popouts
+
 function handleClickOutside(event) {
-    // Check if any popout is currently open
     const hasOpenPopout = activePopouts.some(popout => !popout.isHidden());
-    
     if (!hasOpenPopout) return;
-    
-    // Check if the click/touch is inside any popout or trigger button
     const clickedInsidePopout = event.target.closest('.popout-panel');
     const clickedTriggerButton = activePopouts.some(popout => {
         return popout.triggerElement && popout.triggerElement.contains(event.target);
     });
     
-    // If clicked outside both popout and trigger button, close all popouts
     if (!clickedInsidePopout && !clickedTriggerButton) {
         closeAllPopouts();
     }
 }
 
-// Add listeners for both mouse and touch events
+
 document.addEventListener('click', handleClickOutside);
 document.addEventListener('touchend', handleClickOutside);
 
@@ -64,8 +59,6 @@ export function initUI(worldManagerInterface) {
         statFps: document.getElementById('stat-fps'),
         statActualTps: document.getElementById('stat-actual-tps'),
         statTargetTps: document.getElementById('stat-target-tps'),
-
-        
         playPauseButton: document.getElementById('playPauseButton'),
         speedControlButton: document.getElementById('speedControlButton'),
         brushToolButton: document.getElementById('brushToolButton'),
@@ -78,15 +71,11 @@ export function initUI(worldManagerInterface) {
         setupPanelButton: document.getElementById('setupPanelButton'), 
         analysisPanelButton: document.getElementById('analysisPanelButton'),
         rankPanelButton: document.getElementById('rankPanelButton'),
-
-        
         speedPopout: document.getElementById('speedPopout'),
         brushPopout: document.getElementById('brushPopout'),
         newRulesPopout: document.getElementById('newRulesPopout'),
         setHexPopout: document.getElementById('setHexPopout'),
         resetClearPopout: document.getElementById('resetClearPopout'),
-
-        
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
         generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
@@ -102,17 +91,11 @@ export function initUI(worldManagerInterface) {
         resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
         clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
         clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
-        
-        
         editorRulesetInput: document.getElementById('editorRulesetInput'),
-
-        
         rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
         ruleRankPanel: document.getElementById('ruleRankPanel'),
-
-        
         fileInput: document.getElementById('fileInput'), 
         canvas: document.getElementById('hexGridCanvas'), 
     };
@@ -129,17 +112,15 @@ export function initUI(worldManagerInterface) {
     _initPopoutControls();
     _setupToolbarButtonListeners();
     _setupStateListeners(); 
-    
     loadAndApplyUISettings(); 
     window.addEventListener('keydown', handleGlobalKeyDown); 
     setupUIEventListeners(); 
-
     updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     updateBrushSizeDisplay(worldManagerInterfaceRef.getCurrentBrushSize());
     
-    // Initialize target TPS display
+    
     if (uiElements?.statTargetTps) {
         uiElements.statTargetTps.textContent = String(worldManagerInterfaceRef.getCurrentSimulationSpeed());
     }
@@ -412,20 +393,20 @@ function handleGlobalKeyDown(event) {
         'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },
         'A': () => { closeAllPopouts(); analysisPanelInstance?.toggle(); },
         'C': () => {
-            // Clear All Worlds
+            
             EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' });
         },
         'R': () => {
-            // Reset All Worlds
+            
             EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
         },
         'G': () => {
-            // Generate new ruleset - open popout if closed, then click generate
+            
             if (popoutPanels.newRules && popoutPanels.newRules.isHidden()) {
                 closeAllPopouts();
                 popoutPanels.newRules.show();
             }
-            // Small delay to ensure popout is rendered before clicking button
+            
             setTimeout(() => {
                 uiElements.generateRulesetFromPopoutButton?.click();
             }, 10);
@@ -441,7 +422,7 @@ function handleGlobalKeyDown(event) {
         }
     };
 
-    // Handle Shift+R (Reset Selected) and Shift+C (Clear Selected)
+    
     if (event.shiftKey) {
         if (event.key.toUpperCase() === 'R') {
             EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
@@ -454,13 +435,13 @@ function handleGlobalKeyDown(event) {
             return;
         }
         
-        // Handle Shift+Numpad 1-9 (Enable/Disable World 1-9)
-        // Only process number keys, not the shift key itself
+        
+        
         if (event.key !== 'Shift' && event.code !== 'ShiftLeft' && event.code !== 'ShiftRight') {
-            // Check for both numpad and regular digit keys, and also event.key
+            
             const numpadMatch = event.code.match(/^Numpad(\d)$/);
             const digitMatch = event.code.match(/^Digit(\d)$/);
-            const keyMatch = event.key.match(/^(\d)$/); // Also check event.key
+            const keyMatch = event.key.match(/^(\d)$/); 
             
             let keyNum = null;
             if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
@@ -468,24 +449,24 @@ function handleGlobalKeyDown(event) {
             else if (keyMatch) keyNum = parseInt(keyMatch[1]);
             
             if (keyNum && keyNum >= 1 && keyNum <= 9) {
-                // Map numpad layout to world indices (upside down)
+                
                 const worldMapping = {
-                    1: 6, // bottom-left
-                    2: 7, // bottom-center  
-                    3: 8, // bottom-right
-                    4: 3, // middle-left
-                    5: 4, // middle-center
-                    6: 5, // middle-right
-                    7: 0, // top-left
-                    8: 1, // top-center
-                    9: 2  // top-right
+                    1: 6, 
+                    2: 7, 
+                    3: 8, 
+                    4: 3, 
+                    5: 4, 
+                    6: 5, 
+                    7: 0, 
+                    8: 1, 
+                    9: 2  
                 };
                 const worldIndex = worldMapping[keyNum];
                 
                 const currentSettings = worldManagerInterfaceRef.getWorldSettingsForUI();
                 if (currentSettings[worldIndex]) {
                     const currentEnabled = currentSettings[worldIndex].enabled;
-                    console.log(`World ${worldIndex} current state: ${currentEnabled}, toggling to: ${!currentEnabled}`); // Debug log
+                    console.log(`World ${worldIndex} current state: ${currentEnabled}, toggling to: ${!currentEnabled}`); 
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, {
                         worldIndex: worldIndex,
                         isEnabled: !currentEnabled
@@ -496,10 +477,10 @@ function handleGlobalKeyDown(event) {
             }
         }
     } else {
-        // Handle Numpad 1-9 (Select World 1-9)
+        
         const numpadMatch = event.code.match(/^Numpad(\d)$/);
         const digitMatch = event.code.match(/^Digit(\d)$/);
-        const keyMatch = event.key.match(/^(\d)$/); // Also check event.key
+        const keyMatch = event.key.match(/^(\d)$/); 
         
         let keyNum = null;
         if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
@@ -507,17 +488,17 @@ function handleGlobalKeyDown(event) {
         else if (keyMatch) keyNum = parseInt(keyMatch[1]);
         
         if (keyNum && keyNum >= 1 && keyNum <= 9) {
-            // Map numpad layout to world indices (upside down)
+            
             const worldMapping = {
-                1: 6, // bottom-left
-                2: 7, // bottom-center
-                3: 8, // bottom-right
-                4: 3, // middle-left
-                5: 4, // middle-center
-                6: 5, // middle-right
-                7: 0, // top-left
-                8: 1, // top-center
-                9: 2  // top-right
+                1: 6, 
+                2: 7, 
+                3: 8, 
+                4: 3, 
+                5: 4, 
+                6: 5, 
+                7: 0, 
+                8: 1, 
+                9: 2  
             };
             const worldIndex = worldMapping[keyNum];
             

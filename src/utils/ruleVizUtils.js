@@ -11,7 +11,7 @@
  * @returns {object} RGB values {r, g, b} in 0-1 range
  */
 function hsvToRgb(h, s, v) {
-    // Port of the GLSL hsv2rgb function
+    
     const K = [1.0, 2.0/3.0, 1.0/3.0, 3.0];
     const p = [
         Math.abs((h + K[0]) % 1.0 * 6.0 - K[3]),
@@ -33,7 +33,7 @@ function hsvToRgb(h, s, v) {
  * @returns {string} CSS color string
  */
 export function getRuleIndexColor(ruleIndex, state) {
-    const hueOffset = 0.1667; // Offset for yellow (60.0 / 360.0)
+    const hueOffset = 0.1667; 
     const calculatedHue = ruleIndex / 128.0;
     const hue = (calculatedHue + hueOffset) % 1.0;
     
@@ -48,7 +48,7 @@ export function getRuleIndexColor(ruleIndex, state) {
     
     const rgb = hsvToRgb(hue, saturation, value);
     
-    // Convert to 0-255 range and create CSS color string
+    
     const r = Math.round(rgb.r * 255);
     const g = Math.round(rgb.g * 255);
     const b = Math.round(rgb.b * 255);
@@ -93,11 +93,11 @@ export function createRuleVizElement({
             return `<div class="hexagon neighbor-hex neighbor-${n}" style="background-color: ${neighborColor};"></div>`;
         }).join('');
         
-    // Add the usage overlay if requested
+    
     if (showUsageOverlay && normalizedUsage > 0) {
         const usageOverlay = document.createElement('div');
         usageOverlay.className = 'rule-usage-overlay';
-        usageOverlay.style.opacity = normalizedUsage * 0.8; // Max 80% opacity
+        usageOverlay.style.opacity = normalizedUsage * 0.8; 
         viz.appendChild(usageOverlay);
     }
 

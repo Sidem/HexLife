@@ -9,7 +9,7 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 export class AnalysisPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface, uiManagerRef) {
-        // Call the BasePanel constructor with element, handle selector, and identifier
+        
         super(panelElement, 'h3', 'analysis');
 
         if (!worldManagerInterface) {
@@ -17,7 +17,7 @@ export class AnalysisPanel extends BasePanel {
             return;
         }
 
-        // this.panelElement is already set by the super constructor
+        
         this.worldManager = worldManagerInterface;
         this.uiManager = uiManagerRef;
         this.plugins = [];
@@ -79,7 +79,7 @@ export class AnalysisPanel extends BasePanel {
         if (this.uiElements.closeButton) {
             this.uiElements.closeButton.addEventListener('click', () => this.hide());
         }
-        // The onDragEnd callback is already set by BasePanel constructor
+        
     }
 
     _setupEventSubscriptions() {
@@ -135,5 +135,5 @@ export class AnalysisPanel extends BasePanel {
         super.destroy();
     }
 
-    // isHidden() is now inherited from DraggablePanel, so this method is removed
+    
 }

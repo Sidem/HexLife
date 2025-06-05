@@ -12,15 +12,15 @@ export class WorldProxy {
             tick: 0,
             activeCount: 0,
             ratio: 0,
-            binaryEntropy: 0, // Renamed for clarity
-            blockEntropy: 0,  // New: Block entropy
+            binaryEntropy: 0, 
+            blockEntropy: 0,  
             isEnabled: initialSettings.enabled,
             tps: 0,
             rulesetHex: initialSettings.rulesetHex || "0".repeat(32),
             ratioHistory: [],
             entropyHistory: [],
-            hexBlockEntropyHistory: [], // New: Block entropy history
-            ruleUsage: new Uint32Array(128) // New: Rule usage counters
+            hexBlockEntropyHistory: [], 
+            ruleUsage: new Uint32Array(128) 
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -67,7 +67,7 @@ export class WorldProxy {
                 this.lastTickCountForTPS = 0;
                 this.latestStats.ratioHistory = [];
                 this.latestStats.entropyHistory = [];
-                this.latestStats.hexBlockEntropyHistory = []; // New: Initialize block entropy history
+                this.latestStats.hexBlockEntropyHistory = []; 
                 this.onInitialized(this.worldIndex);
                 break;
             case 'STATE_UPDATE':
@@ -89,12 +89,12 @@ export class WorldProxy {
                     currentTPS = this.latestStats.tps;
                 }
 
-                // Update rule usage counters if provided
+                
                 if (data.ruleUsageCounters) {
                     this.latestStats.ruleUsage = new Uint32Array(data.ruleUsageCounters);
                 }
 
-                // Update history if enabled and data exists
+                
                 if (data.isEnabled && data.ratio !== undefined) {
                     this.latestStats.ratioHistory.push(data.ratio);
                     if (this.latestStats.ratioHistory.length > this.MAX_HISTORY_SIZE) {
@@ -107,7 +107,7 @@ export class WorldProxy {
                         this.latestStats.entropyHistory.shift();
                     }
                 }
-                if (data.isEnabled && data.blockEntropy !== undefined) { // New: Handle block entropy history
+                if (data.isEnabled && data.blockEntropy !== undefined) { 
                     this.latestStats.hexBlockEntropyHistory.push(data.blockEntropy);
                     if (this.latestStats.hexBlockEntropyHistory.length > this.MAX_HISTORY_SIZE) {
                         this.latestStats.hexBlockEntropyHistory.shift();
@@ -118,15 +118,15 @@ export class WorldProxy {
                     tick: data.tick,
                     activeCount: data.activeCount,
                     ratio: data.ratio,
-                    binaryEntropy: data.binaryEntropy, // Renamed for clarity
-                    blockEntropy: data.blockEntropy,   // New: Block entropy
+                    binaryEntropy: data.binaryEntropy, 
+                    blockEntropy: data.blockEntropy,   
                     isEnabled: data.isEnabled,
                     tps: currentTPS,
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
                     ratioHistory: this.latestStats.ratioHistory,
                     entropyHistory: this.latestStats.entropyHistory,
-                    hexBlockEntropyHistory: this.latestStats.hexBlockEntropyHistory, // New: Block entropy history
-                    ruleUsage: this.latestStats.ruleUsage // New: Rule usage counters
+                    hexBlockEntropyHistory: this.latestStats.hexBlockEntropyHistory, 
+                    ruleUsage: this.latestStats.ruleUsage 
                 };
 
                 this.lastTickCountForTPS = data.tick;
@@ -166,8 +166,8 @@ export class WorldProxy {
         this.latestStats.tps = 0;
         this.latestStats.ratioHistory = [];
         this.latestStats.entropyHistory = [];
-        this.latestStats.hexBlockEntropyHistory = []; // New: Clear block entropy history
-        this.latestStats.ruleUsage.fill(0); // New: Clear rule usage counters
+        this.latestStats.hexBlockEntropyHistory = []; 
+        this.latestStats.ruleUsage.fill(0); 
 
         let commandPayload;
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {

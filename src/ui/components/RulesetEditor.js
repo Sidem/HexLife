@@ -4,14 +4,14 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesetEditor extends BasePanel {
     constructor(panelElement, worldManagerInterface) { 
-        // Call the BasePanel constructor with element, handle selector, and identifier
+        
         super(panelElement, 'h3', 'ruleset');
 
         if (!worldManagerInterface) {
             console.error('RulesetEditor: worldManagerInterface is null.');
             return;
         }
-        // this.panelElement is already set by the super constructor
+        
         this.worldManager = worldManagerInterface;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
@@ -29,8 +29,6 @@ export class RulesetEditor extends BasePanel {
         this._loadEditorSettings();
         this._setupInternalListeners();
         if (!this.isHidden()) this.refreshViews();
-        
-        // Override the default onDragEnd to also save editor settings
         this.onDragEnd = () => {
             this._savePanelState();
             this._saveEditorSettings();
@@ -45,7 +43,7 @@ export class RulesetEditor extends BasePanel {
      * @returns {{r: number, g: number, b: number}} RGB values (0-1)
      */
     _hsvToRgb(h, s, v) {
-        // Port of the GLSL hsv2rgb function
+        
         const K = [1.0, 2.0/3.0, 1.0/3.0, 3.0];
         const p = [
             Math.abs((h + K[0]) % 1.0 * 6.0 - K[3]),
@@ -67,7 +65,7 @@ export class RulesetEditor extends BasePanel {
      * @returns {string} CSS color string
      */
     _getRuleIndexColor(ruleIndex, state) {
-        const hueOffset = 0.1667; // Offset for yellow (60.0 / 360.0)
+        const hueOffset = 0.1667; 
         const calculatedHue = ruleIndex / 128.0;
         const hue = (calculatedHue + hueOffset) % 1.0;
         
@@ -82,7 +80,7 @@ export class RulesetEditor extends BasePanel {
         
         const rgb = this._hsvToRgb(hue, saturation, value);
         
-        // Convert to 0-255 range and create CSS color string
+        
         const r = Math.round(rgb.r * 255);
         const g = Math.round(rgb.g * 255);
         const b = Math.round(rgb.b * 255);
@@ -263,7 +261,7 @@ export class RulesetEditor extends BasePanel {
             viz.title = `Rule ${i}: Center ${centerState}, Neighbors ${neighborMask.toString(2).padStart(6, '0')} -> Output ${outputState}`;
             viz.dataset.ruleIndex = i;
             
-            // Calculate colors based on rule index
+            
             const centerColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
             const outputColor = this._getRuleIndexColor(i, outputState);
             

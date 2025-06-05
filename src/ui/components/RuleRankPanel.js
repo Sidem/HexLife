@@ -4,7 +4,7 @@ import { createRuleVizElement, getRuleIndexColor } from '../../utils/ruleVizUtil
 
 export class RuleRankPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface) {
-        // Call the BasePanel constructor with element, handle selector, and identifier
+        
         super(panelElement, 'h3', 'ruleRank');
 
         this.worldManager = worldManagerInterface;
@@ -13,13 +13,10 @@ export class RuleRankPanel extends BasePanel {
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };
         
-        // Throttling and caching for performance
         this.lastUpdateTime = 0;
-        this.updateThrottleMs = 500; // Only update every 500ms max
+        this.updateThrottleMs = 500; 
         this.lastRuleUsageHash = null;
         this.pendingUpdate = false;
-        
-        // DOM element pooling for efficient updates
         this.ruleItemElements = [];
         this.headerElement = null;
         this.lastDisplayedRuleCount = 0;
@@ -30,7 +27,7 @@ export class RuleRankPanel extends BasePanel {
 
     _setupInternalListeners() {
         this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        // The onDragEnd callback is already set by BasePanel constructor
+        
     }
 
     _createRuleItemElement() {
@@ -67,12 +64,12 @@ export class RuleRankPanel extends BasePanel {
         listItem.appendChild(vizContainer);
         listItem.appendChild(usageEl);
 
-        // Store references for easy access
+        
         listItem._usageBar = usageBar;
         listItem._rankEl = rankEl;
         listItem._vizContainer = vizContainer;
         listItem._usageEl = usageEl;
-        listItem._currentRuleIndex = -1; // Track what rule this element is showing
+        listItem._currentRuleIndex = -1; 
 
         return listItem;
     }
@@ -80,22 +77,15 @@ export class RuleRankPanel extends BasePanel {
     _updateRuleVizElement(vizElement, ruleIndex, outputState, usagePercent, normalizedUsage, rawUsageCount, showUsageOverlay = false) {
         const centerState = (ruleIndex >> 6) & 1;
         const neighborMask = ruleIndex & 0x3F;
-
-        // Update title and dataset
         vizElement.title = `Rule ${ruleIndex}: Center ${centerState}, N ${neighborMask.toString(2).padStart(6, '0')} -> Out ${outputState}\nUsage: ${usagePercent.toFixed(2)}% (${rawUsageCount} calls)`;
         vizElement.dataset.ruleIndex = ruleIndex;
-
-        // Update center hexagon colors
         const centerHex = vizElement.querySelector('.center-hex');
         const innerHex = vizElement.querySelector('.inner-hex');
-        
         const centerColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
         const outputColor = getRuleIndexColor(ruleIndex, outputState);
-        
         centerHex.style.backgroundColor = centerColor;
         innerHex.style.backgroundColor = outputColor;
 
-        // Update neighbor hexagons
         for (let n = 0; n < 6; n++) {
             const neighborHex = vizElement.querySelector(`.neighbor-${n}`);
             const neighborState = (neighborMask >> n) & 1;
@@ -103,7 +93,6 @@ export class RuleRankPanel extends BasePanel {
             neighborHex.style.backgroundColor = neighborColor;
         }
 
-        // Handle usage overlay
         let usageOverlay = vizElement.querySelector('.rule-usage-overlay');
         if (showUsageOverlay && normalizedUsage > 0) {
             if (!usageOverlay) {
@@ -111,23 +100,16 @@ export class RuleRankPanel extends BasePanel {
                 usageOverlay.className = 'rule-usage-overlay';
                 vizElement.appendChild(usageOverlay);
             }
-            usageOverlay.style.opacity = normalizedUsage * 0.8; // Max 80% opacity
+            usageOverlay.style.opacity = normalizedUsage * 0.8; 
         } else if (usageOverlay) {
             usageOverlay.remove();
         }
     }
 
     _updateRuleItemElement(element, rule, rank, usagePercent, normalizedUsage, ruleset, totalInvocations) {
-        // Update rank
         element._rankEl.textContent = `#${rank + 1}`;
-        
-        // Update usage bar width
         element._usageBar.style.width = `${usagePercent}%`;
-        
-        // Create or update visualization element
         let vizEl = element._vizContainer.firstChild;
-        
-        // If we don't have a viz element or it's for a different rule, create a new one
         if (!vizEl || element._currentRuleIndex !== rule.index) {
             if (vizEl) {
                 element._vizContainer.removeChild(vizEl);
@@ -146,7 +128,7 @@ export class RuleRankPanel extends BasePanel {
             element._vizContainer.appendChild(vizEl);
             element._currentRuleIndex = rule.index;
         } else {
-            // Update existing viz element
+            
             this._updateRuleVizElement(
                 vizEl,
                 rule.index,
@@ -157,19 +139,14 @@ export class RuleRankPanel extends BasePanel {
                 false
             );
         }
-        
-        // Update usage text
         element._usageEl.innerHTML = `<div class="usage-percent">${usagePercent.toFixed(2)}%</div><div class="usage-count">${rule.count} calls</div>`;
     }
 
-    // Throttled version of refreshViews
+    
     refreshViews() {
         if (this.isHidden() || !this.worldManager) return;
-
         const now = Date.now();
         const timeSinceLastUpdate = now - this.lastUpdateTime;
-
-        // Throttle updates to avoid excessive DOM manipulation
         if (timeSinceLastUpdate < this.updateThrottleMs) {
             if (!this.pendingUpdate) {
                 this.pendingUpdate = true;
@@ -198,13 +175,11 @@ export class RuleRankPanel extends BasePanel {
             this.headerElement = null;
             return;
         }
-
-        // Create a simple hash of the rule usage data to detect changes
         const ruleUsageHash = ruleUsage.reduce((hash, count, index) => {
             return hash + `${index}:${count};`;
         }, '');
 
-        // Only update if the data has actually changed
+        
         if (ruleUsageHash === this.lastRuleUsageHash) {
             return;
         }
@@ -231,22 +206,22 @@ export class RuleRankPanel extends BasePanel {
         rankedRules.sort((a, b) => b.count - a.count);
         maxUsage = rankedRules[0].count;
 
-        // Display top 20 or all rules with usage > 0
+        
         const topRules = rankedRules.filter(r => r.count > 0).slice(0, 20);
 
-        // Create header if it doesn't exist
+        
         if (!this.headerElement) {
             this.headerElement = document.createElement('div');
             this.headerElement.className = 'rank-list-header';
             this.headerElement.innerHTML = '<span>Rank</span><span>Rule Visualization</span><span>Usage</span>';
         }
 
-        // Ensure we have enough rule item elements
+        
         while (this.ruleItemElements.length < topRules.length) {
             this.ruleItemElements.push(this._createRuleItemElement());
         }
 
-        // Update existing elements
+        
         topRules.forEach((rule, rank) => {
             const usagePercent = (rule.count / totalInvocations) * 100;
             const normalizedUsage = (maxUsage > 0) ? (rule.count / maxUsage) : 0;
@@ -262,7 +237,7 @@ export class RuleRankPanel extends BasePanel {
             );
         });
 
-        // Only rebuild DOM if the number of displayed rules changed
+        
         if (this.lastDisplayedRuleCount !== topRules.length) {
             this.uiElements.contentArea.innerHTML = '';
             this.uiElements.contentArea.appendChild(this.headerElement);

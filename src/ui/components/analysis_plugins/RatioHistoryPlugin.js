@@ -21,7 +21,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
 
     onDataUpdate(data) {
         if (data && data.type === 'worldStats' && data.payload && data.payload.ratioHistory) {
-            // Use data directly from payload if available
+            
             this.currentRatioHistory = [...data.payload.ratioHistory];
             if (this.currentRatioHistory.length > 0) {
                 this.lastFitnessValue = this.currentRatioHistory[this.currentRatioHistory.length - 1];
@@ -29,7 +29,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
                 this.lastFitnessValue = 0;
             }
         } else if (data && data.type === 'worldStats' && data.payload) {
-            // Fallback: retrieve from simulationInterface
+            
             this.currentRatioHistory = this.simulationInterface.getSelectedWorldRatioHistory() || [];
             if (this.currentRatioHistory.length > 0) {
                 this.lastFitnessValue = this.currentRatioHistory[this.currentRatioHistory.length - 1];
@@ -37,7 +37,7 @@ export class RatioHistoryPlugin extends IAnalysisPlugin {
                 this.lastFitnessValue = 0;
             }
         } else if (data && data.type === 'allWorldsReset') { 
-            // When allWorldsReset, payload might be initial stats or could be empty history
+            
             this.currentRatioHistory = (data.payload && data.payload.ratioHistory) ? [...data.payload.ratioHistory] : [];
             this.lastFitnessValue = this.currentRatioHistory.length > 0 ? this.currentRatioHistory[this.currentRatioHistory.length - 1] : 0;
         }

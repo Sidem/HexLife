@@ -11,21 +11,16 @@ let worldManager;
 let isInitialized = false;
 let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
-
 let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
-
-// Mouse drawing state
 let isMouseDrawing = false;
 let lastDrawnCellIndex = null;
-let strokeAffectedCells = new Set(); // Track cells affected by current stroke
+let strokeAffectedCells = new Set(); 
 let wasSimulationRunningBeforeStroke = false;
-let justFinishedDrawing = false; // Prevent click after drawing
-let initialWorldState = null; // Store initial cell states when stroke begins
-let cellsShouldBeToggled = new Set(); // Track which cells should be in toggled state
-
-// Touch tracking state
+let justFinishedDrawing = false; 
+let initialWorldState = null; 
+let cellsShouldBeToggled = new Set(); 
 let touchStartX = null;
 let touchStartY = null;
 let hasTouchMoved = false;
@@ -39,7 +34,7 @@ async function initialize() {
         return;
     }
 
-    // Start the loader immediately
+    
     CanvasLoader.startCanvasLoader(canvas);
 
     gl = await Renderer.initRenderer(canvas);
@@ -65,7 +60,6 @@ async function initialize() {
         getSymmetryData: worldManager.getSymmetryData,
         rulesetToHex: worldManager.rulesetToHex,
         hexToRuleset: worldManager.hexToRuleset,
-        
         getSelectedWorldRatioHistory: () => { 
             const stats = worldManager.getSelectedWorldStats();
             return stats?.ratioHistory || [];
@@ -108,8 +102,6 @@ function setupCanvasListeners(canvas) {
     canvas.addEventListener('mouseup', handleCanvasMouseUp);
     canvas.addEventListener('mouseout', handleCanvasMouseOut);
     canvas.addEventListener('wheel', handleCanvasMouseWheel, { passive: false });
-    
-    // Add touch event handlers for mobile support
     canvas.addEventListener('touchstart', handleCanvasTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleCanvasTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleCanvasTouchEnd, { passive: false });
@@ -119,7 +111,7 @@ function setupCanvasListeners(canvas) {
 function handleCanvasClick(event) {
     if (!isInitialized || !worldManager) return;
     
-    // Prevent click if we just finished drawing
+    
     if (justFinishedDrawing) {
         justFinishedDrawing = false;
         return;
@@ -133,7 +125,7 @@ function handleCanvasClick(event) {
             EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
         }
 
-        // Only apply brush if not in continuous drawing mode (to avoid double-clicking)
+        
         if (!isMouseDrawing && viewType === 'selected' && col !== null && row !== null) {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, {
                 worldIndex: worldIndexAtCursor,
@@ -147,24 +139,21 @@ function handleCanvasClick(event) {
 function handleCanvasMouseDown(event) {
     if (!isInitialized || !worldManager) return;
     
-    // Only start drawing with left mouse button
+    
     if (event.button !== 0) return;
     
     const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
     
     if (worldIndexAtCursor !== null && viewType === 'selected' && col !== null && row !== null) {
         isMouseDrawing = true;
-        strokeAffectedCells.clear(); // Clear previous stroke data
-        cellsShouldBeToggled.clear(); // Clear cells that should be toggled
+        strokeAffectedCells.clear(); 
+        cellsShouldBeToggled.clear(); 
         lastDrawnCellIndex = row * Config.GRID_COLS + col;
-        
-        // Pause simulation if it's running
         wasSimulationRunningBeforeStroke = !worldManager.isSimulationPaused();
         if (wasSimulationRunningBeforeStroke) {
             EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
         }
         
-        // Get initial world state from the selected world
         const selectedWorldData = worldManager.getWorldsRenderData()[worldIndexAtCursor];
         if (selectedWorldData && selectedWorldData.jsStateArray) {
             initialWorldState = new Uint8Array(selectedWorldData.jsStateArray);
@@ -172,14 +161,13 @@ function handleCanvasMouseDown(event) {
             initialWorldState = null;
         }
         
-        // Track all cells in brush area as should be toggled
         const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
         brushCells.forEach(cellIndex => {
             cellsShouldBeToggled.add(cellIndex);
             strokeAffectedCells.add(cellIndex);
         });
         
-        // Use selective brush to only toggle the specific cells
+        
         EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
             worldIndex: worldIndexAtCursor,
             cellIndices: brushCells
@@ -191,21 +179,13 @@ function handleCanvasMouseDown(event) {
 
 function handleCanvasMouseUp(event) {
     if (!isInitialized || !worldManager) return;
-    
-    // Only handle left mouse button
     if (event.button !== 0) return;
-    
-    // Set flag to prevent click event if we were drawing
     if (isMouseDrawing) {
         justFinishedDrawing = true;
-        // Clear the flag after a short delay to allow normal clicks
         setTimeout(() => { justFinishedDrawing = false; }, 50);
     }
-    
     isMouseDrawing = false;
     lastDrawnCellIndex = null;
-    
-    // Unpause simulation if it was running before the stroke
     if (wasSimulationRunningBeforeStroke) {
         EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
         wasSimulationRunningBeforeStroke = false;
@@ -216,11 +196,10 @@ function handleCanvasMouseUp(event) {
     initialWorldState = null;
 }
 
-// Function to find hexagons within brush radius (similar to WorldManager's method)
+
 function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
     const affected = new Set();
     if (startCol === null || startRow === null) return Array.from(affected);
-
     const q = [[startCol, startRow, 0]];
     const visited = new Map([[`${startCol},${startRow}`, 0]]);
     const startIndex = startRow * Config.GRID_COLS + startCol;
@@ -229,14 +208,12 @@ function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
     while (q.length > 0) {
         const [cc, cr, cd] = q.shift();
         if (cd >= maxDistance) continue;
-
         const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
         for (const [dx, dy] of dirs) {
             const nc = cc + dx;
             const nr = cr + dy;
             const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
             const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
-
             if (!visited.has(`${wc},${wr}`)) {
                 const ni = wr * Config.GRID_COLS + wc;
                 if (ni !== undefined && ni >= 0 && ni < Config.NUM_CELLS) {
@@ -252,14 +229,11 @@ function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
 
 function handleCanvasMouseMove(event) {
     if (!isInitialized || !worldManager || !gl || !gl.canvas) return;
-
     const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
     const selectedWorldIdx = worldManager.getSelectedWorldIndex();
-    
     let worldThatActuallyReceivedHoverSet = -1;
-
     if (isMouseDrawing && worldIndexAtCursor === selectedWorldIdx && viewType === 'selected' && col !== null && row !== null) {
-        const currentCellIndex = row * Config.GRID_COLS + col; //
+        const currentCellIndex = row * Config.GRID_COLS + col; 
         if (currentCellIndex !== lastDrawnCellIndex) {
             lastDrawnCellIndex = currentCellIndex;
             const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
@@ -269,7 +243,7 @@ function handleCanvasMouseMove(event) {
                     cellsShouldBeToggled.add(cellIndex);
                     strokeAffectedCells.add(cellIndex);
                 });
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { //
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { 
                     worldIndex: selectedWorldIdx,
                     cellIndices: newCellsToToggle
                 });
@@ -281,7 +255,7 @@ function handleCanvasMouseMove(event) {
         viewType === 'selected' &&
         col !== null && row !== null) {
 
-        EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { //
+        EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { 
             worldIndex: selectedWorldIdx,
             col: col,
             row: row,
@@ -289,9 +263,9 @@ function handleCanvasMouseMove(event) {
         worldThatActuallyReceivedHoverSet = selectedWorldIdx;
     }
 
-    for (let i = 0; i < Config.NUM_WORLDS; i++) { //
+    for (let i = 0; i < Config.NUM_WORLDS; i++) { 
         if (i !== worldThatActuallyReceivedHoverSet) {
-            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i }); //
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i }); 
         }
     }
 }
@@ -303,15 +277,15 @@ function handleCanvasMouseOut(event) {
         isMouseDrawing = false;
         lastDrawnCellIndex = null;
         if (wasSimulationRunningBeforeStroke) {
-            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE); //
+            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE); 
             wasSimulationRunningBeforeStroke = false;
         }
         strokeAffectedCells.clear();
         cellsShouldBeToggled.clear();
         initialWorldState = null;
     }
-    for (let i = 0; i < Config.NUM_WORLDS; i++) { //
-        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i }); //
+    for (let i = 0; i < Config.NUM_WORLDS; i++) { 
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: i }); 
     }
 }
 
@@ -338,15 +312,12 @@ function getCoordsFromMouseEvent(event) {
     const rect = gl.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
-
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
     const isLandscape = canvasWidth >= canvasHeight;
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
-
     if (isLandscape) {
         selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
         selectedViewHeight = canvasHeight - padding * 2;
@@ -400,7 +371,6 @@ function getCoordsFromMouseEvent(event) {
         const c_map = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + c_map * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing);
-
         if (mouseX >= miniX && mouseX < miniX + miniMapW &&
             mouseY >= miniY && mouseY < miniY + miniMapH) {
             const texCoordX = (mouseX - miniX) / miniMapW;
@@ -434,18 +404,13 @@ function textureCoordsToGridCoords(texX, texY) {
         for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
             const c = Math.round(estimatedColRough + cOffset);
             const r = Math.round(estimatedRowRough + rOffset);
-
             if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
-
             const center = Utils.gridToPixelCoords(c, r, textureHexSize, startX, startY);
             const dx = pixelX - center.x;
             const dy = pixelY - center.y;
             const distSq = dx * dx + dy * dy;
 
             if (distSq < minDistSq) {
-                 
-                 
-                 
                 if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
                     minDistSq = distSq;
                     closestCol = c;
@@ -458,13 +423,11 @@ function textureCoordsToGridCoords(texX, texY) {
 }
 
 function handleResize() {
-    // Handle Canvas 2D loader resize if active
     const mainCanvas = document.getElementById('hexGridCanvas');
     if (mainCanvas) {
         CanvasLoader.handleLoaderResize(mainCanvas);
     }
     
-    // Handle WebGL renderer resize if initialized
     if (isInitialized && gl) {
         Renderer.resizeRenderer();
     }
@@ -491,19 +454,15 @@ function renderLoop(timestamp) {
         requestAnimationFrame(renderLoop);
         return;
     }
-
     const timeDelta = (timestamp - lastTimestamp) / 1000.0;
     lastTimestamp = timestamp;
-
     const allWorldsData = worldManager.getWorldsRenderData();
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
-    
-    // Stop the Canvas 2D loader once all workers are ready
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
     }
     
-    // Only start WebGL rendering after workers are initialized
+    
     if (areAllWorkersInitialized) {
         Renderer.renderFrameOrLoader(allWorldsData, worldManager.getSelectedWorldIndex(), areAllWorkersInitialized);
     }
@@ -513,7 +472,6 @@ function renderLoop(timestamp) {
         actualFps = frameCount;
         frameCount = 0;
         lastFpsUpdateTime = timestamp;
-
         const selectedStats = worldManager.getSelectedWorldStats();
         const targetTps = worldManager.getCurrentSimulationSpeed();
         EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
@@ -522,31 +480,23 @@ function renderLoop(timestamp) {
     requestAnimationFrame(renderLoop);
 }
 
-// Touch event handlers that translate to mouse events
+
 function handleCanvasTouchStart(event) {
-    event.preventDefault(); // Prevent scrolling and default touch behavior
+    event.preventDefault(); 
     
     if (event.touches.length === 1) {
         const touch = event.touches[0];
-        
-        // Track touch start position and time
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
         touchStartTime = Date.now();
         hasTouchMoved = false;
-        
-        // Don't start drawing immediately - wait to see if it's a tap or drag
-        // We'll handle this in touchmove or touchend
     }
 }
 
 function handleCanvasTouchMove(event) {
-    event.preventDefault(); // Prevent scrolling
-    
+    event.preventDefault(); 
     if (event.touches.length === 1) {
         const touch = event.touches[0];
-        
-        // Check if touch has moved significantly (more than 5 pixels)
         if (touchStartX !== null && touchStartY !== null) {
             const deltaX = Math.abs(touch.clientX - touchStartX);
             const deltaY = Math.abs(touch.clientY - touchStartY);
@@ -554,7 +504,7 @@ function handleCanvasTouchMove(event) {
             if (deltaX > 5 || deltaY > 5) {
                 hasTouchMoved = true;
                 
-                // Start drawing mode if not already started
+                
                 if (!isMouseDrawing) {
                     const startMouseEvent = createMouseEventFromTouch({
                         clientX: touchStartX,
@@ -563,8 +513,6 @@ function handleCanvasTouchMove(event) {
                     }, 'mousedown');
                     handleCanvasMouseDown(startMouseEvent);
                 }
-                
-                // Continue with drag
                 const mouseEvent = createMouseEventFromTouch(touch, 'mousemove');
                 handleCanvasMouseMove(mouseEvent);
             }
@@ -574,23 +522,16 @@ function handleCanvasTouchMove(event) {
 
 function handleCanvasTouchEnd(event) {
     event.preventDefault();
-    
-    // Create a mouse event from the last touch position
     if (event.changedTouches.length === 1) {
         const touch = event.changedTouches[0];
         const touchDuration = Date.now() - (touchStartTime || 0);
-        
         if (hasTouchMoved) {
-            // This was a drag operation - end the drawing
             const mouseEvent = createMouseEventFromTouch(touch, 'mouseup');
             handleCanvasMouseUp(mouseEvent);
         } else {
-            // This was a tap (no significant movement) - treat as click
             const clickEvent = createMouseEventFromTouch(touch, 'click');
             handleCanvasClick(clickEvent);
         }
-        
-        // Reset touch tracking
         touchStartX = null;
         touchStartY = null;
         hasTouchMoved = false;
@@ -601,7 +542,7 @@ function handleCanvasTouchEnd(event) {
 function createMouseEventFromTouch(touch, type) {
     return {
         type: type,
-        button: 0, // Left button
+        button: 0, 
         clientX: touch.clientX,
         clientY: touch.clientY,
         target: touch.target,
