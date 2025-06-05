@@ -1,3 +1,5 @@
+// HexLife/src/core/WorldWorker.js
+
 import * as Config from './config.js';
 
 let worldIndex = -1;
@@ -7,54 +9,59 @@ let jsNextStateArray = null;
 let jsRuleIndexArray = null;
 let jsNextRuleIndexArray = null;
 let jsHoverStateArray = null;
-let ruleset = null; 
+let ruleset = null;
 let commandQueue = [];
 let isRunning = false;
 let isEnabled = true;
 let tickIntervalId = null;
-let currentSpeedTarget = Config.DEFAULT_SPEED; 
+let currentSpeedTarget = Config.DEFAULT_SPEED;
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
-// Add rule usage counter
 let ruleUsageCounters = null;
 
-// History arrays for analysis
 let ratioHistory = [];
 let entropyHistory = [];
-let hexBlockEntropyHistory = []; // New: History for hexagonal block entropy
+let hexBlockEntropyHistory = [];
 const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 
-// Worker-specific entropy sampling settings
 let workerIsEntropySamplingEnabled = false;
-let workerEntropySampleRate = 10; // Default, will be overwritten by INIT
+let workerEntropySampleRate = 10;
 
 const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
 const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
+
+// Optimization: State change detection
+let lastSentChecksum = null; // Checksum of the last state sent to the main thread
+let stateHistoryChecksums = new Set(); // For internal cycle detection awareness
+let stateChecksumQueue = []; // Manages the window for stateHistoryChecksums
+
+/**
+ * Calculates a simple checksum for a Uint8Array.
+ * @param {Uint8Array} arr The array to process.
+ * @returns {number} A 32-bit integer checksum.
+ */
+function calculateChecksum(arr) {
+    if (!arr) return 0; // Should not happen with Uint8Array, but good practice
+    let checksum = 0;
+    for (let i = 0; i < arr.length; i++) {
+        checksum = (checksum * 31 + arr[i]) | 0; // Keep it a 32-bit integer
+    }
+    return checksum;
+}
 
 function rulesetToHex(rulesetArray) {
     if (!rulesetArray || rulesetArray.length !== 128) return "Error";
     let bin = ""; for (let i = 0; i < 128; i++) bin += rulesetArray[i];
     try { return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); }
-    catch (e) { return "Error"; } 
+    catch (e) { return "Error"; }
 }
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
-/**
- * Calculates the block entropy for 7-cell hexagonal patterns.
- * A block consists of a center cell and its 6 immediate neighbors.
- * The pattern is a 7-bit number (0-127).
- * @param {Uint8Array} currentStateArray - The array of current cell states.
- * @param {object} config - The worker's configuration (GRID_ROWS, GRID_COLS, NUM_CELLS).
- * @param {Array<Array<number>>} N_DIRS_ODD - Neighbor directions for odd columns.
- * @param {Array<Array<number>>} N_DIRS_EVEN - Neighbor directions for even columns.
- * @returns {number} The calculated block entropy. Max entropy is log2(128) = 7.
- */
 function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_EVEN) {
     if (!currentStateArray || !config || !config.NUM_CELLS || config.NUM_CELLS === 0) {
         return 0;
     }
-
     const blockCounts = new Map();
     let totalBlocks = 0;
     const numCols = config.GRID_COLS;
@@ -65,10 +72,8 @@ function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_
         const cCol = i % numCols;
         const cRow = Math.floor(i / numCols);
         const cState = currentStateArray[i];
-
         let neighborMask = 0;
         const dirs = (cCol % 2 !== 0) ? N_DIRS_ODD : N_DIRS_EVEN;
-
         for (let nOrder = 0; nOrder < 6; nOrder++) {
             const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
             const nRow = (cRow + dirs[nOrder][1] + numRows) % numRows;
@@ -76,15 +81,10 @@ function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_
                 neighborMask |= (1 << nOrder);
             }
         }
-
-        const blockPattern = (cState << 6) | neighborMask; // 7-bit pattern
+        const blockPattern = (cState << 6) | neighborMask;
         blockCounts.set(blockPattern, (blockCounts.get(blockPattern) || 0) + 1);
     }
-
-    if (totalBlocks === 0) {
-        return 0;
-    }
-
+    if (totalBlocks === 0) return 0;
     let entropy = 0;
     for (const count of blockCounts.values()) {
         const probability = count / totalBlocks;
@@ -92,7 +92,6 @@ function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_
             entropy -= probability * Math.log2(probability);
         }
     }
-
     return entropy / 7.0;
 }
 
@@ -106,7 +105,6 @@ function applyBrushLogic(col, row, brushSize) {
     if (startIndex !== undefined && startIndex >=0 && startIndex < workerConfig.NUM_CELLS) {
         affectedIndicesInBrush.add(startIndex);
     }
-
     while(q.length > 0) {
         const [cc, cr, cd] = q.shift();
         if (cd >= brushSize) continue;
@@ -116,7 +114,6 @@ function applyBrushLogic(col, row, brushSize) {
             const nr = cr + dy;
             const wc = (nc % workerConfig.GRID_COLS + workerConfig.GRID_COLS) % workerConfig.GRID_COLS;
             const wr = (nr % workerConfig.GRID_ROWS + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS;
-
             if (!visited.has(`${wc},${wr}`)) {
                 const ni = wr * workerConfig.GRID_COLS + wc;
                 if (ni !== undefined && ni >=0 && ni < workerConfig.NUM_CELLS) {
@@ -140,7 +137,6 @@ function applyBrushLogic(col, row, brushSize) {
 function applySelectiveBrushLogic(cellIndices) {
     if (!jsStateArray || !cellIndices || cellIndices.length === 0) return false;
     let changed = false;
-    
     for (const idx of cellIndices) {
         if (idx >= 0 && idx < workerConfig.NUM_CELLS) {
             jsStateArray[idx] = 1 - jsStateArray[idx];
@@ -167,44 +163,39 @@ function setHoverStateLogic(hoverAffectedIndicesSet) {
 function processCommandQueue() {
     let needsStateUpdate = false;
     let rulesetChangedInQueue = false;
-    let activeCount = 0; 
+    let activeCount = 0;
 
     for (const command of commandQueue) {
         switch (command.type) {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
-                needsStateUpdate = true;
+                needsStateUpdate = true; // Ruleset change implies potential visual change even if grid is same
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
                 ratioHistory = [];
                 entropyHistory = [];
-                hexBlockEntropyHistory = []; // New: Clear block entropy history
+                hexBlockEntropyHistory = [];
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
                 activeCount = 0;
-                // Reset rule usage counters
                 if (ruleUsageCounters) ruleUsageCounters.fill(0);
-                
                 if (jsStateArray) {
                     if (isClearOp) {
                         jsStateArray.fill(density);
                         activeCount = (density === 1) ? workerConfig.NUM_CELLS : 0;
                     } else {
-                        
-                        if (density === 0 || density === 1) { 
+                        if (density === 0 || density === 1) {
                             jsStateArray.fill(density);
-                            
                             const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + (workerConfig.GRID_COLS / 2));
                             if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
                                 jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
                             }
-                            
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                                 if (jsStateArray[i] === 1) activeCount++;
                             }
-                        } else { 
+                        } else {
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                                 jsStateArray[i] = Math.random() < density ? 1 : 0;
                                 if (jsStateArray[i] === 1) activeCount++;
@@ -212,64 +203,82 @@ function processCommandQueue() {
                         }
                     }
                 }
-                
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
-                if(jsNextStateArray) jsNextStateArray.fill(0); 
-                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0); 
-                if(jsHoverStateArray) jsHoverStateArray.fill(0); 
+                if(jsNextStateArray) jsNextStateArray.fill(0);
+                if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
+                if(jsHoverStateArray) jsHoverStateArray.fill(0);
+                
+                // Reset checksum tracking
+                stateHistoryChecksums.clear();
+                stateChecksumQueue = [];
+                lastSentChecksum = null; // Force next update
                 needsStateUpdate = true;
                 break;
             case 'APPLY_BRUSH':
                 if (applyBrushLogic(command.data.col, command.data.row, command.data.brushSize)) {
+                    stateHistoryChecksums.clear();
+                    stateChecksumQueue = [];
+                    lastSentChecksum = null;
                     needsStateUpdate = true;
                 }
                 break;
             case 'APPLY_SELECTIVE_BRUSH':
                 if (applySelectiveBrushLogic(command.data.cellIndices)) {
+                    stateHistoryChecksums.clear();
+                    stateChecksumQueue = [];
+                    lastSentChecksum = null;
                     needsStateUpdate = true;
                 }
                 break;
             case 'SET_HOVER_STATE':
                 const hoverIndicesSet = new Set(command.data.hoverAffectedIndices);
                 if (setHoverStateLogic(hoverIndicesSet)) {
-                    needsStateUpdate = true;
+                    needsStateUpdate = true; // This only affects hover buffer, not grid state checksum
                 }
                 break;
             case 'CLEAR_HOVER_STATE':
                 if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
                     jsHoverStateArray.fill(0);
-                    needsStateUpdate = true;
+                    needsStateUpdate = true; // Affects hover buffer
                 }
                 break;
-            case 'SET_ENABLED':
+            case 'SET_ENABLED': // Handled in onmessage directly
                 isEnabled = command.data.enabled;
-                if (!isEnabled && jsStateArray) {
+                 if (!isEnabled && jsStateArray) { // If disabling, clear state
                     jsStateArray.fill(0);
                     if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
+                    stateHistoryChecksums.clear();
+                    stateChecksumQueue = [];
+                    lastSentChecksum = null; // Force update of cleared state
+                    needsStateUpdate = true;
+                } else if (isEnabled && jsStateArray) { // If enabling, ensure current state is sent
+                    lastSentChecksum = null; // Force update of current state
                     needsStateUpdate = true;
                 }
                 break;
             case 'LOAD_STATE':
                 jsStateArray = new Uint8Array(command.data.newStateBuffer);
-                ruleset = new Uint8Array(command.data.newRulesetBuffer); 
+                ruleset = new Uint8Array(command.data.newRulesetBuffer);
                 worldTickCounter = command.data.worldTick || 0;
                 ratioHistory = [];
                 entropyHistory = [];
-                hexBlockEntropyHistory = []; // New: Clear block entropy history
-                // Reset rule usage counters
+                hexBlockEntropyHistory = [];
                 if (ruleUsageCounters) ruleUsageCounters.fill(0);
-                
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 isEnabled = true;
+                
+                stateHistoryChecksums.clear();
+                stateChecksumQueue = [];
+                lastSentChecksum = null; // Will be set when sendStateUpdate is called after this command
                 needsStateUpdate = true;
-                rulesetChangedInQueue = true; 
+                rulesetChangedInQueue = true;
                 break;
         }
     }
-    commandQueue = []; 
+    commandQueue = [];
     return { needsStateUpdate, rulesetChangedInQueue };
 }
 
@@ -278,8 +287,15 @@ function runTick() {
     let simulationPerformedUpdate = false;
 
     if (!isEnabled || !isRunning || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) {
-        if (commandInducedUpdate) {
-            sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue);
+        if (commandInducedUpdate) { // e.g. SET_HOVER_STATE on a paused world
+            // If command induced an update (like hover), send it.
+            // Checksum logic mostly applies to simulation ticks.
+            // If it was a state-altering command, lastSentChecksum would be null.
+            const currentChecksum = calculateChecksum(jsStateArray);
+            if (currentChecksum !== lastSentChecksum || rulesetChangedInQueue || commandInducedUpdate ) { // Ensure hover updates still go through even if grid is same
+                 if (jsStateArray) lastSentChecksum = currentChecksum; // Update if we are about to send due to command
+                 sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, commandInducedUpdate);
+            }
         }
         return;
     }
@@ -302,14 +318,25 @@ function runTick() {
             }
         }
         const ruleIdx = (cState << 6) | neighborMask;
-        
-        // Increment rule usage counter during active simulation
         if (isRunning && ruleUsageCounters) ruleUsageCounters[ruleIdx]++;
-        
         const nextStateValue = ruleset[ruleIdx];
         jsNextStateArray[i] = nextStateValue;
         jsNextRuleIndexArray[i] = ruleIdx;
         if (nextStateValue === 1) activeCount++;
+    }
+
+    const newStateChecksum = calculateChecksum(jsNextStateArray);
+
+    // Internal tracking for cycle detection awareness
+    if (!stateHistoryChecksums.has(newStateChecksum)) {
+        stateHistoryChecksums.add(newStateChecksum);
+        stateChecksumQueue.push(newStateChecksum);
+        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
+            const oldestChecksum = stateChecksumQueue.shift();
+            if (!stateChecksumQueue.includes(oldestChecksum)) { // Avoid removing if still in recent queue window
+                stateHistoryChecksums.delete(oldestChecksum);
+            }
+        }
     }
 
     let tempState = jsStateArray;
@@ -319,109 +346,98 @@ function runTick() {
     let tempRuleIndex = jsRuleIndexArray;
     jsRuleIndexArray = jsNextRuleIndexArray;
     jsNextRuleIndexArray = tempRuleIndex;
-    simulationPerformedUpdate = true;
+
+    if (newStateChecksum !== lastSentChecksum) {
+        simulationPerformedUpdate = true;
+    }
 
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
-    
-    // Only calculate entropy when sampling is enabled and it's a sampling tick
     let currentBinaryEntropy = undefined;
-    let currentBlockEntropy = undefined; // New: Block entropy calculation
+    let currentBlockEntropy = undefined;
     const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
     if (shouldSampleEntropy) {
         currentBinaryEntropy = calculateBinaryEntropy(ratio);
-        // Calculate hex block entropy using the new state (jsStateArray now points to the result of the tick)
         currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
     }
 
-    // Record history if simulation is active
     if (isEnabled && isRunning) {
-        ratioHistory.push(ratio); // Ratio history is still recorded every tick
-        if (ratioHistory.length > MAX_HISTORY_SIZE) {
-            ratioHistory.shift();
-        }
-
-        // Record entropy history only when we calculated it
+        ratioHistory.push(ratio);
+        if (ratioHistory.length > MAX_HISTORY_SIZE) ratioHistory.shift();
         if (shouldSampleEntropy) {
             if (currentBinaryEntropy !== undefined) {
                 entropyHistory.push(currentBinaryEntropy);
-                if (entropyHistory.length > MAX_HISTORY_SIZE) {
-                    entropyHistory.shift();
-                }
+                if (entropyHistory.length > MAX_HISTORY_SIZE) entropyHistory.shift();
             }
-            if (currentBlockEntropy !== undefined) { // New: Record block entropy history
+            if (currentBlockEntropy !== undefined) {
                 hexBlockEntropyHistory.push(currentBlockEntropy);
-                if (hexBlockEntropyHistory.length > MAX_HISTORY_SIZE) {
-                    hexBlockEntropyHistory.shift();
-                }
+                if (hexBlockEntropyHistory.length > MAX_HISTORY_SIZE) hexBlockEntropyHistory.shift();
             }
         }
     }
 
     if (simulationPerformedUpdate || commandInducedUpdate) {
-        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue);
+        lastSentChecksum = calculateChecksum(jsStateArray); // Update with the checksum of the state *being sent*
+        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, commandInducedUpdate);
     }
 }
 
-function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulesetHasChanged = false) {
+function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulesetHasChanged = false, commandInducedGridChange = false) {
     if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray || !ruleset) {
-        console.warn(`Worker ${worldIndex}: Attempted to send state update with invalid buffers.`);
+        console.warn(`Worker ${worldIndex}: Attempted to send state update with invalid/missing buffers.`);
         return;
     }
+
     const statePayload = {
         type: 'STATE_UPDATE',
         worldIndex: worldIndex,
-        stateBuffer: jsStateArray.buffer.slice(0),
+        stateBuffer: jsStateArray.buffer.slice(0), // Always send a fresh copy
         ruleIndexBuffer: jsRuleIndexArray.buffer.slice(0),
         hoverStateBuffer: jsHoverStateArray.buffer.slice(0),
     };
-    const transferList = [statePayload.stateBuffer, statePayload.ruleIndexBuffer, statePayload.hoverStateBuffer];
-    self.postMessage(statePayload, transferList);
+    const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer, statePayload.hoverStateBuffer];
+    self.postMessage(statePayload, transferListState);
 
     const currentRulesetHex = rulesetToHex(ruleset);
 
-    if (activeCount !== undefined) {
+    // Stats are usually tied to simulation ticks or significant state changes.
+    if (activeCount !== undefined) { // Indicates a simulation tick or a command that recalculated activeCount
         const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
-        const transferList = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
-        
+        const transferListStats = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
         self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
             tick: worldTickCounter,
             activeCount: activeCount,
             ratio: ratio,
-            binaryEntropy: binaryEntropy, // Renamed for clarity
-            blockEntropy: blockEntropy,   // New: Block entropy
-            rulesetHex: currentRulesetHex, 
+            binaryEntropy: binaryEntropy,
+            blockEntropy: blockEntropy,
+            rulesetHex: currentRulesetHex,
             isEnabled: isEnabled,
             ruleUsageCounters: ruleUsageCountersBuffer
-        }, transferList);
-    } else if (rulesetHasChanged || !isEnabled) { 
+        }, transferListStats);
+    } else if (rulesetHasChanged || !isEnabled || commandInducedGridChange) {
+        // Fallback for commands that change ruleset or enabled state, or directly alter grid
         const currentActiveCount = jsStateArray.reduce((s, c) => s + c, 0);
         const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
-        
-        // Only calculate entropy if sampling is enabled
-        let currentBinaryEntropy = undefined;
-        let currentBlockEntropy = undefined;
+        let currentBinaryEntropyStats, currentBlockEntropyStats;
         if (workerIsEntropySamplingEnabled) {
-            currentBinaryEntropy = calculateBinaryEntropy(currentRatio);
-            currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+            currentBinaryEntropyStats = calculateBinaryEntropy(currentRatio);
+            currentBlockEntropyStats = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
         }
-        
         const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
-        const transferList = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
-        
+        const transferListStats = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
         self.postMessage({
             type: 'STATS_UPDATE',
             worldIndex: worldIndex,
             tick: worldTickCounter,
             activeCount: currentActiveCount,
             ratio: currentRatio,
-            binaryEntropy: currentBinaryEntropy, // Renamed for clarity
-            blockEntropy: currentBlockEntropy,   // New: Block entropy
+            binaryEntropy: currentBinaryEntropyStats,
+            blockEntropy: currentBlockEntropyStats,
             rulesetHex: currentRulesetHex,
             isEnabled: isEnabled,
             ruleUsageCounters: ruleUsageCountersBuffer
-        }, transferList);
+        }, transferListStats);
     }
 }
 
@@ -437,10 +453,9 @@ function updateSimulationInterval() {
     }
 }
 
-
 self.onmessage = function(event) {
     const command = event.data;
-    let rulesetChangedByCommand = false; 
+    let commandCausedGridChange = false; // Flag if command directly altered jsStateArray
 
     switch (command.type) {
         case 'INIT':
@@ -448,36 +463,32 @@ self.onmessage = function(event) {
             workerConfig = command.data.config;
             currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED;
             targetTickDurationMs = 1000 / currentSpeedTarget;
-
-            // Initialize history arrays
             ratioHistory = [];
             entropyHistory = [];
-            hexBlockEntropyHistory = []; // New: Initialize block entropy history
-
+            hexBlockEntropyHistory = [];
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
-            ruleset = new Uint8Array(command.data.initialRulesetBuffer); 
+            ruleset = new Uint8Array(command.data.initialRulesetBuffer);
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
-
             jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS);
             jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
             jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
-            
-            // Initialize rule usage counters
             ruleUsageCounters = new Uint32Array(128);
-
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
             workerEntropySampleRate = command.data.initialEntropySampleRate || 10;
 
+            stateHistoryChecksums.clear();
+            stateChecksumQueue = [];
+            lastSentChecksum = null; // Will be set by the first sendStateUpdate
+
             if (isEnabled) {
                 const density = command.data.initialDensity;
-                 let activeCells = 0;
                 if(density % 1 === 0) {
                     jsStateArray.fill(density);
-                     const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2);
-                     if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) {
-                        jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
-                     }
+                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2);
+                    if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) {
+                       jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
+                    }
                 } else {
                     for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                         jsStateArray[i] = Math.random() < density ? 1 : 0;
@@ -490,27 +501,25 @@ self.onmessage = function(event) {
             }
             jsHoverStateArray.fill(0);
 
+            const initialChecksum = calculateChecksum(jsStateArray);
+            stateHistoryChecksums.add(initialChecksum);
+            stateChecksumQueue.push(initialChecksum);
+            lastSentChecksum = initialChecksum; // Set for the initial state being sent
+
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
-            
             const initialActiveCount = isEnabled ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
             const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
-            
-            // Only calculate initial entropy if sampling is enabled
-            let initialBinaryEntropy = undefined;
-            let initialBlockEntropy = undefined; // New
+            let initialBinaryEntropy, initialBlockEntropy;
             if (isEnabled && workerIsEntropySamplingEnabled) {
                 initialBinaryEntropy = calculateBinaryEntropy(initialRatio);
-                initialBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R); // New
-                // Record initial values in history
+                initialBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                 ratioHistory.push(initialRatio);
                 entropyHistory.push(initialBinaryEntropy);
-                hexBlockEntropyHistory.push(initialBlockEntropy); // New
+                hexBlockEntropyHistory.push(initialBlockEntropy);
             } else if (isEnabled) {
-                // Still record ratio history even if entropy sampling is disabled
                 ratioHistory.push(initialRatio);
             }
-            
-            sendStateUpdate(initialActiveCount, initialRatio, initialBinaryEntropy, initialBlockEntropy, true); 
+            sendStateUpdate(initialActiveCount, initialRatio, initialBinaryEntropy, initialBlockEntropy, true, true);
             break;
 
         case 'START_SIMULATION':
@@ -528,16 +537,20 @@ self.onmessage = function(event) {
         case 'SET_ENABLED':
             const prevEnabled = isEnabled;
             isEnabled = command.data.enabled;
-            let sendUpdateForSetEnabled = false;
+            commandCausedGridChange = false;
             if (!isEnabled && jsStateArray) {
                 jsStateArray.fill(0);
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
-                sendUpdateForSetEnabled = true;
+                stateHistoryChecksums.clear();
+                stateChecksumQueue = [];
+                commandCausedGridChange = true; // Grid content changed to all 0s
             } else if (isEnabled && !prevEnabled && jsStateArray) {
-                sendUpdateForSetEnabled = true; 
+                 // No direct grid change, but we want to send current state if it wasn't sending before
+                 commandCausedGridChange = true; // Treat as if grid content might be "new" to main thread
             }
             updateSimulationInterval();
-            if (sendUpdateForSetEnabled) {
+            if (commandCausedGridChange) {
+                lastSentChecksum = calculateChecksum(jsStateArray);
                 const activeAfterEnable = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0;
                 let binEntropyAfterEnable, blkEntropyAfterEnable;
@@ -545,75 +558,50 @@ self.onmessage = function(event) {
                     binEntropyAfterEnable = calculateBinaryEntropy(ratioAfterEnable);
                     blkEntropyAfterEnable = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                 }
-                sendStateUpdate(activeAfterEnable, ratioAfterEnable, binEntropyAfterEnable, blkEntropyAfterEnable, false); 
+                sendStateUpdate(activeAfterEnable, ratioAfterEnable, binEntropyAfterEnable, blkEntropyAfterEnable, false, true);
             }
             break;
 
         case 'SET_ENTROPY_SAMPLING_PARAMS':
             workerIsEntropySamplingEnabled = command.data.enabled;
-            workerEntropySampleRate = command.data.rate || 10; // Ensure rate is at least 1 if needed, or handle 0
-            // Optional: If sampling is disabled, clear existing entropy history
+            workerEntropySampleRate = command.data.rate || 10;
             if (!workerIsEntropySamplingEnabled) {
                 entropyHistory = [];
-                hexBlockEntropyHistory = []; // New: Clear block entropy history too
-                // If you send a STATS_UPDATE here, ensure plugins expect potentially empty history
+                hexBlockEntropyHistory = [];
             }
             break;
 
-        case 'SET_RULESET':
+        // Commands that directly modify state and need immediate update handling
+        case 'RESET_WORLD':
+        case 'APPLY_BRUSH':
+        case 'APPLY_SELECTIVE_BRUSH':
         case 'LOAD_STATE':
             commandQueue.push(command);
-            const { needsStateUpdate: updateAfterComplexCmd, rulesetChangedInQueue: rsChanged } = processCommandQueue();
-            if (updateAfterComplexCmd) {
+            const { needsStateUpdate: inducedUpdateOnGrid, rulesetChangedInQueue: rsChangedByGridCmd } = processCommandQueue();
+            if (inducedUpdateOnGrid) { // processCommandQueue already cleared checksums if needed
+                lastSentChecksum = calculateChecksum(jsStateArray);
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
-                
-                // Only calculate entropy if sampling is enabled
                 let binEntropy, blkEntropy;
                 if (workerIsEntropySamplingEnabled) {
                     binEntropy = calculateBinaryEntropy(ratio);
                     blkEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
                 }
-                
-                sendStateUpdate(active, ratio, binEntropy, blkEntropy, rsChanged);
+                sendStateUpdate(active, ratio, binEntropy, blkEntropy, rsChangedByGridCmd, true);
             }
             break;
 
-        default: 
+        // Commands that might not change grid state but queue for processing
+        default:
             commandQueue.push(command);
-            
-            
-            if (command.type === 'RESET_WORLD') {
-                const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
-                if (inducedUpdate) {
-                    const currentActiveCount = jsStateArray.reduce((sum, val) => sum + val, 0);
-                    const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
-                    
-                    // Only calculate entropy if sampling is enabled
-                    let currentBinaryEntropyCalc, currentBlockEntropyCalc;
-                    if (workerIsEntropySamplingEnabled) {
-                        currentBinaryEntropyCalc = calculateBinaryEntropy(currentRatio);
-                        currentBlockEntropyCalc = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
-                    }
-                    
-                    sendStateUpdate(currentActiveCount, currentRatio, currentBinaryEntropyCalc, currentBlockEntropyCalc, rsChangedByQueue);
-                }
-            } else if (command.type === 'SET_HOVER_STATE' || command.type === 'CLEAR_HOVER_STATE' || command.type === 'APPLY_BRUSH') {
-                const { needsStateUpdate: inducedUpdate, rulesetChangedInQueue: rsChangedByQueue } = processCommandQueue();
-                if (inducedUpdate) {
-                    const active = jsStateArray.reduce((s, c) => s + c, 0);
-                    const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
-                    
-                    // Only calculate entropy if sampling is enabled
-                    let binaryEntropyCalc, blockEntropyCalc;
-                    if (workerIsEntropySamplingEnabled) {
-                        binaryEntropyCalc = calculateBinaryEntropy(ratio);
-                        blockEntropyCalc = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
-                    }
-                    
-                    sendStateUpdate(active, ratio, binaryEntropyCalc, blockEntropyCalc, rsChangedByQueue);
-                }
-            }
+            // For non-grid-altering commands that queue, runTick will handle updates.
+            // Example: SET_RULESET (if grid doesn't change, but rules do, runTick will send)
+            // Example: SET_HOVER_STATE (processCommandQueue handles hover, runTick might send if grid also changes)
+            // If a command like SET_HOVER_STATE needs an immediate visual update for hover only,
+            // it should ideally send a specific hover-only message or be handled by processCommandQueue
+            // and runTick's logic for commandInducedUpdate.
+            // The current processCommandQueue handles SET_HOVER_STATE and returns needsStateUpdate=true for hover buffer.
+            // This will trigger sendStateUpdate in runTick, which is fine as it sends all buffers.
             break;
     }
 };

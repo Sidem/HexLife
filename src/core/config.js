@@ -25,6 +25,7 @@ export const MAX_SIM_SPEED = 120;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 0; 
 export const MAX_NEIGHBORHOOD_SIZE = Math.floor(GRID_ROWS/2);
 export const STATS_HISTORY_SIZE = 1000; 
+export const CYCLE_DETECTION_HISTORY_SIZE = 250; // Max cycle length to detect for dirty flag optimization
 export const RENDER_TEXTURE_SIZE = 1280; 
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0]; 
 export const HOVER_BORDER_COLOR = [0.6, 0.6, 0.6, 1.0]; 
