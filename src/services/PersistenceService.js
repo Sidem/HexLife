@@ -31,9 +31,10 @@ function _setItem(key, value) {
     }
 }
 
-export function loadRuleset() { 
-    return _getItem(KEYS.RULESET);
+export function loadRuleset() {
+    return _getItem(KEYS.RULESET) || Config.INITIAL_RULESET_CODE;
 }
+
 export function saveRuleset(rulesetHex) { 
     _setItem(KEYS.RULESET, rulesetHex);
 }

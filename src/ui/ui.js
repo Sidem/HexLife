@@ -196,7 +196,7 @@ function _initPopoutControls() {
         updateBiasSliderDisabledStatePopout();
     });
     sliderComponents.biasSliderPopout = new SliderComponent(uiElements.biasSliderMountPopout, {
-        id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, value: PersistenceService.loadUISetting('biasValue', 0.5),
+        id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, value: PersistenceService.loadUISetting('biasValue', 0.33),
         showValue: true, unit: '', disabled: !uiElements.useCustomBiasCheckboxPopout.checked,
         onChange: val => PersistenceService.saveUISetting('biasValue', val)
     });
@@ -294,11 +294,11 @@ function loadAndApplyUISettings() {
     const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
     uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => r.checked = r.value === genMode);
     
-    uiElements.useCustomBiasCheckboxPopout.checked = PersistenceService.loadUISetting('useCustomBias', false);
-    sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.5));
+    uiElements.useCustomBiasCheckboxPopout.checked = PersistenceService.loadUISetting('useCustomBias', true);
+    sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.33));
     updateBiasSliderDisabledStatePopout();
 
-    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', false); 
+    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', true); 
     uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
     
     uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
