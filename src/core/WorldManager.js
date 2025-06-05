@@ -18,7 +18,7 @@ export class WorldManager {
         
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
         this.worldSettings = PersistenceService.loadWorldSettings(); 
-        this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || this._generateRandomRulesetHex(0.5, 'r_sym');
+        this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
 
         this._initWorlds();
         this._setupEventListeners();
