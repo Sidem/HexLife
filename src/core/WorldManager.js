@@ -2,29 +2,28 @@ import * as Config from './config.js';
 import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
-import * as Symmetry from './Symmetry.js'; 
+import * as Symmetry from './Symmetry.js';
 
 export class WorldManager {
     constructor() {
-        this.worlds = []; 
+        this.worlds = [];
         this.selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
-        this.isGloballyPaused = true; 
+        this.isGloballyPaused = true;
         this.currentGlobalSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
         this.currentBrushSize = PersistenceService.loadBrushSize() || Config.DEFAULT_NEIGHBORHOOD_SIZE;
-        
-        
+
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
-        
+
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
-        this.worldSettings = PersistenceService.loadWorldSettings(); 
+        this.worldSettings = PersistenceService.loadWorldSettings();
         this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
 
         this._initWorlds();
         this._setupEventListeners();
     }
 
-    _initWorlds = () => { 
+    _initWorlds = () => {
         const worldManagerCallbacks = {
             onUpdate: (worldIndex, updateType) => this._handleProxyUpdate(worldIndex, updateType),
             onInitialized: (worldIndex) => this._handleProxyInitialized(worldIndex)
@@ -99,17 +98,16 @@ export class WorldManager {
         }
     }
 
-    _setupEventListeners = () => { 
+    _setupEventListeners = () => {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => this.setGlobalPause(!this.isGloballyPaused));
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
-        
-        
+
         EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, (size) => {
-            const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size)); 
+            const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
             if (this.currentBrushSize !== newSizeValidated) {
                 this.currentBrushSize = newSizeValidated;
-                PersistenceService.saveBrushSize(this.currentBrushSize); 
-                EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, this.currentBrushSize); 
+                PersistenceService.saveBrushSize(this.currentBrushSize);
+                EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, this.currentBrushSize);
             }
         });
 
@@ -130,7 +128,7 @@ export class WorldManager {
                 return this.rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
-         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_ALL_RULES_STATE, (data) => {
+        EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_ALL_RULES_STATE, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
                 const rules = this.hexToRuleset(currentRulesetHex);
                 rules.fill(data.targetState);
@@ -168,7 +166,7 @@ export class WorldManager {
 
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
             this.worlds.forEach((proxy, idx) => {
-                if (this.worldSettings[idx]) { 
+                if (this.worldSettings[idx]) {
                     proxy.resetWorld(this.worldSettings[idx].initialDensity);
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
                 }
@@ -186,18 +184,18 @@ export class WorldManager {
 
             indicesToReset.forEach(idx => {
                 if (data.copyPrimaryRuleset && idx !== this.selectedWorldIndex) {
-                     const newRulesetBuffer = this.hexToRuleset(primaryRulesetHex).buffer.slice(0);
-                     this.worlds[idx].setRuleset(newRulesetBuffer);
-                     this.worldSettings[idx].rulesetHex = primaryRulesetHex;
+                    const newRulesetBuffer = this.hexToRuleset(primaryRulesetHex).buffer.slice(0);
+                    this.worlds[idx].setRuleset(newRulesetBuffer);
+                    this.worldSettings[idx].rulesetHex = primaryRulesetHex;
                 }
-                if (this.worldSettings[idx]) { 
+                if (this.worldSettings[idx]) {
                     this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) this.worlds[idx].startSimulation();
                 }
             });
 
             if (data.scope === 'all' || indicesToReset.includes(this.selectedWorldIndex)) {
-                 EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+                EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
             }
             this.dispatchSelectedWorldUpdates();
             PersistenceService.saveWorldSettings(this.worldSettings);
@@ -208,8 +206,8 @@ export class WorldManager {
             indicesToClear.forEach(idx => {
                 const proxy = this.worlds[idx];
                 if (proxy) {
-                    let targetStateForClear = 0; 
-                    if (proxy.latestStateArray) { 
+                    let targetStateForClear = 0;
+                    if (proxy.latestStateArray) {
                         const currentState = proxy.latestStateArray;
                         let allCurrentlyInactive = true;
                         for (let i = 0; i < currentState.length; i++) {
@@ -219,14 +217,14 @@ export class WorldManager {
                             }
                         }
                         if (allCurrentlyInactive) {
-                            targetStateForClear = 1; 
+                            targetStateForClear = 1;
                         }
                     }
                     proxy.resetWorld({ density: targetStateForClear, isClearOperation: true });
                 }
 
                 if (this.worldSettings[idx] && !this.isGloballyPaused && this.worldSettings[idx].enabled) {
-                     this.worlds[idx].startSimulation();
+                    this.worlds[idx].startSimulation();
                 }
             });
             if (data.scope === 'all') EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
@@ -263,7 +261,7 @@ export class WorldManager {
                     this.worlds[data.worldIndex].startSimulation();
                     this.worlds[data.worldIndex].setSpeed(this.currentGlobalSpeed);
                 } else if (!data.isEnabled) {
-                     this.worlds[data.worldIndex].stopSimulation();
+                    this.worlds[data.worldIndex].stopSimulation();
                 }
                 PersistenceService.saveWorldSettings(this.worldSettings);
                 EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
@@ -275,8 +273,8 @@ export class WorldManager {
             EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, newIndex);
         });
 
-        EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState); 
-        EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData)); 
+        EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
+        EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
 
         EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
             this.isEntropySamplingEnabled = data.enabled;
@@ -284,19 +282,17 @@ export class WorldManager {
             PersistenceService.saveUISetting('entropySamplingEnabled', data.enabled);
             PersistenceService.saveUISetting('entropySampleRate', data.rate);
 
-            
             this.worlds.forEach(proxy => {
                 proxy.sendCommand('SET_ENTROPY_SAMPLING_PARAMS', {
                     enabled: this.isEntropySamplingEnabled,
                     rate: this.entropySampleRate
                 });
             });
-            
             EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
         });
     }
 
-    _getAffectedWorldIndices = (scope) => { 
+    _getAffectedWorldIndices = (scope) => {
         if (scope === 'all') return this.worlds.map((_, i) => i);
         if (scope === 'selected') return [this.selectedWorldIndex];
         if (typeof scope === 'number' && scope >= 0 && scope < this.worlds.length) return [scope];
@@ -304,7 +300,7 @@ export class WorldManager {
         return [];
     }
 
-    _applyRulesetToWorlds = (rulesetHex, targetScope, fromMainBarResetLogic, conditionalResetScopeIfEditor = 'none') => { 
+    _applyRulesetToWorlds = (rulesetHex, targetScope, fromMainBarResetLogic, conditionalResetScopeIfEditor = 'none') => {
         const newRulesetArray = this.hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
             console.error("Cannot apply invalid ruleset hex:", rulesetHex);
@@ -322,10 +318,10 @@ export class WorldManager {
                 : conditionalResetScopeIfEditor;
 
             if (resetScopeForThisChange !== 'none') {
-                 const resetTargetIndices = this._getAffectedWorldIndices(resetScopeForThisChange);
-                 if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) { 
+                const resetTargetIndices = this._getAffectedWorldIndices(resetScopeForThisChange);
+                if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
                     this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
-                 }
+                }
             }
         });
 
@@ -337,14 +333,14 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => { 
+    _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {
         const indices = this._getAffectedWorldIndices(scope);
         indices.forEach(idx => {
             const proxyStats = this.worlds[idx]?.getLatestStats();
             let currentHex = (proxyStats?.rulesetHex && proxyStats.rulesetHex !== "Error")
-                               ? proxyStats.rulesetHex
-                               : this.worldSettings[idx]?.rulesetHex;
-            
+                ? proxyStats.rulesetHex
+                : this.worldSettings[idx]?.rulesetHex;
+
             if (!currentHex) {
                 console.warn(`_modifyRulesetForScope: No current hex for world ${idx}, skipping modification.`);
                 return;
@@ -360,7 +356,7 @@ export class WorldManager {
 
                 if (conditionalResetScope !== 'none') {
                     const resetTargetIndices = this._getAffectedWorldIndices(conditionalResetScope);
-                    if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) { 
+                    if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
                         this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
                     }
                 }
@@ -369,15 +365,15 @@ export class WorldManager {
 
         if (indices.includes(this.selectedWorldIndex)) {
             this.dispatchSelectedWorldUpdates();
-            if (this.worldSettings[this.selectedWorldIndex]) { 
-                 PersistenceService.saveRuleset(this.worldSettings[this.selectedWorldIndex].rulesetHex);
+            if (this.worldSettings[this.selectedWorldIndex]) {
+                PersistenceService.saveRuleset(this.worldSettings[this.selectedWorldIndex].rulesetHex);
             }
         }
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    setGlobalPause = (paused) => { 
+    setGlobalPause = (paused) => {
         this.isGloballyPaused = paused;
         this.worlds.forEach(proxy => {
             if (this.isGloballyPaused || !proxy.getLatestStats().isEnabled) {
@@ -390,14 +386,14 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isGloballyPaused);
     }
 
-    setGlobalSpeed = (speed) => { 
+    setGlobalSpeed = (speed) => {
         this.currentGlobalSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
         this.worlds.forEach(proxy => proxy.setSpeed(this.currentGlobalSpeed));
         PersistenceService.saveSimSpeed(this.currentGlobalSpeed);
         EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, this.currentGlobalSpeed);
     }
 
-    getWorldsRenderData = () => { 
+    getWorldsRenderData = () => {
         return this.worlds.map(proxy => proxy.getLatestRenderData());
     }
 
@@ -420,7 +416,7 @@ export class WorldManager {
 
     getSelectedWorldStats = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
-        return proxy ? proxy.getLatestStats() : { tick: 0, ratio: 0, entropy: 0, isEnabled: false, rulesetHex: "0".repeat(32), tps: 0 };
+        return proxy ? proxy.getLatestStats() : { tick: 0, ratio: 0, entropy: 0, isEnabled: false, rulesetHex: "0".repeat(32), tps: 0, ruleUsage: new Uint32Array(128) };
     }
     getWorldSettingsForUI = () => this.worldSettings.map(ws => ({
         initialDensity: ws.initialDensity,
@@ -430,9 +426,9 @@ export class WorldManager {
 
     getSymmetryData = () => this.symmetryData;
 
-    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => { 
+    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => {
         const currentHex = this.getCurrentRulesetHex();
-        if (currentHex === "N/A" || currentHex === "Error") return 2; 
+        if (currentHex === "N/A" || currentHex === "Error") return 2;
         const ruleset = this.hexToRuleset(currentHex);
 
         if (!ruleset || ruleset.length !== 128) return 2;
@@ -441,13 +437,13 @@ export class WorldManager {
             if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
                 const output = ruleset[(centerState << 6) | mask];
                 if (firstOutput === -1) firstOutput = output;
-                else if (firstOutput !== output) return 2;
+                else if (firstOutput !== output) return 2; // Mixed state
             }
         }
-        return firstOutput === -1 ? 2 : firstOutput;
+        return firstOutput === -1 ? 2 : firstOutput; // Default to mixed if no rules match (should not happen for 0-6 neighbors)
     }
 
-    getCanonicalRuleDetails = () => { 
+    getCanonicalRuleDetails = () => {
         if (!this.symmetryData) {
             console.error("getCanonicalRuleDetails: this.symmetryData is undefined.");
             return [];
@@ -478,7 +474,7 @@ export class WorldManager {
         });
     }
 
-    _generateRandomRulesetHex = (bias, generationMode) => { 
+    _generateRandomRulesetHex = (bias, generationMode) => {
         const tempRuleset = new Uint8Array(128);
         if (generationMode === 'n_count') {
             for (let cs = 0; cs <= 1; cs++) {
@@ -488,22 +484,22 @@ export class WorldManager {
                 }
             }
         } else if (generationMode === 'r_sym') {
-            if (!this.symmetryData || !this.symmetryData.canonicalRepresentatives) { 
+            if (!this.symmetryData || !this.symmetryData.canonicalRepresentatives) {
                 console.warn("_generateRandomRulesetHex: symmetryData not available for r_sym, falling back to random.");
                 for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
             } else {
-                tempRuleset.fill(0);
+                tempRuleset.fill(0); // Ensure clean slate
                 for (const group of this.symmetryData.canonicalRepresentatives) {
-                    for (let cs = 0; cs <= 1; cs++) {
+                    for (let cs = 0; cs <= 1; cs++) { // Iterate for center state 0 and 1
                         const out = Math.random() < bias ? 1 : 0;
                         for (const member of group.members) tempRuleset[(cs << 6) | member] = out;
                     }
                 }
             }
-        } else { 
+        } else { // Default to 'random'
             for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
         }
-        return this.rulesetToHex(tempRuleset); 
+        return this.rulesetToHex(tempRuleset);
     }
 
     rulesetToHex(rulesetArray) {
@@ -516,7 +512,8 @@ export class WorldManager {
     hexToRuleset(hexString) {
         const ruleset = new Uint8Array(128).fill(0);
         if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
-            return ruleset; 
+            // console.warn("Invalid hex string provided to hexToRuleset:", hexString);
+            return ruleset; // Return a default (all zeros) ruleset for invalid hex
         }
         try {
             let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
@@ -525,17 +522,24 @@ export class WorldManager {
         return ruleset;
     }
 
-    _findHexagonsInNeighborhood(startCol, startRow, maxDistance) { 
+    _findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
         const affected = new Set();
         if (startCol === null || startRow === null) return Array.from(affected);
 
-        const q = [[startCol, startRow, 0]];
-        const visited = new Map([[`${startCol},${startRow}`, 0]]);
-        const startIndex = startRow * Config.GRID_COLS + startCol;
-        if(startIndex !== undefined && startIndex >= 0 && startIndex < Config.NUM_CELLS) affected.add(startIndex);
+        // OPTIMIZATION: Use numerical key for visited Map
+        const startKey = (startCol << 16) | startRow; // Max GRID_COLS/GRID_ROWS expected < 65536
+        const visited = new Map([[startKey, 0]]);
 
-        while (q.length > 0) {
-            const [cc, cr, cd] = q.shift();
+        // OPTIMIZATION: Pointer-based queue
+        const q = [];
+        q.push([startCol, startRow, 0]);
+        let head = 0;
+
+        const startIndex = startRow * Config.GRID_COLS + startCol;
+        if (startIndex !== undefined && startIndex >= 0 && startIndex < Config.NUM_CELLS) affected.add(startIndex);
+
+        while (head < q.length) {
+            const [cc, cr, cd] = q[head++]; // Dequeue using head pointer
             if (cd >= maxDistance) continue;
 
             const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
@@ -545,10 +549,11 @@ export class WorldManager {
                 const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
                 const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
 
-                if (!visited.has(`${wc},${wr}`)) {
+                const neighborKey = (wc << 16) | wr; // Use numerical key for lookup
+                if (!visited.has(neighborKey)) {
                     const ni = wr * Config.GRID_COLS + wc;
-                    if (ni !== undefined && ni >=0 && ni < Config.NUM_CELLS) {
-                        visited.set(`${wc},${wr}`, cd + 1);
+                    if (ni !== undefined && ni >= 0 && ni < Config.NUM_CELLS) {
+                        visited.set(neighborKey, cd + 1);
                         affected.add(ni);
                         q.push([wc, wr, cd + 1]);
                     }
@@ -558,7 +563,8 @@ export class WorldManager {
         return Array.from(affected);
     }
 
-    saveSelectedWorldState = () => { 
+
+    saveSelectedWorldState = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
         if (!proxy) return;
 
@@ -574,13 +580,13 @@ export class WorldManager {
             worldTick: stats.tick
         };
         EventBus.dispatch(EVENTS.TRIGGER_DOWNLOAD, {
-            filename: `hex_state_world${this.selectedWorldIndex}_${rulesetHex}_${new Date().toISOString().slice(0,-4).replace(/[:.-]/g,'')}.json`,
+            filename: `hex_state_world${this.selectedWorldIndex}_${rulesetHex}_${new Date().toISOString().slice(0, -4).replace(/[:.-]/g, '')}.json`,
             content: JSON.stringify(data, null, 2),
             mimeType: 'application/json'
         });
     }
 
-    loadWorldState = (worldIndex, loadedData) => { 
+    loadWorldState = (worldIndex, loadedData) => {
         if (worldIndex < 0 || worldIndex >= this.worlds.length) return;
         if (loadedData.rows !== Config.GRID_ROWS || loadedData.cols !== Config.GRID_COLS) {
             alert("Grid dimensions in file do not match current configuration.");
@@ -590,11 +596,11 @@ export class WorldManager {
         const newRulesetArray = this.hexToRuleset(loadedData.rulesetHex);
         const newStateArray = Uint8Array.from(loadedData.state);
 
-        if (this.worldSettings[worldIndex]) { 
+        if (this.worldSettings[worldIndex]) {
             this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialDensity = newDensity;
-            this.worldSettings[worldIndex].enabled = true;
+            this.worldSettings[worldIndex].enabled = true; // Ensure loaded world is enabled
         }
 
         proxy.sendCommand('LOAD_STATE', {
@@ -603,7 +609,7 @@ export class WorldManager {
             worldTick: loadedData.worldTick || 0
         }, [newStateArray.buffer.slice(0), newRulesetArray.buffer.slice(0)]);
 
-        proxy.setEnabled(true);
+        proxy.setEnabled(true); // Ensure proxy knows it's enabled
         if (!this.isGloballyPaused) {
             proxy.startSimulation();
             proxy.setSpeed(this.currentGlobalSpeed);
@@ -614,7 +620,7 @@ export class WorldManager {
             this.dispatchSelectedWorldUpdates();
         }
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // To refresh UI if necessary
     }
 
     getEntropySamplingState = () => ({ enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
@@ -623,7 +629,7 @@ export class WorldManager {
         return this.worlds.length > 0 && this.worlds.every(proxy => proxy && proxy.isInitialized);
     }
 
-    terminateAllWorkers = () => { 
+    terminateAllWorkers = () => {
         this.worlds.forEach(proxy => proxy.terminate());
     }
 }

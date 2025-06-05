@@ -1,8 +1,3 @@
-
-
-
-
-
 /**
  * Creates and compiles a shader.
  * @param {WebGL2RenderingContext} gl The WebGL Context.
@@ -38,9 +33,6 @@ export function createProgram(gl, vertexShader, fragmentShader) {
     gl.linkProgram(program);
     const success = gl.getProgramParameter(program, gl.LINK_STATUS);
     if (success) {
-        
-        
-        
         return program;
     }
     console.error("Shader program linking error:", gl.getProgramInfoLog(program));
@@ -59,7 +51,10 @@ export async function loadShaderProgram(gl, vsPath, fsPath) {
     try {
         const responses = await Promise.all([fetch(vsPath), fetch(fsPath)]);
         if (!responses[0].ok || !responses[1].ok) {
-            throw new Error(`HTTP error loading shaders! Status: ${responses[0].status}, ${responses[1].status}`);
+            let errorMsg = `HTTP error loading shaders! Paths: ${vsPath}, ${fsPath}. Status:`;
+            if (!responses[0].ok) errorMsg += ` VS: ${responses[0].status}`;
+            if (!responses[1].ok) errorMsg += ` FS: ${responses[1].status}`;
+            throw new Error(errorMsg);
         }
         const vsSource = await responses[0].text();
         const fsSource = await responses[1].text();
@@ -68,7 +63,8 @@ export async function loadShaderProgram(gl, vsPath, fsPath) {
         const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
         const program = createProgram(gl, vertexShader, fragmentShader);
 
-        if (program) { 
+        if (program) {
+            // It's good practice to delete shaders after linking if they are no longer needed
             gl.deleteShader(vertexShader);
             gl.deleteShader(fragmentShader);
         }
@@ -76,7 +72,7 @@ export async function loadShaderProgram(gl, vsPath, fsPath) {
 
     } catch (e) {
         console.error("Failed to load or compile shaders:", e);
-        alert("Failed to load shaders. Check console.");
+        alert(`Failed to load shaders. Check console for details. Error: ${e.message}`);
         return null;
     }
 }
@@ -94,7 +90,6 @@ export function createBuffer(gl, target, data, usage) {
     const buffer = gl.createBuffer();
     gl.bindBuffer(target, buffer);
     gl.bufferData(target, data, usage);
-    
     return buffer;
 }
 
@@ -108,15 +103,11 @@ export function createBuffer(gl, target, data, usage) {
  */
 export function updateBuffer(gl, buffer, target, data, offset = 0) {
     gl.bindBuffer(target, buffer);
-    
-    if (offset > 0 || data.byteLength < gl.getBufferParameter(target, gl.BUFFER_SIZE)) {
-         gl.bufferSubData(target, offset, data);
-    } else {
-        
-        
-         gl.bufferData(target, data, gl.getBufferParameter(target, gl.BUFFER_USAGE));
-    }
-    
+    // OPTIMIZATION: For dynamic, fixed-size attribute buffers that are updated every frame,
+    // gl.bufferSubData is generally the most efficient way to update their contents
+    // after they have been initialized with gl.bufferData (e.g., in createBuffer).
+    // This avoids the overhead of gl.getBufferParameter and conditional logic in the hot path.
+    gl.bufferSubData(target, offset, data);
 }
 
 
@@ -131,15 +122,14 @@ export function createFBOTexture(gl, width, height) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
     const level = 0;
-    const internalFormat = gl.RGBA; 
+    const internalFormat = gl.RGBA;
     const border = 0;
     const format = gl.RGBA;
     const type = gl.UNSIGNED_BYTE;
-    const data = null; 
+    const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   width, height, border, format, type, data);
 
-    
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);

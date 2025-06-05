@@ -12,8 +12,8 @@ let hexUniformLocations;
 let quadAttributeLocations;
 let quadUniformLocations;
 let worldFBOs = [];
-let hexBuffers; 
-let quadBuffers; 
+let hexBuffers;
+let quadBuffers;
 let hexVAO;
 let quadVAO;
 let disabledTextTexture = null;
@@ -27,8 +27,11 @@ export async function initRenderer(canvasElement) {
         return null;
     }
 
+    // Ensure shader paths are correct if your project structure is different
+    // For this example, assuming they are relative to where the HTML file is served or bundler output
     hexShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/vertex.glsl', 'shaders/fragment.glsl');
     quadShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/quad_vertex.glsl', 'shaders/quad_fragment.glsl');
+
 
     if (!hexShaderProgram || !quadShaderProgram) return null;
 
@@ -56,43 +59,36 @@ export async function initRenderer(canvasElement) {
         u_useTexture: gl.getUniformLocation(quadShaderProgram, "u_useTexture"),
     };
 
-    
     try {
         const tempCanvas = document.createElement('canvas');
-        const texQualityMultiplier = 2; 
-        const texSize = 128 * texQualityMultiplier; 
+        const texQualityMultiplier = 2;
+        const texSize = 128 * texQualityMultiplier;
         tempCanvas.width = texSize;
         tempCanvas.height = texSize;
         const ctx2d = tempCanvas.getContext('2d');
 
-        
         ctx2d.clearRect(0, 0, texSize, texSize);
-
         
-        ctx2d.translate(-texSize / 2, texSize / 1.95);
-        ctx2d.scale(1, -1);
+        // Adjust text baseline and alignment for better centering
+        ctx2d.textAlign = 'center';
+        ctx2d.textBaseline = 'middle';
 
-        
-        ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)'; 
-        const fontSize = texSize / 12; 
+        ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)';
+        const fontSize = texSize / 8; // Adjusted for better visibility
         ctx2d.font = `bold ${fontSize}px sans-serif`;
         
-        
-
-        
+        // No need to translate and scale if using textBaseline and textAlign
         ctx2d.fillText('DISABLED', texSize / 2, texSize / 2);
 
-        
+
         disabledTextTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
-        
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
-        
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.bindTexture(gl.TEXTURE_2D, null); 
+        gl.bindTexture(gl.TEXTURE_2D, null);
 
     } catch (e) {
         console.error("Failed to create disabledTextTexture:", e);
@@ -110,17 +106,16 @@ export async function initRenderer(canvasElement) {
 
 function setupHexBuffersAndVAO() {
     hexBuffers = {};
-    const hexVertices = Utils.createFlatTopHexagonVertices(); 
+    const hexVertices = Utils.createFlatTopHexagonVertices();
     hexBuffers.positionBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, hexVertices, gl.STATIC_DRAW);
 
-    
     const instanceOffsets = new Float32Array(Config.NUM_CELLS * 2);
     const textureHexSize = Utils.calculateHexSizeForTexture();
     const startX = textureHexSize;
     const startY = textureHexSize * Math.sqrt(3) / 2;
 
     for (let i = 0; i < Config.NUM_CELLS; i++) {
-        const coords = Utils.indexToCoords(i); 
+        const coords = Utils.indexToCoords(i);
         if (coords) {
             const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize, startX, startY);
             instanceOffsets[i * 2] = pixelCoords.x;
@@ -129,12 +124,11 @@ function setupHexBuffersAndVAO() {
     }
     hexBuffers.offsetBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, instanceOffsets, gl.STATIC_DRAW);
 
-    
-    
-    const initialZerosFloat = new Float32Array(Config.NUM_CELLS).fill(0.0);
-    hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosFloat, gl.DYNAMIC_DRAW);
-    hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosFloat, gl.DYNAMIC_DRAW);
-    hexBuffers.ruleIndexBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosFloat, gl.DYNAMIC_DRAW);
+    // OPTIMIZATION: Use Uint8Array for initial buffer data for state, hover, and ruleIndex
+    const initialZerosUint8 = new Uint8Array(Config.NUM_CELLS).fill(0);
+    hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
+    hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
+    hexBuffers.ruleIndexBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
 
     hexVAO = gl.createVertexArray();
     gl.bindVertexArray(hexVAO);
@@ -148,19 +142,20 @@ function setupHexBuffersAndVAO() {
     gl.vertexAttribPointer(hexAttributeLocations.instanceOffset, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(hexAttributeLocations.instanceOffset, 1);
 
+    // OPTIMIZATION: Change vertexAttribPointer for instance data to use UNSIGNED_BYTE
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.stateBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceState);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceState, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(hexAttributeLocations.instanceState, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
     gl.vertexAttribDivisor(hexAttributeLocations.instanceState, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.hoverBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceHoverState);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceHoverState, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(hexAttributeLocations.instanceHoverState, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
     gl.vertexAttribDivisor(hexAttributeLocations.instanceHoverState, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.ruleIndexBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceRuleIndex);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
     gl.vertexAttribDivisor(hexAttributeLocations.instanceRuleIndex, 1);
 
     gl.bindVertexArray(null);
@@ -168,8 +163,8 @@ function setupHexBuffersAndVAO() {
 
 function setupQuadBuffersAndVAO() {
     quadBuffers = {};
-    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]); 
-    const texCoords = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]); 
+    const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const texCoords = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
 
     quadBuffers.positionBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
     quadBuffers.texCoordBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
@@ -194,22 +189,17 @@ function setupFBOs() {
     }
 }
 
-
 function renderWorldsToTextures(allWorldsData) {
-    
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const worldData = allWorldsData[i]; 
+        const worldData = allWorldsData[i];
         const fboData = worldFBOs[i];
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
 
-        
-        
-        
         const clearColor = (worldData && worldData.enabled) ? Config.BACKGROUND_COLOR : Config.DISABLED_WORLD_OVERLAY_COLOR;
         gl.clearColor(...clearColor);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -228,48 +218,47 @@ function renderWorldsToTextures(allWorldsData) {
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
-            const gpuState = new Float32Array(worldData.jsStateArray);
-            const gpuHover = new Float32Array(worldData.jsHoverStateArray);
-            const gpuRuleIndex = new Float32Array(worldData.jsRuleIndexArray);
 
-            WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, gpuState);
-            WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, gpuHover);
-            WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, gpuRuleIndex);
+            // OPTIMIZATION: Remove per-frame Float32Array creation. Pass Uint8Array directly.
+            // const gpuState = new Float32Array(worldData.jsStateArray); // REMOVED
+            // const gpuHover = new Float32Array(worldData.jsHoverStateArray); // REMOVED
+            // const gpuRuleIndex = new Float32Array(worldData.jsRuleIndexArray); // REMOVED
 
-            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS); 
+            WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
+            WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
+            WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
 
-        } else { 
-            if (disabledTextTexture) { 
+            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+
+        } else {
+            if (disabledTextTexture) {
                 if (!quadShaderProgram || !quadVAO) continue;
 
                 gl.useProgram(quadShaderProgram);
                 gl.bindVertexArray(quadVAO);
 
-                gl.activeTexture(gl.TEXTURE0); 
+                gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
-                gl.uniform1i(quadUniformLocations.texture, 0); 
-                gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); 
+                gl.uniform1i(quadUniformLocations.texture, 0);
+                gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
 
-                
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-                gl.disable(gl.BLEND); 
+                gl.disable(gl.BLEND);
             }
-            
         }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
 }
 
-
-function renderMainScene(selectedWorldIndex) { 
+function renderMainScene(selectedWorldIndex) {
     if (!quadShaderProgram || !quadVAO) return;
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); 
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(...Config.BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -324,7 +313,6 @@ function renderMainScene(selectedWorldIndex) {
     const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
     const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
-    
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
@@ -332,7 +320,7 @@ function renderMainScene(selectedWorldIndex) {
         const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
         if (i === selectedWorldIndex) {
             const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
-            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0); 
+            gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
             drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);
         }
@@ -340,16 +328,15 @@ function renderMainScene(selectedWorldIndex) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); 
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(miniX, miniY, miniMapW, miniMapH);
     }
 
-    
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0); 
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight);
     }
 
@@ -360,28 +347,26 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
     const clipX = (pixelX / canvasWidth) * 2 - 1;
-    const clipY = (pixelY / canvasHeight) * -2 + 1; 
+    const clipY = (pixelY / canvasHeight) * -2 + 1;
     const clipW = (pixelW / canvasWidth) * 2;
     const clipH = (pixelH / canvasHeight) * 2;
     const positions = new Float32Array([
-        clipX, clipY - clipH,         
-        clipX + clipW, clipY - clipH, 
-        clipX, clipY,                 
-        clipX + clipW, clipY          
+        clipX, clipY - clipH,
+        clipX + clipW, clipY - clipH,
+        clipX, clipY,
+        clipX + clipW, clipY
     ]);
-    
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions); 
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-
 export function renderFrame(allWorldsData, selectedWorldIndex) {
     if (!gl) return;
-    renderWorldsToTextures(allWorldsData); 
-    renderMainScene(selectedWorldIndex);   
+    renderWorldsToTextures(allWorldsData);
+    renderMainScene(selectedWorldIndex);
 }
 
 function renderLoader() {
@@ -401,41 +386,35 @@ function renderLoader() {
     const canvasHeight = gl.canvas.height;
     const centerX = canvasWidth / 2;
     const centerY = canvasHeight / 2;
-    
-    
-    const time = performance.now() * 0.002; 
+
+    const time = performance.now() * 0.002;
     const radius = Math.min(canvasWidth, canvasHeight) * 0.1;
     const dotSize = Math.min(canvasWidth, canvasHeight) * 0.015;
-    
-    
+
     const numDots = 8;
     for (let i = 0; i < numDots; i++) {
         const angle = (i / numDots) * Math.PI * 2 + time;
         const dotX = centerX + Math.cos(angle) * radius - dotSize / 2;
         const dotY = centerY + Math.sin(angle) * radius - dotSize / 2;
-        
-        
+
         const alpha = 0.3 + 0.7 * (Math.sin(angle - time) + 1) / 2;
-        
+
         gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
         gl.uniform4fv(quadUniformLocations.u_color, [1.0, 1.0, 1.0, alpha]);
         drawQuad(dotX, dotY, dotSize, dotSize);
     }
-    
-    
-    
 
     gl.bindVertexArray(null);
 }
 
 export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized) {
     if (!gl) return;
-    
+
     if (!areAllWorkersInitialized) {
         renderLoader();
     } else {
-        renderWorldsToTextures(allWorldsData); 
-        renderMainScene(selectedWorldIndex);   
+        renderWorldsToTextures(allWorldsData);
+        renderMainScene(selectedWorldIndex);
     }
 }
 
