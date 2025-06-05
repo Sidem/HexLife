@@ -22,7 +22,7 @@ export const DEFAULT_WORLD_ENABLED_STATES = [
 ];
 
 export const DEFAULT_SPEED = 20; 
-export const MAX_SIM_SPEED = 120;
+export const MAX_SIM_SPEED = 240;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 0; 
 export const MAX_NEIGHBORHOOD_SIZE = Math.floor(GRID_ROWS/2);
 export const STATS_HISTORY_SIZE = 1000; 
