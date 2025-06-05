@@ -69,10 +69,8 @@ export async function initRenderer(canvasElement) {
 
         ctx2d.clearRect(0, 0, texSize, texSize);
         
-        // Adjust text baseline and alignment for better centering
-        ctx2d.textAlign = 'center';
-        ctx2d.textBaseline = 'middle';
-
+        ctx2d.translate(-texSize / 2, texSize / 1.95);
+        ctx2d.scale(1, -1);
         ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)';
         const fontSize = texSize / 8; // Adjusted for better visibility
         ctx2d.font = `bold ${fontSize}px sans-serif`;
