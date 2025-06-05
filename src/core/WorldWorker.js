@@ -1,5 +1,8 @@
 import * as Config from './config.js';
+import init, { World } from './wasm-engine/hexlife_wasm.js';
 
+let wasm_module;
+let wasm_world;
 let worldIndex = -1;
 let workerConfig = {};
 let jsStateArray = null;
@@ -33,18 +36,9 @@ let lastSentChecksum = null;
 let stateHistoryChecksums = new Set();
 let stateChecksumQueue = [];
 
-/**
- * Calculates a simple checksum for a Uint8Array.
- * @param {Uint8Array} arr The array to process.
- * @returns {number} A 32-bit integer checksum.
- */
 function calculateChecksum(arr) {
-    if (!arr) return 0;
-    let checksum = 0;
-    for (let i = 0; i < arr.length; i++) {
-        checksum = (checksum * 31 + arr[i]) | 0;
-    }
-    return checksum;
+    if (!arr || !wasm_world) return 0;
+    return wasm_world.calculate_checksum(arr);
 }
 
 function rulesetToHex(rulesetArray) {
@@ -300,28 +294,21 @@ function runTick() {
 
     
     worldTickCounter++;
-    let activeCount = 0;
-    const numCols = workerConfig.GRID_COLS; 
+    //const numCols = workerConfig.GRID_COLS; 
 
-    for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
-        const cCol = i % numCols;
-        const cRow = Math.floor(i / numCols);
-        const cState = jsStateArray[i];
-        let neighborMask = 0;
-        const dirs = (cCol % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
-        for (let nOrder = 0; nOrder < 6; nOrder++) {
-            const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
-            const nRow = (cRow + dirs[nOrder][1] + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS; 
-            if (jsStateArray[nRow * numCols + nCol] === 1) {
-                neighborMask |= (1 << nOrder);
-            }
-        }
-        const ruleIdx = (cState << 6) | neighborMask;
-        if (isRunning && ruleUsageCounters) ruleUsageCounters[ruleIdx]++;
-        const nextStateValue = ruleset[ruleIdx];
-        jsNextStateArray[i] = nextStateValue;
-        jsNextRuleIndexArray[i] = ruleIdx;
-        if (nextStateValue === 1) activeCount++;
+    if (isRunning && wasm_world) {
+        wasm_world.run_tick(
+            ruleset,
+            jsStateArray,
+            jsNextStateArray,
+            jsNextRuleIndexArray,
+            ruleUsageCounters
+        );
+    }
+
+    let activeCount = 0;
+    for(let i = 0; i < jsNextStateArray.length; i++) {
+        if (jsNextStateArray[i] === 1) activeCount++;
     }
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
@@ -449,12 +436,14 @@ function updateSimulationInterval() {
     }
 }
 
-self.onmessage = function(event) {
+self.onmessage = async function(event) {
     const command = event.data;
     let processQueueAndForceTickForPausedState = false;
 
     switch (command.type) {
         case 'INIT':
+            await init(); 
+            wasm_world = new World(command.data.config.GRID_COLS, command.data.config.GRID_ROWS);
             worldIndex = command.data.worldIndex;
             workerConfig = command.data.config;
             currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED; 
