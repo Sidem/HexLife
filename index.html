@@ -124,28 +124,28 @@
 
         <div id="main-content-area">
             <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
-                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" aria-label="Play or pause simulation">▶</button>
-                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed" aria-label="Adjust simulation speed">SPD</button>
-                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size" aria-label="Brush tool and size adjustment">BRS</button>
+                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button>
+                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button>
+                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" aria-label="Generate new ruleset">NEW</button> 
-                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" aria-label="Set or copy ruleset">HEX</button>
+                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> 
+                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" aria-label="Reset or clear worlds">R/C</button>
+                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" aria-label="Open ruleset editor">EDT</button> 
-                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" aria-label="Open world setup panel">SET</button> 
-                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" aria-label="Open analysis panel">ANL</button>
-                <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" aria-label="Open rule rank panel">RNK</button>
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> 
+                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> 
+                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button>
+                <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel">RNK</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" aria-label="Save current world state">SAV</button>
-                <button id="loadStateButton" class="toolbar-button" title="Load World State" aria-label="Load world state from file">LOD</button>
+                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
+                <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
             </div>
-            <canvas id="hexGridCanvas" role="img" aria-label="Hexagonal cellular automaton simulation display"></canvas>
+            <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display"></canvas>
         </div>
 
         <div id="speedPopout" class="popout-panel hidden">
@@ -211,7 +211,7 @@
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true">
-            <button id="closeEditorButton" class="close-panel-button" title="Close Panel" aria-label="Close ruleset editor">&times;</button>
+            <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rulesetEditorTitle">Ruleset Editor</h3>
             <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input"
@@ -220,7 +220,7 @@
                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                 <button id="clearRulesButton" class="button"
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
-                <select id="rulesetEditorMode" title="Choose editor mode" aria-label="Editor mode selection">
+                <select id="rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
@@ -264,7 +264,7 @@
         </div>
 
         <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true">
-            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close setup panel">&times;</button>
+            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="setupPanelTitle">World Setup</h3>
             <div class="panel-content-area">
                 <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click
@@ -279,7 +279,7 @@
         </div>
 
         <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" aria-modal="true">
-            <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close analysis panel">&times;</button>
+            <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="analysisPanelTitle">Analysis Tools</h3>
             <div class="panel-content-area">
                 <div class="plugins-mount-area">
@@ -288,7 +288,7 @@
         </div>
 
         <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" aria-modal="true">
-            <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel" aria-label="Close rule rank panel">&times;</button>
+            <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rankPanelTitle">Rule Usage Ranking</h3>
             <div id="ruleRankContent" class="panel-content-area">
             </div>
