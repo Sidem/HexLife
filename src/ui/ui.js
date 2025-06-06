@@ -7,7 +7,8 @@ import { RuleRankPanel } from './components/RuleRankPanel.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { PopoutPanel } from './components/PopoutPanel.js'; 
+import { PopoutPanel } from './components/PopoutPanel.js';
+import { OnboardingManager } from './OnboardingManager.js'; 
 
 let uiElements;
 let sliderComponents = {}; 
@@ -33,6 +34,13 @@ document.addEventListener('popoutinteraction', (event) => {
 function handleClickOutside(event) {
     const hasOpenPopout = activePopouts.some(popout => !popout.isHidden());
     if (!hasOpenPopout) return;
+
+    // If the tour is active, don't close popouts.
+    // This is a cleaner alternative to checking for clicks inside the onboarding tooltip.
+    if (OnboardingManager.isActive()) {
+        return;
+    }
+
     const clickedInsidePopout = event.target.closest('.popout-panel');
     const clickedTriggerButton = activePopouts.some(popout => {
         return popout.triggerElement && popout.triggerElement.contains(event.target);
@@ -250,7 +258,17 @@ function _initPopoutControls() {
             setTimeout(() => uiElements.copyRuleFromPopoutButton.textContent = oldTxt, 1500);
         }).catch(err => alert('Failed to copy ruleset hex.'));
     });
-    
+
+    // Add an 'input' listener to the popout's hex input field.
+    // This will fire on typing, pasting, or any other value change.
+    uiElements.rulesetInputPopout.addEventListener('input', () => {
+        const hex = uiElements.rulesetInputPopout.value;
+        // Only dispatch if the input is a potentially valid hex string,
+        // which will trigger the onboarding step to advance.
+        if (hex && hex.length > 0) {
+            EventBus.dispatch(EVENTS.UI_RULESET_INPUT_CHANGED, { value: hex });
+        }
+    });
     
     uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
     uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); popoutPanels.resetClear.hide(); });
@@ -631,9 +649,30 @@ function setupUIEventListeners() {
     EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => {
         downloadFile(data.filename, data.content, data.mimeType);
     });
+    EventBus.subscribe(EVENTS.COMMAND_SHOW_POPOUT, (data) => {
+        if (popoutPanels[data.panelName]) {
+            if (data.shouldShow) {
+                closeAllPopouts();
+                popoutPanels[data.panelName].show();
+            } else {
+                popoutPanels[data.panelName].hide();
+            }
+        }
+    });
     uiElements.shareButton.addEventListener('click', generateAndShowShareLink);
     uiElements.copyShareLinkButton.addEventListener('click', copyShareLink);
 }
 
 
 export function getUIElements() { return uiElements; }
+
+export function showPopout(panelName, shouldShow = true) {
+    if (popoutPanels[panelName]) {
+        if (shouldShow) {
+            closeAllPopouts(); // Ensure others are closed
+            popoutPanels[panelName].show();
+        } else {
+            popoutPanels[panelName].hide();
+        }
+    }
+}

@@ -153,8 +153,8 @@ function defineOnboardingSteps() {
         },
         {
             element: '#newRulesButton',
-            content: "Let's change the rules. Click the 'NEW' button to open the rule generator. (`N` key works too!)",
-            primaryAction: { text: 'Generate' },
+            content: "Let's change the rules. This is the 'NEW' button, which opens the rule generator. (`N` key works too!)",
+            primaryAction: { text: 'Next' },
             advanceOn: { type: 'click', target: 'element' }
         },
         {
@@ -170,14 +170,17 @@ function defineOnboardingSteps() {
             advanceOn: { type: 'click', target: 'element' }
         },
         {
-            element: '#rulesetInputPopout',
-            content: `Now, copy this special "glider" ruleset and paste it into the input box:<br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code>`,
-            primaryAction: { text: 'I pasted it!' },
-            advanceOn: { type: 'click' } // User self-advances after pasting
+            element: '#setHexPopout',
+            content: `Now, use the button below to copy the special "glider" ruleset and then **paste it into the input box to continue.**<br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName: 'setHex', shouldShow: true });
+            },
+            primaryAction: { text: 'Waiting for paste...' },
+            advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
         },
         {
             element: '#setRuleFromPopoutButton',
-            content: "Click 'Set' to apply the new rules. After it resets, watch for the small, moving patterns—the 'gliders'!",
+            content: "Excellent! Now click 'Set' to apply the new rules. After it resets, watch for the small, moving patterns—the 'gliders'!",
             primaryAction: { text: 'Set' },
             advanceOn: { type: 'click', target: 'element' }
         },

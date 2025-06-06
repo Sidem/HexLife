@@ -1,9 +1,11 @@
 import * as PersistenceService from '../services/PersistenceService.js';
-import { EventBus } from '../services/EventBus.js';
+import { EventBus, EVENTS } from '../services/EventBus.js';
 
 let tourSteps = [];
 let currentStepIndex = -1;
 let highlightedElement = null;
+let highlightedElementParentPanel = null; // Track parent panel for z-index management
+let tourIsActive = false;
 
 const ui = {
     overlay: document.getElementById('onboarding-overlay'),
@@ -92,6 +94,11 @@ function cleanupCurrentStep() {
         highlightedElement.classList.remove('onboarding-highlight');
         highlightedElement = null;
     }
+    // Reset z-index of parent panel if it was modified
+    if (highlightedElementParentPanel) {
+        highlightedElementParentPanel.style.zIndex = ''; // Reset z-index to its default
+        highlightedElementParentPanel = null;
+    }
     ui.overlay.classList.add('hidden');
     ui.tooltip.classList.add('hidden');
     // Important: remove old listeners to prevent memory leaks
@@ -110,12 +117,25 @@ function showStep(stepIndex) {
     currentStepIndex = stepIndex;
     const step = tourSteps[stepIndex];
 
+    // Execute any pre-step actions, like opening a panel
+    if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
+        step.onBeforeShow();
+    }
+
     const targetElement = document.querySelector(step.element);
     if (!targetElement) {
         console.warn(`Onboarding element not found: ${step.element}`);
         showStep(stepIndex + 1); // Skip to next step
         return;
     }
+
+    const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
+    if (parentPanel) {
+        parentPanel.style.zIndex = '2001';
+        highlightedElementParentPanel = parentPanel; 
+    }
+
+    targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 
     highlightedElement = targetElement;
     if (targetElement !== document.body) {
@@ -126,6 +146,25 @@ function showStep(stepIndex) {
     ui.tooltip.classList.remove('hidden');
 
     ui.content.innerHTML = step.content;
+
+    const copyButton = document.getElementById('onboarding-copy-ruleset');
+    if (copyButton) {
+        copyButton.addEventListener('click', () => {
+            const rulesetToCopy = "12482080480080006880800180010117"; // The glider ruleset
+            navigator.clipboard.writeText(rulesetToCopy).then(() => {
+                copyButton.textContent = "Copied!";
+                copyButton.disabled = true; // Prevent multiple clicks
+                setTimeout(() => { 
+                    copyButton.textContent = "Copy Ruleset"; 
+                    copyButton.disabled = false;
+                }, 2000);
+            }).catch(err => {
+                console.error("Onboarding copy failed:", err);
+                copyButton.textContent = "Copy Failed";
+            });
+        });
+    }
+
     ui.primaryBtn.textContent = step.primaryAction.text;
 
     positionTooltip(targetElement);
@@ -158,12 +197,14 @@ function startTour() {
     if (PersistenceService.loadUISetting('onboarding_complete', false)) {
         return;
     }
+    tourIsActive = true; // Set state
     showStep(0);
 }
 
 function endTour() {
     cleanupCurrentStep();
     PersistenceService.saveUISetting('onboarding_complete', true);
+    tourIsActive = false; // Reset state
 }
 
 // Attach listeners for secondary actions
@@ -173,4 +214,5 @@ export const OnboardingManager = {
     defineTour,
     startTour,
     endTour,
+    isActive: () => tourIsActive, // Expose getter
 };

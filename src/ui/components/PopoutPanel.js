@@ -1,4 +1,3 @@
-
 import { BaseComponent } from './BaseComponent.js';
 
 export class PopoutPanel extends BaseComponent {
@@ -35,6 +34,10 @@ export class PopoutPanel extends BaseComponent {
 
     _handleOutsideClick(event) {
         if (this.popoutElement && !this.popoutElement.classList.contains('hidden')) {
+            const onboardingTooltip = document.getElementById('onboarding-tooltip');
+            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && onboardingTooltip.contains(event.target)) {
+                return;
+            }
             if (!this.popoutElement.contains(event.target) && event.target !== this.triggerElement && !this.triggerElement.contains(event.target)) {
                 this.hide();
             }

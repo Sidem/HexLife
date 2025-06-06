@@ -65,6 +65,8 @@ export const EVENTS = {
     COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled', 
     COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
     COMMAND_SELECT_WORLD: 'command:selectWorld', 
+    COMMAND_SHOW_POPOUT: 'command:showPopout',
     UI_RULESET_SCOPE_CHANGED: 'ui:rulesetScopeChanged', 
     UI_EDITOR_RULESET_SCOPE_CHANGED: 'ui:editorRulesetScopeChanged', 
+    UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged'
 };
