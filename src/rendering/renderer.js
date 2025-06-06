@@ -1,6 +1,7 @@
 import * as Config from '../core/config.js';
 import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
+import { generateColorLUT } from '../utils/ruleVizUtils.js';
 
 let gl;
 let canvas;
@@ -16,6 +17,7 @@ let hexBuffers;
 let quadBuffers;
 let hexVAO;
 let quadVAO;
+let hexLUTTexture = null;
 let disabledTextTexture = null;
 
 export async function initRenderer(canvasElement) {
@@ -27,8 +29,6 @@ export async function initRenderer(canvasElement) {
         return null;
     }
 
-    // Ensure shader paths are correct if your project structure is different
-    // For this example, assuming they are relative to where the HTML file is served or bundler output
     hexShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/vertex.glsl', 'shaders/fragment.glsl');
     quadShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/quad_vertex.glsl', 'shaders/quad_fragment.glsl');
 
@@ -47,6 +47,7 @@ export async function initRenderer(canvasElement) {
         hexSize: gl.getUniformLocation(hexShaderProgram, "u_hexSize"),
         hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
         hoverInactiveLightenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverInactiveLightenFactor"),
+        colorLUT: gl.getUniformLocation(hexShaderProgram, "u_colorLUT"),
     };
 
     quadAttributeLocations = {
@@ -58,6 +59,14 @@ export async function initRenderer(canvasElement) {
         u_color: gl.getUniformLocation(quadShaderProgram, "u_color"),
         u_useTexture: gl.getUniformLocation(quadShaderProgram, "u_useTexture"),
     };
+    const lutData = generateColorLUT();
+    hexLUTTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     try {
         const tempCanvas = document.createElement('canvas');
@@ -72,10 +81,10 @@ export async function initRenderer(canvasElement) {
         ctx2d.translate(-texSize / 2, texSize / 1.95);
         ctx2d.scale(1, -1);
         ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)';
-        const fontSize = texSize / 8; // Adjusted for better visibility
+        const fontSize = texSize / 8; 
         ctx2d.font = `bold ${fontSize}px sans-serif`;
         
-        // No need to translate and scale if using textBaseline and textAlign
+        
         ctx2d.fillText('DISABLED', texSize / 2, texSize / 2);
 
 
@@ -122,7 +131,7 @@ function setupHexBuffersAndVAO() {
     }
     hexBuffers.offsetBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, instanceOffsets, gl.STATIC_DRAW);
 
-    // OPTIMIZATION: Use Uint8Array for initial buffer data for state, hover, and ruleIndex
+    
     const initialZerosUint8 = new Uint8Array(Config.NUM_CELLS).fill(0);
     hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
     hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
@@ -140,20 +149,20 @@ function setupHexBuffersAndVAO() {
     gl.vertexAttribPointer(hexAttributeLocations.instanceOffset, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(hexAttributeLocations.instanceOffset, 1);
 
-    // OPTIMIZATION: Change vertexAttribPointer for instance data to use UNSIGNED_BYTE
+    
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.stateBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceState);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceState, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
+    gl.vertexAttribPointer(hexAttributeLocations.instanceState, 1, gl.UNSIGNED_BYTE, false, 0, 0); 
     gl.vertexAttribDivisor(hexAttributeLocations.instanceState, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.hoverBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceHoverState);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceHoverState, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
+    gl.vertexAttribPointer(hexAttributeLocations.instanceHoverState, 1, gl.UNSIGNED_BYTE, false, 0, 0); 
     gl.vertexAttribDivisor(hexAttributeLocations.instanceHoverState, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.ruleIndexBuffer);
     gl.enableVertexAttribArray(hexAttributeLocations.instanceRuleIndex);
-    gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.UNSIGNED_BYTE, false, 0, 0); // Type: UNSIGNED_BYTE, Normalized: false
+    gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.UNSIGNED_BYTE, false, 0, 0); 
     gl.vertexAttribDivisor(hexAttributeLocations.instanceRuleIndex, 1);
 
     gl.bindVertexArray(null);
@@ -193,6 +202,9 @@ function renderWorldsToTextures(allWorldsData) {
 
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const worldData = allWorldsData[i];
         const fboData = worldFBOs[i];
@@ -216,11 +228,7 @@ function renderWorldsToTextures(allWorldsData) {
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
-
-            // OPTIMIZATION: Remove per-frame Float32Array creation. Pass Uint8Array directly.
-            // const gpuState = new Float32Array(worldData.jsStateArray); // REMOVED
-            // const gpuHover = new Float32Array(worldData.jsHoverStateArray); // REMOVED
-            // const gpuRuleIndex = new Float32Array(worldData.jsRuleIndexArray); // REMOVED
+            gl.uniform1i(hexUniformLocations.colorLUT, 1);
 
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);

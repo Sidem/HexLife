@@ -1,5 +1,8 @@
-
 import * as Config from '../core/config.js'; 
+
+let _neighborhoodQueue = [];
+let _neighborhoodVisited = new Map();
+let _queueHead = 0;
 
 /**
  * Calculates grid coordinates from a flat array index.
@@ -193,4 +196,50 @@ export function calculateHexSizeForTexture() {
     const scaleY = Config.RENDER_TEXTURE_SIZE / approxGridPixelHeight;
     const scale = Math.min(scaleX, scaleY) * 0.98; 
     return Config.HEX_SIZE * scale;
+}
+
+/**
+ * Finds all hexagons within a certain distance from a starting point using a breadth-first search.
+ * This function is optimized to avoid memory allocation in the hot path by using pre-allocated,
+ * reusable data structures for the queue and visited set.
+ *
+ * @param {number} startCol The starting column.
+ * @param {number} startRow The starting row.
+ * @param {number} maxDistance The maximum distance (brush size) from the start.
+ * @param {Set<number>} outAffectedSet A Set object that will be cleared and populated with the indices of the affected cells.
+ */
+export function findHexagonsInNeighborhood(startCol, startRow, maxDistance, outAffectedSet) {
+    outAffectedSet.clear();
+    if (startCol === null || startRow === null) return;
+
+    _neighborhoodQueue.length = 0;
+    _neighborhoodVisited.clear();
+    _queueHead = 0;
+
+    const startIndex = startRow * Config.GRID_COLS + startCol;
+    if (startIndex < 0 || startIndex >= Config.NUM_CELLS) return;
+
+    _neighborhoodQueue.push([startCol, startRow, 0]);
+    _neighborhoodVisited.set(startIndex, 0);
+    outAffectedSet.add(startIndex);
+
+    while (_queueHead < _neighborhoodQueue.length) {
+        const [cc, cr, cd] = _neighborhoodQueue[_queueHead++]; // Dequeue without shifting array
+        if (cd >= maxDistance) continue;
+
+        const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
+        for (const [dx, dy] of dirs) {
+            const nc = cc + dx;
+            const nr = cr + dy;
+            const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
+            const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
+            const neighborIndex = wr * Config.GRID_COLS + wc;
+
+            if (!_neighborhoodVisited.has(neighborIndex)) {
+                _neighborhoodVisited.set(neighborIndex, cd + 1);
+                outAffectedSet.add(neighborIndex);
+                _neighborhoodQueue.push([wc, wr, cd + 1]);
+            }
+        }
+    }
 }

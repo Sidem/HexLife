@@ -127,7 +127,7 @@ function applyBrushLogic(col, row, brushSize) {
 }
 
 function applySelectiveBrushLogic(cellIndices) {
-    if (!jsStateArray || !cellIndices || cellIndices.length === 0) return false;
+    if (!jsStateArray || !cellIndices || cellIndices.size === 0) return false;
     let changed = false;
     for (const idx of cellIndices) {
         if (idx >= 0 && idx < workerConfig.NUM_CELLS) {
@@ -220,8 +220,7 @@ function processCommandQueue() {
                 }
                 break;
             case 'SET_HOVER_STATE':
-                const hoverIndicesSet = new Set(command.data.hoverAffectedIndices);
-                if (setHoverStateLogic(hoverIndicesSet)) {
+                if (setHoverStateLogic(command.data.hoverAffectedIndices)) {
                     needsStateUpdate = true;
                 }
                 break;
@@ -291,10 +290,8 @@ function runTick() {
         }
         return;
     }
-
     
     worldTickCounter++;
-    //const numCols = workerConfig.GRID_COLS; 
 
     if (isRunning && wasm_world) {
         wasm_world.run_tick(

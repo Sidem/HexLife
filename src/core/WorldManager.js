@@ -3,6 +3,7 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
+import * as Utils from '../utils/utils.js';
 
 export class WorldManager {
     constructor() {
@@ -11,6 +12,7 @@ export class WorldManager {
         this.isGloballyPaused = true;
         this.currentGlobalSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
         this.currentBrushSize = PersistenceService.loadBrushSize() || Config.DEFAULT_NEIGHBORHOOD_SIZE;
+        this._hoverAffectedIndicesSet = new Set();
 
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
@@ -238,8 +240,8 @@ export class WorldManager {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-            const affectedIndices = this._findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize);
-            this.worlds[data.worldIndex]?.setHoverState(affectedIndices);
+            Utils.findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize, this._hoverAffectedIndicesSet);
+            this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
             this.worlds[data.worldIndex]?.clearHoverState();
@@ -437,10 +439,10 @@ export class WorldManager {
             if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
                 const output = ruleset[(centerState << 6) | mask];
                 if (firstOutput === -1) firstOutput = output;
-                else if (firstOutput !== output) return 2; // Mixed state
+                else if (firstOutput !== output) return 2;
             }
         }
-        return firstOutput === -1 ? 2 : firstOutput; // Default to mixed if no rules match (should not happen for 0-6 neighbors)
+        return firstOutput === -1 ? 2 : firstOutput;
     }
 
     getCanonicalRuleDetails = () => {
@@ -488,15 +490,15 @@ export class WorldManager {
                 console.warn("_generateRandomRulesetHex: symmetryData not available for r_sym, falling back to random.");
                 for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
             } else {
-                tempRuleset.fill(0); // Ensure clean slate
+                tempRuleset.fill(0);
                 for (const group of this.symmetryData.canonicalRepresentatives) {
-                    for (let cs = 0; cs <= 1; cs++) { // Iterate for center state 0 and 1
+                    for (let cs = 0; cs <= 1; cs++) {
                         const out = Math.random() < bias ? 1 : 0;
                         for (const member of group.members) tempRuleset[(cs << 6) | member] = out;
                     }
                 }
             }
-        } else { // Default to 'random'
+        } else {
             for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
         }
         return this.rulesetToHex(tempRuleset);
@@ -512,8 +514,7 @@ export class WorldManager {
     hexToRuleset(hexString) {
         const ruleset = new Uint8Array(128).fill(0);
         if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
-            // console.warn("Invalid hex string provided to hexToRuleset:", hexString);
-            return ruleset; // Return a default (all zeros) ruleset for invalid hex
+            return ruleset;
         }
         try {
             let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
@@ -521,48 +522,6 @@ export class WorldManager {
         } catch (e) { console.error("Error converting hex to ruleset:", hexString, e); }
         return ruleset;
     }
-
-    _findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
-        const affected = new Set();
-        if (startCol === null || startRow === null) return Array.from(affected);
-
-        // OPTIMIZATION: Use numerical key for visited Map
-        const startKey = (startCol << 16) | startRow; // Max GRID_COLS/GRID_ROWS expected < 65536
-        const visited = new Map([[startKey, 0]]);
-
-        // OPTIMIZATION: Pointer-based queue
-        const q = [];
-        q.push([startCol, startRow, 0]);
-        let head = 0;
-
-        const startIndex = startRow * Config.GRID_COLS + startCol;
-        if (startIndex !== undefined && startIndex >= 0 && startIndex < Config.NUM_CELLS) affected.add(startIndex);
-
-        while (head < q.length) {
-            const [cc, cr, cd] = q[head++]; // Dequeue using head pointer
-            if (cd >= maxDistance) continue;
-
-            const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
-            for (const [dx, dy] of dirs) {
-                const nc = cc + dx;
-                const nr = cr + dy;
-                const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
-                const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
-
-                const neighborKey = (wc << 16) | wr; // Use numerical key for lookup
-                if (!visited.has(neighborKey)) {
-                    const ni = wr * Config.GRID_COLS + wc;
-                    if (ni !== undefined && ni >= 0 && ni < Config.NUM_CELLS) {
-                        visited.set(neighborKey, cd + 1);
-                        affected.add(ni);
-                        q.push([wc, wr, cd + 1]);
-                    }
-                }
-            }
-        }
-        return Array.from(affected);
-    }
-
 
     saveSelectedWorldState = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
@@ -600,7 +559,7 @@ export class WorldManager {
             this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialDensity = newDensity;
-            this.worldSettings[worldIndex].enabled = true; // Ensure loaded world is enabled
+            this.worldSettings[worldIndex].enabled = true;
         }
 
         proxy.sendCommand('LOAD_STATE', {
@@ -609,7 +568,7 @@ export class WorldManager {
             worldTick: loadedData.worldTick || 0
         }, [newStateArray.buffer.slice(0), newRulesetArray.buffer.slice(0)]);
 
-        proxy.setEnabled(true); // Ensure proxy knows it's enabled
+        proxy.setEnabled(true);
         if (!this.isGloballyPaused) {
             proxy.startSimulation();
             proxy.setSpeed(this.currentGlobalSpeed);
@@ -620,7 +579,7 @@ export class WorldManager {
             this.dispatchSelectedWorldUpdates();
         }
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // To refresh UI if necessary
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
     }
 
     getEntropySamplingState = () => ({ enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });

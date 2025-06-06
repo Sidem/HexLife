@@ -27,12 +27,12 @@ export class WorldProxy {
         this.onInitialized = worldManagerCallbacks.onInitialized;
         this.MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 
-        // For TPS calculation
-        this.lastTickCountForServerUpdate = 0; // Renamed for clarity
+        
+        this.lastTickCountForServerUpdate = 0; 
         this.tpsAggregator = {
             ticksCounted: 0,
             startTime: performance.now(),
-            calculationWindowSeconds: 0.5 // Calculate TPS over this period (e.g., 500ms)
+            calculationWindowSeconds: 0.5 
         };
 
 
@@ -43,7 +43,7 @@ export class WorldProxy {
             GRID_COLS: initialSettings.config.GRID_COLS,
             NUM_CELLS: initialSettings.config.NUM_CELLS,
         };
-        // Ensure .slice(0) is used for rulesetBuffer if it's from an existing buffer that might be modified elsewhere
+        
         const initialStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
         const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0);
         const initialHoverStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
@@ -69,7 +69,7 @@ export class WorldProxy {
         switch (data.type) {
             case 'INIT_ACK':
                 this.isInitialized = true;
-                this.tpsAggregator.startTime = performance.now(); // Reset TPS aggregator start time
+                this.tpsAggregator.startTime = performance.now(); 
                 this.lastTickCountForServerUpdate = 0;
                 this.latestStats.ratioHistory = [];
                 this.latestStats.entropyHistory = [];
@@ -84,21 +84,21 @@ export class WorldProxy {
                 break;
             case 'STATS_UPDATE':
                 const currentTime = performance.now();
-                // Calculate ticks performed by worker since its last STATS_UPDATE processed by this proxy
+                
                 const ticksSinceLastWorkerUpdate = data.tick - this.lastTickCountForServerUpdate;
 
                 this.tpsAggregator.ticksCounted += ticksSinceLastWorkerUpdate;
                 const elapsedAggregatorTimeSeconds = (currentTime - this.tpsAggregator.startTime) / 1000;
 
-                let smoothedTPS = this.latestStats.tps; // Default to previous value
+                let smoothedTPS = this.latestStats.tps; 
 
                 if (elapsedAggregatorTimeSeconds >= this.tpsAggregator.calculationWindowSeconds) {
                     if (this.tpsAggregator.ticksCounted > 0 && elapsedAggregatorTimeSeconds > 0) {
                         smoothedTPS = parseFloat((this.tpsAggregator.ticksCounted / elapsedAggregatorTimeSeconds).toFixed(1));
-                    } else if (elapsedAggregatorTimeSeconds > 0) { // Time passed, but no ticks
+                    } else if (elapsedAggregatorTimeSeconds > 0) { 
                         smoothedTPS = 0;
                     }
-                    // Reset aggregator for the next window
+                    
                     this.tpsAggregator.ticksCounted = 0;
                     this.tpsAggregator.startTime = currentTime;
                 }
@@ -127,19 +127,19 @@ export class WorldProxy {
                 }
 
                 this.latestStats = {
-                    ...this.latestStats, // Preserve history arrays and other potentially unchanged stats
+                    ...this.latestStats, 
                     tick: data.tick,
                     activeCount: data.activeCount,
                     ratio: data.ratio,
                     binaryEntropy: data.binaryEntropy,
                     blockEntropy: data.blockEntropy,
                     isEnabled: data.isEnabled,
-                    tps: smoothedTPS, // Use the smoothed TPS
+                    tps: smoothedTPS, 
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
-                    // ruleUsage is updated above if present
+                    
                 };
 
-                this.lastTickCountForServerUpdate = data.tick; // Update for the next calculation
+                this.lastTickCountForServerUpdate = data.tick; 
 
                 this.onUpdate(this.worldIndex, 'stats');
                 break;
@@ -148,7 +148,7 @@ export class WorldProxy {
 
     sendCommand(commandType, commandData, transferList = []) {
         if (!this.isInitialized && commandType !== 'INIT') {
-            // console.warn(`WorldProxy ${this.worldIndex}: Worker not initialized, command '${commandType}' buffered or ignored.`);
+            
             return;
         }
         if (transferList.length > 0) {
@@ -162,7 +162,7 @@ export class WorldProxy {
     stopSimulation() { this.sendCommand('STOP_SIMULATION', {}); }
     setSpeed(speed) { this.sendCommand('SET_SPEED_TARGET', { speed }); }
     setEnabled(enabled) {
-        // Optimistically update local state, worker will confirm via STATS_UPDATE
+        
         this.latestStats.isEnabled = enabled;
         this.sendCommand('SET_ENABLED', { enabled });
     }
@@ -171,11 +171,11 @@ export class WorldProxy {
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
     }
     resetWorld(optionsOrDensity) {
-        // Reset TPS aggregator on world reset
+        
         this.tpsAggregator.ticksCounted = 0;
         this.tpsAggregator.startTime = performance.now();
-        this.lastTickCountForServerUpdate = 0; // Reset tick count as worker's tick will reset
-        this.latestStats.tps = 0; // Display 0 until new calculation window completes
+        this.lastTickCountForServerUpdate = 0; 
+        this.latestStats.tps = 0; 
 
         this.latestStats.ratioHistory = [];
         this.latestStats.entropyHistory = [];
@@ -203,7 +203,7 @@ export class WorldProxy {
         this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices });
     }
     setHoverState(hoverAffectedIndices) {
-        this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices: Array.from(hoverAffectedIndices) });
+        this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices });
     }
     clearHoverState() {
         this.sendCommand('CLEAR_HOVER_STATE', {});
@@ -219,7 +219,7 @@ export class WorldProxy {
     }
 
     getLatestStats() {
-        // Return a copy to prevent external modification
+        
         return { ...this.latestStats };
     }
 

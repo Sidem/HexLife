@@ -139,7 +139,6 @@ function handleCanvasClick(event) {
 function handleCanvasMouseDown(event) {
     if (!isInitialized || !worldManager) return;
     
-    
     if (event.button !== 0) return;
     
     const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
@@ -161,16 +160,14 @@ function handleCanvasMouseDown(event) {
             initialWorldState = null;
         }
         
-        const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
-        brushCells.forEach(cellIndex => {
+        Utils.findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
+
+        strokeAffectedCells.forEach(cellIndex => {
             cellsShouldBeToggled.add(cellIndex);
-            strokeAffectedCells.add(cellIndex);
         });
-        
-        
         EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
             worldIndex: worldIndexAtCursor,
-            cellIndices: brushCells
+            cellIndices: strokeAffectedCells
         });
         
         event.preventDefault();
@@ -196,37 +193,6 @@ function handleCanvasMouseUp(event) {
     initialWorldState = null;
 }
 
-
-function findHexagonsInNeighborhood(startCol, startRow, maxDistance) {
-    const affected = new Set();
-    if (startCol === null || startRow === null) return Array.from(affected);
-    const q = [[startCol, startRow, 0]];
-    const visited = new Map([[`${startCol},${startRow}`, 0]]);
-    const startIndex = startRow * Config.GRID_COLS + startCol;
-    if (startIndex !== undefined && startIndex >= 0 && startIndex < Config.NUM_CELLS) affected.add(startIndex);
-
-    while (q.length > 0) {
-        const [cc, cr, cd] = q.shift();
-        if (cd >= maxDistance) continue;
-        const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
-        for (const [dx, dy] of dirs) {
-            const nc = cc + dx;
-            const nr = cr + dy;
-            const wc = (nc % Config.GRID_COLS + Config.GRID_COLS) % Config.GRID_COLS;
-            const wr = (nr % Config.GRID_ROWS + Config.GRID_ROWS) % Config.GRID_ROWS;
-            if (!visited.has(`${wc},${wr}`)) {
-                const ni = wr * Config.GRID_COLS + wc;
-                if (ni !== undefined && ni >= 0 && ni < Config.NUM_CELLS) {
-                    visited.set(`${wc},${wr}`, cd + 1);
-                    affected.add(ni);
-                    q.push([wc, wr, cd + 1]);
-                }
-            }
-        }
-    }
-    return Array.from(affected);
-}
-
 function handleCanvasMouseMove(event) {
     if (!isInitialized || !worldManager || !gl || !gl.canvas) return;
     const { worldIndexAtCursor, col, row, viewType } = getCoordsFromMouseEvent(event);
@@ -236,14 +202,17 @@ function handleCanvasMouseMove(event) {
         const currentCellIndex = row * Config.GRID_COLS + col; 
         if (currentCellIndex !== lastDrawnCellIndex) {
             lastDrawnCellIndex = currentCellIndex;
-            const brushCells = findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize());
-            const newCellsToToggle = brushCells.filter(cellIndex => !cellsShouldBeToggled.has(cellIndex));
-            if (newCellsToToggle.length > 0) {
-                newCellsToToggle.forEach(cellIndex => {
+            Utils.findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
+            const newCellsToToggle = [];
+            strokeAffectedCells.forEach(cellIndex => {
+                if (!cellsShouldBeToggled.has(cellIndex)) {
+                    newCellsToToggle.push(cellIndex);
                     cellsShouldBeToggled.add(cellIndex);
-                    strokeAffectedCells.add(cellIndex);
-                });
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { 
+                }
+            });
+
+            if (newCellsToToggle.length > 0) {
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
                     worldIndex: selectedWorldIdx,
                     cellIndices: newCellsToToggle
                 });

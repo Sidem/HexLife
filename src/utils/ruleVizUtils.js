@@ -1,42 +1,45 @@
 /**
- * Utility functions for creating rule visualizations.
- * These functions are shared between RulesetEditor and RuleRankPanel components.
+ * Utility functions for creating rule visualizations and colors.
+ * These functions are shared between UI components and the WebGL renderer.
  */
 
 /**
- * Converts HSV color values to RGB
+ * Converts HSV color values to an [r, g, b] array.
  * @param {number} h Hue (0-1)
  * @param {number} s Saturation (0-1)
  * @param {number} v Value (0-1)
- * @returns {object} RGB values {r, g, b} in 0-1 range
+ * @returns {number[]} Array of RGB values [r, g, b] in the 0-255 range.
  */
 function hsvToRgb(h, s, v) {
-    
-    const K = [1.0, 2.0/3.0, 1.0/3.0, 3.0];
-    const p = [
-        Math.abs((h + K[0]) % 1.0 * 6.0 - K[3]),
-        Math.abs((h + K[1]) % 1.0 * 6.0 - K[3]),
-        Math.abs((h + K[2]) % 1.0 * 6.0 - K[3])
-    ].map(val => Math.max(0, Math.min(1, val - 1)));
-    
-    return {
-        r: v * (K[0] * (1 - s) + p[0] * s),
-        g: v * (K[0] * (1 - s) + p[1] * s),
-        b: v * (K[0] * (1 - s) + p[2] * s)
-    };
+    let r, g, b;
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+
+    switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        case 5: r = v; g = p; b = q; break;
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
 /**
- * Calculates the color for a hexagon based on rule index and state, matching the fragment shader logic.
- * @param {number} ruleIndex The rule index (0-127)
- * @param {number} state The cell state (0 or 1)
- * @returns {string} CSS color string
+ * Generates the precise color for a rule index and state, matching the shader logic.
+ * @param {number} ruleIndex The rule index (0-127).
+ * @param {number} state The cell state (0 or 1).
+ * @returns {number[]} An array of [r, g, b] values (0-255).
  */
-export function getRuleIndexColor(ruleIndex, state) {
-    const hueOffset = 0.1667; 
+function generateRuleColor(ruleIndex, state) {
+    const hueOffset = 0.1667; // Yellow offset
     const calculatedHue = ruleIndex / 128.0;
     const hue = (calculatedHue + hueOffset) % 1.0;
-    
+
     let saturation, value;
     if (state === 1) {
         saturation = 1.0;
@@ -45,35 +48,59 @@ export function getRuleIndexColor(ruleIndex, state) {
         saturation = 0.5;
         value = 0.15;
     }
-    
-    const rgb = hsvToRgb(hue, saturation, value);
-    
-    
-    const r = Math.round(rgb.r * 255);
-    const g = Math.round(rgb.g * 255);
-    const b = Math.round(rgb.b * 255);
-    
+    return hsvToRgb(hue, saturation, value);
+}
+
+/**
+ * Creates a Uint8Array representing a 128x2 RGBA texture for rule colors.
+ * Row 0: Inactive states
+ * Row 1: Active states
+ * @returns {Uint8Array} The texture data.
+ */
+export function generateColorLUT() {
+    const width = 128;
+    const height = 2;
+    const data = new Uint8Array(width * height * 4);
+
+    for (let state = 0; state < height; state++) { // 0 for inactive, 1 for active
+        for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
+            const color = generateRuleColor(ruleIndex, state);
+            const dataIndex = (state * width + ruleIndex) * 4;
+            data[dataIndex] = color[0];     // R
+            data[dataIndex + 1] = color[1]; // G
+            data[dataIndex + 2] = color[2]; // B
+            data[dataIndex + 3] = 255;      // A
+        }
+    }
+    return data;
+}
+
+
+/**
+ * Returns a CSS color string for a given rule and state, for use in the UI.
+ * This function now uses the centralized color generator.
+ * @param {number} ruleIndex The rule index (0-127)
+ * @param {number} state The cell state (0 or 1)
+ * @returns {string} CSS color string
+ */
+export function getRuleIndexColor(ruleIndex, state) {
+    const [r, g, b] = generateRuleColor(ruleIndex, state);
     return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**
  * Creates a DOM element for visualizing a single cellular automaton rule.
+ * (This function remains unchanged but now relies on the updated getRuleIndexColor)
  * @param {object} options - The configuration for the visualization.
- * @param {number} options.ruleIndex - The rule index (0-127).
- * @param {number} options.outputState - The output of the rule (0 or 1).
- * @param {number} [options.usagePercent=0] - The usage percentage of the rule.
- * @param {number} [options.normalizedUsage=0] - The usage normalized from 0.0 to 1.0.
- * @param {number} [options.rawUsageCount=0] - The raw invocation count.
- * @param {boolean} [options.showUsageOverlay=false] - Whether to show usage overlay.
  * @returns {HTMLElement} The complete div element for the rule visualization.
  */
-export function createRuleVizElement({ 
-    ruleIndex, 
-    outputState, 
-    usagePercent = 0, 
-    normalizedUsage = 0, 
+export function createRuleVizElement({
+    ruleIndex,
+    outputState,
+    usagePercent = 0,
+    normalizedUsage = 0,
     rawUsageCount = 0,
-    showUsageOverlay = false 
+    showUsageOverlay = false
 }) {
     const centerState = (ruleIndex >> 6) & 1;
     const neighborMask = ruleIndex & 0x3F;
@@ -92,14 +119,14 @@ export function createRuleVizElement({
             const neighborColor = neighborState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
             return `<div class="hexagon neighbor-hex neighbor-${n}" style="background-color: ${neighborColor};"></div>`;
         }).join('');
-        
-    
+
+
     if (showUsageOverlay && normalizedUsage > 0) {
         const usageOverlay = document.createElement('div');
         usageOverlay.className = 'rule-usage-overlay';
-        usageOverlay.style.opacity = normalizedUsage * 0.8; 
+        usageOverlay.style.opacity = normalizedUsage * 0.8;
         viz.appendChild(usageOverlay);
     }
 
     return viz;
-} 
+}

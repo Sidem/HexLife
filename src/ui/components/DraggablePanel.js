@@ -55,7 +55,6 @@ export class DraggablePanel {
     }
 
     _onTouchStart(event) {
-        // Ignore if touching an interactive element
         if (event.target.closest('input, button, select, textarea, .rule-viz, .neighbor-count-rule-viz, a')) {
             return;
         }

@@ -64,7 +64,6 @@ export async function loadShaderProgram(gl, vsPath, fsPath) {
         const program = createProgram(gl, vertexShader, fragmentShader);
 
         if (program) {
-            // It's good practice to delete shaders after linking if they are no longer needed
             gl.deleteShader(vertexShader);
             gl.deleteShader(fragmentShader);
         }
