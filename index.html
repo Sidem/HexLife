@@ -36,58 +36,11 @@
       "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
     }
     </script>
-    <link rel="preload" href="style.css?v=1.1" as="style">
+    <link rel="preload" href="style.css?v=1.2" as="style">
     <link rel="preload" href="src/main.js" as="script" crossorigin="">
-    <link rel="stylesheet" href="style.css?v=1.1">
+    <link rel="stylesheet" href="style.css?v=1.2">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-
     <link rel="apple-touch-icon" href="favicon.ico">
-    <style>
-        .toolbar-button, .button, .checkbox-label, .radio-switch-label {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-        }
-        
-        @media (hover: none) and (pointer: coarse) {
-            .toolbar-button, .button, .checkbox-label, .radio-switch-label {
-                min-height: 44px;
-                min-width: 44px;
-            }
-        }
-        
-        @supports (-webkit-overflow-scrolling: touch) {
-            input[type="text"], input[type="range"], select, textarea {
-                font-size: 16px !important;
-            }
-        }
-        
-        body {
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-        }
-        
-        #top-info-bar {
-            padding-top: env(safe-area-inset-top);
-        }
-        
-        * {
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .toolbar-button, .button {
-            touch-action: manipulation;
-        }
-        
-        #hexGridCanvas {
-            touch-action: manipulation;
-        }
-        #vertical-toolbar {
-            touch-action: pan-x;
-        }
-    </style>
 </head>
 
 <body>
@@ -324,9 +277,6 @@
                 document.body.style.webkitTouchCallout = 'none';
             });
         }
-        window.addEventListener('load', function() {
-            console.log('HexLife Explorer loaded and optimized for mobile');
-        });
     </script>
     
     <script type="module" src="src/main.js"></script>

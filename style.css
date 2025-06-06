@@ -1242,7 +1242,7 @@ label.sym-label {
 
 /* Rule Rank Panel Specific Styles */
 #ruleRankPanel {
-    width: 400px;
+    width: 600px;
     max-height: 70vh;
     overflow-y: auto;
 }
@@ -1366,4 +1366,144 @@ label.sym-label {
         transform: scale(0.3) translate(-95px, -75px);
         margin: -35px 0;
     }
+}
+
+/* Add to the end of style.css */
+#ruleRankPanel .panel-content-area {
+    padding: 0;
+}
+
+#ruleRankPanel .empty-state-text {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    font-style: italic;
+}
+
+.dual-rank-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+    height: 100%;
+}
+
+.rank-column {
+    flex: 1;
+    min-width: 0;
+    background-color: rgba(0,0,0,0.2);
+    border: 1px solid #333;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Important for child scrolling */
+}
+
+.rank-column-header {
+    font-weight: bold;
+    text-align: center;
+    padding: 8px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid #444;
+    font-size: 0.9em;
+    color: #ddd;
+    flex-shrink: 0;
+}
+
+.rank-list-content {
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+/* This is the crucial addition to restore the background bar's base style */
+.usage-background-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    transition: width 0.3s ease-out; /* Add a smooth transition */
+}
+
+/* Specific background colors for each column's bar */
+#activation-rank .usage-background-bar {
+    background-color: rgba(59, 130, 246, 0.25); /* Blueish for activation */
+}
+
+#deactivation-rank .usage-background-bar {
+    background-color: rgba(239, 68, 68, 0.25); /* Reddish for deactivation */
+}
+
+/* --- Adjustments to existing Rule Rank Panel styles --- */
+
+/* Make list items relative for the absolute background bar */
+.rank-list-item {
+    position: relative;
+    z-index: 1; /* Keep content above the background bar */
+}
+
+
+#ruleRankPanel .rank-list-header {
+    grid-template-columns: 35px 1fr 80px;
+    font-size: 0.8em;
+    padding: 6px 8px;
+    position: sticky;
+    top: 0;
+    background-color: rgba(40, 40, 40, 0.95);
+    z-index: 2; /* Header should be above scrolling content */
+}
+
+#ruleRankPanel .rank-list-item {
+    grid-template-columns: 35px 1fr 80px;
+}
+
+#ruleRankPanel .rank-list-item .rank-list-viz {
+    transform: scale(0.45) translate(-10px, 0px);
+    margin: -30px 0;
+}
+
+.toolbar-button, .button, .checkbox-label, .radio-switch-label {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .toolbar-button, .button, .checkbox-label, .radio-switch-label {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+@supports (-webkit-overflow-scrolling: touch) {
+    input[type="text"], input[type="range"], select, textarea {
+        font-size: 16px !important;
+    }
+}
+
+body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+#top-info-bar {
+    padding-top: env(safe-area-inset-top);
+}
+
+* {
+    -webkit-overflow-scrolling: touch;
+}
+
+.toolbar-button, .button {
+    touch-action: manipulation;
+}
+
+#hexGridCanvas {
+    touch-action: manipulation;
+}
+#vertical-toolbar {
+    touch-action: pan-x;
 }

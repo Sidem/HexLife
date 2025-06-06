@@ -1,7 +1,7 @@
 import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { getRuleIndexColor, createRuleVizElement } from '../../utils/ruleVizUtils.js';
+import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditor extends BasePanel {
     constructor(panelElement, worldManagerInterface) {
@@ -51,7 +51,7 @@ export class RulesetEditor extends BasePanel {
         const detailedGrid = this.uiElements.rulesetEditorGrid;
         const detailedFrag = document.createDocumentFragment();
         for (let i = 0; i < 128; i++) {
-            const viz = createRuleVizElement({ ruleIndex: i, outputState: 0 }); // Create with default state
+            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }); // Create with default state
             const innerHex = viz.querySelector('.inner-hex');
             this.cachedDetailedRules[i] = { viz, innerHex }; // Cache the element and its key part
             detailedFrag.appendChild(viz);

@@ -1,10 +1,22 @@
 import { BasePanel } from './BasePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
-import { createRuleVizElement, getRuleIndexColor } from '../../utils/ruleVizUtils.js';
+import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
+
+class ElementPool {
+    constructor(creator) {
+        this.pool = [];
+        this.creator = creator;
+    }
+    get() {
+        return this.pool.length > 0 ? this.pool.pop() : this.creator();
+    }
+    release(element) {
+        this.pool.push(element);
+    }
+}
 
 export class RuleRankPanel extends BasePanel {
     constructor(panelElement, worldManagerInterface) {
-        
         super(panelElement, 'h3', 'ruleRank');
 
         this.worldManager = worldManagerInterface;
@@ -12,152 +24,106 @@ export class RuleRankPanel extends BasePanel {
             closeButton: panelElement.querySelector('#closeRankPanelButton'),
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };
-        
+
         this.lastUpdateTime = 0;
-        this.updateThrottleMs = 500; 
+        this.updateThrottleMs = 500;
         this.lastRuleUsageHash = null;
         this.pendingUpdate = false;
-        this.ruleItemElements = [];
-        this.headerElement = null;
-        this.lastDisplayedRuleCount = 0;
-        
+
+        this.activationRuleItems = [];
+        this.deactivationRuleItems = [];
+
+        this.ruleItemPool = new ElementPool(() => this._createRuleItemElement());
+
         this._setupInternalListeners();
+        this._setupPanelLayout();
         if (!this.isHidden()) this.refreshViews();
     }
 
     _setupInternalListeners() {
         this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        
+    }
+
+    _setupPanelLayout() {
+        this.uiElements.contentArea.innerHTML = `
+            <div class="dual-rank-container">
+                <div class="rank-column" id="activation-rank">
+                    <div class="rank-column-header">Activation Rules</div>
+                    <div class="rank-list-header"><span>Rank</span><span>Rule</span><span>Usage</span></div>
+                    <div class="rank-list-content"></div>
+                </div>
+                <div class="rank-column" id="deactivation-rank">
+                    <div class="rank-column-header">Deactivation Rules</div>
+                    <div class="rank-list-header"><span>Rank</span><span>Rule</span><span>Usage</span></div>
+                    <div class="rank-list-content"></div>
+                </div>
+            </div>
+        `;
+        this.uiElements.activationRankContent = this.panelElement.querySelector('#activation-rank .rank-list-content');
+        this.uiElements.deactivationRankContent = this.panelElement.querySelector('#deactivation-rank .rank-list-content');
     }
 
     _createRuleItemElement() {
         const listItem = document.createElement('div');
         listItem.className = 'rank-list-item';
-        listItem.style.position = 'relative';
+        // Note: The position: 'relative' style is now handled in style.css
 
         const usageBar = document.createElement('div');
         usageBar.className = 'usage-background-bar';
-        usageBar.style.cssText = `
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            background-color: rgba(59, 130, 246, 0.15);
-            z-index: 0;
-            pointer-events: none;
-        `;
+        listItem.appendChild(usageBar);
 
         const rankEl = document.createElement('span');
         rankEl.className = 'rank-list-rank';
-        rankEl.style.cssText = 'position: relative; z-index: 1;';
+        listItem.appendChild(rankEl);
 
         const vizContainer = document.createElement('div');
         vizContainer.className = 'rank-list-viz-container';
-        vizContainer.style.cssText = 'position: relative; z-index: 1;';
+        listItem.appendChild(vizContainer);
 
         const usageEl = document.createElement('span');
         usageEl.className = 'rank-list-usage';
-        usageEl.style.cssText = 'position: relative; z-index: 1;';
-
-        listItem.appendChild(usageBar);
-        listItem.appendChild(rankEl);
-        listItem.appendChild(vizContainer);
         listItem.appendChild(usageEl);
 
-        
-        listItem._usageBar = usageBar;
-        listItem._rankEl = rankEl;
-        listItem._vizContainer = vizContainer;
-        listItem._usageEl = usageEl;
-        listItem._currentRuleIndex = -1; 
-
+        listItem._cache = { usageBar, rankEl, vizContainer, usageEl };
         return listItem;
     }
 
-    _updateRuleVizElement(vizElement, ruleIndex, outputState, usagePercent, normalizedUsage, rawUsageCount, showUsageOverlay = false) {
-        const centerState = (ruleIndex >> 6) & 1;
-        const neighborMask = ruleIndex & 0x3F;
-        vizElement.title = `Rule ${ruleIndex}: Center ${centerState}, N ${neighborMask.toString(2).padStart(6, '0')} -> Out ${outputState}\nUsage: ${usagePercent.toFixed(2)}% (${rawUsageCount} calls)`;
-        vizElement.dataset.ruleIndex = ruleIndex;
-        const centerHex = vizElement.querySelector('.center-hex');
-        const innerHex = vizElement.querySelector('.inner-hex');
-        const centerColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-        const outputColor = getRuleIndexColor(ruleIndex, outputState);
-        centerHex.style.backgroundColor = centerColor;
-        innerHex.style.backgroundColor = outputColor;
+    _updateRuleItem(element, rule, rank, totalInvocations, ruleset) {
+        const { usageBar, rankEl, vizContainer, usageEl } = element._cache;
+        const usagePercent = totalInvocations > 0 ? (rule.count / totalInvocations) * 100 : 0;
 
-        for (let n = 0; n < 6; n++) {
-            const neighborHex = vizElement.querySelector(`.neighbor-${n}`);
-            const neighborState = (neighborMask >> n) & 1;
-            const neighborColor = neighborState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-            neighborHex.style.backgroundColor = neighborColor;
+        rankEl.textContent = `#${rank + 1}`;
+        usageBar.style.width = `${usagePercent}%`;
+
+        const vizEl = createOrUpdateRuleVizElement({
+            existingElement: vizContainer.firstChild,
+            ruleIndex: rule.index,
+            outputState: ruleset[rule.index],
+            rawUsageCount: rule.count,
+            usagePercent: usagePercent,
+        });
+        vizEl.classList.add('rank-list-viz');
+
+        if (!vizContainer.firstChild) {
+            vizContainer.appendChild(vizEl);
         }
 
-        let usageOverlay = vizElement.querySelector('.rule-usage-overlay');
-        if (showUsageOverlay && normalizedUsage > 0) {
-            if (!usageOverlay) {
-                usageOverlay = document.createElement('div');
-                usageOverlay.className = 'rule-usage-overlay';
-                vizElement.appendChild(usageOverlay);
-            }
-            usageOverlay.style.opacity = normalizedUsage * 0.8; 
-        } else if (usageOverlay) {
-            usageOverlay.remove();
-        }
+        usageEl.innerHTML = `<div class="usage-percent">${usagePercent.toFixed(2)}%</div><div class="usage-count">${rule.count} calls</div>`;
     }
 
-    _updateRuleItemElement(element, rule, rank, usagePercent, normalizedUsage, ruleset, totalInvocations) {
-        element._rankEl.textContent = `#${rank + 1}`;
-        element._usageBar.style.width = `${usagePercent}%`;
-        let vizEl = element._vizContainer.firstChild;
-        if (!vizEl || element._currentRuleIndex !== rule.index) {
-            if (vizEl) {
-                element._vizContainer.removeChild(vizEl);
-            }
-            
-            vizEl = createRuleVizElement({
-                ruleIndex: rule.index,
-                outputState: ruleset[rule.index],
-                usagePercent: usagePercent,
-                normalizedUsage: normalizedUsage,
-                rawUsageCount: rule.count,
-                showUsageOverlay: false
-            });
-            vizEl.classList.add('rank-list-viz');
-            vizEl.style.cssText = 'position: relative; z-index: 1;';
-            element._vizContainer.appendChild(vizEl);
-            element._currentRuleIndex = rule.index;
-        } else {
-            
-            this._updateRuleVizElement(
-                vizEl,
-                rule.index,
-                ruleset[rule.index],
-                usagePercent,
-                normalizedUsage,
-                rule.count,
-                false
-            );
-        }
-        element._usageEl.innerHTML = `<div class="usage-percent">${usagePercent.toFixed(2)}%</div><div class="usage-count">${rule.count} calls</div>`;
-    }
-
-    
     refreshViews() {
         if (this.isHidden() || !this.worldManager) return;
         const now = Date.now();
-        const timeSinceLastUpdate = now - this.lastUpdateTime;
-        if (timeSinceLastUpdate < this.updateThrottleMs) {
+        if (now - this.lastUpdateTime < this.updateThrottleMs) {
             if (!this.pendingUpdate) {
                 this.pendingUpdate = true;
                 setTimeout(() => {
                     this.pendingUpdate = false;
                     this._actuallyRefreshViews();
-                }, this.updateThrottleMs - timeSinceLastUpdate);
+                }, this.updateThrottleMs - (now - this.lastUpdateTime));
             }
             return;
         }
-
         this._actuallyRefreshViews();
     }
 
@@ -169,105 +135,69 @@ export class RuleRankPanel extends BasePanel {
         const ruleUsage = stats.ruleUsage;
 
         if (!ruleUsage || !ruleset) {
-            this.uiElements.contentArea.innerHTML = '<p class="empty-state-text">No rule usage data available.</p>';
-            this.lastRuleUsageHash = null;
-            this.ruleItemElements = [];
-            this.headerElement = null;
+            this._setupPanelLayout(); // Reset to show empty state if needed
+            this.uiElements.contentArea.querySelector('.dual-rank-container').innerHTML = '<p class="empty-state-text">No rule usage data available.</p>';
             return;
         }
-        const ruleUsageHash = ruleUsage.reduce((hash, count, index) => {
-            return hash + `${index}:${count};`;
-        }, '');
 
-        
-        if (ruleUsageHash === this.lastRuleUsageHash) {
-            return;
-        }
+        const ruleUsageHash = Array.from(ruleUsage).join(',');
+        if (ruleUsageHash === this.lastRuleUsageHash) return;
 
         this.lastRuleUsageHash = ruleUsageHash;
         this.lastUpdateTime = Date.now();
 
-        let totalInvocations = 0;
-        let maxUsage = 0;
-        const rankedRules = [];
+        let totalActivationInvocations = 0;
+        let totalDeactivationInvocations = 0;
+        const activationRules = [];
+        const deactivationRules = [];
 
         for (let i = 0; i < ruleUsage.length; i++) {
-            totalInvocations += ruleUsage[i];
-            rankedRules.push({ index: i, count: ruleUsage[i] });
-        }
-        
-        if (totalInvocations === 0) {
-            this.uiElements.contentArea.innerHTML = '<p class="empty-state-text">Run a simulation to see rule usage statistics.</p>';
-            this.ruleItemElements = [];
-            this.headerElement = null;
-            return;
-        }
-
-        rankedRules.sort((a, b) => b.count - a.count);
-        maxUsage = rankedRules[0].count;
-
-        
-        const topRules = rankedRules.filter(r => r.count > 0).slice(0, 20);
-
-        
-        if (!this.headerElement) {
-            this.headerElement = document.createElement('div');
-            this.headerElement.className = 'rank-list-header';
-            this.headerElement.innerHTML = '<span>Rank</span><span>Rule Visualization</span><span>Usage</span>';
-        }
-
-        
-        while (this.ruleItemElements.length < topRules.length) {
-            this.ruleItemElements.push(this._createRuleItemElement());
-        }
-
-        
-        topRules.forEach((rule, rank) => {
-            const usagePercent = (rule.count / totalInvocations) * 100;
-            const normalizedUsage = (maxUsage > 0) ? (rule.count / maxUsage) : 0;
-            
-            this._updateRuleItemElement(
-                this.ruleItemElements[rank],
-                rule,
-                rank,
-                usagePercent,
-                normalizedUsage,
-                ruleset,
-                totalInvocations
-            );
-        });
-
-        
-        if (this.lastDisplayedRuleCount !== topRules.length) {
-            this.uiElements.contentArea.innerHTML = '';
-            this.uiElements.contentArea.appendChild(this.headerElement);
-            
-            for (let i = 0; i < topRules.length; i++) {
-                this.uiElements.contentArea.appendChild(this.ruleItemElements[i]);
+            if (ruleUsage[i] > 0) {
+                const rule = { index: i, count: ruleUsage[i] };
+                if (ruleset[i] === 1) {
+                    activationRules.push(rule);
+                    totalActivationInvocations += rule.count;
+                } else {
+                    deactivationRules.push(rule);
+                    totalDeactivationInvocations += rule.count;
+                }
             }
-            
-            this.lastDisplayedRuleCount = topRules.length;
         }
+
+        activationRules.sort((a, b) => b.count - a.count);
+        deactivationRules.sort((a, b) => b.count - a.count);
+
+        this._renderRankList(this.uiElements.activationRankContent, this.activationRuleItems, activationRules, totalActivationInvocations, ruleset);
+        this._renderRankList(this.uiElements.deactivationRankContent, this.deactivationRuleItems, deactivationRules, totalDeactivationInvocations, ruleset);
     }
-    
+
+    _renderRankList(container, elementCache, rankedRules, totalInvocations, ruleset) {
+        const topRules = rankedRules.slice(0, 20);
+
+        // Release extra elements back to the pool
+        while (elementCache.length > topRules.length) {
+            const el = elementCache.pop();
+            container.removeChild(el);
+            this.ruleItemPool.release(el);
+        }
+
+        // Get or create elements for the current view
+        while (elementCache.length < topRules.length) {
+            elementCache.push(this.ruleItemPool.get());
+        }
+
+        // Update and append elements
+        topRules.forEach((rule, rank) => {
+            const element = elementCache[rank];
+            this._updateRuleItem(element, rule, rank, totalInvocations, ruleset);
+            if (!element.parentNode) {
+                container.appendChild(element);
+            }
+        });
+    }
+
     show(saveState = true) {
         super.show(saveState);
         this.refreshViews();
     }
-    
-    hide(saveState = true) {
-        super.hide(saveState);
-    }
-    
-    toggle() {
-        const isVisible = super.toggle();
-        if (isVisible) {
-            this.refreshViews();
-        }
-        return isVisible;
-    }
-    
-    destroy() {
-        super.destroy();
-    }
-} 
+}

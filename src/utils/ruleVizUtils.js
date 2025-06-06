@@ -1,9 +1,4 @@
 /**
- * Utility functions for creating rule visualizations and colors.
- * These functions are shared between UI components and the WebGL renderer.
- */
-
-/**
  * Converts HSV color values to an [r, g, b] array.
  * @param {number} h Hue (0-1)
  * @param {number} s Saturation (0-1)
@@ -89,12 +84,14 @@ export function getRuleIndexColor(ruleIndex, state) {
 }
 
 /**
- * Creates a DOM element for visualizing a single cellular automaton rule.
- * (This function remains unchanged but now relies on the updated getRuleIndexColor)
+ * Creates a DOM element for visualizing a single cellular automaton rule,
+ * or updates an existing one for performance.
  * @param {object} options - The configuration for the visualization.
+ * @param {HTMLElement} [options.existingElement=null] - An optional existing element to update.
  * @returns {HTMLElement} The complete div element for the rule visualization.
  */
-export function createRuleVizElement({
+export function createOrUpdateRuleVizElement({
+    existingElement = null,
     ruleIndex,
     outputState,
     usagePercent = 0,
@@ -105,27 +102,40 @@ export function createRuleVizElement({
     const centerState = (ruleIndex >> 6) & 1;
     const neighborMask = ruleIndex & 0x3F;
 
-    const viz = document.createElement('div');
-    viz.className = 'rule-viz';
+    const viz = existingElement || document.createElement('div');
+    if (!existingElement) {
+        viz.className = 'rule-viz';
+        let innerHTML = `<div class="hexagon center-hex"><div class="hexagon inner-hex"></div></div>`;
+        for (let i = 0; i < 6; i++) {
+            innerHTML += `<div class="hexagon neighbor-hex neighbor-${i}"></div>`;
+        }
+        viz.innerHTML = innerHTML;
+    }
+
     viz.title = `Rule ${ruleIndex}: Center ${centerState}, N ${neighborMask.toString(2).padStart(6, '0')} -> Out ${outputState}\nUsage: ${usagePercent.toFixed(2)}% (${rawUsageCount} calls)`;
     viz.dataset.ruleIndex = ruleIndex;
 
-    const centerColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-    const outputColor = getRuleIndexColor(ruleIndex, outputState);
+    const centerHex = viz.querySelector('.center-hex');
+    const innerHex = viz.querySelector('.inner-hex');
 
-    viz.innerHTML = `<div class="hexagon center-hex" style="background-color: ${centerColor};"><div class="hexagon inner-hex" style="background-color: ${outputColor};"></div></div>` +
-        Array.from({ length: 6 }, (_, n) => {
-            const neighborState = (neighborMask >> n) & 1;
-            const neighborColor = neighborState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-            return `<div class="hexagon neighbor-hex neighbor-${n}" style="background-color: ${neighborColor};"></div>`;
-        }).join('');
+    centerHex.style.backgroundColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
+    innerHex.style.backgroundColor = getRuleIndexColor(ruleIndex, outputState);
 
+    for (let n = 0; n < 6; n++) {
+        const neighborHex = viz.querySelector(`.neighbor-${n}`);
+        neighborHex.style.backgroundColor = (neighborMask >> n) & 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
+    }
 
+    let usageOverlay = viz.querySelector('.rule-usage-overlay');
     if (showUsageOverlay && normalizedUsage > 0) {
-        const usageOverlay = document.createElement('div');
-        usageOverlay.className = 'rule-usage-overlay';
+        if (!usageOverlay) {
+            usageOverlay = document.createElement('div');
+            usageOverlay.className = 'rule-usage-overlay';
+            viz.appendChild(usageOverlay);
+        }
         usageOverlay.style.opacity = normalizedUsage * 0.8;
-        viz.appendChild(usageOverlay);
+    } else if (usageOverlay) {
+        usageOverlay.remove();
     }
 
     return viz;
