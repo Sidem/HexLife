@@ -200,40 +200,43 @@ function setupFBOs() {
 }
 
 // UPDATED: Function signature to accept camera and selectedWorldIndex
+// UPDATED: Function signature to accept camera and selectedWorldIndex
+// REFACTORED: This function now uses a two-pass approach to avoid shader switching in a loop.
 function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
-
+    // --- PASS 1: Render all ENABLED worlds using the Hexagon Shader ---
     gl.useProgram(hexShaderProgram);
     gl.bindVertexArray(hexVAO);
+    
+    // Bind the color lookup table texture to texture unit 1
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+    gl.uniform1i(hexUniformLocations.colorLUT, 1);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const worldData = allWorldsData[i];
-        const fboData = worldFBOs[i];
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
-
-        const clearColor = (worldData && worldData.enabled) ? Config.BACKGROUND_COLOR : Config.DISABLED_WORLD_OVERLAY_COLOR;
-        gl.clearColor(...clearColor);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
         if (worldData && worldData.enabled) {
+            const fboData = worldFBOs[i];
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
+
+            // Clear the texture for this world
+            gl.clearColor(...Config.BACKGROUND_COLOR);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // Skip drawing if data is missing
             if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
                 continue;
             }
 
+            // Set uniforms for hexagon rendering
             const textureHexSize = Utils.calculateHexSizeForTexture();
             gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
-            gl.uniform1i(hexUniformLocations.colorLUT, 1);
             
-            // NEW: Apply pan and zoom uniforms
+            // Apply pan and zoom uniforms
             // Apply transformation for the selected world, use defaults for others
             if (i === selectedWorldIndex) {
                 gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
@@ -244,30 +247,50 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
                 gl.uniform1f(hexUniformLocations.zoom, 1.0);
             }
 
+            // Update instance buffers with the latest data
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
 
+            // Draw the hexagons for this world
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
-
-        } else if (disabledTextTexture) {
-            // This part requires switching programs, which is less efficient inside the loop.
-            // For now, we'll keep it, but a refactor could separate enabled/disabled world rendering.
-            gl.useProgram(quadShaderProgram);
-            gl.bindVertexArray(quadVAO);
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
-            gl.uniform1i(quadUniformLocations.texture, 0);
-            gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-            gl.disable(gl.BLEND);
-            // Switch back to hex program for the next loop iteration
-            gl.useProgram(hexShaderProgram);
-            gl.bindVertexArray(hexVAO);
         }
     }
+
+    // --- PASS 2: Render all DISABLED worlds using the Quad Shader ---
+    if (disabledTextTexture) {
+        gl.useProgram(quadShaderProgram);
+        gl.bindVertexArray(quadVAO);
+
+        // Bind the "DISABLED" text texture to texture unit 0
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
+        gl.uniform1i(quadUniformLocations.texture, 0);
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+
+        // Enable blending for the text overlay
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        for (let i = 0; i < Config.NUM_WORLDS; i++) {
+            const worldData = allWorldsData[i];
+            if (!worldData || !worldData.enabled) {
+                const fboData = worldFBOs[i];
+                gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
+
+                // Clear the background to the disabled color
+                gl.clearColor(...Config.DISABLED_WORLD_OVERLAY_COLOR);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                
+                // Draw the "DISABLED" text quad
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            }
+        }
+        
+        gl.disable(gl.BLEND);
+    }
+    
+    // Unbind framebuffer and VAO to clean up state
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
 }

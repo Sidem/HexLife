@@ -120,14 +120,18 @@ async function initialize() {
     requestAnimationFrame(renderLoop);
 }
 
+/**
+ * REFACTORED: This function now also calls the input handler's resize method.
+ */
 function handleResize() {
     const mainCanvas = document.getElementById('hexGridCanvas');
     if (mainCanvas) {
         CanvasLoader.handleLoaderResize(mainCanvas);
     }
     
-    if (isInitialized && gl) {
-        Renderer.resizeRenderer();
+    if (isInitialized) {
+        if (gl) Renderer.resizeRenderer();
+        if (canvasInputHandler) canvasInputHandler.handleResize(); // <-- ADD THIS LINE
     }
 }
 

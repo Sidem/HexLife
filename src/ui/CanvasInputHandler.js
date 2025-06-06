@@ -35,8 +35,84 @@ export class CanvasInputHandler {
         this.touchTimeout = null;    // To distinguish tap from press-and-draw
         this.hasTouchMoved = false;
 
+        // --- NEW: Cache for UI layout dimensions ---
+        this.layoutCache = {};
+
         this._calculateGridBounds();
+        this._calculateAndCacheLayout(); // Initial layout calculation
         this._setupListeners();
+    }
+
+    /**
+     * NEW: Public method to be called on window resize.
+     */
+    handleResize() {
+        this._calculateAndCacheLayout();
+    }
+
+    /**
+     * NEW: Calculates and caches the dimensions of the main view and minimap areas.
+     * This logic is moved from _getCoordsFromMouseEvent to avoid recalculation.
+     * @private
+     */
+    _calculateAndCacheLayout() {
+        if (!this.gl || !this.gl.canvas) return;
+
+        const canvasWidth = this.gl.canvas.width;
+        const canvasHeight = this.gl.canvas.height;
+        const isLandscape = canvasWidth >= canvasHeight;
+        const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
+
+        let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
+        let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+
+        if (isLandscape) {
+            selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
+            selectedViewHeight = canvasHeight - padding * 2;
+            selectedViewX = padding;
+            selectedViewY = padding;
+            miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
+            miniMapAreaHeight = selectedViewHeight;
+            miniMapAreaX = selectedViewX + selectedViewWidth + padding;
+            miniMapAreaY = padding;
+        } else {
+            selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
+            selectedViewWidth = canvasWidth - padding * 2;
+            selectedViewX = padding;
+            selectedViewY = padding;
+            miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
+            miniMapAreaWidth = selectedViewWidth;
+            miniMapAreaX = padding;
+            miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+        }
+
+        this.layoutCache.selectedView = { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight };
+
+        const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
+        const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
+        let gridContainerWidth, gridContainerHeight;
+        const miniMapContainerPaddingFactor = 0.95;
+
+        if (miniMapAreaRatio > miniMapGridRatio) {
+            gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
+            gridContainerWidth = gridContainerHeight * miniMapGridRatio;
+        } else {
+            gridContainerWidth = miniMapAreaWidth * miniMapContainerPaddingFactor;
+            gridContainerHeight = gridContainerWidth / miniMapGridRatio;
+        }
+        const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
+        const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
+        const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
+        const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
+        const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
+
+        this.layoutCache.miniMap = {
+            gridContainerX,
+            gridContainerY,
+            miniMapW,
+            miniMapH,
+            miniMapSpacing,
+        };
     }
 
     /**
@@ -97,39 +173,21 @@ export class CanvasInputHandler {
         this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
     }
 
+    /**
+     * REFACTORED: This function now uses the cached layout dimensions.
+     */
     _getCoordsFromMouseEvent(event) {
         const camera = this.worldManager.getCurrentCameraState();
-        if (!this.gl || !this.gl.canvas || !this.worldManager || !camera) return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
+        if (!this.gl || !this.gl.canvas || !this.worldManager || !camera || !this.layoutCache.selectedView) {
+            return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
+        }
+        
         const rect = this.gl.canvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
-        const canvasWidth = this.gl.canvas.width;
-        const canvasHeight = this.gl.canvas.height;
-        const isLandscape = canvasWidth >= canvasHeight;
-        let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
-        let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-        const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
 
-        if (isLandscape) {
-            selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
-            selectedViewHeight = canvasHeight - padding * 2;
-            selectedViewX = padding;
-            selectedViewY = padding;
-            miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
-            miniMapAreaHeight = selectedViewHeight;
-            miniMapAreaX = selectedViewX + selectedViewWidth + padding;
-            miniMapAreaY = padding;
-        } else {
-            selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
-            selectedViewWidth = canvasWidth - padding * 2;
-            selectedViewX = padding;
-            selectedViewY = padding;
-            miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
-            miniMapAreaWidth = selectedViewWidth;
-            miniMapAreaX = padding;
-            miniMapAreaY = selectedViewY + selectedViewHeight + padding;
-        }
-
+        const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
+        
         const currentSelectedWorldIdx = this.worldManager.getSelectedWorldIndex();
         if (mouseX >= selectedViewX && mouseX < selectedViewX + selectedViewWidth &&
             mouseY >= selectedViewY && mouseY < selectedViewY + selectedViewHeight) {
@@ -139,24 +197,8 @@ export class CanvasInputHandler {
             return { worldIndexAtCursor: currentSelectedWorldIdx, col, row, viewType: 'selected', worldX, worldY };
         }
 
-        const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
-        const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
-        let gridContainerWidth, gridContainerHeight;
-        const miniMapContainerPaddingFactor = 0.95;
-
-        if (miniMapAreaRatio > miniMapGridRatio) {
-            gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
-            gridContainerWidth = gridContainerHeight * miniMapGridRatio;
-        } else {
-            gridContainerWidth = miniMapAreaWidth * miniMapContainerPaddingFactor;
-            gridContainerHeight = gridContainerWidth / miniMapGridRatio;
-        }
-        const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
-        const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
-        const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
-        const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
-        const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
-
+        const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = this.layoutCache.miniMap;
+        
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
             const c_map = i % Config.WORLD_LAYOUT_COLS;
