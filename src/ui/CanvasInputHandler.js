@@ -31,14 +31,6 @@ export class CanvasInputHandler {
         this.hasTouchMoved = false;
         this.touchStartTime = null;
         
-        // State for multi-touch gestures
-        this.isMultiTouch = false;
-        this.initialTouchDistance = null;
-        this.initialTouchCenterX = null;
-        this.initialTouchCenterY = null;
-        this.lastTouchCenterX = null;
-        this.lastTouchCenterY = null;
-        
         // Pre-calculate the grid's world boundaries for panning limits
         this._calculateGridBounds();
 
@@ -350,189 +342,58 @@ export class CanvasInputHandler {
         }
     }
     
-         /**
-      * Calculates the distance between two touch points.
-      * @param {Touch} touch1 - First touch point
-      * @param {Touch} touch2 - Second touch point
-      * @returns {number} Distance between the touches
-      * @private
-      */
-     _getTouchDistance(touch1, touch2) {
-         const dx = touch1.clientX - touch2.clientX;
-         const dy = touch1.clientY - touch2.clientY;
-         return Math.sqrt(dx * dx + dy * dy);
-     }
+    _createMouseEventFromTouch(touch, type) {
+        return new MouseEvent(type, {
+            bubbles: true, cancelable: true, view: window, detail: 1,
+            screenX: touch.screenX, screenY: touch.screenY,
+            clientX: touch.clientX, clientY: touch.clientY,
+            button: 0, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
+        });
+    }
 
-     /**
-      * Calculates the center point between two touches.
-      * @param {Touch} touch1 - First touch point
-      * @param {Touch} touch2 - Second touch point
-      * @returns {object} Object with x and y coordinates of the center
-      * @private
-      */
-     _getTouchCenter(touch1, touch2) {
-         return {
-             x: (touch1.clientX + touch2.clientX) / 2,
-             y: (touch1.clientY + touch2.clientY) / 2
-         };
-     }
+    _handleCanvasTouchStart(event) {
+        event.preventDefault();
+        if (event.touches.length === 1) {
+            const touch = event.touches[0];
+            this.hasTouchMoved = false;
+            this.touchStartTime = Date.now();
+            this.touchStartX = touch.clientX;
+            this.touchStartY = touch.clientY;
+            
+            setTimeout(() => {
+                if (!this.hasTouchMoved) {
+                    const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousedown');
+                    this._handleCanvasMouseDown(syntheticEvent);
+                }
+            }, 150);
+        }
+    }
 
-     _createMouseEventFromTouch(touch, type) {
-         return new MouseEvent(type, {
-             bubbles: true, cancelable: true, view: window, detail: 1,
-             screenX: touch.screenX, screenY: touch.screenY,
-             clientX: touch.clientX, clientY: touch.clientY,
-             button: 0, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
-         });
-     }
+    _handleCanvasTouchMove(event) {
+        event.preventDefault();
+        if (event.touches.length === 1) {
+            const touch = event.touches[0];
+            const deltaX = Math.abs(touch.clientX - this.touchStartX);
+            const deltaY = Math.abs(touch.clientY - this.touchStartY);
+            
+            if (deltaX > 5 || deltaY > 5) {
+                this.hasTouchMoved = true;
+                const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousemove');
+                this._handleCanvasMouseMove(syntheticEvent);
+            }
+        }
+    }
 
-         _handleCanvasTouchStart(event) {
-         event.preventDefault();
-         
-         if (event.touches.length === 1) {
-             // Single touch - potential drawing/clicking
-             const touch = event.touches[0];
-             this.hasTouchMoved = false;
-             this.touchStartTime = Date.now();
-             this.touchStartX = touch.clientX;
-             this.touchStartY = touch.clientY;
-             this.isMultiTouch = false;
-             
-             setTimeout(() => {
-                 if (!this.hasTouchMoved && !this.isMultiTouch) {
-                     const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousedown');
-                     this._handleCanvasMouseDown(syntheticEvent);
-                 }
-             }, 150);
-         } else if (event.touches.length === 2) {
-             // Two finger touch - start pan/zoom gesture
-             this.isMultiTouch = true;
-             this.hasTouchMoved = false;
-             
-             const touch1 = event.touches[0];
-             const touch2 = event.touches[1];
-             
-             this.initialTouchDistance = this._getTouchDistance(touch1, touch2);
-             const center = this._getTouchCenter(touch1, touch2);
-             this.initialTouchCenterX = center.x;
-             this.initialTouchCenterY = center.y;
-             this.lastTouchCenterX = center.x;
-             this.lastTouchCenterY = center.y;
-         }
-     }
-
-         _handleCanvasTouchMove(event) {
-         event.preventDefault();
-         
-         if (event.touches.length === 1 && !this.isMultiTouch) {
-             // Single touch movement - drawing
-             const touch = event.touches[0];
-             const deltaX = Math.abs(touch.clientX - this.touchStartX);
-             const deltaY = Math.abs(touch.clientY - this.touchStartY);
-             
-             if (deltaX > 5 || deltaY > 5) {
-                 this.hasTouchMoved = true;
-                 const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousemove');
-                 this._handleCanvasMouseMove(syntheticEvent);
-             }
-         } else if (event.touches.length === 2 && this.isMultiTouch) {
-             // Two finger movement - pan and zoom
-             this.hasTouchMoved = true;
-             
-             const touch1 = event.touches[0];
-             const touch2 = event.touches[1];
-             
-             const currentDistance = this._getTouchDistance(touch1, touch2);
-             const currentCenter = this._getTouchCenter(touch1, touch2);
-             
-             // Handle pinch-to-zoom
-             if (this.initialTouchDistance !== null) {
-                 const zoomFactor = currentDistance / this.initialTouchDistance;
-                 const targetZoom = Math.max(1.0, Math.min(20.0, this.camera.zoom * zoomFactor));
-                 
-                 if (Math.abs(targetZoom - this.camera.zoom) > 0.01) {
-                     // Convert touch center to world coordinates for zoom pivot
-                     const rect = this.canvas.getBoundingClientRect();
-                     const touchCenterX = currentCenter.x - rect.left;
-                     const touchCenterY = currentCenter.y - rect.top;
-                     
-                     // Create a synthetic mouse event to get world coordinates
-                     const syntheticEvent = {
-                         clientX: currentCenter.x,
-                         clientY: currentCenter.y
-                     };
-                     const { worldX, worldY } = this._getCoordsFromMouseEvent(syntheticEvent);
-                     
-                     if (worldX !== null && worldY !== null) {
-                         const oldZoom = this.camera.zoom;
-                         const ratio = oldZoom / targetZoom;
-                         
-                         this.camera.x = worldX * (1 - ratio) + this.camera.x * ratio;
-                         this.camera.y = worldY * (1 - ratio) + this.camera.y * ratio;
-                         this.camera.zoom = targetZoom;
-                         
-                         this._clampCameraPan();
-                     }
-                     
-                     this.initialTouchDistance = currentDistance;
-                 }
-             }
-             
-             // Handle two-finger pan
-             if (this.lastTouchCenterX !== null && this.lastTouchCenterY !== null) {
-                 const panDeltaX = currentCenter.x - this.lastTouchCenterX;
-                 const panDeltaY = currentCenter.y - this.lastTouchCenterY;
-                 
-                 // Convert screen delta to world delta
-                 const worldDeltaX = -(panDeltaX / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-                 const worldDeltaY = -(panDeltaY / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
-                 
-                 this.camera.x += worldDeltaX;
-                 this.camera.y += worldDeltaY;
-                 
-                 this._clampCameraPan();
-             }
-             
-             this.lastTouchCenterX = currentCenter.x;
-             this.lastTouchCenterY = currentCenter.y;
-         }
-     }
-
-         _handleCanvasTouchEnd(event) {
-         event.preventDefault();
-         
-         if (event.touches.length === 0) {
-             // All touches ended
-             if (this.isMultiTouch) {
-                 // End of multi-touch gesture
-                 this.isMultiTouch = false;
-                 this.initialTouchDistance = null;
-                 this.initialTouchCenterX = null;
-                 this.initialTouchCenterY = null;
-                 this.lastTouchCenterX = null;
-                 this.lastTouchCenterY = null;
-             } else {
-                 // End of single touch
-                 const touch = event.changedTouches[0];
-                 if (!this.hasTouchMoved) {
-                     const syntheticClick = this._createMouseEventFromTouch(touch, 'click');
-                     this._handleCanvasClick(syntheticClick);
-                 }
-                 const syntheticEvent = this._createMouseEventFromTouch(touch, 'mouseup');
-                 this._handleCanvasMouseUp(syntheticEvent);
-             }
-             
-             this.touchStartX = null;
-             this.touchStartY = null;
-             this.hasTouchMoved = false;
-         } else if (event.touches.length === 1 && this.isMultiTouch) {
-             // One finger lifted during multi-touch, end the gesture
-             this.isMultiTouch = false;
-             this.initialTouchDistance = null;
-             this.initialTouchCenterX = null;
-             this.initialTouchCenterY = null;
-             this.lastTouchCenterX = null;
-             this.lastTouchCenterY = null;
-         }
-     }
+    _handleCanvasTouchEnd(event) {
+        event.preventDefault();
+        const touch = event.changedTouches[0];
+        if (!this.hasTouchMoved) {
+             const syntheticClick = this._createMouseEventFromTouch(touch, 'click');
+             this._handleCanvasClick(syntheticClick);
+        }
+        const syntheticEvent = this._createMouseEventFromTouch(touch, 'mouseup');
+        this._handleCanvasMouseUp(syntheticEvent);
+        this.touchStartX = null;
+        this.touchStartY = null;
+    }
 }
