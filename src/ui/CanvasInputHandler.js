@@ -13,27 +13,29 @@ export class CanvasInputHandler {
         this.worldManager = worldManager;
         this.gl = canvas.getContext('webgl2');
 
-        // State for input handling
+        // --- State for input handling ---
         this.isMouseDrawing = false;
         this.justFinishedDrawing = false;
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
-
-        // State for panning
+        
+        // State for mouse panning
         this.isPanning = false;
         this.lastPanX = 0;
         this.lastPanY = 0;
 
-        // State for touch interaction
-        this.touchStartX = null;
-        this.touchStartY = null;
-        this.hasTouchMoved = false;
-        this.touchStartTime = null;
-        
-        // Pre-calculate the grid's world boundaries for panning limits
-        this._calculateGridBounds();
+        // --- NEW: State for multi-touch gestures ---
+        this.isMultiTouching = false; // True when two fingers are down
+        this.lastTouchDistance = 0;   // For pinch-to-zoom
+        this.lastTouchCenter = null;  // For two-finger pan
 
+        // State for single-touch interaction
+        this.touchIdentifier = null; // To track a single touch
+        this.touchTimeout = null;    // To distinguish tap from press-and-draw
+        this.hasTouchMoved = false;
+
+        this._calculateGridBounds();
         this._setupListeners();
     }
 
@@ -44,7 +46,6 @@ export class CanvasInputHandler {
      */
     _calculateGridBounds() {
         const hexSize = calculateHexSizeForTexture();
-        
         const topLeft = gridToPixelCoords(0, 0, hexSize);
         const topRight = gridToPixelCoords(Config.GRID_COLS - 1, 0, hexSize);
         const bottomLeft = gridToPixelCoords(0, Config.GRID_ROWS - 1, hexSize);
@@ -53,7 +54,7 @@ export class CanvasInputHandler {
         this.gridWorldBounds = {
             minX: topLeft.x - hexSize,
             maxX: topRight.x + hexSize,
-            minY: topRight.y - hexSize, // Use topRight for min Y due to odd-r layout
+            minY: topRight.y - hexSize,
             maxY: bottomRight.y + hexSize
         };
     }
@@ -65,7 +66,6 @@ export class CanvasInputHandler {
      */
     _clampCameraPan() {
         const { RENDER_TEXTURE_SIZE } = Config;
-
         const viewWidth = RENDER_TEXTURE_SIZE / this.camera.zoom;
         const viewHeight = RENDER_TEXTURE_SIZE / this.camera.zoom;
         
@@ -79,6 +79,7 @@ export class CanvasInputHandler {
     }
 
     _setupListeners() {
+        // Mouse Listeners
         this.canvas.addEventListener('click', this._handleCanvasClick.bind(this));
         this.canvas.addEventListener('mousedown', this._handleCanvasMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this._handleCanvasMouseMove.bind(this));
@@ -87,14 +88,15 @@ export class CanvasInputHandler {
         this.canvas.addEventListener('wheel', this._handleCanvasMouseWheel.bind(this), { passive: false });
         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-        this.canvas.addEventListener('touchstart', this._handleCanvasTouchStart.bind(this), { passive: false });
-        this.canvas.addEventListener('touchmove', this._handleCanvasTouchMove.bind(this), { passive: false });
-        this.canvas.addEventListener('touchend', this._handleCanvasTouchEnd.bind(this), { passive: false });
-        this.canvas.addEventListener('touchcancel', this._handleCanvasTouchEnd.bind(this), { passive: false });
+        // Touch Listeners
+        this.canvas.addEventListener('touchstart', this._handleTouchStart.bind(this), { passive: false });
+        this.canvas.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
+        this.canvas.addEventListener('touchend', this._handleTouchEnd.bind(this), { passive: false });
+        this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
     }
 
     _getCoordsFromMouseEvent(event) {
-        if (!this.gl || !this.gl.canvas || !this.worldManager) return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
+        if (!this.gl || !this.gl.canvas || !this.worldManager) return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
         const rect = this.gl.canvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
@@ -168,32 +170,38 @@ export class CanvasInputHandler {
         }
         return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
     }
+
+    _zoomAtPoint(zoomFactor, pivotClientX, pivotClientY) {
+        const { worldX, worldY } = this._getCoordsFromMouseEvent({ clientX: pivotClientX, clientY: pivotClientY });
+        if (worldX === null) return;
+
+        const oldZoom = this.camera.zoom;
+        const newZoom = Math.max(1.0, Math.min(20.0, oldZoom * zoomFactor));
+
+        if (newZoom !== oldZoom) {
+            const ratio = oldZoom / newZoom;
+            this.camera.x = worldX * (1 - ratio) + this.camera.x * ratio;
+            this.camera.y = worldY * (1 - ratio) + this.camera.y * ratio;
+            this.camera.zoom = newZoom;
+            this._clampCameraPan();
+        }
+    }
     
     _handleCanvasClick(event) {
-        if (this.justFinishedDrawing) {
-            this.justFinishedDrawing = false;
-            return;
-        }
-
+        if (this.justFinishedDrawing || this.isMultiTouching) return;
         const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
         if (worldIndexAtCursor === null) return;
-
-        const previousSelectedWorld = this.worldManager.getSelectedWorldIndex();
-        if (worldIndexAtCursor !== previousSelectedWorld) {
+        if (worldIndexAtCursor !== this.worldManager.getSelectedWorldIndex()) {
             EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-        }
-
-        if (viewType === 'selected' && col !== null && row !== null) {
+        } else if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, { worldIndex: worldIndexAtCursor, col, row });
         }
     }
 
     _handleCanvasMouseDown(event) {
         event.preventDefault();
-        
         if (event.button === 1 || (event.button === 0 && event.altKey)) {
-            const { viewType } = this._getCoordsFromMouseEvent(event);
-            if (viewType === 'selected') {
+            if (this._getCoordsFromMouseEvent(event).viewType === 'selected') {
                 this.isPanning = true;
                 this.lastPanX = event.clientX;
                 this.lastPanY = event.clientY;
@@ -201,25 +209,16 @@ export class CanvasInputHandler {
             }
             return;
         }
-
         if (event.button === 0) {
             const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
             if (viewType !== 'selected' || col === null) return;
-
             this.isMouseDrawing = true;
             this.strokeAffectedCells.clear();
             this.lastDrawnCellIndex = row * Config.GRID_COLS + col;
-
             this.wasSimulationRunningBeforeStroke = !this.worldManager.isSimulationPaused();
-            if (this.wasSimulationRunningBeforeStroke) {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
-            }
-
+            if (this.wasSimulationRunningBeforeStroke) EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), this.strokeAffectedCells);
-            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
-                worldIndex: worldIndexAtCursor,
-                cellIndices: this.strokeAffectedCells
-            });
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndexAtCursor, cellIndices: this.strokeAffectedCells });
         }
     }
 
@@ -227,13 +226,10 @@ export class CanvasInputHandler {
         if (this.isPanning) {
             const dx = event.clientX - this.lastPanX;
             const dy = event.clientY - this.lastPanY;
-
             this.camera.x -= (dx / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
             this.camera.y -= (dy / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
-            
             this.lastPanX = event.clientX;
             this.lastPanY = event.clientY;
-
             this._clampCameraPan();
             return;
         }
@@ -277,15 +273,11 @@ export class CanvasInputHandler {
             this.isPanning = false;
             this.canvas.style.cursor = 'default';
         }
-
         if (this.isMouseDrawing) {
             this.isMouseDrawing = false;
             this.justFinishedDrawing = true;
             setTimeout(() => { this.justFinishedDrawing = false; }, 50);
-            
-            if (this.wasSimulationRunningBeforeStroke) {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
-            }
+            if (this.wasSimulationRunningBeforeStroke) EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             this.strokeAffectedCells.clear();
             this.lastDrawnCellIndex = null;
         }
@@ -305,39 +297,19 @@ export class CanvasInputHandler {
      */
     _handleCanvasMouseWheel(event) {
         event.preventDefault();
-        
-        const { viewType, worldX, worldY } = this._getCoordsFromMouseEvent(event);
+        const { viewType } = this._getCoordsFromMouseEvent(event);
         if (viewType !== 'selected') return;
-
         if (event.ctrlKey) {
+            const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+            this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
+        } else {
             let currentBrush = this.worldManager.getCurrentBrushSize();
             const scrollAmount = Math.sign(event.deltaY);
             let newSize = currentBrush - scrollAmount;
             newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, newSize));
-
             if (newSize !== currentBrush) {
                 EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
                 this._handleCanvasMouseMove(event);
-            }
-        } else {
-            if (worldX === null) return; // Cannot zoom without a valid world coordinate under cursor
-
-            const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-            const newZoom = Math.max(1.0, Math.min(20.0, this.camera.zoom * zoomFactor));
-
-            if (newZoom !== this.camera.zoom) {
-                const oldZoom = this.camera.zoom;
-                
-                const pivotX = worldX;
-                const pivotY = worldY;
-
-                const ratio = oldZoom / newZoom;
-                this.camera.x = pivotX * (1 - ratio) + this.camera.x * ratio;
-                this.camera.y = pivotY * (1 - ratio) + this.camera.y * ratio;
-
-                this.camera.zoom = newZoom;
-                
-                this._clampCameraPan();
             }
         }
     }
@@ -351,49 +323,93 @@ export class CanvasInputHandler {
         });
     }
 
-    _handleCanvasTouchStart(event) {
+    _handleTouchStart(event) {
         event.preventDefault();
-        if (event.touches.length === 1) {
+        clearTimeout(this.touchTimeout);
+
+        if (event.touches.length === 2) {
+            this.isMultiTouching = true;
+            this.isMouseDrawing = false; // Cancel any drawing
+            const t0 = event.touches[0];
+            const t1 = event.touches[1];
+            this.lastTouchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            this.lastTouchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+        } else if (event.touches.length === 1) {
+            this.isMultiTouching = false;
             const touch = event.touches[0];
+            this.touchIdentifier = touch.identifier;
             this.hasTouchMoved = false;
-            this.touchStartTime = Date.now();
-            this.touchStartX = touch.clientX;
-            this.touchStartY = touch.clientY;
-            
-            setTimeout(() => {
+            // Use a timeout to differentiate a tap from a press-and-draw
+            this.touchTimeout = setTimeout(() => {
                 if (!this.hasTouchMoved) {
-                    const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousedown');
-                    this._handleCanvasMouseDown(syntheticEvent);
+                    this._handleCanvasMouseDown(this._createMouseEventFromTouch(touch, 'mousedown'));
                 }
             }, 150);
         }
     }
 
-    _handleCanvasTouchMove(event) {
+    _handleTouchMove(event) {
         event.preventDefault();
-        if (event.touches.length === 1) {
-            const touch = event.touches[0];
-            const deltaX = Math.abs(touch.clientX - this.touchStartX);
-            const deltaY = Math.abs(touch.clientY - this.touchStartY);
+
+        if (event.touches.length === 2 && this.isMultiTouching) {
+            const t0 = event.touches[0];
+            const t1 = event.touches[1];
+            const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
             
-            if (deltaX > 5 || deltaY > 5) {
-                this.hasTouchMoved = true;
-                const syntheticEvent = this._createMouseEventFromTouch(touch, 'mousemove');
-                this._handleCanvasMouseMove(syntheticEvent);
+            // Handle Pan
+            const dx = newCenter.x - this.lastTouchCenter.x;
+            const dy = newCenter.y - this.lastTouchCenter.y;
+            if (dx !== 0 || dy !== 0) {
+                 this.camera.x -= (dx / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
+                 this.camera.y -= (dy / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
             }
+            
+            // Handle Zoom
+            const zoomFactor = newDist / this.lastTouchDistance;
+            if (zoomFactor !== 1.0) {
+                 this._zoomAtPoint(zoomFactor, newCenter.x, newCenter.y);
+            }
+
+            this.lastTouchDistance = newDist;
+            this.lastTouchCenter = newCenter;
+            this._clampCameraPan();
+
+        } else if (event.touches.length === 1 && !this.isMultiTouching) {
+            const touch = this._findTouch(event.touches);
+            if (!touch) return;
+            this.hasTouchMoved = true;
+            this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
         }
     }
 
-    _handleCanvasTouchEnd(event) {
+
+    _handleTouchEnd(event) {
         event.preventDefault();
-        const touch = event.changedTouches[0];
-        if (!this.hasTouchMoved) {
-             const syntheticClick = this._createMouseEventFromTouch(touch, 'click');
-             this._handleCanvasClick(syntheticClick);
+        clearTimeout(this.touchTimeout);
+
+        if (this.isMultiTouching && event.touches.length < 2) {
+            this.isMultiTouching = false;
+            this.lastTouchDistance = 0;
+            this.lastTouchCenter = null;
         }
-        const syntheticEvent = this._createMouseEventFromTouch(touch, 'mouseup');
-        this._handleCanvasMouseUp(syntheticEvent);
-        this.touchStartX = null;
-        this.touchStartY = null;
+
+        const touch = this._findTouch(event.changedTouches);
+        if (touch) {
+            if (!this.hasTouchMoved && !this.isMouseDrawing) {
+                this._handleCanvasClick(this._createMouseEventFromTouch(touch, 'click'));
+            }
+            this._handleCanvasMouseUp(this._createMouseEventFromTouch(touch, 'mouseup'));
+            this.touchIdentifier = null;
+        }
+    }
+
+    _findTouch(touchList) {
+        for (let i = 0; i < touchList.length; i++) {
+            if (touchList[i].identifier === this.touchIdentifier) {
+                return touchList[i];
+            }
+        }
+        return touchList.length > 0 ? touchList[0] : null; // Fallback
     }
 }
