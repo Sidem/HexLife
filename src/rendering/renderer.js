@@ -344,19 +344,17 @@ function renderMainScene(selectedWorldIndex) {
         const col = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
-        
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
-        gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(miniX, miniY, miniMapW, miniMapH);
-
         if (i === selectedWorldIndex) {
             const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
             drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);
         }
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
+        gl.uniform1i(quadUniformLocations.texture, 0);
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+        drawQuad(miniX, miniY, miniMapW, miniMapH);
     }
 
     gl.bindVertexArray(null);
