@@ -130,12 +130,14 @@ async function initialize() {
     requestAnimationFrame(renderLoop);
 }
 function defineOnboardingSteps() {
+    const gliderRuleset = "12482080480080006880800180010117";
+
     const steps = [
         {
             element: '#hexGridCanvas',
             content: "Welcome to HexLife Explorer! This is a simulation where cells (the hexagons) live or die based on a set of rules. Let's see it in action.",
             primaryAction: { text: 'Next' },
-            advanceOn: { type: 'click' } // Advances when user clicks 'Next'
+            advanceOn: { type: 'click' }
         },
         {
             element: '#playPauseButton',
@@ -153,34 +155,67 @@ function defineOnboardingSteps() {
             element: '#newRulesButton',
             content: "Let's change the rules. Click the 'NEW' button to open the rule generator. (`N` key works too!)",
             primaryAction: { text: 'Generate' },
-            advanceOn: { type: 'click', target: 'element' } // Must click the highlighted element
+            advanceOn: { type: 'click', target: 'element' }
         },
         {
             element: '#generateRulesetFromPopoutButton',
-            content: "Now, just click **'Generate'** to create a new random ruleset and see how everything changes.",
+            content: "This popout has many options, but for now, just click **'Generate'** to create a new random ruleset and see how everything changes.",
             primaryAction: { text: 'Generate' },
             advanceOn: { type: 'click', target: 'element' }
         },
         {
-            element: '#hexGridCanvas',
-            content: "You can also edit the world directly! **Click and drag** on the main view to draw your own patterns.",
+            element: '#setRulesetButton',
+            content: "Random rules are fun, but some specific rules create amazing, predictable patterns. Click the `HEX` button to set a specific ruleset.",
+            primaryAction: { text: 'Set a Rule' },
+            advanceOn: { type: 'click', target: 'element' }
+        },
+        {
+            element: '#rulesetInputPopout',
+            content: `Now, copy this special "glider" ruleset and paste it into the input box:<br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code>`,
+            primaryAction: { text: 'I pasted it!' },
+            advanceOn: { type: 'click' } // User self-advances after pasting
+        },
+        {
+            element: '#setRuleFromPopoutButton',
+            content: "Click 'Set' to apply the new rules. After it resets, watch for the small, moving patterns—the 'gliders'!",
+            primaryAction: { text: 'Set' },
+            advanceOn: { type: 'click', target: 'element' }
+        },
+        {
+            element: '#hexGridCanvas', // Highlighting the canvas again
+            content: "You can also edit the world directly! **Click and drag** on the main view to draw your own patterns and interact with the gliders.",
             primaryAction: { text: 'Continue' },
             advanceOn: { type: 'click' }
         },
-        // ... and so on for the rest of the steps outlined in the previous response.
         {
-            element: 'body', // No specific highlight
-            content: "You've learned the basics! For more control, explore the panels on the left. Enjoy discovering new worlds!",
-            primaryAction: { text: 'Finish' },
+            element: '#hexGridCanvas', // Assuming you wrap the minimaps for easier selection
+            content: "HexLife Explorer runs 9 worlds at once so you can compare rules. This is the mini-map. The highlighted world is the one you're viewing.",
+            primaryAction: { text: 'Next' },
+            advanceOn: { type: 'click' }
+        },
+        {
+            element: '#hexGridCanvas', // Pseudo-selector, would need a class on the items
+            content: "Click on any other world in the mini-map to select it. You can also use the number keys `1-9`.",
+            primaryAction: { text: 'Select a world' },
+            advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+        },
+        {
+            element: '#vertical-toolbar', // Can also group the panel buttons
+            content: "You've learned the basics! When you're ready to dive deeper, these buttons open powerful panels to **Edit** rules, **Setup** worlds, and **Analyze** patterns.",
+            primaryAction: { text: 'Got it!' },
+            advanceOn: { type: 'click' }
+        },
+        {
+            element: 'body', // No specific highlight, will center the tooltip
+            content: "The tour is complete. Enjoy exploring the emergent worlds of HexLife! You can restart this tour anytime using the 'Help' button.",
+            primaryAction: { text: 'Start Exploring' },
             advanceOn: { type: 'click' }
         }
     ];
 
     OnboardingManager.defineTour(steps);
 }
-/**
- * REFACTORED: This function now also calls the input handler's resize method.
- */
+
 function handleResize() {
     const mainCanvas = document.getElementById('hexGridCanvas');
     if (mainCanvas) {
