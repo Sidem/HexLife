@@ -271,35 +271,58 @@ export function hexToRuleset(hexString) {
  * @param {number} texY The normalized Y coordinate in the texture (0 to 1).
  * @returns {{col: number|null, row: number|null}} The resulting grid coordinates or null if none found.
  */
-export function textureCoordsToGridCoords(texX, texY) {
-    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null };
-    const pixelX = texX * Config.RENDER_TEXTURE_SIZE;
-    const pixelY = texY * Config.RENDER_TEXTURE_SIZE;
+export function textureCoordsToGridCoords(texX, texY, camera) {
+    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null, worldX: null, worldY: null };
 
+    let pixelX = texX * Config.RENDER_TEXTURE_SIZE;
+    let pixelY = texY * Config.RENDER_TEXTURE_SIZE;
+
+    // This is the tricky part. We need to convert screen/texture coords to world coords
+    // by reversing the shader logic.
+    // Simplified approach: find world coordinates of the view center
+    const viewCenterX = Config.RENDER_TEXTURE_SIZE / 2;
+    const viewCenterY = Config.RENDER_TEXTURE_SIZE / 2;
+
+    // Find how far the mouse is from the center of the view in pixels
+    const dxFromCenter = pixelX - viewCenterX;
+    const dyFromCenter = pixelY - viewCenterY;
+
+    // Scale this distance by the zoom level to find world-space offset
+    const worldX = camera.x + (dxFromCenter / camera.zoom);
+    const worldY = camera.y + (dyFromCenter / camera.zoom);
+
+    // Now that we have worldX and worldY, find the closest hex
     const textureHexSize = calculateHexSizeForTexture();
-    const startX = textureHexSize;
-    const startY = textureHexSize * Math.sqrt(3) / 2;
 
     let minDistSq = Infinity;
     let closestCol = null;
     let closestRow = null;
 
+    // Estimate grid position based on world coordinates
+    const horizSpacing = textureHexSize * 2 * 3 / 4;
+    const vertSpacing = textureHexSize * Math.sqrt(3);
+
+    const estimatedColRough = worldX / horizSpacing;
+    const estimatedRowRough = worldY / vertSpacing;
+
     const searchRadius = 2;
-    const estimatedColRough = (pixelX - startX) / (textureHexSize * 1.5);
-    const estimatedRowRough = (pixelY - startY) / (textureHexSize * Math.sqrt(3));
+
+    // ... (the rest of the search logic can now use worldX and worldY instead of pixelX/pixelY)
+    // ... (Remember to use gridToPixelCoords for getting hex centers in world space)
 
     for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
         for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
             const c = Math.round(estimatedColRough + cOffset);
             const r = Math.round(estimatedRowRough + rOffset);
             if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
-            const center = gridToPixelCoords(c, r, textureHexSize, startX, startY);
-            const dx = pixelX - center.x;
-            const dy = pixelY - center.y;
+
+            const center = gridToPixelCoords(c, r, textureHexSize); // No startX/Y needed if we work in world space
+            const dx = worldX - center.x;
+            const dy = worldY - center.y;
             const distSq = dx * dx + dy * dy;
 
             if (distSq < minDistSq) {
-                if (isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
+                if (isPointInHexagon(worldX, worldY, center.x, center.y, textureHexSize)) {
                     minDistSq = distSq;
                     closestCol = c;
                     closestRow = r;
@@ -307,5 +330,5 @@ export function textureCoordsToGridCoords(texX, texY) {
             }
         }
     }
-    return { col: closestCol, row: closestRow };
+    return { col: closestCol, row: closestRow, worldX: worldX, worldY: worldY };
 }

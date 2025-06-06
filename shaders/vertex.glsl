@@ -15,11 +15,18 @@ out float v_rule_index;
 uniform vec2 u_resolution;
 uniform float u_hexSize;
 
+uniform vec2 u_pan;
+uniform float u_zoom;
+
 void main() {
   v_localPos = a_position * u_hexSize;
   vec2 pos = v_localPos + a_instance_offset;
 
-  vec2 zeroToOne = pos / u_resolution;
+  // NEW: Apply camera pan and zoom transformation
+  vec2 transformedPos = (pos - u_pan) * u_zoom + (u_resolution / 2.0);
+
+  // Convert transformed position to clip space
+  vec2 zeroToOne = transformedPos / u_resolution;
   vec2 zeroToTwo = zeroToOne * 2.0;
   vec2 clipSpace = zeroToTwo - 1.0;
 

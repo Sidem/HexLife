@@ -48,6 +48,9 @@ export async function initRenderer(canvasElement) {
         hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
         hoverInactiveLightenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverInactiveLightenFactor"),
         colorLUT: gl.getUniformLocation(hexShaderProgram, "u_colorLUT"),
+        // NEW: Add locations for pan and zoom uniforms
+        pan: gl.getUniformLocation(hexShaderProgram, "u_pan"),
+        zoom: gl.getUniformLocation(hexShaderProgram, "u_zoom"),
     };
 
     quadAttributeLocations = {
@@ -118,13 +121,13 @@ function setupHexBuffersAndVAO() {
 
     const instanceOffsets = new Float32Array(Config.NUM_CELLS * 2);
     const textureHexSize = Utils.calculateHexSizeForTexture();
-    const startX = textureHexSize;
-    const startY = textureHexSize * Math.sqrt(3) / 2;
+    const startX = Config.RENDER_TEXTURE_SIZE / 2; // Center grid in texture
+    const startY = Config.RENDER_TEXTURE_SIZE / 2;
 
     for (let i = 0; i < Config.NUM_CELLS; i++) {
         const coords = Utils.indexToCoords(i);
         if (coords) {
-            const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize, startX, startY);
+            const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize);
             instanceOffsets[i * 2] = pixelCoords.x;
             instanceOffsets[i * 2 + 1] = pixelCoords.y;
         }
@@ -196,7 +199,8 @@ function setupFBOs() {
     }
 }
 
-function renderWorldsToTextures(allWorldsData) {
+// UPDATED: Function signature to accept camera and selectedWorldIndex
+function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -204,6 +208,9 @@ function renderWorldsToTextures(allWorldsData) {
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+
+    gl.useProgram(hexShaderProgram);
+    gl.bindVertexArray(hexVAO);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const worldData = allWorldsData[i];
@@ -218,10 +225,6 @@ function renderWorldsToTextures(allWorldsData) {
             if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
                 continue;
             }
-            if (!hexShaderProgram || !hexVAO) continue;
-
-            gl.useProgram(hexShaderProgram);
-            gl.bindVertexArray(hexVAO);
 
             const textureHexSize = Utils.calculateHexSizeForTexture();
             gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
@@ -229,6 +232,17 @@ function renderWorldsToTextures(allWorldsData) {
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
             gl.uniform1i(hexUniformLocations.colorLUT, 1);
+            
+            // NEW: Apply pan and zoom uniforms
+            // Apply transformation for the selected world, use defaults for others
+            if (i === selectedWorldIndex) {
+                gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
+                gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
+            } else {
+                // Default view for mini-maps
+                gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
+                gl.uniform1f(hexUniformLocations.zoom, 1.0);
+            }
 
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
@@ -236,31 +250,29 @@ function renderWorldsToTextures(allWorldsData) {
 
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
 
-        } else {
-            if (disabledTextTexture) {
-                if (!quadShaderProgram || !quadVAO) continue;
-
-                gl.useProgram(quadShaderProgram);
-                gl.bindVertexArray(quadVAO);
-
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
-                gl.uniform1i(quadUniformLocations.texture, 0);
-                gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-
-                gl.enable(gl.BLEND);
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-                gl.disable(gl.BLEND);
-            }
+        } else if (disabledTextTexture) {
+            // This part requires switching programs, which is less efficient inside the loop.
+            // For now, we'll keep it, but a refactor could separate enabled/disabled world rendering.
+            gl.useProgram(quadShaderProgram);
+            gl.bindVertexArray(quadVAO);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
+            gl.uniform1i(quadUniformLocations.texture, 0);
+            gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            gl.disable(gl.BLEND);
+            // Switch back to hex program for the next loop iteration
+            gl.useProgram(hexShaderProgram);
+            gl.bindVertexArray(hexVAO);
         }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
 }
 
+// UNCHANGED: This function now just composites the final textures.
 function renderMainScene(selectedWorldIndex) {
     if (!quadShaderProgram || !quadVAO) return;
 
@@ -300,6 +312,14 @@ function renderMainScene(selectedWorldIndex) {
         miniMapAreaY = selectedViewY + selectedViewHeight + padding;
     }
 
+    if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
+        gl.uniform1i(quadUniformLocations.texture, 0);
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+        drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight);
+    }
+
     const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
     const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
     let gridContainerWidth, gridContainerHeight;
@@ -324,26 +344,19 @@ function renderMainScene(selectedWorldIndex) {
         const col = i % Config.WORLD_LAYOUT_COLS;
         const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
         const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
+        
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
+        gl.uniform1i(quadUniformLocations.texture, 0);
+        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+        drawQuad(miniX, miniY, miniMapW, miniMapH);
+
         if (i === selectedWorldIndex) {
             const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
             drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);
         }
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
-        gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(miniX, miniY, miniMapW, miniMapH);
-    }
-
-    if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
-        gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight);
     }
 
     gl.bindVertexArray(null);
@@ -367,12 +380,6 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-
-export function renderFrame(allWorldsData, selectedWorldIndex) {
-    if (!gl) return;
-    renderWorldsToTextures(allWorldsData);
-    renderMainScene(selectedWorldIndex);
 }
 
 function renderLoader() {
@@ -413,13 +420,13 @@ function renderLoader() {
     gl.bindVertexArray(null);
 }
 
-export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized) {
+export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized, camera) {
     if (!gl) return;
 
     if (!areAllWorkersInitialized) {
         renderLoader();
     } else {
-        renderWorldsToTextures(allWorldsData);
+        renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
         renderMainScene(selectedWorldIndex);
     }
 }
