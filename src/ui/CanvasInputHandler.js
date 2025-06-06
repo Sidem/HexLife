@@ -186,16 +186,22 @@ export class CanvasInputHandler {
             this._clampCameraPan();
         }
     }
-    
-    _handleCanvasClick(event) {
-        if (this.justFinishedDrawing || this.isMultiTouching) return;
+
+    _performClickAction(event) {
         const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
         if (worldIndexAtCursor === null) return;
+    
         if (worldIndexAtCursor !== this.worldManager.getSelectedWorldIndex()) {
             EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-        } else if (viewType === 'selected' && col !== null) {
+        }
+        else if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, { worldIndex: worldIndexAtCursor, col, row });
         }
+    }
+    
+    _handleCanvasClick(event) {
+        if (this.justFinishedDrawing) return;
+        this._performClickAction(event);
     }
 
     _handleCanvasMouseDown(event) {
@@ -387,18 +393,20 @@ export class CanvasInputHandler {
     _handleTouchEnd(event) {
         event.preventDefault();
         clearTimeout(this.touchTimeout);
-
+        const wasMultiTouching = this.isMultiTouching;
+    
         if (this.isMultiTouching && event.touches.length < 2) {
             this.isMultiTouching = false;
             this.lastTouchDistance = 0;
             this.lastTouchCenter = null;
         }
-
+    
         const touch = this._findTouch(event.changedTouches);
         if (touch) {
-            if (!this.hasTouchMoved && !this.isMouseDrawing) {
-                this._handleCanvasClick(this._createMouseEventFromTouch(touch, 'click'));
+            if (!this.isMouseDrawing && !wasMultiTouching) {
+                this._performClickAction(this._createMouseEventFromTouch(touch, 'click'));
             }
+            
             this._handleCanvasMouseUp(this._createMouseEventFromTouch(touch, 'mouseup'));
             this.touchIdentifier = null;
         }
