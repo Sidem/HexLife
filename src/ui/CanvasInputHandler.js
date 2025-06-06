@@ -25,8 +25,9 @@ export class CanvasInputHandler {
         this.lastPanX = 0;
         this.lastPanY = 0;
 
-        // --- NEW: State for multi-touch gestures ---
+        // --- State for multi-touch gestures ---
         this.isMultiTouching = false; // True when two fingers are down
+        this.multiTouchOccurred = false; // Flag to prevent click after multi-touch
         this.lastTouchDistance = 0;   // For pinch-to-zoom
         this.lastTouchCenter = null;  // For two-finger pan
 
@@ -332,25 +333,27 @@ export class CanvasInputHandler {
     _handleTouchStart(event) {
         event.preventDefault();
         clearTimeout(this.touchTimeout);
-
-        if (event.touches.length === 2) {
+    
+        if (event.touches.length >= 2) {
             this.isMultiTouching = true;
-            this.isMouseDrawing = false; // Cancel any drawing
+            this.multiTouchOccurred = true; 
+            this.isMouseDrawing = false; 
             const t0 = event.touches[0];
             const t1 = event.touches[1];
             this.lastTouchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
             this.lastTouchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
         } else if (event.touches.length === 1) {
-            this.isMultiTouching = false;
-            const touch = event.touches[0];
-            this.touchIdentifier = touch.identifier;
-            this.hasTouchMoved = false;
-            // Use a timeout to differentiate a tap from a press-and-draw
-            this.touchTimeout = setTimeout(() => {
-                if (!this.hasTouchMoved) {
-                    this._handleCanvasMouseDown(this._createMouseEventFromTouch(touch, 'mousedown'));
-                }
-            }, 150);
+            if (!this.isMultiTouching) {
+                this.isMultiTouching = false;
+                const touch = event.touches[0];
+                this.touchIdentifier = touch.identifier;
+                this.hasTouchMoved = false;
+                this.touchTimeout = setTimeout(() => {
+                    if (!this.hasTouchMoved) {
+                        this._handleCanvasMouseDown(this._createMouseEventFromTouch(touch, 'mousedown'));
+                    }
+                }, 150);
+            }
         }
     }
 
@@ -393,7 +396,6 @@ export class CanvasInputHandler {
     _handleTouchEnd(event) {
         event.preventDefault();
         clearTimeout(this.touchTimeout);
-        const wasMultiTouching = this.isMultiTouching;
     
         if (this.isMultiTouching && event.touches.length < 2) {
             this.isMultiTouching = false;
@@ -403,12 +405,16 @@ export class CanvasInputHandler {
     
         const touch = this._findTouch(event.changedTouches);
         if (touch) {
-            if (!this.isMouseDrawing && !wasMultiTouching) {
+            if (!this.isMouseDrawing && !this.multiTouchOccurred) {
                 this._performClickAction(this._createMouseEventFromTouch(touch, 'click'));
             }
             
             this._handleCanvasMouseUp(this._createMouseEventFromTouch(touch, 'mouseup'));
             this.touchIdentifier = null;
+        }
+    
+        if (event.touches.length === 0) {
+            this.multiTouchOccurred = false;
         }
     }
 
