@@ -16,11 +16,48 @@ let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
 
-const camera = {
-    x: Config.RENDER_TEXTURE_SIZE / 2,
-    y: Config.RENDER_TEXTURE_SIZE / 2,
-    zoom: 1.0
-};
+function parseUrlParameters() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('r')) return {}; 
+
+    const sharedSettings = {};
+
+    const rulesetHex = params.get('r');
+    if (/^[0-9a-fA-F]{32}$/.test(rulesetHex)) {
+        sharedSettings.rulesetHex = rulesetHex;
+    }
+
+    if (params.has('w')) {
+        const worldIndex = parseInt(params.get('w'), 10);
+        if (worldIndex >= 0 && worldIndex < Config.NUM_WORLDS) {
+            sharedSettings.selectedWorldIndex = worldIndex;
+        }
+    }
+
+    if (params.has('s')) {
+        const speed = parseInt(params.get('s'), 10);
+        if (speed >= 1 && speed <= Config.MAX_SIM_SPEED) {
+            sharedSettings.speed = speed;
+        }
+    }
+
+    if (params.has('e')) {
+        const enabledMask = parseInt(params.get('e'), 10);
+        if (!isNaN(enabledMask)) {
+            sharedSettings.enabledMask = enabledMask;
+        }
+    }
+
+    if (params.has('cam')) {
+        const camParts = params.get('cam').split(',').map(Number);
+        if (camParts.length === 3 && !camParts.some(isNaN)) {
+            sharedSettings.camera = { x: camParts[0], y: camParts[1], zoom: camParts[2] };
+        }
+    }
+    
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return sharedSettings;
+}
 
 async function initialize() {
     console.log("Starting Initialization (Worker Architecture)...");
@@ -30,6 +67,8 @@ async function initialize() {
         return;
     }
     
+    const sharedSettings = parseUrlParameters();
+
     CanvasLoader.startCanvasLoader(canvas);
 
     gl = await Renderer.initRenderer(canvas);
@@ -39,28 +78,33 @@ async function initialize() {
         return;
     }
 
-    worldManager = new WorldManager();
-    canvasInputHandler = new CanvasInputHandler(canvas, camera, worldManager);
+    worldManager = new WorldManager(sharedSettings);
+    canvasInputHandler = new CanvasInputHandler(canvas, worldManager);
 
     const worldManagerInterfaceForUI = {
-        isSimulationPaused: worldManager.isSimulationPaused,
-        getCurrentRulesetHex: worldManager.getCurrentRulesetHex,
-        getCurrentRulesetArray: worldManager.getCurrentRulesetArray,
-        getCurrentSimulationSpeed: worldManager.getCurrentSimulationSpeed,
-        getCurrentBrushSize: worldManager.getCurrentBrushSize,
-        getSelectedWorldIndex: worldManager.getSelectedWorldIndex,
-        getSelectedWorldStats: worldManager.getSelectedWorldStats,
-        getWorldSettingsForUI: worldManager.getWorldSettingsForUI,
-        getEffectiveRuleForNeighborCount: worldManager.getEffectiveRuleForNeighborCount,
-        getCanonicalRuleDetails: worldManager.getCanonicalRuleDetails,
-        getSymmetryData: worldManager.getSymmetryData,
-        getEntropySamplingState: () => worldManager.getEntropySamplingState(),
+        isSimulationPaused: worldManager.isSimulationPaused.bind(worldManager),
+        getCurrentRulesetHex: worldManager.getCurrentRulesetHex.bind(worldManager),
+        getCurrentRulesetArray: worldManager.getCurrentRulesetArray.bind(worldManager),
+        getCurrentSimulationSpeed: worldManager.getCurrentSimulationSpeed.bind(worldManager),
+        getCurrentBrushSize: worldManager.getCurrentBrushSize.bind(worldManager),
+        getSelectedWorldIndex: worldManager.getSelectedWorldIndex.bind(worldManager),
+        getSelectedWorldStats: worldManager.getSelectedWorldStats.bind(worldManager),
+        getWorldSettingsForUI: worldManager.getWorldSettingsForUI.bind(worldManager),
+        getEffectiveRuleForNeighborCount: worldManager.getEffectiveRuleForNeighborCount.bind(worldManager),
+        getCanonicalRuleDetails: worldManager.getCanonicalRuleDetails.bind(worldManager),
+        getSymmetryData: worldManager.getSymmetryData.bind(worldManager),
+        getEntropySamplingState: worldManager.getEntropySamplingState.bind(worldManager),
+        getCurrentCameraState: worldManager.getCurrentCameraState.bind(worldManager),
     };
 
     if (!UI.initUI(worldManagerInterfaceForUI)) {
         console.error("UI initialization failed.");
         return;
     }
+
+    // Dispatch initial events to sync UI with the starting state
+    EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
+    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, worldManager.isSimulationPaused());
     
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -119,7 +163,7 @@ function renderLoop(timestamp) {
         allWorldsData, 
         worldManager.getSelectedWorldIndex(), 
         areAllWorkersInitialized, 
-        camera
+        worldManager.getCurrentCameraState()
     );
 
     frameCount++;

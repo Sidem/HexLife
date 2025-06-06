@@ -6,26 +6,49 @@ import * as Symmetry from './Symmetry.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
 
 export class WorldManager {
-    constructor() {
+    constructor(sharedSettings = {}) {
         this.worlds = [];
-        this.selectedWorldIndex = Config.DEFAULT_SELECTED_WORLD_INDEX;
+        this.cameraStates = [];
+        this.sharedSettings = sharedSettings;
+        this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
-        this.currentGlobalSpeed = PersistenceService.loadSimSpeed() || Config.DEFAULT_SPEED;
-        this.currentBrushSize = PersistenceService.loadBrushSize() || Config.DEFAULT_NEIGHBORHOOD_SIZE;
+        this.currentGlobalSpeed = sharedSettings.speed ?? PersistenceService.loadSimSpeed() ?? Config.DEFAULT_SPEED;
+        this.currentBrushSize = PersistenceService.loadBrushSize() ?? Config.DEFAULT_NEIGHBORHOOD_SIZE;
         this._hoverAffectedIndicesSet = new Set();
 
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
 
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
-        this.worldSettings = PersistenceService.loadWorldSettings();
-        this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
+        this.worldSettings = [];
+        this.initialDefaultRulesetHex = "";
 
         this._initWorlds();
+        this._initCameraStates(sharedSettings.camera);
         this._setupEventListeners();
     }
 
     _initWorlds = () => {
+        const hasSharedSettings = this.sharedSettings.rulesetHex;
+
+        if (hasSharedSettings) {
+            console.log("Applying shared settings from URL.");
+            this.initialDefaultRulesetHex = this.sharedSettings.rulesetHex;
+            const enabledMask = this.sharedSettings.enabledMask ?? 0b111111111;
+            for (let i = 0; i < Config.NUM_WORLDS; i++) {
+                this.worldSettings.push({
+                    initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
+                    enabled: (enabledMask & (1 << i)) !== 0,
+                    rulesetHex: this.initialDefaultRulesetHex
+                });
+            }
+            PersistenceService.saveWorldSettings(this.worldSettings);
+            PersistenceService.saveRuleset(this.initialDefaultRulesetHex);
+        } else {
+            this.worldSettings = PersistenceService.loadWorldSettings();
+            this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
+        }
+
         const worldManagerCallbacks = {
             onUpdate: (worldIndex, updateType) => this._handleProxyUpdate(worldIndex, updateType),
             onInitialized: (worldIndex) => this._handleProxyInitialized(worldIndex)
@@ -571,5 +594,25 @@ export class WorldManager {
 
     terminateAllWorkers = () => {
         this.worlds.forEach(proxy => proxy.terminate());
+    }
+
+    _initCameraStates(sharedCameraSettings) {
+        for (let i = 0; i < Config.NUM_WORLDS; i++) {
+            const defaultCamera = {
+                x: Config.RENDER_TEXTURE_SIZE / 2,
+                y: Config.RENDER_TEXTURE_SIZE / 2,
+                zoom: 1.0
+            };
+
+            if (sharedCameraSettings && i === this.selectedWorldIndex) {
+                this.cameraStates.push(sharedCameraSettings);
+            } else {
+                this.cameraStates.push(defaultCamera);
+            }
+        }
+    }
+
+    getCurrentCameraState = () => {
+        return this.cameraStates[this.selectedWorldIndex];
     }
 }

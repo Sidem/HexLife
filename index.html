@@ -97,6 +97,7 @@
 
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
+                <button id="shareButton" class="toolbar-button" title="Share Setup">SHR</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display"></canvas>
         </div>
@@ -161,6 +162,17 @@
             <div class="popout-separator"></div>
             <button id="clearCurrentButtonPopout" class="button">Clear Selected</button>
             <button id="clearAllButtonPopout" class="button">Clear All</button>
+        </div>
+
+        <div id="sharePopout" class="popout-panel hidden">
+            <h4>Share Link</h4>
+            <div class="form-group">
+                <label for="shareLinkInput">Your shareable link:</label>
+                <input type="text" id="shareLinkInput" class="hex-input" readonly>
+            </div>
+            <div class="form-group-buttons">
+                <button id="copyShareLinkButton" class="button">Copy to Clipboard</button>
+            </div>
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true">

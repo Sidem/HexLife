@@ -121,13 +121,13 @@ function setupHexBuffersAndVAO() {
 
     const instanceOffsets = new Float32Array(Config.NUM_CELLS * 2);
     const textureHexSize = Utils.calculateHexSizeForTexture();
-    const startX = Config.RENDER_TEXTURE_SIZE / 2; // Center grid in texture
-    const startY = Config.RENDER_TEXTURE_SIZE / 2;
+    const startX = 0;
+    const startY = 0;
 
     for (let i = 0; i < Config.NUM_CELLS; i++) {
         const coords = Utils.indexToCoords(i);
         if (coords) {
-            const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize);
+            const pixelCoords = Utils.gridToPixelCoords(coords.col, coords.row, textureHexSize, startX, startY);
             instanceOffsets[i * 2] = pixelCoords.x;
             instanceOffsets[i * 2 + 1] = pixelCoords.y;
         }

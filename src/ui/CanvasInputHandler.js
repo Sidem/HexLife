@@ -7,9 +7,8 @@ import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoord
  * panning, and zooming with boundaries.
  */
 export class CanvasInputHandler {
-    constructor(canvas, camera, worldManager) {
+    constructor(canvas, worldManager) {
         this.canvas = canvas;
-        this.camera = camera;
         this.worldManager = worldManager;
         this.gl = canvas.getContext('webgl2');
 
@@ -66,17 +65,19 @@ export class CanvasInputHandler {
      * @private
      */
     _clampCameraPan() {
+        const camera = this.worldManager.getCurrentCameraState();
+        if (!camera) return;
         const { RENDER_TEXTURE_SIZE } = Config;
-        const viewWidth = RENDER_TEXTURE_SIZE / this.camera.zoom;
-        const viewHeight = RENDER_TEXTURE_SIZE / this.camera.zoom;
+        const viewWidth = RENDER_TEXTURE_SIZE / camera.zoom;
+        const viewHeight = RENDER_TEXTURE_SIZE / camera.zoom;
         
         const minX = this.gridWorldBounds.minX + viewWidth / 2;
         const maxX = this.gridWorldBounds.maxX - viewWidth / 2;
         const minY = this.gridWorldBounds.minY + viewHeight / 2;
         const maxY = this.gridWorldBounds.maxY - viewHeight / 2;
 
-        this.camera.x = (minX > maxX) ? (minX + maxX) / 2 : Math.max(minX, Math.min(maxX, this.camera.x));
-        this.camera.y = (minY > maxY) ? (minY + maxY) / 2 : Math.max(minY, Math.min(maxY, this.camera.y));
+        camera.x = (minX > maxX) ? (minX + maxX) / 2 : Math.max(minX, Math.min(maxX, camera.x));
+        camera.y = (minY > maxY) ? (minY + maxY) / 2 : Math.max(minY, Math.min(maxY, camera.y));
     }
 
     _setupListeners() {
@@ -97,7 +98,8 @@ export class CanvasInputHandler {
     }
 
     _getCoordsFromMouseEvent(event) {
-        if (!this.gl || !this.gl.canvas || !this.worldManager) return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
+        const camera = this.worldManager.getCurrentCameraState();
+        if (!this.gl || !this.gl.canvas || !this.worldManager || !camera) return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
         const rect = this.gl.canvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
@@ -133,7 +135,7 @@ export class CanvasInputHandler {
             mouseY >= selectedViewY && mouseY < selectedViewY + selectedViewHeight) {
             const texCoordX = (mouseX - selectedViewX) / selectedViewWidth;
             const texCoordY = (mouseY - selectedViewY) / selectedViewHeight;
-            const { col, row, worldX, worldY } = textureCoordsToGridCoords(texCoordX, texCoordY, this.camera);
+            const { col, row, worldX, worldY } = textureCoordsToGridCoords(texCoordX, texCoordY, camera);
             return { worldIndexAtCursor: currentSelectedWorldIdx, col, row, viewType: 'selected', worldX, worldY };
         }
 
@@ -173,17 +175,25 @@ export class CanvasInputHandler {
     }
 
     _zoomAtPoint(zoomFactor, pivotClientX, pivotClientY) {
+        const camera = this.worldManager.getCurrentCameraState();
+        if (!camera) return;
+
         const { worldX, worldY } = this._getCoordsFromMouseEvent({ clientX: pivotClientX, clientY: pivotClientY });
         if (worldX === null) return;
 
-        const oldZoom = this.camera.zoom;
+        const oldZoom = camera.zoom;
         const newZoom = Math.max(1.0, Math.min(20.0, oldZoom * zoomFactor));
 
         if (newZoom !== oldZoom) {
-            const ratio = oldZoom / newZoom;
-            this.camera.x = worldX * (1 - ratio) + this.camera.x * ratio;
-            this.camera.y = worldY * (1 - ratio) + this.camera.y * ratio;
-            this.camera.zoom = newZoom;
+            if (newZoom === 1.0) {
+                camera.x = Config.RENDER_TEXTURE_SIZE / 2;
+                camera.y = Config.RENDER_TEXTURE_SIZE / 2;
+            } else {
+                const ratio = oldZoom / newZoom;
+                camera.x = worldX * (1 - ratio) + camera.x * ratio;
+                camera.y = worldY * (1 - ratio) + camera.y * ratio;
+            }
+            camera.zoom = newZoom;
             this._clampCameraPan();
         }
     }
@@ -231,10 +241,12 @@ export class CanvasInputHandler {
 
     _handleCanvasMouseMove(event) {
         if (this.isPanning) {
+            const camera = this.worldManager.getCurrentCameraState();
+            if (!camera) return;
             const dx = event.clientX - this.lastPanX;
             const dy = event.clientY - this.lastPanY;
-            this.camera.x -= (dx / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-            this.camera.y -= (dy / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
+            camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
+            camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
             this.lastPanX = event.clientX;
             this.lastPanY = event.clientY;
             this._clampCameraPan();
@@ -297,8 +309,8 @@ export class CanvasInputHandler {
     }
 
     /**
-     * UPDATED: Handles mouse wheel events for zooming (with Ctrl) or changing brush size.
-     * Zooming is now centered on the cursor's position.
+     * UPDATED: Handles mouse wheel events for zooming or changing brush size (with Ctrl).
+     * Zooming is centered on the cursor's position.
      * @param {WheelEvent} event
      * @private
      */
@@ -307,9 +319,6 @@ export class CanvasInputHandler {
         const { viewType } = this._getCoordsFromMouseEvent(event);
         if (viewType !== 'selected') return;
         if (event.ctrlKey) {
-            const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-            this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
-        } else {
             let currentBrush = this.worldManager.getCurrentBrushSize();
             const scrollAmount = Math.sign(event.deltaY);
             let newSize = currentBrush - scrollAmount;
@@ -318,6 +327,9 @@ export class CanvasInputHandler {
                 EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
                 this._handleCanvasMouseMove(event);
             }
+        } else {
+            const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
+            this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
         }
     }
     
@@ -367,11 +379,14 @@ export class CanvasInputHandler {
             const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
             
             // Handle Pan
-            const dx = newCenter.x - this.lastTouchCenter.x;
-            const dy = newCenter.y - this.lastTouchCenter.y;
-            if (dx !== 0 || dy !== 0) {
-                 this.camera.x -= (dx / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-                 this.camera.y -= (dy / this.camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
+            const camera = this.worldManager.getCurrentCameraState();
+            if (camera) {
+                const dx = newCenter.x - this.lastTouchCenter.x;
+                const dy = newCenter.y - this.lastTouchCenter.y;
+                if (dx !== 0 || dy !== 0) {
+                     camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
+                     camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
+                }
             }
             
             // Handle Zoom

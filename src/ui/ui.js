@@ -71,13 +71,17 @@ export function initUI(worldManagerInterface) {
         setupPanelButton: document.getElementById('setupPanelButton'), 
         analysisPanelButton: document.getElementById('analysisPanelButton'),
         rankPanelButton: document.getElementById('rankPanelButton'),
+        shareButton: document.getElementById('shareButton'),
         speedPopout: document.getElementById('speedPopout'),
         brushPopout: document.getElementById('brushPopout'),
         newRulesPopout: document.getElementById('newRulesPopout'),
         setHexPopout: document.getElementById('setHexPopout'),
         resetClearPopout: document.getElementById('resetClearPopout'),
+        sharePopout: document.getElementById('sharePopout'),
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
+        shareLinkInput: document.getElementById('shareLinkInput'),
+        copyShareLinkButton: document.getElementById('copyShareLinkButton'),
         generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
         useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
         biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
@@ -168,6 +172,7 @@ function _initPopoutPanels() {
     popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5});
     popoutPanels.setHex = new PopoutPanel(uiElements.setHexPopout, uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
+    popoutPanels.share = new PopoutPanel(uiElements.sharePopout, uiElements.shareButton, { position: 'right', alignment: 'start' });
     
     activePopouts = Object.values(popoutPanels);
 }
@@ -263,6 +268,7 @@ function _setupToolbarButtonListeners() {
     
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
+    uiElements.shareButton.addEventListener('click', () => generateAndShowShareLink());
 }
 
 function _setupStateListeners() { 
@@ -284,6 +290,68 @@ function _setupStateListeners() {
         reader.onerror = () => { alert(`Error reading file.`); e.target.value = null; };
         reader.readAsText(file);
     });
+}
+
+function generateAndShowShareLink() {
+    const params = new URLSearchParams();
+    const rulesetHex = worldManagerInterfaceRef.getCurrentRulesetHex();
+
+    if (!rulesetHex || rulesetHex === "N/A" || rulesetHex === "Error") {
+        alert("Cannot share: The selected world does not have a valid ruleset.");
+        return;
+    }
+    params.set('r', rulesetHex);
+
+    const selectedWorld = worldManagerInterfaceRef.getSelectedWorldIndex();
+    if (selectedWorld !== Config.DEFAULT_SELECTED_WORLD_INDEX) {
+        params.set('w', selectedWorld);
+    }
+
+    const speed = worldManagerInterfaceRef.getCurrentSimulationSpeed();
+    if (speed !== Config.DEFAULT_SPEED) {
+        params.set('s', speed);
+    }
+
+    const worldSettings = worldManagerInterfaceRef.getWorldSettingsForUI();
+    let enabledBitmask = 0;
+    worldSettings.forEach((ws, i) => {
+        if (ws.enabled) enabledBitmask |= (1 << i);
+    });
+    if (enabledBitmask !== 511) { // 511 is the default for all 9 worlds enabled
+        params.set('e', enabledBitmask);
+    }
+
+    const camera = worldManagerInterfaceRef.getCurrentCameraState();
+    if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
+        const camX = parseFloat(camera.x.toFixed(1));
+        const camY = parseFloat(camera.y.toFixed(1));
+        const camZ = parseFloat(camera.zoom.toFixed(2));
+        params.set('cam', `${camX},${camY},${camZ}`);
+    }
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    uiElements.shareLinkInput.value = `${baseUrl}?${params.toString()}`;
+    
+    if (uiElements.copyShareLinkButton) {
+        uiElements.copyShareLinkButton.addEventListener('click', copyShareLink, { once: true });
+    }
+}
+
+function copyShareLink() {
+    if (uiElements.shareLinkInput.value) {
+        uiElements.shareLinkInput.select();
+        navigator.clipboard.writeText(uiElements.shareLinkInput.value).then(() => {
+            const oldTxt = uiElements.copyShareLinkButton.textContent;
+            uiElements.copyShareLinkButton.textContent = "Copied!";
+            setTimeout(() => {
+                uiElements.copyShareLinkButton.textContent = oldTxt;
+                 // Re-attach listener after a short delay
+                setTimeout(() => {
+                    uiElements.copyShareLinkButton.addEventListener('click', copyShareLink, { once: true });
+                }, 100);
+            }, 1500);
+        }).catch(err => alert('Failed to copy link.'));
+    }
 }
 
 function loadAndApplyUISettings() {
@@ -563,6 +631,8 @@ function setupUIEventListeners() {
     EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => {
         downloadFile(data.filename, data.content, data.mimeType);
     });
+    uiElements.shareButton.addEventListener('click', generateAndShowShareLink);
+    uiElements.copyShareLinkButton.addEventListener('click', copyShareLink);
 }
 
 
