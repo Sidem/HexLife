@@ -1,5 +1,6 @@
 import * as Config from './config.js';
 import init, { World } from './wasm-engine/hexlife_wasm.js';
+import { rulesetToHex, findHexagonsInNeighborhood } from '../utils/utils.js';
 
 let wasm_module;
 let wasm_world;
@@ -41,13 +42,6 @@ function calculateChecksum(arr) {
     return wasm_world.calculate_checksum(arr);
 }
 
-function rulesetToHex(rulesetArray) {
-    if (!rulesetArray || rulesetArray.length !== 128) return "Error";
-    let bin = ""; for (let i = 0; i < 128; i++) bin += rulesetArray[i];
-    try { return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); }
-    catch (e) { return "Error"; }
-}
-
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
 function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_EVEN) {
@@ -85,45 +79,6 @@ function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_
         }
     }
     return entropy / 7.0;
-}
-
-function applyBrushLogic(col, row, brushSize) {
-    if (!jsStateArray) return false;
-    let changed = false;
-    const q = [[col, row, 0]];
-    const visited = new Map([[`${col},${row}`, 0]]);
-    const affectedIndicesInBrush = new Set();
-    const startIndex = row * workerConfig.GRID_COLS + col;
-    if (startIndex !== undefined && startIndex >=0 && startIndex < workerConfig.NUM_CELLS) {
-        affectedIndicesInBrush.add(startIndex);
-    }
-    while(q.length > 0) {
-        const [cc, cr, cd] = q.shift();
-        if (cd >= brushSize) continue;
-        const dirs = (cc % 2 !== 0) ? NEIGHBOR_DIRS_ODD_R : NEIGHBOR_DIRS_EVEN_R;
-        for (const [dx, dy] of dirs) {
-            const nc = cc + dx;
-            const nr = cr + dy;
-            const wc = (nc % workerConfig.GRID_COLS + workerConfig.GRID_COLS) % workerConfig.GRID_COLS;
-            const wr = (nr % workerConfig.GRID_ROWS + workerConfig.GRID_ROWS) % workerConfig.GRID_ROWS;
-            if (!visited.has(`${wc},${wr}`)) {
-                const ni = wr * workerConfig.GRID_COLS + wc;
-                if (ni !== undefined && ni >=0 && ni < workerConfig.NUM_CELLS) {
-                    visited.set(`${wc},${wr}`, cd + 1);
-                    affectedIndicesInBrush.add(ni);
-                    q.push([wc, wr, cd + 1]);
-                }
-            }
-        }
-    }
-    for (const idx of affectedIndicesInBrush) {
-        if (idx >= 0 && idx < workerConfig.NUM_CELLS) {
-            jsStateArray[idx] = 1 - jsStateArray[idx];
-            if(jsRuleIndexArray) jsRuleIndexArray[idx] = 0;
-            changed = true;
-        }
-    }
-    return changed;
 }
 
 function applySelectiveBrushLogic(cellIndices) {
@@ -208,7 +163,9 @@ function processCommandQueue() {
             case 'APPLY_SELECTIVE_BRUSH':
                 let brushChanged = false;
                 if (command.type === 'APPLY_BRUSH') {
-                    brushChanged = applyBrushLogic(command.data.col, command.data.row, command.data.brushSize);
+                    const affectedIndicesInBrush = new Set();
+                    findHexagonsInNeighborhood(command.data.col, command.data.row, command.data.brushSize, affectedIndicesInBrush);
+                    brushChanged = applySelectiveBrushLogic(affectedIndicesInBrush);
                 } else {
                     brushChanged = applySelectiveBrushLogic(command.data.cellIndices);
                 }

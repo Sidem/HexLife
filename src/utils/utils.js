@@ -87,37 +87,17 @@ export function gridToPixelCoords(col, row, hexSize, startX = 0, startY = 0) {
  * @returns {boolean} True if the point is inside.
  */
 export function isPointInHexagon(pointX, pointY, hexCenterX, hexCenterY, hexSize) {
-    
     const localX = pointX - hexCenterX;
     const localY = pointY - hexCenterY;
     const absX = Math.abs(localX);
     const absY = Math.abs(localY);
-    const hexWidth = 2 * hexSize;
-    const hexVertRadius = Math.sqrt(3)/2 * hexSize; 
 
-    if (absY > hexSize) return false; 
-    if (absX > hexVertRadius) return false; 
-    if (absX <= hexVertRadius && absY <= hexSize / 2) return true; 
-
-    const q = localX;
-    const r = localY;
-    
-    if (Math.abs(r) > hexSize) return false;
-
-    const innerRadius = hexSize * Math.sqrt(3) / 2;
-    if (Math.abs(q) > innerRadius) return false;
-    const halfHexVertRadius = hexSize * Math.sqrt(3) / 2; 
-    if (absY > hexSize || absX > halfHexVertRadius) return false; 
-    const s = hexSize;
-    if (Math.abs(localX) * Math.sqrt(3) + Math.abs(localY) <= s * Math.sqrt(3)) {
-        return Math.abs(localY) <= s; 
-    } 
-      
-    const hexInnerRadius = hexSize * Math.sqrt(3) / 2; 
-    if (absY > hexSize * 0.5 && absX > hexInnerRadius - ( (hexSize - absY) / Math.sqrt(3) ) ) return false;
+    if (absY > hexSize) return false;
+    const hexInnerRadius = hexSize * Math.sqrt(3) / 2;
+    if (absX <= hexInnerRadius && absY <= hexSize / 2) return true;
     if (absX > hexInnerRadius) return false;
-    if (absY > hexSize) return false; 
-    return true; 
+    return absY <= hexSize && 
+           absX <= hexInnerRadius - ((hexSize - absY) / Math.sqrt(3));
 }
 
 
@@ -242,4 +222,90 @@ export function findHexagonsInNeighborhood(startCol, startRow, maxDistance, outA
             }
         }
     }
+}
+
+/**
+ * Converts a 128-element Uint8Array ruleset into a 32-character hex string.
+ * @param {Uint8Array} rulesetArray The 128-element array of 0s and 1s.
+ * @returns {string} The 32-character uppercase hex string, or "Error".
+ */
+export function rulesetToHex(rulesetArray) {
+    if (!rulesetArray || rulesetArray.length !== 128) return "Error";
+    let bin = ""; 
+    for (let i = 0; i < 128; i++) {
+        bin += rulesetArray[i];
+    }
+    try { 
+        return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); 
+    }
+    catch (e) { 
+        return "Error"; 
+    }
+}
+
+/**
+ * Converts a 32-character hex string into a 128-element Uint8Array ruleset.
+ * @param {string} hexString The 32-character hex string.
+ * @returns {Uint8Array} The 128-element Uint8Array. Returns a zeroed array on error.
+ */
+export function hexToRuleset(hexString) {
+    const ruleset = new Uint8Array(128).fill(0);
+    if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
+        return ruleset;
+    }
+    try {
+        let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
+        for (let i = 0; i < 128; i++) {
+            ruleset[i] = bin[i] === '1' ? 1 : 0;
+        }
+    } catch (e) { 
+        console.error("Error converting hex to ruleset:", hexString, e); 
+    }
+    return ruleset;
+}
+
+/**
+ * Converts normalized texture coordinates (0-1) to discrete grid coordinates.
+ * Searches in a small radius around a rough estimate for the closest valid hex.
+ * @param {number} texX The normalized X coordinate in the texture (0 to 1).
+ * @param {number} texY The normalized Y coordinate in the texture (0 to 1).
+ * @returns {{col: number|null, row: number|null}} The resulting grid coordinates or null if none found.
+ */
+export function textureCoordsToGridCoords(texX, texY) {
+    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null };
+    const pixelX = texX * Config.RENDER_TEXTURE_SIZE;
+    const pixelY = texY * Config.RENDER_TEXTURE_SIZE;
+
+    const textureHexSize = calculateHexSizeForTexture();
+    const startX = textureHexSize;
+    const startY = textureHexSize * Math.sqrt(3) / 2;
+
+    let minDistSq = Infinity;
+    let closestCol = null;
+    let closestRow = null;
+
+    const searchRadius = 2;
+    const estimatedColRough = (pixelX - startX) / (textureHexSize * 1.5);
+    const estimatedRowRough = (pixelY - startY) / (textureHexSize * Math.sqrt(3));
+
+    for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
+        for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
+            const c = Math.round(estimatedColRough + cOffset);
+            const r = Math.round(estimatedRowRough + rOffset);
+            if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
+            const center = gridToPixelCoords(c, r, textureHexSize, startX, startY);
+            const dx = pixelX - center.x;
+            const dy = pixelY - center.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (distSq < minDistSq) {
+                if (isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
+                    minDistSq = distSq;
+                    closestCol = c;
+                    closestRow = r;
+                }
+            }
+        }
+    }
+    return { col: closestCol, row: closestRow };
 }

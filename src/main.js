@@ -3,7 +3,7 @@ import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
 import * as CanvasLoader from './rendering/canvasLoader.js';
 import * as UI from './ui/ui.js';
-import * as Utils from './utils/utils.js';
+import { textureCoordsToGridCoords, findHexagonsInNeighborhood } from './utils/utils.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 
 let gl;
@@ -160,7 +160,7 @@ function handleCanvasMouseDown(event) {
             initialWorldState = null;
         }
         
-        Utils.findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
+        findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
 
         strokeAffectedCells.forEach(cellIndex => {
             cellsShouldBeToggled.add(cellIndex);
@@ -202,7 +202,7 @@ function handleCanvasMouseMove(event) {
         const currentCellIndex = row * Config.GRID_COLS + col; 
         if (currentCellIndex !== lastDrawnCellIndex) {
             lastDrawnCellIndex = currentCellIndex;
-            Utils.findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
+            findHexagonsInNeighborhood(col, row, worldManager.getCurrentBrushSize(), strokeAffectedCells);
             const newCellsToToggle = [];
             strokeAffectedCells.forEach(cellIndex => {
                 if (!cellsShouldBeToggled.has(cellIndex)) {
@@ -349,46 +349,6 @@ function getCoordsFromMouseEvent(event) {
         }
     }
     return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
-}
-
-
-function textureCoordsToGridCoords(texX, texY) {
-    if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null };
-    const pixelX = texX * Config.RENDER_TEXTURE_SIZE;
-    const pixelY = texY * Config.RENDER_TEXTURE_SIZE;
-
-    const textureHexSize = Utils.calculateHexSizeForTexture();
-    const startX = textureHexSize;
-    const startY = textureHexSize * Math.sqrt(3) / 2;
-
-    let minDistSq = Infinity;
-    let closestCol = null;
-    let closestRow = null;
-
-    const searchRadius = 2;
-    const estimatedColRough = (pixelX - startX) / (textureHexSize * 1.5);
-    const estimatedRowRough = (pixelY - startY) / (textureHexSize * Math.sqrt(3));
-
-    for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
-        for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
-            const c = Math.round(estimatedColRough + cOffset);
-            const r = Math.round(estimatedRowRough + rOffset);
-            if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
-            const center = Utils.gridToPixelCoords(c, r, textureHexSize, startX, startY);
-            const dx = pixelX - center.x;
-            const dy = pixelY - center.y;
-            const distSq = dx * dx + dy * dy;
-
-            if (distSq < minDistSq) {
-                if (Utils.isPointInHexagon(pixelX, pixelY, center.x, center.y, textureHexSize)) {
-                    minDistSq = distSq;
-                    closestCol = c;
-                    closestRow = r;
-                }
-            }
-        }
-    }
-    return { col: closestCol, row: closestRow };
 }
 
 function handleResize() {

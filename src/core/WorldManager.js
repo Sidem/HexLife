@@ -3,7 +3,7 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
-import * as Utils from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
 
 export class WorldManager {
     constructor() {
@@ -38,7 +38,7 @@ export class WorldManager {
                 rulesetHex: this.initialDefaultRulesetHex
             };
 
-            const rulesetArray = this.hexToRuleset(settings.rulesetHex);
+            const rulesetArray = hexToRuleset(settings.rulesetHex);
 
             const proxy = new WorldProxy(i, {
                 config: { GRID_ROWS: Config.GRID_ROWS, GRID_COLS: Config.GRID_COLS, NUM_CELLS: Config.NUM_CELLS },
@@ -123,35 +123,35 @@ export class WorldManager {
 
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
-                const rules = this.hexToRuleset(currentRulesetHex);
+                const rules = hexToRuleset(currentRulesetHex);
                 if (data.ruleIndex >= 0 && data.ruleIndex < 128) {
                     rules[data.ruleIndex] = 1 - rules[data.ruleIndex];
                 }
-                return this.rulesetToHex(rules);
+                return rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_ALL_RULES_STATE, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
-                const rules = this.hexToRuleset(currentRulesetHex);
+                const rules = hexToRuleset(currentRulesetHex);
                 rules.fill(data.targetState);
-                return this.rulesetToHex(rules);
+                return rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
-                const rules = this.hexToRuleset(currentRulesetHex);
+                const rules = hexToRuleset(currentRulesetHex);
                 for (let mask = 0; mask < 64; mask++) {
                     if (Symmetry.countSetBits(mask) === data.numActive) {
                         const idx = (data.centerState << 6) | mask;
                         rules[idx] = data.outputState;
                     }
                 }
-                return this.rulesetToHex(rules);
+                return rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
-                const rules = this.hexToRuleset(currentRulesetHex);
+                const rules = hexToRuleset(currentRulesetHex);
                 const group = this.symmetryData.canonicalRepresentatives.find(g => g.representative === data.canonicalBitmask);
                 if (group) {
                     for (const member of group.members) {
@@ -159,7 +159,7 @@ export class WorldManager {
                         rules[idx] = data.outputState;
                     }
                 }
-                return this.rulesetToHex(rules);
+                return rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, (data) => {
@@ -186,7 +186,7 @@ export class WorldManager {
 
             indicesToReset.forEach(idx => {
                 if (data.copyPrimaryRuleset && idx !== this.selectedWorldIndex) {
-                    const newRulesetBuffer = this.hexToRuleset(primaryRulesetHex).buffer.slice(0);
+                    const newRulesetBuffer = hexToRuleset(primaryRulesetHex).buffer.slice(0);
                     this.worlds[idx].setRuleset(newRulesetBuffer);
                     this.worldSettings[idx].rulesetHex = primaryRulesetHex;
                 }
@@ -240,7 +240,7 @@ export class WorldManager {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-            Utils.findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize, this._hoverAffectedIndicesSet);
+            findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize, this._hoverAffectedIndicesSet);
             this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
@@ -303,7 +303,7 @@ export class WorldManager {
     }
 
     _applyRulesetToWorlds = (rulesetHex, targetScope, fromMainBarResetLogic, conditionalResetScopeIfEditor = 'none') => {
-        const newRulesetArray = this.hexToRuleset(rulesetHex);
+        const newRulesetArray = hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
             console.error("Cannot apply invalid ruleset hex:", rulesetHex);
             return;
@@ -351,7 +351,7 @@ export class WorldManager {
             const newHex = modifierFunc(currentHex);
 
             if (newHex !== currentHex && newHex !== "Error") {
-                const newRulesetArray = this.hexToRuleset(newHex);
+                const newRulesetArray = hexToRuleset(newHex);
                 const newRulesetBuffer = newRulesetArray.buffer.slice(0);
                 this.worlds[idx].setRuleset(newRulesetBuffer);
                 this.worldSettings[idx].rulesetHex = newHex;
@@ -414,7 +414,7 @@ export class WorldManager {
         }
         return this.worldSettings[this.selectedWorldIndex]?.rulesetHex || "N/A";
     }
-    getCurrentRulesetArray = () => this.hexToRuleset(this.getCurrentRulesetHex());
+    getCurrentRulesetArray = () => hexToRuleset(this.getCurrentRulesetHex());
 
     getSelectedWorldStats = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
@@ -431,7 +431,7 @@ export class WorldManager {
     getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => {
         const currentHex = this.getCurrentRulesetHex();
         if (currentHex === "N/A" || currentHex === "Error") return 2;
-        const ruleset = this.hexToRuleset(currentHex);
+        const ruleset = hexToRuleset(currentHex);
 
         if (!ruleset || ruleset.length !== 128) return 2;
         let firstOutput = -1;
@@ -452,7 +452,7 @@ export class WorldManager {
         }
         const currentHex = this.getCurrentRulesetHex();
         if (currentHex === "N/A" || currentHex === "Error") return [];
-        const ruleset = this.hexToRuleset(currentHex);
+        const ruleset = hexToRuleset(currentHex);
 
         if (!ruleset || ruleset.length !== 128) return [];
 
@@ -501,26 +501,7 @@ export class WorldManager {
         } else {
             for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
         }
-        return this.rulesetToHex(tempRuleset);
-    }
-
-    rulesetToHex(rulesetArray) {
-        if (!rulesetArray || rulesetArray.length !== 128) return "Error";
-        let bin = ""; for (let i = 0; i < 128; i++) bin += rulesetArray[i];
-        try { return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); }
-        catch (e) { return "Error"; }
-    }
-
-    hexToRuleset(hexString) {
-        const ruleset = new Uint8Array(128).fill(0);
-        if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
-            return ruleset;
-        }
-        try {
-            let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
-            for (let i = 0; i < 128; i++) ruleset[i] = bin[i] === '1' ? 1 : 0;
-        } catch (e) { console.error("Error converting hex to ruleset:", hexString, e); }
-        return ruleset;
+        return rulesetToHex(tempRuleset);
     }
 
     saveSelectedWorldState = () => {
@@ -552,7 +533,7 @@ export class WorldManager {
             return;
         }
         const proxy = this.worlds[worldIndex];
-        const newRulesetArray = this.hexToRuleset(loadedData.rulesetHex);
+        const newRulesetArray = hexToRuleset(loadedData.rulesetHex);
         const newStateArray = Uint8Array.from(loadedData.state);
 
         if (this.worldSettings[worldIndex]) {
