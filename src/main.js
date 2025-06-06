@@ -5,6 +5,8 @@ import * as CanvasLoader from './rendering/canvasLoader.js';
 import * as UI from './ui/ui.js';
 import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
+import { OnboardingManager } from './ui/OnboardingManager.js';
+import * as PersistenceService from './services/PersistenceService.js';
 
 let gl;
 let worldManager;
@@ -101,6 +103,14 @@ async function initialize() {
         console.error("UI initialization failed.");
         return;
     }
+    defineOnboardingSteps();
+    OnboardingManager.startTour();
+
+    // Add a 'Help' button listener if you added one to the UI
+    document.getElementById('helpButton').addEventListener('click', () => {
+        PersistenceService.saveUISetting('onboarding_complete', false);
+        OnboardingManager.startTour();
+    });
 
     // Dispatch initial events to sync UI with the starting state
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
@@ -119,7 +129,55 @@ async function initialize() {
     console.log("Initialization Complete. Starting Render Loop.");
     requestAnimationFrame(renderLoop);
 }
+function defineOnboardingSteps() {
+    const steps = [
+        {
+            element: '#hexGridCanvas',
+            content: "Welcome to HexLife Explorer! This is a simulation where cells (the hexagons) live or die based on a set of rules. Let's see it in action.",
+            primaryAction: { text: 'Next' },
+            advanceOn: { type: 'click' } // Advances when user clicks 'Next'
+        },
+        {
+            element: '#playPauseButton',
+            content: "This is the Play/Pause button. Click it to bring the world to life. The `P` key is a handy shortcut.",
+            primaryAction: { text: 'I clicked it!' },
+            advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
+        },
+        {
+            element: '#rulesetDisplay',
+            content: "Great! The patterns you see are controlled by this **Ruleset**. It's like the DNA of this universe. A different ruleset creates a different world.",
+            primaryAction: { text: 'Interesting...' },
+            advanceOn: { type: 'click' }
+        },
+        {
+            element: '#newRulesButton',
+            content: "Let's change the rules. Click the 'NEW' button to open the rule generator. (`N` key works too!)",
+            primaryAction: { text: 'Generate' },
+            advanceOn: { type: 'click', target: 'element' } // Must click the highlighted element
+        },
+        {
+            element: '#generateRulesetFromPopoutButton',
+            content: "Now, just click **'Generate'** to create a new random ruleset and see how everything changes.",
+            primaryAction: { text: 'Generate' },
+            advanceOn: { type: 'click', target: 'element' }
+        },
+        {
+            element: '#hexGridCanvas',
+            content: "You can also edit the world directly! **Click and drag** on the main view to draw your own patterns.",
+            primaryAction: { text: 'Continue' },
+            advanceOn: { type: 'click' }
+        },
+        // ... and so on for the rest of the steps outlined in the previous response.
+        {
+            element: 'body', // No specific highlight
+            content: "You've learned the basics! For more control, explore the panels on the left. Enjoy discovering new worlds!",
+            primaryAction: { text: 'Finish' },
+            advanceOn: { type: 'click' }
+        }
+    ];
 
+    OnboardingManager.defineTour(steps);
+}
 /**
  * REFACTORED: This function now also calls the input handler's resize method.
  */

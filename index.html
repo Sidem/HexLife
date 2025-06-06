@@ -50,7 +50,14 @@
             <div>Loading HexLife Explorer...</div>
         </div>
     </div>
-
+    <div id="onboarding-overlay" class="hidden"></div>
+    <div id="onboarding-tooltip" class="hidden">
+        <div id="onboarding-tooltip-content"></div>
+        <div id="onboarding-tooltip-actions">
+            <button id="onboarding-action-primary" class="button"></button>
+            <button id="onboarding-action-secondary" class="button-link">Skip Tour</button>
+        </div>
+    </div>
     <div id="app-container">
         <div id="top-info-bar">
             <div id="appTitleContainer">
@@ -98,6 +105,7 @@
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup">SHR</button>
+                <button id="helpButton" class="toolbar-button" title="Help">HLP</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display"></canvas>
         </div>
