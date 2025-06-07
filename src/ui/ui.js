@@ -666,6 +666,11 @@ function setupUIEventListeners() {
 
 export function getUIElements() { return uiElements; }
 
+export function getRulesetEditor() { return rulesetEditorComponent; }
+export function getSetupPanel() { return setupPanelComponent; }
+export function getAnalysisPanel() { return analysisPanelInstance; }
+export function getRuleRankPanel() { return ruleRankPanelComponent; }
+
 export function showPopout(panelName, shouldShow = true) {
     if (popoutPanels[panelName]) {
         if (shouldShow) {

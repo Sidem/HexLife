@@ -165,7 +165,12 @@ function showStep(stepIndex) {
         });
     }
 
-    ui.primaryBtn.textContent = step.primaryAction.text;
+    if (step.primaryAction && step.primaryAction.text) {
+        ui.primaryBtn.textContent = step.primaryAction.text;
+        ui.primaryBtn.style.display = 'inline-block';
+    } else {
+        ui.primaryBtn.style.display = 'none';
+    }
 
     positionTooltip(targetElement);
 

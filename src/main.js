@@ -104,7 +104,6 @@ async function initialize() {
         return;
     }
     defineOnboardingSteps();
-    OnboardingManager.startTour();
 
     // Add a 'Help' button listener if you added one to the UI
     document.getElementById('helpButton').addEventListener('click', () => {
@@ -135,82 +134,100 @@ function defineOnboardingSteps() {
     const steps = [
         {
             element: '#hexGridCanvas',
-            content: "Welcome to HexLife Explorer! This is a simulation where cells (the hexagons) live or die based on a set of rules. Let's see it in action.",
+            content: "<h3>Welcome to HexLife Explorer!</h3>This is a simulation where cells (the hexagons) live or die based on a set of rules. Let's see it in action.",
             primaryAction: { text: 'Next' },
             advanceOn: { type: 'click' }
         },
         {
             element: '#playPauseButton',
             content: "This is the Play/Pause button. Click it to bring the world to life. The `P` key is a handy shortcut.",
-            primaryAction: { text: 'I clicked it!' },
+            primaryAction: null,
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
         },
         {
             element: '#rulesetDisplay',
-            content: "Great! The patterns you see are controlled by this **Ruleset**. It's like the DNA of this universe. A different ruleset creates a different world.",
+            content: "Great! The patterns you see are controlled by this <b>Ruleset</b>. It's like the DNA of this universe. A different ruleset creates a different world.",
             primaryAction: { text: 'Interesting...' },
             advanceOn: { type: 'click' }
         },
         {
             element: '#newRulesButton',
-            content: "Let's change the rules. This is the 'NEW' button, which opens the rule generator. (`N` key works too!)",
-            primaryAction: { text: 'Next' },
+            content: "Let's change the rules. Click the 'NEW' button to open the rule generator. (`N` key works too!)",
+            primaryAction: null,
             advanceOn: { type: 'click', target: 'element' }
         },
         {
             element: '#generateRulesetFromPopoutButton',
-            content: "This popout has many options, but for now, just click **'Generate'** to create a new random ruleset and see how everything changes.",
-            primaryAction: { text: 'Generate' },
-            advanceOn: { type: 'click', target: 'element' }
+            content: "This popout lets you generate new rules. Try clicking <b>'Generate'</b> a few times to see how the simulation changes.",
+            primaryAction: { text: 'I\'ve tried it!' },
+            advanceOn: { type: 'click' }
         },
         {
             element: '#setRulesetButton',
-            content: "Random rules are fun, but some specific rules create amazing, predictable patterns. Click the `HEX` button to set a specific ruleset.",
-            primaryAction: { text: 'Set a Rule' },
+            content: "Random rules are fun, but some specific rules create amazing patterns. Click the `HEX` button to set a specific ruleset.",
+            primaryAction: null,
             advanceOn: { type: 'click', target: 'element' }
         },
         {
             element: '#setHexPopout',
-            content: `Now, use the button below to copy the special "glider" ruleset and then **paste it into the input box to continue.**<br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
+            content: `Now, use the button below to copy the special "glider" ruleset and then <b>paste it into the input box to continue.</b><br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
             onBeforeShow: () => {
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName: 'setHex', shouldShow: true });
             },
-            primaryAction: { text: 'Waiting for paste...' },
+            primaryAction: null,
             advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
         },
         {
             element: '#setRuleFromPopoutButton',
-            content: "Excellent! Now click 'Set' to apply the new rules. After it resets, watch for the small, moving patterns—the 'gliders'!",
-            primaryAction: { text: 'Set' },
+            content: "Excellent! Now click 'Set' to apply the new rules. After the world resets, watch for the small, moving patterns—the 'gliders'!",
+            primaryAction: null,
             advanceOn: { type: 'click', target: 'element' }
         },
         {
-            element: '#hexGridCanvas', // Highlighting the canvas again
-            content: "You can also edit the world directly! **Click and drag** on the main view to draw your own patterns and interact with the gliders.",
+            element: '#hexGridCanvas',
+            content: "You can also edit the world directly! <b>Click and drag</b> on the main view to draw your own patterns and interact with the gliders.",
             primaryAction: { text: 'Continue' },
             advanceOn: { type: 'click' }
         },
         {
-            element: '#hexGridCanvas', // Assuming you wrap the minimaps for easier selection
+            element: '#main-content-area', // A broader element for the mini-map
             content: "HexLife Explorer runs 9 worlds at once so you can compare rules. This is the mini-map. The highlighted world is the one you're viewing.",
             primaryAction: { text: 'Next' },
             advanceOn: { type: 'click' }
         },
         {
-            element: '#hexGridCanvas', // Pseudo-selector, would need a class on the items
+            element: '#main-content-area',
             content: "Click on any other world in the mini-map to select it. You can also use the number keys `1-9`.",
-            primaryAction: { text: 'Select a world' },
+            primaryAction: null,
             advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
         },
         {
-            element: '#vertical-toolbar', // Can also group the panel buttons
-            content: "You've learned the basics! When you're ready to dive deeper, these buttons open powerful panels to **Edit** rules, **Setup** worlds, and **Analyze** patterns.",
-            primaryAction: { text: 'Got it!' },
+            element: '#editRuleButton',
+            content: "Now for the advanced tools! Click the 'EDT' button to open the powerful <b>Ruleset Editor</b>.",
+            primaryAction: null,
+            advanceOn: { type: 'click', target: 'element' }
+        },
+        {
+            element: '#rulesetEditorPanel',
+            content: "The editor lets you see and change every rule. The <b>Rotational Symmetry</b> view groups similar rules. Try clicking on a rule visualization to toggle its output in the next step.",
+            primaryAction: { text: 'I see!' },
             advanceOn: { type: 'click' }
         },
         {
-            element: 'body', // No specific highlight, will center the tooltip
-            content: "The tour is complete. Enjoy exploring the emergent worlds of HexLife! You can restart this tour anytime using the 'Help' button.",
+            element: '#analysisPanelButton',
+            content: "The <b>Analysis Panel</b> ('ANL') gives you real-time data about the simulation. Let's open it.",
+            primaryAction: null,
+            advanceOn: { type: 'click', target: 'element' }
+        },
+        {
+            element: '#analysisPanel',
+            content: "Here you can see the history of the world's <b>Activity Ratio</b> and <b>Entropy</b>. These are great for understanding the complexity of a ruleset.",
+            primaryAction: { text: 'Next' },
+            advanceOn: { type: 'click' }
+        },
+        {
+            element: 'body',
+            content: "<h3>You're Ready to Explore!</h3>You've learned the basics of HexLife Explorer. The best way to learn more is to experiment. Try generating new rules, editing them, and see what you discover! <a href='https://github.com/Sidem/HexLife/blob/main/README.md' target='_blank'>Check out the README</a> for more information.",
             primaryAction: { text: 'Start Exploring' },
             advanceOn: { type: 'click' }
         }
@@ -257,6 +274,7 @@ function renderLoop(timestamp) {
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
+        OnboardingManager.startTour();
     }
     
     Renderer.renderFrameOrLoader(

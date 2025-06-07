@@ -89,7 +89,6 @@ export function stopCanvasLoader() {
         loaderAnimationId = null;
     }
     
-    
     if (loaderCanvas && loaderCanvas.parentElement) {
         loaderCanvas.parentElement.removeChild(loaderCanvas);
     }
