@@ -4,7 +4,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 let tourSteps = [];
 let currentStepIndex = -1;
 let highlightedElement = null;
-let highlightedElementParentPanel = null; // Track parent panel for z-index management
+let highlightedElementParentPanel = null;
 let tourIsActive = false;
 
 const ui = {
@@ -59,7 +59,7 @@ function positionTooltip(targetElement) {
 
 function cleanupCurrentStep() {
     if (highlightedElement) {
-        highlightedElement.classList.remove('onboarding-highlight');
+        highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
         highlightedElement = null;
     }
     if (highlightedElementParentPanel) {
@@ -97,14 +97,19 @@ function showStep(stepIndex) {
             highlightedElementParentPanel = parentPanel;
         }
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        
         highlightedElement = targetElement;
         if (targetElement !== document.body) {
             highlightedElement.classList.add('onboarding-highlight');
+            // BUG FIX: Add special class for text elements to prevent blur
+            if (['rulesetDisplay', 'rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.id)) {
+                 highlightedElement.classList.add('onboarding-highlight-no-filter');
+            }
         }
+
         ui.overlay.classList.remove('hidden');
         ui.tooltip.classList.remove('hidden');
         
-        // Update Title, Content, and Progress Bar
         ui.title.innerHTML = step.title || '';
         ui.content.innerHTML = step.content;
         const progress = ((currentStepIndex + 1) / tourSteps.length) * 100;

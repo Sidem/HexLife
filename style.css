@@ -1591,18 +1591,18 @@ body {
     width: 100vw;
     height: 100vh;
     background-color: rgba(0, 0, 0, 0.7);
-    z-index: 2000; /* Must be above all other UI */
-    pointer-events: none; /* Allows clicks to pass through initially */
+    z-index: 2000;
+    pointer-events: none;
     transition: all 0.3s ease-in-out;
     backdrop-filter: blur(2px);
 }
 
 #onboarding-overlay.interactive {
-    pointer-events: auto; /* Block clicks on background elements */
+    pointer-events: auto;
 }
 
 .onboarding-highlight {
-    z-index: 2001 !important; /* Must be above the overlay */
+    z-index: 2001 !important;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
     animation: pulse-highlight 2s infinite;
     pointer-events: auto !important;
@@ -1610,18 +1610,25 @@ body {
     transition: all 0.3s ease-in-out;
 }
 
+/* NEW: Special class to prevent blurriness on text-heavy elements */
+.onboarding-highlight.onboarding-highlight-no-filter {
+    animation: none; /* Turn off pulsing to be less distracting on text */
+    box-shadow: 0 0 10px 3px rgba(255, 240, 150, 0.85); /* Use a crisp box-shadow */
+    border: 1px solid rgba(255, 240, 150, 0.9);
+}
+
 #onboarding-tooltip {
     position: fixed;
     background: linear-gradient(145deg, #4a4a4a, #383838);
     border: 1px solid #777;
     border-radius: 8px;
-    padding: 0; /* Padding is handled internally */
-    z-index: 2002; /* Above the highlighted element and overlay */
+    padding: 0;
+    z-index: 2002;
     width: 320px;
     max-width: 90vw;
     box-shadow: 0 8px 25px rgba(0,0,0,0.5);
     transition: opacity 0.3s ease-in-out;
-    overflow: hidden; /* To contain the progress bar */
+    overflow: hidden;
 }
 
 #onboarding-progress-container {
@@ -1633,7 +1640,7 @@ body {
 #onboarding-progress-bar {
     width: 0%;
     height: 100%;
-    background-color: #f0c674; /* A gold/yellow color */
+    background-color: #f0c674;
     transition: width 0.5s ease;
 }
 

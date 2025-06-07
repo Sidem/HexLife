@@ -1,15 +1,15 @@
-// src/ui/tourSteps.js
-
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as UI from './ui.js';
 
-/**
- * The 'onBeforeShow' functions are crucial for preparing the UI for the next step.
- * They ensure panels and popouts are open when they need to be highlighted.
- */
-
 const showPopout = (panelName) => EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName, shouldShow: true });
 const hidePopout = (panelName) => EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName, shouldShow: false });
+const hideAllPopouts = () => ['speed', 'brush', 'newRules', 'setHex', 'resetClear', 'share'].forEach(name => hidePopout(name));
+const hideAllPanels = () => {
+    UI.getRulesetEditor()?.hide();
+    UI.getSetupPanel()?.hide();
+    UI.getAnalysisPanel()?.hide();
+    UI.getRuleRankPanel()?.hide();
+};
 
 const gliderRuleset = "12482080480080006880800180010117";
 
@@ -18,63 +18,116 @@ export const tourSteps = [
     {
         element: '#hexGridCanvas',
         title: 'Welcome, Researcher',
-        content: `You've discovered the HexLife Explorer, a laboratory for digital life. Before you are universes where simple rules can lead to breathtaking complexity. Your exploration begins now.`,
+        content: `You've discovered the HexLife Explorer, a laboratory for digital life. Your exploration begins now.`,
         primaryAction: { text: 'Begin Exploration' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#playPauseButton',
         title: 'The Flow of Time',
-        content: `Time is currently frozen. The <span class="onboarding-highlight-text">Play/Pause button</span> controls the flow of time in all worlds. Press it now to see what happens.`,
+        content: `Time is frozen. The <span class="onboarding-highlight-text">Play/Pause button</span> starts and stops the simulation. Press it now.`,
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
     },
     {
+        element: '#statsDisplayContainer',
+        title: 'Reading the Vitals',
+        content: `This is your main data feed. It shows the current <span class="onboarding-highlight-text">Tick</span>, <span class="onboarding-highlight-text">Ratio</span> of active cells, and performance stats like <span class="onboarding-highlight-text">TPS</span> (Ticks Per Second).`,
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#speedControlButton',
+        title: `Adjusting Time's Pace`,
+        content: `You can change the simulation speed. Click 'SPD' to open the speed controls.`,
+        advanceOn: { type: 'click', target: 'element' }
+    },
+    {
+        element: '#speedPopout',
+        title: 'Speed Control',
+        content: `Use this slider to set the target Ticks Per Second. Faster speeds allow you to observe long-term evolution quickly.`,
+        onBeforeShow: () => showPopout('speed'),
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    },
+    {
         element: '#main-content-area',
-        title: 'The Main Viewfinder',
-        content: `You are observing a multiverse of nine worlds in the mini-map. The large screen is your main <span class="onboarding-highlight-text">viewfinder</span>, focused on the highlighted world. <br><br>Click any other world to shift your focus.`,
+        title: 'The Multiverse',
+        content: `You are observing nine worlds at once in the mini-map. This allows for parallel experiments. <br><br>Click any other world in the mini-map to shift your focus.`,
+        onBeforeShow: () => hidePopout('speed'),
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     },
     {
         element: '#hexGridCanvas',
         title: 'Seeding Life',
-        content: `A petri dish needs a sample. You can introduce life by "seeding" the grid. <br><br><span class="onboarding-highlight-text">Click and drag your mouse</span> on the main view. The simulation will pause automatically for precise control.`,
+        content: `You can introduce life by "seeding" the grid. <span class="onboarding-highlight-text">Click and drag your mouse</span> on the main view. The simulation will pause automatically.`,
         primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#brushToolButton',
         title: 'Calibrating Instruments',
-        content: `Your seeding tool is the <span class="onboarding-highlight-text">Brush</span>. Click 'BRS' to open the brush tool and change its size.`,
+        content: `Your seeding tool is the <span class="onboarding-highlight-text">Brush</span>. Click 'BRS' to change its size.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#brushPopout',
         title: 'The Pipette',
-        content: `Use this slider to adjust your brush size. <br><br><span class="onboarding-highlight-text">Pro-Tip:</span> Hover over the main grid and use <span class="onboarding-highlight-text">Ctrl + Mouse Wheel</span> to change the size on the fly.`,
+        content: `Use this slider to adjust your brush size. <br><br><span class="onboarding-highlight-text">Pro-Tip:</span> Hover over the main grid and use <span class="onboarding-highlight-text">Ctrl + Mouse Wheel</span> for quick adjustments.`,
         onBeforeShow: () => showPopout('brush'),
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     },
-
+    {
+        element: '#resetClearButton',
+        title: 'Wiping the Slate Clean',
+        content: `Sometimes you need to start a fresh experiment. The 'R/C' button gives you options to <span class="onboarding-highlight-text">Reset</span> or <span class="onboarding-highlight-text">Clear</span> your worlds.`,
+        onBeforeShow: () => hidePopout('brush'),
+        advanceOn: { type: 'click', target: 'element' }
+    },
+    {
+        element: '#resetClearPopout',
+        title: 'Reset & Clear Options',
+        content: `You can reset the <span class="onboarding-highlight-text">Selected</span> world or <span class="onboarding-highlight-text">All</span> of them at once. Clearing sets all cells to a single state.`,
+        onBeforeShow: () => showPopout('resetClear'),
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
+    },
+    
     // =========== ACT II: THE GENETICS LAB ===========
     {
-        element: '#rulesetDisplay',
+        element: '#rulesetDisplayContainer',
         title: 'The Genetic Code',
-        content: `Every world's behavior is governed by this 32-character hex code. Think of it as the <span class="onboarding-highlight-text">digital DNA</span> for its universe. A single character change can lead to a completely different outcome.`,
-        onBeforeShow: () => hidePopout('brush'),
-        primaryAction: { text: 'Continue' },
+        content: `Now for the most important part. Every world's behavior is governed by its <span class="onboarding-highlight-text">Ruleset</span>—its digital DNA.`,
+        onBeforeShow: () => hidePopout('resetClear'),
+        primaryAction: { text: 'How do I change it?' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#newRulesButton',
         title: 'The Gene Synthesizer',
-        content: `Let's synthesize a new genetic code. The 'NEW' button opens the <span class="onboarding-highlight-text">Gene Synthesizer</span> for generating new rulesets from scratch.`,
+        content: `The 'NEW' button opens the <span class="onboarding-highlight-text">Gene Synthesizer</span> for generating new rulesets from scratch.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
+        element: '#newRulesPopout',
+        title: 'Synthesis Methods',
+        content: `<span class="onboarding-highlight-text">R-Sym</span> (Rotational Symmetry) often creates structured patterns. <span class="onboarding-highlight-text">N-Count</span> bases rules on neighbor counts. <span class="onboarding-highlight-text">Random</span> is pure chaos.`,
+        onBeforeShow: () => showPopout('newRules'),
+        primaryAction: { text: 'More Options?' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#newRulesPopout',
+        title: 'Controlling the Synthesis',
+        content: `Use <span class="onboarding-highlight-text">Custom Bias</span> to control the tendency towards life. Use <span class="onboarding-highlight-text">Apply to</span> to target the selected world or all of them at once.`,
+        onBeforeShow: () => showPopout('newRules'),
+        primaryAction: { text: 'Lets Generate!' },
+        advanceOn: { type: 'click' }
+    },
+    {
         element: '#generateRulesetFromPopoutButton',
-        title: 'Generation Methods',
-        content: `This panel offers several rule generation methods. <span class="onboarding-highlight-text">R-Sym</span> (Rotational Symmetry) often creates more structured patterns. <br><br>Click <span class="onboarding-highlight-text">'Generate'</span> to create a new ruleset.`,
+        title: 'Create a New World',
+        content: `Click <span class="onboarding-highlight-text">'Generate'</span> to create a new ruleset and see how the simulation changes instantly.`,
         onBeforeShow: () => showPopout('newRules'),
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
@@ -98,11 +151,27 @@ export const tourSteps = [
         content: `Excellent! Now click <span class="onboarding-highlight-text">'Set'</span> to apply the new rules. After the world resets, watch for the small, moving patterns—the 'gliders'!`,
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
+
+    // =========== ACT III: THE LAB NOTEBOOK & ADVANCED ANALYSIS ===========
+    {
+        element: '#saveStateButton',
+        title: 'The Lab Notebook',
+        content: `Found a fascinating state you want to preserve? The 'SAV' button saves the selected world's <span class="onboarding-highlight-text">entire state</span>—all cells and the ruleset—to a file.`,
+        onBeforeShow: () => hideAllPopouts(),
+        primaryAction: { text: 'How do I load it?' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#loadStateButton',
+        title: 'Opening an Old Entry',
+        content: `The 'LOD' button lets you load a previously saved file, restoring your experiment exactly as it was.`,
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
+    },
     {
         element: '#editRuleButton',
         title: 'The Gene-Splicer',
-        content: `Now for the most powerful tool: the <span class="onboarding-highlight-text">Ruleset Editor</span>. This is where you perform gene-splicing, modifying the DNA rule by rule. Click 'EDT' to open it.`,
-        onBeforeShow: () => hidePopout('setHex'),
+        content: `Now for the most powerful tool: the <span class="onboarding-highlight-text">Ruleset Editor</span> ('EDT'). This is where you modify the DNA rule by rule.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
@@ -112,8 +181,6 @@ export const tourSteps = [
         onBeforeShow: () => UI.getRulesetEditor()?.show(),
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
-    
-    // =========== ACT III: THE ANALYTICS SUITE ===========
     {
         element: '#setupPanelButton',
         title: 'The Analytics Suite',
@@ -139,7 +206,7 @@ export const tourSteps = [
     {
         element: '#analysisPanel',
         title: 'Complexity Over Time',
-        content: `These charts track <span class="onboarding-highlight-text">Activity Ratio</span> (how many cells are alive) and <span class="onboarding-highlight-text">Entropy</span> (a measure of complexity). They are invaluable for comparing rulesets.`,
+        content: `These charts track <span class="onboarding-highlight-text">Activity Ratio</span> and <span class="onboarding-highlight-text">Entropy</span> (a measure of complexity). They are invaluable for comparing rulesets.`,
         onBeforeShow: () => UI.getAnalysisPanel()?.show(),
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
