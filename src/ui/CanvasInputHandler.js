@@ -5,6 +5,9 @@ import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoord
 /**
  * Manages all user input for the main canvas, including clicking, drawing,
  * panning, and zooming with boundaries.
+ *
+ * REFACTORED: Touch handling has been rewritten for a more robust gesture
+ * detection system (tap vs. swipe vs. multi-touch).
  */
 export class CanvasInputHandler {
     constructor(canvas, worldManager) {
@@ -12,52 +15,47 @@ export class CanvasInputHandler {
         this.worldManager = worldManager;
         this.gl = canvas.getContext('webgl2');
 
-        // --- State for input handling ---
+        // --- Mouse Input State ---
         this.isMouseDrawing = false;
-        this.justFinishedDrawing = false;
+        this.justFinishedDrawing = false; // Prevents click after a mouse draw stroke
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
         
-        // State for mouse panning
+        // --- Panning State (Mouse & Touch) ---
         this.isPanning = false;
         this.lastPanX = 0;
         this.lastPanY = 0;
 
-        // --- State for multi-touch gestures ---
-        this.isMultiTouching = false; // True when two fingers are down
-        this.multiTouchOccurred = false; // Flag to prevent click after multi-touch
-        this.lastTouchDistance = 0;   // For pinch-to-zoom
-        this.lastTouchCenter = null;  // For two-finger pan
+        // --- REFACTORED: Gesture Recognition State ---
+        this.gestureState = 'idle'; // 'idle', 'pending', 'drawing', 'panning_zooming'
+        this.initialTouch = null; // { x, y, identifier, clientX, clientY }
+        this.lastTouchCenter = null; // For two-finger panning
+        this.lastTouchDistance = 0; // For pinch-to-zoom
+        
+        // --- Constants for Gesture Detection ---
+        this.TAP_THRESHOLD = 10; // Max pixels a touch can move to be considered a tap
 
-        // State for single-touch interaction
-        this.touchIdentifier = null; // To track a single touch
-        this.touchTimeout = null;    // To distinguish tap from press-and-draw
-        this.hasTouchMoved = false;
-
-        // --- NEW: Cache for UI layout dimensions ---
+        // --- UI Layout Cache ---
         this.layoutCache = {};
 
         this._calculateGridBounds();
-        this._calculateAndCacheLayout(); // Initial layout calculation
+        this._calculateAndCacheLayout();
         this._setupListeners();
     }
 
     /**
-     * NEW: Public method to be called on window resize.
+     * Public method to be called on window resize.
      */
     handleResize() {
         this._calculateAndCacheLayout();
     }
 
     /**
-     * NEW: Calculates and caches the dimensions of the main view and minimap areas.
-     * This logic is moved from _getCoordsFromMouseEvent to avoid recalculation.
-     * @private
+     * Calculates and caches the dimensions of the main view and minimap areas.
      */
     _calculateAndCacheLayout() {
         if (!this.gl || !this.gl.canvas) return;
-
         const canvasWidth = this.gl.canvas.width;
         const canvasHeight = this.gl.canvas.height;
         const isLandscape = canvasWidth >= canvasHeight;
@@ -107,18 +105,12 @@ export class CanvasInputHandler {
         const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
         this.layoutCache.miniMap = {
-            gridContainerX,
-            gridContainerY,
-            miniMapW,
-            miniMapH,
-            miniMapSpacing,
+            gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing,
         };
     }
 
     /**
      * Calculates the world-space bounding box of the entire hex grid.
-     * This is used to clamp the camera pan.
-     * @private
      */
     _calculateGridBounds() {
         const hexSize = calculateHexSizeForTexture();
@@ -137,8 +129,6 @@ export class CanvasInputHandler {
 
     /**
      * Clamps the camera's pan coordinates to the pre-calculated grid boundaries.
-     * This prevents the user from panning into empty space.
-     * @private
      */
     _clampCameraPan() {
         const camera = this.worldManager.getCurrentCameraState();
@@ -173,41 +163,38 @@ export class CanvasInputHandler {
         this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
     }
 
-    /**
-     * REFACTORED: This function now uses the cached layout dimensions.
-     */
-    _getCoordsFromMouseEvent(event) {
+    // --- Coordinate and Zoom Logic ---
+    _getCoordsFromPointerEvent(event) {
         const camera = this.worldManager.getCurrentCameraState();
         if (!this.gl || !this.gl.canvas || !this.worldManager || !camera || !this.layoutCache.selectedView) {
             return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
         }
         
         const rect = this.gl.canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const pointerX = event.clientX - rect.left;
+        const pointerY = event.clientY - rect.top;
 
         const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
         
         const currentSelectedWorldIdx = this.worldManager.getSelectedWorldIndex();
-        if (mouseX >= selectedViewX && mouseX < selectedViewX + selectedViewWidth &&
-            mouseY >= selectedViewY && mouseY < selectedViewY + selectedViewHeight) {
-            const texCoordX = (mouseX - selectedViewX) / selectedViewWidth;
-            const texCoordY = (mouseY - selectedViewY) / selectedViewHeight;
+        if (pointerX >= selectedViewX && pointerX < selectedViewX + selectedViewWidth &&
+            pointerY >= selectedViewY && pointerY < selectedViewY + selectedViewHeight) {
+            const texCoordX = (pointerX - selectedViewX) / selectedViewWidth;
+            const texCoordY = (pointerY - selectedViewY) / selectedViewHeight;
             const { col, row, worldX, worldY } = textureCoordsToGridCoords(texCoordX, texCoordY, camera);
             return { worldIndexAtCursor: currentSelectedWorldIdx, col, row, viewType: 'selected', worldX, worldY };
         }
 
         const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = this.layoutCache.miniMap;
-        
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
             const c_map = i % Config.WORLD_LAYOUT_COLS;
             const miniX = gridContainerX + c_map * (miniMapW + miniMapSpacing);
             const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing);
-            if (mouseX >= miniX && mouseX < miniX + miniMapW &&
-                mouseY >= miniY && mouseY < miniY + miniMapH) {
-                const texCoordX = (mouseX - miniX) / miniMapW;
-                const texCoordY = (mouseY - miniY) / miniMapH;
+            if (pointerX >= miniX && pointerX < miniX + miniMapW &&
+                pointerY >= miniY && pointerY < miniY + miniMapH) {
+                const texCoordX = (pointerX - miniX) / miniMapW;
+                const texCoordY = (pointerY - miniY) / miniMapH;
                 const defaultCamera = { x: Config.RENDER_TEXTURE_SIZE / 2, y: Config.RENDER_TEXTURE_SIZE / 2, zoom: 1.0 };
                 const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY, defaultCamera);
                 return { worldIndexAtCursor: i, col, row, viewType: 'mini', worldX: null, worldY: null };
@@ -220,7 +207,7 @@ export class CanvasInputHandler {
         const camera = this.worldManager.getCurrentCameraState();
         if (!camera) return;
 
-        const { worldX, worldY } = this._getCoordsFromMouseEvent({ clientX: pivotClientX, clientY: pivotClientY });
+        const { worldX, worldY } = this._getCoordsFromPointerEvent({ clientX: pivotClientX, clientY: pivotClientY });
         if (worldX === null) return;
 
         const oldZoom = camera.zoom;
@@ -241,7 +228,7 @@ export class CanvasInputHandler {
     }
 
     _performClickAction(event) {
-        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
+        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
         if (worldIndexAtCursor === null) return;
     
         if (worldIndexAtCursor !== this.worldManager.getSelectedWorldIndex()) {
@@ -252,15 +239,16 @@ export class CanvasInputHandler {
         }
     }
     
+    // --- Mouse Handlers ---
     _handleCanvasClick(event) {
-        if (this.justFinishedDrawing) return;
+        if (this.justFinishedDrawing || this.gestureState === 'drawing') return;
         this._performClickAction(event);
     }
 
     _handleCanvasMouseDown(event) {
         event.preventDefault();
         if (event.button === 1 || (event.button === 0 && event.altKey)) {
-            if (this._getCoordsFromMouseEvent(event).viewType === 'selected') {
+            if (this._getCoordsFromPointerEvent(event).viewType === 'selected') {
                 this.isPanning = true;
                 this.lastPanX = event.clientX;
                 this.lastPanY = event.clientY;
@@ -269,7 +257,7 @@ export class CanvasInputHandler {
             return;
         }
         if (event.button === 0) {
-            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
+            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
             if (viewType !== 'selected' || col === null) return;
             this.isMouseDrawing = true;
             this.strokeAffectedCells.clear();
@@ -295,7 +283,7 @@ export class CanvasInputHandler {
             return;
         }
 
-        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromMouseEvent(event);
+        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
         const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
         
         if (this.isMouseDrawing && worldIndexAtCursor === selectedWorldIdx && viewType === 'selected' && col !== null) {
@@ -305,13 +293,8 @@ export class CanvasInputHandler {
                 const newCellsInBrush = new Set();
                 findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), newCellsInBrush);
                 
-                const cellsToToggle = [];
-                newCellsInBrush.forEach(cellIndex => {
-                    if (!this.strokeAffectedCells.has(cellIndex)) {
-                        cellsToToggle.push(cellIndex);
-                        this.strokeAffectedCells.add(cellIndex);
-                    }
-                });
+                const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
+                cellsToToggle.forEach(cellIndex => this.strokeAffectedCells.add(cellIndex));
 
                 if (cellsToToggle.length > 0) {
                     EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
@@ -350,31 +333,146 @@ export class CanvasInputHandler {
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
     }
 
-    /**
-     * UPDATED: Handles mouse wheel events for zooming or changing brush size (with Ctrl).
-     * Zooming is centered on the cursor's position.
-     * @param {WheelEvent} event
-     * @private
-     */
     _handleCanvasMouseWheel(event) {
         event.preventDefault();
-        const { viewType } = this._getCoordsFromMouseEvent(event);
+        const { viewType } = this._getCoordsFromPointerEvent(event);
         if (viewType !== 'selected') return;
         if (event.ctrlKey) {
-            let currentBrush = this.worldManager.getCurrentBrushSize();
             const scrollAmount = Math.sign(event.deltaY);
-            let newSize = currentBrush - scrollAmount;
-            newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, newSize));
-            if (newSize !== currentBrush) {
-                EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
-                this._handleCanvasMouseMove(event);
-            }
+            const newSize = this.worldManager.getCurrentBrushSize() - scrollAmount;
+            EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
+            this._handleCanvasMouseMove(event);
         } else {
             const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
             this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
         }
     }
     
+    // --- REVISED: Touch Handlers ---
+
+    _handleTouchStart(event) {
+        event.preventDefault();
+        const touches = event.touches;
+
+        if (touches.length === 1 && this.gestureState === 'idle') {
+            this.gestureState = 'pending';
+            const touch = touches[0];
+            this.initialTouch = {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                identifier: touch.identifier
+            };
+        } else if (touches.length >= 2) {
+            // Prevent drawing from starting if a second finger is placed quickly
+            if (this.gestureState === 'drawing') {
+                 this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
+            }
+            this.gestureState = 'panning_zooming';
+            this.initialTouch = null; // Invalidate single touch
+
+            const t0 = touches[0];
+            const t1 = touches[1];
+            this.lastTouchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            this.lastTouchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+        }
+    }
+
+    _handleTouchMove(event) {
+        event.preventDefault();
+
+        if (this.gestureState === 'panning_zooming') {
+            if (event.touches.length < 2) return; // Need two fingers
+            const t0 = event.touches[0];
+            const t1 = event.touches[1];
+            const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+            const camera = this.worldManager.getCurrentCameraState();
+            
+            // Handle Pan
+            if (camera && this.lastTouchCenter) {
+                const dx = newCenter.x - this.lastTouchCenter.x;
+                const dy = newCenter.y - this.lastTouchCenter.y;
+                camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
+                camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
+            }
+            
+            // Handle Zoom
+            if (this.lastTouchDistance > 0) {
+                const zoomFactor = newDist / this.lastTouchDistance;
+                this._zoomAtPoint(zoomFactor, newCenter.x, newCenter.y);
+            }
+
+            this.lastTouchDistance = newDist;
+            this.lastTouchCenter = newCenter;
+            this._clampCameraPan();
+
+        } else if (this.gestureState === 'pending') {
+            if (!this.initialTouch) return;
+            const touch = this._findTouchById(event.touches, this.initialTouch.identifier);
+            if (!touch) return;
+            
+            const distance = Math.hypot(touch.clientX - this.initialTouch.clientX, touch.clientY - this.initialTouch.clientY);
+
+            if (distance > this.TAP_THRESHOLD) {
+                // --- STATE TRANSITION: From Pending to Drawing ---
+                this.gestureState = 'drawing';
+                // Start the drawing stroke from the initial touch point
+                this._handleCanvasMouseDown(this._createMouseEventFromTouch(this.initialTouch, 'mousedown'));
+                // Process the current touch position as the next point in the stroke
+                this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
+            }
+        } else if (this.gestureState === 'drawing') {
+            if (!this.initialTouch) return; 
+            const touch = this._findTouchById(event.touches, this.initialTouch.identifier);
+            if (!touch) {
+                // The primary finger was lost. End the gesture.
+                this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
+                this.gestureState = 'idle';
+                this.initialTouch = null;
+                return;
+            }
+            // Continue the drawing stroke
+            this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
+        }
+    }
+
+    _handleTouchEnd(event) {
+        event.preventDefault();
+        
+        if (this.gestureState === 'pending') {
+            // Finger lifted before moving enough for a swipe. This is a TAP.
+            const changedTouch = this._findTouchById(event.changedTouches, this.initialTouch.identifier);
+            if(changedTouch) {
+                this._performClickAction(this._createMouseEventFromTouch(changedTouch, 'click'));
+            }
+        } else if (this.gestureState === 'drawing') {
+            // Finger lifted after a swipe-draw. End the drawing stroke.
+            const changedTouch = this._findTouchById(event.changedTouches, this.initialTouch.identifier);
+            if (changedTouch) {
+                 this._handleCanvasMouseUp(this._createMouseEventFromTouch(changedTouch, 'mouseup'));
+            }
+        }
+        
+        if (event.touches.length === 0) {
+            // All fingers are lifted, reset to idle state.
+            this.gestureState = 'idle';
+            this.initialTouch = null;
+            this.lastTouchCenter = null;
+            this.lastTouchDistance = 0;
+        }
+    }
+
+    // --- Touch Utility Helpers ---
+    _findTouchById(touchList, identifier) {
+        if (identifier === null) return null;
+        for (let i = 0; i < touchList.length; i++) {
+            if (touchList[i].identifier === identifier) {
+                return touchList[i];
+            }
+        }
+        return null;
+    }
+
     _createMouseEventFromTouch(touch, type) {
         return new MouseEvent(type, {
             bubbles: true, cancelable: true, view: window, detail: 1,
@@ -382,105 +480,5 @@ export class CanvasInputHandler {
             clientX: touch.clientX, clientY: touch.clientY,
             button: 0, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
         });
-    }
-
-    _handleTouchStart(event) {
-        event.preventDefault();
-        clearTimeout(this.touchTimeout);
-    
-        if (event.touches.length >= 2) {
-            this.isMultiTouching = true;
-            this.multiTouchOccurred = true; 
-            this.isMouseDrawing = false; 
-            const t0 = event.touches[0];
-            const t1 = event.touches[1];
-            this.lastTouchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-            this.lastTouchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-        } else if (event.touches.length === 1) {
-            if (!this.isMultiTouching) {
-                this.isMultiTouching = false;
-                const touch = event.touches[0];
-                this.touchIdentifier = touch.identifier;
-                this.hasTouchMoved = false;
-                this.touchTimeout = setTimeout(() => {
-                    if (!this.hasTouchMoved) {
-                        this._handleCanvasMouseDown(this._createMouseEventFromTouch(touch, 'mousedown'));
-                    }
-                }, 150);
-            }
-        }
-    }
-
-    _handleTouchMove(event) {
-        event.preventDefault();
-
-        if (event.touches.length === 2 && this.isMultiTouching) {
-            const t0 = event.touches[0];
-            const t1 = event.touches[1];
-            const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-            const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-            
-            // Handle Pan
-            const camera = this.worldManager.getCurrentCameraState();
-            if (camera) {
-                const dx = newCenter.x - this.lastTouchCenter.x;
-                const dy = newCenter.y - this.lastTouchCenter.y;
-                if (dx !== 0 || dy !== 0) {
-                     camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-                     camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
-                }
-            }
-            
-            // Handle Zoom
-            const zoomFactor = newDist / this.lastTouchDistance;
-            if (zoomFactor !== 1.0) {
-                 this._zoomAtPoint(zoomFactor, newCenter.x, newCenter.y);
-            }
-
-            this.lastTouchDistance = newDist;
-            this.lastTouchCenter = newCenter;
-            this._clampCameraPan();
-
-        } else if (event.touches.length === 1 && !this.isMultiTouching) {
-            const touch = this._findTouch(event.touches);
-            if (!touch) return;
-            this.hasTouchMoved = true;
-            this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
-        }
-    }
-
-
-    _handleTouchEnd(event) {
-        event.preventDefault();
-        clearTimeout(this.touchTimeout);
-    
-        if (this.isMultiTouching && event.touches.length < 2) {
-            this.isMultiTouching = false;
-            this.lastTouchDistance = 0;
-            this.lastTouchCenter = null;
-        }
-    
-        const touch = this._findTouch(event.changedTouches);
-        if (touch) {
-            if (!this.isMouseDrawing && !this.multiTouchOccurred) {
-                this._performClickAction(this._createMouseEventFromTouch(touch, 'click'));
-            }
-            
-            this._handleCanvasMouseUp(this._createMouseEventFromTouch(touch, 'mouseup'));
-            this.touchIdentifier = null;
-        }
-    
-        if (event.touches.length === 0) {
-            this.multiTouchOccurred = false;
-        }
-    }
-
-    _findTouch(touchList) {
-        for (let i = 0; i < touchList.length; i++) {
-            if (touchList[i].identifier === this.touchIdentifier) {
-                return touchList[i];
-            }
-        }
-        return touchList.length > 0 ? touchList[0] : null; // Fallback
     }
 }
