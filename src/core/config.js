@@ -21,7 +21,7 @@ export const DEFAULT_WORLD_ENABLED_STATES = [
     true, true, true
 ];
 
-export const DEFAULT_SPEED = 20; 
+export const DEFAULT_SPEED = 40; 
 export const MAX_SIM_SPEED = 240;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 2; 
 export const MAX_NEIGHBORHOOD_SIZE = 40;

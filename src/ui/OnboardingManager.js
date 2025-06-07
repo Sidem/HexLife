@@ -117,81 +117,86 @@ function showStep(stepIndex) {
     currentStepIndex = stepIndex;
     const step = tourSteps[stepIndex];
 
-    // Execute any pre-step actions, like opening a panel
+    // *** MODIFIED: Execute any pre-step actions, like opening a panel ***
     if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
         step.onBeforeShow();
     }
 
-    const targetElement = document.querySelector(step.element);
-    if (!targetElement) {
-        console.warn(`Onboarding element not found: ${step.element}`);
-        showStep(stepIndex + 1); // Skip to next step
-        return;
-    }
+    // *** MODIFIED: A small delay to allow the UI to update (e.g., for a panel to open) ***
+    setTimeout(() => {
+        const targetElement = document.querySelector(step.element);
+        if (!targetElement) {
+            console.warn(`Onboarding element not found: ${step.element}`);
+            // Recursively call showStep for the *next* index to avoid getting stuck
+            showStep(stepIndex + 1);
+            return;
+        }
 
-    const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
-    if (parentPanel) {
-        parentPanel.style.zIndex = '2001';
-        highlightedElementParentPanel = parentPanel; 
-    }
+        const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
+        if (parentPanel) {
+            parentPanel.style.zIndex = '2001';
+            highlightedElementParentPanel = parentPanel;
+        }
 
-    targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
 
-    highlightedElement = targetElement;
-    if (targetElement !== document.body) {
-        highlightedElement.classList.add('onboarding-highlight');
-    }
-    
-    ui.overlay.classList.remove('hidden');
-    ui.tooltip.classList.remove('hidden');
+        highlightedElement = targetElement;
+        if (targetElement !== document.body) {
+            highlightedElement.classList.add('onboarding-highlight');
+        }
 
-    ui.content.innerHTML = step.content;
+        ui.overlay.classList.remove('hidden');
+        ui.tooltip.classList.remove('hidden');
 
-    const copyButton = document.getElementById('onboarding-copy-ruleset');
-    if (copyButton) {
-        copyButton.addEventListener('click', () => {
-            const rulesetToCopy = "12482080480080006880800180010117"; // The glider ruleset
-            navigator.clipboard.writeText(rulesetToCopy).then(() => {
-                copyButton.textContent = "Copied!";
-                copyButton.disabled = true; // Prevent multiple clicks
-                setTimeout(() => { 
-                    copyButton.textContent = "Copy Ruleset"; 
-                    copyButton.disabled = false;
-                }, 2000);
-            }).catch(err => {
-                console.error("Onboarding copy failed:", err);
-                copyButton.textContent = "Copy Failed";
+        ui.content.innerHTML = step.content;
+
+        const copyButton = document.getElementById('onboarding-copy-ruleset');
+        if (copyButton) {
+            copyButton.addEventListener('click', () => {
+                const rulesetToCopy = "12482080480080006880800180010117"; // The glider ruleset
+                navigator.clipboard.writeText(rulesetToCopy).then(() => {
+                    copyButton.textContent = "Copied!";
+                    copyButton.disabled = true; // Prevent multiple clicks
+                    setTimeout(() => {
+                        copyButton.textContent = "Copy Ruleset";
+                        copyButton.disabled = false;
+                    }, 2000);
+                }).catch(err => {
+                    console.error("Onboarding copy failed:", err);
+                    copyButton.textContent = "Copy Failed";
+                });
             });
-        });
-    }
+        }
 
-    if (step.primaryAction && step.primaryAction.text) {
-        ui.primaryBtn.textContent = step.primaryAction.text;
-        ui.primaryBtn.style.display = 'inline-block';
-    } else {
-        ui.primaryBtn.style.display = 'none';
-    }
+        if (step.primaryAction && step.primaryAction.text) {
+            ui.primaryBtn.textContent = step.primaryAction.text;
+            ui.primaryBtn.style.display = 'inline-block';
+        } else {
+            ui.primaryBtn.style.display = 'none';
+        }
 
-    positionTooltip(targetElement);
+        positionTooltip(targetElement);
 
-    // Block background clicks unless the step is just pointing something out
-    if (step.advanceOn.type === 'click' && step.advanceOn.target === 'element') {
-        ui.overlay.classList.remove('interactive');
-    } else {
-        ui.overlay.classList.add('interactive');
-    }
+        // Block background clicks unless the step is just pointing something out
+        if (step.advanceOn.type === 'click' && step.advanceOn.target === 'element') {
+            ui.overlay.classList.remove('interactive');
+        } else {
+            ui.overlay.classList.add('interactive');
+        }
 
-    // Set up the trigger for the next step
-    if (step.advanceOn.type === 'click') {
-        const actionTarget = step.advanceOn.target === 'element' ? highlightedElement : ui.primaryBtn;
-        actionTarget.addEventListener('click', () => showStep(currentStepIndex + 1), { once: true });
-    } else if (step.advanceOn.type === 'event') {
-        const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, () => {
-            unsubscribe(); // Clean up listener
-            setTimeout(() => showStep(currentStepIndex + 1), 500); // Small delay for effect
-        });
-    }
+        // Set up the trigger for the next step
+        if (step.advanceOn.type === 'click') {
+            const actionTarget = step.advanceOn.target === 'element' ? highlightedElement : ui.primaryBtn;
+            actionTarget.addEventListener('click', () => showStep(currentStepIndex + 1), { once: true });
+        } else if (step.advanceOn.type === 'event') {
+            const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, () => {
+                unsubscribe(); // Clean up listener
+                setTimeout(() => showStep(currentStepIndex + 1), 500); // Small delay for effect
+            });
+        }
+    }, 100); // 100ms delay is usually enough for UI transitions.
 }
+
 
 function defineTour(steps) {
     tourSteps = steps;
