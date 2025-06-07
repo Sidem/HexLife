@@ -1,7 +1,6 @@
 // src/ui/tourSteps.js
 
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { OnboardingManager } from './OnboardingManager.js';
 import * as UI from './ui.js';
 
 /**
@@ -9,149 +8,163 @@ import * as UI from './ui.js';
  * They ensure panels and popouts are open when they need to be highlighted.
  */
 
-// A helper to close all popouts before showing a new one.
-const showPopout = (panelName) => {
-    EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName, shouldShow: true });
-};
+const showPopout = (panelName) => EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName, shouldShow: true });
+const hidePopout = (panelName) => EventBus.dispatch(EVENTS.COMMAND_SHOW_POPOUT, { panelName, shouldShow: false });
 
-// The special "glider" ruleset used in the tutorial.
 const gliderRuleset = "12482080480080006880800180010117";
 
 export const tourSteps = [
-    // =========== Chapter 1: First Contact ===========
+    // =========== ACT I: THE OBSERVATORY ===========
     {
         element: '#hexGridCanvas',
-        content: `<h3>Welcome, Explorer!</h3>You've discovered a multiverse of digital life. These are cellular automata on hexagonal grids, and you are in control.`,
+        title: 'Welcome, Researcher',
+        content: `You've discovered the HexLife Explorer, a laboratory for digital life. Before you are universes where simple rules can lead to breathtaking complexity. Your exploration begins now.`,
         primaryAction: { text: 'Begin Exploration' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#playPauseButton',
-        content: `The universe is currently paused. Press the **Play** button to set it in motion. The \`P\` key is a handy shortcut for this.`,
+        title: 'The Flow of Time',
+        content: `Time is currently frozen. The <span class="onboarding-highlight-text">Play/Pause button</span> controls the flow of time in all worlds. Press it now to see what happens.`,
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
     },
     {
         element: '#main-content-area',
-        content: `You're observing 9 worlds at once in the mini-map. This allows you to compare how different rules or starting conditions evolve. The highlighted world is the one in the main view.`,
-        primaryAction: { text: 'Got it!' },
-        advanceOn: { type: 'click' }
-    },
-    {
-        element: '#main-content-area',
-        content: `**Click on any other world** in the mini-map to select it. You can also use the number keys \`1-9\` (corresponding to the numpad layout) to switch between them.`,
+        title: 'The Main Viewfinder',
+        content: `You are observing a multiverse of nine worlds in the mini-map. The large screen is your main <span class="onboarding-highlight-text">viewfinder</span>, focused on the highlighted world. <br><br>Click any other world to shift your focus.`,
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     },
     {
         element: '#hexGridCanvas',
-        content: `Now for the fun part! You can edit the world directly. **Click and drag on the main view** to draw your own patterns. The simulation will pause automatically while you draw.`,
+        title: 'Seeding Life',
+        content: `A petri dish needs a sample. You can introduce life by "seeding" the grid. <br><br><span class="onboarding-highlight-text">Click and drag your mouse</span> on the main view. The simulation will pause automatically for precise control.`,
         primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#brushToolButton',
-        content: `Your creative tool is the **Brush**. Click 'BRS' to open the brush size controls.`,
+        title: 'Calibrating Instruments',
+        content: `Your seeding tool is the <span class="onboarding-highlight-text">Brush</span>. Click 'BRS' to open the brush tool and change its size.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#brushPopout',
-        content: `Adjust the slider to change your brush size. You can also hover over the main canvas and use **ctrl + mouse wheel** for quick adjustments.`,
+        title: 'The Pipette',
+        content: `Use this slider to adjust your brush size. <br><br><span class="onboarding-highlight-text">Pro-Tip:</span> Hover over the main grid and use <span class="onboarding-highlight-text">Ctrl + Mouse Wheel</span> to change the size on the fly.`,
+        onBeforeShow: () => showPopout('brush'),
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     },
 
-    // =========== Chapter 2: The Genetic Code ===========
+    // =========== ACT II: THE GENETICS LAB ===========
     {
         element: '#rulesetDisplay',
-        content: `<h3>The Genetic Code</h3>The behavior of each universe is dictated by its **Ruleset**. It's a 32-character hex code, like the DNA of this digital world.`,
-        primaryAction: { text: 'How do I change it?' },
+        title: 'The Genetic Code',
+        content: `Every world's behavior is governed by this 32-character hex code. Think of it as the <span class="onboarding-highlight-text">digital DNA</span> for its universe. A single character change can lead to a completely different outcome.`,
+        onBeforeShow: () => hidePopout('brush'),
+        primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#newRulesButton',
-        content: `Let's create a new universe. Click 'NEW' to open the rule generator. The \`N\` key also works.`,
+        title: 'The Gene Synthesizer',
+        content: `Let's synthesize a new genetic code. The 'NEW' button opens the <span class="onboarding-highlight-text">Gene Synthesizer</span> for generating new rulesets from scratch.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#generateRulesetFromPopoutButton',
-        content: `This panel has powerful options for generating rules. For now, just click **'Generate'** to create a new random ruleset and see how the simulation changes instantly.`,
+        title: 'Generation Methods',
+        content: `This panel offers several rule generation methods. <span class="onboarding-highlight-text">R-Sym</span> (Rotational Symmetry) often creates more structured patterns. <br><br>Click <span class="onboarding-highlight-text">'Generate'</span> to create a new ruleset.`,
+        onBeforeShow: () => showPopout('newRules'),
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
     {
         element: '#setRulesetButton',
-        content: `Random rules are fun, but some specific rules create amazing patterns. Click 'HEX' to set a ruleset manually.`,
+        title: 'Loading a Known Specimen',
+        content: `Some lifeforms are already catalogued. Let's load <span class="onboarding-highlight-text">"Gliders"</span>. Click 'HEX' to open the manual input panel.`,
+        onBeforeShow: () => hidePopout('newRules'),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#setHexPopout',
-        content: `Now, let's load a famous ruleset that creates 'gliders'. **Paste the code below** into the input box. <br><br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
+        title: 'Manual Input',
+        content: `Paste this code into the input box: <br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
+        onBeforeShow: () => showPopout('setHex'),
         advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
     },
     {
         element: '#setRuleFromPopoutButton',
-        content: `Excellent! Now click **'Set'** to apply the new rules. After the world resets, watch for the small, moving patterns—the 'gliders'!`,
+        title: 'Apply the Code',
+        content: `Excellent! Now click <span class="onboarding-highlight-text">'Set'</span> to apply the new rules. After the world resets, watch for the small, moving patterns—the 'gliders'!`,
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
-
-    // =========== Chapter 3: The Explorer's Toolkit ===========
     {
         element: '#editRuleButton',
-        content: `<h3>The Explorer's Toolkit</h3>Ready to play god? The **Ruleset Editor** ('EDT') lets you modify the DNA of a universe, rule by rule. Click to open it.`,
+        title: 'The Gene-Splicer',
+        content: `Now for the most powerful tool: the <span class="onboarding-highlight-text">Ruleset Editor</span>. This is where you perform gene-splicing, modifying the DNA rule by rule. Click 'EDT' to open it.`,
+        onBeforeShow: () => hidePopout('setHex'),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#rulesetEditorPanel',
-        content: `The editor lets you see and change every rule. This view groups similar rules by their rotational symmetry. **Try clicking on a rule visualization** to toggle its output!`,
-        primaryAction: { text: 'Understood' },
-        advanceOn: { type: 'click' }
+        title: 'Editing a Gene',
+        content: `This panel visualizes all 128 rules. <span class="onboarding-highlight-text">Click any rule visualization</span> to flip its outcome and instantly alter the laws of the universe.`,
+        onBeforeShow: () => UI.getRulesetEditor()?.show(),
+        advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
+    
+    // =========== ACT III: THE ANALYTICS SUITE ===========
     {
         element: '#setupPanelButton',
-        content: `The **World Setup** panel ('SET') lets you configure each of the 9 worlds' starting conditions and toggle them on or off.`,
+        title: 'The Analytics Suite',
+        content: `Good science requires controlled experiments. The <span class="onboarding-highlight-text">World Setup</span> panel ('SET') lets you define the starting conditions for all nine worlds.`,
         onBeforeShow: () => UI.getRulesetEditor()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#setupPanel',
-        content: `The **World Setup** panel ('SET') lets you configure each of the 9 worlds' starting conditions and toggle them on or off.`,
+        title: 'Controlling The Experiment',
+        content: `Here you can change the initial <span class="onboarding-highlight-text">Density</span> of active cells for each world, or disable them entirely.`,
+        onBeforeShow: () => UI.getSetupPanel()?.show(),
         primaryAction: { text: 'Understood' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#analysisPanelButton',
-        content: `Curious about the data behind the patterns? The **Analysis Panel** ('ANL') provides real-time visualizations of world statistics.`,
+        title: 'Macroscopic Data',
+        content: `How do you measure a universe? The <span class="onboarding-highlight-text">Analysis Panel</span> ('ANL') provides real-time data on the world's overall state and complexity.`,
         onBeforeShow: () => UI.getSetupPanel()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#analysisPanel',
-        content: `Here you can see the history of the world's **Activity Ratio** and **Entropy**. These are great for understanding the complexity of a ruleset.`,
-        primaryAction: { text: 'Understood' },
+        title: 'Complexity Over Time',
+        content: `These charts track <span class="onboarding-highlight-text">Activity Ratio</span> (how many cells are alive) and <span class="onboarding-highlight-text">Entropy</span> (a measure of complexity). They are invaluable for comparing rulesets.`,
+        onBeforeShow: () => UI.getAnalysisPanel()?.show(),
+        primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     },
     {
         element: '#rankPanelButton',
-        content: `The **Rule Rank** panel ('RNK') is a powerful tool that shows you which rules are being used most often, helping you understand *why* a world behaves the way it does.`,
+        title: 'Microscopic Data',
+        content: `But *why* does a world behave a certain way? The <span class="onboarding-highlight-text">Rule Rank</span> panel ('RNK') shows exactly which "genes" are most active.`,
         onBeforeShow: () => UI.getAnalysisPanel()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
         element: '#ruleRankPanel',
-        content: `Here you you can watch the most used rules in the currently selected world.`,
-        primaryAction: { text: 'Understood' },
+        title: 'Activation vs. Deactivation',
+        content: `This tool shows which rules are creating life (Activation) versus which are removing it (Deactivation). It's essential for deep analysis.`,
+        onBeforeShow: () => UI.getRuleRankPanel()?.show(),
+        primaryAction: { text: 'Got it' },
         advanceOn: { type: 'click' }
     },
-
-    // =========== Chapter 4: Go Forth and Discover! ===========
     {
         element: '#shareButton',
-        content: `<h3>Go Forth!</h3>Found something amazing? Click 'SHR' to generate a unique URL to share your discovery with others.`,
+        title: 'Go Forth and Discover!',
+        content: `You have mastered the lab. When you find something amazing, use the <span class="onboarding-highlight-text">Share</span> ('SHR') button to get a link to your discovery. Use <span class="onboarding-highlight-text">Help</span> ('HLP') to replay this tour.`,
         onBeforeShow: () => UI.getRuleRankPanel()?.hide(),
-        advanceOn: { type: 'click', target: 'element' }
-    },
-    {
-        element: 'body',
-        content: `<h3>You're Ready to Explore!</h3>You've learned the basics. The best way to learn more is to experiment. Try generating new rules, editing them, and see what you discover! You can restart this tour anytime via the 'HLP' button.`,
-        primaryAction: { text: 'Start Exploring' },
+        primaryAction: { text: 'Begin Your Research' },
         advanceOn: { type: 'click' }
     }
 ];
