@@ -1185,8 +1185,7 @@ label.sym-label {
     #statsDisplayContainer {
         order: 3;
         justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
+        gap: 4px;
     }
     
     #statsDisplayContainer > span {
