@@ -1,32 +1,170 @@
 [
-    {
-      "name": "Gliders",
-      "description": "The original classic. Produces stable, moving structures called 'gliders'.",
-      "tags": ["Stable", "Mover"],
-      "hex": "12482080480080006880800180010117"
-    },
-    {
-      "name": "HighLife",
-      "description": "Similar to the classic, but with an extra birth rule that creates self-replicating 'replicators'.",
-      "tags": ["Replicator", "Chaotic"],
-      "hex": "92482080480080006880800180010117"
-    },
-    {
-      "name": "Corals",
-      "description": "Forms static, coral-like structures that grow slowly and intricately.",
-      "tags": ["Stable", "Grower"],
-      "hex": "12482080480080007C00800180010117"
-    },
-    {
-      "name": "Amoeba",
-      "description": "A chaotic rule that creates shimmering, amoeba-like patterns with a distinct texture.",
-      "tags": ["Chaotic", "Amoeba"],
-      "hex": "5A482080480080006880800180010117"
-    },
-    {
-      "name": "Maze",
-      "description": "Generates intricate, maze-like corridors that are mostly static.",
-      "tags": ["Stable", "Maze"],
-      "hex": "1E482080480080006880800180010117"
-    }
-  ]
+  {
+    "name": "Rain freezing",
+    "description": "",
+    "tags": [],
+    "hex": "200110000006000C8903020805009804"
+  },
+  {
+    "name": "Rain up 1",
+    "description": "",
+    "tags": [],
+    "hex": "00000111A40000204482045480000100"
+  },
+  {
+    "name": "Moving Cracks",
+    "description": "",
+    "tags": [],
+    "hex": "004180808001D20490122500400D0800"
+  },
+  {
+    "name": "Lichtenberg figures",
+    "description": "",
+    "tags": [],
+    "hex": "400811081000190281004A0844200020"
+  },
+  {
+    "name": "Lichtenberg figures 2",
+    "description": "",
+    "tags": [],
+    "hex": "01000109C0140044A2009A8023228048"
+  },
+  {
+    "name": "Stabilizing Chaos 1 (single cell active inoculation)",
+    "description": "",
+    "tags": [],
+    "hex": "68808000800000007AC8A184C8128420"
+  },
+  {
+    "name": "Stabilizing Chaos 2 (uncertain)",
+    "description": "",
+    "tags": [],
+    "hex": "986CD1F428E9008456CB7D9FC96B3465"
+  },
+  {
+    "name": "Oscillators 1",
+    "description": "",
+    "tags": [],
+    "hex": "16284880608080000010024004082001"
+  },
+  {
+    "name": "Oscillators 2 / Spinners",
+    "description": "",
+    "tags": [],
+    "hex": "120C11B442568E21134E30A85A40C880"
+  },
+  {
+    "name": "Amoeba 1",
+    "description": "",
+    "tags": [],
+    "hex": "8157327A1F4C7AC80152275D1C3F67B7"
+  },
+  {
+    "name": "Game of life-like 1",
+    "description": "",
+    "tags": [],
+    "hex": "16686880688080000117177E177E7EE8"
+  },
+  {
+    "name": "Game of life-like 2",
+    "description": "",
+    "tags": [],
+    "hex": "16696882698090480117177E177E7EE8"
+  },
+  {
+    "name": "Game of life-like 3",
+    "description": "",
+    "tags": [],
+    "hex": "16686881688181160117177E177E7EE8"
+  },
+  {
+    "name": "Organic crystals",
+    "description": "",
+    "tags": [],
+    "hex": "84304E4024A82000162D5CB263E49A49"
+  },
+  {
+    "name": "Chains",
+    "description": "",
+    "tags": [],
+    "hex": "0860021D400412C2C8008E110205A182"
+  },
+  {
+    "name": "War (Caution: flickering)",
+    "description": "",
+    "tags": [],
+    "hex": "FFFFFFFEFFFEFEE81669699669969668"
+  },
+  {
+    "name": "Burning Cuts",
+    "description": "",
+    "tags": [],
+    "hex": "90FBB2E4BFBC90BF69FF93038DD1BF7B"
+  },
+  {
+    "name": "Dying Culture",
+    "description": "",
+    "tags": [],
+    "hex": "0117177F177F7FFEFEE8E881E8818116"
+  },
+  {
+    "name": "Mandala 1 (with hidden stability)",
+    "description": "",
+    "tags": [],
+    "hex": "6880800180010116E880800080000001"
+  },
+  {
+    "name": "Exothermic reaction requiring activation energy",
+    "description": "",
+    "tags": [],
+    "hex": "16686880688080006880800080000001"
+  },
+  {
+    "name": "Crowded line growth",
+    "description": "",
+    "tags": [],
+    "hex": "00A0090080A804200412C00422140000"
+  },
+  {
+    "name": "Healing cracks",
+    "description": "",
+    "tags": [],
+    "hex": "00818180043200B880430008334140E0"
+  },
+  {
+    "name": "Dancer 1",
+    "description": "",
+    "tags": [],
+    "hex": "0088800010028810820000F431000D08"
+  },
+  {
+    "name": "Dancer 2",
+    "description": "",
+    "tags": [],
+    "hex": "60000044000000044000190A08406104"
+  },
+  {
+    "name": "Spears in Rain",
+    "description": "",
+    "tags": [],
+    "hex": "00248110000200838101085400000010"
+  },
+  {
+    "name": "Crystal Growth high activation energy (Caution: flickering)",
+    "description": "",
+    "tags": [],
+    "hex": "177F7FFF7FFFFFFF0000000000000000"
+  },
+  {
+    "name": "Stable Exchange",
+    "description": "",
+    "tags": [],
+    "hex": "12080081400181171249219649169669"
+  },
+  {
+    "name": "Spontaneous Gliders 1",
+    "description": "",
+    "tags": [],
+    "hex": "12482080480080006880800180010117"
+  }
+]

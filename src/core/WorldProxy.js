@@ -8,6 +8,7 @@ export class WorldProxy {
         this.latestStateArray = null;
         this.latestRuleIndexArray = null;
         this.latestHoverStateArray = null;
+        this.latestGhostStateArray = null;
         this.latestStats = {
             tick: 0,
             activeCount: 0,
@@ -80,6 +81,9 @@ export class WorldProxy {
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
                 this.latestHoverStateArray = new Uint8Array(data.hoverStateBuffer);
+                if (this.latestGhostStateArray) {
+                    this.latestGhostStateArray.fill(0);
+                }
                 this.onUpdate(this.worldIndex, 'state');
                 break;
             case 'STATS_UPDATE':
@@ -143,6 +147,24 @@ export class WorldProxy {
 
                 this.onUpdate(this.worldIndex, 'stats');
                 break;
+        }
+    }
+
+    setGhostState(indices) {
+        if (!this.latestGhostStateArray) {
+            this.latestGhostStateArray = new Uint8Array(Config.NUM_CELLS);
+        }
+        this.latestGhostStateArray.fill(0);
+        for (const index of indices) {
+            if (index >= 0 && index < Config.NUM_CELLS) {
+                this.latestGhostStateArray[index] = 1;
+            }
+        }
+    }
+
+    clearGhostState() {
+        if (this.latestGhostStateArray) {
+            this.latestGhostStateArray.fill(0);
         }
     }
 
@@ -214,6 +236,7 @@ export class WorldProxy {
             jsStateArray: this.latestStateArray,
             jsRuleIndexArray: this.latestRuleIndexArray,
             jsHoverStateArray: this.latestHoverStateArray,
+            jsGhostStateArray: this.latestGhostStateArray,
             enabled: this.latestStats.isEnabled,
         };
     }

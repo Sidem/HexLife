@@ -67,6 +67,8 @@ export const EVENTS = {
     COMMAND_SELECT_WORLD: 'command:selectWorld', 
     COMMAND_SHOW_POPOUT: 'command:showPopout',
     COMMAND_ENTER_PLACING_MODE: 'command:enterPlacingMode',
+    COMMAND_UPDATE_GHOST_PREVIEW: 'command:updateGhostPreview',
+    COMMAND_CLEAR_GHOST_PREVIEW: 'command:clearGhostPreview',
     UI_RULESET_SCOPE_CHANGED: 'ui:rulesetScopeChanged', 
     UI_EDITOR_RULESET_SCOPE_CHANGED: 'ui:editorRulesetScopeChanged', 
     UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged'

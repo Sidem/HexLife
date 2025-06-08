@@ -17,7 +17,7 @@ export class CanvasInputHandler {
 
         // --- Mouse Input State ---
         this.isMouseDrawing = false;
-        this.justFinishedDrawing = false; // Prevents click after a mouse draw stroke
+        this.justFinishedDrawing = false;
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
@@ -27,18 +27,18 @@ export class CanvasInputHandler {
         this.lastPanX = 0;
         this.lastPanY = 0;
 
-        // --- REFACTORED: Gesture Recognition State ---
-        this.gestureState = 'idle'; // 'idle', 'pending', 'drawing', 'panning_zooming'
-        this.initialTouch = null; // { x, y, identifier, clientX, clientY }
-        this.lastTouchCenter = null; // For two-finger panning
-        this.lastTouchDistance = 0; // For pinch-to-zoom
+        // --- Gesture Recognition State ---
+        this.gestureState = 'idle';
+        this.initialTouch = null;
+        this.lastTouchCenter = null;
+        this.lastTouchDistance = 0;
         
-        // --- Constants for Gesture Detection ---
-        this.TAP_THRESHOLD = 10; // Max pixels a touch can move to be considered a tap
+        this.TAP_THRESHOLD = 10;
 
-        // --- NEW: Pattern Placing State ---
+        // --- Pattern Placing State ---
         this.isPlacingPattern = false;
         this.patternToPlace = null;
+        // The 'justPlacedPattern' flag is no longer needed.
 
         // --- UI Layout Cache ---
         this.layoutCache = {};
@@ -58,16 +58,14 @@ export class CanvasInputHandler {
     enterPlacingMode(patternData) {
         this.isPlacingPattern = true;
         this.patternToPlace = patternData.cells;
-        // Optional: change cursor
-        this.canvas.style.cursor = 'copy';
+        this.canvas.classList.add('placing-pattern-cursor');
     }
 
     exitPlacingMode() {
         this.isPlacingPattern = false;
         this.patternToPlace = null;
-        this.canvas.style.cursor = 'default';
-        // Clear any lingering hover state
-        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex() });
+        this.canvas.classList.remove('placing-pattern-cursor');
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW);
     }
 
     /**
@@ -267,6 +265,13 @@ export class CanvasInputHandler {
                 });
             }
             this.exitPlacingMode();
+            const stopClick = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                document.removeEventListener('click', stopClick, true);
+            };
+            document.addEventListener('click', stopClick, true);
+
             return;
         }
 
@@ -280,6 +285,7 @@ export class CanvasInputHandler {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, { worldIndex: worldIndexAtCursor, col, row });
         }
     }
+
     
     // --- Mouse Handlers ---
     _handleCanvasClick(event) {
@@ -290,7 +296,6 @@ export class CanvasInputHandler {
     _handleCanvasMouseDown(event) {
         event.preventDefault();
 
-        // Exit placing mode on any other mouse click
         if (this.isPlacingPattern && event.button !== 0) {
             this.exitPlacingMode();
             return;
@@ -307,7 +312,6 @@ export class CanvasInputHandler {
         }
         if (event.button === 0) {
              if (this.isPlacingPattern) {
-                // The actual placement logic is in _performClickAction
                 this._performClickAction(event);
                 return;
             }
@@ -346,14 +350,13 @@ export class CanvasInputHandler {
                 this.patternToPlace.forEach(([px, py]) => {
                     const targetCol = col + px;
                     const targetRow = row + py;
-                    // Check bounds before adding
                     if (targetCol >= 0 && targetCol < Config.GRID_COLS && targetRow >= 0 && targetRow < Config.GRID_ROWS) {
                         hoverIndices.add(targetRow * Config.GRID_COLS + targetCol);
                     }
                 });
-                EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, hoverAffectedIndices: hoverIndices });
+                EventBus.dispatch(EVENTS.COMMAND_UPDATE_GHOST_PREVIEW, { indices: hoverIndices });
             } else {
-                EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW);
             }
             return;
         }

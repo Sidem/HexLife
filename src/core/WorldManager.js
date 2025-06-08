@@ -269,6 +269,14 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
             this.worlds[data.worldIndex]?.clearHoverState();
         });
+        EventBus.subscribe(EVENTS.COMMAND_UPDATE_GHOST_PREVIEW, (data) => {
+            const selectedProxy = this.worlds[this.selectedWorldIndex];
+            selectedProxy?.setGhostState(data.indices);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW, () => {
+            const selectedProxy = this.worlds[this.selectedWorldIndex];
+            selectedProxy?.clearGhostState();
+        });
 
         EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
             if (this.worldSettings[data.worldIndex]) {

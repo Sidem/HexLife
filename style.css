@@ -152,6 +152,10 @@ canvas#hexGridCanvas {
     min-width: 0;
 }
 
+canvas#hexGridCanvas.placing-pattern-cursor {
+    cursor: crosshair;
+}
+
 input[type="range"] {
     color: #2b2d42;
     --track-color: rgba(0, 0, 0, 0.4);

@@ -41,6 +41,7 @@ export async function initRenderer(canvasElement) {
         instanceState: gl.getAttribLocation(hexShaderProgram, "a_instance_state"),
         instanceHoverState: gl.getAttribLocation(hexShaderProgram, "a_instance_hover_state"),
         instanceRuleIndex: gl.getAttribLocation(hexShaderProgram, "a_instance_rule_index"),
+        instanceGhostState: gl.getAttribLocation(hexShaderProgram, "a_instance_ghost_state"), // NEW
     };
     hexUniformLocations = {
         resolution: gl.getUniformLocation(hexShaderProgram, "u_resolution"),
@@ -139,6 +140,7 @@ function setupHexBuffersAndVAO() {
     hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
     hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
     hexBuffers.ruleIndexBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
+    hexBuffers.ghostBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW); // NEW
 
     hexVAO = gl.createVertexArray();
     gl.bindVertexArray(hexVAO);
@@ -167,6 +169,11 @@ function setupHexBuffersAndVAO() {
     gl.enableVertexAttribArray(hexAttributeLocations.instanceRuleIndex);
     gl.vertexAttribPointer(hexAttributeLocations.instanceRuleIndex, 1, gl.UNSIGNED_BYTE, false, 0, 0); 
     gl.vertexAttribDivisor(hexAttributeLocations.instanceRuleIndex, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, hexBuffers.ghostBuffer);
+    gl.enableVertexAttribArray(hexAttributeLocations.instanceGhostState);
+    gl.vertexAttribPointer(hexAttributeLocations.instanceGhostState, 1, gl.UNSIGNED_BYTE, false, 0, 0);
+    gl.vertexAttribDivisor(hexAttributeLocations.instanceGhostState, 1);
 
     gl.bindVertexArray(null);
 }
@@ -199,9 +206,6 @@ function setupFBOs() {
     }
 }
 
-// UPDATED: Function signature to accept camera and selectedWorldIndex
-// UPDATED: Function signature to accept camera and selectedWorldIndex
-// REFACTORED: This function now uses a two-pass approach to avoid shader switching in a loop.
 function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
@@ -209,10 +213,13 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.useProgram(hexShaderProgram);
     gl.bindVertexArray(hexVAO);
     
-    // Bind the color lookup table texture to texture unit 1
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
     gl.uniform1i(hexUniformLocations.colorLUT, 1);
+
+    // NEW: Enable blending for ghost transparency
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const worldData = allWorldsData[i];
@@ -251,6 +258,9 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
+            if (worldData.jsGhostStateArray) {
+                WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
+            }
 
             // Draw the hexagons for this world
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
