@@ -15,7 +15,7 @@ let sliderComponents = {};
 let popoutPanels = {};    
 let worldManagerInterfaceRef;
 let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance, ruleRankPanelComponent;
-
+let libraryDataRef = { rulesets: [], patterns: [] };
 
 let activePopouts = [];
 
@@ -55,8 +55,9 @@ function handleClickOutside(event) {
 document.addEventListener('click', handleClickOutside);
 document.addEventListener('touchend', handleClickOutside);
 
-export function initUI(worldManagerInterface) {
+export function initUI(worldManagerInterface, libraryData) {
     worldManagerInterfaceRef = worldManagerInterface;
+    libraryDataRef = libraryData;
     
     uiElements = {
         
@@ -72,6 +73,7 @@ export function initUI(worldManagerInterface) {
         brushToolButton: document.getElementById('brushToolButton'),
         newRulesButton: document.getElementById('newRulesButton'),
         setRulesetButton: document.getElementById('setRulesetButton'), 
+        libraryButton: document.getElementById('libraryButton'),
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
         resetClearButton: document.getElementById('resetClearButton'), 
@@ -85,6 +87,7 @@ export function initUI(worldManagerInterface) {
         newRulesPopout: document.getElementById('newRulesPopout'),
         setHexPopout: document.getElementById('setHexPopout'),
         resetClearPopout: document.getElementById('resetClearPopout'),
+        libraryPopout: document.getElementById('libraryPopout'),
         sharePopout: document.getElementById('sharePopout'),
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
@@ -122,6 +125,7 @@ export function initUI(worldManagerInterface) {
 
     _initPopoutPanels();
     _initPopoutControls();
+    _populateLibraryPanel();
     _setupToolbarButtonListeners();
     _setupStateListeners(); 
     loadAndApplyUISettings(); 
@@ -144,10 +148,10 @@ export function initUI(worldManagerInterface) {
 function validateElements() {
     const critical = [
         'rulesetDisplay', 'statTick', 'statRatio', 'statBrushSize', 'statFps', 'statActualTps', 'statTargetTps',
-        'playPauseButton', 'speedControlButton', 'brushToolButton', 'newRulesButton',
+        'playPauseButton', 'speedControlButton', 'brushToolButton', 'newRulesButton', 'libraryButton',
         'setRulesetButton', 'saveStateButton', 'loadStateButton', 'resetClearButton',
         'editRuleButton', 'setupPanelButton', 'analysisPanelButton',
-        'speedPopout', 'brushPopout', 'newRulesPopout', 'setHexPopout', 'resetClearPopout',
+        'speedPopout', 'brushPopout', 'newRulesPopout', 'setHexPopout', 'resetClearPopout', 'libraryPopout',
         'rulesetEditorPanel', 'setupPanel', 'analysisPanel', 'fileInput', 'canvas'
     ];
     let allFound = true;
@@ -179,11 +183,74 @@ function _initPopoutPanels() {
     popoutPanels.brush = new PopoutPanel(uiElements.brushPopout, uiElements.brushToolButton, { position: 'right', alignment: 'start'});
     popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5});
     popoutPanels.setHex = new PopoutPanel(uiElements.setHexPopout, uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
+    popoutPanels.library = new PopoutPanel(uiElements.libraryPopout, uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.share = new PopoutPanel(uiElements.sharePopout, uiElements.shareButton, { position: 'right', alignment: 'start' });
     
     activePopouts = Object.values(popoutPanels);
 }
+
+function _populateLibraryPanel() {
+    const rulesetContent = uiElements.libraryPopout.querySelector('#rulesetsLibraryContent');
+    const patternContent = uiElements.libraryPopout.querySelector('#patternsLibraryContent');
+    const tabs = uiElements.libraryPopout.querySelectorAll('.tab-button');
+    
+    if (!rulesetContent || !patternContent) return;
+
+    rulesetContent.innerHTML = '';
+    patternContent.innerHTML = '';
+
+    libraryDataRef.rulesets.forEach(rule => {
+        const item = document.createElement('div');
+        item.className = 'library-item';
+        item.innerHTML = `
+            <div class="library-item-info">
+                <div class="library-item-name">${rule.name}</div>
+                <div class="library-item-desc">${rule.description}</div>
+            </div>
+            <button class="button load-rule-btn">Load</button>
+        `;
+        item.querySelector('.load-rule-btn').addEventListener('click', () => {
+            const targetScope = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked')?.value || 'selected';
+            EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
+                hexString: rule.hex,
+                resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
+            });
+            popoutPanels.library.hide();
+        });
+        rulesetContent.appendChild(item);
+    });
+
+    libraryDataRef.patterns.forEach(pattern => {
+        const item = document.createElement('div');
+        item.className = 'library-item';
+        item.innerHTML = `
+            <div class="library-item-info">
+                <div class="library-item-name">${pattern.name}</div>
+                <div class="library-item-desc">${pattern.description}</div>
+            </div>
+            <button class="button place-pattern-btn">Place</button>
+        `;
+        item.querySelector('.place-pattern-btn').addEventListener('click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: pattern.cells });
+            popoutPanels.library.hide();
+        });
+        patternContent.appendChild(item);
+    });
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const targetContent = uiElements.libraryPopout.querySelector(`#${tab.dataset.tab}LibraryContent`);
+            uiElements.libraryPopout.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            if(targetContent) {
+                targetContent.classList.remove('hidden');
+            }
+        });
+    });
+}
+
 
 function _initPopoutControls() {
     

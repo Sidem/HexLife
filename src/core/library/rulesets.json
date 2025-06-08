@@ -1,0 +1,32 @@
+[
+    {
+      "name": "Gliders",
+      "description": "The original classic. Produces stable, moving structures called 'gliders'.",
+      "tags": ["Stable", "Mover"],
+      "hex": "12482080480080006880800180010117"
+    },
+    {
+      "name": "HighLife",
+      "description": "Similar to the classic, but with an extra birth rule that creates self-replicating 'replicators'.",
+      "tags": ["Replicator", "Chaotic"],
+      "hex": "92482080480080006880800180010117"
+    },
+    {
+      "name": "Corals",
+      "description": "Forms static, coral-like structures that grow slowly and intricately.",
+      "tags": ["Stable", "Grower"],
+      "hex": "12482080480080007C00800180010117"
+    },
+    {
+      "name": "Amoeba",
+      "description": "A chaotic rule that creates shimmering, amoeba-like patterns with a distinct texture.",
+      "tags": ["Chaotic", "Amoeba"],
+      "hex": "5A482080480080006880800180010117"
+    },
+    {
+      "name": "Maze",
+      "description": "Generates intricate, maze-like corridors that are mostly static.",
+      "tags": ["Stable", "Maze"],
+      "hex": "1E482080480080006880800180010117"
+    }
+  ]

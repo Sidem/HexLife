@@ -95,6 +95,7 @@
 
                 <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> 
                 <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button>
+                <button id="libraryButton" class="toolbar-button" title="Content Library">LIB</button>
                 <div class="toolbar-separator" role="separator"></div>
 
                 <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button>
@@ -174,6 +175,16 @@
             <div class="popout-separator"></div>
             <button id="clearCurrentButtonPopout" class="button">Clear Selected</button>
             <button id="clearAllButtonPopout" class="button">Clear All</button>
+        </div>
+        <div id="libraryPopout" class="popout-panel hidden">
+            <div class="popout-tabs">
+                <button class="tab-button active" data-tab="rulesets">Rulesets</button>
+                <button class="tab-button" data-tab="patterns">Patterns</button>
+            </div>
+            <div id="rulesetsLibraryContent" class="tab-content active">
+                </div>
+            <div id="patternsLibraryContent" class="tab-content hidden">
+                </div>
         </div>
 
         <div id="sharePopout" class="popout-panel hidden">

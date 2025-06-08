@@ -36,6 +36,10 @@ export class CanvasInputHandler {
         // --- Constants for Gesture Detection ---
         this.TAP_THRESHOLD = 10; // Max pixels a touch can move to be considered a tap
 
+        // --- NEW: Pattern Placing State ---
+        this.isPlacingPattern = false;
+        this.patternToPlace = null;
+
         // --- UI Layout Cache ---
         this.layoutCache = {};
 
@@ -49,6 +53,21 @@ export class CanvasInputHandler {
      */
     handleResize() {
         this._calculateAndCacheLayout();
+    }
+
+    enterPlacingMode(patternData) {
+        this.isPlacingPattern = true;
+        this.patternToPlace = patternData.cells;
+        // Optional: change cursor
+        this.canvas.style.cursor = 'copy';
+    }
+
+    exitPlacingMode() {
+        this.isPlacingPattern = false;
+        this.patternToPlace = null;
+        this.canvas.style.cursor = 'default';
+        // Clear any lingering hover state
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex() });
     }
 
     /**
@@ -161,6 +180,9 @@ export class CanvasInputHandler {
         this.canvas.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
         this.canvas.addEventListener('touchend', this._handleTouchEnd.bind(this), { passive: false });
         this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
+        
+        // Listen for placing mode command
+        EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.enterPlacingMode(data));
     }
 
     // --- Coordinate and Zoom Logic ---
@@ -228,6 +250,26 @@ export class CanvasInputHandler {
     }
 
     _performClickAction(event) {
+        if (this.isPlacingPattern) {
+            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
+            if (viewType === 'selected' && col !== null && row !== null) {
+                const finalCellIndices = new Set();
+                this.patternToPlace.forEach(([px, py]) => {
+                    const targetCol = col + px;
+                    const targetRow = row + py;
+                    if (targetCol >= 0 && targetCol < Config.GRID_COLS && targetRow >= 0 && targetRow < Config.GRID_ROWS) {
+                        finalCellIndices.add(targetRow * Config.GRID_COLS + targetCol);
+                    }
+                });
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+                    worldIndex: worldIndexAtCursor,
+                    cellIndices: finalCellIndices
+                });
+            }
+            this.exitPlacingMode();
+            return;
+        }
+
         const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
         if (worldIndexAtCursor === null) return;
     
@@ -247,6 +289,13 @@ export class CanvasInputHandler {
 
     _handleCanvasMouseDown(event) {
         event.preventDefault();
+
+        // Exit placing mode on any other mouse click
+        if (this.isPlacingPattern && event.button !== 0) {
+            this.exitPlacingMode();
+            return;
+        }
+
         if (event.button === 1 || (event.button === 0 && event.altKey)) {
             if (this._getCoordsFromPointerEvent(event).viewType === 'selected') {
                 this.isPanning = true;
@@ -257,6 +306,11 @@ export class CanvasInputHandler {
             return;
         }
         if (event.button === 0) {
+             if (this.isPlacingPattern) {
+                // The actual placement logic is in _performClickAction
+                this._performClickAction(event);
+                return;
+            }
             const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
             if (viewType !== 'selected' || col === null) return;
             this.isMouseDrawing = true;
@@ -282,10 +336,28 @@ export class CanvasInputHandler {
             this._clampCameraPan();
             return;
         }
-
+        
         const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
         const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
         
+        if (this.isPlacingPattern) {
+            if (viewType === 'selected' && col !== null && row !== null) {
+                const hoverIndices = new Set();
+                this.patternToPlace.forEach(([px, py]) => {
+                    const targetCol = col + px;
+                    const targetRow = row + py;
+                    // Check bounds before adding
+                    if (targetCol >= 0 && targetCol < Config.GRID_COLS && targetRow >= 0 && targetRow < Config.GRID_ROWS) {
+                        hoverIndices.add(targetRow * Config.GRID_COLS + targetCol);
+                    }
+                });
+                EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, hoverAffectedIndices: hoverIndices });
+            } else {
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
+            }
+            return;
+        }
+
         if (this.isMouseDrawing && worldIndexAtCursor === selectedWorldIdx && viewType === 'selected' && col !== null) {
             const currentCellIndex = row * Config.GRID_COLS + col;
             if (currentCellIndex !== this.lastDrawnCellIndex) {
@@ -329,12 +401,18 @@ export class CanvasInputHandler {
 
     _handleCanvasMouseOut(event) {
         this._handleCanvasMouseUp(event);
+        if (this.isPlacingPattern) {
+            this.exitPlacingMode();
+        }
         const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
     }
 
     _handleCanvasMouseWheel(event) {
         event.preventDefault();
+        
+        if (this.isPlacingPattern) return;
+
         const { viewType } = this._getCoordsFromPointerEvent(event);
         if (viewType !== 'selected') return;
         if (event.ctrlKey) {

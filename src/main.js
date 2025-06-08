@@ -74,12 +74,21 @@ async function initialize() {
 
     CanvasLoader.startCanvasLoader(canvas);
 
+    // Fetch library data in parallel with renderer initialization
+    const libraryPromises = [
+        fetch('src/core/library/rulesets.json').then(res => res.json()),
+        fetch('src/core/library/patterns.json').then(res => res.json())
+    ];
+
     gl = await Renderer.initRenderer(canvas);
     if (!gl) {
         console.error("Renderer initialization failed.");
         CanvasLoader.stopCanvasLoader();
         return;
     }
+
+    const [rulesetLibrary, patternLibrary] = await Promise.all(libraryPromises);
+    const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     worldManager = new WorldManager(sharedSettings);
     canvasInputHandler = new CanvasInputHandler(canvas, worldManager);
@@ -100,7 +109,7 @@ async function initialize() {
         getCurrentCameraState: worldManager.getCurrentCameraState.bind(worldManager),
     };
 
-    if (!UI.initUI(worldManagerInterfaceForUI)) {
+    if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
         console.error("UI initialization failed.");
         return;
     }

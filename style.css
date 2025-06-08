@@ -1694,3 +1694,58 @@ body {
 .button-link:hover {
     color: white;
 }
+
+/* Library Panel Styles */
+.popout-tabs {
+    display: flex;
+    border-bottom: 1px solid #555;
+    margin: -15px -15px 10px -15px;
+}
+.tab-button {
+    flex: 1;
+    padding: 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 0.9em;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+.tab-button:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+.tab-button.active {
+    color: white;
+    font-weight: bold;
+    border-bottom-color: #0078d4;
+}
+.tab-content {
+    max-height: 40vh;
+    overflow-y: auto;
+}
+.library-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 5px;
+    border-bottom: 1px solid #4f4f4f;
+}
+.library-item:last-child {
+    border-bottom: none;
+}
+.library-item-info {
+    flex-grow: 1;
+}
+.library-item-name {
+    font-weight: bold;
+    color: #e0e0e0;
+}
+.library-item-desc {
+    font-size: 0.85em;
+    color: #b0b0b0;
+    margin-top: 2px;
+}
+.library-item .button {
+    flex-shrink: 0;
+    margin-left: 10px;
+}
