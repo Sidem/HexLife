@@ -73,6 +73,9 @@ export function initUI(worldManagerInterface, libraryData) {
         brushToolButton: document.getElementById('brushToolButton'),
         newRulesButton: document.getElementById('newRulesButton'),
         mutateButton: document.getElementById('mutateButton'),
+        undoButton: document.getElementById('undoButton'),
+        redoButton: document.getElementById('redoButton'),
+        historyButton: document.getElementById('historyButton'),
         setRulesetButton: document.getElementById('setRulesetButton'),
         libraryButton: document.getElementById('libraryButton'),
         saveStateButton: document.getElementById('saveStateButton'),
@@ -90,6 +93,7 @@ export function initUI(worldManagerInterface, libraryData) {
         resetClearPopout: document.getElementById('resetClearPopout'),
         libraryPopout: document.getElementById('libraryPopout'),
         sharePopout: document.getElementById('sharePopout'),
+        historyPopout: document.getElementById('historyPopout'),
         mutatePopout: document.getElementById('mutatePopout'),
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
@@ -142,6 +146,7 @@ export function initUI(worldManagerInterface, libraryData) {
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     updateBrushSizeDisplay(worldManagerInterfaceRef.getCurrentBrushSize());
+    updateUndoRedoButtons();
 
 
     if (uiElements?.statTargetTps) {
@@ -194,6 +199,7 @@ function _initPopoutPanels() {
     popoutPanels.library = new PopoutPanel(uiElements.libraryPopout, uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.share = new PopoutPanel(uiElements.sharePopout, uiElements.shareButton, { position: 'right', alignment: 'start' });
+    popoutPanels.history = new PopoutPanel(uiElements.historyPopout, uiElements.historyButton, { position: 'bottom', alignment: 'end' });
 
     activePopouts = Object.values(popoutPanels);
 }
@@ -389,6 +395,9 @@ function _setupToolbarButtonListeners() {
     uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
     uiElements.rankPanelButton?.addEventListener('click', () => ruleRankPanelComponent?.toggle());
 
+    uiElements.undoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() }));
+    uiElements.redoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() }));
+
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
     uiElements.shareButton.addEventListener('click', () => generateAndShowShareLink());
@@ -550,6 +559,52 @@ function updateBrushSizeDisplay(brushSize) {
     }
 }
 
+function updateUndoRedoButtons() {
+    if (!worldManagerInterfaceRef || !uiElements.undoButton) return;
+    const selectedIndex = worldManagerInterfaceRef.getSelectedWorldIndex();
+    const { history, future } = worldManagerInterfaceRef.getRulesetHistoryArrays(selectedIndex);
+
+    uiElements.undoButton.disabled = history.length <= 1;
+    uiElements.redoButton.disabled = future.length === 0;
+}
+
+function updateHistoryPopout() {
+    if (!worldManagerInterfaceRef || !uiElements.historyPopout) return;
+
+    const listContainer = uiElements.historyPopout.querySelector('#historyList');
+    if (!listContainer) return;
+
+    const selectedIndex = worldManagerInterfaceRef.getSelectedWorldIndex();
+    const { history } = worldManagerInterfaceRef.getRulesetHistoryArrays(selectedIndex);
+    const currentIndex = history.length - 1;
+
+    listContainer.innerHTML = ''; // Clear previous items
+
+    history.slice().reverse().forEach((hex, index) => {
+        const reversedIndex = history.length - 1 - index;
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.textContent = formatHexCode(hex);
+        
+        if (reversedIndex === currentIndex) {
+            item.classList.add('is-current');
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.textContent = 'Current';
+            item.appendChild(tag);
+        } else {
+            item.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, {
+                    worldIndex: selectedIndex,
+                    historyIndex: reversedIndex
+                });
+                popoutPanels.history.hide();
+            });
+        }
+        listContainer.appendChild(item);
+    });
+}
+
 function handleGlobalKeyDown(event) {
     const activeEl = document.activeElement;
     const isInputFocused = activeEl && (
@@ -586,6 +641,19 @@ function handleGlobalKeyDown(event) {
         return;
     }
 
+    // Handle Ctrl/Cmd keyboard shortcuts
+    if (event.ctrlKey || event.metaKey) {
+        if (event.key.toLowerCase() === 'z' && !event.shiftKey) {
+            event.preventDefault();
+            uiElements.undoButton?.click();
+            return;
+        }
+        if (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z')) {
+            event.preventDefault();
+            uiElements.redoButton?.click();
+            return;
+        }
+    }
 
     const keyMap = {
         'P': () => uiElements.playPauseButton?.click(),
@@ -747,6 +815,7 @@ function setupUIEventListeners() {
         if (uiElements.rulesetInputPopout && document.activeElement !== uiElements.rulesetInputPopout) {
             uiElements.rulesetInputPopout.value = (hex === "Error" || hex === "N/A") ? "" : hex;
         }
+        updateUndoRedoButtons(); // Add this call
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, updateBrushSizeDisplay);
@@ -768,6 +837,11 @@ function setupUIEventListeners() {
         if (worldManagerInterfaceRef) {
             updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
             updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
+            updateUndoRedoButtons();
+            // Update history popout if it's open
+            if (popoutPanels.history && !popoutPanels.history.isHidden()) {
+                updateHistoryPopout();
+            }
             if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.refreshViews();
             if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.refreshViews();
             if (ruleRankPanelComponent && !ruleRankPanelComponent.isHidden()) ruleRankPanelComponent.refreshViews();
@@ -787,6 +861,18 @@ function setupUIEventListeners() {
             }
         }
     });
+    EventBus.subscribe(EVENTS.HISTORY_CHANGED, (data) => {
+        if (data.worldIndex === worldManagerInterfaceRef.getSelectedWorldIndex()) {
+            updateUndoRedoButtons();
+            // Update popout only if it's open to save performance
+            if (popoutPanels.history && !popoutPanels.history.isHidden()) {
+                updateHistoryPopout();
+            }
+        }
+    });
+    
+    // Update history popout when it's opened
+    uiElements.historyButton?.addEventListener('popoutshown', updateHistoryPopout);
     uiElements.shareButton.addEventListener('click', generateAndShowShareLink);
     uiElements.copyShareLinkButton.addEventListener('click', copyShareLink);
 }

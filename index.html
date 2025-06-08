@@ -75,7 +75,14 @@
                 </a>
             </div>
             <div id="rulesetDisplayContainer" data-tour-id="ruleset-display-container">
+                <div class="ruleset-history-controls">
+                    <button id="undoButton" class="button-icon" title="Undo Ruleset Change (Ctrl+Z)" disabled>↶</button>
+                    <button id="redoButton" class="button-icon" title="Redo Ruleset Change (Ctrl+Y)" disabled>↷</button>
+                </div>
                 <code id="rulesetDisplay">N/A</code>
+                <div class="ruleset-history-controls">
+                    <button id="historyButton" class="button-icon" title="View Ruleset History">🕒</button>
+                </div>
             </div>
             <div id="statsDisplayContainer" data-tour-id="stats-display-container">
                 <span>Tick: <span id="stat-tick">--</span></span>
@@ -228,6 +235,12 @@
             </div>
             <div class="form-group-buttons">
                 <button id="copyShareLinkButton" class="button">Copy to Clipboard</button>
+            </div>
+        </div>
+
+        <div id="historyPopout" class="popout-panel hidden">
+            <h4>Ruleset History</h4>
+            <div id="historyList" class="history-list-container">
             </div>
         </div>
 

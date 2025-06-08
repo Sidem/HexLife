@@ -36,16 +36,28 @@ export class WorldManager {
             this.initialDefaultRulesetHex = this.sharedSettings.rulesetHex;
             const enabledMask = this.sharedSettings.enabledMask ?? 0b111111111;
             for (let i = 0; i < Config.NUM_WORLDS; i++) {
+                const rulesetHex = this.initialDefaultRulesetHex;
                 this.worldSettings.push({
                     initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
                     enabled: (enabledMask & (1 << i)) !== 0,
-                    rulesetHex: this.initialDefaultRulesetHex
+                    rulesetHex: rulesetHex,
+                    rulesetHistory: [rulesetHex], // Start history with the initial ruleset
+                    rulesetFuture: []
                 });
             }
             PersistenceService.saveWorldSettings(this.worldSettings);
             PersistenceService.saveRuleset(this.initialDefaultRulesetHex);
         } else {
             this.worldSettings = PersistenceService.loadWorldSettings();
+            // Ensure history arrays exist for settings loaded from persistence
+            this.worldSettings.forEach(setting => {
+                if (!setting.rulesetHistory) {
+                    setting.rulesetHistory = [setting.rulesetHex];
+                }
+                if (!setting.rulesetFuture) {
+                    setting.rulesetFuture = [];
+                }
+            });
             this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
         }
 
@@ -58,7 +70,9 @@ export class WorldManager {
             const settings = this.worldSettings[i] || {
                 initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
                 enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
-                rulesetHex: this.initialDefaultRulesetHex
+                rulesetHex: this.initialDefaultRulesetHex,
+                rulesetHistory: [this.initialDefaultRulesetHex],
+                rulesetFuture: []
             };
 
             const rulesetArray = hexToRuleset(settings.rulesetHex);
@@ -75,6 +89,28 @@ export class WorldManager {
             }, worldManagerCallbacks);
             this.worlds.push(proxy);
         }
+    }
+
+    _addRulesetToHistory = (worldIndex, rulesetHex) => {
+        const worldSetting = this.worldSettings[worldIndex];
+        if (!worldSetting) return;
+
+        // Don't add if it's the same as the last one in history
+        if (worldSetting.rulesetHistory[worldSetting.rulesetHistory.length - 1] === rulesetHex) {
+            return;
+        }
+        
+        worldSetting.rulesetHistory.push(rulesetHex);
+
+        if (worldSetting.rulesetHistory.length > Config.RULESET_HISTORY_SIZE) {
+            worldSetting.rulesetHistory.shift();
+        }
+
+        // Any new action clears the "future" (redo) stack.
+        if (worldSetting.rulesetFuture.length > 0) {
+            worldSetting.rulesetFuture = [];
+        }
+        EventBus.dispatch(EVENTS.HISTORY_CHANGED, { worldIndex });
     }
 
     _handleProxyInitialized = (worldIndex) => {
@@ -153,6 +189,10 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLONE_AND_MUTATE, (data) => {
             this._cloneAndMutateOthers(data.mutationRate, data.mode);
         });
+
+        EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
+        EventBus.subscribe(EVENTS.COMMAND_REDO_RULESET, (data) => this.redoRulesetChange(data.worldIndex));
+        EventBus.subscribe(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, (data) => this.revertToHistoryState(data.worldIndex, data.historyIndex));
 
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
@@ -376,6 +416,9 @@ export class WorldManager {
         const indices = this._getAffectedWorldIndices(targetScope);
 
         indices.forEach(idx => {
+            // Add the new ruleset to history BEFORE applying it
+            this._addRulesetToHistory(idx, rulesetHex);
+            
             const newRulesetBuffer = newRulesetArray.buffer.slice(0);
             this.worlds[idx].setRuleset(newRulesetBuffer);
             this.worldSettings[idx].rulesetHex = rulesetHex;
@@ -468,6 +511,7 @@ export class WorldManager {
             const newHex = this._generateMutatedHex(currentHex, mutationRate, mutationMode);
 
             if (newHex !== currentHex && newHex !== "Error") {
+                this._addRulesetToHistory(idx, newHex);
                 const newRulesetArray = hexToRuleset(newHex);
                 const newRulesetBuffer = newRulesetArray.buffer.slice(0);
                 this.worlds[idx].setRuleset(newRulesetBuffer);
@@ -500,23 +544,23 @@ export class WorldManager {
              return;
         }
 
-        // Iterate through ALL worlds.
         this.worlds.forEach((proxy, idx) => {
-            // If it's not the selected world, mutate the ruleset and apply it.
+            let newHex = sourceRulesetHex;
             if (idx !== this.selectedWorldIndex) {
-                const newMutatedHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
-                if (newMutatedHex !== "Error") {
-                    const newRulesetBuffer = hexToRuleset(newMutatedHex).buffer.slice(0);
+                newHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
+                if (newHex !== "Error") {
+                    const newRulesetBuffer = hexToRuleset(newHex).buffer.slice(0);
                     proxy.setRuleset(newRulesetBuffer);
-                    this.worldSettings[idx].rulesetHex = newMutatedHex;
                 }
             }
+            
+            // Add to history for every world, even the source one to keep a coherent history point
+            this._addRulesetToHistory(idx, newHex);
+            this.worldSettings[idx].rulesetHex = newHex;
 
-            // Reset every world to its own initial density defined in the Setup Panel.
             if (this.worldSettings[idx]) {
                 proxy.resetWorld(this.worldSettings[idx].initialDensity);
                 
-                // Also ensure the world is enabled and starts if the simulation isn't paused.
                 if (!this.worldSettings[idx].enabled) {
                     this.worldSettings[idx].enabled = true;
                     proxy.setEnabled(true);
@@ -549,6 +593,7 @@ export class WorldManager {
             const newHex = modifierFunc(currentHex);
 
             if (newHex !== currentHex && newHex !== "Error") {
+                this._addRulesetToHistory(idx, newHex);
                 const newRulesetArray = hexToRuleset(newHex);
                 const newRulesetBuffer = newRulesetArray.buffer.slice(0);
                 this.worlds[idx].setRuleset(newRulesetBuffer);
@@ -735,6 +780,7 @@ export class WorldManager {
         const newStateArray = Uint8Array.from(loadedData.state);
 
         if (this.worldSettings[worldIndex]) {
+            this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); // Add loaded ruleset to history
             this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialDensity = newDensity;
@@ -759,6 +805,83 @@ export class WorldManager {
         }
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
         EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+    }
+
+    revertToHistoryState = (worldIndex, historyIndex) => {
+        const settings = this.worldSettings[worldIndex];
+        if (!settings || historyIndex < 0 || historyIndex >= settings.rulesetHistory.length) return;
+
+        const currentIndex = settings.rulesetHistory.length - 1;
+        if (historyIndex === currentIndex) return; // Already at this state
+
+        // Move all states after the target state from history to future
+        const itemsToMove = settings.rulesetHistory.splice(historyIndex + 1);
+        settings.rulesetFuture.unshift(...itemsToMove.reverse());
+
+        const targetRuleset = settings.rulesetHistory[historyIndex];
+        settings.rulesetHex = targetRuleset;
+
+        const newRulesetBuffer = hexToRuleset(targetRuleset).buffer.slice(0);
+        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+
+        if (worldIndex === this.selectedWorldIndex) {
+            EventBus.dispatch(EVENTS.RULESET_CHANGED, targetRuleset);
+            PersistenceService.saveRuleset(targetRuleset);
+        }
+        EventBus.dispatch(EVENTS.HISTORY_CHANGED, { worldIndex });
+        PersistenceService.saveWorldSettings(this.worldSettings);
+    }
+
+    undoRulesetChange = (worldIndex) => {
+        const settings = this.worldSettings[worldIndex];
+        if (!settings || settings.rulesetHistory.length < 2) return;
+
+        // The state to revert to is the second to last one in the history
+        const targetIndex = settings.rulesetHistory.length - 2;
+        
+        const currentRuleset = settings.rulesetHistory.pop();
+        settings.rulesetFuture.unshift(currentRuleset); // Add to the beginning of future for correct order
+
+        const previousRuleset = settings.rulesetHistory[targetIndex];
+        settings.rulesetHex = previousRuleset;
+        
+        const newRulesetBuffer = hexToRuleset(previousRuleset).buffer.slice(0);
+        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+
+        if (worldIndex === this.selectedWorldIndex) {
+            EventBus.dispatch(EVENTS.RULESET_CHANGED, previousRuleset);
+            PersistenceService.saveRuleset(previousRuleset);
+        }
+        EventBus.dispatch(EVENTS.HISTORY_CHANGED, { worldIndex });
+        PersistenceService.saveWorldSettings(this.worldSettings);
+    }
+
+    redoRulesetChange = (worldIndex) => {
+        const settings = this.worldSettings[worldIndex];
+        if (!settings || settings.rulesetFuture.length === 0) return;
+
+        const nextRuleset = settings.rulesetFuture.shift(); // Get from the beginning
+        settings.rulesetHistory.push(nextRuleset);
+        settings.rulesetHex = nextRuleset;
+
+        const newRulesetBuffer = hexToRuleset(nextRuleset).buffer.slice(0);
+        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+
+        if (worldIndex === this.selectedWorldIndex) {
+            EventBus.dispatch(EVENTS.RULESET_CHANGED, nextRuleset);
+            PersistenceService.saveRuleset(nextRuleset);
+        }
+        EventBus.dispatch(EVENTS.HISTORY_CHANGED, { worldIndex });
+        PersistenceService.saveWorldSettings(this.worldSettings);
+    }
+
+    getRulesetHistoryArrays = (worldIndex) => {
+        const settings = this.worldSettings[worldIndex];
+        if (!settings) return { history: [], future: [] };
+        return {
+            history: [...settings.rulesetHistory], // Return copies
+            future: [...settings.rulesetFuture],
+        };
     }
 
     getEntropySamplingState = () => ({ enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });

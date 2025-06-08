@@ -53,14 +53,23 @@ body {
 }
 
 #rulesetDisplayContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #3c3c3c;
+    border-radius: 4px;
+    padding: 0 5px;
+    border: 1px solid #555;
     font-family: monospace;
     font-size: 0.9rem;
 }
 
-#rulesetDisplayContainer code {
-    background-color: #3c3c3c;
-    padding: 2px 5px;
-    border-radius: 3px;
+#rulesetDisplay {
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 4px 5px;
+    background-color: transparent;
+    border: none;
     font-weight: bold;
 }
 #statsDisplayContainer {
@@ -1381,6 +1390,68 @@ label.sym-label {
     color: #888;
     padding: 20px;
     font-style: italic;
+}
+
+/* --- Ruleset History UX Enhancements --- */
+
+.ruleset-history-controls .button-icon {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 0 5px;
+    border-radius: 3px;
+    line-height: 1;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.ruleset-history-controls .button-icon:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.ruleset-history-controls .button-icon:disabled {
+    color: #666;
+    cursor: not-allowed;
+}
+
+#historyPopout .history-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+}
+
+.history-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    border-bottom: 1px solid #4a4a4a;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-item:hover {
+    background-color: #0078d4;
+}
+
+.history-item.is-current {
+    font-weight: bold;
+    color: #f0c674;
+    background-color: rgba(40, 40, 40, 0.5);
+    cursor: default;
+}
+
+.history-item .tag {
+    font-size: 0.8em;
+    color: #999;
+    margin-left: 10px;
 }
 
 .dual-rank-container {

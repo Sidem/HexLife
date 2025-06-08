@@ -107,6 +107,7 @@ async function initialize() {
         getSymmetryData: worldManager.getSymmetryData.bind(worldManager),
         getEntropySamplingState: worldManager.getEntropySamplingState.bind(worldManager),
         getCurrentCameraState: worldManager.getCurrentCameraState.bind(worldManager),
+        getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
     };
 
     if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
