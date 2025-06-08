@@ -2,13 +2,6 @@ import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoords, calculateHexSizeForTexture } from '../utils/utils.js';
 
-/**
- * Manages all user input for the main canvas, including clicking, drawing,
- * panning, and zooming with boundaries.
- *
- * REFACTORED: Touch handling has been rewritten for a more robust gesture
- * detection system (tap vs. swipe vs. multi-touch).
- */
 export class CanvasInputHandler {
     constructor(canvas, worldManager) {
         this.canvas = canvas;
@@ -38,7 +31,6 @@ export class CanvasInputHandler {
         // --- Pattern Placing State ---
         this.isPlacingPattern = false;
         this.patternToPlace = null;
-        // The 'justPlacedPattern' flag is no longer needed.
 
         // --- UI Layout Cache ---
         this.layoutCache = {};
@@ -48,29 +40,30 @@ export class CanvasInputHandler {
         this._setupListeners();
     }
 
-    /**
-     * Public method to be called on window resize.
-     */
-    handleResize() {
-        this._calculateAndCacheLayout();
+    _handleEscKey(event) {
+        if (event.key === 'Escape' && this.isPlacingPattern) {
+            this.exitPlacingMode();
+        }
     }
 
     enterPlacingMode(patternData) {
+        if (this.isPlacingPattern) return;
         this.isPlacingPattern = true;
         this.patternToPlace = patternData.cells;
         this.canvas.classList.add('placing-pattern-cursor');
+        // NEW: Add listener for escape key to cancel
+        this.boundHandleEsc = this._handleEscKey.bind(this);
+        document.addEventListener('keydown', this.boundHandleEsc);
     }
 
     exitPlacingMode() {
+        if (!this.isPlacingPattern) return;
         this.isPlacingPattern = false;
         this.patternToPlace = null;
         this.canvas.classList.remove('placing-pattern-cursor');
+        document.removeEventListener('keydown', this.boundHandleEsc);
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW);
     }
-
-    /**
-     * Calculates and caches the dimensions of the main view and minimap areas.
-     */
     _calculateAndCacheLayout() {
         if (!this.gl || !this.gl.canvas) return;
         const canvasWidth = this.gl.canvas.width;
@@ -126,9 +119,6 @@ export class CanvasInputHandler {
         };
     }
 
-    /**
-     * Calculates the world-space bounding box of the entire hex grid.
-     */
     _calculateGridBounds() {
         const hexSize = calculateHexSizeForTexture();
         const topLeft = gridToPixelCoords(0, 0, hexSize);
@@ -144,9 +134,6 @@ export class CanvasInputHandler {
         };
     }
 
-    /**
-     * Clamps the camera's pan coordinates to the pre-calculated grid boundaries.
-     */
     _clampCameraPan() {
         const camera = this.worldManager.getCurrentCameraState();
         if (!camera) return;
@@ -183,7 +170,6 @@ export class CanvasInputHandler {
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.enterPlacingMode(data));
     }
 
-    // --- Coordinate and Zoom Logic ---
     _getCoordsFromPointerEvent(event) {
         const camera = this.worldManager.getCurrentCameraState();
         if (!this.gl || !this.gl.canvas || !this.worldManager || !camera || !this.layoutCache.selectedView) {
@@ -246,7 +232,7 @@ export class CanvasInputHandler {
             this._clampCameraPan();
         }
     }
-
+    
     _performClickAction(event) {
         if (this.isPlacingPattern) {
             const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
@@ -264,7 +250,11 @@ export class CanvasInputHandler {
                     cellIndices: finalCellIndices
                 });
             }
-            this.exitPlacingMode();
+            
+            if (!event.shiftKey) {
+                this.exitPlacingMode();
+            }
+
             const stopClick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -286,15 +276,17 @@ export class CanvasInputHandler {
         }
     }
 
-    
-    // --- Mouse Handlers ---
     _handleCanvasClick(event) {
         if (this.justFinishedDrawing || this.gestureState === 'drawing') return;
         this._performClickAction(event);
     }
-
+    
     _handleCanvasMouseDown(event) {
         event.preventDefault();
+        if (this.isPlacingPattern && event.button === 2) { 
+            this.exitPlacingMode();
+            return;
+        }
 
         if (this.isPlacingPattern && event.button !== 0) {
             this.exitPlacingMode();
@@ -428,8 +420,6 @@ export class CanvasInputHandler {
             this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
         }
     }
-    
-    // --- REVISED: Touch Handlers ---
 
     _handleTouchStart(event) {
         event.preventDefault();
@@ -444,12 +434,11 @@ export class CanvasInputHandler {
                 identifier: touch.identifier
             };
         } else if (touches.length >= 2) {
-            // Prevent drawing from starting if a second finger is placed quickly
             if (this.gestureState === 'drawing') {
                  this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
             }
             this.gestureState = 'panning_zooming';
-            this.initialTouch = null; // Invalidate single touch
+            this.initialTouch = null;
 
             const t0 = touches[0];
             const t1 = touches[1];
@@ -469,7 +458,6 @@ export class CanvasInputHandler {
             const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
             const camera = this.worldManager.getCurrentCameraState();
             
-            // Handle Pan
             if (camera && this.lastTouchCenter) {
                 const dx = newCenter.x - this.lastTouchCenter.x;
                 const dy = newCenter.y - this.lastTouchCenter.y;
@@ -477,7 +465,6 @@ export class CanvasInputHandler {
                 camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
             }
             
-            // Handle Zoom
             if (this.lastTouchDistance > 0) {
                 const zoomFactor = newDist / this.lastTouchDistance;
                 this._zoomAtPoint(zoomFactor, newCenter.x, newCenter.y);
@@ -495,24 +482,19 @@ export class CanvasInputHandler {
             const distance = Math.hypot(touch.clientX - this.initialTouch.clientX, touch.clientY - this.initialTouch.clientY);
 
             if (distance > this.TAP_THRESHOLD) {
-                // --- STATE TRANSITION: From Pending to Drawing ---
                 this.gestureState = 'drawing';
-                // Start the drawing stroke from the initial touch point
                 this._handleCanvasMouseDown(this._createMouseEventFromTouch(this.initialTouch, 'mousedown'));
-                // Process the current touch position as the next point in the stroke
                 this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
             }
         } else if (this.gestureState === 'drawing') {
             if (!this.initialTouch) return; 
             const touch = this._findTouchById(event.touches, this.initialTouch.identifier);
             if (!touch) {
-                // The primary finger was lost. End the gesture.
                 this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
                 this.gestureState = 'idle';
                 this.initialTouch = null;
                 return;
             }
-            // Continue the drawing stroke
             this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
         }
     }
@@ -543,7 +525,6 @@ export class CanvasInputHandler {
         }
     }
 
-    // --- Touch Utility Helpers ---
     _findTouchById(touchList, identifier) {
         if (identifier === null) return null;
         for (let i = 0; i < touchList.length; i++) {
