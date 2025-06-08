@@ -9,7 +9,6 @@ layout (location=4) in float a_instance_rule_index;
 layout (location=5) in float a_instance_ghost_state; /* NEW */
 
 out float v_state;
-out vec2 v_localPos;
 out float v_hover_state;
 out float v_rule_index;
 out float v_ghost_state; /* NEW */

@@ -47,6 +47,7 @@ export const EVENTS = {
     COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize', 
     COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', 
     COMMAND_SET_RULESET: 'command:setRuleset', 
+    COMMAND_MUTATE_RULESET: 'command:mutateRuleset',
     COMMAND_EDITOR_TOGGLE_RULE_OUTPUT: 'command:editorToggleRuleOutput', 
     COMMAND_EDITOR_SET_ALL_RULES_STATE: 'command:editorSetAllRulesState', 
     COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:editorSetRulesForNeighborCount', 

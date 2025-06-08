@@ -3,7 +3,7 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRulesetHex } from '../utils/utils.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -142,6 +142,10 @@ export class WorldManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (data) => {
             this._applyRulesetToWorlds(data.hexString, data.resetScopeForThisChange, true, data.resetScopeForThisChange);
+        });
+
+        EventBus.subscribe(EVENTS.COMMAND_MUTATE_RULESET, (data) => {
+            this._mutateRulesetForScope(data.scope, data.mutationRate);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
@@ -365,6 +369,40 @@ export class WorldManager {
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
+
+    _mutateRulesetForScope = (scope, mutationRate) => {
+        const indices = this._getAffectedWorldIndices(scope);
+
+        indices.forEach(idx => {
+            const proxyStats = this.worlds[idx]?.getLatestStats();
+            let currentHex = (proxyStats?.rulesetHex && proxyStats.rulesetHex !== "Error")
+                ? proxyStats.rulesetHex
+                : this.worldSettings[idx]?.rulesetHex;
+            
+            if (!currentHex) {
+                console.warn(`_mutateRulesetForScope: No current hex for world ${idx}, skipping mutation.`);
+                return;
+            }
+
+            const newHex = mutateRulesetHex(currentHex, mutationRate);
+
+            if (newHex !== currentHex && newHex !== "Error") {
+                const newRulesetArray = hexToRuleset(newHex);
+                const newRulesetBuffer = newRulesetArray.buffer.slice(0);
+                this.worlds[idx].setRuleset(newRulesetBuffer);
+                this.worldSettings[idx].rulesetHex = newHex;
+            }
+        });
+
+        if (indices.includes(this.selectedWorldIndex)) {
+            this.dispatchSelectedWorldUpdates();
+            if (this.worldSettings[this.selectedWorldIndex]) {
+                PersistenceService.saveRuleset(this.worldSettings[this.selectedWorldIndex].rulesetHex);
+            }
+        }
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+    };
 
     _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {
         const indices = this._getAffectedWorldIndices(scope);

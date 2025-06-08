@@ -265,6 +265,46 @@ export function hexToRuleset(hexString) {
 }
 
 /**
+ * Mutates a 32-character hex ruleset string by flipping a specified number of rule bits.
+ * @param {string} hexString The 32-character hex string.
+ * @param {number} mutationRate The number of individual rules (bits) to flip.
+ * @returns {string} The new, mutated 32-character uppercase hex string.
+ */
+export function mutateRulesetHex(hexString, mutationRate = 1) {
+    if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
+        console.error("Invalid hex string provided for mutation:", hexString);
+        return hexString;
+    }
+
+    let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
+    let binArray = bin.split('');
+
+    const numRules = 128;
+    const rate = Math.min(mutationRate, numRules);
+
+    // Create an array of indices [0, 1, ..., 127] and shuffle it
+    const indices = Array.from({ length: numRules }, (_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    // Flip the bits at the first 'rate' indices from the shuffled array
+    for (let i = 0; i < rate; i++) {
+        const indexToFlip = indices[i];
+        binArray[indexToFlip] = binArray[indexToFlip] === '1' ? '0' : '1';
+    }
+
+    const newBin = binArray.join('');
+    try {
+        return BigInt('0b' + newBin).toString(16).toUpperCase().padStart(32, '0');
+    } catch (e) {
+        console.error("Error converting mutated binary back to hex:", e);
+        return hexString; // Return original on error
+    }
+}
+
+/**
  * Converts normalized texture coordinates (0-1) to discrete grid coordinates.
  * Searches in a small radius around a rough estimate for the closest valid hex.
  * @param {number} texX The normalized X coordinate in the texture (0 to 1).
@@ -306,9 +346,6 @@ export function textureCoordsToGridCoords(texX, texY, camera) {
     const estimatedRowRough = worldY / vertSpacing;
 
     const searchRadius = 2;
-
-    // ... (the rest of the search logic can now use worldX and worldY instead of pixelX/pixelY)
-    // ... (Remember to use gridToPixelCoords for getting hex centers in world space)
 
     for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
         for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {

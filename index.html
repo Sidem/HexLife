@@ -94,8 +94,9 @@
                 <div class="toolbar-separator" role="separator"></div>
 
                 <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" data-tour-id="new-rules-button">NEW</button> 
+                <button id="mutateButton" class="toolbar-button" title="Mutate Ruleset" data-tour-id="mutate-button">MUT</button>
                 <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" data-tour-id="set-ruleset-button">HEX</button>
-                <button id="libraryButton" class="toolbar-button" title="Content Library">LIB</button>
+                <button id="libraryButton" class="toolbar-button" title="Content Library" data-tour-id="library-button">LIB</button>
                 <div class="toolbar-separator" role="separator"></div>
 
                 <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" data-tour-id="reset-clear-button">R/C</button>
@@ -157,6 +158,24 @@
                 <label for="resetOnNewRuleCheckboxPopout" class="checkbox-label">Auto-Reset World(s)</label>
             </div>
             <button id="generateRulesetFromPopoutButton" class="button" data-tour-id="generate-ruleset-button">Generate</button>
+        </div>
+        <div id="mutatePopout" class="popout-panel hidden">
+            <h4>Mutate Ruleset</h4>
+            <div class="form-group">
+                <label for="mutationRateSlider">Mutation Amount (Rules to flip):</label>
+                <div id="mutationRateSliderMount"></div>
+            </div>
+            <div class="form-group">
+                <label>Apply to:</label>
+                <div id="mutateScopeSwitch" class="three-way-switch">
+                    <input type="radio" id="mutateScopeSelected" name="mutateScope" value="selected" class="radio-switch-input" checked>
+                    <label for="mutateScopeSelected" class="radio-switch-label">Selected</label>
+                    <input type="radio" id="mutateScopeAll" name="mutateScope" value="all" class="radio-switch-input">
+                    <label for="mutateScopeAll" class="radio-switch-label">All</label>
+                </div>
+            </div>
+            <div class="popout-separator"></div>
+            <button id="triggerMutationButton" class="button">Mutate</button>
         </div>
         <div id="setHexPopout" class="popout-panel hidden" data-tour-id="set-hex-popout">
             <h4>Set/Copy Ruleset Hex</h4>

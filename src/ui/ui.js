@@ -72,6 +72,7 @@ export function initUI(worldManagerInterface, libraryData) {
         speedControlButton: document.getElementById('speedControlButton'),
         brushToolButton: document.getElementById('brushToolButton'),
         newRulesButton: document.getElementById('newRulesButton'),
+        mutateButton: document.getElementById('mutateButton'),
         setRulesetButton: document.getElementById('setRulesetButton'), 
         libraryButton: document.getElementById('libraryButton'),
         saveStateButton: document.getElementById('saveStateButton'),
@@ -89,6 +90,7 @@ export function initUI(worldManagerInterface, libraryData) {
         resetClearPopout: document.getElementById('resetClearPopout'),
         libraryPopout: document.getElementById('libraryPopout'),
         sharePopout: document.getElementById('sharePopout'),
+        mutatePopout: document.getElementById('mutatePopout'),
         speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
         neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
         shareLinkInput: document.getElementById('shareLinkInput'),
@@ -97,6 +99,9 @@ export function initUI(worldManagerInterface, libraryData) {
         useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
         biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
         rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'), 
+        mutationRateSliderMount: document.getElementById('mutationRateSliderMount'),
+        mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
+        triggerMutationButton: document.getElementById('triggerMutationButton'),
         resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
         generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
         rulesetInputPopout: document.getElementById('rulesetInputPopout'),
@@ -182,6 +187,7 @@ function _initPopoutPanels() {
     popoutPanels.speed = new PopoutPanel(uiElements.speedPopout, uiElements.speedControlButton, { position: 'right', alignment: 'start'});
     popoutPanels.brush = new PopoutPanel(uiElements.brushPopout, uiElements.brushToolButton, { position: 'right', alignment: 'start'});
     popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5});
+    popoutPanels.mutate = new PopoutPanel(uiElements.mutatePopout, uiElements.mutateButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.setHex = new PopoutPanel(uiElements.setHexPopout, uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.library = new PopoutPanel(uiElements.libraryPopout, uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
@@ -299,6 +305,21 @@ function _initPopoutControls() {
         
     });
 
+    sliderComponents.mutationRateSlider = new SliderComponent(uiElements.mutationRateSliderMount, {
+        id: 'mutationRateSlider', min: 1, max: 10, step: 1,
+        value: 1, unit: 'rules', showValue: true,
+        onChange: val => PersistenceService.saveUISetting('mutationRate', val)
+    });
+    uiElements.mutateScopeSwitch.querySelectorAll('input[name="mutateScope"]').forEach(r => {
+        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('mutateScope', r.value); });
+    });
+    uiElements.triggerMutationButton.addEventListener('click', () => {
+        const mutationRate = sliderComponents.mutationRateSlider.getValue();
+        const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
+        
+        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope });
+        popoutPanels.mutate.hide();
+    });
     
     uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
         const hex = uiElements.rulesetInputPopout.value.trim().toUpperCase();
@@ -455,6 +476,12 @@ function loadAndApplyUISettings() {
     uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
     
     uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
+
+    sliderComponents.mutationRateSlider?.setValue(PersistenceService.loadUISetting('mutationRate', 1));
+    const mutateScope = PersistenceService.loadUISetting('mutateScope', 'selected');
+    if (uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`)) {
+        uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`).checked = true;
+    }
 
     updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
 }
