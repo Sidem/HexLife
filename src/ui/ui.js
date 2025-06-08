@@ -259,6 +259,17 @@ function _populateLibraryPanel() {
     });
 }
 
+function _setupRadioSwitch(switchElement, persistenceKey, valueExtractor = (value => value)) {
+    if (!switchElement) return;
+    switchElement.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.checked) {
+                const valueToSave = valueExtractor(radio.value);
+                PersistenceService.saveUISetting(persistenceKey, valueToSave);
+            }
+        });
+    });
+}
 
 function _initPopoutControls() {
 
@@ -276,9 +287,8 @@ function _initPopoutControls() {
     });
 
 
-    uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => {
-        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('rulesetGenerationMode', r.value); });
-    });
+    // --- Refactored Part Starts Here ---
+    _setupRadioSwitch(uiElements.generateModeSwitchPopout, 'rulesetGenerationMode');
     uiElements.useCustomBiasCheckboxPopout.addEventListener('change', e => {
         PersistenceService.saveUISetting('useCustomBias', e.target.checked);
         updateBiasSliderDisabledStatePopout();
@@ -288,9 +298,7 @@ function _initPopoutControls() {
         showValue: true, unit: '', disabled: !uiElements.useCustomBiasCheckboxPopout.checked,
         onChange: val => PersistenceService.saveUISetting('biasValue', val)
     });
-    uiElements.rulesetScopeSwitchPopout.querySelectorAll('input[name="rulesetScopePopout"]').forEach(r => {
-        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('globalRulesetScopeAll', r.value === 'all'); });
-    });
+    _setupRadioSwitch(uiElements.rulesetScopeSwitchPopout, 'globalRulesetScopeAll', value => value === 'all');
     uiElements.resetOnNewRuleCheckboxPopout.addEventListener('change', e => PersistenceService.saveUISetting('resetOnNewRule', e.target.checked));
     uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => {
         const bias = uiElements.useCustomBiasCheckboxPopout.checked ? sliderComponents.biasSliderPopout.getValue() : Math.random();
@@ -308,18 +316,15 @@ function _initPopoutControls() {
     });
 
     sliderComponents.mutationRateSlider = new SliderComponent(uiElements.mutationRateSliderMount, {
-        id: 'mutationRateSlider', min: 1, max: 10, step: 1,
-        value: 1, unit: 'rules', showValue: true,
+        id: 'mutationRateSlider', min: 1, max: 50, step: 1,
+        value: 1, unit: '%', showValue: true,
         onChange: val => PersistenceService.saveUISetting('mutationRate', val)
     });
-    uiElements.mutateModeSwitch.querySelectorAll('input[name="mutateMode"]').forEach(r => {
-        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('mutateMode', r.value); });
-    });
-    uiElements.mutateScopeSwitch.querySelectorAll('input[name="mutateScope"]').forEach(r => {
-        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('mutateScope', r.value); });
-    });
+    _setupRadioSwitch(uiElements.mutateModeSwitch, 'mutateMode');
+    _setupRadioSwitch(uiElements.mutateScopeSwitch, 'mutateScope');
+    // --- Refactored Part Ends Here ---
     uiElements.triggerMutationButton.addEventListener('click', () => {
-        const mutationRate = sliderComponents.mutationRateSlider.getValue();
+        const mutationRate = sliderComponents.mutationRateSlider.getValue() / 100.0; // Convert to probability
         const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
         const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
 
@@ -327,7 +332,7 @@ function _initPopoutControls() {
     });
 
     uiElements.cloneAndMutateButton.addEventListener('click', () => {
-        const mutationRate = sliderComponents.mutationRateSlider.getValue();
+        const mutationRate = sliderComponents.mutationRateSlider.getValue() / 100.0; // Convert to probability
         const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
         EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
         //popoutPanels.mutate.hide();
@@ -585,7 +590,7 @@ function handleGlobalKeyDown(event) {
     const keyMap = {
         'P': () => uiElements.playPauseButton?.click(),
         'M': () => {
-            const mutationRate = sliderComponents.mutationRateSlider.getValue();
+            const mutationRate = sliderComponents.mutationRateSlider.getValue() / 100.0; // Convert to probability
             const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
             const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
             EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope, mode });
@@ -627,7 +632,7 @@ function handleGlobalKeyDown(event) {
 
     if (event.shiftKey) {
         if (event.key.toUpperCase() === 'M') {
-            const mutationRate = sliderComponents.mutationRateSlider.getValue();
+            const mutationRate = sliderComponents.mutationRateSlider.getValue() / 100.0; // Convert to probability
             const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
             EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
             event.preventDefault();

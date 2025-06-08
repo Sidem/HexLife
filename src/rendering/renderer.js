@@ -5,6 +5,7 @@ import { generateColorLUT } from '../utils/ruleVizUtils.js';
 
 let gl;
 let canvas;
+let layoutCache = {}; // Cache for layout calculations
 
 let hexShaderProgram;
 let quadShaderProgram;
@@ -113,6 +114,64 @@ export async function initRenderer(canvasElement) {
     resizeRenderer();
     console.log("Renderer initialized.");
     return gl;
+}
+
+function _calculateAndCacheLayout() {
+    if (!gl || !gl.canvas) return;
+    const canvasWidth = gl.canvas.width;
+    const canvasHeight = gl.canvas.height;
+    const isLandscape = canvasWidth >= canvasHeight;
+    const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
+
+    let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
+    let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+
+    if (isLandscape) {
+        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
+        selectedViewHeight = canvasHeight - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
+        miniMapAreaHeight = selectedViewHeight;
+        miniMapAreaX = selectedViewX + selectedViewWidth + padding;
+        miniMapAreaY = padding;
+    } else {
+        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
+        selectedViewWidth = canvasWidth - padding * 2;
+        selectedViewX = padding;
+        selectedViewY = padding;
+        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
+        miniMapAreaWidth = selectedViewWidth;
+        miniMapAreaX = padding;
+        miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+    }
+
+    const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
+    const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
+    let gridContainerWidth, gridContainerHeight;
+    const miniMapContainerPaddingFactor = 0.95;
+
+    if (miniMapAreaRatio > miniMapGridRatio) {
+        gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
+        gridContainerWidth = gridContainerHeight * miniMapGridRatio;
+    } else {
+        gridContainerWidth = miniMapAreaWidth * miniMapContainerPaddingFactor;
+        gridContainerHeight = gridContainerWidth / miniMapGridRatio;
+    }
+    const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
+    const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
+    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
+    const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
+    const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
+
+    layoutCache = {
+        selectedView: { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight },
+        miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
+    };
+}
+
+export function getLayoutCache() {
+    return layoutCache;
 }
 
 function setupHexBuffersAndVAO() {
@@ -317,77 +376,35 @@ function renderMainScene(selectedWorldIndex) {
     gl.useProgram(quadShaderProgram);
     gl.bindVertexArray(quadVAO);
 
-    const canvasWidth = gl.canvas.width;
-    const canvasHeight = gl.canvas.height;
-    const isLandscape = canvasWidth >= canvasHeight;
-    let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
-    let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-
-    const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
-
-    if (isLandscape) {
-        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
-        selectedViewHeight = canvasHeight - padding * 2;
-        selectedViewX = padding;
-        selectedViewY = padding;
-        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
-        miniMapAreaHeight = selectedViewHeight;
-        miniMapAreaX = selectedViewX + selectedViewWidth + padding;
-        miniMapAreaY = padding;
-    } else {
-        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
-        selectedViewWidth = canvasWidth - padding * 2;
-        selectedViewX = padding;
-        selectedViewY = padding;
-        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
-        miniMapAreaWidth = selectedViewWidth;
-        miniMapAreaX = padding;
-        miniMapAreaY = selectedViewY + selectedViewHeight + padding;
-    }
+    // Use the cached layout instead of recalculating
+    const { selectedView, miniMap } = layoutCache;
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight);
+        drawQuad(selectedView.x, selectedView.y, selectedView.width, selectedView.height);
     }
-
-    const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;
-    const miniMapAreaRatio = miniMapAreaWidth / miniMapAreaHeight;
-    let gridContainerWidth, gridContainerHeight;
-    const miniMapContainerPaddingFactor = 0.95;
-
-    if (miniMapAreaRatio > miniMapGridRatio) {
-        gridContainerHeight = miniMapAreaHeight * miniMapContainerPaddingFactor;
-        gridContainerWidth = gridContainerHeight * miniMapGridRatio;
-    } else {
-        gridContainerWidth = miniMapAreaWidth * miniMapContainerPaddingFactor;
-        gridContainerHeight = gridContainerWidth / miniMapGridRatio;
-    }
-    const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
-    const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
-    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
-
-    const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
-    const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
-        const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
-        const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
+        const miniX = miniMap.gridContainerX + col * (miniMap.miniMapW + miniMap.miniMapSpacing);
+        const miniY = miniMap.gridContainerY + row * (miniMap.miniMapH + miniMap.miniMapSpacing);
+
         if (i === selectedWorldIndex) {
-            const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
+            const outlineThickness = Math.max(2, Math.min(miniMap.miniMapW, miniMap.miniMapH) * 0.02);
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
-            drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness);
+            drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMap.miniMapW + 2 * outlineThickness, miniMap.miniMapH + 2 * outlineThickness);
         }
+
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(miniX, miniY, miniMapW, miniMapH);
+        drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
     }
 
     gl.bindVertexArray(null);
@@ -465,4 +482,5 @@ export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWor
 export function resizeRenderer() {
     if (!gl || !canvas) return;
     Utils.resizeCanvasToDisplaySize(canvas, gl);
+    _calculateAndCacheLayout(); // Add this line
 }

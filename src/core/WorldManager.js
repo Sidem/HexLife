@@ -401,46 +401,53 @@ export class WorldManager {
     }
 
     _generateMutatedHex = (sourceHex, mutationRate, mutationMode) => {
-        if (mutationMode === 'single') {
-            return mutateRandomBitsInHex(sourceHex, mutationRate);
-        }
-
         const rules = hexToRuleset(sourceHex);
-        const numRulesToChange = Math.max(1, mutationRate);
 
-        if (mutationMode === 'r_sym') {
+        if (mutationMode === 'single') {
+            // Each of the 128 rules has a `mutationRate` chance to flip.
+            for (let i = 0; i < 128; i++) {
+                if (Math.random() < mutationRate) {
+                    rules[i] = 1 - rules[i];
+                }
+            }
+        } else if (mutationMode === 'r_sym') {
+            // Each of the 28 symmetry groups (14 canonical reps * 2 center states) has a `mutationRate` chance to flip.
             const canonicalGroups = this.symmetryData.canonicalRepresentatives;
             if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
 
-            for (let i = 0; i < numRulesToChange; i++) {
-                const randGroupIndex = Math.floor(Math.random() * canonicalGroups.length);
-                const randCenterState = Math.floor(Math.random() * 2);
-                const group = canonicalGroups[randGroupIndex];
-                
-                const currentOutput = rules[(randCenterState << 6) | group.representative];
-                const newOutput = 1 - currentOutput;
-                
-                for (const member of group.members) {
-                    const idx = (randCenterState << 6) | member;
-                    rules[idx] = newOutput;
+            for (const group of canonicalGroups) {
+                for (let cs = 0; cs <= 1; cs++) {
+                    if (Math.random() < mutationRate) {
+                        // All rules in this group get the same new output
+                        const currentOutput = rules[(cs << 6) | group.representative];
+                        const newOutput = 1 - currentOutput;
+                        for (const member of group.members) {
+                            const idx = (cs << 6) | member;
+                            rules[idx] = newOutput;
+                        }
+                    }
                 }
             }
         } else if (mutationMode === 'n_count') {
-            for (let i = 0; i < numRulesToChange; i++) {
-                const randNeighborCount = Math.floor(Math.random() * 7);
-                const randCenterState = Math.floor(Math.random() * 2);
-                
-                const currentEffectiveOutput = this.getEffectiveRuleForNeighborCount(randCenterState, randNeighborCount);
-                const newOutput = (currentEffectiveOutput === 2) ? Math.round(Math.random()) : 1 - currentEffectiveOutput;
-                
-                for (let mask = 0; mask < 64; mask++) {
-                    if (Symmetry.countSetBits(mask) === randNeighborCount) {
-                        const idx = (randCenterState << 6) | mask;
-                        rules[idx] = newOutput;
+            // Each of the 14 neighbor-count groups (7 counts * 2 center states) has a `mutationRate` chance to flip.
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let nan = 0; nan <= 6; nan++) {
+                    if (Math.random() < mutationRate) {
+                        // Determine the new output state for this group and apply it to all rules within that group
+                        const currentEffectiveOutput = this.getEffectiveRuleForNeighborCount(cs, nan);
+                        const newOutput = (currentEffectiveOutput === 2) ? Math.round(Math.random()) : 1 - currentEffectiveOutput;
+                        
+                        for (let mask = 0; mask < 64; mask++) {
+                            if (Symmetry.countSetBits(mask) === nan) {
+                                const idx = (cs << 6) | mask;
+                                rules[idx] = newOutput;
+                            }
+                        }
                     }
                 }
             }
         }
+        
         return rulesetToHex(rules);
     }
 
