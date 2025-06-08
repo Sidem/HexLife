@@ -8,11 +8,11 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
-import { OnboardingManager } from './OnboardingManager.js'; 
+import { OnboardingManager } from './OnboardingManager.js';
 
 let uiElements;
-let sliderComponents = {}; 
-let popoutPanels = {};    
+let sliderComponents = {};
+let popoutPanels = {};
 let worldManagerInterfaceRef;
 let rulesetEditorComponent, setupPanelComponent, analysisPanelInstance, ruleRankPanelComponent;
 let libraryDataRef = { rulesets: [], patterns: [] };
@@ -45,7 +45,7 @@ function handleClickOutside(event) {
     const clickedTriggerButton = activePopouts.some(popout => {
         return popout.triggerElement && popout.triggerElement.contains(event.target);
     });
-    
+
     if (!clickedInsidePopout && !clickedTriggerButton) {
         closeAllPopouts();
     }
@@ -58,9 +58,9 @@ document.addEventListener('touchend', handleClickOutside);
 export function initUI(worldManagerInterface, libraryData) {
     worldManagerInterfaceRef = worldManagerInterface;
     libraryDataRef = libraryData;
-    
+
     uiElements = {
-        
+
         rulesetDisplay: document.getElementById('rulesetDisplay'),
         statTick: document.getElementById('stat-tick'),
         statRatio: document.getElementById('stat-ratio'),
@@ -73,13 +73,13 @@ export function initUI(worldManagerInterface, libraryData) {
         brushToolButton: document.getElementById('brushToolButton'),
         newRulesButton: document.getElementById('newRulesButton'),
         mutateButton: document.getElementById('mutateButton'),
-        setRulesetButton: document.getElementById('setRulesetButton'), 
+        setRulesetButton: document.getElementById('setRulesetButton'),
         libraryButton: document.getElementById('libraryButton'),
         saveStateButton: document.getElementById('saveStateButton'),
         loadStateButton: document.getElementById('loadStateButton'),
-        resetClearButton: document.getElementById('resetClearButton'), 
-        editRuleButton: document.getElementById('editRuleButton'), 
-        setupPanelButton: document.getElementById('setupPanelButton'), 
+        resetClearButton: document.getElementById('resetClearButton'),
+        editRuleButton: document.getElementById('editRuleButton'),
+        setupPanelButton: document.getElementById('setupPanelButton'),
         analysisPanelButton: document.getElementById('analysisPanelButton'),
         rankPanelButton: document.getElementById('rankPanelButton'),
         shareButton: document.getElementById('shareButton'),
@@ -98,8 +98,9 @@ export function initUI(worldManagerInterface, libraryData) {
         generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
         useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
         biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
-        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'), 
+        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'),
         mutationRateSliderMount: document.getElementById('mutationRateSliderMount'),
+        mutateModeSwitch: document.getElementById('mutateModeSwitch'),
         mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
         triggerMutationButton: document.getElementById('triggerMutationButton'),
         cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
@@ -117,13 +118,13 @@ export function initUI(worldManagerInterface, libraryData) {
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
         ruleRankPanel: document.getElementById('ruleRankPanel'),
-        fileInput: document.getElementById('fileInput'), 
-        canvas: document.getElementById('hexGridCanvas'), 
+        fileInput: document.getElementById('fileInput'),
+        canvas: document.getElementById('hexGridCanvas'),
     };
 
     if (!validateElements()) return false;
 
-    
+
     if (uiElements.rulesetEditorPanel) rulesetEditorComponent = new RulesetEditor(uiElements.rulesetEditorPanel, worldManagerInterfaceRef);
     if (uiElements.setupPanel) setupPanelComponent = new SetupPanel(uiElements.setupPanel, worldManagerInterfaceRef);
     if (uiElements.analysisPanel) analysisPanelInstance = new AnalysisPanel(uiElements.analysisPanel, worldManagerInterfaceRef, {});
@@ -133,16 +134,16 @@ export function initUI(worldManagerInterface, libraryData) {
     _initPopoutControls();
     _populateLibraryPanel();
     _setupToolbarButtonListeners();
-    _setupStateListeners(); 
-    loadAndApplyUISettings(); 
-    window.addEventListener('keydown', handleGlobalKeyDown); 
-    setupUIEventListeners(); 
+    _setupStateListeners();
+    loadAndApplyUISettings();
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    setupUIEventListeners();
     updatePauseButtonVisual(worldManagerInterfaceRef.isSimulationPaused());
     updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
     updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     updateBrushSizeDisplay(worldManagerInterfaceRef.getCurrentBrushSize());
-    
-    
+
+
     if (uiElements?.statTargetTps) {
         uiElements.statTargetTps.textContent = String(worldManagerInterfaceRef.getCurrentSimulationSpeed());
     }
@@ -167,7 +168,7 @@ function validateElements() {
             allFound = false;
         }
     });
-    
+
     const popoutControls = [
         'speedSliderMountPopout', 'neighborhoodSizeSliderMountPopout', 'generateModeSwitchPopout',
         'useCustomBiasCheckboxPopout', 'biasSliderMountPopout', 'rulesetScopeSwitchPopout',
@@ -175,25 +176,25 @@ function validateElements() {
         'setRuleFromPopoutButton', 'copyRuleFromPopoutButton', 'resetCurrentButtonPopout',
         'resetAllButtonPopout', 'clearCurrentButtonPopout', 'clearAllButtonPopout'
     ];
-     popoutControls.forEach(key => {
+    popoutControls.forEach(key => {
         if (!uiElements[key]) {
             console.warn(`UI Rework Warning: Popout control Element '${key}' not found. Might affect functionality.`);
-            
+
         }
     });
     return allFound;
 }
 
 function _initPopoutPanels() {
-    popoutPanels.speed = new PopoutPanel(uiElements.speedPopout, uiElements.speedControlButton, { position: 'right', alignment: 'start'});
-    popoutPanels.brush = new PopoutPanel(uiElements.brushPopout, uiElements.brushToolButton, { position: 'right', alignment: 'start'});
-    popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5});
+    popoutPanels.speed = new PopoutPanel(uiElements.speedPopout, uiElements.speedControlButton, { position: 'right', alignment: 'start' });
+    popoutPanels.brush = new PopoutPanel(uiElements.brushPopout, uiElements.brushToolButton, { position: 'right', alignment: 'start' });
+    popoutPanels.newRules = new PopoutPanel(uiElements.newRulesPopout, uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.mutate = new PopoutPanel(uiElements.mutatePopout, uiElements.mutateButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.setHex = new PopoutPanel(uiElements.setHexPopout, uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.library = new PopoutPanel(uiElements.libraryPopout, uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.resetClear = new PopoutPanel(uiElements.resetClearPopout, uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
     popoutPanels.share = new PopoutPanel(uiElements.sharePopout, uiElements.shareButton, { position: 'right', alignment: 'start' });
-    
+
     activePopouts = Object.values(popoutPanels);
 }
 
@@ -201,7 +202,7 @@ function _populateLibraryPanel() {
     const rulesetContent = uiElements.libraryPopout.querySelector('#rulesetsLibraryContent');
     const patternContent = uiElements.libraryPopout.querySelector('#patternsLibraryContent');
     const tabs = uiElements.libraryPopout.querySelectorAll('.tab-button');
-    
+
     if (!rulesetContent || !patternContent) return;
 
     rulesetContent.innerHTML = '';
@@ -244,14 +245,14 @@ function _populateLibraryPanel() {
         });
         patternContent.appendChild(item);
     });
-    
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             const targetContent = uiElements.libraryPopout.querySelector(`#${tab.dataset.tab}LibraryContent`);
             uiElements.libraryPopout.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            if(targetContent) {
+            if (targetContent) {
                 targetContent.classList.remove('hidden');
             }
         });
@@ -260,21 +261,21 @@ function _populateLibraryPanel() {
 
 
 function _initPopoutControls() {
-    
+
     sliderComponents.speedSliderPopout = new SliderComponent(uiElements.speedSliderMountPopout, {
         id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1,
         value: worldManagerInterfaceRef.getCurrentSimulationSpeed(), unit: 'tps', showValue: true,
         onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val)
     });
 
-    
+
     sliderComponents.neighborhoodSliderPopout = new SliderComponent(uiElements.neighborhoodSizeSliderMountPopout, {
         id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1,
         value: worldManagerInterfaceRef.getCurrentBrushSize(), unit: '', showValue: true,
         onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
     });
 
-    
+
     uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => {
         r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('rulesetGenerationMode', r.value); });
     });
@@ -303,7 +304,7 @@ function _initPopoutControls() {
             generationMode: mode,
             resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
         });
-        
+
     });
 
     sliderComponents.mutationRateSlider = new SliderComponent(uiElements.mutationRateSliderMount, {
@@ -311,39 +312,43 @@ function _initPopoutControls() {
         value: 1, unit: 'rules', showValue: true,
         onChange: val => PersistenceService.saveUISetting('mutationRate', val)
     });
+    uiElements.mutateModeSwitch.querySelectorAll('input[name="mutateMode"]').forEach(r => {
+        r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('mutateMode', r.value); });
+    });
     uiElements.mutateScopeSwitch.querySelectorAll('input[name="mutateScope"]').forEach(r => {
         r.addEventListener('change', () => { if (r.checked) PersistenceService.saveUISetting('mutateScope', r.value); });
     });
     uiElements.triggerMutationButton.addEventListener('click', () => {
         const mutationRate = sliderComponents.mutationRateSlider.getValue();
         const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
-        
-        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope });
-        // popoutPanels.mutate.hide(); // THIS LINE IS REMOVED
+        const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
+
+        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope, mode });
     });
 
     uiElements.cloneAndMutateButton.addEventListener('click', () => {
         const mutationRate = sliderComponents.mutationRateSlider.getValue();
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate });
-        popoutPanels.mutate.hide();
+        const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
+        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
+        //popoutPanels.mutate.hide();
     });
-    
+
     uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
         const hex = uiElements.rulesetInputPopout.value.trim().toUpperCase();
         if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
             alert("Invalid Hex: Must be 32 hex chars."); uiElements.rulesetInputPopout.select(); return;
         }
-        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked'); 
+        const targetScopeRadio = uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked');
         const targetScope = targetScopeRadio ? targetScopeRadio.value : 'selected';
 
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
             hexString: hex,
-            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' 
+            resetScopeForThisChange: uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none'
         });
-        uiElements.rulesetInputPopout.value = ''; 
+        uiElements.rulesetInputPopout.value = '';
         popoutPanels.setHex.hide();
     });
-    uiElements.rulesetInputPopout.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); uiElements.setRuleFromPopoutButton.click(); }});
+    uiElements.rulesetInputPopout.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); uiElements.setRuleFromPopoutButton.click(); } });
     uiElements.copyRuleFromPopoutButton.addEventListener('click', () => {
         const hex = worldManagerInterfaceRef.getCurrentRulesetHex();
         if (!hex || hex === "N/A" || hex === "Error") { alert("No ruleset for selected world to copy."); return; }
@@ -364,7 +369,7 @@ function _initPopoutControls() {
             EventBus.dispatch(EVENTS.UI_RULESET_INPUT_CHANGED, { value: hex });
         }
     });
-    
+
     uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
     uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); popoutPanels.resetClear.hide(); });
     uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); popoutPanels.resetClear.hide(); });
@@ -373,18 +378,18 @@ function _initPopoutControls() {
 
 function _setupToolbarButtonListeners() {
     uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
-    
+
     uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
     uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
     uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
     uiElements.rankPanelButton?.addEventListener('click', () => ruleRankPanelComponent?.toggle());
-    
+
     uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
     uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
     uiElements.shareButton.addEventListener('click', () => generateAndShowShareLink());
 }
 
-function _setupStateListeners() { 
+function _setupStateListeners() {
     uiElements.fileInput.addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) { e.target.value = null; return; }
@@ -444,7 +449,7 @@ function generateAndShowShareLink() {
 
     const baseUrl = window.location.origin + window.location.pathname;
     uiElements.shareLinkInput.value = `${baseUrl}?${params.toString()}`;
-    
+
     if (uiElements.copyShareLinkButton) {
         uiElements.copyShareLinkButton.addEventListener('click', copyShareLink, { once: true });
     }
@@ -458,7 +463,7 @@ function copyShareLink() {
             uiElements.copyShareLinkButton.textContent = "Copied!";
             setTimeout(() => {
                 uiElements.copyShareLinkButton.textContent = oldTxt;
-                 // Re-attach listener after a short delay
+                // Re-attach listener after a short delay
                 setTimeout(() => {
                     uiElements.copyShareLinkButton.addEventListener('click', copyShareLink, { once: true });
                 }, 100);
@@ -468,23 +473,27 @@ function copyShareLink() {
 }
 
 function loadAndApplyUISettings() {
-    
+
     sliderComponents.speedSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentSimulationSpeed());
     sliderComponents.neighborhoodSliderPopout?.setValue(worldManagerInterfaceRef.getCurrentBrushSize());
-    
+
     const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
     uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => r.checked = r.value === genMode);
-    
+
     uiElements.useCustomBiasCheckboxPopout.checked = PersistenceService.loadUISetting('useCustomBias', true);
     sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.33));
     updateBiasSliderDisabledStatePopout();
 
-    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', true); 
+    const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', true);
     uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
-    
+
     uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
 
     sliderComponents.mutationRateSlider?.setValue(PersistenceService.loadUISetting('mutationRate', 1));
+    const mutateMode = PersistenceService.loadUISetting('mutateMode', 'single');
+    if (uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`)) {
+        uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`).checked = true;
+    }
     const mutateScope = PersistenceService.loadUISetting('mutateScope', 'selected');
     if (uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`)) {
         uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`).checked = true;
@@ -497,15 +506,15 @@ function updateBiasSliderDisabledStatePopout() {
     sliderComponents.biasSliderPopout?.setDisabled(!uiElements.useCustomBiasCheckboxPopout.checked);
 }
 
-function updatePauseButtonVisual(isPaused) { 
+function updatePauseButtonVisual(isPaused) {
     if (uiElements?.playPauseButton) {
-        uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚"; 
+        uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚";
         uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
     }
 }
-function updateMainRulesetDisplay(hex) { 
+function updateMainRulesetDisplay(hex) {
     if (uiElements?.rulesetDisplay) {
-        uiElements.rulesetDisplay.textContent = formatHexCode(hex); 
+        uiElements.rulesetDisplay.textContent = formatHexCode(hex);
     }
 }
 
@@ -513,15 +522,15 @@ function updateStatsDisplay(stats) {
     if (!stats || !uiElements) return;
 
     if (stats.worldIndex !== undefined && stats.worldIndex !== worldManagerInterfaceRef.getSelectedWorldIndex()) {
-      
-      
-      return;
+
+
+        return;
     }
-    
+
     uiElements.statTick.textContent = stats.tick !== undefined ? String(stats.tick) : '--';
     uiElements.statRatio.textContent = stats.ratio !== undefined ? (stats.ratio * 100).toFixed(2) : '--';
-    
-    
+
+
 }
 
 function updatePerformanceDisplay(fps, tpsOfSelectedWorld, targetTps) {
@@ -539,37 +548,37 @@ function updateBrushSizeDisplay(brushSize) {
 function handleGlobalKeyDown(event) {
     const activeEl = document.activeElement;
     const isInputFocused = activeEl && (
-        activeEl.tagName === 'INPUT' || 
-        activeEl.tagName === 'TEXTAREA' || 
-        activeEl.tagName === 'SELECT' || 
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT' ||
         activeEl.isContentEditable
     );
-    
+
     if (isInputFocused && activeEl !== uiElements.rulesetInputPopout && activeEl !== uiElements.editorRulesetInput) {
-         
+
         if (activeEl.closest('.popout-panel') || activeEl.closest('.draggable-panel-base')) {
-            
-             if (event.key === "Escape") { 
+
+            if (event.key === "Escape") {
                 closeAllPopouts();
-                
+
                 if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
                 else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
                 else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
-             }
+            }
             return;
         }
     }
 
 
-    
-    
+
+
     if (isInputFocused && (activeEl === uiElements.rulesetInputPopout || activeEl === uiElements.editorRulesetInput)) {
         if (event.key === "Escape") {
-            activeEl.blur(); 
-            
+            activeEl.blur();
+
             if (activeEl === uiElements.rulesetInputPopout) popoutPanels.setHex.hide();
         }
-        return; 
+        return;
     }
 
 
@@ -578,35 +587,36 @@ function handleGlobalKeyDown(event) {
         'M': () => {
             const mutationRate = sliderComponents.mutationRateSlider.getValue();
             const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
-            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope });
+            const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
+            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope, mode });
         },
         'N': () => { closeAllPopouts(); popoutPanels.newRules?.toggle(); },
         'E': () => { closeAllPopouts(); rulesetEditorComponent?.toggle(); },
         'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },
         'A': () => { closeAllPopouts(); analysisPanelInstance?.toggle(); },
         'C': () => {
-            
+
             EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' });
         },
         'R': () => {
-            
+
             EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
         },
         'G': () => {
-            
+
             if (popoutPanels.newRules && popoutPanels.newRules.isHidden()) {
                 closeAllPopouts();
                 popoutPanels.newRules.show();
             }
-            
+
             setTimeout(() => {
                 uiElements.generateRulesetFromPopoutButton?.click();
             }, 10);
         },
-        'Escape': () => { 
+        'Escape': () => {
             let aPopoutWasOpen = false;
-            activePopouts.forEach(p => { if (!p.isHidden()) { p.hide(); aPopoutWasOpen = true; }});
-            if (!aPopoutWasOpen) { 
+            activePopouts.forEach(p => { if (!p.isHidden()) { p.hide(); aPopoutWasOpen = true; } });
+            if (!aPopoutWasOpen) {
                 if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) rulesetEditorComponent.hide();
                 else if (setupPanelComponent && !setupPanelComponent.isHidden()) setupPanelComponent.hide();
                 else if (analysisPanelInstance && !analysisPanelInstance.isHidden()) analysisPanelInstance.hide();
@@ -614,8 +624,15 @@ function handleGlobalKeyDown(event) {
         }
     };
 
-    
+
     if (event.shiftKey) {
+        if (event.key.toUpperCase() === 'M') {
+            const mutationRate = sliderComponents.mutationRateSlider.getValue();
+            const mode = uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
+            EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
+            event.preventDefault();
+            return;
+        }
         if (event.key.toUpperCase() === 'R') {
             EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
             event.preventDefault();
@@ -626,39 +643,39 @@ function handleGlobalKeyDown(event) {
             event.preventDefault();
             return;
         }
-        
-        
-        
+
+
+
         if (event.key !== 'Shift' && event.code !== 'ShiftLeft' && event.code !== 'ShiftRight') {
-            
+
             const numpadMatch = event.code.match(/^Numpad(\d)$/);
             const digitMatch = event.code.match(/^Digit(\d)$/);
-            const keyMatch = event.key.match(/^(\d)$/); 
-            
+            const keyMatch = event.key.match(/^(\d)$/);
+
             let keyNum = null;
             if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
             else if (digitMatch) keyNum = parseInt(digitMatch[1]);
             else if (keyMatch) keyNum = parseInt(keyMatch[1]);
-            
+
             if (keyNum && keyNum >= 1 && keyNum <= 9) {
-                
+
                 const worldMapping = {
-                    1: 6, 
-                    2: 7, 
-                    3: 8, 
-                    4: 3, 
-                    5: 4, 
-                    6: 5, 
-                    7: 0, 
-                    8: 1, 
-                    9: 2  
+                    1: 6,
+                    2: 7,
+                    3: 8,
+                    4: 3,
+                    5: 4,
+                    6: 5,
+                    7: 0,
+                    8: 1,
+                    9: 2
                 };
                 const worldIndex = worldMapping[keyNum];
-                
+
                 const currentSettings = worldManagerInterfaceRef.getWorldSettingsForUI();
                 if (currentSettings[worldIndex]) {
                     const currentEnabled = currentSettings[worldIndex].enabled;
-                    console.log(`World ${worldIndex} current state: ${currentEnabled}, toggling to: ${!currentEnabled}`); 
+                    console.log(`World ${worldIndex} current state: ${currentEnabled}, toggling to: ${!currentEnabled}`);
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, {
                         worldIndex: worldIndex,
                         isEnabled: !currentEnabled
@@ -669,38 +686,38 @@ function handleGlobalKeyDown(event) {
             }
         }
     } else {
-        
+
         const numpadMatch = event.code.match(/^Numpad(\d)$/);
         const digitMatch = event.code.match(/^Digit(\d)$/);
-        const keyMatch = event.key.match(/^(\d)$/); 
-        
+        const keyMatch = event.key.match(/^(\d)$/);
+
         let keyNum = null;
         if (numpadMatch) keyNum = parseInt(numpadMatch[1]);
         else if (digitMatch) keyNum = parseInt(digitMatch[1]);
         else if (keyMatch) keyNum = parseInt(keyMatch[1]);
-        
+
         if (keyNum && keyNum >= 1 && keyNum <= 9) {
-            
+
             const worldMapping = {
-                1: 6, 
-                2: 7, 
-                3: 8, 
-                4: 3, 
-                5: 4, 
-                6: 5, 
-                7: 0, 
-                8: 1, 
-                9: 2  
+                1: 6,
+                2: 7,
+                3: 8,
+                4: 3,
+                5: 4,
+                6: 5,
+                7: 0,
+                8: 1,
+                9: 2
             };
             const worldIndex = worldMapping[keyNum];
-            
+
             EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
             event.preventDefault();
             return;
         }
     }
 
-    const action = keyMap[event.key.toUpperCase()] || keyMap[event.key]; 
+    const action = keyMap[event.key.toUpperCase()] || keyMap[event.key];
     if (action) {
         action();
         event.preventDefault();
@@ -715,15 +732,15 @@ function setupUIEventListeners() {
     });
     EventBus.subscribe(EVENTS.RULESET_CHANGED, hex => {
         updateMainRulesetDisplay(hex);
-        
+
         if (rulesetEditorComponent && !rulesetEditorComponent.isHidden()) {
             if (document.activeElement !== uiElements.editorRulesetInput) {
                 uiElements.editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
             }
-            rulesetEditorComponent.refreshViews(); 
+            rulesetEditorComponent.refreshViews();
         }
         if (uiElements.rulesetInputPopout && document.activeElement !== uiElements.rulesetInputPopout) {
-             uiElements.rulesetInputPopout.value = (hex === "Error" || hex === "N/A") ? "" : hex;
+            uiElements.rulesetInputPopout.value = (hex === "Error" || hex === "N/A") ? "" : hex;
         }
     });
     EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, size => sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
@@ -731,14 +748,14 @@ function setupUIEventListeners() {
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, updateStatsDisplay);
     EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, () => ruleRankPanelComponent?.refreshViews());
     EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-        setupPanelComponent?.refreshViews(); 
+        setupPanelComponent?.refreshViews();
         ruleRankPanelComponent?.refreshViews();
         if (worldManagerInterfaceRef) updateStatsDisplay(worldManagerInterfaceRef.getSelectedWorldStats());
     });
-    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => { 
+    EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => {
         setupPanelComponent?.refreshViews();
-        if (worldManagerInterfaceRef) { 
-             updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
+        if (worldManagerInterfaceRef) {
+            updateMainRulesetDisplay(worldManagerInterfaceRef.getCurrentRulesetHex());
         }
     });
     EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, data => updatePerformanceDisplay(data.fps, data.tps, data.targetTps));

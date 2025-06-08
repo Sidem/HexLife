@@ -3,7 +3,7 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRulesetHex } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRandomBitsInHex } from '../utils/utils.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -126,6 +126,8 @@ export class WorldManager {
     _setupEventListeners = () => {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => this.setGlobalPause(!this.isGloballyPaused));
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
+        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
+        EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
 
         EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, (size) => {
             const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
@@ -145,11 +147,11 @@ export class WorldManager {
         });
 
         EventBus.subscribe(EVENTS.COMMAND_MUTATE_RULESET, (data) => {
-            this._mutateRulesetForScope(data.scope, data.mutationRate);
+            this._mutateRulesetForScope(data.scope, data.mutationRate, data.mode);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_CLONE_AND_MUTATE, (data) => {
-            this._cloneAndMutateOthers(data.mutationRate);
+            this._cloneAndMutateOthers(data.mutationRate, data.mode);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
@@ -333,6 +335,30 @@ export class WorldManager {
         });
     }
 
+    _applySelectedDensityToAll = () => {
+        const selectedDensity = this.worldSettings[this.selectedWorldIndex]?.initialDensity;
+        if (selectedDensity === undefined) {
+            console.error("Could not apply density: selected world's density is not available.");
+            return;
+        }
+
+        this.worldSettings.forEach(setting => {
+            setting.initialDensity = selectedDensity;
+        });
+
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+    }
+
+    _resetDensitiesToDefault = () => {
+        this.worldSettings.forEach((setting, idx) => {
+            setting.initialDensity = Config.DEFAULT_INITIAL_DENSITIES[idx] ?? 0.5;
+        });
+
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+    }
+
     _getAffectedWorldIndices = (scope) => {
         if (scope === 'all') return this.worlds.map((_, i) => i);
         if (scope === 'selected') return [this.selectedWorldIndex];
@@ -374,7 +400,51 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    _mutateRulesetForScope = (scope, mutationRate) => {
+    _generateMutatedHex = (sourceHex, mutationRate, mutationMode) => {
+        if (mutationMode === 'single') {
+            return mutateRandomBitsInHex(sourceHex, mutationRate);
+        }
+
+        const rules = hexToRuleset(sourceHex);
+        const numRulesToChange = Math.max(1, mutationRate);
+
+        if (mutationMode === 'r_sym') {
+            const canonicalGroups = this.symmetryData.canonicalRepresentatives;
+            if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
+
+            for (let i = 0; i < numRulesToChange; i++) {
+                const randGroupIndex = Math.floor(Math.random() * canonicalGroups.length);
+                const randCenterState = Math.floor(Math.random() * 2);
+                const group = canonicalGroups[randGroupIndex];
+                
+                const currentOutput = rules[(randCenterState << 6) | group.representative];
+                const newOutput = 1 - currentOutput;
+                
+                for (const member of group.members) {
+                    const idx = (randCenterState << 6) | member;
+                    rules[idx] = newOutput;
+                }
+            }
+        } else if (mutationMode === 'n_count') {
+            for (let i = 0; i < numRulesToChange; i++) {
+                const randNeighborCount = Math.floor(Math.random() * 7);
+                const randCenterState = Math.floor(Math.random() * 2);
+                
+                const currentEffectiveOutput = this.getEffectiveRuleForNeighborCount(randCenterState, randNeighborCount);
+                const newOutput = (currentEffectiveOutput === 2) ? Math.round(Math.random()) : 1 - currentEffectiveOutput;
+                
+                for (let mask = 0; mask < 64; mask++) {
+                    if (Symmetry.countSetBits(mask) === randNeighborCount) {
+                        const idx = (randCenterState << 6) | mask;
+                        rules[idx] = newOutput;
+                    }
+                }
+            }
+        }
+        return rulesetToHex(rules);
+    }
+
+    _mutateRulesetForScope = (scope, mutationRate, mutationMode = 'single') => {
         const indices = this._getAffectedWorldIndices(scope);
 
         indices.forEach(idx => {
@@ -388,7 +458,7 @@ export class WorldManager {
                 return;
             }
 
-            const newHex = mutateRulesetHex(currentHex, mutationRate);
+            const newHex = this._generateMutatedHex(currentHex, mutationRate, mutationMode);
 
             if (newHex !== currentHex && newHex !== "Error") {
                 const newRulesetArray = hexToRuleset(newHex);
@@ -408,53 +478,52 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     };
 
-    _cloneAndMutateOthers = (mutationRate) => {
+    _cloneAndMutateOthers = (mutationRate, mutationMode = 'single') => {
         const selectedProxy = this.worlds[this.selectedWorldIndex];
-        if (!selectedProxy || !selectedProxy.latestStateArray) {
-            console.error("Cannot clone: selected world's state is not available.");
-            alert("Selected world's state is not ready. Please wait a moment and try again.");
+        if (!selectedProxy) {
+            console.error("Cannot clone/mutate: selected world proxy is not available.");
             return;
         }
 
-        const sourceStateBuffer = selectedProxy.latestStateArray.buffer.slice(0);
         const sourceRulesetHex = this.getCurrentRulesetHex();
-        const sourceTick = selectedProxy.getLatestStats().tick || 0;
 
         if (sourceRulesetHex === "Error" || sourceRulesetHex === "N/A") {
-             console.error("Cannot clone: selected world's ruleset is invalid.");
+             console.error("Cannot clone/mutate: selected world's ruleset is invalid.");
              alert("Selected world has an invalid ruleset and cannot be cloned.");
              return;
         }
 
+        // Iterate through ALL worlds.
         this.worlds.forEach((proxy, idx) => {
-            if (idx === this.selectedWorldIndex) return; // Skip the selected world
+            // If it's not the selected world, mutate the ruleset and apply it.
+            if (idx !== this.selectedWorldIndex) {
+                const newMutatedHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
+                if (newMutatedHex !== "Error") {
+                    const newRulesetBuffer = hexToRuleset(newMutatedHex).buffer.slice(0);
+                    proxy.setRuleset(newRulesetBuffer);
+                    this.worldSettings[idx].rulesetHex = newMutatedHex;
+                }
+            }
 
-            // 1. Generate a new, uniquely mutated ruleset for this world
-            const newMutatedHex = mutateRulesetHex(sourceRulesetHex, mutationRate);
-            const newMutatedRuleset = hexToRuleset(newMutatedHex);
-
-            // 2. Prepare the payload for the LOAD_STATE command
-            const payload = {
-                newStateBuffer: sourceStateBuffer.slice(0), // Use slice to copy for each worker
-                newRulesetBuffer: newMutatedRuleset.buffer.slice(0),
-                worldTick: sourceTick
-            };
-
-            // 3. Send the command to the worker to load the state and ruleset
-            proxy.sendCommand('LOAD_STATE', payload, [payload.newStateBuffer, payload.newRulesetBuffer]);
-            
-            // 4. Update the manager's internal settings cache for this world
+            // Reset every world to its own initial density defined in the Setup Panel.
             if (this.worldSettings[idx]) {
-                this.worldSettings[idx].rulesetHex = newMutatedHex;
-                this.worldSettings[idx].enabled = true; // Ensure the world is enabled
-                proxy.setEnabled(true); // Also enable it in the proxy
+                proxy.resetWorld(this.worldSettings[idx].initialDensity);
+                
+                // Also ensure the world is enabled and starts if the simulation isn't paused.
+                if (!this.worldSettings[idx].enabled) {
+                    this.worldSettings[idx].enabled = true;
+                    proxy.setEnabled(true);
+                }
+                if (!this.isGloballyPaused) {
+                    proxy.startSimulation();
+                }
             }
         });
 
-        // Save the updated settings and notify the UI
+        // Save the updated settings and notify the UI of the changes.
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // Force a full UI refresh
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // This triggers a full UI refresh.
     }
 
     _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {

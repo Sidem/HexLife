@@ -162,8 +162,19 @@
         <div id="mutatePopout" class="popout-panel hidden">
             <h4>Mutate Ruleset</h4>
             <div class="form-group">
-                <label for="mutationRateSlider">Mutation Amount (Rules to flip):</label>
+                <label for="mutationRateSlider">Mutation Amount:</label>
                 <div id="mutationRateSliderMount"></div>
+            </div>
+            <div class="form-group">
+                <label>Mutation Mode:</label>
+                <div id="mutateModeSwitch" class="three-way-switch">
+                    <input type="radio" id="mutateModeSingle" name="mutateMode" value="single" class="radio-switch-input" checked>
+                    <label for="mutateModeSingle" class="radio-switch-label">Single</label>
+                    <input type="radio" id="mutateModeRSym" name="mutateMode" value="r_sym" class="radio-switch-input">
+                    <label for="mutateModeRSym" class="radio-switch-label">R-Sym</label>
+                    <input type="radio" id="mutateModeNCount" name="mutateMode" value="n_count" class="radio-switch-input">
+                    <label for="mutateModeNCount" class="radio-switch-label">N-Count</label>
+                </div>
             </div>
             <div class="form-group">
                 <label>Apply to:</label>
@@ -283,6 +294,8 @@
                 <div id="worldSetupGrid" class="world-config-grid">
                 </div>
                 <div class="panel-actions">
+                    <button id="applySelectedDensityButton" class="button">Apply Selected Density to All</button>
+                    <button id="resetDensitiesButton" class="button">Reset Densities to Default</button>
                     <button id="applySetupButton" class="button">Apply & Reset All Enabled Worlds</button>
                 </div>
             </div>

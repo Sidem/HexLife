@@ -18,6 +18,8 @@ export class SetupPanel extends BasePanel {
             closeButton: panelElement.querySelector('#closeSetupPanelButton') || panelElement.querySelector('.close-panel-button'),
             worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: panelElement.querySelector('#applySetupButton'),
+            applySelectedDensityButton: panelElement.querySelector('#applySelectedDensityButton'),
+            resetDensitiesButton: panelElement.querySelector('#resetDensitiesButton'),
         };
         this.worldSliderComponents = [];
         this._setupInternalListeners();
@@ -34,6 +36,16 @@ export class SetupPanel extends BasePanel {
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+            });
+        }
+        if (this.uiElements.applySelectedDensityButton) {
+            this.uiElements.applySelectedDensityButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
+            });
+        }
+        if (this.uiElements.resetDensitiesButton) {
+            this.uiElements.resetDensitiesButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
             });
         }
         if (this.uiElements.worldSetupGrid) {

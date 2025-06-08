@@ -265,12 +265,12 @@ export function hexToRuleset(hexString) {
 }
 
 /**
- * Mutates a 32-character hex ruleset string by flipping a specified number of rule bits.
+ * Mutates a 32-character hex ruleset string by flipping a specified number of random rule bits.
  * @param {string} hexString The 32-character hex string.
  * @param {number} mutationRate The number of individual rules (bits) to flip.
  * @returns {string} The new, mutated 32-character uppercase hex string.
  */
-export function mutateRulesetHex(hexString, mutationRate = 1) {
+export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
     if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
         console.error("Invalid hex string provided for mutation:", hexString);
         return hexString;
