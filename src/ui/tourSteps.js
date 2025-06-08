@@ -1,3 +1,4 @@
+// ADD the ruleset constant at the top and REPLACE the contents of 'tourSteps'
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as UI from './ui.js';
 
@@ -16,33 +17,33 @@ const gliderRuleset = "12482080480080006880800180010117";
 export const tourSteps = [
     // =========== ACT I: THE OBSERVATORY ===========
     {
-        element: '#hexGridCanvas',
+        element: '[data-tour-id="hex-grid-canvas"]',
         title: 'Welcome, Researcher',
         content: `You've discovered the HexLife Explorer, a laboratory for digital life. Your exploration begins now.`,
         primaryAction: { text: 'Begin Exploration' },
         advanceOn: { type: 'click' }
     },
     {
-        element: '#playPauseButton',
+        element: '[data-tour-id="play-pause-button"]',
         title: 'The Flow of Time',
         content: `Time is frozen. The <span class="onboarding-highlight-text">Play/Pause button</span> starts and stops the simulation. Press it now.`,
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
     },
     {
-        element: '#statsDisplayContainer',
+        element: '[data-tour-id="stats-display-container"]',
         title: 'Reading the Vitals',
         content: `This is your main data feed. It shows the current <span class="onboarding-highlight-text">Tick</span>, <span class="onboarding-highlight-text">Ratio</span> of active cells, and performance stats like <span class="onboarding-highlight-text">TPS</span> (Ticks Per Second).`,
         primaryAction: { text: 'Got it' },
         advanceOn: { type: 'click' }
     },
     {
-        element: '#speedControlButton',
+        element: '[data-tour-id="speed-control-button"]',
         title: `Adjusting Time's Pace`,
         content: `You can change the simulation speed. Click 'SPD' to open the speed controls.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#speedPopout',
+        element: '[data-tour-id="speed-popout"]',
         title: 'Speed Control',
         content: `Use this slider to set the target Ticks Per Second. Faster speeds allow you to observe long-term evolution quickly.`,
         onBeforeShow: () => showPopout('speed'),
@@ -50,27 +51,27 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#main-content-area',
+        element: '[data-tour-id="main-content-area"]',
         title: 'The Multiverse',
         content: `You are observing nine worlds at once in the mini-map. This allows for parallel experiments. <br><br>Click any other world in the mini-map to shift your focus.`,
         onBeforeShow: () => hidePopout('speed'),
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     },
     {
-        element: '#hexGridCanvas',
+        element: '[data-tour-id="hex-grid-canvas"]',
         title: 'Seeding Life',
         content: `You can introduce life by "seeding" the grid. <span class="onboarding-highlight-text">Click and drag your mouse</span> on the main view. The simulation will pause automatically.`,
         primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
     },
     {
-        element: '#brushToolButton',
+        element: '[data-tour-id="brush-tool-button"]',
         title: 'Calibrating Instruments',
         content: `Your seeding tool is the <span class="onboarding-highlight-text">Brush</span>. Click 'BRS' to change its size.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#brushPopout',
+        element: '[data-tour-id="brush-popout"]',
         title: 'The Pipette',
         content: `Use this slider to adjust your brush size. <br><br><span class="onboarding-highlight-text">Pro-Tip:</span> Hover over the main grid and use <span class="onboarding-highlight-text">Ctrl + Mouse Wheel</span> for quick adjustments.`,
         onBeforeShow: () => showPopout('brush'),
@@ -78,14 +79,14 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#resetClearButton',
+        element: '[data-tour-id="reset-clear-button"]',
         title: 'Wiping the Slate Clean',
         content: `Sometimes you need to start a fresh experiment. The 'R/C' button gives you options to <span class="onboarding-highlight-text">Reset</span> or <span class="onboarding-highlight-text">Clear</span> your worlds.`,
         onBeforeShow: () => hidePopout('brush'),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#resetClearPopout',
+        element: '[data-tour-id="reset-clear-popout"]',
         title: 'Reset & Clear Options',
         content: `You can reset the <span class="onboarding-highlight-text">Selected</span> world or <span class="onboarding-highlight-text">All</span> of them at once. Clearing sets all cells to a single state.`,
         onBeforeShow: () => showPopout('resetClear'),
@@ -95,7 +96,7 @@ export const tourSteps = [
     
     // =========== ACT II: THE GENETICS LAB ===========
     {
-        element: '#rulesetDisplayContainer',
+        element: '[data-tour-id="ruleset-display-container"]',
         title: 'The Genetic Code',
         content: `Now for the most important part. Every world's behavior is governed by its <span class="onboarding-highlight-text">Ruleset</span>—its digital DNA.`,
         onBeforeShow: () => hidePopout('resetClear'),
@@ -103,13 +104,13 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#newRulesButton',
+        element: '[data-tour-id="new-rules-button"]',
         title: 'The Gene Synthesizer',
         content: `The 'NEW' button opens the <span class="onboarding-highlight-text">Gene Synthesizer</span> for generating new rulesets from scratch.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#newRulesPopout',
+        element: '[data-tour-id="new-rules-popout"]',
         title: 'Synthesis Methods',
         content: `<span class="onboarding-highlight-text">R-Sym</span> (Rotational Symmetry) often creates structured patterns. <span class="onboarding-highlight-text">N-Count</span> bases rules on neighbor counts. <span class="onboarding-highlight-text">Random</span> is pure chaos.`,
         onBeforeShow: () => showPopout('newRules'),
@@ -117,7 +118,7 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#newRulesPopout',
+        element: '[data-tour-id="new-rules-popout"]',
         title: 'Controlling the Synthesis',
         content: `Use <span class="onboarding-highlight-text">Custom Bias</span> to control the tendency towards life. Use <span class="onboarding-highlight-text">Apply to</span> to target the selected world or all of them at once.`,
         onBeforeShow: () => showPopout('newRules'),
@@ -125,28 +126,29 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#generateRulesetFromPopoutButton',
+        element: '[data-tour-id="generate-ruleset-button"]',
         title: 'Create a New World',
         content: `Click <span class="onboarding-highlight-text">'Generate'</span> to create a new ruleset and see how the simulation changes instantly.`,
         onBeforeShow: () => showPopout('newRules'),
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
     {
-        element: '#setRulesetButton',
+        element: '[data-tour-id="set-ruleset-button"]',
         title: 'Loading a Known Specimen',
         content: `Some lifeforms are already catalogued. Let's load <span class="onboarding-highlight-text">"Gliders"</span>. Click 'HEX' to open the manual input panel.`,
         onBeforeShow: () => hidePopout('newRules'),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#setHexPopout',
+        element: '[data-tour-id="set-hex-popout"]',
         title: 'Manual Input',
         content: `Paste this code into the input box: <br><code style="background: #222; padding: 5px 8px; border-radius: 4px; user-select: all;">${gliderRuleset}</code><br><button id="onboarding-copy-ruleset" class="button" style="margin-top: 10px;">Copy Ruleset</button>`,
+        onboardingCopyText: gliderRuleset,
         onBeforeShow: () => showPopout('setHex'),
         advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
     },
     {
-        element: '#setRuleFromPopoutButton',
+        element: '[data-tour-id="set-rule-from-popout-button"]',
         title: 'Apply the Code',
         content: `Excellent! Now click <span class="onboarding-highlight-text">'Set'</span> to apply the new rules. After the world resets, watch for the small, moving patterns—the 'gliders'!`,
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
@@ -154,7 +156,7 @@ export const tourSteps = [
 
     // =========== ACT III: THE LAB NOTEBOOK & ADVANCED ANALYSIS ===========
     {
-        element: '#saveStateButton',
+        element: '[data-tour-id="save-state-button"]',
         title: 'The Lab Notebook',
         content: `Found a fascinating state you want to preserve? The 'SAV' button saves the selected world's <span class="onboarding-highlight-text">entire state</span>—all cells and the ruleset—to a file.`,
         onBeforeShow: () => hideAllPopouts(),
@@ -162,34 +164,34 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#loadStateButton',
+        element: '[data-tour-id="load-state-button"]',
         title: 'Opening an Old Entry',
         content: `The 'LOD' button lets you load a previously saved file, restoring your experiment exactly as it was.`,
         primaryAction: { text: 'Got it' },
         advanceOn: { type: 'click' }
     },
     {
-        element: '#editRuleButton',
+        element: '[data-tour-id="edit-rule-button"]',
         title: 'The Gene-Splicer',
         content: `Now for the most powerful tool: the <span class="onboarding-highlight-text">Ruleset Editor</span> ('EDT'). This is where you modify the DNA rule by rule.`,
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#rulesetEditorPanel',
+        element: '[data-tour-id="ruleset-editor-panel"]',
         title: 'Editing a Gene',
         content: `This panel visualizes all 128 rules. <span class="onboarding-highlight-text">Click any rule visualization</span> to flip its outcome and instantly alter the laws of the universe.`,
         onBeforeShow: () => UI.getRulesetEditor()?.show(),
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     },
     {
-        element: '#setupPanelButton',
+        element: '[data-tour-id="setup-panel-button"]',
         title: 'The Analytics Suite',
         content: `Good science requires controlled experiments. The <span class="onboarding-highlight-text">World Setup</span> panel ('SET') lets you define the starting conditions for all nine worlds.`,
         onBeforeShow: () => UI.getRulesetEditor()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#setupPanel',
+        element: '[data-tour-id="setup-panel"]',
         title: 'Controlling The Experiment',
         content: `Here you can change the initial <span class="onboarding-highlight-text">Density</span> of active cells for each world, or disable them entirely.`,
         onBeforeShow: () => UI.getSetupPanel()?.show(),
@@ -197,14 +199,14 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#analysisPanelButton',
+        element: '[data-tour-id="analysis-panel-button"]',
         title: 'Macroscopic Data',
         content: `How do you measure a universe? The <span class="onboarding-highlight-text">Analysis Panel</span> ('ANL') provides real-time data on the world's overall state and complexity.`,
         onBeforeShow: () => UI.getSetupPanel()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#analysisPanel',
+        element: '[data-tour-id="analysis-panel"]',
         title: 'Complexity Over Time',
         content: `These charts track <span class="onboarding-highlight-text">Activity Ratio</span> and <span class="onboarding-highlight-text">Entropy</span> (a measure of complexity). They are invaluable for comparing rulesets.`,
         onBeforeShow: () => UI.getAnalysisPanel()?.show(),
@@ -212,14 +214,14 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#rankPanelButton',
+        element: '[data-tour-id="rank-panel-button"]',
         title: 'Microscopic Data',
         content: `But *why* does a world behave a certain way? The <span class="onboarding-highlight-text">Rule Rank</span> panel ('RNK') shows exactly which "genes" are most active.`,
         onBeforeShow: () => UI.getAnalysisPanel()?.hide(),
         advanceOn: { type: 'click', target: 'element' }
     },
     {
-        element: '#ruleRankPanel',
+        element: '[data-tour-id="rule-rank-panel"]',
         title: 'Activation vs. Deactivation',
         content: `This tool shows which rules are creating life (Activation) versus which are removing it (Deactivation). It's essential for deep analysis.`,
         onBeforeShow: () => UI.getRuleRankPanel()?.show(),
@@ -227,7 +229,7 @@ export const tourSteps = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#shareButton',
+        element: '[data-tour-id="share-button"]',
         title: 'Go Forth and Discover!',
         content: `You have mastered the lab. When you find something amazing, use the <span class="onboarding-highlight-text">Share</span> ('SHR') button to get a link to your discovery. Use <span class="onboarding-highlight-text">Help</span> ('HLP') to replay this tour.`,
         onBeforeShow: () => UI.getRuleRankPanel()?.hide(),

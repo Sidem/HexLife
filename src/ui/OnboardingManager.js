@@ -101,8 +101,7 @@ function showStep(stepIndex) {
         highlightedElement = targetElement;
         if (targetElement !== document.body) {
             highlightedElement.classList.add('onboarding-highlight');
-            // BUG FIX: Add special class for text elements to prevent blur
-            if (['rulesetDisplay', 'rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.id)) {
+            if (['rulesetDisplay', 'rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) { // Use dataset for check
                  highlightedElement.classList.add('onboarding-highlight-no-filter');
             }
         }
@@ -116,10 +115,9 @@ function showStep(stepIndex) {
         ui.progressBar.style.width = `${progress}%`;
 
         const copyButton = document.getElementById('onboarding-copy-ruleset');
-        if (copyButton) {
+        if (copyButton && step.onboardingCopyText) { // Check for the new property
             copyButton.addEventListener('click', () => {
-                const rulesetToCopy = "12482080480080006880800180010117";
-                navigator.clipboard.writeText(rulesetToCopy).then(() => {
+                navigator.clipboard.writeText(step.onboardingCopyText).then(() => { // Use the property
                     copyButton.textContent = "Copied!";
                     copyButton.disabled = true;
                     setTimeout(() => {

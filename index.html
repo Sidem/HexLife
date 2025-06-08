@@ -74,10 +74,10 @@
                     GitHub
                 </a>
             </div>
-            <div id="rulesetDisplayContainer">
+            <div id="rulesetDisplayContainer" data-tour-id="ruleset-display-container">
                 <code id="rulesetDisplay">N/A</code>
             </div>
-            <div id="statsDisplayContainer">
+            <div id="statsDisplayContainer" data-tour-id="stats-display-container">
                 <span>Tick: <span id="stat-tick">--</span></span>
                 <span>Ratio: <span id="stat-ratio">--</span>%</span>
                 <span>Brush: <span id="stat-brush-size">--</span></span>
@@ -86,44 +86,44 @@
             </div>
         </div>
 
-        <div id="main-content-area">
+        <div id="main-content-area" data-tour-id="main-content-area">
             <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
-                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation">▶</button>
-                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed">SPD</button>
-                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size">BRS</button>
+                <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" data-tour-id="play-pause-button">▶</button>
+                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed" data-tour-id="speed-control-button">SPD</button>
+                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size" data-tour-id="brush-tool-button">BRS</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options">NEW</button> 
-                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex">HEX</button>
+                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" data-tour-id="new-rules-button">NEW</button> 
+                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" data-tour-id="set-ruleset-button">HEX</button>
                 <button id="libraryButton" class="toolbar-button" title="Content Library">LIB</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds">R/C</button>
+                <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" data-tour-id="reset-clear-button">R/C</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel">EDT</button> 
-                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel">SET</button> 
-                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel">ANL</button>
-                <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel">RNK</button>
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" data-tour-id="edit-rule-button">EDT</button> 
+                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" data-tour-id="setup-panel-button">SET</button> 
+                <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" data-tour-id="analysis-panel-button">ANL</button>
+                <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" data-tour-id="rank-panel-button">RNK</button>
                 <div class="toolbar-separator" role="separator"></div>
 
-                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State">SAV</button>
-                <button id="loadStateButton" class="toolbar-button" title="Load World State">LOD</button>
-                <button id="shareButton" class="toolbar-button" title="Share Setup">SHR</button>
+                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">SAV</button>
+                <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">LOD</button>
+                <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">SHR</button>
                 <button id="helpButton" class="toolbar-button" title="Help">HLP</button>
             </div>
-            <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display"></canvas>
+            <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas"></canvas>
         </div>
 
-        <div id="speedPopout" class="popout-panel hidden">
+        <div id="speedPopout" class="popout-panel hidden" data-tour-id="speed-popout">
             <label for="speedSliderPopout">Speed:</label>
             <div id="speedSliderMountPopout"></div>
         </div>
-        <div id="brushPopout" class="popout-panel hidden">
+        <div id="brushPopout" class="popout-panel hidden" data-tour-id="brush-popout">
             <label for="brushSliderPopout">Brush Size:</label>
             <div id="neighborhoodSizeSliderMountPopout"></div>
         </div>
-        <div id="newRulesPopout" class="popout-panel hidden">
+        <div id="newRulesPopout" class="popout-panel hidden" data-tour-id="new-rules-popout">
             <h4>Generate New Ruleset</h4>
             <div class="form-group">
                 <label>Mode:</label>
@@ -156,19 +156,19 @@
                 <input type="checkbox" id="resetOnNewRuleCheckboxPopout" class="checkbox-input" checked>
                 <label for="resetOnNewRuleCheckboxPopout" class="checkbox-label">Auto-Reset World(s)</label>
             </div>
-            <button id="generateRulesetFromPopoutButton" class="button">Generate</button>
+            <button id="generateRulesetFromPopoutButton" class="button" data-tour-id="generate-ruleset-button">Generate</button>
         </div>
-        <div id="setHexPopout" class="popout-panel hidden">
+        <div id="setHexPopout" class="popout-panel hidden" data-tour-id="set-hex-popout">
             <h4>Set/Copy Ruleset Hex</h4>
             <div class="form-group">
                 <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
             <div class="form-group-buttons">
-                <button id="setRuleFromPopoutButton" class="button">Set</button>
+                <button id="setRuleFromPopoutButton" class="button" data-tour-id="set-rule-from-popout-button">Set</button>
                 <button id="copyRuleFromPopoutButton" class="button">Copy Current</button>
             </div>
         </div>
-        <div id="resetClearPopout" class="popout-panel hidden">
+        <div id="resetClearPopout" class="popout-panel hidden" data-tour-id="reset-clear-popout">
             <h4>Reset / Clear</h4>
             <button id="resetCurrentButtonPopout" class="button">Reset Selected</button>
             <button id="resetAllButtonPopout" class="button">Reset All</button>
@@ -198,7 +198,7 @@
             </div>
         </div>
 
-        <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true">
+        <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true" data-tour-id="ruleset-editor-panel">
             <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rulesetEditorTitle">Ruleset Editor</h3>
             <div class="editor-controls">
@@ -251,7 +251,7 @@
             </div>
         </div>
 
-        <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true">
+        <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true" data-tour-id="setup-panel">
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="setupPanelTitle">World Setup</h3>
             <div class="panel-content-area">
@@ -266,7 +266,7 @@
             </div>
         </div>
 
-        <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" aria-modal="true">
+        <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" aria-modal="true" data-tour-id="analysis-panel">
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="analysisPanelTitle">Analysis Tools</h3>
             <div class="panel-content-area">
@@ -275,7 +275,7 @@
             </div>
         </div>
 
-        <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" aria-modal="true">
+        <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" aria-modal="true" data-tour-id="rule-rank-panel">
             <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rankPanelTitle">Rule Usage Ranking</h3>
             <div id="ruleRankContent" class="panel-content-area">

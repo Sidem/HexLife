@@ -20,6 +20,8 @@ let currentSpeedTarget = Config.DEFAULT_SPEED;
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
 let ruleUsageCounters = null;
+let lastStatsUpdateTime = 0;
+const STATS_UPDATE_THROTTLE_MS = Config.STATS_UPDATE_THROTTLE_MS;
 
 let ratioHistory = [];
 let entropyHistory = [];
@@ -267,7 +269,8 @@ function runTick() {
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
 
-    if (!stateHistoryChecksums.has(newStateChecksum)) {
+    if (stateHistoryChecksums.has(newStateChecksum)) {
+    } else {
         stateHistoryChecksums.add(newStateChecksum);
         stateChecksumQueue.push(newStateChecksum);
         if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) { 
@@ -313,10 +316,17 @@ function runTick() {
             }
         }
     }
+    
+    const now = performance.now();
+    const shouldSendThrottledUpdate = now - lastStatsUpdateTime > STATS_UPDATE_THROTTLE_MS;
 
-    if (simulationPerformedUpdate || commandInducedUpdate) { 
+    if (commandInducedUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) { 
         lastSentChecksum = calculateChecksum(jsStateArray);
         sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, commandInducedUpdate || simulationPerformedUpdate);
+        
+        if (simulationPerformedUpdate) {
+            lastStatsUpdateTime = now;
+        }
     }
 }
 

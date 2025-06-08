@@ -20,17 +20,15 @@ uniform float u_hexSize;
 uniform vec2 u_pan;
 uniform float u_zoom;
 void main() {
-  v_localPos = a_position * u_hexSize;
-  vec2 pos = v_localPos + a_instance_offset;
+  vec2 pos = (a_position * u_hexSize) + a_instance_offset;
   vec2 transformedPos = (pos - u_pan) * u_zoom + (u_resolution / 2.0);
   vec2 zeroToOne = transformedPos / u_resolution;
   vec2 zeroToTwo = zeroToOne * 2.0;
   vec2 clipSpace = zeroToTwo - 1.0;
-
   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
 
   v_state = a_instance_state;
   v_hover_state = a_instance_hover_state;
   v_rule_index = a_instance_rule_index; 
-  v_ghost_state = a_instance_ghost_state; /* NEW */
+  v_ghost_state = a_instance_ghost_state;
 }
