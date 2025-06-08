@@ -110,7 +110,8 @@ function setHoverStateLogic(hoverAffectedIndicesSet) {
 }
 
 function processCommandQueue() {
-    let needsStateUpdate = false;
+    let needsGridUpdate = false;
+    let needsVisualUpdate = false;
     let rulesetChangedInQueue = false;
     let activeCount = 0;
 
@@ -119,7 +120,7 @@ function processCommandQueue() {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
-                needsStateUpdate = true;
+                needsGridUpdate = true; // Ruleset change affects the grid
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
@@ -159,7 +160,7 @@ function processCommandQueue() {
                 stateHistoryChecksums.clear();
                 stateChecksumQueue = [];
                 lastSentChecksum = null;
-                needsStateUpdate = true;
+                needsGridUpdate = true;
                 break;
             case 'APPLY_BRUSH':
             case 'APPLY_SELECTIVE_BRUSH':
@@ -175,18 +176,18 @@ function processCommandQueue() {
                     stateHistoryChecksums.clear();
                     stateChecksumQueue = [];
                     lastSentChecksum = null;
-                    needsStateUpdate = true;
+                    needsGridUpdate = true;
                 }
                 break;
             case 'SET_HOVER_STATE':
                 if (setHoverStateLogic(command.data.hoverAffectedIndices)) {
-                    needsStateUpdate = true;
+                    needsVisualUpdate = true; // This is a visual-only update
                 }
                 break;
             case 'CLEAR_HOVER_STATE':
                 if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
                     jsHoverStateArray.fill(0);
-                    needsStateUpdate = true;
+                    needsVisualUpdate = true; // This is a visual-only update
                 }
                 break;
             case 'SET_ENABLED':
@@ -197,10 +198,10 @@ function processCommandQueue() {
                     stateHistoryChecksums.clear();
                     stateChecksumQueue = [];
                     lastSentChecksum = null;
-                    needsStateUpdate = true;
+                    needsGridUpdate = true;
                 } else if (isEnabled && jsStateArray) {
                     lastSentChecksum = null;
-                    needsStateUpdate = true;
+                    needsGridUpdate = true;
                 }
                 break;
             case 'LOAD_STATE':
@@ -219,23 +220,24 @@ function processCommandQueue() {
                 stateHistoryChecksums.clear();
                 stateChecksumQueue = [];
                 lastSentChecksum = null;
-                needsStateUpdate = true;
+                needsGridUpdate = true;
                 rulesetChangedInQueue = true;
                 break;
         }
     }
     commandQueue = [];
-    return { needsStateUpdate, rulesetChangedInQueue };
+    // Return a more detailed object instead of a single boolean
+    return { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue };
 }
 
 function runTick() {
-    const { needsStateUpdate: commandInducedUpdate, rulesetChangedInQueue } = processCommandQueue();
+    const { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue } = processCommandQueue();
     let simulationPerformedUpdate = false; 
 
     if (!isEnabled || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) { 
-        if (commandInducedUpdate) { 
+        if (needsGridUpdate || needsVisualUpdate) { 
             const currentGridChecksum = calculateChecksum(jsStateArray);
-            if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || commandInducedUpdate) { 
+            if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || needsGridUpdate || needsVisualUpdate) { 
                 lastSentChecksum = currentGridChecksum; 
                 sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, true); 
             }
@@ -244,7 +246,7 @@ function runTick() {
     }
 
     if (!isRunning) { 
-        if (commandInducedUpdate) { 
+        if (needsGridUpdate || needsVisualUpdate) { 
             sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, false);
         }
         return;
@@ -320,13 +322,26 @@ function runTick() {
     const now = performance.now();
     const shouldSendThrottledUpdate = now - lastStatsUpdateTime > STATS_UPDATE_THROTTLE_MS;
 
-    if (commandInducedUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) { 
+    // IMPORTANT: This is the key change. We only bypass the throttle for grid updates.
+    if (needsGridUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) { 
         lastSentChecksum = calculateChecksum(jsStateArray);
-        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, commandInducedUpdate || simulationPerformedUpdate);
+        sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, needsGridUpdate || simulationPerformedUpdate);
         
         if (simulationPerformedUpdate) {
             lastStatsUpdateTime = now;
         }
+    } else if (needsVisualUpdate) {
+        // For visual-only updates (like hover), send only the state data, not stats.
+        // This prevents the main thread from thinking a tick has occurred.
+        const statePayload = {
+            type: 'STATE_UPDATE',
+            worldIndex: worldIndex,
+            stateBuffer: jsStateArray.buffer.slice(0),
+            ruleIndexBuffer: jsRuleIndexArray.buffer.slice(0),
+            hoverStateBuffer: jsHoverStateArray.buffer.slice(0),
+        };
+        const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer, statePayload.hoverStateBuffer];
+        self.postMessage(statePayload, transferListState);
     }
 }
 

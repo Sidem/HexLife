@@ -102,6 +102,7 @@ export function initUI(worldManagerInterface, libraryData) {
         mutationRateSliderMount: document.getElementById('mutationRateSliderMount'),
         mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
         triggerMutationButton: document.getElementById('triggerMutationButton'),
+        cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
         resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
         generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
         rulesetInputPopout: document.getElementById('rulesetInputPopout'),
@@ -318,6 +319,12 @@ function _initPopoutControls() {
         const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
         
         EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope });
+        // popoutPanels.mutate.hide(); // THIS LINE IS REMOVED
+    });
+
+    uiElements.cloneAndMutateButton.addEventListener('click', () => {
+        const mutationRate = sliderComponents.mutationRateSlider.getValue();
+        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate });
         popoutPanels.mutate.hide();
     });
     
@@ -568,6 +575,11 @@ function handleGlobalKeyDown(event) {
 
     const keyMap = {
         'P': () => uiElements.playPauseButton?.click(),
+        'M': () => {
+            const mutationRate = sliderComponents.mutationRateSlider.getValue();
+            const scope = uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
+            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope });
+        },
         'N': () => { closeAllPopouts(); popoutPanels.newRules?.toggle(); },
         'E': () => { closeAllPopouts(); rulesetEditorComponent?.toggle(); },
         'S': () => { closeAllPopouts(); setupPanelComponent?.toggle(); },

@@ -35,7 +35,7 @@ export const HOVER_INACTIVE_LIGHTEN_FACTOR = 1.5;
 export const BACKGROUND_COLOR = [0.10, 0.10, 0.10, 1.0];
 export const SELECTION_OUTLINE_COLOR = [1.0, 1.0, 0.0, 0.9];
 export const DISABLED_WORLD_OVERLAY_COLOR = [0.25, 0.25, 0.25, 1.0];
-export const STATS_UPDATE_THROTTLE_MS = 50;
+export const STATS_UPDATE_THROTTLE_MS = 4;
 
 
 export const NEIGHBOR_DIRS_ODD_R = [ 

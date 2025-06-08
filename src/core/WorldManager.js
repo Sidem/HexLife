@@ -148,6 +148,10 @@ export class WorldManager {
             this._mutateRulesetForScope(data.scope, data.mutationRate);
         });
 
+        EventBus.subscribe(EVENTS.COMMAND_CLONE_AND_MUTATE, (data) => {
+            this._cloneAndMutateOthers(data.mutationRate);
+        });
+
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
                 const rules = hexToRuleset(currentRulesetHex);
@@ -403,6 +407,55 @@ export class WorldManager {
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     };
+
+    _cloneAndMutateOthers = (mutationRate) => {
+        const selectedProxy = this.worlds[this.selectedWorldIndex];
+        if (!selectedProxy || !selectedProxy.latestStateArray) {
+            console.error("Cannot clone: selected world's state is not available.");
+            alert("Selected world's state is not ready. Please wait a moment and try again.");
+            return;
+        }
+
+        const sourceStateBuffer = selectedProxy.latestStateArray.buffer.slice(0);
+        const sourceRulesetHex = this.getCurrentRulesetHex();
+        const sourceTick = selectedProxy.getLatestStats().tick || 0;
+
+        if (sourceRulesetHex === "Error" || sourceRulesetHex === "N/A") {
+             console.error("Cannot clone: selected world's ruleset is invalid.");
+             alert("Selected world has an invalid ruleset and cannot be cloned.");
+             return;
+        }
+
+        this.worlds.forEach((proxy, idx) => {
+            if (idx === this.selectedWorldIndex) return; // Skip the selected world
+
+            // 1. Generate a new, uniquely mutated ruleset for this world
+            const newMutatedHex = mutateRulesetHex(sourceRulesetHex, mutationRate);
+            const newMutatedRuleset = hexToRuleset(newMutatedHex);
+
+            // 2. Prepare the payload for the LOAD_STATE command
+            const payload = {
+                newStateBuffer: sourceStateBuffer.slice(0), // Use slice to copy for each worker
+                newRulesetBuffer: newMutatedRuleset.buffer.slice(0),
+                worldTick: sourceTick
+            };
+
+            // 3. Send the command to the worker to load the state and ruleset
+            proxy.sendCommand('LOAD_STATE', payload, [payload.newStateBuffer, payload.newRulesetBuffer]);
+            
+            // 4. Update the manager's internal settings cache for this world
+            if (this.worldSettings[idx]) {
+                this.worldSettings[idx].rulesetHex = newMutatedHex;
+                this.worldSettings[idx].enabled = true; // Ensure the world is enabled
+                proxy.setEnabled(true); // Also enable it in the proxy
+            }
+        });
+
+        // Save the updated settings and notify the UI
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // Force a full UI refresh
+    }
 
     _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {
         const indices = this._getAffectedWorldIndices(scope);
