@@ -1,0 +1,40 @@
+#app-container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+#main-content-area {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+canvas#hexGridCanvas {
+    display: block;
+    flex-grow: 1;
+    background-color: #181818;
+    min-width: 0;
+    touch-action: none; /* Changed from manipulation to none for better pan/zoom control */
+}
+
+canvas#hexGridCanvas.placing-pattern-cursor {
+    cursor: crosshair;
+}
+
+/* MOBILE LAYOUT OVERRIDE - To be expanded in mobile-first refactoring */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+    #main-content-area {
+        flex-direction: column;
+        padding-bottom: 10px;
+    }
+
+    canvas#hexGridCanvas {
+        margin-bottom: 10px;
+    }
+}

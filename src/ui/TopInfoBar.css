@@ -1,0 +1,183 @@
+#top-info-bar {
+    height: 2.5rem;
+    line-height: 2.5rem;
+    background-color: #2a2a2a;
+    border-bottom: 1px solid #444;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    flex-shrink: 0;
+    font-size: 0.85em;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top);
+}
+
+#appTitleContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+#appLogo {
+    font-size: 2.0rem;
+    color: #FFFF00;
+    text-shadow: 0 0 3px rgba(255, 255, 0, 0.3);
+    font-weight: bolder;
+}
+
+#appTitle {
+    font-size: 1em;
+    color: #f0f0f0;
+    white-space: nowrap;
+}
+
+#githubLink {
+    margin-left: 10px;
+    color: #ccc;
+    text-decoration: none;
+    font-size:0.9em;
+}
+
+#githubLink svg {
+    vertical-align: middle;
+}
+
+#rulesetDisplayContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #3c3c3c;
+    border-radius: 4px;
+    padding: 0 5px;
+    border: 1px solid #555;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+#rulesetDisplay {
+    font-family: monospace;
+    font-size: 0.9rem;
+    padding: 4px 5px;
+    background-color: transparent;
+    border: none;
+    font-weight: bold;
+}
+
+.ruleset-history-controls .button-icon {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.4em;
+    cursor: pointer;
+    padding: 0 5px;
+    border-radius: 3px;
+    line-height: 1;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.ruleset-history-controls .button-icon:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.ruleset-history-controls .button-icon:disabled {
+    color: #666;
+    cursor: not-allowed;
+}
+
+#statsDisplayContainer {
+    display: flex;
+    gap: 15px;
+}
+
+#statsDisplayContainer > span {
+    min-width: 60px;
+    white-space: nowrap;
+    display: inline-block;
+    text-align: left;
+}
+
+/* Fixed widths for each stat to prevent layout shifts */
+#statsDisplayContainer > span:nth-child(1) { /* Tick */
+    width: 80px;
+}
+#statsDisplayContainer > span:nth-child(2) { /* Ratio */
+    width: 85px;
+}
+#statsDisplayContainer > span:nth-child(3) { /* Brush */
+    width: 65px;
+}
+#statsDisplayContainer > span:nth-child(4) { /* FPS */
+    width: 65px;
+}
+#statsDisplayContainer > span:nth-child(5) { /* TPS */
+    width: 90px;
+}
+
+#statsDisplayContainer span span {
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+/* Mobile Overrides */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
+    #top-info-bar { 
+        padding: 0 10px; 
+        font-size: 0.8em; 
+        height: 30px; 
+    }
+    #statsDisplayContainer { 
+        gap: 8px; 
+    }
+    #appTitle { 
+        font-size: 0.9em; 
+    }
+    #appLogo { 
+        font-size: 1.1em; 
+    }
+}
+
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+    #top-info-bar {
+        flex-direction: column;
+        height: auto;
+        line-height: 1.3;
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    
+    #appTitleContainer {
+        justify-content: center;
+        order: 1;
+    }
+    
+    #rulesetDisplayContainer {
+        order: 2;
+        text-align: center;
+    }
+    
+    #statsDisplayContainer {
+        order: 3;
+        justify-content: center;
+        gap: 4px;
+    }
+    
+    #statsDisplayContainer > span {
+        min-width: auto;
+        font-size: 0.75em;
+    }
+
+    #appTitle { display: inline; }
+    
+    #githubLink {
+        font-size: 0.9em !important;
+    }
+    
+    #githubLink svg {
+        width: 16px;
+        height: 16px;
+    }
+}

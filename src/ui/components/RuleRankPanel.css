@@ -1,0 +1,154 @@
+#ruleRankPanel {
+    width: 600px;
+    max-height: 70vh;
+}
+#ruleRankPanel .panel-content-area {
+    padding: 0;
+}
+
+#ruleRankContent .empty-state-text {
+    text-align: center;
+    color: #888;
+    padding-top: 20px;
+    font-style: italic;
+}
+
+.dual-rank-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+    height: 100%;
+}
+
+.rank-column {
+    flex: 1;
+    min-width: 0;
+    background-color: rgba(0,0,0,0.2);
+    border: 1px solid #333;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.rank-column-header {
+    font-weight: bold;
+    text-align: center;
+    padding: 8px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid #444;
+    font-size: 0.9em;
+    color: #ddd;
+    flex-shrink: 0;
+}
+
+.rank-list-content {
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.rank-list-header, .rank-list-item {
+    display: grid;
+    grid-template-columns: 50px 1fr 120px;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+    font-size: 0.9em;
+    position: relative;
+}
+
+.rank-list-header {
+    font-weight: bold;
+    color: #ccc;
+    background-color: rgba(40, 40, 40, 0.95);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.rank-list-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.rank-list-item .rank-list-rank {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #aaa;
+    text-align: center;
+    z-index: 1;
+}
+
+.rank-list-item .rank-list-viz-container {
+    z-index: 1;
+}
+
+.rank-list-item .rank-list-viz {
+    transform: scale(0.45) translate(-10px, 0px);
+    margin: -30px 0;
+}
+
+.rank-list-item .rank-list-usage {
+    font-family: monospace;
+    text-align: right;
+    font-weight: bold;
+    font-size: 0.9em;
+    z-index: 1;
+}
+
+.rank-list-item .usage-percent {
+    font-size: 1.1em;
+    color: #fff;
+}
+
+.rank-list-item .usage-count {
+    font-size: 0.8em;
+    color: #aaa;
+    margin-top: 2px;
+}
+
+.usage-background-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    transition: width 0.3s ease-out;
+}
+
+#activation-rank .usage-background-bar {
+    background-color: rgba(59, 130, 246, 0.25); /* Blueish */
+}
+
+#deactivation-rank .usage-background-bar {
+    background-color: rgba(239, 68, 68, 0.25); /* Reddish */
+}
+
+
+/* Mobile Overrides */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
+    #ruleRankPanel {
+        width: clamp(300px, 85vw, 400px);
+        max-height: 80vh;
+    }
+    
+    .rank-list-header, .rank-list-item {
+        grid-template-columns: 40px 1fr 100px;
+        padding: 6px 8px;
+        font-size: 0.85em;
+    }
+}
+
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+    #ruleRankPanel {
+        width: 100%;
+        max-height: 100vh;
+    }
+    
+    .rank-list-header, .rank-list-item {
+        grid-template-columns: 35px 1fr 90px;
+        padding: 5px 6px;
+        font-size: 0.8em;
+    }
+}

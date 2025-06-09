@@ -1,0 +1,126 @@
+.slider-component-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.slider-component-container label {
+    margin-right: 3px;
+    user-select: none;
+    font-size: 0.9em;
+}
+
+.slider-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+}
+
+.slider-component-container input[type="range"] {
+    vertical-align: middle;
+    min-width: 100px;
+    width: 100%;
+    color: #2b2d42;
+    --track-color: rgba(0, 0, 0, 0.4);
+    --brightness-hover: 180%;
+    --brightness-down: 80%;
+    --thumb-height: 2.1rem;
+    --thumb-width: 1px;
+    --clip-edges: 0.0125em;
+    position: relative;
+    background: #fff0;
+    overflow: hidden;
+}
+
+.slider-wrapper span.value-display {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #FFFFFF;
+    font-size: 0.8rem;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+    z-index: 2;
+    text-shadow: 0px 0px 3px rgba(0,0,0,0.9);
+    padding: 1px 3px;
+    white-space: nowrap;
+}
+
+.slider-component-container span.unit-display {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-left: 2px;
+    user-select: none;
+}
+
+/* WebKit Range Styles */
+.slider-component-container input[type="range"]:active {
+    cursor: grabbing;
+}
+
+.slider-component-container input[type="range"]:disabled {
+    filter: grayscale(1);
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.slider-component-container input[type="range"],
+.slider-component-container input[type="range"]::-webkit-slider-runnable-track,
+.slider-component-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    transition: all ease 100ms;
+    height: var(--thumb-height);
+}
+
+.slider-component-container input[type="range"]::-webkit-slider-runnable-track,
+.slider-component-container input[type="range"]::-webkit-slider-thumb {
+    position: relative;
+}
+
+.slider-component-container input[type="range"]::-webkit-slider-thumb {
+    --thumb-radius: calc((var(--thumb-height) * 0.5) - 1px);
+    --clip-top: calc((var(--thumb-height) - var(--track-height, 0.5rem)) * 0.5 - 0.5px);
+    --clip-bottom: calc(var(--thumb-height) - var(--clip-top));
+    --clip-further: calc(100% + 1px);
+    --box-fill: calc(-100vmax - var(--thumb-width, var(--thumb-height))) 0 0 100vmax currentColor;
+
+    width: var(--thumb-width, var(--thumb-height));
+    background: linear-gradient(currentColor 0 0) scroll no-repeat left center / 50% calc(var(--track-height, 0.5rem) + 1px);
+    background-color: currentColor;
+    box-shadow: var(--box-fill);
+    border-radius: var(--thumb-width, var(--thumb-height));
+    filter: brightness(100%);
+    clip-path: polygon(
+        100% -1px, var(--clip-edges) -1px, 0 var(--clip-top),
+        -100vmax var(--clip-top), -100vmax var(--clip-bottom),
+        0 var(--clip-bottom), var(--clip-edges) 100%,
+        var(--clip-further) var(--clip-further)
+    );
+}
+
+.slider-component-container input[type="range"]:hover::-webkit-slider-thumb {
+    filter: brightness(var(--brightness-hover));
+    cursor: grab;
+}
+
+.slider-component-container input[type="range"]:active::-webkit-slider-thumb {
+    filter: brightness(var(--brightness-down));
+    cursor: grabbing;
+}
+
+.slider-component-container input[type="range"]::-webkit-slider-runnable-track {
+    background: linear-gradient(var(--track-color) 0 0) scroll no-repeat center / 100% calc(var(--track-height, 0.5rem) + 1px);
+}
+
+.slider-component-container input[type="range"]:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+}
+
+/* iOS Font Size override for inputs */
+@supports (-webkit-overflow-scrolling: touch) {
+    input[type="range"] {
+        font-size: 16px !important;
+    }
+}

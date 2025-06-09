@@ -1,0 +1,195 @@
+.popout-panel {
+    position: absolute;
+    background-color: #383838cc;
+    border: 1px solid #555;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    padding: 15px;
+    min-width: 200px;
+    color: #e0e0e0;
+    z-index: 1010;
+}
+
+.popout-panel.hidden {
+    display: none !important;
+}
+
+.popout-panel h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 1em;
+    border-bottom: 1px solid #4f4f4f;
+    padding-bottom: 8px;
+    color: #f0f0f0;
+}
+
+.popout-panel .form-group {
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.popout-panel .form-group label:not(.checkbox-label):not(.radio-switch-label) {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 2px;
+}
+
+.popout-panel .form-group-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: flex-end;
+}
+
+.popout-panel .hex-input {
+    padding: 6px 8px;
+    border: 1px solid #555;
+    background-color: #2c2c2c;
+    color: white;
+    border-radius: 3px;
+    font-size: 0.9em;
+    font-family: monospace;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.popout-panel .popout-separator {
+    height: 1px;
+    background-color: #4f4f4f;
+    margin: 12px 0;
+}
+
+/* Radio Switch (used in popouts) */
+.radio-switch-input { display: none; }
+
+.three-way-switch {
+    display: inline-flex;
+    border-radius: 4px;
+}
+
+.radio-switch-label {
+    padding: 6px 10px; cursor: pointer; color: #ccc;
+    background-color: #4a4a4a; font-size: 0.85em; user-select: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    border-right: 1px solid #555;
+    -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.three-way-switch .radio-switch-label:last-of-type { border-right: none; }
+.radio-switch-input:checked + .radio-switch-label {
+    background-color: #0078d4; color: white; font-weight: bold;
+}
+.radio-switch-label:hover { background-color: #5a5a5a; }
+
+/* History Popout Specific */
+#historyPopout .history-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+}
+
+.history-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    border-bottom: 1px solid #4a4a4a;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-item:hover {
+    background-color: #0078d4;
+}
+
+.history-item.is-current {
+    font-weight: bold;
+    color: #f0c674;
+    background-color: rgba(40, 40, 40, 0.5);
+    cursor: default;
+}
+
+.history-item .tag {
+    font-size: 0.8em;
+    color: #999;
+    margin-left: 10px;
+}
+
+/* Library Popout Specific */
+.popout-tabs {
+    display: flex;
+    border-bottom: 1px solid #555;
+    margin: -15px -15px 10px -15px;
+}
+.tab-button {
+    flex: 1;
+    padding: 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 0.9em;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+.tab-button:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+.tab-button.active {
+    color: white;
+    font-weight: bold;
+    border-bottom-color: #0078d4;
+}
+.tab-content {
+    max-height: 40vh;
+    overflow-y: auto;
+}
+.library-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 5px;
+    border-bottom: 1px solid #4f4f4f;
+}
+.library-item:last-child {
+    border-bottom: none;
+}
+.library-item-info {
+    flex-grow: 1;
+}
+.library-item-name {
+    font-weight: bold;
+    color: #e0e0e0;
+}
+.library-item-desc {
+    font-size: 0.85em;
+    color: #b0b0b0;
+    margin-top: 2px;
+}
+.library-item .button {
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+/* Mobile Overrides */
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
+    .popout-panel { 
+        min-width: 200px;
+        padding: 10px;
+    }
+}
+@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+    .popout-panel {
+        left: 5% !important;
+        width: 90% !important;
+        max-width: 90vw;
+        box-sizing: border-box;
+    }
+}
