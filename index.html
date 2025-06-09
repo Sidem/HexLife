@@ -36,9 +36,9 @@
       "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
     }
     </script>
-    <link rel="preload" href="style.css?v=1.4" as="style">
+    <link rel="preload" href="style.css?v=1.5" as="style">
     <link rel="preload" href="src/main.js" as="script" crossorigin="">
-    <link rel="stylesheet" href="style.css?v=1.4">
+    <link rel="stylesheet" href="style.css?v=1.5">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
 </head>
@@ -132,7 +132,7 @@
             <div id="neighborhoodSizeSliderMountPopout"></div>
         </div>
         <div id="newRulesPopout" class="popout-panel hidden" data-tour-id="new-rules-popout">
-            <h4>Generate New Ruleset</h4>
+            <h4>Generate New Ruleset<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h4>
             <div class="form-group">
                 <label>Mode:</label>
                 <div id="generateModeSwitchPopout" class="three-way-switch">
@@ -166,8 +166,8 @@
             </div>
             <button id="generateRulesetFromPopoutButton" class="button" data-tour-id="generate-ruleset-button">Generate</button>
         </div>
-        <div id="mutatePopout" class="popout-panel hidden">
-            <h4>Mutate Ruleset</h4>
+        <div id="mutatePopout" class="popout-panel hidden" data-tour-id="mutatePopout">
+            <h4>Mutate Ruleset<button class="button-help-trigger" data-tour-name="mutation" title="Help with this feature">[?]</button></h4>
             <div class="form-group">
                 <label for="mutationRateSlider">Mutation Rate:</label>
                 <div id="mutationRateSliderMount"></div>
@@ -199,7 +199,7 @@
             </div>
         </div>
         <div id="setHexPopout" class="popout-panel hidden" data-tour-id="set-hex-popout">
-            <h4>Set/Copy Ruleset Hex</h4>
+            <h4>Set/Copy Ruleset Hex<button class="button-help-trigger" data-tour-name="directInput" title="Help with this feature">[?]</button></h4>
             <div class="form-group">
                 <input type="text" id="rulesetInputPopout" class="hex-input" placeholder="32 hex chars" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
@@ -209,14 +209,15 @@
             </div>
         </div>
         <div id="resetClearPopout" class="popout-panel hidden" data-tour-id="reset-clear-popout">
-            <h4>Reset / Clear</h4>
+            <h4>Reset / Clear<button class="button-help-trigger" data-tour-name="resetClear" title="Help with this feature">[?]</button></h4>
             <button id="resetCurrentButtonPopout" class="button">Reset Selected</button>
             <button id="resetAllButtonPopout" class="button">Reset All</button>
             <div class="popout-separator"></div>
             <button id="clearCurrentButtonPopout" class="button">Clear Selected</button>
             <button id="clearAllButtonPopout" class="button">Clear All</button>
         </div>
-        <div id="libraryPopout" class="popout-panel hidden">
+        <div id="libraryPopout" class="popout-panel hidden" data-tour-id="libraryPopout">
+            <h4>Content Library<button class="button-help-trigger" data-tour-name="library" title="Help with this feature">[?]</button></h4>
             <div class="popout-tabs">
                 <button class="tab-button active" data-tab="rulesets">Rulesets</button>
                 <button class="tab-button" data-tab="patterns">Patterns</button>
@@ -228,7 +229,7 @@
         </div>
 
         <div id="sharePopout" class="popout-panel hidden">
-            <h4>Share Link</h4>
+            <h4>Share Link<button class="button-help-trigger" data-tour-name="saveLoad" title="Help with this feature">[?]</button></h4>
             <div class="form-group">
                 <label for="shareLinkInput">Your shareable link:</label>
                 <input type="text" id="shareLinkInput" class="hex-input" readonly>
@@ -239,14 +240,14 @@
         </div>
 
         <div id="historyPopout" class="popout-panel hidden">
-            <h4>Ruleset History</h4>
+            <h4>Ruleset History<button class="button-help-trigger" data-tour-name="history" title="Help with this feature">[?]</button></h4>
             <div id="historyList" class="history-list-container">
             </div>
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true" data-tour-id="ruleset-editor-panel">
             <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rulesetEditorTitle">Ruleset Editor</h3>
+            <h3 id="rulesetEditorTitle">Ruleset Editor<button class="button-help-trigger" data-tour-name="editor" title="Help with this feature">[?]</button></h3>
             <div class="editor-controls">
                 <input type="text" id="editorRulesetInput" class="editor-hex-input"
                     placeholder="32 hex chars (e.g., FFFFFF...000000)"
@@ -299,7 +300,7 @@
 
         <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true" data-tour-id="setup-panel">
             <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="setupPanelTitle">World Setup</h3>
+            <h3 id="setupPanelTitle">World Setup<button class="button-help-trigger" data-tour-name="setup" title="Help with this feature">[?]</button></h3>
             <div class="panel-content-area">
                 <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click
                     "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and
@@ -316,7 +317,7 @@
 
         <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" aria-modal="true" data-tour-id="analysis-panel">
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="analysisPanelTitle">Analysis Tools</h3>
+            <h3 id="analysisPanelTitle">Analysis Tools<button class="button-help-trigger" data-tour-name="analysis" title="Help with this feature">[?]</button></h3>
             <div class="panel-content-area">
                 <div class="plugins-mount-area">
                 </div>
@@ -325,7 +326,7 @@
 
         <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" aria-modal="true" data-tour-id="rule-rank-panel">
             <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rankPanelTitle">Rule Usage Ranking</h3>
+            <h3 id="rankPanelTitle">Rule Usage Ranking<button class="button-help-trigger" data-tour-name="ruleRank" title="Help with this feature">[?]</button></h3>
             <div id="ruleRankContent" class="panel-content-area">
             </div>
         </div>

@@ -1,11 +1,11 @@
 import * as Config from '../../core/config.js';
-import { BasePanel } from './BasePanel.js';
+import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js'; 
 
-export class SetupPanel extends BasePanel {
+export class SetupPanel extends PersistentDraggablePanel {
     constructor(panelElement, worldManagerInterface) { 
         super(panelElement, 'h3', 'setup');
 

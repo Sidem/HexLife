@@ -22,11 +22,6 @@ export class PopoutPanel extends BaseComponent {
         this.popoutElement.style.zIndex = '1050'; 
         this.hide(false); 
 
-        this._addDOMListener(this.triggerElement, 'click', (event) => {
-            event.stopPropagation();
-            this.toggle();
-        });
-
         if (this.options.closeOnOutsideClick) {
             this.boundHandleOutsideClick = this._handleOutsideClick.bind(this);
         }
@@ -48,11 +43,10 @@ export class PopoutPanel extends BaseComponent {
         if (!this.popoutElement || !this.triggerElement) return;
 
         const triggerRect = this.triggerElement.getBoundingClientRect();
-        const popoutRect = this.popoutElement.getBoundingClientRect(); 
-
-        let top, left;
-
         
+        // CHANGED: Renamed variables 'top' and 'left' to 'newTop' and 'newLeft' to avoid conflict with the global 'window.top' property.
+        let newTop, newLeft;
+
         const wasHidden = this.popoutElement.classList.contains('hidden');
         if (wasHidden) {
             this.popoutElement.style.visibility = 'hidden';
@@ -64,60 +58,58 @@ export class PopoutPanel extends BaseComponent {
             this.popoutElement.style.visibility = 'visible';
         }
 
-
         switch (this.options.position) {
             case 'bottom':
-                top = triggerRect.bottom + this.options.offset;
-                left = triggerRect.left;
+                newTop = triggerRect.bottom + this.options.offset;
+                newLeft = triggerRect.left;
                 if (this.options.alignment === 'center') {
-                    left += (triggerRect.width - actualPopoutRect.width) / 2;
+                    newLeft += (triggerRect.width - actualPopoutRect.width) / 2;
                 } else if (this.options.alignment === 'end') {
-                    left += triggerRect.width - actualPopoutRect.width;
+                    newLeft += triggerRect.width - actualPopoutRect.width;
                 }
                 break;
             case 'top':
-                top = triggerRect.top - actualPopoutRect.height - this.options.offset;
-                left = triggerRect.left;
+                newTop = triggerRect.top - actualPopoutRect.height - this.options.offset;
+                newLeft = triggerRect.left;
                  if (this.options.alignment === 'center') {
-                    left += (triggerRect.width - actualPopoutRect.width) / 2;
+                    newLeft += (triggerRect.width - actualPopoutRect.width) / 2;
                 } else if (this.options.alignment === 'end') {
-                    left += triggerRect.width - actualPopoutRect.width;
+                    newLeft += triggerRect.width - actualPopoutRect.width;
                 }
                 break;
             case 'left':
-                top = triggerRect.top;
-                left = triggerRect.left - actualPopoutRect.width - this.options.offset;
+                newTop = triggerRect.top;
+                newLeft = triggerRect.left - actualPopoutRect.width - this.options.offset;
                 if (this.options.alignment === 'center') {
-                    top += (triggerRect.height - actualPopoutRect.height) / 2;
+                    newTop += (triggerRect.height - actualPopoutRect.height) / 2;
                 } else if (this.options.alignment === 'end') {
-                    top += triggerRect.height - actualPopoutRect.height;
+                    newTop += triggerRect.height - actualPopoutRect.height;
                 }
                 break;
             case 'right':
             default:
-                top = triggerRect.top;
-                left = triggerRect.right + this.options.offset;
+                newTop = triggerRect.top;
+                newLeft = triggerRect.right + this.options.offset;
                  if (this.options.alignment === 'center') {
-                    top += (triggerRect.height - actualPopoutRect.height) / 2;
+                    newTop += (triggerRect.height - actualPopoutRect.height) / 2;
                 } else if (this.options.alignment === 'end') {
-                    top += triggerRect.height - actualPopoutRect.height;
+                    newTop += triggerRect.height - actualPopoutRect.height;
                 }
                 break;
         }
 
-        
-        if (left + actualPopoutRect.width > window.innerWidth) {
-            left = window.innerWidth - actualPopoutRect.width - this.options.offset;
+        if (newLeft + actualPopoutRect.width > window.innerWidth) {
+            newLeft = window.innerWidth - actualPopoutRect.width - this.options.offset;
         }
-        if (top + actualPopoutRect.height > window.innerHeight) {
-            top = window.innerHeight - actualPopoutRect.height - this.options.offset;
+        if (newTop + actualPopoutRect.height > window.innerHeight) {
+            newTop = window.innerHeight - actualPopoutRect.height - this.options.offset;
         }
-        if (left < 0) left = this.options.offset;
-        if (top < 0) top = this.options.offset;
+        if (newLeft < 0) newLeft = this.options.offset;
+        if (newTop < 0) newTop = this.options.offset;
 
-
-        this.popoutElement.style.top = `${top}px`;
-        this.popoutElement.style.left = `${left}px`;
+        // Apply the corrected variable names here
+        this.popoutElement.style.top = `${newTop}px`;
+        this.popoutElement.style.left = `${newLeft}px`;
     }
 
     show() {
@@ -126,7 +118,6 @@ export class PopoutPanel extends BaseComponent {
             this.popoutElement.classList.remove('hidden');
             this.triggerElement.classList.add('active');
             if (this.options.closeOnOutsideClick) {
-                
                 setTimeout(() => document.addEventListener('click', this.boundHandleOutsideClick), 0);
             }
             
@@ -148,7 +139,6 @@ export class PopoutPanel extends BaseComponent {
     toggle() {
         if (this.popoutElement) {
             if (this.popoutElement.classList.contains('hidden')) {
-                
                 const event = new CustomEvent('popoutinteraction', { bubbles: true, detail: { panel: this } });
                 this.triggerElement.dispatchEvent(event);
                 this.show();

@@ -1,9 +1,9 @@
-import { BasePanel } from './BasePanel.js';
+import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
-export class RulesetEditor extends BasePanel {
+export class RulesetEditor extends PersistentDraggablePanel {
     constructor(panelElement, worldManagerInterface) {
 
         super(panelElement, 'h3', 'ruleset');

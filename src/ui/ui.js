@@ -390,17 +390,94 @@ function _initPopoutControls() {
 function _setupToolbarButtonListeners() {
     uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
 
-    uiElements.editRuleButton?.addEventListener('click', () => rulesetEditorComponent?.toggle());
-    uiElements.setupPanelButton?.addEventListener('click', () => setupPanelComponent?.toggle());
-    uiElements.analysisPanelButton?.addEventListener('click', () => analysisPanelInstance?.toggle());
-    uiElements.rankPanelButton?.addEventListener('click', () => ruleRankPanelComponent?.toggle());
+    // --- Popout Buttons with Tour Triggers ---
+    uiElements.speedControlButton.addEventListener('click', () => {
+        popoutPanels.speed.toggle();
+        OnboardingManager.startTour('speedAndBrush');
+    });
 
-    uiElements.undoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() }));
-    uiElements.redoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() }));
+    uiElements.brushToolButton.addEventListener('click', () => {
+        popoutPanels.brush.toggle();
+        OnboardingManager.startTour('speedAndBrush');
+    });
 
-    uiElements.loadStateButton.addEventListener('click', () => { uiElements.fileInput.accept = ".txt,.json"; uiElements.fileInput.click(); });
-    uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
-    uiElements.shareButton.addEventListener('click', () => generateAndShowShareLink());
+    uiElements.newRulesButton.addEventListener('click', () => {
+        popoutPanels.newRules.toggle();
+        OnboardingManager.startTour('rulesetGeneration');
+    });
+
+    uiElements.mutateButton.addEventListener('click', () => {
+        popoutPanels.mutate.toggle();
+        OnboardingManager.startTour('mutation');
+    });
+
+    uiElements.setRulesetButton.addEventListener('click', () => {
+        popoutPanels.setHex.toggle();
+        OnboardingManager.startTour('directInput');
+    });
+
+    uiElements.libraryButton.addEventListener('click', () => {
+        popoutPanels.library.toggle();
+        OnboardingManager.startTour('library');
+    });
+
+    uiElements.resetClearButton.addEventListener('click', () => {
+        popoutPanels.resetClear.toggle();
+        OnboardingManager.startTour('resetClear');
+    });
+    
+    uiElements.shareButton.addEventListener('click', () => {
+        generateAndShowShareLink();
+        popoutPanels.share.toggle();
+    });
+
+    // --- Panel Buttons with Tour Triggers ---
+    uiElements.editRuleButton?.addEventListener('click', () => {
+        rulesetEditorComponent?.toggle();
+        OnboardingManager.startTour('editor');
+    });
+    
+    uiElements.setupPanelButton?.addEventListener('click', () => {
+        setupPanelComponent?.toggle();
+        OnboardingManager.startTour('setup');
+    });
+
+    uiElements.analysisPanelButton?.addEventListener('click', () => {
+        analysisPanelInstance?.toggle();
+        OnboardingManager.startTour('analysis');
+    });
+
+    uiElements.rankPanelButton?.addEventListener('click', () => {
+        ruleRankPanelComponent?.toggle();
+        OnboardingManager.startTour('ruleRank');
+    });
+
+    // --- History Buttons with Tour Triggers ---
+    const triggerHistoryTour = () => OnboardingManager.startTour('history');
+    uiElements.undoButton?.addEventListener('click', () => {
+        EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() });
+        triggerHistoryTour();
+    });
+    uiElements.redoButton?.addEventListener('click', () => {
+        EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: worldManagerInterfaceRef.getSelectedWorldIndex() });
+        triggerHistoryTour();
+    });
+    // The history popout itself is also a trigger
+    uiElements.historyButton?.addEventListener('click', () => {
+        popoutPanels.history.toggle();
+        triggerHistoryTour();
+    });
+
+    // --- State Buttons with Tour Triggers ---
+    uiElements.saveStateButton.addEventListener('click', () => {
+        EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
+        OnboardingManager.startTour('saveLoad');
+    });
+    uiElements.loadStateButton.addEventListener('click', () => {
+        uiElements.fileInput.accept = ".txt,.json";
+        uiElements.fileInput.click();
+        OnboardingManager.startTour('saveLoad');
+    });
 }
 
 function _setupStateListeners() {
@@ -867,6 +944,16 @@ function setupUIEventListeners() {
             // Update popout only if it's open to save performance
             if (popoutPanels.history && !popoutPanels.history.isHidden()) {
                 updateHistoryPopout();
+            }
+        }
+    });
+
+    document.body.addEventListener('click', (event) => {
+        if (event.target.matches('.button-help-trigger')) {
+            event.stopPropagation();
+            const tourName = event.target.dataset.tourName;
+            if (tourName) {
+                OnboardingManager.startTour(tourName, true);
             }
         }
     });

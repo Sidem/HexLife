@@ -1824,3 +1824,27 @@ body {
     flex-shrink: 0;
     margin-left: 10px;
 }
+
+/* Add this to the end of style.css */
+
+.button-help-trigger {
+    background: #555;
+    color: white;
+    border: 1px solid #777;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 8px;
+    vertical-align: middle;
+    line-height: 18px;
+    padding: 0;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.button-help-trigger:hover {
+    background: #0078d4;
+    transform: scale(1.1);
+}

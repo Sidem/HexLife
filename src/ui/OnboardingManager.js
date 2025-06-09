@@ -1,11 +1,14 @@
 import * as PersistenceService from '../services/PersistenceService.js';
-import { EventBus, EVENTS } from '../services/EventBus.js';
+import { EventBus } from '../services/EventBus.js';
 
-let tourSteps = [];
+let allTours = {};
+let activeTourSteps = [];
 let currentStepIndex = -1;
-let highlightedElement = null;
-let highlightedElementParentPanel = null;
+let currentTourName = null;
 let tourIsActive = false;
+let highlightedElement = null; // FIX: Declare here
+let highlightedElementParentPanel = null; // FIX: Declare here
+
 
 const ui = {
     overlay: document.getElementById('onboarding-overlay'),
@@ -35,26 +38,16 @@ function positionTooltip(targetElement) {
         right: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.right + margin, fits: function() { return this.left + tooltipRect.width < window.innerWidth; } },
         left: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.left - tooltipRect.width - margin, fits: function() { return this.left > 0; } }
     };
-    let bestPlacement = null;
-    for (const pos of ['bottom', 'top', 'right', 'left']) {
-        if (placements[pos].fits()) {
-            bestPlacement = placements[pos];
-            break;
-        }
-    }
-    if (bestPlacement) {
-        let { top, left } = bestPlacement;
-        if (left < margin) left = margin;
-        if (left + tooltipRect.width > window.innerWidth - margin) left = window.innerWidth - tooltipRect.width - margin;
-        if (top < margin) top = margin;
-        if (top + tooltipRect.height > window.innerHeight - margin) top = window.innerHeight - tooltipRect.height - margin;
-        ui.tooltip.style.top = `${top}px`;
-        ui.tooltip.style.left = `${left}px`;
-    } else {
-        ui.tooltip.style.top = '50%';
-        ui.tooltip.style.left = '50%';
-        ui.tooltip.style.transform = 'translate(-50%, -50%)';
-    }
+    let bestPlacement = Object.values(placements).find(p => p.fits()) || placements.bottom;
+    
+    let { top, left } = bestPlacement;
+    if (left < margin) left = margin;
+    if (left + tooltipRect.width > window.innerWidth - margin) left = window.innerWidth - tooltipRect.width - margin;
+    if (top < margin) top = margin;
+    if (top + tooltipRect.height > window.innerHeight - margin) top = window.innerHeight - tooltipRect.height - margin;
+    
+    ui.tooltip.style.top = `${top}px`;
+    ui.tooltip.style.left = `${left}px`;
 }
 
 function cleanupCurrentStep() {
@@ -71,37 +64,49 @@ function cleanupCurrentStep() {
     const newPrimaryBtn = ui.primaryBtn.cloneNode(true);
     ui.primaryBtn.parentNode.replaceChild(newPrimaryBtn, ui.primaryBtn);
     ui.primaryBtn = newPrimaryBtn;
+    currentTourName = null;
 }
 
 function showStep(stepIndex) {
-    if (stepIndex < 0 || stepIndex >= tourSteps.length) {
+    if (stepIndex < 0 || stepIndex >= activeTourSteps.length) {
         endTour();
         return;
     }
-    cleanupCurrentStep();
+
     currentStepIndex = stepIndex;
-    const step = tourSteps[stepIndex];
+    const step = activeTourSteps[stepIndex];
+
     if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
         step.onBeforeShow();
     }
+
     setTimeout(() => {
         const targetElement = document.querySelector(step.element);
         if (!targetElement) {
-            console.warn(`Onboarding element not found: ${step.element}`);
+            console.warn(`Onboarding element not found: ${step.element}. Skipping step.`);
             showStep(stepIndex + 1);
             return;
         }
+
+        if (highlightedElement) { // This is line 90 where the error occurred
+             highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
+        }
+        if (highlightedElementParentPanel) {
+             highlightedElementParentPanel.style.zIndex = '';
+        }
+
         const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
         if (parentPanel) {
             parentPanel.style.zIndex = '2001';
             highlightedElementParentPanel = parentPanel;
         }
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-        
+
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         highlightedElement = targetElement;
+        
         if (targetElement !== document.body) {
             highlightedElement.classList.add('onboarding-highlight');
-            if (['rulesetDisplay', 'rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) { // Use dataset for check
+             if (['rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) {
                  highlightedElement.classList.add('onboarding-highlight-no-filter');
             }
         }
@@ -111,37 +116,18 @@ function showStep(stepIndex) {
         
         ui.title.innerHTML = step.title || '';
         ui.content.innerHTML = step.content;
-        const progress = ((currentStepIndex + 1) / tourSteps.length) * 100;
+        const progress = ((currentStepIndex + 1) / activeTourSteps.length) * 100;
         ui.progressBar.style.width = `${progress}%`;
-
-        const copyButton = document.getElementById('onboarding-copy-ruleset');
-        if (copyButton && step.onboardingCopyText) { // Check for the new property
-            copyButton.addEventListener('click', () => {
-                navigator.clipboard.writeText(step.onboardingCopyText).then(() => { // Use the property
-                    copyButton.textContent = "Copied!";
-                    copyButton.disabled = true;
-                    setTimeout(() => {
-                        copyButton.textContent = "Copy Ruleset";
-                        copyButton.disabled = false;
-                    }, 2000);
-                }).catch(err => {
-                    console.error("Onboarding copy failed:", err);
-                    copyButton.textContent = "Copy Failed";
-                });
-            });
-        }
+        
         if (step.primaryAction && step.primaryAction.text) {
             ui.primaryBtn.textContent = step.primaryAction.text;
             ui.primaryBtn.style.display = 'inline-block';
         } else {
             ui.primaryBtn.style.display = 'none';
         }
+
         positionTooltip(targetElement);
-        if (step.advanceOn.type === 'click' && step.advanceOn.target === 'element') {
-            ui.overlay.classList.remove('interactive');
-        } else {
-            ui.overlay.classList.add('interactive');
-        }
+
         if (step.advanceOn.type === 'click') {
             const actionTarget = step.advanceOn.target === 'element' ? highlightedElement : ui.primaryBtn;
             actionTarget.addEventListener('click', () => showStep(currentStepIndex + 1), { once: true });
@@ -154,28 +140,33 @@ function showStep(stepIndex) {
     }, 100);
 }
 
-function defineTour(steps) {
-    tourSteps = steps;
+function defineTours(tourCollection) {
+    allTours = tourCollection;
 }
 
-function startTour() {
-    if (PersistenceService.loadUISetting('onboarding_complete', false)) {
-        return;
-    }
+function startTour(tourName, force = false) {
+    if (tourIsActive || !allTours[tourName]) return;
+    if (!force && PersistenceService.loadUISetting(`onboarding_complete_${tourName}`, false)) return;
+
+    currentTourName = tourName;
+    activeTourSteps = allTours[tourName];
     tourIsActive = true;
     showStep(0);
 }
 
 function endTour() {
+    if (!tourIsActive) return;
+    if (currentTourName) {
+        PersistenceService.saveUISetting(`onboarding_complete_${currentTourName}`, true);
+    }
     cleanupCurrentStep();
-    PersistenceService.saveUISetting('onboarding_complete', true);
     tourIsActive = false;
 }
 
 ui.secondaryBtn.addEventListener('click', endTour);
 
 export const OnboardingManager = {
-    defineTour,
+    defineTours,
     startTour,
     endTour,
     isActive: () => tourIsActive,

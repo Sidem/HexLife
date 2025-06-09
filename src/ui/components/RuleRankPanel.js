@@ -1,4 +1,4 @@
-import { BasePanel } from './BasePanel.js';
+import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
@@ -15,7 +15,7 @@ class ElementPool {
     }
 }
 
-export class RuleRankPanel extends BasePanel {
+export class RuleRankPanel extends PersistentDraggablePanel {
     constructor(panelElement, worldManagerInterface) {
         super(panelElement, 'h3', 'ruleRank');
 

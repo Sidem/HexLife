@@ -1,7 +1,7 @@
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
-export class BasePanel extends DraggablePanel {
+export class PersistentDraggablePanel extends DraggablePanel {
     constructor(panelElement, handleSelector, panelIdentifier) {
         super(panelElement, handleSelector);
         this.panelIdentifier = panelIdentifier;
@@ -58,4 +58,4 @@ export class BasePanel extends DraggablePanel {
         this._savePanelState();
         return isVisible;
     }
-} 
+}

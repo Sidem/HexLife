@@ -5,9 +5,9 @@ import * as CanvasLoader from './rendering/canvasLoader.js';
 import * as UI from './ui/ui.js';
 import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
-import { OnboardingManager } from './ui/OnboardingManager.js';
 import * as PersistenceService from './services/PersistenceService.js';
-import { tourSteps } from './ui/tourSteps.js'; 
+import { OnboardingManager } from './ui/OnboardingManager.js';
+import { tours } from './ui/tourSteps.js'; 
 
 let gl;
 let worldManager;
@@ -114,12 +114,11 @@ async function initialize() {
         console.error("UI initialization failed.");
         return;
     }
-    OnboardingManager.defineTour(tourSteps);
+    OnboardingManager.defineTours(tours);
 
     // Add a 'Help' button listener if you added one to the UI
     document.getElementById('helpButton').addEventListener('click', () => {
-        PersistenceService.saveUISetting('onboarding_complete', false);
-        OnboardingManager.startTour();
+        OnboardingManager.startTour('core', true);
     });
 
     // Dispatch initial events to sync UI with the starting state
@@ -178,7 +177,7 @@ function renderLoop(timestamp) {
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
-        OnboardingManager.startTour();
+        OnboardingManager.startTour('core');
     }
     
     Renderer.renderFrameOrLoader(
