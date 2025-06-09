@@ -13,9 +13,6 @@ uniform sampler2D u_colorLUT;
 
 out vec4 outColor;
 void main() {
-    // REMOVED: lut_x and lut_y calculations are no longer needed here.
-    
-    // CHANGED: Use the incoming v_lut_x and v_lut_y variables directly.
     vec3 base_color_rgb = texture(u_colorLUT, vec2(v_lut_x, v_lut_y)).rgb;
     
     if (v_hover_state == 1.0) {
