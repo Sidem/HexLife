@@ -29,8 +29,8 @@ export class PopoutPanel extends BaseComponent {
 
     _handleOutsideClick(event) {
         if (this.popoutElement && !this.popoutElement.classList.contains('hidden')) {
-            const onboardingTooltip = document.getElementById('onboarding-tooltip');
-            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && onboardingTooltip.contains(event.target)) {
+            let onboardingTooltip = document.getElementById('onboarding-tooltip');
+            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && (onboardingTooltip.contains(event.target) || event.target.id.includes("action"))) {
                 return;
             }
             if (!this.popoutElement.contains(event.target) && event.target !== this.triggerElement && !this.triggerElement.contains(event.target)) {
@@ -44,7 +44,6 @@ export class PopoutPanel extends BaseComponent {
 
         const triggerRect = this.triggerElement.getBoundingClientRect();
         
-        // CHANGED: Renamed variables 'top' and 'left' to 'newTop' and 'newLeft' to avoid conflict with the global 'window.top' property.
         let newTop, newLeft;
 
         const wasHidden = this.popoutElement.classList.contains('hidden');

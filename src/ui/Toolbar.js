@@ -43,6 +43,10 @@ export class Toolbar {
         };
         document.addEventListener('popoutinteraction', (event) => closeAll(event.detail.panel));
         const handleClickOutside = (event) => {
+            let onboardingTooltip = document.getElementById('onboarding-tooltip');
+            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && (onboardingTooltip.contains(event.target) || event.target.id.includes("action"))) {
+                return;
+            }
             if (!this.activePopouts.some(p => !p.isHidden())) return;
             if (OnboardingManager.isActive()) return;
 

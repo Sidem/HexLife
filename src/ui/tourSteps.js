@@ -78,7 +78,7 @@ const rulesetGenerationTour = [
         element: '[data-tour-id="new-rules-popout"]',
         title: 'The Genesis Chamber',
         content: "This is where you create entirely new laws of physics. Each mode generates a 128-bit 'ruleset'—the DNA for a universe.",
-        onBeforeShow: () => { hidePopouts(); showPopout('newRules'); },
+        onBeforeShow: () => { showPopout('newRules'); },
         primaryAction: { text: 'Tell Me About the Modes' },
         advanceOn: { type: 'click' }
     },
@@ -103,7 +103,7 @@ const mutationTour = [
         element: '[data-tour-id="mutatePopout"]',
         title: 'The DNA Splicer',
         content: "Evolution requires mutation. This tool introduces small, random changes to an existing ruleset. A low <span class=\"onboarding-highlight-text\">Mutation Rate</span> (1-5%) is often best for finding interesting variations.",
-        onBeforeShow: () => { hidePopouts(); showPopout('mutate'); },
+        onBeforeShow: () => { showPopout('mutate'); },
         primaryAction: { text: 'What About Cloning?' },
         advanceOn: { type: 'click' }
     },
@@ -121,7 +121,7 @@ const directInputTour = [
         element: '[data-tour-id="set-hex-popout"]',
         title: 'The Ruleset Archive',
         content: "Every ruleset can be encoded as a 32-character hex string. If another researcher gives you a code, you can input it here to replicate their findings. <span class=\"onboarding-highlight-text\">Try copying and pasting this code in the input field.</span> <code>01000109C0140044A2009A8023228048</code>",
-        onBeforeShow: () => { hidePopouts(); showPopout('setHex'); },
+        onBeforeShow: () => { showPopout('setHex'); },
         primaryAction: { text: 'Enter a Hex Code' },
         advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
     },
@@ -139,7 +139,7 @@ const libraryTour = [
         element: '[data-tour-id="libraryPopout"]',
         title: 'The Specimen Library',
         content: "We've cataloged some interesting specimens. The <span class=\"onboarding-highlight-text\">Rulesets</span> tab contains entire sets of universal laws, while the <span class=\"onboarding-highlight-text\">Patterns</span> tab contains specific starting configurations of cells.",
-        onBeforeShow: () => { hidePopouts(); showPopout('library'); },
+        onBeforeShow: () => { showPopout('library'); },
         primaryAction: { text: 'Got It' },
         advanceOn: { type: 'click' }
     },
@@ -181,7 +181,7 @@ const historyTour = [
         title: 'Viewing the Full Timeline',
         content: "Click the <span class=\"onboarding-highlight-text\">History (🕒)</span> button to open a list of all rulesets you've used. You can click any entry to instantly revert the world to that point in its history.",
         primaryAction: { text: 'Finish' },
-        onBeforeShow: () => { hidePopouts(); showPopout('history'); },
+        onBeforeShow: () => { showPopout('history'); },
         advanceOn: { type: 'click' }
     }
 ];
@@ -208,7 +208,7 @@ const resetClearTour = [
         element: '[data-tour-id="reset-clear-popout"]',
         title: 'Wiping the Slate Clean',
         content: "<span class=\"onboarding-highlight-text\">Reset</span> re-seeds a world with random cells. <span class=\"onboarding-highlight-text\">Clear</span> sets all cells to a single state (clicking again flips it). You can apply these to the selected world or all of them.",
-        onBeforeShow: () => { hidePopouts(); showPopout('resetClear'); },
+        onBeforeShow: () => { showPopout('resetClear'); },
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }
