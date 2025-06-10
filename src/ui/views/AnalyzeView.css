@@ -1,0 +1,85 @@
+#analyze-view {
+    background-color: #1e1e1e;
+    padding: 0;
+}
+
+.analyze-view-header {
+    display: flex;
+    justify-content: stretch;
+    background-color: #2a2a2a;
+    padding: 10px;
+    flex-shrink: 0;
+}
+
+.analyze-view-segment {
+    flex-grow: 1;
+    padding: 12px 5px;
+    font-size: 0.9em;
+    text-align: center;
+    background-color: #3a3a3a;
+    color: #ccc;
+    border: none;
+    border-right: 1px solid #555;
+}
+
+.analyze-view-segment:last-child {
+    border-right: none;
+}
+
+.analyze-view-segment.active {
+    background-color: #f0c674;
+    color: #1e1e1e;
+    font-weight: bold;
+}
+
+.analyze-view-content {
+    padding: 20px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.analyze-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Make canvas plots responsive */
+.analyze-pane .plugin-canvas {
+    width: 100%;
+    height: auto;
+    max-height: 150px;
+}
+
+/* Styles for the rule rank list */
+.mobile-rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-rank-item {
+    display: grid;
+    grid-template-columns: 20px 50px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    background-color: #2a2a2a;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.mobile-rank-item .rank {
+    font-weight: bold;
+    color: #888;
+}
+
+.mobile-rank-item .viz {
+    transform: scale(0.3) translate(-80px, -85px);
+    height: 35px; /* Contain the scaled element */
+}
+
+.mobile-rank-item .usage {
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.9em;
+}

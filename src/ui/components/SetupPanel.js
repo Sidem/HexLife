@@ -6,8 +6,8 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js'; 
 
 export class SetupPanel extends PersistentDraggablePanel {
-    constructor(panelElement, worldManagerInterface) { 
-        super(panelElement, 'h3', 'setup');
+    constructor(panelElement, worldManagerInterface, options = {}) { 
+        super(panelElement, 'h3', 'setup', options);
 
         if (!worldManagerInterface) {
             console.error('SetupPanel: worldManagerInterface is null.');

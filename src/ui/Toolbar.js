@@ -7,9 +7,10 @@ import { OnboardingManager } from './OnboardingManager.js';
 import { formatHexCode } from '../utils/utils.js';
 
 export class Toolbar {
-    constructor(worldManagerInterface, libraryData) {
+    constructor(worldManagerInterface, libraryData, isMobile = false) {
         this.worldManager = worldManagerInterface;
         this.libraryData = libraryData;
+        this.isMobile = isMobile;
         
         this.uiElements = null;
         this.sliderComponents = {};
@@ -20,13 +21,18 @@ export class Toolbar {
     init(uiElements) {
         this.uiElements = uiElements;
 
-        this._initPopoutPanels();
-        this._initPopoutControls();
-        this._populateLibraryPanel();
+        if (!this.isMobile) {
+            this._initPopoutPanels();
+            this._initPopoutControls();
+            this._populateLibraryPanel();
+            this._setupGlobalPopoutListeners();
+        }
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
-        this._loadAndApplyUISettings();
-        this._setupGlobalPopoutListeners();
+        
+        if (!this.isMobile) {
+            this._loadAndApplyUISettings();
+        }
     }
 
     _setupGlobalPopoutListeners() {

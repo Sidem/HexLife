@@ -4,9 +4,9 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditor extends PersistentDraggablePanel {
-    constructor(panelElement, worldManagerInterface) {
+    constructor(panelElement, worldManagerInterface, options = {}) {
 
-        super(panelElement, 'h3', 'ruleset');
+        super(panelElement, 'h3', 'ruleset', options);
 
         if (!worldManagerInterface) {
             console.error('RulesetEditor: worldManagerInterface is null.');
@@ -242,6 +242,9 @@ export class RulesetEditor extends PersistentDraggablePanel {
 
     refreshViews() {
         if (!this.worldManager || this.isHidden()) return;
+        if (!this.areGridsCreated) {
+            this._createAllGrids();
+        }
         const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex();
         if (this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;

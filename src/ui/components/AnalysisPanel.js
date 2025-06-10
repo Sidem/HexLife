@@ -8,9 +8,9 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 
 export class AnalysisPanel extends PersistentDraggablePanel {
-    constructor(panelElement, worldManagerInterface, uiManagerRef) {
+    constructor(panelElement, worldManagerInterface, uiManagerRef, options = {}) {
         
-        super(panelElement, 'h3', 'analysis');
+        super(panelElement, 'h3', 'analysis', options);
 
         if (!worldManagerInterface) {
             console.error('AnalysisPanel: worldManagerInterface is null.');

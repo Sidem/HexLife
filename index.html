@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="google-site-verification" content="61Y9kjxqcAt7TYpyxqaFIaPjGP3IktL46ohSLVOZY4c" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
         <title>HexLife Explorer - Interactive Hexagonal Cellular Automata</title>
     <meta name="description" content="Explore complex emergent behaviors with HexLife Explorer, an interactive web-based cellular automaton simulator on a hexagonal grid, powered by WebGL2 and Web Workers. Define custom rulesets and observe intricate patterns unfold in multiple concurrent simulations.">
     <meta property="og:type" content="website">
@@ -15,6 +15,7 @@
     <meta property="twitter:url" content="https://sidem.github.io/HexLife/">
     <meta property="twitter:title" content="HexLife Explorer - Interactive Hexagonal Cellular Automata">
     <meta property="twitter:description" content="Discover emergent complexity with HexLife Explorer, a WebGL2 & Web Worker powered cellular automaton on a hexagonal grid.">
+    <meta name="theme-color" content="#1e1e1e">
 
     <script type="application/ld+json">
     {
@@ -36,9 +37,9 @@
       "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
     }
     </script>
-    <link rel="preload" href="style.css?v=1.6" as="style">
+    <link rel="preload" href="style.css?v=1.7" as="style">
     <link rel="preload" href="src/main.js" as="script" crossorigin="">
-    <link rel="stylesheet" href="style.css?v=1.6">
+    <link rel="stylesheet" href="style.css?v=1.7">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
 </head>
@@ -120,7 +121,14 @@
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">SHR</button>
                 <button id="helpButton" class="toolbar-button" title="Help">HLP</button>
             </div>
-            <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas"></canvas>
+            <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">
+                <div id="mobile-canvas-controls" class="hidden">
+                    <button id="interaction-mode-toggle" class="button" title="Toggle Pan/Draw Mode">
+                        <span class="icon">🖐️</span>
+                        <span class="label">Pan</span>
+                    </button>
+                </div>
+            </canvas>
         </div>
 
         <div id="speedPopout" class="popout-panel hidden" data-tour-id="speed-popout">
@@ -330,7 +338,32 @@
             <div id="ruleRankContent" class="panel-content-area">
             </div>
         </div>
-
+        <div id="bottom-tab-bar" class="hidden">
+            <button class="tab-bar-button active" data-view="simulate" title="Simulation View">
+                <span class="icon">⬡</span>
+                <span class="label">Simulate</span>
+            </button>
+            <button class="tab-bar-button" data-view="rules" title="Ruleset Controls">
+                <span class="icon">🧬</span>
+                <span class="label">Rules</span>
+            </button>
+            <button class="tab-bar-button" data-view="editor" title="Ruleset Editor">
+                <span class="icon">📝</span>
+                <span class="label">Editor</span>
+            </button>
+            <button class="tab-bar-button" data-view="worlds" title="World Setup">
+                <span class="icon">🪐</span>
+                <span class="label">Worlds</span>
+            </button>
+            <button class="tab-bar-button" data-view="analyze" title="Analysis Tools">
+                <span class="icon">📊</span>
+                <span class="label">Analyze</span>
+            </button>
+            <button class="tab-bar-button" data-view="more" title="More Options">
+                <span class="icon">•••</span>
+                <span class="label">More</span>
+            </button>
+        </div>
     </div> 
     
     <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
@@ -362,7 +395,7 @@
             });
         }
     </script>
-    
+    <div id="mobile-views-container"></div>
     <script type="module" src="src/main.js"></script>
 </body>
 

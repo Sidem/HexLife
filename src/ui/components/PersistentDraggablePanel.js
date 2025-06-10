@@ -2,11 +2,13 @@ import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class PersistentDraggablePanel extends DraggablePanel {
-    constructor(panelElement, handleSelector, panelIdentifier) {
-        super(panelElement, handleSelector);
+    constructor(panelElement, handleSelector, panelIdentifier, options = {}) {
+        super(panelElement, handleSelector, options);
         this.panelIdentifier = panelIdentifier;
         this.onDragEnd = () => this._savePanelState();
-        this._loadPanelState();
+        if (!this.options.isMobile) {
+            this._loadPanelState();
+        }
     }
 
     _loadPanelState() {

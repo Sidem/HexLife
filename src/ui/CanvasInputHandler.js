@@ -1,43 +1,69 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { getLayoutCache } from '../rendering/renderer.js'; // Import getLayoutCache from renderer
+import { getLayoutCache } from '../rendering/renderer.js';
 import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoords, calculateHexSizeForTexture } from '../utils/utils.js';
 
 export class CanvasInputHandler {
-    constructor(canvas, worldManager) {
+    constructor(canvas, worldManager, isMobile = false) {
         this.canvas = canvas;
         this.worldManager = worldManager;
         this.gl = canvas.getContext('webgl2');
+        this.isMobile = isMobile;
 
-        // --- Mouse Input State ---
+        // --- Interaction State ---
+        this.interactionMode = 'pan'; // 'pan' or 'draw'
         this.isMouseDrawing = false;
-        this.justFinishedDrawing = false;
-        this.wasSimulationRunningBeforeStroke = false;
-        this.strokeAffectedCells = new Set();
-        this.lastDrawnCellIndex = null;
-        
-        // --- Panning State (Mouse & Touch) ---
         this.isPanning = false;
         this.lastPanX = 0;
         this.lastPanY = 0;
 
-        // --- Gesture Recognition State ---
-        this.gestureState = 'idle';
-        this.initialTouch = null;
-        this.lastTouchCenter = null;
-        this.lastTouchDistance = 0;
-        
-        this.TAP_THRESHOLD = 10;
+        // --- Stroke State for Drawing ---
+        this.justFinishedDrawing = false;
+        this.wasSimulationRunningBeforeStroke = false;
+        this.strokeAffectedCells = new Set();
+        this.lastDrawnCellIndex = null;
+
+        // --- Touch Gesture State ---
+        this.touchState = {
+            isDown: false,
+            isDragging: false,
+            gesture: 'none', // 'none', 'pan', 'draw', 'pinch'
+            startPoint: { x: 0, y: 0 },
+            lastPoint: { x: 0, y: 0 },
+            lastDistance: 0,
+            TAP_THRESHOLD: 10,
+        };
 
         // --- Pattern Placing State ---
         this.isPlacingPattern = false;
         this.patternToPlace = null;
 
         // --- UI Layout Cache ---
-        this.layoutCache = getLayoutCache(); // Replaced _calculateAndCacheLayout()
+        this.layoutCache = getLayoutCache();
 
         this._calculateGridBounds();
         this._setupListeners();
+    }
+
+    toggleInteractionMode() {
+        this.interactionMode = this.interactionMode === 'pan' ? 'draw' : 'pan';
+        console.log(`Interaction mode set to: ${this.interactionMode}`);
+        EventBus.dispatch(EVENTS.INTERACTION_MODE_CHANGED, this.interactionMode);
+
+        if (!this.isMobile) {
+            this.canvas.style.cursor = (this.interactionMode === 'draw') ? 'crosshair' : 'grab';
+        }
+    }
+
+    setInteractionMode(mode) {
+        if (mode !== 'pan' && mode !== 'draw') return;
+        this.interactionMode = mode;
+        console.log(`Interaction mode set to: ${this.interactionMode}`);
+
+        // Update cursor style for desktop if needed
+        if (!this.isMobile) {
+            this.canvas.style.cursor = (this.interactionMode === 'draw') ? 'crosshair' : 'grab';
+        }
     }
 
     _handleEscKey(event) {
@@ -49,9 +75,9 @@ export class CanvasInputHandler {
     enterPlacingMode(patternData) {
         if (this.isPlacingPattern) return;
         this.isPlacingPattern = true;
+        this.interactionMode = 'draw'; // Force draw mode
         this.patternToPlace = patternData.cells;
         this.canvas.classList.add('placing-pattern-cursor');
-        // NEW: Add listener for escape key to cancel
         this.boundHandleEsc = this._handleEscKey.bind(this);
         document.addEventListener('keydown', this.boundHandleEsc);
     }
@@ -71,7 +97,7 @@ export class CanvasInputHandler {
         const topRight = gridToPixelCoords(Config.GRID_COLS - 1, 0, hexSize);
         const bottomLeft = gridToPixelCoords(0, Config.GRID_ROWS - 1, hexSize);
         const bottomRight = gridToPixelCoords(Config.GRID_COLS - 1, Config.GRID_ROWS - 1, hexSize);
-        
+
         this.gridWorldBounds = {
             minX: topLeft.x - hexSize,
             maxX: topRight.x + hexSize,
@@ -86,7 +112,7 @@ export class CanvasInputHandler {
         const { RENDER_TEXTURE_SIZE } = Config;
         const viewWidth = RENDER_TEXTURE_SIZE / camera.zoom;
         const viewHeight = RENDER_TEXTURE_SIZE / camera.zoom;
-        
+
         const minX = this.gridWorldBounds.minX + viewWidth / 2;
         const maxX = this.gridWorldBounds.maxX - viewWidth / 2;
         const minY = this.gridWorldBounds.minY + viewHeight / 2;
@@ -97,37 +123,43 @@ export class CanvasInputHandler {
     }
 
     _setupListeners() {
-        // Mouse Listeners
-        this.canvas.addEventListener('click', this._handleCanvasClick.bind(this));
-        this.canvas.addEventListener('mousedown', this._handleCanvasMouseDown.bind(this));
-        this.canvas.addEventListener('mousemove', this._handleCanvasMouseMove.bind(this));
-        this.canvas.addEventListener('mouseup', this._handleCanvasMouseUp.bind(this));
-        this.canvas.addEventListener('mouseout', this._handleCanvasMouseOut.bind(this));
-        this.canvas.addEventListener('wheel', this._handleCanvasMouseWheel.bind(this), { passive: false });
+        // --- Mouse (Desktop) Listeners ---
+        this.canvas.addEventListener('mousedown', this._handleMouseDown.bind(this));
+        this.canvas.addEventListener('mousemove', this._handleMouseMove.bind(this));
+        this.canvas.addEventListener('mouseup', this._handleMouseUp.bind(this));
+        this.canvas.addEventListener('mouseout', this._handleMouseOut.bind(this));
+        this.canvas.addEventListener('wheel', this._handleMouseWheel.bind(this), { passive: false });
         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-        // Touch Listeners
+        // --- Touch (Mobile) Listeners ---
         this.canvas.addEventListener('touchstart', this._handleTouchStart.bind(this), { passive: false });
         this.canvas.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
         this.canvas.addEventListener('touchend', this._handleTouchEnd.bind(this), { passive: false });
         this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
-        
-        // Listen for placing mode command
+
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, () => this.toggleInteractionMode());
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.enterPlacingMode(data));
+        EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, () => {
+            console.log('Layout calculated event received. Updating input handler cache.');
+            this.handleResize();
+        });
     }
 
     _getCoordsFromPointerEvent(event) {
+        console.log('Pointer Event Triggered. Layout Cache:', JSON.parse(JSON.stringify(this.layoutCache)));
+        if (!this.layoutCache.selectedView) {
+            console.error('CRITICAL: layoutCache.selectedView is missing. Layout has not been calculated.');
+        }
         const camera = this.worldManager.getCurrentCameraState();
         if (!this.gl || !this.gl.canvas || !this.worldManager || !camera || !this.layoutCache.selectedView) {
             return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
         }
-        
+
         const rect = this.gl.canvas.getBoundingClientRect();
         const pointerX = event.clientX - rect.left;
         const pointerY = event.clientY - rect.top;
 
         const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
-        
+
         const currentSelectedWorldIdx = this.worldManager.getSelectedWorldIndex();
         if (pointerX >= selectedViewX && pointerX < selectedViewX + selectedViewWidth &&
             pointerY >= selectedViewY && pointerY < selectedViewY + selectedViewHeight) {
@@ -145,115 +177,33 @@ export class CanvasInputHandler {
             const miniY = gridContainerY + r_map * (miniMapH + miniMapSpacing);
             if (pointerX >= miniX && pointerX < miniX + miniMapW &&
                 pointerY >= miniY && pointerY < miniY + miniMapH) {
-                const texCoordX = (pointerX - miniX) / miniMapW;
-                const texCoordY = (pointerY - miniY) / miniMapH;
-                const defaultCamera = { x: Config.RENDER_TEXTURE_SIZE / 2, y: Config.RENDER_TEXTURE_SIZE / 2, zoom: 1.0 };
-                const { col, row } = textureCoordsToGridCoords(texCoordX, texCoordY, defaultCamera);
-                return { worldIndexAtCursor: i, col, row, viewType: 'mini', worldX: null, worldY: null };
+                //EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, i);
+                return { worldIndexAtCursor: i, col: null, row: null, viewType: 'mini', worldX: null, worldY: null };
             }
         }
         return { worldIndexAtCursor: null, col: null, row: null, viewType: null, worldX: null, worldY: null };
     }
 
-    _zoomAtPoint(zoomFactor, pivotClientX, pivotClientY) {
-        const camera = this.worldManager.getCurrentCameraState();
-        if (!camera) return;
-
-        const { worldX, worldY } = this._getCoordsFromPointerEvent({ clientX: pivotClientX, clientY: pivotClientY });
-        if (worldX === null) return;
-
-        const oldZoom = camera.zoom;
-        const newZoom = Math.max(1.0, Math.min(20.0, oldZoom * zoomFactor));
-
-        if (newZoom !== oldZoom) {
-            if (newZoom === 1.0) {
-                camera.x = Config.RENDER_TEXTURE_SIZE / 2;
-                camera.y = Config.RENDER_TEXTURE_SIZE / 2;
-            } else {
-                const ratio = oldZoom / newZoom;
-                camera.x = worldX * (1 - ratio) + camera.x * ratio;
-                camera.y = worldY * (1 - ratio) + camera.y * ratio;
-            }
-            camera.zoom = newZoom;
-            this._clampCameraPan();
-        }
-    }
-    
-    _performClickAction(event) {
-        if (this.isPlacingPattern) {
-            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
-            if (viewType === 'selected' && col !== null && row !== null) {
-                const finalCellIndices = new Set();
-                this.patternToPlace.forEach(([px, py]) => {
-                    const targetCol = col + px;
-                    const targetRow = row + py;
-                    if (targetCol >= 0 && targetCol < Config.GRID_COLS && targetRow >= 0 && targetRow < Config.GRID_ROWS) {
-                        finalCellIndices.add(targetRow * Config.GRID_COLS + targetCol);
-                    }
-                });
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
-                    worldIndex: worldIndexAtCursor,
-                    cellIndices: finalCellIndices
-                });
-            }
-            
-            if (!event.shiftKey) {
-                this.exitPlacingMode();
-            }
-
-            const stopClick = (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                document.removeEventListener('click', stopClick, true);
-            };
-            document.addEventListener('click', stopClick, true);
-
-            return;
-        }
-
-        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
-        if (worldIndexAtCursor === null) return;
-    
-        if (worldIndexAtCursor !== this.worldManager.getSelectedWorldIndex()) {
-            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-        }
-        else if (viewType === 'selected' && col !== null) {
-            EventBus.dispatch(EVENTS.COMMAND_APPLY_BRUSH, { worldIndex: worldIndexAtCursor, col, row });
-        }
-    }
-
-    _handleCanvasClick(event) {
-        if (this.justFinishedDrawing || this.gestureState === 'drawing') return;
-        this._performClickAction(event);
-    }
-    
-    _handleCanvasMouseDown(event) {
+    // --- MOUSE EVENT HANDLERS (DESKTOP) ---
+    _handleMouseDown(event) {
         event.preventDefault();
-        if (this.isPlacingPattern && event.button === 2) { 
-            this.exitPlacingMode();
-            return;
-        }
+        if (this.isMobile) return; // Ignore mouse events on mobile
 
-        if (this.isPlacingPattern && event.button !== 0) {
-            this.exitPlacingMode();
-            return;
-        }
-
+        // Middle mouse or Alt+Click for panning
         if (event.button === 1 || (event.button === 0 && event.altKey)) {
-            if (this._getCoordsFromPointerEvent(event).viewType === 'selected') {
-                this.isPanning = true;
-                this.lastPanX = event.clientX;
-                this.lastPanY = event.clientY;
-                this.canvas.style.cursor = 'grabbing';
-            }
+            this.isPanning = true;
+            this.lastPanX = event.clientX;
+            this.lastPanY = event.clientY;
+            this.canvas.style.cursor = 'grabbing';
             return;
         }
+
         if (event.button === 0) {
-             if (this.isPlacingPattern) {
-                this._performClickAction(event);
+            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
+            if (viewType === 'mini' && worldIndexAtCursor !== null) {
+                EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
                 return;
             }
-            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
             if (viewType !== 'selected' || col === null) return;
             this.isMouseDrawing = true;
             this.strokeAffectedCells.clear();
@@ -265,220 +215,243 @@ export class CanvasInputHandler {
         }
     }
 
-    _handleCanvasMouseMove(event) {
+    _handleMouseMove(event) {
+        if (this.isMobile) return;
+
         if (this.isPanning) {
             const camera = this.worldManager.getCurrentCameraState();
             if (!camera) return;
             const dx = event.clientX - this.lastPanX;
             const dy = event.clientY - this.lastPanY;
-            camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-            camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
+            camera.x -= dx / camera.zoom;
+            camera.y -= dy / camera.zoom;
             this.lastPanX = event.clientX;
             this.lastPanY = event.clientY;
             this._clampCameraPan();
             return;
         }
-        
+
         const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(event);
         const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
-        
-        if (this.isPlacingPattern) {
-            if (viewType === 'selected' && col !== null && row !== null) {
-                const hoverIndices = new Set();
-                this.patternToPlace.forEach(([px, py]) => {
-                    const targetCol = col + px;
-                    const targetRow = row + py;
-                    if (targetCol >= 0 && targetCol < Config.GRID_COLS && targetRow >= 0 && targetRow < Config.GRID_ROWS) {
-                        hoverIndices.add(targetRow * Config.GRID_COLS + targetCol);
-                    }
-                });
-                EventBus.dispatch(EVENTS.COMMAND_UPDATE_GHOST_PREVIEW, { indices: hoverIndices });
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW);
-            }
-            return;
-        }
 
-        if (this.isMouseDrawing && worldIndexAtCursor === selectedWorldIdx && viewType === 'selected' && col !== null) {
+        if (this.isMouseDrawing && viewType === 'selected' && col !== null) {
+            // Drawing logic
             const currentCellIndex = row * Config.GRID_COLS + col;
             if (currentCellIndex !== this.lastDrawnCellIndex) {
                 this.lastDrawnCellIndex = currentCellIndex;
                 const newCellsInBrush = new Set();
                 findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), newCellsInBrush);
-                
                 const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
-                cellsToToggle.forEach(cellIndex => this.strokeAffectedCells.add(cellIndex));
-
                 if (cellsToToggle.length > 0) {
-                    EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
-                        worldIndex: selectedWorldIdx,
-                        cellIndices: cellsToToggle
-                    });
+                    cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
+                    EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: selectedWorldIdx, cellIndices: new Set(cellsToToggle) });
                 }
             }
         }
 
-        if (worldIndexAtCursor === selectedWorldIdx && viewType === 'selected' && col !== null) {
+        // Hover logic for desktop
+        if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
         } else {
             EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
         }
     }
 
-    _handleCanvasMouseUp(event) {
-        if (this.isPanning) {
-            this.isPanning = false;
-            this.canvas.style.cursor = 'default';
-        }
+    _handleMouseUp(event) {
+        if (this.isMobile) return;
+        this.isPanning = false;
+        this.canvas.style.cursor = 'grab';
+
         if (this.isMouseDrawing) {
             this.isMouseDrawing = false;
-            this.justFinishedDrawing = true;
-            setTimeout(() => { this.justFinishedDrawing = false; }, 50);
-            if (this.wasSimulationRunningBeforeStroke) EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+            if (this.wasSimulationRunningBeforeStroke) {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+            }
             this.strokeAffectedCells.clear();
             this.lastDrawnCellIndex = null;
         }
     }
 
-    _handleCanvasMouseOut(event) {
-        this._handleCanvasMouseUp(event);
-        if (this.isPlacingPattern) {
-            this.exitPlacingMode();
-        }
-        const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
-        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
+    _handleMouseOut(event) {
+        if (this.isMobile) return;
+        this._handleMouseUp(event);
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex() });
     }
 
-    _handleCanvasMouseWheel(event) {
+    _handleMouseWheel(event) {
         event.preventDefault();
-        
-        if (this.isPlacingPattern) return;
+        if (this.isMobile) return;
 
         const { viewType } = this._getCoordsFromPointerEvent(event);
         if (viewType !== 'selected') return;
+
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
             const newSize = this.worldManager.getCurrentBrushSize() - scrollAmount;
             EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
-            this._handleCanvasMouseMove(event);
+            this._handleMouseMove(event); // Update hover
         } else {
             const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-            this._zoomAtPoint(zoomFactor, event.clientX, event.clientY);
+            this._zoomAtPoint(event.clientX, event.clientY, zoomFactor);
         }
     }
 
+    // --- TOUCH EVENT HANDLERS (MOBILE) ---
     _handleTouchStart(event) {
         event.preventDefault();
+        if (!this.isMobile) return;
+
         const touches = event.touches;
+        this.touchState.isDown = true;
+        this.touchState.isDragging = false;
+        this.touchState.startPoint = { x: touches[0].clientX, y: touches[0].clientY };
+        this.touchState.lastPoint = { ...this.touchState.startPoint };
 
-        if (touches.length === 1 && this.gestureState === 'idle') {
-            this.gestureState = 'pending';
-            const touch = touches[0];
-            this.initialTouch = {
-                clientX: touch.clientX,
-                clientY: touch.clientY,
-                identifier: touch.identifier
-            };
-        } else if (touches.length >= 2) {
-            if (this.gestureState === 'drawing') {
-                 this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
+        if (touches.length >= 2) {
+            this.touchState.gesture = 'pinch';
+            this.isPanning = false; // Stop single-finger panning if a second finger is added
+            this.touchState.lastDistance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+        } else {
+            this.touchState.gesture = 'pending';
+
+            if (this.interactionMode === 'pan') {
+                this.isPanning = true;
+            } else { // Draw mode
+                this.isPanning = false;
+                this.wasSimulationRunningBeforeStroke = !this.worldManager.isSimulationPaused();
+                if (this.wasSimulationRunningBeforeStroke) {
+                    EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+                }
+                // Initiate the drawing stroke
+                const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(this.touchState.startPoint);
+                if (viewType === 'selected' && col !== null) {
+                    this.strokeAffectedCells.clear();
+                    this.lastDrawnCellIndex = row * Config.GRID_COLS + col;
+                    findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), this.strokeAffectedCells);
+                    EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+                        worldIndex: worldIndexAtCursor,
+                        cellIndices: this.strokeAffectedCells
+                    });
+                }
             }
-            this.gestureState = 'panning_zooming';
-            this.initialTouch = null;
-
-            const t0 = touches[0];
-            const t1 = touches[1];
-            this.lastTouchDistance = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-            this.lastTouchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
         }
     }
 
     _handleTouchMove(event) {
         event.preventDefault();
+        if (!this.isMobile || !this.touchState.isDown) return;
 
-        if (this.gestureState === 'panning_zooming') {
-            if (event.touches.length < 2) return; // Need two fingers
-            const t0 = event.touches[0];
-            const t1 = event.touches[1];
-            const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-            const newCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
-            const camera = this.worldManager.getCurrentCameraState();
-            
-            if (camera && this.lastTouchCenter) {
-                const dx = newCenter.x - this.lastTouchCenter.x;
-                const dy = newCenter.y - this.lastTouchCenter.y;
-                camera.x -= (dx / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientWidth);
-                camera.y -= (dy / camera.zoom) * (Config.RENDER_TEXTURE_SIZE / this.canvas.clientHeight);
-            }
-            
-            if (this.lastTouchDistance > 0) {
-                const zoomFactor = newDist / this.lastTouchDistance;
-                this._zoomAtPoint(zoomFactor, newCenter.x, newCenter.y);
-            }
+        const touches = event.touches;
+        const camera = this.worldManager.getCurrentCameraState();
+        const newPoint = { x: touches[0].clientX, y: touches[0].clientY };
 
-            this.lastTouchDistance = newDist;
-            this.lastTouchCenter = newCenter;
-            this._clampCameraPan();
-
-        } else if (this.gestureState === 'pending') {
-            if (!this.initialTouch) return;
-            const touch = this._findTouchById(event.touches, this.initialTouch.identifier);
-            if (!touch) return;
-            
-            const distance = Math.hypot(touch.clientX - this.initialTouch.clientX, touch.clientY - this.initialTouch.clientY);
-
-            if (distance > this.TAP_THRESHOLD) {
-                this.gestureState = 'drawing';
-                this._handleCanvasMouseDown(this._createMouseEventFromTouch(this.initialTouch, 'mousedown'));
-                this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
-            }
-        } else if (this.gestureState === 'drawing') {
-            if (!this.initialTouch) return; 
-            const touch = this._findTouchById(event.touches, this.initialTouch.identifier);
-            if (!touch) {
-                this._handleCanvasMouseUp(this._createMouseEventFromTouch(this.initialTouch, 'mouseup'));
-                this.gestureState = 'idle';
-                this.initialTouch = null;
-                return;
-            }
-            this._handleCanvasMouseMove(this._createMouseEventFromTouch(touch, 'mousemove'));
+        const dist = Math.hypot(newPoint.x - this.touchState.startPoint.x, newPoint.y - this.touchState.startPoint.y);
+        if (dist > this.touchState.TAP_THRESHOLD) {
+            this.touchState.isDragging = true;
         }
+
+        if (touches.length >= 2) {
+            this.touchState.gesture = 'pinch';
+            const newDist = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+            const pinchCenter = { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
+
+            if (this.touchState.lastDistance > 0) {
+                const zoomFactor = newDist / this.touchState.lastDistance;
+                this._zoomAtPoint(pinchCenter.x, pinchCenter.y, zoomFactor);
+            }
+            this.touchState.lastDistance = newDist;
+        } else if (this.touchState.isDragging) {
+            const dx = newPoint.x - this.touchState.lastPoint.x;
+            const dy = newPoint.y - this.touchState.lastPoint.y;
+
+            if (this.interactionMode === 'pan') {
+                if (camera) {
+                    camera.x -= dx / camera.zoom;
+                    camera.y -= dy / camera.zoom;
+                    this._clampCameraPan();
+                }
+            } else if (this.interactionMode === 'draw') {
+                const { col, row, viewType } = this._getCoordsFromPointerEvent(newPoint);
+                if (viewType === 'selected' && col !== null) {
+                    const currentCellIndex = row * Config.GRID_COLS + col;
+                    if (currentCellIndex !== this.lastDrawnCellIndex) {
+                        this.lastDrawnCellIndex = currentCellIndex;
+                        const newCellsInBrush = new Set();
+                        findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), newCellsInBrush);
+
+                        const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
+
+                        if (cellsToToggle.length > 0) {
+                            cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
+                            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+                                worldIndex: this.worldManager.getSelectedWorldIndex(),
+                                cellIndices: new Set(cellsToToggle)
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        this.touchState.lastPoint = newPoint;
     }
+
 
     _handleTouchEnd(event) {
         event.preventDefault();
-        
-        if (this.gestureState === 'pending') {
-            // Finger lifted before moving enough for a swipe. This is a TAP.
-            const changedTouch = this._findTouchById(event.changedTouches, this.initialTouch.identifier);
-            if(changedTouch) {
-                this._performClickAction(this._createMouseEventFromTouch(changedTouch, 'click'));
-            }
-        } else if (this.gestureState === 'drawing') {
-            // Finger lifted after a swipe-draw. End the drawing stroke.
-            const changedTouch = this._findTouchById(event.changedTouches, this.initialTouch.identifier);
-            if (changedTouch) {
-                 this._handleCanvasMouseUp(this._createMouseEventFromTouch(changedTouch, 'mouseup'));
+        if (!this.isMobile) return;
+
+        const endTouch = event.changedTouches[0];
+        if (endTouch) {
+            const { worldIndexAtCursor, viewType } = this._getCoordsFromPointerEvent(endTouch);
+
+            if (viewType === 'mini' && worldIndexAtCursor !== null) {
+                EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
+                this.touchState.isDown = false;
+                this.touchState.isDragging = false;
+                return;
             }
         }
-        
-        if (event.touches.length === 0) {
-            // All fingers are lifted, reset to idle state.
-            this.gestureState = 'idle';
-            this.initialTouch = null;
-            this.lastTouchCenter = null;
-            this.lastTouchDistance = 0;
+
+        if (!this.touchState.isDragging && this.interactionMode === 'draw') {
+            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(this.touchState.startPoint);
+            if (viewType === 'selected' && col !== null) {
+                // The tap already triggered a draw in _handleTouchStart, so this block can be simplified
+                // or left empty if start handles it completely. We'll ensure stroke is cleared.
+            }
         }
+
+        if (this.interactionMode === 'draw' && this.wasSimulationRunningBeforeStroke) {
+            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+        }
+
+        // Reset all states
+        this.wasSimulationRunningBeforeStroke = false;
+        this.isPanning = false;
+        this.lastDrawnCellIndex = null;
+        this.strokeAffectedCells.clear();
+        this.touchState.isDown = false;
+        this.touchState.isDragging = false;
+        this.touchState.gesture = 'none';
+        this.touchState.lastDistance = 0;
     }
 
-    _findTouchById(touchList, identifier) {
-        if (identifier === null) return null;
-        for (let i = 0; i < touchList.length; i++) {
-            if (touchList[i].identifier === identifier) {
-                return touchList[i];
-            }
+    _zoomAtPoint(pivotClientX, pivotClientY, zoomFactor) {
+        const camera = this.worldManager.getCurrentCameraState();
+        if (!camera) return;
+
+        const { worldX, worldY } = this._getCoordsFromPointerEvent({ clientX: pivotClientX, clientY: pivotClientY });
+        if (worldX === null) return;
+
+        const oldZoom = camera.zoom;
+        const newZoom = Math.max(1.0, Math.min(25.0, oldZoom * zoomFactor));
+
+        if (newZoom !== oldZoom) {
+            const ratio = oldZoom / newZoom;
+            camera.x = worldX * (1 - ratio) + camera.x * ratio;
+            camera.y = worldY * (1 - ratio) + camera.y * ratio;
+            camera.zoom = newZoom;
+            this._clampCameraPan();
         }
-        return null;
     }
 
     _createMouseEventFromTouch(touch, type) {
@@ -489,7 +462,7 @@ export class CanvasInputHandler {
             button: 0, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
         });
     }
-    
+
     handleResize() {
         this.layoutCache = getLayoutCache();
     }

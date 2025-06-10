@@ -1,8 +1,8 @@
 export class DraggablePanel {
-    constructor(panelElement, handleSelector = 'h3', constrainToViewport = true) {
+    constructor(panelElement, handleSelector = 'h3', options = {}) {
         this.panelElement = panelElement;
         this.handleElement = panelElement.querySelector(handleSelector);
-        this.constrainToViewport = constrainToViewport;
+        this.options = { constrainToViewport: true, isMobile: false, ...options };
         this.offsetX = 0;
         this.offsetY = 0;
 
@@ -21,6 +21,10 @@ export class DraggablePanel {
     }
 
     _initDragging() {
+        if (this.options.isMobile) {
+            this.panelElement.classList.add('is-mobile-panel');
+            return;
+        }
         this.handleElement.style.cursor = 'move';
         this.boundOnMouseDown = this._onMouseDown.bind(this);
         this.boundOnTouchStart = this._onTouchStart.bind(this);

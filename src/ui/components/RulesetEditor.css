@@ -339,3 +339,20 @@
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+@media screen and (max-width: 768px) {
+    #rulesetEditorPanel {
+        /* Override fixed positioning and dimensions */
+        position: relative;
+        width: 100% !important;
+        height: 100% !important;
+        border: none;
+        box-shadow: none;
+        background-color: transparent;
+    }
+
+    #rulesetEditorPanel .panel-content-area {
+         /* Adjust padding/scrolling for mobile screen */
+        padding-right: 0;
+    }
+}

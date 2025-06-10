@@ -33,21 +33,21 @@ function positionTooltip(targetElement) {
     const tooltipRect = ui.tooltip.getBoundingClientRect();
     const margin = 15;
     const placements = {
-        bottom: { top: targetRect.bottom + margin, left: targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2), fits: function() { return this.top + tooltipRect.height < window.innerHeight; } },
-        top: { top: targetRect.top - tooltipRect.height - margin, left: targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2), fits: function() { return this.top > 0; } },
-        right: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.right + margin, fits: function() { return this.left + tooltipRect.width < window.innerWidth; } },
-        left: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.left - tooltipRect.width - margin, fits: function() { return this.left > 0; } }
+        bottom: { top: targetRect.bottom + margin, left: targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2), fits: function () { return this.top + tooltipRect.height < window.innerHeight; } },
+        top: { top: targetRect.top - tooltipRect.height - margin, left: targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2), fits: function () { return this.top > 0; } },
+        right: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.right + margin, fits: function () { return this.left + tooltipRect.width < window.innerWidth; } },
+        left: { top: targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2), left: targetRect.left - tooltipRect.width - margin, fits: function () { return this.left > 0; } }
     };
     let bestPlacement = Object.values(placements).find(p => p.fits()) || placements.bottom;
-    
-    let { top, left } = bestPlacement;
-    if (left < margin) left = margin;
-    if (left + tooltipRect.width > window.innerWidth - margin) left = window.innerWidth - tooltipRect.width - margin;
-    if (top < margin) top = margin;
-    if (top + tooltipRect.height > window.innerHeight - margin) top = window.innerHeight - tooltipRect.height - margin;
-    
-    ui.tooltip.style.top = `${top}px`;
-    ui.tooltip.style.left = `${left}px`;
+
+    let { top: tooltipTop, left: tooltipLeft } = bestPlacement;
+    if (tooltipLeft < margin) tooltipLeft = margin;
+    if (tooltipLeft + tooltipRect.width > window.innerWidth - margin) tooltipLeft = window.innerWidth - tooltipRect.width - margin;
+    if (tooltipTop < margin) tooltipTop = margin;
+    if (tooltipTop + tooltipRect.height > window.innerHeight - margin) tooltipTop = window.innerHeight - tooltipRect.height - margin;
+
+    ui.tooltip.style.top = `${tooltipTop}px`;
+    ui.tooltip.style.left = `${tooltipLeft}px`;
 }
 
 function cleanupCurrentStep() {
@@ -68,6 +68,7 @@ function cleanupCurrentStep() {
 }
 
 function showStep(stepIndex) {
+    cleanupCurrentStep();
     if (stepIndex < 0 || stepIndex >= activeTourSteps.length) {
         endTour();
         return;
@@ -89,10 +90,10 @@ function showStep(stepIndex) {
         }
 
         if (highlightedElement) { // This is line 90 where the error occurred
-             highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
+            highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
         }
         if (highlightedElementParentPanel) {
-             highlightedElementParentPanel.style.zIndex = '';
+            highlightedElementParentPanel.style.zIndex = '';
         }
 
         const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
@@ -103,22 +104,22 @@ function showStep(stepIndex) {
 
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         highlightedElement = targetElement;
-        
+
         if (targetElement !== document.body) {
             highlightedElement.classList.add('onboarding-highlight');
-             if (['rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) {
-                 highlightedElement.classList.add('onboarding-highlight-no-filter');
+            if (['rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) {
+                highlightedElement.classList.add('onboarding-highlight-no-filter');
             }
         }
 
         ui.overlay.classList.remove('hidden');
         ui.tooltip.classList.remove('hidden');
-        
+
         ui.title.innerHTML = step.title || '';
         ui.content.innerHTML = step.content;
         const progress = ((currentStepIndex + 1) / activeTourSteps.length) * 100;
         ui.progressBar.style.width = `${progress}%`;
-        
+
         if (step.primaryAction && step.primaryAction.text) {
             ui.primaryBtn.textContent = step.primaryAction.text;
             ui.primaryBtn.style.display = 'inline-block';

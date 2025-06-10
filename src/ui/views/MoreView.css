@@ -1,0 +1,30 @@
+#more-view {
+    background-color: #1e1e1e;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#more-view .more-view-title {
+    font-size: 1.5em;
+    color: #f0c674;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#more-view .button,
+#more-view .file-input-label {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 15px;
+    font-size: 1.1em;
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    box-sizing: border-box;
+}
+
+#more-view .file-input-label {
+    cursor: pointer;
+}

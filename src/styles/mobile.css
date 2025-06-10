@@ -1,0 +1,230 @@
+/* HexLife Explorer - Mobile UI Stylesheet */
+
+/* Apply mobile styles only on smaller screens */
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+
+    /* --- Main Layout Overrides --- */
+    #app-container {
+        display: flex;
+        flex-direction: column;
+        /* Changed to column for more intuitive ordering */
+    }
+
+    #main-content-area {
+        order: 2;
+        display: flex;
+        /* Ensure it's a flex container for the canvas */
+        flex-direction: column;
+        flex-grow: 1;
+        min-height: 0;
+        /* Important for flex-children sizing */
+        overflow: hidden;
+        /* Prevent canvas from overflowing */
+    }
+
+    canvas#hexGridCanvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        flex-grow: 1;
+        min-width: 0;
+        /* Important for flex-children sizing */
+        touch-action: none;
+        /* Disables browser gestures like pull-to-refresh */
+    }
+
+    #vertical-toolbar {
+        display: none;
+        /* Hide the desktop toolbar */
+    }
+
+    #top-info-bar {
+        order: 1;
+        /* Top bar is the first item */
+        height: auto;
+        padding: 8px 10px;
+        flex-wrap: wrap;
+        line-height: 1.4;
+        gap: 8px;
+    }
+
+    #statsDisplayContainer {
+        display: flex;
+        width: 100%;
+        justify-content: space-around;
+        font-size: 0.9em;
+        gap: 10px;
+    }
+
+    #statsDisplayContainer>span:nth-child(3),
+    /* Brush */
+    #statsDisplayContainer>span:nth-child(4),
+    /* FPS */
+    #statsDisplayContainer>span:nth-child(5) {
+        /* TPS */
+        display: none;
+    }
+
+    /* Hide detailed stats on mobile */
+    #rulesetDisplayContainer {
+        order: 2;
+        width: 100%;
+        justify-content: center;
+    }
+
+    #appTitleContainer {
+        order: 1;
+        width: 100%;
+        justify-content: center;
+    }
+
+
+    /* --- Bottom Tab Bar --- */
+    #bottom-tab-bar {
+        display: flex;
+        margin-bottom: 50px;
+        order: 3;
+        width: 100%;
+        height: 60px;
+        background-color: #2a2a2a;
+        border-top: 1px solid #444;
+        flex-shrink: 0;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .tab-bar-button {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        color: #aaa;
+        font-size: 0.7em;
+        gap: 2px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .tab-bar-button .icon {
+        font-size: 1.8em;
+    }
+
+    .tab-bar-button.active {
+        color: #f0c674;
+    }
+
+    /* --- Panel Overrides: From Draggable to Full-Screen --- */
+    .draggable-panel-base {
+        position: fixed;
+        display: none;
+        /* Hide by default, shown by JS */
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        border: none;
+        transform: none !important;
+        z-index: 5000;
+        background-color: #1e1e1e;
+    }
+
+    .draggable-panel-base.is-mobile-view {
+        display: flex;
+        /* Use this class to show the panel on mobile */
+    }
+
+    .draggable-panel-base h3 {
+        cursor: default;
+        /* No dragging on mobile */
+    }
+
+    /* Specific Panel Adjustments */
+    #rulesetEditorPanel .editor-controls,
+    #rulesetEditorPanel .editor-apply-scope-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #worldSetupGrid {
+        grid-template-columns: 1fr;
+        /* Stack world configs vertically */
+    }
+
+    /* --- Popout Overrides: From Popout to Bottom Sheet --- */
+    .popout-panel {
+        /* This will be handled by a new BottomSheet component, for now, we hide it */
+        display: none !important;
+    }
+
+    #interaction-mode-toggle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: rgba(40, 40, 40, 0.9);
+        border: 1px solid #666;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        color: white;
+        font-size: 1em;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #interaction-mode-toggle .icon {
+        font-size: 1.8em;
+        line-height: 1;
+    }
+
+    #interaction-mode-toggle .label {
+        font-size: 0.7em;
+        margin-top: 2px;
+    }
+
+    /* --- Mobile FABs --- */
+    #mobile-fab-container {
+        position: absolute;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); /* Position above tab bar */
+        right: 20px;
+        z-index: 4500;
+        display: flex;
+        flex-direction: column-reverse; /* To place primary button on bottom */
+        align-items: center;
+        gap: 15px;
+    }
+
+    .mobile-fab {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        color: white;
+        font-size: 1.8em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .primary-fab {
+        background-color: #f0c674;
+        color: #1e1e1e;
+        width: 70px;
+        height: 70px;
+        font-size: 2.2em;
+    }
+
+    .secondary-fab {
+        background-color: #4a4a4a;
+        border: 1px solid #666;
+    }
+}

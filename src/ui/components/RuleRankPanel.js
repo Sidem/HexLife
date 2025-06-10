@@ -16,8 +16,8 @@ class ElementPool {
 }
 
 export class RuleRankPanel extends PersistentDraggablePanel {
-    constructor(panelElement, worldManagerInterface) {
-        super(panelElement, 'h3', 'ruleRank');
+    constructor(panelElement, worldManagerInterface, options = {}) {
+        super(panelElement, 'h3', 'ruleRank', options);
 
         this.worldManager = worldManagerInterface;
         this.uiElements = {

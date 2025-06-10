@@ -1,0 +1,125 @@
+#rules-view {
+    background-color: #1e1e1e;
+    padding: 0;
+}
+
+.rules-view-header {
+    display: flex;
+    justify-content: stretch;
+    background-color: #2a2a2a;
+    padding: 10px;
+    flex-shrink: 0;
+}
+
+.rules-view-segment {
+    flex-grow: 1;
+    padding: 12px 5px;
+    font-size: 0.9em;
+    text-align: center;
+    background-color: #3a3a3a;
+    color: #ccc;
+    border: none;
+    border-right: 1px solid #555;
+}
+
+.rules-view-segment:last-child {
+    border-right: none;
+}
+
+.rules-view-segment.active {
+    background-color: #f0c674;
+    color: #1e1e1e;
+    font-weight: bold;
+}
+
+.rules-view-content {
+    padding: 20px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.rules-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.rules-pane .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rules-pane .form-group label {
+    font-weight: bold;
+    color: #ccc;
+}
+
+.rules-pane .hex-input {
+    padding: 12px;
+    font-size: 1.1em;
+    text-align: center;
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: white;
+}
+
+.rules-pane .action-button {
+    padding: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    background-color: #f0c674;
+    color: #1e1e1e;
+    border: none;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.library-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.library-item-mobile {
+    background-color: #2a2a2a;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #444;
+}
+
+.library-item-mobile .name {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #f0f0f0;
+}
+
+.library-item-mobile .description {
+    font-size: 0.9em;
+    color: #aaa;
+    margin: 5px 0 15px 0;
+}
+
+.library-item-mobile .button {
+    width: 100%;
+    padding: 10px;
+}
+
+.rules-history-controls {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 5px;
+}
+
+.rules-history-controls .button-icon {
+    background: #4f4f4f;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    border: none;
+    color: white;
+    font-size: 1.5em;
+}

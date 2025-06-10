@@ -3,28 +3,58 @@ import { SetupPanel } from './components/SetupPanel.js';
 import { AnalysisPanel } from './components/AnalysisPanel.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { MoreView } from './views/MoreView.js';
+import { RulesView } from './views/RulesView.js';
+import { WorldsView } from './views/WorldsView.js';
+import { AnalyzeView } from './views/AnalyzeView.js';
+import { EditorView } from './views/EditorView.js';
 
 export class PanelManager {
-    constructor(worldManagerInterface) {
+    constructor(worldManagerInterface, isMobile = false) {
         this.worldManager = worldManagerInterface;
+        this.isMobile = isMobile;
         this.panels = {};
         this.uiElements = null;
+        this.mobileViews = {};
+        this.libraryData = null;
     }
 
-    init(uiElements) {
+    init(uiElements, libraryData) {
         this.uiElements = uiElements;
+        this.libraryData = libraryData;
 
         if (this.uiElements.rulesetEditorPanel) {
-            this.panels.rulesetEditor = new RulesetEditor(this.uiElements.rulesetEditorPanel, this.worldManager);
+            this.panels.rulesetEditor = new RulesetEditor(this.uiElements.rulesetEditorPanel, this.worldManager, { isMobile: this.isMobile });
         }
         if (this.uiElements.setupPanel) {
-            this.panels.setupPanel = new SetupPanel(this.uiElements.setupPanel, this.worldManager);
+            this.panels.setupPanel = new SetupPanel(this.uiElements.setupPanel, this.worldManager, { isMobile: this.isMobile });
         }
         if (this.uiElements.analysisPanel) {
-            this.panels.analysisPanel = new AnalysisPanel(this.uiElements.analysisPanel, this.worldManager, this);
+            this.panels.analysisPanel = new AnalysisPanel(this.uiElements.analysisPanel, this.worldManager, this, { isMobile: this.isMobile });
         }
         if (this.uiElements.ruleRankPanel) {
-            this.panels.ruleRankPanel = new RuleRankPanel(this.uiElements.ruleRankPanel, this.worldManager);
+            this.panels.ruleRankPanel = new RuleRankPanel(this.uiElements.ruleRankPanel, this.worldManager, { isMobile: this.isMobile });
+        }
+
+        // MOBILE VIEW INITIALIZATIONS
+        if (this.isMobile) {
+            const mobileViewsContainer = document.getElementById('mobile-views-container');
+            if (mobileViewsContainer) {
+                this.mobileViews.more = new MoreView(mobileViewsContainer);
+                this.mobileViews.more.render();
+
+                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.libraryData);
+                this.mobileViews.rules.render();
+                
+                this.mobileViews.worlds = new WorldsView(mobileViewsContainer, this.worldManager);
+                this.mobileViews.worlds.render();
+
+                this.mobileViews.analyze = new AnalyzeView(mobileViewsContainer, this.worldManager);
+                this.mobileViews.analyze.render();
+                
+                this.mobileViews.editor = new EditorView(mobileViewsContainer, this);
+                this.mobileViews.editor.render();
+            }
         }
 
         this._setupPanelToggleListeners();
@@ -66,6 +96,14 @@ export class PanelManager {
              if (this.panels.analysisPanel && !this.panels.analysisPanel.isHidden()) this.panels.analysisPanel.refreshViews();
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
+    }
+    
+    getMobileViews() {
+        return this.mobileViews;
+    }
+    
+    getMobileView(viewName) {
+        return this.mobileViews[viewName];
     }
 
     getPanel(panelName) {

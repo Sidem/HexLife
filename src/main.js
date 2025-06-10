@@ -91,7 +91,6 @@ async function initialize() {
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     worldManager = new WorldManager(sharedSettings);
-    canvasInputHandler = new CanvasInputHandler(canvas, worldManager);
 
     const worldManagerInterfaceForUI = {
         isSimulationPaused: worldManager.isSimulationPaused.bind(worldManager),
@@ -110,7 +109,13 @@ async function initialize() {
         getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
     };
 
-    if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
+    const mobileQuery = '(max-width: 768px), (pointer: coarse) and (hover: none)';
+    const isMobile = window.matchMedia(mobileQuery).matches;
+    
+    canvasInputHandler = new CanvasInputHandler(canvas, worldManager, isMobile);
+
+
+    if (!UI.initUI(worldManagerInterfaceForUI, libraryData, isMobile)) {
         console.error("UI initialization failed.");
         return;
     }
@@ -177,6 +182,8 @@ function renderLoop(timestamp) {
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
+        //Renderer.resizeRenderer();
+        
         OnboardingManager.startTour('core');
     }
     

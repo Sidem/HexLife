@@ -77,7 +77,10 @@ export const EVENTS = {
     COMMAND_ENTER_PLACING_MODE: 'command:enterPlacingMode',
     COMMAND_UPDATE_GHOST_PREVIEW: 'command:updateGhostPreview',
     COMMAND_CLEAR_GHOST_PREVIEW: 'command:clearGhostPreview',
+    COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
     UI_RULESET_SCOPE_CHANGED: 'ui:rulesetScopeChanged', 
     UI_EDITOR_RULESET_SCOPE_CHANGED: 'ui:editorRulesetScopeChanged', 
-    UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged'
+    UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged',
+    LAYOUT_CALCULATED: 'system:layoutCalculated',
+    INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged'
 };

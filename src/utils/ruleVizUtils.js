@@ -36,12 +36,11 @@ function generateRuleColor(ruleIndex, state) {
     const hue = (calculatedHue + hueOffset) % 1.0;
 
     let saturation, value;
+    saturation = 1.0;
     if (state === 1) {
-        saturation = 1.0;
         value = 1.0;
     } else {
-        saturation = 0.5;
-        value = 0.15;
+        value = 0.075;
     }
     return hsvToRgb(hue, saturation, value);
 }

@@ -66,7 +66,7 @@ export class KeyboardShortcutManager {
             'R': () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES),
             'G': () => this.toolbar.triggerGenerate(),
             'Escape': () => {
-                const aPopoutWasOpen = this.toolbar.closeAllPopouts();
+                const aPopoutWasOpen = this.toolbar ? this.toolbar.closeAllPopouts() : false;
                 if (!aPopoutWasOpen) {
                     this.panelManager.hideAllPanels();
                 }
@@ -87,7 +87,7 @@ export class KeyboardShortcutManager {
                 event.preventDefault();
                 return;
             }
-             if (event.key.toUpperCase() === 'M') {
+            if (event.key.toUpperCase() === 'M') {
                 this.toolbar.triggerCloneAndMutate();
                 event.preventDefault();
                 return;

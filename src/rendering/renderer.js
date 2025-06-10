@@ -2,6 +2,7 @@ import * as Config from '../core/config.js';
 import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
+import { EventBus, EVENTS } from '../services/EventBus.js';
 
 let gl;
 let canvas;
@@ -111,7 +112,8 @@ export async function initRenderer(canvasElement) {
     setupQuadBuffersAndVAO();
     setupFBOs();
 
-    resizeRenderer();
+    requestAnimationFrame(() => resizeRenderer());
+
     console.log("Renderer initialized.");
     return gl;
 }
@@ -120,13 +122,17 @@ function _calculateAndCacheLayout() {
     if (!gl || !gl.canvas) return;
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
-    const isLandscape = canvasWidth >= canvasHeight;
+    // ===================================================================
+    console.log(`%cCalculating layout with dimensions: ${canvasWidth} x ${canvasHeight}`, 'color: lightblue; font-weight: bold;');
+    // ===================================================================
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
 
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
 
-    if (isLandscape) {
+    const isLandscape = canvasWidth >= canvasHeight;
+    const aspectRatio = canvasWidth / canvasHeight;
+    if (isLandscape && aspectRatio > 1.2) {
         selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
         selectedViewHeight = canvasHeight - padding * 2;
         selectedViewX = padding;
@@ -136,11 +142,11 @@ function _calculateAndCacheLayout() {
         miniMapAreaX = selectedViewX + selectedViewWidth + padding;
         miniMapAreaY = padding;
     } else {
-        selectedViewHeight = canvasHeight * 0.6 - padding * 1.5;
+        selectedViewHeight = canvasHeight * 0.65 - padding * 1.5;
         selectedViewWidth = canvasWidth - padding * 2;
         selectedViewX = padding;
         selectedViewY = padding;
-        miniMapAreaHeight = canvasHeight * 0.4 - padding * 1.5;
+        miniMapAreaHeight = canvasHeight * 0.35 - padding * 1.5;
         miniMapAreaWidth = selectedViewWidth;
         miniMapAreaX = padding;
         miniMapAreaY = selectedViewY + selectedViewHeight + padding;
@@ -160,7 +166,7 @@ function _calculateAndCacheLayout() {
     }
     const gridContainerX = miniMapAreaX + (miniMapAreaWidth - gridContainerWidth) / 2;
     const gridContainerY = miniMapAreaY + (miniMapAreaHeight - gridContainerHeight) / 2;
-    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.01;
+    const miniMapSpacing = Math.min(gridContainerWidth, gridContainerHeight) * 0.02;
     const miniMapW = (gridContainerWidth - (Config.WORLD_LAYOUT_COLS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_COLS;
     const miniMapH = (gridContainerHeight - (Config.WORLD_LAYOUT_ROWS - 1) * miniMapSpacing) / Config.WORLD_LAYOUT_ROWS;
 
@@ -168,6 +174,7 @@ function _calculateAndCacheLayout() {
         selectedView: { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight },
         miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
     };
+    EventBus.dispatch(EVENTS.LAYOUT_CALCULATED);
 }
 
 export function getLayoutCache() {
@@ -357,6 +364,8 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
         }
         
         gl.disable(gl.BLEND);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, null);
     }
     
     // Unbind framebuffer and VAO to clean up state

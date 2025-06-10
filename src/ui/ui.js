@@ -8,6 +8,8 @@ import { TopInfoBar } from './TopInfoBar.js';
 import { Toolbar } from './Toolbar.js';
 import { PanelManager } from './PanelManager.js';
 import { KeyboardShortcutManager } from './KeyboardShortcutManager.js';
+import { BottomTabBar } from './BottomTabBar.js';
+import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 
 let panelManager, toolbar;
 
@@ -77,33 +79,133 @@ function getUIElements() {
         ruleRankPanel: document.getElementById('ruleRankPanel'),
         fileInput: document.getElementById('fileInput'),
         canvas: document.getElementById('hexGridCanvas'),
+        mobileViewsContainer: document.getElementById('mobile-views-container'),
+        mobileToolsButton: document.getElementById('mobileToolsButton'),
     };
 }
 
-export function initUI(worldManagerInterface, libraryData) {
+function initMobileUI(worldManagerInterface, panelManager, uiElements) {
+    console.log("Mobile UI Initialized");
+
+    const bottomTabBarEl = document.getElementById('bottom-tab-bar');
+    if (bottomTabBarEl) {
+        const tabBar = new BottomTabBar(bottomTabBarEl, panelManager);
+        bottomTabBarEl.classList.remove('hidden');
+    }
+
+    const fabContainer = document.createElement('div');
+    fabContainer.id = 'mobile-fab-container';
+    fabContainer.innerHTML = `
+        <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush">
+            <span class="icon">🛠️</span>
+        </button>
+        <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode">
+            <span class="icon">🖐️</span>
+        </button>
+        <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
+    `;
+    uiElements.canvas.parentElement.appendChild(fabContainer);
+
+    const toolsTabButton = document.querySelector('.tab-bar-button[data-view="tools"]');
+    if (toolsTabButton) {
+        new ToolsBottomSheet('tools-bottom-sheet', toolsTabButton, worldManagerInterface);
+    }
+
+    const mobileToolsFab = fabContainer.querySelector('#mobileToolsFab');
+    if (mobileToolsFab) {
+        new ToolsBottomSheet('fab-tools-bottom-sheet', mobileToolsFab, worldManagerInterface);
+    }
+
+    const mobileToolsButton = document.querySelector('.tab-bar-button[data-view="tools"]');
+    if (mobileToolsButton) {
+        const toolsSheet = new ToolsBottomSheet('tools-bottom-sheet', mobileToolsButton, worldManagerInterface);
+    }
+
+    const mobilePlayPauseButton = fabContainer.querySelector('#mobilePlayPauseButton');
+    mobilePlayPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+
+    const interactionModeButton = fabContainer.querySelector('#interaction-mode-toggle');
+    interactionModeButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
+
+    EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
+        mobilePlayPauseButton.textContent = isPaused ? "▶" : "❚❚";
+    });
+
+    EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
+        const icon = interactionModeButton.querySelector('.icon');
+        if (icon) {
+            icon.textContent = mode === 'pan' ? '🖐️' : '✏️';
+        }
+    });
+}
+
+export function initUI(worldManagerInterface, libraryData, isMobile) {
     const uiElements = getUIElements();
 
+    // --- SHARED INITIALIZATION ---
+    // TopInfoBar is used by both layouts, so it must be initialized first.
     const topInfoBar = new TopInfoBar(worldManagerInterface);
     topInfoBar.init(uiElements);
 
-    toolbar = new Toolbar(worldManagerInterface, libraryData);
-    toolbar.init(uiElements);
-    
-    panelManager = new PanelManager(worldManagerInterface);
-    panelManager.init(uiElements);
+    // PanelManager is also shared, managing panel state for both layouts.
+    panelManager = new PanelManager(worldManagerInterface, isMobile);
+    panelManager.init(uiElements, libraryData);
 
-    const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar);
+    // --- LAYOUT-SPECIFIC INITIALIZATION ---
+    if (isMobile) {
+        initMobileUI(worldManagerInterface, panelManager, uiElements);
+    } else {
+        // Desktop-only components
+        toolbar = new Toolbar(worldManagerInterface, libraryData, isMobile);
+        toolbar.init(uiElements);
+    }
+
+    // --- GLOBAL INITIALIZATION ---
+    // Keyboard shortcuts are mostly for desktop, but Escape key can be global.
+    const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar, isMobile);
     keyboardManager.init(uiElements);
 
     OnboardingManager.defineTours(tours);
-    document.getElementById('helpButton').addEventListener('click', () => OnboardingManager.startTour('core', true));
+    const helpButton = document.getElementById('helpButton');
+    if (helpButton) {
+        if (!isMobile) {
+            helpButton.addEventListener('click', () => OnboardingManager.startTour('core', true));
+        } else {
+            helpButton.classList.add('hidden');
+        }
+    }
+
+    document.body.addEventListener('click', (event) => {
+        const helpTrigger = event.target.closest('.button-help-trigger');
+        if (helpTrigger && helpTrigger.dataset.tourName) {
+            event.stopPropagation();
+            OnboardingManager.startTour(helpTrigger.dataset.tourName, true);
+        }
+    });
 
     EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => downloadFile(data.filename, data.content, data.mimeType));
-    
-    // Initial UI state sync
-    toolbar.updatePauseButtonVisual(worldManagerInterface.isSimulationPaused());
 
-    console.log("Modular Toolbar UI Initialized.");
+    EventBus.subscribe(EVENTS.TRIGGER_FILE_LOAD, (data) => {
+        const reader = new FileReader();
+        reader.onload = re => {
+            try {
+                const loadedData = JSON.parse(re.target.result);
+                EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: worldManagerInterface.getSelectedWorldIndex(), loadedData });
+            } catch (err) { alert(`Error processing file: ${err.message}`); }
+        };
+        reader.onerror = () => { alert(`Error reading file.`); };
+        reader.readAsText(data.file);
+    });
+
+    // Initial UI state sync
+    if (!isMobile && toolbar) {
+        toolbar.updatePauseButtonVisual(worldManagerInterface.isSimulationPaused());
+    } else if (isMobile) {
+        const playPauseButton = uiElements.playPauseButton;
+        if (playPauseButton) playPauseButton.textContent = worldManagerInterface.isSimulationPaused() ? "▶" : "❚❚";
+    }
+
+    console.log(`UI Initialized for: ${isMobile ? 'Mobile' : 'Desktop'}`);
     return true;
 }
 
