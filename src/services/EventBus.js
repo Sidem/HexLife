@@ -82,5 +82,8 @@ export const EVENTS = {
     UI_EDITOR_RULESET_SCOPE_CHANGED: 'ui:editorRulesetScopeChanged', 
     UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged',
     LAYOUT_CALCULATED: 'system:layoutCalculated',
-    INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged'
+    INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged',
+    COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
+    COMMAND_SET_FAB_LOCK: 'command:setFabLock',
+    COMMAND_RESET_FAB_POSITIONS: 'command:resetFabPositions'
 };

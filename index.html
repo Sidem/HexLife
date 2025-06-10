@@ -122,13 +122,11 @@
                 <button id="helpButton" class="toolbar-button" title="Help">HLP</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">
-                <div id="mobile-canvas-controls" class="hidden">
-                    <button id="interaction-mode-toggle" class="button" title="Toggle Pan/Draw Mode">
-                        <span class="icon">🖐️</span>
-                        <span class="label">Pan</span>
-                    </button>
-                </div>
             </canvas>
+            <div id="mobile-canvas-controls" class="hidden">
+                <div id="mobile-fab-container-right" class="mobile-fab-container"></div>
+                <div id="mobile-fab-container-left" class="mobile-fab-container left"></div>
+            </div>
         </div>
 
         <div id="speedPopout" class="popout-panel hidden" data-tour-id="speed-popout">

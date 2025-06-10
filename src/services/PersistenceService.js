@@ -10,7 +10,8 @@ const KEYS = {
     SETUP_PANEL_STATE: `${LS_KEY_PREFIX}setupPanelState`,
     ANALYSIS_PANEL_STATE: `${LS_KEY_PREFIX}analysisPanelState`,
     RULERANK_PANEL_STATE: `${LS_KEY_PREFIX}ruleRankPanelState`,
-    UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings` 
+    UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
+    FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`
 };
 
 function _getItem(key) {

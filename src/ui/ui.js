@@ -10,6 +10,7 @@ import { PanelManager } from './PanelManager.js';
 import { KeyboardShortcutManager } from './KeyboardShortcutManager.js';
 import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
+import * as PersistenceService from '../services/PersistenceService.js';
 
 let panelManager, toolbar;
 
@@ -85,58 +86,81 @@ function getUIElements() {
 }
 
 function initMobileUI(worldManagerInterface, panelManager, uiElements) {
-    console.log("Mobile UI Initialized");
+    console.log("Mobile UI Initialized with corrected FAB logic");
 
     const bottomTabBarEl = document.getElementById('bottom-tab-bar');
     if (bottomTabBarEl) {
-        const tabBar = new BottomTabBar(bottomTabBarEl, panelManager);
+        new BottomTabBar(bottomTabBarEl, panelManager);
         bottomTabBarEl.classList.remove('hidden');
     }
 
-    const fabContainer = document.createElement('div');
-    fabContainer.id = 'mobile-fab-container';
-    fabContainer.innerHTML = `
-        <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush">
-            <span class="icon">🛠️</span>
-        </button>
-        <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode">
-            <span class="icon">🖐️</span>
-        </button>
+    document.getElementById('mobile-canvas-controls')?.classList.remove('hidden');
+    const fabRightContainer = document.getElementById('mobile-fab-container-right');
+    const fabLeftContainer = document.getElementById('mobile-fab-container-left');
+    
+    // --- Step 1: Render the STATIC Right-side FABs ---
+    // These buttons are permanent and not part of the customization system.
+    fabRightContainer.innerHTML = `
+        <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush"><span class="icon">🛠️</span></button>
+        <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
         <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
     `;
-    uiElements.canvas.parentElement.appendChild(fabContainer);
 
-    const toolsTabButton = document.querySelector('.tab-bar-button[data-view="tools"]');
-    if (toolsTabButton) {
-        new ToolsBottomSheet('tools-bottom-sheet', toolsTabButton, worldManagerInterface);
-    }
-
-    const mobileToolsFab = fabContainer.querySelector('#mobileToolsFab');
-    if (mobileToolsFab) {
-        new ToolsBottomSheet('fab-tools-bottom-sheet', mobileToolsFab, worldManagerInterface);
-    }
-
-    const mobileToolsButton = document.querySelector('.tab-bar-button[data-view="tools"]');
-    if (mobileToolsButton) {
-        const toolsSheet = new ToolsBottomSheet('tools-bottom-sheet', mobileToolsButton, worldManagerInterface);
-    }
-
-    const mobilePlayPauseButton = fabContainer.querySelector('#mobilePlayPauseButton');
-    mobilePlayPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
-
-    const interactionModeButton = fabContainer.querySelector('#interaction-mode-toggle');
-    interactionModeButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
-
+    // Connect listeners to the permanent right-side FABs
+    new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), worldManagerInterface);
+    fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+    fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
-        mobilePlayPauseButton.textContent = isPaused ? "▶" : "❚❚";
+        fabRightContainer.querySelector('#mobilePlayPauseButton').textContent = isPaused ? "▶" : "❚❚";
+    });
+    EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
+        fabRightContainer.querySelector('#interaction-mode-toggle .icon').textContent = mode === 'pan' ? '🖐️' : '✏️';
     });
 
-    EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
-        const icon = interactionModeButton.querySelector('.icon');
-        if (icon) {
-            icon.textContent = mode === 'pan' ? '🖐️' : '✏️';
-        }
-    });
+
+    // --- Step 2: Render the DYNAMIC Left-side FABs ---
+    // This logic is completely separate from the right side.
+    const fabActionMap = {
+        'generate': { icon: '✨', title: 'Generate', command: EVENTS.COMMAND_GENERATE_RANDOM_RULESET, payload: { bias: 0.5, generationMode: 'r_sym', resetScopeForThisChange: 'all' } },
+        'mutate':   { icon: '🦠', title: 'Mutate', command: EVENTS.COMMAND_MUTATE_RULESET, payload: { mutationRate: 0.05, scope: 'selected', mode: 'single' } },
+        'clone':    { icon: '🧬', title: 'Clone & Mutate', command: EVENTS.COMMAND_CLONE_AND_MUTATE, payload: { mutationRate: 0.05, mode: 'single' } },
+        'clear-one':{ icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
+        'clear-all':{ icon: '💥', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
+        'reset-one':{ icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
+        'reset-all':{ icon: '🌍', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} }
+    };
+    
+    function renderCustomFabs() {
+        fabLeftContainer.innerHTML = '';
+        const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone', 'reset-all'], locked: true, order: [] });
+
+        // Use saved order, or default to the order they were enabled in
+        const orderedIds = (fabSettings.order && fabSettings.order.length > 0) ? fabSettings.order : fabSettings.enabled;
+        const enabledSet = new Set(fabSettings.enabled);
+        
+        orderedIds.forEach(actionId => {
+            if (!enabledSet.has(actionId)) return; // Only render enabled buttons
+
+            const action = fabActionMap[actionId];
+            if (!action) return;
+
+            const button = document.createElement('button');
+            button.className = 'mobile-fab secondary-fab';
+            button.innerHTML = `<span class="icon">${action.icon}</span>`;
+            button.title = action.title;
+            button.dataset.actionId = actionId;
+            button.draggable = !fabSettings.locked;
+            if (!fabSettings.locked) {
+                button.classList.add('draggable');
+            }
+            button.addEventListener('click', () => EventBus.dispatch(action.command, action.payload));
+            fabLeftContainer.appendChild(button);
+        });
+    }
+
+    // --- Step 3: Initial Render & Event Subscriptions ---
+    renderCustomFabs();
+    EventBus.subscribe(EVENTS.COMMAND_UPDATE_FAB_UI, renderCustomFabs);
 }
 
 export function initUI(worldManagerInterface, libraryData, isMobile) {
