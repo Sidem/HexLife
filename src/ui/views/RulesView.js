@@ -4,9 +4,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class RulesView extends BaseComponent {
-    constructor(mountPoint, libraryData) {
+    constructor(mountPoint, libraryData, worldManagerInterface) {
         super(mountPoint);
         this.libraryData = libraryData;
+        this.worldManager = worldManagerInterface;
         this.element = null;
         this.panes = {};
         this.segments = {};
@@ -78,7 +79,7 @@ export class RulesView extends BaseComponent {
                 <label for="mobileGenModeRandom" class="radio-switch-label">Random</label>
                 <input type="radio" id="mobileGenModeNCount" name="mobileGenerateMode" value="n_count" class="radio-switch-input">
                 <label for="mobileGenModeNCount" class="radio-switch-label">N-Count</label>
-                <input type="radio" id="mobileGenModeRSym" name="mobileGenerateMode" value="r_sym" class="radio-switch-input" checked>
+                <input type="radio" id="mobileGenModeRSym" name="mobileGenerateMode" value="r_sym" class="radio-switch-input">
                 <label for="mobileGenModeRSym" class="radio-switch-label">R-Sym</label>
             </div>
         </div>
@@ -91,18 +92,42 @@ export class RulesView extends BaseComponent {
             <div id="mobileRulesetScopeSwitch" class="three-way-switch">
                 <input type="radio" id="mobileScopeSelected" name="mobileRulesetScope" value="selected" class="radio-switch-input">
                 <label for="mobileScopeSelected" class="radio-switch-label">Selected</label>
-                <input type="radio" id="mobileScopeAll" name="mobileRulesetScope" value="all" class="radio-switch-input" checked>
+                <input type="radio" id="mobileScopeAll" name="mobileRulesetScope" value="all" class="radio-switch-input">
                 <label for="mobileScopeAll" class="radio-switch-label">All</label>
             </div>
         </div>
         <div class="form-group">
-            <input type="checkbox" id="mobileResetOnNewRule" class="checkbox-input" checked>
+            <input type="checkbox" id="mobileResetOnNewRule" class="checkbox-input">
             <label for="mobileResetOnNewRule" class="checkbox-label">Auto-Reset World(s)</label>
         </div>
         <button class="action-button" data-action="generate">Generate New Ruleset</button>
-    `;
+        `;
+    
+        // Load saved settings and attach persistence listeners
+        const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
+        pane.querySelector(`input[value="${genMode}"]`).checked = true;
+        pane.querySelector('#mobileGenerateModeSwitch').addEventListener('change', e => {
+            PersistenceService.saveUISetting('rulesetGenerationMode', e.target.value);
+        });
+    
         this.sliders.bias = new SliderComponent(pane.querySelector('#mobileBiasSliderMount'), {
-            min: 0, max: 1, step: 0.01, value: PersistenceService.loadUISetting('biasValue', 0.33), showValue: true
+            min: 0, max: 1, step: 0.01,
+            value: PersistenceService.loadUISetting('biasValue', 0.33),
+            showValue: true,
+            onChange: val => PersistenceService.saveUISetting('biasValue', val)
+        });
+    
+        const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', true);
+        pane.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
+        pane.querySelector('#mobileRulesetScopeSwitch').addEventListener('change', e => {
+            PersistenceService.saveUISetting('globalRulesetScopeAll', e.target.value === 'all');
+        });
+    
+        const resetOnNew = PersistenceService.loadUISetting('resetOnNewRule', true);
+        const resetCheckbox = pane.querySelector('#mobileResetOnNewRule');
+        resetCheckbox.checked = resetOnNew;
+        resetCheckbox.addEventListener('change', e => {
+            PersistenceService.saveUISetting('resetOnNewRule', e.target.checked);
         });
     }
 
@@ -115,7 +140,7 @@ export class RulesView extends BaseComponent {
         <div class="form-group">
             <label>Mutation Mode:</label>
             <div id="mobileMutateModeSwitch" class="three-way-switch">
-                <input type="radio" id="mobileMutateModeSingle" name="mobileMutateMode" value="single" class="radio-switch-input" checked>
+                <input type="radio" id="mobileMutateModeSingle" name="mobileMutateMode" value="single" class="radio-switch-input">
                 <label for="mobileMutateModeSingle" class="radio-switch-label">Single</label>
                 <input type="radio" id="mobileMutateModeRSym" name="mobileMutateMode" value="r_sym" class="radio-switch-input">
                 <label for="mobileMutateModeRSym" class="radio-switch-label">R-Sym</label>
@@ -126,7 +151,7 @@ export class RulesView extends BaseComponent {
         <div class="form-group">
             <label>Apply to:</label>
             <div id="mobileMutateScopeSwitch" class="three-way-switch">
-                <input type="radio" id="mobileMutateScopeSelected" name="mobileMutateScope" value="selected" class="radio-switch-input" checked>
+                <input type="radio" id="mobileMutateScopeSelected" name="mobileMutateScope" value="selected" class="radio-switch-input">
                 <label for="mobileMutateScopeSelected" class="radio-switch-label">Selected</label>
                 <input type="radio" id="mobileMutateScopeAll" name="mobileMutateScope" value="all" class="radio-switch-input">
                 <label for="mobileMutateScopeAll" class="radio-switch-label">All</label>
@@ -136,9 +161,26 @@ export class RulesView extends BaseComponent {
             <button class="action-button" data-action="mutate" style="flex: 1;">Mutate</button>
             <button class="action-button" data-action="clone-mutate" style="flex: 1;">Clone & Mutate</button>
         </div>
-    `;
+        `;
+    
+        // Load saved settings and attach persistence listeners
         this.sliders.mutate = new SliderComponent(this.panes.mutate.querySelector('#mobileMutateSliderMount'), {
-            min: 1, max: 50, step: 1, value: 1, showValue: true, unit: '%'
+            min: 1, max: 50, step: 1,
+            value: PersistenceService.loadUISetting('mutationRate', 1),
+            showValue: true, unit: '%',
+            onChange: val => PersistenceService.saveUISetting('mutationRate', val)
+        });
+    
+        const mutateMode = PersistenceService.loadUISetting('mutateMode', 'single');
+        this.panes.mutate.querySelector(`input[value="${mutateMode}"]`).checked = true;
+        this.panes.mutate.querySelector('#mobileMutateModeSwitch').addEventListener('change', e => {
+            PersistenceService.saveUISetting('mutateMode', e.target.value);
+        });
+    
+        const mutateScope = PersistenceService.loadUISetting('mutateScope', 'selected');
+        this.panes.mutate.querySelector(`input[name="mobileMutateScope"][value="${mutateScope}"]`).checked = true;
+        this.panes.mutate.querySelector('#mobileMutateScopeSwitch').addEventListener('change', e => {
+            PersistenceService.saveUISetting('mutateScope', e.target.value);
         });
     }
 
@@ -199,10 +241,11 @@ export class RulesView extends BaseComponent {
 
         this.element.addEventListener('click', e => {
             const action = e.target.dataset.action;
-            if (action === 'undo') {
-                EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: 0 }); // Note: worldIndex should be dynamic if you support per-world history
-            } else if (action === 'redo') {
-                EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: 0 });
+            if (action === 'undo' || action === 'redo') {
+                if (!this.worldManager) return;
+                const selectedIndex = this.worldManager.getSelectedWorldIndex();
+                const event = action === 'undo' ? EVENTS.COMMAND_UNDO_RULESET : EVENTS.COMMAND_REDO_RULESET;
+                EventBus.dispatch(event, { worldIndex: selectedIndex });
             }
         });
 

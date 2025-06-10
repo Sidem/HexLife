@@ -40,10 +40,10 @@ export class PanelManager {
         if (this.isMobile) {
             const mobileViewsContainer = document.getElementById('mobile-views-container');
             if (mobileViewsContainer) {
-                this.mobileViews.more = new MoreView(mobileViewsContainer);
+                this.mobileViews.more = new MoreView(mobileViewsContainer, this.worldManager);
                 this.mobileViews.more.render();
 
-                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.libraryData);
+                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.libraryData, this.worldManager);
                 this.mobileViews.rules.render();
                 
                 this.mobileViews.worlds = new WorldsView(mobileViewsContainer, this.worldManager);

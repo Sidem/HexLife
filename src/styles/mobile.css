@@ -56,15 +56,6 @@ screen and (pointer: coarse) and (hover: none) {
         gap: 10px;
     }
 
-    #statsDisplayContainer>span:nth-child(3),
-    /* Brush */
-    #statsDisplayContainer>span:nth-child(4),
-    /* FPS */
-    #statsDisplayContainer>span:nth-child(5) {
-        /* TPS */
-        display: none;
-    }
-
     /* Hide detailed stats on mobile */
     #rulesetDisplayContainer {
         order: 2;

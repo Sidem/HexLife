@@ -1,9 +1,11 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import * as Config from '../../core/config.js';
 
 export class MoreView extends BaseComponent {
-    constructor(mountPoint) {
+    constructor(mountPoint, worldManagerInterface) {
         super(mountPoint);
+        this.worldManager = worldManagerInterface;
         this.element = null;
     }
 
@@ -29,6 +31,35 @@ export class MoreView extends BaseComponent {
         this.attachEventListeners();
     }
 
+    _generateShareLink() {
+        if (!this.worldManager) return null;
+        const params = new URLSearchParams();
+        const rulesetHex = this.worldManager.getCurrentRulesetHex();
+        if (!rulesetHex || rulesetHex === "N/A" || rulesetHex === "Error") {
+            alert("Cannot share: The selected world does not have a valid ruleset.");
+            return null;
+        }
+        params.set('r', rulesetHex);
+    
+        const selectedWorld = this.worldManager.getSelectedWorldIndex();
+        if (selectedWorld !== Config.DEFAULT_SELECTED_WORLD_INDEX) params.set('w', selectedWorld);
+    
+        const speed = this.worldManager.getCurrentSimulationSpeed();
+        if (speed !== Config.DEFAULT_SPEED) params.set('s', speed);
+    
+        const worldSettings = this.worldManager.getWorldSettingsForUI();
+        let enabledBitmask = 0;
+        worldSettings.forEach((ws, i) => { if (ws.enabled) enabledBitmask |= (1 << i); });
+        if (enabledBitmask !== 511) params.set('e', enabledBitmask);
+    
+        const camera = this.worldManager.getCurrentCameraState();
+        if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
+            params.set('cam', `<span class="math-inline">\{parseFloat\(camera\.x\.toFixed\(1\)\)\},</span>{parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
+        }
+    
+        return `<span class="math-inline">\{window\.location\.origin\}</span>{window.location.pathname}?${params.toString()}`;
+    }
+
     attachEventListeners() {
         this.element.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
@@ -39,10 +70,25 @@ export class MoreView extends BaseComponent {
                 case 'save':
                     EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
                     break;
-                case 'share':
-                    // We can reuse the share link generation logic, but present it in a mobile-friendly way
-                    alert('Share functionality to be implemented for mobile.');
-                    break;
+                    case 'share':
+                        const url = this._generateShareLink();
+                        if (!url) break;
+                    
+                        if (navigator.share) {
+                            navigator.share({
+                                title: 'HexLife Explorer Setup',
+                                text: 'Check out this cellular automaton setup!',
+                                url: url,
+                            }).catch(err => console.error('Share failed:', err));
+                        } else {
+                            navigator.clipboard.writeText(url).then(() => {
+                                alert('Share link copied to clipboard!');
+                            }).catch(err => {
+                                console.error('Failed to copy share link:', err);
+                                alert('Could not copy link. Please copy it manually from the address bar on desktop.');
+                            });
+                        }
+                        break;
                 case 'help':
                     // We can trigger the onboarding tour
                     alert('Help/Tour to be implemented for mobile.');
