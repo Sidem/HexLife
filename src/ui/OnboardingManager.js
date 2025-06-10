@@ -89,7 +89,7 @@ function showStep(stepIndex) {
             return;
         }
 
-        if (highlightedElement) { // This is line 90 where the error occurred
+        if (highlightedElement) {
             highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
         }
         if (highlightedElementParentPanel) {

@@ -145,7 +145,7 @@ export class CanvasInputHandler {
     }
 
     _getCoordsFromPointerEvent(event) {
-        console.log('Pointer Event Triggered. Layout Cache:', JSON.parse(JSON.stringify(this.layoutCache)));
+        //console.log('Pointer Event Triggered. Layout Cache:', JSON.parse(JSON.stringify(this.layoutCache)));
         if (!this.layoutCache.selectedView) {
             console.error('CRITICAL: layoutCache.selectedView is missing. Layout has not been calculated.');
         }
@@ -304,13 +304,18 @@ export class CanvasInputHandler {
         const touches = event.touches;
         this.touchState.isDown = true;
         this.touchState.isDragging = false;
-        this.touchState.startPoint = { x: touches[0].clientX, y: touches[0].clientY };
+        // We only care about the first touch for drawing/panning
+        const primaryTouch = touches[0];
+        this.touchState.startPoint = { x: primaryTouch.clientX, y: primaryTouch.clientY };
         this.touchState.lastPoint = { ...this.touchState.startPoint };
 
         if (touches.length >= 2) {
-            this.touchState.gesture = 'pinch';
-            this.isPanning = false; // Stop single-finger panning if a second finger is added
-            this.touchState.lastDistance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+            // Correctly handle pinch gesture only in pan mode
+            if (this.interactionMode === 'pan') {
+                this.touchState.gesture = 'pinch';
+                this.isPanning = false; // Stop single-finger panning if a second finger is added
+                this.touchState.lastDistance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
+            }
         } else {
             this.touchState.gesture = 'pending';
 
@@ -322,8 +327,9 @@ export class CanvasInputHandler {
                 if (this.wasSimulationRunningBeforeStroke) {
                     EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
                 }
-                // Initiate the drawing stroke
-                const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(this.touchState.startPoint);
+                
+                // CRITICAL FIX: Pass the correct touch object to get coordinates
+                const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(primaryTouch);
                 if (viewType === 'selected' && col !== null) {
                     this.strokeAffectedCells.clear();
                     this.lastDrawnCellIndex = row * Config.GRID_COLS + col;
@@ -343,14 +349,30 @@ export class CanvasInputHandler {
 
         const touches = event.touches;
         const camera = this.worldManager.getCurrentCameraState();
-        const newPoint = { x: touches[0].clientX, y: touches[0].clientY };
+        const primaryTouch = touches[0];
+        const newPoint = { x: primaryTouch.clientX, y: primaryTouch.clientY };
 
-        const dist = Math.hypot(newPoint.x - this.touchState.startPoint.x, newPoint.y - this.touchState.startPoint.y);
-        if (dist > this.touchState.TAP_THRESHOLD) {
-            this.touchState.isDragging = true;
+        // Determine if the user is dragging
+        if (!this.touchState.isDragging) {
+            const dist = Math.hypot(newPoint.x - this.touchState.startPoint.x, newPoint.y - this.touchState.startPoint.y);
+            if (dist > this.touchState.TAP_THRESHOLD) {
+                this.touchState.isDragging = true;
+            }
+        }
+        
+        // CRITICAL FIX: Get coordinates from the correct touch object for hover and drawing
+        const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(primaryTouch);
+        const selectedWorldIdx = this.worldManager.getSelectedWorldIndex();
+
+        // FIX: Dispatch hover state, just like in the desktop mousemove handler. This fixes the missing shadow.
+        if (viewType === 'selected' && col !== null) {
+            EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
+        } else {
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
         }
 
-        if (touches.length >= 2) {
+        // --- Gesture Handling ---
+        if (touches.length >= 2 && this.interactionMode === 'pan') {
             this.touchState.gesture = 'pinch';
             const newDist = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
             const pinchCenter = { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
@@ -371,7 +393,6 @@ export class CanvasInputHandler {
                     this._clampCameraPan();
                 }
             } else if (this.interactionMode === 'draw') {
-                const { col, row, viewType } = this._getCoordsFromPointerEvent(newPoint);
                 if (viewType === 'selected' && col !== null) {
                     const currentCellIndex = row * Config.GRID_COLS + col;
                     if (currentCellIndex !== this.lastDrawnCellIndex) {
@@ -384,7 +405,7 @@ export class CanvasInputHandler {
                         if (cellsToToggle.length > 0) {
                             cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
                             EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
-                                worldIndex: this.worldManager.getSelectedWorldIndex(),
+                                worldIndex: selectedWorldIdx,
                                 cellIndices: new Set(cellsToToggle)
                             });
                         }
@@ -400,31 +421,25 @@ export class CanvasInputHandler {
         event.preventDefault();
         if (!this.isMobile) return;
 
+        // Clear any lingering hover state
+        EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex() });
+
         const endTouch = event.changedTouches[0];
         if (endTouch) {
             const { worldIndexAtCursor, viewType } = this._getCoordsFromPointerEvent(endTouch);
 
-            if (viewType === 'mini' && worldIndexAtCursor !== null) {
+            // Handle tapping on a mini-map to select it
+            if (this.touchState.isDown && !this.touchState.isDragging && viewType === 'mini' && worldIndexAtCursor !== null) {
                 EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-                this.touchState.isDown = false;
-                this.touchState.isDragging = false;
-                return;
             }
         }
 
-        if (!this.touchState.isDragging && this.interactionMode === 'draw') {
-            const { worldIndexAtCursor, col, row, viewType } = this._getCoordsFromPointerEvent(this.touchState.startPoint);
-            if (viewType === 'selected' && col !== null) {
-                // The tap already triggered a draw in _handleTouchStart, so this block can be simplified
-                // or left empty if start handles it completely. We'll ensure stroke is cleared.
-            }
-        }
-
+        // Unpause the simulation if it was running before the stroke began
         if (this.interactionMode === 'draw' && this.wasSimulationRunningBeforeStroke) {
             EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
         }
 
-        // Reset all states
+        // Reset all touch and drawing states for the next interaction
         this.wasSimulationRunningBeforeStroke = false;
         this.isPanning = false;
         this.lastDrawnCellIndex = null;

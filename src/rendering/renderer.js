@@ -123,7 +123,7 @@ function _calculateAndCacheLayout() {
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
     // ===================================================================
-    console.log(`%cCalculating layout with dimensions: ${canvasWidth} x ${canvasHeight}`, 'color: lightblue; font-weight: bold;');
+    //console.log(`%cCalculating layout with dimensions: ${canvasWidth} x ${canvasHeight}`, 'color: lightblue; font-weight: bold;');
     // ===================================================================
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
 
