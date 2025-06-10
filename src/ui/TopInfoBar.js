@@ -1,10 +1,12 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { formatHexCode } from '../utils/utils.js';
+import { PopoutPanel } from './components/PopoutPanel.js';
 
 export class TopInfoBar {
     constructor(worldManagerInterface) {
         this.worldManager = worldManagerInterface;
         this.uiElements = null;
+        this.popoutPanels = {};
     }
 
     init(uiElements) {
@@ -19,6 +21,7 @@ export class TopInfoBar {
         if (this.uiElements?.statTargetTps) {
             this.uiElements.statTargetTps.textContent = String(this.worldManager.getCurrentSimulationSpeed());
         }
+        this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
     }
 
     _setupEventListeners() {
@@ -33,8 +36,52 @@ export class TopInfoBar {
             this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
             this.updateUndoRedoButtons();
         });
+        if (this.uiElements.undoButton) {
+            this.uiElements.undoButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
+            });
+        }
+    
+        if (this.uiElements.redoButton) {
+            this.uiElements.redoButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
+            });
+        }
+        this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
+        this.uiElements.historyButton?.addEventListener('popoutshown', this._updateHistoryPopout.bind(this));
+        EventBus.subscribe(EVENTS.HISTORY_CHANGED, (data) => {
+            if (data.worldIndex === this.worldManager.getSelectedWorldIndex() && this.popoutPanels.history && !this.popoutPanels.history.isHidden()) {
+                this._updateHistoryPopout();
+            }
+        });
     }
-
+    _updateHistoryPopout() {
+        const listContainer = this.uiElements.historyPopout.querySelector('#historyList');
+        if (!listContainer) return;
+        const selectedIndex = this.worldManager.getSelectedWorldIndex();
+        const { history } = this.worldManager.getRulesetHistoryArrays(selectedIndex);
+        const currentIndex = history.length - 1;
+        listContainer.innerHTML = '';
+        history.slice().reverse().forEach((hex, index) => {
+            const reversedIndex = history.length - 1 - index;
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.textContent = formatHexCode(hex);
+            if (reversedIndex === currentIndex) {
+                item.classList.add('is-current');
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                tag.textContent = 'Current';
+                item.appendChild(tag);
+            } else {
+                item.addEventListener('click', () => {
+                    EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, { worldIndex: selectedIndex, historyIndex: reversedIndex });
+                    this.popoutPanels.history.hide();
+                });
+            }
+            listContainer.appendChild(item);
+        });
+    }
     updateMainRulesetDisplay(hex) {
         if (this.uiElements?.rulesetDisplay) {
             this.uiElements.rulesetDisplay.textContent = formatHexCode(hex);

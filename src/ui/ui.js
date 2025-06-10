@@ -198,6 +198,7 @@ export function initUI(worldManagerInterface, libraryData, isMobile) {
             helpButton.classList.add('hidden');
         }
     }
+    window.OnboardingManager = OnboardingManager;
 
     document.body.addEventListener('click', (event) => {
         const helpTrigger = event.target.closest('.button-help-trigger');

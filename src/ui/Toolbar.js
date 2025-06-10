@@ -64,7 +64,6 @@ export class Toolbar {
         this.popoutPanels.library = new PopoutPanel(this.uiElements.libraryPopout, this.uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
         this.popoutPanels.resetClear = new PopoutPanel(this.uiElements.resetClearPopout, this.uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
         this.popoutPanels.share = new PopoutPanel(this.uiElements.sharePopout, this.uiElements.shareButton, { position: 'right', alignment: 'start' });
-        this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
         this.activePopouts = Object.values(this.popoutPanels);
     }
 
@@ -196,9 +195,6 @@ export class Toolbar {
             this.popoutPanels.share.toggle();
         });
         
-        this.uiElements.undoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() }));
-        this.uiElements.redoButton?.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() }));
-        this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
 
         this.uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
         this.uiElements.loadStateButton.addEventListener('click', () => {
@@ -206,14 +202,7 @@ export class Toolbar {
             this.uiElements.fileInput.click();
         });
         
-        this.uiElements.historyButton?.addEventListener('popoutshown', this._updateHistoryPopout.bind(this));
         this.uiElements.copyShareLinkButton.addEventListener('click', this._copyShareLink.bind(this));
-        
-        EventBus.subscribe(EVENTS.HISTORY_CHANGED, (data) => {
-            if (data.worldIndex === this.worldManager.getSelectedWorldIndex() && this.popoutPanels.history && !this.popoutPanels.history.isHidden()) {
-                this._updateHistoryPopout();
-            }
-        });
     }
 
     _setupStateListeners() {
@@ -289,34 +278,6 @@ export class Toolbar {
                 setTimeout(() => this.uiElements.copyShareLinkButton.textContent = "Copy to Clipboard", 1500);
             }).catch(err => alert('Failed to copy link.'));
         }
-    }
-    
-    _updateHistoryPopout() {
-        const listContainer = this.uiElements.historyPopout.querySelector('#historyList');
-        if (!listContainer) return;
-        const selectedIndex = this.worldManager.getSelectedWorldIndex();
-        const { history } = this.worldManager.getRulesetHistoryArrays(selectedIndex);
-        const currentIndex = history.length - 1;
-        listContainer.innerHTML = '';
-        history.slice().reverse().forEach((hex, index) => {
-            const reversedIndex = history.length - 1 - index;
-            const item = document.createElement('div');
-            item.className = 'history-item';
-            item.textContent = formatHexCode(hex);
-            if (reversedIndex === currentIndex) {
-                item.classList.add('is-current');
-                const tag = document.createElement('span');
-                tag.className = 'tag';
-                tag.textContent = 'Current';
-                item.appendChild(tag);
-            } else {
-                item.addEventListener('click', () => {
-                    EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, { worldIndex: selectedIndex, historyIndex: reversedIndex });
-                    this.popoutPanels.history.hide();
-                });
-            }
-            listContainer.appendChild(item);
-        });
     }
 
     updatePauseButtonVisual(isPaused) {
