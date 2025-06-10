@@ -13,6 +13,13 @@ export class RulesetEditor extends PersistentDraggablePanel {
             return;
         }
 
+        if (options.isMobile) {
+            const header = this.panelElement.querySelector('h3');
+            if (header) header.classList.add('hidden');
+            const closeButton = this.panelElement.querySelector('.close-panel-button');
+            if (closeButton) closeButton.classList.add('hidden');
+        }
+
         this.worldManager = worldManagerInterface;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),

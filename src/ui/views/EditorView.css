@@ -1,0 +1,39 @@
+/* Ensure the editor panel fits correctly within the mobile view container */
+#editor-view #rulesetEditorPanel {
+    position: relative; /* Override fixed positioning from desktop */
+    width: 100% !important;
+    height: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+}
+
+#editor-view .panel-content-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 0;
+}
+
+
+/* Responsive layout for the detailed 128-rule grid */
+#rulesetEditorGrid {
+    grid-template-columns: repeat(16, minmax(39px, 1fr));
+    gap: 1px;
+}
+
+/* Make Rotational Symmetry grid more compact on mobile */
+#rotationalSymmetryRulesetEditorGrid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 2px;
+}
+
+/* Adjust scaling of the rule visualization hexagons */
+.r-sym-rule-viz .rule-viz-hex-display {
+    transform: scale(0.4) translate(0px, -50px);
+    margin-bottom: -40px;
+}
