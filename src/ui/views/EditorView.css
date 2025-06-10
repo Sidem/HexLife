@@ -19,11 +19,42 @@
     padding-right: 0;
 }
 
+#editor-view .radio-switch-input {
+    display: none;
+}
+
+#editor-view .editor-controls {
+    flex-direction: row;
+    align-items: center;
+}
+
+#editor-view .editor-hex-input {
+    width: auto;
+}
+
+#editor-view #rulesetEditorGrid {
+    grid-template-columns: repeat(8, minmax(39px, 1fr));
+    gap: 1px;
+    margin-bottom: 200px;
+}
+
+#editor-view #rotationalSymmetryRulesetEditorGrid {
+    grid-template-columns: repeat(4, minmax(39px, 1fr));
+    margin-bottom: 200px; 
+}
 
 /* Responsive layout for the detailed 128-rule grid */
 #rulesetEditorGrid {
     grid-template-columns: repeat(16, minmax(39px, 1fr));
     gap: 1px;
+}
+
+#editor-view .neighbor-count-rule-viz .hexagon.center-hex {
+    transform: scale(0.8) translate(-25px, -53px);
+}
+
+#editor-view #neighborCountRulesetEditorGrid {
+    grid-template-columns: repeat(7, 13.2%);
 }
 
 /* Make Rotational Symmetry grid more compact on mobile */

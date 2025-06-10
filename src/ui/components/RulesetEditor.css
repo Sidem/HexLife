@@ -329,12 +329,7 @@
 }
 
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
-    .editor-controls { flex-direction: column; align-items: stretch; }
-    .editor-controls .editor-hex-input,
-    .editor-controls #rulesetEditorMode,
-    .editor-controls #clearRulesButton.button {
-        width: 100%; margin-bottom: 5px;
-    }
+    .editor-controls { flex-direction: row; align-items: stretch; }
     #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(2, 1fr);
     }

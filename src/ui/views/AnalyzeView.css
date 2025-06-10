@@ -83,3 +83,8 @@
     font-family: monospace;
     font-size: 0.9em;
 }
+
+#analyze-view .rule-viz {
+    width: 100px;
+    transform: scale(1.2) translate(50px, 40px);
+}

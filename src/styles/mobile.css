@@ -134,13 +134,6 @@ screen and (pointer: coarse) and (hover: none) {
         /* No dragging on mobile */
     }
 
-    /* Specific Panel Adjustments */
-    #rulesetEditorPanel .editor-controls,
-    #rulesetEditorPanel .editor-apply-scope-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     #worldSetupGrid {
         grid-template-columns: 1fr;
         /* Stack world configs vertically */
