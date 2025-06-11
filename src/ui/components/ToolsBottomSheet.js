@@ -10,11 +10,10 @@ export class ToolsBottomSheet extends BottomSheet {
         super(id, triggerElement, { title: 'Simulation Tools' });
         this.worldManager = worldManagerInterface;
         this.render();
-        this.attachEventListeners(); // Call the new method
+        this.attachEventListeners();
     }
 
     render() {
-        // REPLACED METHOD
         const content = document.createElement('div');
         content.className = 'tools-bottom-sheet-content';
 

@@ -205,6 +205,35 @@ screen and (pointer: coarse) and (hover: none) {
         justify-content: center;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
+        transition: transform 0.15s ease-out, background-color 0.15s ease-out, box-shadow 0.15s ease-out;
+    }
+
+    .mobile-fab:hover {
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 7px 18px rgba(0, 0, 0, 0.5);
+    }
+    .secondary-fab:hover {
+        background-color: #5a5a5a;
+    }
+    .primary-fab:hover {
+        background-color: #ffda83;
+    }
+
+    .mobile-fab:active {
+        transform: translateY(1px) scale(0.95);
+        transition-duration: 0.05s;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    .secondary-fab:active {
+        background-color: #3f3f3f;
+    }
+    .primary-fab:active {
+        background-color: #d8b05b;
+    }
+
+    .mobile-fab:focus-visible {
+        outline: 3px solid #009dff;
+        outline-offset: 3px;
     }
 
     .primary-fab {

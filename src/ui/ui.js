@@ -97,7 +97,7 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
     document.getElementById('mobile-canvas-controls')?.classList.remove('hidden');
     const fabRightContainer = document.getElementById('mobile-fab-container-right');
     const fabLeftContainer = document.getElementById('mobile-fab-container-left');
-    
+
     // --- Step 1: Render the STATIC Right-side FABs ---
     // These buttons are permanent and not part of the customization system.
     fabRightContainer.innerHTML = `
@@ -121,15 +121,39 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
     // --- Step 2: Render the DYNAMIC Left-side FABs ---
     // This logic is completely separate from the right side.
     const fabActionMap = {
-        'generate': { icon: '✨', title: 'Generate', command: EVENTS.COMMAND_GENERATE_RANDOM_RULESET, payload: { bias: 0.5, generationMode: 'r_sym', resetScopeForThisChange: 'all' } },
-        'mutate':   { icon: '🦠', title: 'Mutate', command: EVENTS.COMMAND_MUTATE_RULESET, payload: { mutationRate: 0.05, scope: 'selected', mode: 'single' } },
-        'clone':    { icon: '🧬', title: 'Clone & Mutate', command: EVENTS.COMMAND_CLONE_AND_MUTATE, payload: { mutationRate: 0.05, mode: 'single' } },
-        'clear-one':{ icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
-        'clear-all':{ icon: '💥', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
-        'reset-one':{ icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
-        'reset-all':{ icon: '🌍', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} }
+        'generate': {
+            icon: '✨', title: 'Generate', handler: () => {
+                const scope = PersistenceService.loadUISetting('globalRulesetScopeAll', true) ? 'all' : 'selected';
+                EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+                    bias: PersistenceService.loadUISetting('biasValue', 0.33),
+                    generationMode: PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym'),
+                    resetScopeForThisChange: PersistenceService.loadUISetting('resetOnNewRule', true) ? scope : 'none'
+                });
+            }
+        },
+        'mutate': {
+            icon: '🦠', title: 'Mutate', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+                    mutationRate: PersistenceService.loadUISetting('mutationRate', 1) / 100.0,
+                    scope: PersistenceService.loadUISetting('mutateScope', 'selected'),
+                    mode: PersistenceService.loadUISetting('mutateMode', 'single')
+                });
+            }
+        },
+        'clone': {
+            icon: '🧬', title: 'Clone & Mutate', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+                    mutationRate: PersistenceService.loadUISetting('mutationRate', 1) / 100.0,
+                    mode: PersistenceService.loadUISetting('mutateMode', 'single')
+                });
+            }
+        },
+        'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
+        'clear-all': { icon: '💥', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
+        'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
+        'reset-all': { icon: '🌍', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} }
     };
-    
+
     function renderCustomFabs() {
         fabLeftContainer.innerHTML = '';
         const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone', 'reset-all'], locked: true, order: [] });
@@ -137,7 +161,7 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
         // Use saved order, or default to the order they were enabled in
         const orderedIds = (fabSettings.order && fabSettings.order.length > 0) ? fabSettings.order : fabSettings.enabled;
         const enabledSet = new Set(fabSettings.enabled);
-        
+
         orderedIds.forEach(actionId => {
             if (!enabledSet.has(actionId)) return; // Only render enabled buttons
 
@@ -153,7 +177,13 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
             if (!fabSettings.locked) {
                 button.classList.add('draggable');
             }
-            button.addEventListener('click', () => EventBus.dispatch(action.command, action.payload));
+            button.addEventListener('click', () => {
+                if (action.handler) {
+                    action.handler();
+                } else {
+                    EventBus.dispatch(action.command, action.payload);
+                }
+            });
             fabLeftContainer.appendChild(button);
         });
     }

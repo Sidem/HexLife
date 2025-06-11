@@ -84,6 +84,4 @@ export const EVENTS = {
     LAYOUT_CALCULATED: 'system:layoutCalculated',
     INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged',
     COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
-    COMMAND_SET_FAB_LOCK: 'command:setFabLock',
-    COMMAND_RESET_FAB_POSITIONS: 'command:resetFabPositions'
 };
