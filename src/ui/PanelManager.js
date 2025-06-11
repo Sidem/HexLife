@@ -17,24 +17,29 @@ export class PanelManager {
         this.uiElements = null;
         this.mobileViews = {};
         this.libraryData = null;
+        this.panelConfig = [
+            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: { isMobile: this.isMobile } },
+            { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: { isMobile: this.isMobile } },
+            { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: { isMobile: this.isMobile } },
+            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: { isMobile: this.isMobile } }
+        ];
     }
 
     init(uiElements, libraryData) {
         this.uiElements = uiElements;
         this.libraryData = libraryData;
 
-        if (this.uiElements.rulesetEditorPanel) {
-            this.panels.rulesetEditor = new RulesetEditor(this.uiElements.rulesetEditorPanel, this.worldManager, { isMobile: this.isMobile });
-        }
-        if (this.uiElements.setupPanel) {
-            this.panels.setupPanel = new SetupPanel(this.uiElements.setupPanel, this.worldManager, { isMobile: this.isMobile });
-        }
-        if (this.uiElements.analysisPanel) {
-            this.panels.analysisPanel = new AnalysisPanel(this.uiElements.analysisPanel, this.worldManager, this, { isMobile: this.isMobile });
-        }
-        if (this.uiElements.ruleRankPanel) {
-            this.panels.ruleRankPanel = new RuleRankPanel(this.uiElements.ruleRankPanel, this.worldManager, { isMobile: this.isMobile });
-        }
+        this.panelConfig.forEach(config => {
+            const panelElement = this.uiElements[config.elementId];
+            if (panelElement) {
+                const PanelClass = config.constructor;
+                if (PanelClass === AnalysisPanel) {
+                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, this, config.options);
+                } else {
+                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
+                }
+            }
+        });
 
         // MOBILE VIEW INITIALIZATIONS
         if (this.isMobile) {
@@ -62,10 +67,12 @@ export class PanelManager {
     }
     
     _setupPanelToggleListeners() {
-        this.uiElements.editRuleButton?.addEventListener('click', () => this.panels.rulesetEditor?.toggle());
-        this.uiElements.setupPanelButton?.addEventListener('click', () => this.panels.setupPanel?.toggle());
-        this.uiElements.analysisPanelButton?.addEventListener('click', () => this.panels.analysisPanel?.toggle());
-        this.uiElements.rankPanelButton?.addEventListener('click', () => this.panels.ruleRankPanel?.toggle());
+        this.panelConfig.forEach(config => {
+            const buttonElement = this.uiElements[config.buttonId];
+            if (buttonElement) {
+                buttonElement.addEventListener('click', () => this.panels[config.name]?.toggle());
+            }
+        });
     }
 
     _setupEventListeners() {
@@ -96,6 +103,7 @@ export class PanelManager {
              if (this.panels.analysisPanel && !this.panels.analysisPanel.isHidden()) this.panels.analysisPanel.refreshViews();
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
     }
     
     getMobileViews() {
@@ -108,6 +116,20 @@ export class PanelManager {
 
     getPanel(panelName) {
         return this.panels[panelName];
+    }
+
+    showMobileView({ targetView, currentView }) {
+        if (!this.isMobile) return;
+    
+        const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
+    
+        Object.values(this.mobileViews).forEach(v => v.hide());
+    
+        const viewToShow = this.mobileViews[nextView];
+        if (viewToShow) {
+            viewToShow.show();
+        }
+        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: nextView });
     }
     
     hideAllPanels() {

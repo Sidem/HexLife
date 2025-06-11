@@ -24,25 +24,17 @@ export class BottomTabBar extends BaseComponent {
         Object.entries(this.buttons).forEach(([view, button]) => {
             this._addDOMListener(button, 'click', () => this.handleViewChange(view));
         });
+        this._subscribeToEvent(EVENTS.MOBILE_VIEW_CHANGED, (data) => {
+            this.activeView = data.activeView;
+            this.updateActiveButton();
+        });
     }
 
     handleViewChange(view) {
-        const currentlyActive = this.activeView;
-        Object.values(this.panelManager.getMobileViews()).forEach(v => v.hide());
-
-        if (view === currentlyActive && view !== 'simulate') {
-             this.activeView = 'simulate';
-        } else {
-            const targetView = this.panelManager.getMobileView(view);
-            if (targetView) {
-                targetView.show();
-                this.activeView = view;
-            } else {
-                this.activeView = 'simulate';
-            }
-        }
-        
-        this.updateActiveButton();
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, {
+            targetView: view,
+            currentView: this.activeView
+        });
     }
 
     updateActiveButton() {

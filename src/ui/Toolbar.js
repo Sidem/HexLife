@@ -16,6 +16,16 @@ export class Toolbar {
         this.sliderComponents = {};
         this.popoutPanels = {};
         this.activePopouts = [];
+        this.popoutConfig = [
+            { name: 'speed', buttonId: 'speedControlButton', popoutId: 'speedPopout', options: { position: 'right', alignment: 'start' } },
+            { name: 'brush', buttonId: 'brushToolButton', popoutId: 'brushPopout', options: { position: 'right', alignment: 'start' } },
+            { name: 'newRules', buttonId: 'newRulesButton', popoutId: 'newRulesPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
+            { name: 'mutate', buttonId: 'mutateButton', popoutId: 'mutatePopout', options: { position: 'right', alignment: 'start', offset: 5 } },
+            { name: 'setHex', buttonId: 'setRulesetButton', popoutId: 'setHexPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
+            { name: 'library', buttonId: 'libraryButton', popoutId: 'libraryPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
+            { name: 'resetClear', buttonId: 'resetClearButton', popoutId: 'resetClearPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
+            { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } }
+        ];
     }
 
     init(uiElements) {
@@ -69,14 +79,13 @@ export class Toolbar {
     }
     
     _initPopoutPanels() {
-        this.popoutPanels.speed = new PopoutPanel(this.uiElements.speedPopout, this.uiElements.speedControlButton, { position: 'right', alignment: 'start' });
-        this.popoutPanels.brush = new PopoutPanel(this.uiElements.brushPopout, this.uiElements.brushToolButton, { position: 'right', alignment: 'start' });
-        this.popoutPanels.newRules = new PopoutPanel(this.uiElements.newRulesPopout, this.uiElements.newRulesButton, { position: 'right', alignment: 'start', offset: 5 });
-        this.popoutPanels.mutate = new PopoutPanel(this.uiElements.mutatePopout, this.uiElements.mutateButton, { position: 'right', alignment: 'start', offset: 5 });
-        this.popoutPanels.setHex = new PopoutPanel(this.uiElements.setHexPopout, this.uiElements.setRulesetButton, { position: 'right', alignment: 'start', offset: 5 });
-        this.popoutPanels.library = new PopoutPanel(this.uiElements.libraryPopout, this.uiElements.libraryButton, { position: 'right', alignment: 'start', offset: 5 });
-        this.popoutPanels.resetClear = new PopoutPanel(this.uiElements.resetClearPopout, this.uiElements.resetClearButton, { position: 'right', alignment: 'start', offset: 5 });
-        this.popoutPanels.share = new PopoutPanel(this.uiElements.sharePopout, this.uiElements.shareButton, { position: 'right', alignment: 'start' });
+        this.popoutConfig.forEach(config => {
+            const buttonElement = this.uiElements[config.buttonId];
+            const popoutElement = this.uiElements[config.popoutId];
+            if (buttonElement && popoutElement) {
+                this.popoutPanels[config.name] = new PopoutPanel(popoutElement, buttonElement, config.options);
+            }
+        });
         this.activePopouts = Object.values(this.popoutPanels);
     }
 
@@ -188,27 +197,33 @@ export class Toolbar {
     _setupToolbarButtonListeners() {
         this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
 
-        const setupPopoutToggle = (button, popoutName, tourName) => {
-            this.uiElements[button].addEventListener('click', () => {
-                this.popoutPanels[popoutName].toggle();
-                if (tourName) OnboardingManager.startTour(tourName);
-            });
-        };
-
-        setupPopoutToggle('speedControlButton', 'speed', 'speedAndBrush');
-        setupPopoutToggle('brushToolButton', 'brush', 'speedAndBrush');
-        setupPopoutToggle('newRulesButton', 'newRules', 'rulesetGeneration');
-        setupPopoutToggle('mutateButton', 'mutate', 'mutation');
-        setupPopoutToggle('setRulesetButton', 'setHex', 'directInput');
-        setupPopoutToggle('libraryButton', 'library', 'library');
-        setupPopoutToggle('resetClearButton', 'resetClear', 'resetClear');
+        this.popoutConfig.forEach(config => {
+            const tourName = {
+                speed: 'speedAndBrush',
+                brush: 'speedAndBrush',
+                newRules: 'rulesetGeneration',
+                mutate: 'mutation',
+                setHex: 'directInput',
+                library: 'library',
+                resetClear: 'resetClear'
+            }[config.name];
+        
+            const buttonElement = this.uiElements[config.buttonId];
+            if (buttonElement) {
+                buttonElement.addEventListener('click', () => {
+                    this.popoutPanels[config.name]?.toggle();
+                    if (tourName) {
+                        onboardingManager.startTour(tourName);
+                    }
+                });
+            }
+        });
         
         this.uiElements.shareButton.addEventListener('click', () => {
             this._generateAndShowShareLink();
             this.popoutPanels.share.toggle();
         });
         
-
         this.uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
         this.uiElements.loadStateButton.addEventListener('click', () => {
             this.uiElements.fileInput.accept = ".txt,.json";

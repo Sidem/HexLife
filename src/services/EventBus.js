@@ -83,5 +83,7 @@ export const EVENTS = {
     UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged',
     LAYOUT_CALCULATED: 'system:layoutCalculated',
     INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged',
+    COMMAND_SHOW_VIEW: 'command:showView',
+    MOBILE_VIEW_CHANGED: 'ui:mobileViewChanged',
     COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
 };
