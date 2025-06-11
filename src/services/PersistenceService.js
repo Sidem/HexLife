@@ -11,7 +11,8 @@ const KEYS = {
     ANALYSIS_PANEL_STATE: `${LS_KEY_PREFIX}analysisPanelState`,
     RULERANK_PANEL_STATE: `${LS_KEY_PREFIX}ruleRankPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
-    FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`
+    FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
+    ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`
 };
 
 function _getItem(key) {
@@ -156,4 +157,12 @@ export function clearAllAppSettings() {
         }
     });
     console.log("All application settings cleared.");
+}
+
+export function loadOnboardingStates() {
+    return _getItem(KEYS.ONBOARDING_STATES) || {};
+}
+
+export function saveOnboardingStates(statesObject) { 
+    _setItem(KEYS.ONBOARDING_STATES, statesObject);
 }

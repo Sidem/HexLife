@@ -49,21 +49,12 @@ export class CanvasInputHandler {
         this.interactionMode = this.interactionMode === 'pan' ? 'draw' : 'pan';
         console.log(`Interaction mode set to: ${this.interactionMode}`);
         EventBus.dispatch(EVENTS.INTERACTION_MODE_CHANGED, this.interactionMode);
-
-        if (!this.isMobile) {
-            this.canvas.style.cursor = (this.interactionMode === 'draw') ? 'crosshair' : 'grab';
-        }
     }
 
     setInteractionMode(mode) {
         if (mode !== 'pan' && mode !== 'draw') return;
         this.interactionMode = mode;
         console.log(`Interaction mode set to: ${this.interactionMode}`);
-
-        // Update cursor style for desktop if needed
-        if (!this.isMobile) {
-            this.canvas.style.cursor = (this.interactionMode === 'draw') ? 'crosshair' : 'grab';
-        }
     }
 
     _handleEscKey(event) {
@@ -194,7 +185,6 @@ export class CanvasInputHandler {
             this.isPanning = true;
             this.lastPanX = event.clientX;
             this.lastPanY = event.clientY;
-            this.canvas.style.cursor = 'grabbing';
             return;
         }
 
@@ -260,7 +250,6 @@ export class CanvasInputHandler {
     _handleMouseUp(event) {
         if (this.isMobile) return;
         this.isPanning = false;
-        this.canvas.style.cursor = 'grab';
 
         if (this.isMouseDrawing) {
             this.isMouseDrawing = false;

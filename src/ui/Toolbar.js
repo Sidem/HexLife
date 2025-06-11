@@ -3,8 +3,7 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
-import { OnboardingManager } from './OnboardingManager.js';
-import { formatHexCode } from '../utils/utils.js';
+import { onboardingManager } from './ui.js';
 
 export class Toolbar {
     constructor(worldManagerInterface, libraryData, isMobile = false) {
@@ -44,7 +43,7 @@ export class Toolbar {
         document.addEventListener('popoutinteraction', (event) => closeAll(event.detail.panel));
         
         const handleClickOutside = (event) => {
-            if (OnboardingManager.isActive()) {
+            if (onboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
                 if (tooltip) {
                     const rect = tooltip.getBoundingClientRect();

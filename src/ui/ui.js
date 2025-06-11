@@ -12,7 +12,8 @@ import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 
-let panelManager, toolbar;
+let panelManager, toolbar, onboardingManager;;
+export { onboardingManager };
 
 function getUIElements() {
     // This function now just serves as a central query for all needed DOM elements.
@@ -196,45 +197,48 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
 export function initUI(worldManagerInterface, libraryData, isMobile) {
     const uiElements = getUIElements();
 
-    // --- SHARED INITIALIZATION ---
-    // TopInfoBar is used by both layouts, so it must be initialized first.
     const topInfoBar = new TopInfoBar(worldManagerInterface);
     topInfoBar.init(uiElements);
 
-    // PanelManager is also shared, managing panel state for both layouts.
     panelManager = new PanelManager(worldManagerInterface, isMobile);
     panelManager.init(uiElements, libraryData);
 
-    // --- LAYOUT-SPECIFIC INITIALIZATION ---
     if (isMobile) {
         initMobileUI(worldManagerInterface, panelManager, uiElements);
     } else {
-        // Desktop-only components
         toolbar = new Toolbar(worldManagerInterface, libraryData, isMobile);
         toolbar.init(uiElements);
     }
 
-    // --- GLOBAL INITIALIZATION ---
-    // Keyboard shortcuts are mostly for desktop, but Escape key can be global.
     const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar, isMobile);
     keyboardManager.init(uiElements);
 
-    OnboardingManager.defineTours(tours);
+    onboardingManager = new OnboardingManager({
+        overlay: document.getElementById('onboarding-overlay'),
+        tooltip: document.getElementById('onboarding-tooltip'),
+        title: document.getElementById('onboarding-tooltip-title'),
+        content: document.getElementById('onboarding-tooltip-content'),
+        primaryBtn: document.getElementById('onboarding-action-primary'),
+        secondaryBtn: document.getElementById('onboarding-action-secondary'),
+        progressBar: document.getElementById('onboarding-progress-bar'),
+    });
+    onboardingManager.defineTours(tours);
+
     const helpButton = document.getElementById('helpButton');
     if (helpButton) {
         if (!isMobile) {
-            helpButton.addEventListener('click', () => OnboardingManager.startTour('core', true));
+            helpButton.addEventListener('click', () => onboardingManager.startTour('core', true));
         } else {
             helpButton.classList.add('hidden');
         }
     }
-    window.OnboardingManager = OnboardingManager;
+    window.OnboardingManager = onboardingManager;
 
     document.body.addEventListener('click', (event) => {
         const helpTrigger = event.target.closest('.button-help-trigger');
         if (helpTrigger && helpTrigger.dataset.tourName) {
             event.stopPropagation();
-            OnboardingManager.startTour(helpTrigger.dataset.tourName, true);
+            onboardingManager.startTour(helpTrigger.dataset.tourName, true);
         }
     });
 
