@@ -81,7 +81,7 @@ export class WorldsView extends BaseComponent {
             this.listElement.appendChild(card);
 
             const slider = new SliderComponent(card.querySelector(`#world_density_${index}`), {
-                id: `densitySlider_${index}`, label: 'Density:', min: 0, max: 1, step: 0.01,
+                id: `densitySlider_${index}`, label: 'Density:', min: 0, max: 1, step: 0.001,
                 value: world.initialDensity, showValue: true,
                 onChange: (newDensity) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: index, density: newDensity });
