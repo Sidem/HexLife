@@ -72,10 +72,6 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
 
 A rich set of keyboard shortcuts enhances usability.
 
-### 5. Keyboard Shortcuts
-
-A rich set of keyboard shortcuts enhances usability.
-
 * **Playback:** `P` - Play/Pause
 * **Panels/Popouts:** `N`, `E`, `S`, `A` - Toggle New Rules, Editor, Setup, and Analysis panels.
 * **Actions:**
