@@ -56,20 +56,20 @@ const coreTour = [
 
 const speedAndBrushTour = [
     {
-        element: '[data-tour-id="speed-control-button"]',
+        element: '[data-tour-id="speed-popout"]',
         title: 'Controlling Time',
-        content: "The <span class=\"onboarding-highlight-text\">SPD</span> button controls the simulation's target Ticks Per Second (TPS). <span class=\"onboarding-highlight-text\">Click it to open the speed controls.</span>",
-        onBeforeShow: () => { hidePopouts(); },
-        primaryAction: { text: 'Open Speed Controls' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SHOW_POPOUT, condition: (data) => data.panelName === 'speed' }
+        content: "The <span class=\"onboarding-highlight-text\">SPD</span> button opens the controls for the simulation's target Ticks Per Second (TPS). <span class=\"onboarding-highlight-text\">Move the slider to change the speed.</span>",
+        onBeforeShow: () => { showPopout('speed'); },
+        primaryAction: { text: 'Change Speed' },
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_SPEED_CHANGED }
     },
     {
-        element: '[data-tour-id="brush-tool-button"]',
-        title: 'Controlling Space',
-        content: "Excellent. Now, click the <span class=\"onboarding-highlight-text\">BRS</span> button. It controls the size of your drawing brush. <br><br><span class=\"onboarding-highlight-text\">Pro-Tip:</span> For faster workflow, hover over the grid and use <span class=\"onboarding-highlight-text\">Ctrl + Mouse Wheel</span> to adjust the brush size on the fly.",
-        onBeforeShow: () => { hidePopouts(); },
-        primaryAction: { text: 'Open Brush Controls' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SHOW_POPOUT, condition: (data) => data.panelName === 'brush' }
+        element: '[data-tour-id="brush-popout"]',
+        title: 'Wielding the Brush',
+        content: "Excellent. The <span class=\"onboarding-highlight-text\">BRS</span> button opens the controls for the size of your drawing brush. <br><span class=\"onboarding-highlight-text\">Move the slider to change the size.</span> <br><span class=\"onboarding-highlight-text\">Pro-Tip:</span> For faster workflow, hover over the grid and use <span class=\"onboarding-highlight-text\">Ctrl + Mouse Wheel</span> to adjust the brush size on the fly.",
+        onBeforeShow: () => { showPopout('brush'); },
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
     }
 ];
 
@@ -102,7 +102,7 @@ const mutationTour = [
     {
         element: '[data-tour-id="mutatePopout"]',
         title: 'The DNA Splicer',
-        content: "Evolution requires mutation. This tool introduces small, random changes to an existing ruleset. A low <span class=\"onboarding-highlight-text\">Mutation Rate</span> (1-5%) is often best for finding interesting variations.",
+        content: "Evolution requires mutation. This tool introduces small, random changes to an existing ruleset. A low <span class=\"onboarding-highlight-text\">Mutation Rate</span> (5-10%) is often best for finding interesting variations.",
         onBeforeShow: () => { showPopout('mutate'); },
         primaryAction: { text: 'What About Cloning?' },
         advanceOn: { type: 'click' }
@@ -150,15 +150,15 @@ const libraryTour = [
         onBeforeShow: () => { document.querySelector('[data-tab="rulesets"]').click(); },
         primaryAction: { text: 'Click \'Load\'' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
-    },
-    {
-        element: '.library-item .place-pattern-btn',
-        title: 'Placing a Pattern',
-        content: "Placing a <span class=\"onboarding-highlight-text\">Pattern</span> seeds the grid with a specific shape, like the famous 'Glider', using the current ruleset. <span class=\"onboarding-highlight-text\">Click 'Place' to enter placing mode.</span>",
-        onBeforeShow: () => { document.querySelector('[data-tab="patterns"]').click(); },
-        primaryAction: { text: 'Click \'Place\'' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_ENTER_PLACING_MODE }
-    }
+    }//,
+    //{
+    //    element: '.library-item .place-pattern-btn',
+    //    title: 'Placing a Pattern',
+    //    content: "Placing a <span class=\"onboarding-highlight-text\">Pattern</span> seeds the grid with a specific shape, like the famous 'Glider', using the current ruleset. <span class=\"onboarding-highlight-text\">Click 'Place' to enter placing mode.</span>",
+    //    onBeforeShow: () => { document.querySelector('[data-tab="patterns"]').click(); },
+    //    primaryAction: { text: 'Click \'Place\'' },
+    //    advanceOn: { type: 'event', eventName: EVENTS.COMMAND_ENTER_PLACING_MODE }
+    //}
 ];
 
 const historyTour = [
