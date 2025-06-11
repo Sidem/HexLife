@@ -29,7 +29,7 @@ const coreTour = [
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
         primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;}
     },
     {
         element: '[data-tour-id="main-content-area"]',
@@ -60,7 +60,7 @@ const coreTourMobile = [
         title: 'Welcome to the HexLife Explorer',
         content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
         primaryAction: { text: 'Begin Orientation' },
-        onBeforeShow: () => { document.querySelector('[data-view="more"]').click(); },
+        onBeforeShow: () => { document.querySelector('[data-view="simulate"]').click(); },
         advanceOn: { type: 'click' }
     },
     {
@@ -68,7 +68,7 @@ const coreTourMobile = [
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
         primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;} }
     },
     {
         element: '#hexGridCanvas',
@@ -82,7 +82,7 @@ const coreTourMobile = [
         title: 'Wielding the Brush',
         content: "The most direct way to influence a universe is by seeding it with life. <span class=\"onboarding-highlight-text\">Switch to Draw mode</span>",
         primaryAction: null,
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_INTERACTION_MODE }
+        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => {return mode === 'draw';} }
     },
     {
         element: '#hexGridCanvas',
