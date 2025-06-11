@@ -32,14 +32,16 @@ const coreTour = [
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;} }
     },
     {
-        element: '[data-tour-id="main-content-area"]',
+        element: '#minimap-guide',
+        highlightType: 'canvas',
         title: 'The Focal Point',
         content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click on any mini-map view</span> to shift your focus.",
         primaryAction: { text: 'Select a Different World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     },
     {
-        element: '[data-tour-id="hex-grid-canvas"]',
+        element: '#selected-world-guide',
+        highlightType: 'canvas',
         title: 'The Spark of Creation',
         content: "The most direct way to influence a universe is by seeding it with life. The simulation will pause automatically when you draw. <span class=\"onboarding-highlight-text\">Click and drag your mouse on the main view.</span>",
         primaryAction: { text: 'Try Drawing on the Grid' },
@@ -66,35 +68,37 @@ const coreTourMobile = [
     {
         element: '#mobilePlayPauseButton',
         title: 'The Flow of Time',
-        content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
+        content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock.",
         primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;} }
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => !data }
     },
     {
-        element: '#hexGridCanvas',
-        title: 'The Focal Point',
-        content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click on any mini-map view</span> to shift your focus.",
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'The Observatory',
+        content: "This area shows all nine universes at once. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Tap on any mini-map view</span> to shift your focus to it.",
         primaryAction: { text: 'Select a Different World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     },
     {
         element: '#interaction-mode-toggle',
         title: 'Wielding the Brush',
-        content: "The most direct way to influence a universe is by seeding it with life. <span class=\"onboarding-highlight-text\">Switch to Draw mode</span>",
+        content: "To influence a universe, you must first switch from Pan mode to Draw mode. <span class=\"onboarding-highlight-text\">Tap the hand icon</span> to switch to the brush.",
         primaryAction: null,
-        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => {return mode === 'draw';} }
+        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' }
     },
     {
-        element: '#hexGridCanvas',
+        element: '#selected-world-guide',
+        highlightType: 'canvas',
         title: 'The Spark of Creation',
-        content: "Now with your Brush in hand start painting. <span class=\"onboarding-highlight-text\">Touch and move across the main view on top</span>",
+        content: "Now, with your Brush active, you can seed life directly onto the main view. The simulation will pause automatically. <span class=\"onboarding-highlight-text\">Touch and drag on the main view</span> to draw.",
         primaryAction: null,
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
     },
     {
         element: '[data-tour-id="mobile-help-button"]',
         title: 'Your Lab Assistant',
-        content: "You now have the core skills. For every other tool in this lab, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon to launch a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help button</span> to restart this orientation at any time. The rest is up to you. Good luck.",
+        content: "You now have the core skills. To restart this tour, find the <span class=\"onboarding-highlight-text\">Help</span> button in the 'More' tab. The rest is up to you. Good luck.",
         onBeforeShow: () => { document.querySelector('[data-view="more"]').click(); },
         primaryAction: { text: 'Begin My Research' },
         advanceOn: { type: 'click' }

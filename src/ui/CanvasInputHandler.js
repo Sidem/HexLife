@@ -129,9 +129,8 @@ export class CanvasInputHandler {
 
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, () => this.toggleInteractionMode());
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.enterPlacingMode(data));
-        EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, () => {
-            console.log('Layout calculated event received. Updating input handler cache.');
-            this.handleResize();
+        EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => {
+            this.layoutCache = newLayout;
         });
     }
 
@@ -465,9 +464,5 @@ export class CanvasInputHandler {
             clientX: touch.clientX, clientY: touch.clientY,
             button: 0, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false,
         });
-    }
-
-    handleResize() {
-        this.layoutCache = getLayoutCache();
     }
 }

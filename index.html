@@ -123,6 +123,8 @@
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">
             </canvas>
+            <div id="selected-world-guide" style="position: absolute; pointer-events: none; box-sizing: border-box; display: none;"></div>
+            <div id="minimap-guide" style="position: absolute; pointer-events: none; box-sizing: border-box; display: none;"></div>
             <div id="mobile-canvas-controls" class="hidden">
                 <div id="mobile-fab-container-right" class="mobile-fab-container"></div>
                 <div id="mobile-fab-container-left" class="mobile-fab-container left"></div>
@@ -364,7 +366,7 @@
     </div> 
     
     <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
-    
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {

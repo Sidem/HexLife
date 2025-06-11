@@ -37,6 +37,15 @@
     border: 1px solid rgba(255, 240, 150, 0.9);
 }
 
+.onboarding-canvas-highlight {
+    display: block !important;
+    box-shadow: 0 0 0 500vmax rgba(0, 0, 0, 0.7);
+    border: 2px solid #f0c674;
+    z-index: 2000;
+    pointer-events: none;
+    animation: pulse-highlight 2s infinite;
+}
+
 #onboarding-tooltip {
     position: fixed;
     background: linear-gradient(145deg, #4a4a4a, #383838);

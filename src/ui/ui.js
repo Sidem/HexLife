@@ -11,6 +11,7 @@ import { KeyboardShortcutManager } from './KeyboardShortcutManager.js';
 import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import * as PersistenceService from '../services/PersistenceService.js';
+import * as Config from '../core/config.js';
 
 let panelManager, toolbar, onboardingManager;;
 export { onboardingManager };
@@ -194,9 +195,46 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
     EventBus.subscribe(EVENTS.COMMAND_UPDATE_FAB_UI, renderCustomFabs);
 }
 
+function initGuidingBoxes() {
+    const canvas = document.getElementById('hexGridCanvas');
+    const selectedWorldGuide = document.getElementById('selected-world-guide');
+    const miniMapGuide = document.getElementById('minimap-guide');
+
+    if (canvas && selectedWorldGuide && miniMapGuide) {
+        EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (layout) => {
+            if (layout && layout.selectedView && layout.miniMap) {
+                // Get the canvas's position relative to its direct parent (#main-content-area)
+                // This is the correct, dynamic offset that replaces your manual values.
+                const canvasOffsetX = canvas.offsetLeft;
+                const canvasOffsetY = canvas.offsetTop;
+
+                // --- Position the Selected World Guide ---
+                const { x, y, width, height } = layout.selectedView;
+                selectedWorldGuide.style.left = `${x + canvasOffsetX}px`;
+                selectedWorldGuide.style.top = `${y + canvasOffsetY}px`;
+                selectedWorldGuide.style.width = `${width}px`;
+                selectedWorldGuide.style.height = `${height}px`;
+                selectedWorldGuide.style.display = 'block';
+
+                // --- Position the Minimap Guide ---
+                const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = layout.miniMap;
+                
+                // Calculate total grid size dynamically using config variables
+                const miniMapGridWidth = miniMapW * Config.WORLD_LAYOUT_COLS + miniMapSpacing * (Config.WORLD_LAYOUT_COLS - 1);
+                const miniMapGridHeight = miniMapH * Config.WORLD_LAYOUT_ROWS + miniMapSpacing * (Config.WORLD_LAYOUT_ROWS - 1);
+
+                miniMapGuide.style.left = `${gridContainerX + canvasOffsetX}px`;
+                miniMapGuide.style.top = `${gridContainerY + canvasOffsetY}px`;
+                miniMapGuide.style.width = `${miniMapGridWidth}px`;
+                miniMapGuide.style.height = `${miniMapGridHeight}px`;
+                miniMapGuide.style.display = 'block';
+            }
+        });
+    }
+}
+
 export function initUI(worldManagerInterface, libraryData, isMobile) {
     const uiElements = getUIElements();
-
     const topInfoBar = new TopInfoBar(worldManagerInterface);
     topInfoBar.init(uiElements);
 
@@ -209,7 +247,6 @@ export function initUI(worldManagerInterface, libraryData, isMobile) {
         toolbar = new Toolbar(worldManagerInterface, libraryData, isMobile);
         toolbar.init(uiElements);
     }
-
     const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar, isMobile);
     keyboardManager.init(uiElements);
 
@@ -264,6 +301,7 @@ export function initUI(worldManagerInterface, libraryData, isMobile) {
         if (playPauseButton) playPauseButton.textContent = worldManagerInterface.isSimulationPaused() ? "▶" : "❚❚";
     }
 
+    initGuidingBoxes();
     console.log(`UI Initialized for: ${isMobile ? 'Mobile' : 'Desktop'}`);
     return true;
 }

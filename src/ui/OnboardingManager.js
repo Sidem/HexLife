@@ -162,7 +162,7 @@ export class OnboardingManager {
     
     _cleanupCurrentStep() {
         if (this.highlightedElement) {
-            this.highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-no-filter');
+            this.highlightedElement.classList.remove('onboarding-highlight', 'onboarding-highlight-canvas-area', 'onboarding-canvas-highlight');
             this.highlightedElement = null;
         }
         if (this.highlightedElementParentPanel) {
@@ -171,27 +171,35 @@ export class OnboardingManager {
         }
         this.ui.overlay.classList.add('hidden');
         this.ui.tooltip.classList.add('hidden');
-
-        // Replace primary button to remove old event listeners
+    
+        this.ui.overlay.style.backgroundColor = '';
+        this.ui.overlay.style.backdropFilter = '';
+    
         const newPrimaryBtn = this.ui.primaryBtn.cloneNode(true);
         this.ui.primaryBtn.parentNode.replaceChild(newPrimaryBtn, this.ui.primaryBtn);
         this.ui.primaryBtn = newPrimaryBtn;
     }
 
     _highlightElement(targetElement) {
+        const step = this.activeTourSteps[this.currentStepIndex];
+        const highlightType = step.highlightType || 'default';
+    
         const parentPanel = targetElement.closest('.popout-panel, .draggable-panel-base');
         if (parentPanel) {
             parentPanel.style.zIndex = '2001';
             this.highlightedElementParentPanel = parentPanel;
         }
-
+    
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         this.highlightedElement = targetElement;
-
+    
         if (targetElement !== document.body) {
-            this.highlightedElement.classList.add('onboarding-highlight');
-            if (['rulesetDisplayContainer', 'statsDisplayContainer'].includes(targetElement.dataset.tourId)) {
-                this.highlightedElement.classList.add('onboarding-highlight-no-filter');
+            if (highlightType === 'canvas') {
+                this.highlightedElement.classList.add('onboarding-canvas-highlight');
+                this.ui.overlay.style.backgroundColor = 'transparent';
+                this.ui.overlay.style.backdropFilter = 'none';
+            } else {
+                this.highlightedElement.classList.add('onboarding-highlight');
             }
         }
     }

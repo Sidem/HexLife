@@ -174,7 +174,7 @@ function _calculateAndCacheLayout() {
         selectedView: { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight },
         miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
     };
-    EventBus.dispatch(EVENTS.LAYOUT_CALCULATED);
+    EventBus.dispatch(EVENTS.LAYOUT_CALCULATED, { ...layoutCache });
 }
 
 export function getLayoutCache() {

@@ -152,7 +152,6 @@ function handleResize() {
     
     if (isInitialized) {
         if (gl) Renderer.resizeRenderer();
-        if (canvasInputHandler) canvasInputHandler.handleResize();
     }
 }
 
