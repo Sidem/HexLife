@@ -44,15 +44,12 @@ export class Toolbar {
         document.addEventListener('popoutinteraction', (event) => closeAll(event.detail.panel));
         
         const handleClickOutside = (event) => {
-            // Check if onboarding is active. If so, we need to be careful.
             if (OnboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
-                // Check if the tooltip is visible and if the click coordinates are inside its bounds.
-                if (tooltip && !tooltip.classList.contains('hidden')) {
+                if (tooltip) {
                     const rect = tooltip.getBoundingClientRect();
-                    if (event.clientX >= rect.left && event.clientX <= rect.right &&
-                        event.clientY >= rect.top && event.clientY <= rect.bottom) {
-                        // The click was physically inside the onboarding tooltip. Ignore it.
+                    if (event.target.id.includes('action') || (event.clientX >= rect.left && event.clientX <= rect.right &&
+                        event.clientY >= rect.top && event.clientY <= rect.bottom)) {
                         return;
                     }
                 }
