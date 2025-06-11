@@ -17,6 +17,7 @@ let pausedByVisibilityChange = false;
 let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
+let isMobile = false;
 
 function parseUrlParameters() {
     const params = new URLSearchParams(window.location.search);
@@ -109,7 +110,8 @@ async function initialize() {
     };
 
     const mobileQuery = '(max-width: 768px), (pointer: coarse) and (hover: none)';
-    const isMobile = window.matchMedia(mobileQuery).matches;
+    isMobile = window.matchMedia(mobileQuery).matches;
+    window.isMobile = isMobile;
     
     canvasInputHandler = new CanvasInputHandler(canvas, worldManager, isMobile);
 
@@ -180,7 +182,11 @@ function renderLoop(timestamp) {
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
-        onboardingManager.startTour('core');
+        if (isMobile) {
+            onboardingManager.startTour('coreMobile');
+        } else {
+            onboardingManager.startTour('core');
+        }
     }
     
     Renderer.renderFrameOrLoader(

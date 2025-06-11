@@ -1,6 +1,7 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
+import { onboardingManager } from '../ui.js';
 
 export class MoreView extends BaseComponent {
     constructor(mountPoint, worldManagerInterface) {
@@ -23,7 +24,7 @@ export class MoreView extends BaseComponent {
         <label for="mobileFileInput" class="button file-input-label">Load World State</label>
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
         <button class="button" data-action="share">Share Setup</button>
-        <button class="button" data-action="help">Help / Tour</button>
+        <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
     </div>
 `;
@@ -91,7 +92,7 @@ export class MoreView extends BaseComponent {
                         break;
                 case 'help':
                     // We can trigger the onboarding tour
-                    alert('Help/Tour to be implemented for mobile.');
+                    onboardingManager.startTour('coreMobile', true);
                     break;
             }
         });

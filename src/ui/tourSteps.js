@@ -54,6 +54,54 @@ const coreTour = [
     }
 ];
 
+const coreTourMobile = [
+    {
+        element: 'body',
+        title: 'Welcome to the HexLife Explorer',
+        content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
+        primaryAction: { text: 'Begin Orientation' },
+        onBeforeShow: () => { document.querySelector('[data-view="more"]').click(); },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#mobilePlayPauseButton',
+        title: 'The Flow of Time',
+        content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
+        primaryAction: { text: 'Click the Play Button' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_PAUSE }
+    },
+    {
+        element: '#hexGridCanvas',
+        title: 'The Focal Point',
+        content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click on any mini-map view</span> to shift your focus.",
+        primaryAction: { text: 'Select a Different World' },
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+    },
+    {
+        element: '#interaction-mode-toggle',
+        title: 'Wielding the Brush',
+        content: "The most direct way to influence a universe is by seeding it with life. <span class=\"onboarding-highlight-text\">Switch to Draw mode</span>",
+        primaryAction: null,
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_TOGGLE_INTERACTION_MODE }
+    },
+    {
+        element: '#hexGridCanvas',
+        title: 'The Spark of Creation',
+        content: "Now with your Brush in hand start painting. <span class=\"onboarding-highlight-text\">Touch and move across the main view on top</span>",
+        primaryAction: null,
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+    },
+    {
+        element: '[data-tour-id="mobile-help-button"]',
+        title: 'Your Lab Assistant',
+        content: "You now have the core skills. For every other tool in this lab, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon to launch a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help button</span> to restart this orientation at any time. The rest is up to you. Good luck.",
+        onBeforeShow: () => { document.querySelector('[data-view="more"]').click(); },
+        primaryAction: { text: 'Begin My Research' },
+        advanceOn: { type: 'click' }
+    }
+];
+
+
 const speedAndBrushTour = [
     {
         element: '[data-tour-id="speed-popout"]',
@@ -296,6 +344,7 @@ const ruleRankTour = [
 
 export const tours = {
     core: coreTour,
+    coreMobile: coreTourMobile,
     speedAndBrush: speedAndBrushTour,
     rulesetGeneration: rulesetGenerationTour,
     mutation: mutationTour,
