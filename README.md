@@ -44,6 +44,8 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
 
 ### 3. Interactive Controls & UI
 
+* **Responsive Mobile UI:** Features a distinct mobile interface with a bottom tab bar, quick-action FABs, and touch-friendly controls for a seamless experience on any device.
+* **Advanced Analysis & Onboarding:** Includes an interactive tour system to guide new users, a plugin-based analysis panel for visualizing simulation metrics, and a real-time rule ranking panel to understand automaton dynamics.
 * **Toolbar & Popouts:** A vertical toolbar provides quick access to primary functions. Most controls are housed in popout panels (`PopoutPanel.js`) that appear next to their trigger button, keeping the interface clean.
 * **Playback & Speed:** Globally play/pause the simulation (`P` key) and adjust the target Ticks Per Second (TPS) for all worlds.
 * **Brush Interaction:** Draw on the main world's canvas to toggle cell states. Brush size can be adjusted with a slider or the mouse wheel. The simulation automatically pauses during a drawing stroke for precise edits.
@@ -70,9 +72,21 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
 
 A rich set of keyboard shortcuts enhances usability.
 
+### 5. Keyboard Shortcuts
+
+A rich set of keyboard shortcuts enhances usability.
+
 * **Playback:** `P` - Play/Pause
 * **Panels/Popouts:** `N`, `E`, `S`, `A` - Toggle New Rules, Editor, Setup, and Analysis panels.
-* **Actions:** `G` - Generate new ruleset, `R` - Reset All, `Shift+R` - Reset Selected, `C` - Clear All, `Shift+C` - Clear Selected.
+* **Actions:**
+    * `G` - Generate new ruleset.
+    * `M` - Mutate selected world's ruleset.
+    * `Shift+M` - Clone selected ruleset to all other worlds and mutate each.
+    * `R` - Reset All worlds to initial densities.
+    * `Shift+R` - Reset Selected world.
+    * `C` - Clear All worlds.
+    * `Shift+C` - Clear Selected world.
 * **World Selection:** `1-9` / `Numpad 1-9` - Select a world.
 * **World Toggle:** `Shift + 1-9` - Toggle a world's enabled state.
+* **History:** `Ctrl+Z` - Undo ruleset change, `Ctrl+Y` - Redo.
 * **General:** `Escape` - Close active popout or panel.
