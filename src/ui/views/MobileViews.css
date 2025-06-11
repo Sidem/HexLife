@@ -1,6 +1,6 @@
 .mobile-view {
     position: fixed;
-    bottom: 0; /* Anchor to the bottom */
+    bottom: 110px;
     left: 0;
     width: 100%;
     height: 75%; /* Cover most of the screen, leaving room for the top view */

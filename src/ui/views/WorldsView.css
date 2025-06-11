@@ -48,3 +48,28 @@
 .world-card .density-control .slider-component-container {
     width: 100%;
 }
+
+.worlds-list {
+    padding: 15px;
+    /* Add flex-grow to make the list take available space */
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.worlds-view-actions {
+    padding: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #444;
+    background-color: #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* This makes sure the actions stay at the bottom */
+    flex-shrink: 0;
+}
+
+.worlds-view-actions .button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+}

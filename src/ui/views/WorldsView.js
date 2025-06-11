@@ -19,7 +19,12 @@ export class WorldsView extends BaseComponent {
                 <h2 class="mobile-view-title">Manage Worlds</h2>
                 <button class="mobile-view-close-button" data-action="close">&times;</button>
             </div>
-            <div class="worlds-list" style="padding: 15px;"></div>
+            <div class="worlds-list"></div>
+            <div class="worlds-view-actions">
+                <button class="button" data-action="apply-density-all">Apply Selected Density to All</button>
+                <button class="button" data-action="reset-densities">Reset Densities to Default</button>
+                <button class="button" data-action="reset-all-worlds">Apply & Reset All Enabled</button>
+            </div>
         `;
         this.mountPoint.appendChild(this.element);
 
@@ -32,9 +37,20 @@ export class WorldsView extends BaseComponent {
     
     attachEventListeners() {
         this.element.addEventListener('click', (e) => {
-            if (e.target.matches('.mobile-view-close-button')) {
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
-                return;
+            const action = e.target.dataset.action;
+            switch (action) {
+                case 'close':
+                    document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+                    break;
+                case 'apply-density-all':
+                    EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
+                    break;
+                case 'reset-densities':
+                    EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
+                    break;
+                case 'reset-all-worlds':
+                    EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+                    break;
             }
         });
     }
