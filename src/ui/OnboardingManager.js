@@ -6,8 +6,8 @@ let activeTourSteps = [];
 let currentStepIndex = -1;
 let currentTourName = null;
 let tourIsActive = false;
-let highlightedElement = null; // FIX: Declare here
-let highlightedElementParentPanel = null; // FIX: Declare here
+let highlightedElement = null; 
+let highlightedElementParentPanel = null; 
 
 
 const ui = {
@@ -61,9 +61,13 @@ function cleanupCurrentStep() {
     }
     ui.overlay.classList.add('hidden');
     ui.tooltip.classList.add('hidden');
+    
+    //console.log('[DEBUG-Onboarding] cleanupCurrentStep: About to replace primary button.');
     const newPrimaryBtn = ui.primaryBtn.cloneNode(true);
     ui.primaryBtn.parentNode.replaceChild(newPrimaryBtn, ui.primaryBtn);
     ui.primaryBtn = newPrimaryBtn;
+    //console.log('[DEBUG-Onboarding] cleanupCurrentStep: Primary button has been replaced.');
+
     currentTourName = null;
 }
 

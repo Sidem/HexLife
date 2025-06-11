@@ -42,18 +42,30 @@ export class Toolbar {
             });
         };
         document.addEventListener('popoutinteraction', (event) => closeAll(event.detail.panel));
+        
         const handleClickOutside = (event) => {
-            let onboardingTooltip = document.getElementById('onboarding-tooltip');
-            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && (onboardingTooltip.contains(event.target) || event.target.id.includes("action"))) {
-                return;
+            // Check if onboarding is active. If so, we need to be careful.
+            if (OnboardingManager.isActive()) {
+                const tooltip = document.getElementById('onboarding-tooltip');
+                // Check if the tooltip is visible and if the click coordinates are inside its bounds.
+                if (tooltip && !tooltip.classList.contains('hidden')) {
+                    const rect = tooltip.getBoundingClientRect();
+                    if (event.clientX >= rect.left && event.clientX <= rect.right &&
+                        event.clientY >= rect.top && event.clientY <= rect.bottom) {
+                        // The click was physically inside the onboarding tooltip. Ignore it.
+                        return;
+                    }
+                }
             }
+
             if (!this.activePopouts.some(p => !p.isHidden())) return;
-            if (OnboardingManager.isActive()) return;
 
             const clickedInsidePopout = event.target.closest('.popout-panel');
             const clickedTriggerButton = this.activePopouts.some(p => p.triggerElement && p.triggerElement.contains(event.target));
-
-            if (!clickedInsidePopout && !clickedTriggerButton) closeAll();
+            
+            if (!clickedInsidePopout && !clickedTriggerButton) {
+                closeAll();
+            }
         };
         document.addEventListener('click', handleClickOutside);
         document.addEventListener('touchend', handleClickOutside);

@@ -28,12 +28,21 @@ export class PopoutPanel extends BaseComponent {
     }
 
     _handleOutsideClick(event) {
+        //console.log('[DEBUG-PopoutPanel] _handleOutsideClick triggered.', { target: event.target });
         if (this.popoutElement && !this.popoutElement.classList.contains('hidden')) {
-            let onboardingTooltip = document.getElementById('onboarding-tooltip');
-            if (onboardingTooltip && !onboardingTooltip.classList.contains('hidden') && (onboardingTooltip.contains(event.target) || event.target.id.includes("action"))) {
+            const inOnboarding = event.target.closest('#onboarding-tooltip');
+            //console.log(`[DEBUG-PopoutPanel] Is click inside onboarding tooltip? ${!!inOnboarding}`);
+            if (inOnboarding) {
+                //console.log('[DEBUG-PopoutPanel] Click is inside onboarding, taking no action.');
                 return;
             }
-            if (!this.popoutElement.contains(event.target) && event.target !== this.triggerElement && !this.triggerElement.contains(event.target)) {
+
+            const inPopout = this.popoutElement.contains(event.target);
+            const isTrigger = event.target === this.triggerElement || this.triggerElement.contains(event.target);
+            //console.log(`[DEBUG-PopoutPanel] Checks: inPopout=${inPopout}, isTrigger=${isTrigger}`);
+
+            if (!inPopout && !isTrigger) {
+                //console.log('%c[DEBUG-PopoutPanel] HIDING popout now.', 'color: orange');
                 this.hide();
             }
         }
@@ -106,7 +115,6 @@ export class PopoutPanel extends BaseComponent {
         if (newLeft < 0) newLeft = this.options.offset;
         if (newTop < 0) newTop = this.options.offset;
 
-        // Apply the corrected variable names here
         this.popoutElement.style.top = `${newTop}px`;
         this.popoutElement.style.left = `${newLeft}px`;
     }
