@@ -29,7 +29,7 @@ const coreTour = [
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
         primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;}
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => {return !data;} }
     },
     {
         element: '[data-tour-id="main-content-area"]',

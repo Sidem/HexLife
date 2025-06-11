@@ -304,6 +304,26 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
     }
 }
 
+export function generateShareUrl(worldManager) {
+    if (!worldManager) return null;
+    const params = new URLSearchParams();
+
+    const rulesetHex = worldManager.getCurrentRulesetHex();
+    if (!rulesetHex || rulesetHex === "N/A" || rulesetHex === "Error") {
+        console.error("Cannot generate share link: No valid ruleset.");
+        return null;
+    }
+    params.set('r', rulesetHex);
+
+    // ... (rest of the parameter setting logic) ...
+    const camera = worldManager.getCurrentCameraState();
+    if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
+        params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
+    }
+
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+}
+
 /**
  * Converts normalized texture coordinates (0-1) to discrete grid coordinates.
  * Searches in a small radius around a rough estimate for the closest valid hex.

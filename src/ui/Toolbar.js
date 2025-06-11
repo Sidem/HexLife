@@ -4,6 +4,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { onboardingManager } from './ui.js';
+import { generateShareUrl } from '../utils/utils.js';
 
 export class Toolbar {
     constructor(worldManagerInterface, libraryData, isMobile = false) {
@@ -258,28 +259,7 @@ export class Toolbar {
     }
 
     _generateAndShowShareLink() {
-        const params = new URLSearchParams();
-        const rulesetHex = this.worldManager.getCurrentRulesetHex();
-        if (!rulesetHex || rulesetHex === "N/A" || rulesetHex === "Error") { alert("Cannot share: The selected world does not have a valid ruleset."); return; }
-        params.set('r', rulesetHex);
-
-        const selectedWorld = this.worldManager.getSelectedWorldIndex();
-        if (selectedWorld !== Config.DEFAULT_SELECTED_WORLD_INDEX) params.set('w', selectedWorld);
-
-        const speed = this.worldManager.getCurrentSimulationSpeed();
-        if (speed !== Config.DEFAULT_SPEED) params.set('s', speed);
-
-        const worldSettings = this.worldManager.getWorldSettingsForUI();
-        let enabledBitmask = 0;
-        worldSettings.forEach((ws, i) => { if (ws.enabled) enabledBitmask |= (1 << i); });
-        if (enabledBitmask !== 511) params.set('e', enabledBitmask);
-
-        const camera = this.worldManager.getCurrentCameraState();
-        if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
-            params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
-        }
-        
-        this.uiElements.shareLinkInput.value = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+        this.uiElements.shareLinkInput.value = generateShareUrl(this.worldManager);
     }
 
     _copyShareLink() {
