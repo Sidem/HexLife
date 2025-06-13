@@ -10,8 +10,8 @@
 .ruleset-viz-svg {
     border: 1px solid #555;
     border-radius: 2px;
-    width: 16px;
-    height: 32px;
+    width: 24px;
+    height: 48px;
     background-color: #111;
 }
 
@@ -48,18 +48,10 @@
 
 /* Top Info Bar Integration */
 #rulesetDisplayContainer .ruleset-viz-container {
-    width: 16px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     margin-right: 8px;
 }
-
-/* Setup Panel Integration */
-.world-config-cell .ruleset-viz-container {
-    width: 24px;
-    height: 48px;
-    margin-top: 5px;
-}
-
 /* Mobile Worlds View Integration */
 .world-card .ruleset-viz-container {
     width: 24px;

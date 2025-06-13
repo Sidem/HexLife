@@ -55,8 +55,6 @@
     }
 
     .panel-actions {
-        margin-top: 15px;
-        padding-top: 10px;
         border-top: 1px solid #444;
         display: flex;
         justify-content: center;
