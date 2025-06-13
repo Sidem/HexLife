@@ -12,8 +12,9 @@ import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
+import { uiManager } from './UIManager.js';
 
-let panelManager, toolbar, onboardingManager;;
+let panelManager, toolbar, onboardingManager;
 export { onboardingManager };
 
 function getUIElements() {
@@ -87,16 +88,22 @@ function getUIElements() {
     };
 }
 
-function initMobileUI(worldManagerInterface, panelManager, uiElements) {
+function initMobileUI(worldManagerInterface) {
     console.log("Mobile UI Initialized with corrected FAB logic");
 
     const bottomTabBarEl = document.getElementById('bottom-tab-bar');
     if (bottomTabBarEl) {
         new BottomTabBar(bottomTabBarEl, panelManager);
-        bottomTabBarEl.classList.remove('hidden');
     }
 
-    document.getElementById('mobile-canvas-controls')?.classList.remove('hidden');
+    const mobileControls = document.getElementById('mobile-canvas-controls');
+    if (mobileControls) {
+        mobileControls.classList.toggle('hidden', !uiManager.isMobile());
+        EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
+            mobileControls.classList.toggle('hidden', mode !== 'mobile');
+        });
+    }
+
     const fabRightContainer = document.getElementById('mobile-fab-container-right');
     const fabLeftContainer = document.getElementById('mobile-fab-container-left');
 
@@ -113,10 +120,12 @@ function initMobileUI(worldManagerInterface, panelManager, uiElements) {
     fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
     fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
-        fabRightContainer.querySelector('#mobilePlayPauseButton').textContent = isPaused ? "▶" : "❚❚";
+        const mobilePlayPause = fabRightContainer.querySelector('#mobilePlayPauseButton');
+        if (mobilePlayPause) mobilePlayPause.textContent = isPaused ? "▶" : "❚❚";
     });
     EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
-        fabRightContainer.querySelector('#interaction-mode-toggle .icon').textContent = mode === 'pan' ? '🖐️' : '✏️';
+        const toggleIcon = fabRightContainer.querySelector('#interaction-mode-toggle .icon');
+        if (toggleIcon) toggleIcon.textContent = mode === 'pan' ? '🖐️' : '✏️';
     });
 
 
@@ -233,22 +242,23 @@ function initGuidingBoxes() {
     }
 }
 
-export function initUI(worldManagerInterface, libraryData, isMobile) {
+export function initUI(worldManagerInterface, libraryData) {
     const uiElements = getUIElements();
     const topInfoBar = new TopInfoBar(worldManagerInterface);
     topInfoBar.init(uiElements);
 
-    panelManager = new PanelManager(worldManagerInterface, isMobile);
+    panelManager = new PanelManager(worldManagerInterface);
     panelManager.init(uiElements, libraryData);
 
-    if (isMobile) {
-        initMobileUI(worldManagerInterface, panelManager, uiElements);
-    } else {
-        toolbar = new Toolbar(worldManagerInterface, libraryData, isMobile);
-        toolbar.init(uiElements);
-    }
-    const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar, isMobile);
+    toolbar = new Toolbar(worldManagerInterface, libraryData);
+    toolbar.init(uiElements);
+
+    const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar);
     keyboardManager.init(uiElements);
+
+    // This function initializes all mobile-specific components.
+    // They will self-regulate their visibility based on UI mode.
+    initMobileUI(worldManagerInterface);
 
     onboardingManager = new OnboardingManager({
         overlay: document.getElementById('onboarding-overlay'),
@@ -263,11 +273,10 @@ export function initUI(worldManagerInterface, libraryData, isMobile) {
 
     const helpButton = document.getElementById('helpButton');
     if (helpButton) {
-        if (!isMobile) {
-            helpButton.addEventListener('click', () => onboardingManager.startTour('core', true));
-        } else {
-            helpButton.classList.add('hidden');
-        }
+        helpButton.addEventListener('click', () => {
+            const tour = uiManager.isMobile() ? 'coreMobile' : 'core';
+            onboardingManager.startTour(tour, true);
+        });
     }
     window.OnboardingManager = onboardingManager;
 
@@ -294,15 +303,10 @@ export function initUI(worldManagerInterface, libraryData, isMobile) {
     });
 
     // Initial UI state sync
-    if (!isMobile && toolbar) {
-        toolbar.updatePauseButtonVisual(worldManagerInterface.isSimulationPaused());
-    } else if (isMobile) {
-        const playPauseButton = uiElements.playPauseButton;
-        if (playPauseButton) playPauseButton.textContent = worldManagerInterface.isSimulationPaused() ? "▶" : "❚❚";
-    }
-
+    toolbar.updatePauseButtonVisual(worldManagerInterface.isSimulationPaused());
+    
     initGuidingBoxes();
-    console.log(`UI Initialized for: ${isMobile ? 'Mobile' : 'Desktop'}`);
+    console.log(`UI Initialized for: ${uiManager.getMode()}`);
     return true;
 }
 

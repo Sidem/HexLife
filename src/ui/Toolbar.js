@@ -5,17 +5,18 @@ import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { onboardingManager } from './ui.js';
 import { generateShareUrl } from '../utils/utils.js';
+import { uiManager } from './UIManager.js';
 
 export class Toolbar {
-    constructor(worldManagerInterface, libraryData, isMobile = false) {
+    constructor(worldManagerInterface, libraryData) {
         this.worldManager = worldManagerInterface;
         this.libraryData = libraryData;
-        this.isMobile = isMobile;
         
         this.uiElements = null;
         this.sliderComponents = {};
         this.popoutPanels = {};
         this.activePopouts = [];
+        this.toolbarElement = document.getElementById('vertical-toolbar');
         this.popoutConfig = [
             { name: 'speed', buttonId: 'speedControlButton', popoutId: 'speedPopout', options: { position: 'right', alignment: 'start' } },
             { name: 'brush', buttonId: 'brushToolButton', popoutId: 'brushPopout', options: { position: 'right', alignment: 'start' } },
@@ -31,18 +32,18 @@ export class Toolbar {
     init(uiElements) {
         this.uiElements = uiElements;
 
-        if (!this.isMobile) {
-            this._initPopoutPanels();
-            this._initPopoutControls();
-            this._populateLibraryPanel();
-            this._setupGlobalPopoutListeners();
-        }
+        this._initPopoutPanels();
+        this._initPopoutControls();
+        this._populateLibraryPanel();
+        this._setupGlobalPopoutListeners();
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
-        
-        if (!this.isMobile) {
-            this._loadAndApplyUISettings();
-        }
+        this._loadAndApplyUISettings();
+
+        // Subscribe to UI mode changes
+        EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => this.updateVisibility(mode));
+        // Set initial visibility
+        this.updateVisibility(uiManager.getMode());
     }
 
     _setupGlobalPopoutListeners() {
@@ -312,6 +313,13 @@ export class Toolbar {
         const mutationRate = this.sliderComponents.mutationRateSlider.getValue() / 100.0;
         const mode = this.uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
         EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
+    }
+
+    updateVisibility(mode) {
+        if (this.toolbarElement) {
+            const isVisible = (mode === 'desktop');
+            this.toolbarElement.classList.toggle('hidden', !isVisible);
+        }
     }
 
     getPopout(panelName) { return this.popoutPanels[panelName]; }

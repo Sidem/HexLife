@@ -1,5 +1,6 @@
 import { BaseComponent } from './components/BaseComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { uiManager } from './UIManager.js';
 
 export class BottomTabBar extends BaseComponent {
     constructor(mountPoint, panelManager) {
@@ -11,6 +12,9 @@ export class BottomTabBar extends BaseComponent {
         this._initButtons();
         this._setupEventListeners();
         this.updateActiveButton();
+
+        // Set initial visibility based on the UIManager's state
+        this.mountPoint.classList.toggle('hidden', !uiManager.isMobile());
     }
 
     _initButtons() {
@@ -27,6 +31,10 @@ export class BottomTabBar extends BaseComponent {
         this._subscribeToEvent(EVENTS.MOBILE_VIEW_CHANGED, (data) => {
             this.activeView = data.activeView;
             this.updateActiveButton();
+        });
+        // Subscribe to UI mode changes to control visibility
+        this._subscribeToEvent(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
+            this.mountPoint.classList.toggle('hidden', mode !== 'mobile');
         });
     }
 

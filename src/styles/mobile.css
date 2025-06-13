@@ -34,11 +34,6 @@ screen and (pointer: coarse) and (hover: none) {
         position: relative;
     }
 
-    #vertical-toolbar {
-        display: none;
-        /* Hide the desktop toolbar */
-    }
-
     #top-info-bar {
         order: 1;
         /* Top bar is the first item */

@@ -7,6 +7,7 @@ import { onboardingManager } from './ui/ui.js';
 import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 import { tours } from './ui/tourSteps.js'; 
+import { uiManager } from './ui/UIManager.js';
 
 let gl;
 let worldManager;
@@ -17,7 +18,6 @@ let pausedByVisibilityChange = false;
 let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
-let isMobile = false;
 
 function parseUrlParameters() {
     const params = new URLSearchParams(window.location.search);
@@ -69,6 +69,9 @@ async function initialize() {
         console.error("Canvas element not found!");
         return;
     }
+
+    // Initialize the UI Manager first, as other components depend on it.
+    uiManager.init();
     
     const sharedSettings = parseUrlParameters();
 
@@ -108,15 +111,11 @@ async function initialize() {
         getCurrentCameraState: worldManager.getCurrentCameraState.bind(worldManager),
         getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
     };
-
-    const mobileQuery = '(max-width: 768px), (pointer: coarse) and (hover: none)';
-    isMobile = window.matchMedia(mobileQuery).matches;
-    window.isMobile = isMobile;
     
-    canvasInputHandler = new CanvasInputHandler(canvas, worldManager, isMobile);
+    canvasInputHandler = new CanvasInputHandler(canvas, worldManager, uiManager.isMobile());
 
 
-    if (!UI.initUI(worldManagerInterfaceForUI, libraryData, isMobile)) {
+    if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
         console.error("UI initialization failed.");
         return;
     }
@@ -181,7 +180,7 @@ function renderLoop(timestamp) {
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
         CanvasLoader.stopCanvasLoader();
-        if (isMobile) {
+        if (uiManager.getMode() === 'mobile') {
             onboardingManager.startTour('coreMobile');
         } else {
             onboardingManager.startTour('core');
