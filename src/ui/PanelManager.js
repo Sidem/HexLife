@@ -8,11 +8,11 @@ import { RulesView } from './views/RulesView.js';
 import { WorldsView } from './views/WorldsView.js';
 import { AnalyzeView } from './views/AnalyzeView.js';
 import { EditorView } from './views/EditorView.js';
+import { uiManager } from './UIManager.js';
 
 export class PanelManager {
-    constructor(worldManagerInterface, isMobile = false) {
+    constructor(worldManagerInterface) {
         this.worldManager = worldManagerInterface;
-        this.isMobile = isMobile;
         this.panels = {};
         this.uiElements = null;
         this.mobileViews = {};
@@ -42,7 +42,7 @@ export class PanelManager {
         });
 
         // MOBILE VIEW INITIALIZATIONS
-        if (this.isMobile) {
+        if (uiManager.isMobile()) {
             const mobileViewsContainer = document.getElementById('mobile-views-container');
             if (mobileViewsContainer) {
                 this.mobileViews.more = new MoreView(mobileViewsContainer, this.worldManager);
@@ -119,7 +119,7 @@ export class PanelManager {
     }
 
     showMobileView({ targetView, currentView }) {
-        if (!this.isMobile) return;
+        if (!uiManager.isMobile()) return;
     
         const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
     
