@@ -27,6 +27,8 @@
 @import url('src/ui/components/SetupPanel.css');
 @import url('src/ui/components/AnalysisPanel.css');
 @import url('src/ui/components/RuleRankPanel.css');
+@import url('src/ui/components/Settings.css');
+@import url('src/ui/RulesetVisualizer.css');
 @import url('src/ui/components/ToolsBottomSheet.css');
 
 /* 6. Mobile-Specific Full-Screen Views */

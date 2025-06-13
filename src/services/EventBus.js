@@ -87,4 +87,5 @@ export const EVENTS = {
     COMMAND_SHOW_VIEW: 'command:showView',
     MOBILE_VIEW_CHANGED: 'ui:mobileViewChanged',
     COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
+    RULESET_VISUALIZATION_CHANGED: 'ui:rulesetVisualizationChanged',
 };

@@ -3,6 +3,7 @@ import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
 let gl;
 let canvas;
@@ -21,6 +22,8 @@ let hexVAO;
 let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
+let minimapOverlayElements = [];
+let lastWorldSettings = [];
 
 export async function initRenderer(canvasElement) {
     canvas = canvasElement;
@@ -111,6 +114,7 @@ export async function initRenderer(canvasElement) {
     setupHexBuffersAndVAO();
     setupQuadBuffersAndVAO();
     setupFBOs();
+    initMinimapOverlays();
 
     requestAnimationFrame(() => resizeRenderer());
 
@@ -175,6 +179,20 @@ function _calculateAndCacheLayout() {
         miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
     };
     EventBus.dispatch(EVENTS.LAYOUT_CALCULATED, { ...layoutCache });
+}
+
+function initMinimapOverlays() {
+    const container = document.getElementById('minimap-guide');
+    if (!container) return;
+    container.innerHTML = '';
+    minimapOverlayElements = [];
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        const overlay = document.createElement('div');
+        overlay.className = 'minimap-ruleset-overlay';
+        overlay.style.display = 'none'; // Initially hidden
+        container.appendChild(overlay);
+        minimapOverlayElements.push(overlay);
+    }
 }
 
 export function getLayoutCache() {
@@ -374,7 +392,7 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
 }
 
 // UNCHANGED: This function now just composites the final textures.
-function renderMainScene(selectedWorldIndex) {
+function renderMainScene(selectedWorldIndex, allWorldsData) {
     if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -396,6 +414,7 @@ function renderMainScene(selectedWorldIndex) {
         drawQuad(selectedView.x, selectedView.y, selectedView.width, selectedView.height);
     }
 
+    const selectedWorldRuleset = allWorldsData[selectedWorldIndex]?.rulesetHex;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
@@ -414,6 +433,34 @@ function renderMainScene(selectedWorldIndex) {
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
+        
+        // Add ruleset visualization overlay
+        const overlayEl = minimapOverlayElements[i];
+        const worldData = allWorldsData[i];
+        if (overlayEl && worldData?.enabled) {
+            overlayEl.style.display = 'block';
+            overlayEl.style.left = `${miniX-miniMap.gridContainerX}px`;
+            overlayEl.style.top = `${miniY-miniMap.gridContainerY}px`;
+            
+            // Avoid re-rendering SVG if ruleset hasn't changed
+            const currentSignature = `${i}-${worldData.rulesetHex}-${selectedWorldIndex}-${selectedWorldRuleset}-${rulesetVisualizer.getVisualizationType()}`;
+            if (overlayEl.dataset.signature !== currentSignature) {
+                overlayEl.innerHTML = '';
+                let svg;
+                if (i === selectedWorldIndex) {
+                    svg = rulesetVisualizer.createRulesetSVG(worldData.rulesetHex);
+                } else {
+                    svg = rulesetVisualizer.createDiffSVG(selectedWorldRuleset, worldData.rulesetHex);
+                }
+                if (svg) {
+                    svg.classList.add('ruleset-viz-svg');
+                    overlayEl.appendChild(svg);
+                }
+                overlayEl.dataset.signature = currentSignature;
+            }
+        } else if (overlayEl) {
+            overlayEl.style.display = 'none';
+        }
     }
 
     gl.bindVertexArray(null);
@@ -484,7 +531,7 @@ export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWor
         renderLoader();
     } else {
         renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
-        renderMainScene(selectedWorldIndex);
+        renderMainScene(selectedWorldIndex, allWorldsData);
     }
 }
 

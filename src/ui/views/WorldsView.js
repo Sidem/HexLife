@@ -1,6 +1,7 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { SliderComponent } from '../components/SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class WorldsView extends BaseComponent {
     constructor(mountPoint, worldManagerInterface) {
@@ -33,6 +34,7 @@ export class WorldsView extends BaseComponent {
         this.refresh();
         this.attachEventListeners();
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refresh());
+        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refresh());
     }
     
     attachEventListeners() {
@@ -61,6 +63,7 @@ export class WorldsView extends BaseComponent {
         this.worldSliders = [];
 
         const settings = this.worldManager.getWorldSettingsForUI();
+        const selectedWorldHex = this.worldManager.getCurrentRulesetHex();
 
         settings.forEach((world, index) => {
             const card = document.createElement('div');
@@ -68,6 +71,7 @@ export class WorldsView extends BaseComponent {
             card.innerHTML = `
                 <div class="world-card-header">
                     <span class="title">World ${index}</span>
+                    <div class="ruleset-viz-container"></div>
                     <span class="ruleset-hex">${world.rulesetHex.substring(0, 8)}...</span>
                 </div>
                 <div class="density-control">
@@ -78,6 +82,14 @@ export class WorldsView extends BaseComponent {
                     <label for="world_enable_${index}" class="checkbox-label" style="width:100%; text-align:center;">${world.enabled ? 'Enabled' : 'Disabled'}</label>
                 </div>
             `;
+
+            const vizContainer = card.querySelector('.ruleset-viz-container');
+            if (vizContainer) {
+                const svg = rulesetVisualizer.createDiffSVG(selectedWorldHex, world.rulesetHex, { width: 24, height: 24});
+                svg.classList.add('ruleset-viz-svg');
+                vizContainer.appendChild(svg);
+            }
+
             this.listElement.appendChild(card);
 
             const slider = new SliderComponent(card.querySelector(`#world_density_${index}`), {

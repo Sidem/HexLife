@@ -3,7 +3,8 @@ import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { formatHexCode } from '../../utils/utils.js'; 
+import { formatHexCode } from '../../utils/utils.js';
+import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js'; 
 
 export class SetupPanel extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) { 
@@ -26,6 +27,7 @@ export class SetupPanel extends DraggablePanel {
         if (!this.isHidden()) this.refreshViews();
 
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refreshViews());
+        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refreshViews());
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refreshViews());
     }
 
@@ -75,7 +77,8 @@ export class SetupPanel extends DraggablePanel {
         this.worldSliderComponents = [];
 
         const fragment = document.createDocumentFragment();
-        const currentWorldSettings = this.worldManager.getWorldSettingsForUI(); 
+        const currentWorldSettings = this.worldManager.getWorldSettingsForUI();
+        const selectedWorldHex = this.worldManager.getCurrentRulesetHex();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
@@ -86,13 +89,21 @@ export class SetupPanel extends DraggablePanel {
             const shortHex = settings.rulesetHex && settings.rulesetHex !== "Error" ? settings.rulesetHex.substring(0,4) : "ERR";
 
             cell.innerHTML =
-                `<div class="world-label" title="${formattedFullHex}">World ${i} (Rules: ${shortHex}...)</div>` + 
+                `<div class="world-label" title="${formattedFullHex}">World ${i}</div>` +
+                `<div class="ruleset-viz-container"></div>` +
                 `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
                 `<div class="setting-control enable-control">` +
                     `<input type="checkbox" id="enableSwitch_${i}" class="enable-switch checkbox-input" ${settings.enabled ? 'checked' : ''} data-world-index="${i}">` +
                     `<label for="enableSwitch_${i}" class="checkbox-label">${settings.enabled ? 'Enabled' : 'Disabled'}</label>` +
                 `</div>` +
                 `<button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>`;
+
+            const vizContainer = cell.querySelector('.ruleset-viz-container');
+            if (vizContainer) {
+                const svg = rulesetVisualizer.createDiffSVG(selectedWorldHex, settings.rulesetHex);
+                svg.classList.add('ruleset-viz-svg');
+                vizContainer.appendChild(svg);
+            }
 
             const sliderMount = cell.querySelector(`#densitySliderMount_${i}`);
             const densitySlider = new SliderComponent(sliderMount, {

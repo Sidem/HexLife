@@ -1,0 +1,12 @@
+/* src/ui/components/Settings.css */
+#settingsPopout .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#settingsPopout .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+} 

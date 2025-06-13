@@ -42,6 +42,8 @@ function getUIElements() {
         resetClearButton: document.getElementById('resetClearButton'),
         editRuleButton: document.getElementById('editRuleButton'),
         setupPanelButton: document.getElementById('setupPanelButton'),
+        settingsButton: document.getElementById('settingsButton'),
+        settingsPopout: document.getElementById('settingsPopout'),
         analysisPanelButton: document.getElementById('analysisPanelButton'),
         rankPanelButton: document.getElementById('rankPanelButton'),
         shareButton: document.getElementById('shareButton'),

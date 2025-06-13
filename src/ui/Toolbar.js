@@ -6,6 +6,7 @@ import { SliderComponent } from './components/SliderComponent.js';
 import { onboardingManager } from './ui.js';
 import { generateShareUrl } from '../utils/utils.js';
 import { uiManager } from './UIManager.js';
+import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
 export class Toolbar {
     constructor(worldManagerInterface, libraryData) {
@@ -25,7 +26,8 @@ export class Toolbar {
             { name: 'setHex', buttonId: 'setRulesetButton', popoutId: 'setHexPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'library', buttonId: 'libraryButton', popoutId: 'libraryPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'resetClear', buttonId: 'resetClearButton', popoutId: 'resetClearPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
-            { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } }
+            { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } },
+            { name: 'settings', buttonId: 'settingsButton', popoutId: 'settingsPopout', options: { position: 'right', alignment: 'start' } }
         ];
     }
 
@@ -183,6 +185,14 @@ export class Toolbar {
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
+
+        this.uiElements.settingsPopout.querySelectorAll('input[name="rulesetViz"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    rulesetVisualizer.setVisualizationType(radio.value);
+                }
+            });
+        });
     }
     
     _copyRuleset() {
@@ -272,6 +282,12 @@ export class Toolbar {
         if (this.uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`)) this.uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`).checked = true;
         const mutateScope = PersistenceService.loadUISetting('mutateScope', 'selected');
         if (this.uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`)) this.uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`).checked = true;
+
+        const vizType = rulesetVisualizer.getVisualizationType();
+        const radioToCheck = this.uiElements.settingsPopout.querySelector(`input[name="rulesetViz"][value="${vizType}"]`);
+        if (radioToCheck) {
+            radioToCheck.checked = true;
+        }
     }
 
     _generateAndShowShareLink() {

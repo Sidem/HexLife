@@ -119,6 +119,7 @@
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">SAV</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">LOD</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">SHR</button>
+                <button id="settingsButton" class="toolbar-button" title="Settings">⚙️</button>
                 <button id="helpButton" class="toolbar-button" title="Help">HLP</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">
@@ -244,6 +245,21 @@
             </div>
             <div class="form-group-buttons">
                 <button id="copyShareLinkButton" class="button">Copy to Clipboard</button>
+            </div>
+        </div>
+
+        <div id="settingsPopout" class="popout-panel hidden">
+            <h4>Settings</h4>
+            <div class="form-group">
+                <label>Ruleset Visualization:</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="rulesetViz" value="binary" checked> Binary
+                    </label>
+                    <label>
+                        <input type="radio" name="rulesetViz" value="color"> Color
+                    </label>
+                </div>
             </div>
         </div>
 

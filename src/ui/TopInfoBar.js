@@ -1,6 +1,7 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { formatHexCode } from '../utils/utils.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
+import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
 export class TopInfoBar {
     constructor(worldManagerInterface) {
@@ -22,10 +23,16 @@ export class TopInfoBar {
             this.uiElements.statTargetTps.textContent = String(this.worldManager.getCurrentSimulationSpeed());
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
+        
+        const vizContainer = document.createElement('span');
+        vizContainer.className = 'ruleset-viz-container';
+        this.uiElements.rulesetDisplay.parentNode.insertBefore(vizContainer, this.uiElements.rulesetDisplay);
+        this.uiElements.rulesetVizContainer = vizContainer;
     }
 
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => this.updateMainRulesetDisplay(hex));
+        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex()));
         EventBus.subscribe(EVENTS.HISTORY_CHANGED, () => this.updateUndoRedoButtons());
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (stats) => this.updateStatsDisplay(stats));
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.updateStatsDisplay(this.worldManager.getSelectedWorldStats()));
@@ -85,6 +92,12 @@ export class TopInfoBar {
     updateMainRulesetDisplay(hex) {
         if (this.uiElements?.rulesetDisplay) {
             this.uiElements.rulesetDisplay.textContent = formatHexCode(hex);
+            if (this.uiElements.rulesetVizContainer) {
+                this.uiElements.rulesetVizContainer.innerHTML = '';
+                const svg = rulesetVisualizer.createRulesetSVG(hex, {width: '100%', height: '100%'});
+                svg.classList.add('ruleset-viz-svg');
+                this.uiElements.rulesetVizContainer.appendChild(svg);
+            }
         }
     }
 

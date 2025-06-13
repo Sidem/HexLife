@@ -1,0 +1,66 @@
+/* src/ui/RulesetVisualizer.css */
+
+.ruleset-viz-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+}
+
+.ruleset-viz-svg {
+    border: 1px solid #555;
+    border-radius: 2px;
+    background-color: #111;
+}
+
+/* Minimap Overlays */
+#minimap-overlays-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50; /* Above canvas, below guides */
+}
+
+.minimap-ruleset-overlay {
+    position: absolute;
+    width: 32px; /* Adjust size as needed */
+    height: 64px;
+    opacity: 0.85;
+    box-sizing: border-box;
+    transition: opacity 0.2s ease;
+}
+
+.minimap-ruleset-overlay svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Top Info Bar Integration */
+#rulesetDisplayContainer .ruleset-viz-container {
+    width: 16px;
+    height: 32px;
+    margin-right: 8px;
+}
+
+/* Setup Panel Integration */
+.world-config-cell .ruleset-viz-container {
+    width: 24px;
+    height: 48px;
+    margin-top: 5px;
+}
+
+/* Mobile Worlds View Integration */
+.world-card .ruleset-viz-container {
+    width: 24px;
+    height: 48px;
+    margin-left: 10px;
+}
+
+.world-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+} 
