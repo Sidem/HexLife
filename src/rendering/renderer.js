@@ -4,6 +4,8 @@ import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import * as PersistenceService from '../services/PersistenceService.js';
+import { uiManager } from '../ui/UIManager.js';
 
 let gl;
 let canvas;
@@ -116,10 +118,24 @@ export async function initRenderer(canvasElement) {
     setupFBOs();
     initMinimapOverlays();
 
+    EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
+        _handleUIModeChange(mode);
+    });
+
+    _handleUIModeChange(uiManager.getMode());
+
     requestAnimationFrame(() => resizeRenderer());
 
     console.log("Renderer initialized.");
     return gl;
+}
+
+function _handleUIModeChange(mode) {
+    if (!minimapOverlayElements || minimapOverlayElements.length === 0) return;
+    const isMobile = mode === 'mobile';
+    minimapOverlayElements.forEach(overlay => {
+        overlay.classList.toggle('mini', isMobile);
+    });
 }
 
 function _calculateAndCacheLayout() {
@@ -437,7 +453,9 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
         // Add ruleset visualization overlay
         const overlayEl = minimapOverlayElements[i];
         const worldData = allWorldsData[i];
-        if (overlayEl && worldData?.enabled) {
+        const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
+        
+        if (overlayEl && worldData?.enabled && showOverlay) {
             overlayEl.style.display = 'block';
             overlayEl.style.left = `${miniX-miniMap.gridContainerX}px`;
             overlayEl.style.top = `${miniY-miniMap.gridContainerY}px`;

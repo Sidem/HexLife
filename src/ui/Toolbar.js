@@ -193,6 +193,15 @@ export class Toolbar {
                 }
             });
         });
+
+        // Add minimap overlay toggle
+        const overlayCheckbox = this.uiElements.settingsPopout.querySelector('input[name="showMinimapOverlay"]');
+        if (overlayCheckbox) {
+            overlayCheckbox.addEventListener('change', (e) => {
+                PersistenceService.saveUISetting('showMinimapOverlay', e.target.checked);
+                EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Trigger redraw
+            });
+        }
     }
     
     _copyRuleset() {
@@ -287,6 +296,13 @@ export class Toolbar {
         const radioToCheck = this.uiElements.settingsPopout.querySelector(`input[name="rulesetViz"][value="${vizType}"]`);
         if (radioToCheck) {
             radioToCheck.checked = true;
+        }
+
+        // Load minimap overlay setting
+        const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
+        const overlayCheckbox = this.uiElements.settingsPopout.querySelector('input[name="showMinimapOverlay"]');
+        if (overlayCheckbox) {
+            overlayCheckbox.checked = showOverlay;
         }
     }
 

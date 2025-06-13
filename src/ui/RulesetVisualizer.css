@@ -10,6 +10,8 @@
 .ruleset-viz-svg {
     border: 1px solid #555;
     border-radius: 2px;
+    width: 16px;
+    height: 32px;
     background-color: #111;
 }
 
@@ -31,6 +33,12 @@
     opacity: 0.85;
     box-sizing: border-box;
     transition: opacity 0.2s ease;
+    transform-origin: top left;
+}
+
+.minimap-ruleset-overlay.mini {
+    transform: scale(0.5);
+    opacity: 0.9;
 }
 
 .minimap-ruleset-overlay svg {

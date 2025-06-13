@@ -78,7 +78,6 @@ export class SetupPanel extends DraggablePanel {
 
         const fragment = document.createDocumentFragment();
         const currentWorldSettings = this.worldManager.getWorldSettingsForUI();
-        const selectedWorldHex = this.worldManager.getCurrentRulesetHex();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
@@ -86,11 +85,10 @@ export class SetupPanel extends DraggablePanel {
             cell.className = 'world-config-cell';
             
             const formattedFullHex = formatHexCode(settings.rulesetHex); 
-            const shortHex = settings.rulesetHex && settings.rulesetHex !== "Error" ? settings.rulesetHex.substring(0,4) : "ERR";
 
             cell.innerHTML =
-                `<div class="world-label" title="${formattedFullHex}">World ${i}</div>` +
-                `<div class="ruleset-viz-container"></div>` +
+                `<div class="world-label">World ${i}</div>` +
+                `<div class="ruleset-viz-container" title="${formattedFullHex}"></div>` +
                 `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
                 `<div class="setting-control enable-control">` +
                     `<input type="checkbox" id="enableSwitch_${i}" class="enable-switch checkbox-input" ${settings.enabled ? 'checked' : ''} data-world-index="${i}">` +
@@ -100,7 +98,7 @@ export class SetupPanel extends DraggablePanel {
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');
             if (vizContainer) {
-                const svg = rulesetVisualizer.createDiffSVG(selectedWorldHex, settings.rulesetHex);
+                const svg = rulesetVisualizer.createRulesetSVG(settings.rulesetHex);
                 svg.classList.add('ruleset-viz-svg');
                 vizContainer.appendChild(svg);
             }

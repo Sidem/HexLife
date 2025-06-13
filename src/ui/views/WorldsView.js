@@ -63,7 +63,6 @@ export class WorldsView extends BaseComponent {
         this.worldSliders = [];
 
         const settings = this.worldManager.getWorldSettingsForUI();
-        const selectedWorldHex = this.worldManager.getCurrentRulesetHex();
 
         settings.forEach((world, index) => {
             const card = document.createElement('div');
@@ -85,7 +84,7 @@ export class WorldsView extends BaseComponent {
 
             const vizContainer = card.querySelector('.ruleset-viz-container');
             if (vizContainer) {
-                const svg = rulesetVisualizer.createDiffSVG(selectedWorldHex, world.rulesetHex, { width: 24, height: 24});
+                const svg = rulesetVisualizer.createRulesetSVG(world.rulesetHex, { width: 16, height: 32});
                 svg.classList.add('ruleset-viz-svg');
                 vizContainer.appendChild(svg);
             }
