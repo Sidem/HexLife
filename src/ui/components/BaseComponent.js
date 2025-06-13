@@ -13,10 +13,10 @@ export class BaseComponent {
         this.eventListeners = []; 
     }
 
-    _addDOMListener(element, eventType, handler) {
+    _addDOMListener(element, eventType, handler, options = {}) {
         const boundHandler = handler.bind(this);
-        element.addEventListener(eventType, boundHandler);
-        this.eventListeners.push({ element, eventType, handler: boundHandler });
+        element.addEventListener(eventType, boundHandler, options);
+        this.eventListeners.push({ element, eventType, handler: boundHandler, options });
     }
 
     _subscribeToEvent(eventType, handler) {

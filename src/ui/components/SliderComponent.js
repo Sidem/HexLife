@@ -110,7 +110,7 @@ export class SliderComponent extends BaseComponent {
              this._updateValueDisplay(currentValue);
              this.sliderElement.dispatchEvent(new Event('input', { bubbles: true }));
              this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+        }, { passive: false });
     }
 
     _updateValueDisplay(value) {
