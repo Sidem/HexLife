@@ -1,5 +1,5 @@
 import * as Config from '../../core/config.js';
-import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
+import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
@@ -7,10 +7,10 @@ import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 
-export class AnalysisPanel extends PersistentDraggablePanel {
+export class AnalysisPanel extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, uiManagerRef, options = {}) {
         
-        super(panelElement, 'h3', 'analysis', options);
+        super(panelElement, 'h3', { ...options, persistence: { identifier: 'analysis' } });
 
         if (!worldManagerInterface) {
             console.error('AnalysisPanel: worldManagerInterface is null.');
@@ -112,13 +112,13 @@ export class AnalysisPanel extends PersistentDraggablePanel {
         this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: currentSelectedStats }));
     }
 
-    show(saveState = true) {
-        super.show(saveState);
+    show() {
+        super.show();
         this.refreshViews();
     }
 
-    hide(saveState = true) {
-        super.hide(saveState);
+    hide() {
+        super.hide();
     }
 
     toggle() {

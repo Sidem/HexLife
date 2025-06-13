@@ -1,11 +1,17 @@
 import { DraggablePanel } from './DraggablePanel.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
-export class RulesetEditor extends PersistentDraggablePanel {
+export class RulesetEditor extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) {
 
-        super(panelElement, 'h3', 'ruleset', options);
+        // Pass persistence config and onDragEnd callback to the DraggablePanel constructor
+        super(panelElement, 'h3', { 
+            ...options, 
+            persistence: { identifier: 'ruleset' },
+            onDragEnd: () => this._saveEditorSettings() 
+        });
 
         if (!worldManagerInterface) {
             console.error('RulesetEditor: worldManagerInterface is null.');
@@ -43,11 +49,6 @@ export class RulesetEditor extends PersistentDraggablePanel {
         this._setupInternalListeners();
 
         if (!this.isHidden()) this.refreshViews();
-
-        this.onDragEnd = () => {
-            this._savePanelState();
-            this._saveEditorSettings();
-        };
     }
 
     _createAllGrids() {
@@ -340,16 +341,16 @@ export class RulesetEditor extends PersistentDraggablePanel {
         if (this.uiElements.editorAutoResetCheckbox) this.uiElements.editorAutoResetCheckbox.checked = PersistenceService.loadUISetting('editorAutoReset', true);
     }
 
-    show(save = true) {
+    show() {
         this._createAllGrids();
-        super.show(save);
+        super.show();
         this.refreshViews();
-        if (save) this._saveEditorSettings();
+        this._saveEditorSettings();
     }
 
-    hide(save = true) {
-        super.hide(save);
-        if (save) this._saveEditorSettings();
+    hide() {
+        super.hide();
+        this._saveEditorSettings();
     }
 
     toggle() {

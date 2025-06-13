@@ -1,4 +1,4 @@
-import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
+import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
@@ -15,9 +15,9 @@ class ElementPool {
     }
 }
 
-export class RuleRankPanel extends PersistentDraggablePanel {
+export class RuleRankPanel extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) {
-        super(panelElement, 'h3', 'ruleRank', options);
+        super(panelElement, 'h3', { ...options, persistence: { identifier: 'ruleRank' } });
 
         this.worldManager = worldManagerInterface;
         this.uiElements = {
@@ -135,7 +135,7 @@ export class RuleRankPanel extends PersistentDraggablePanel {
         const ruleUsage = stats.ruleUsage;
 
         if (!ruleUsage || !ruleset) {
-            this._setupPanelLayout(); // Reset to show empty state if needed
+            this._setupPanelLayout();
             this.uiElements.contentArea.querySelector('.dual-rank-container').innerHTML = '<p class="empty-state-text">No rule usage data available.</p>';
             return;
         }
@@ -173,20 +173,14 @@ export class RuleRankPanel extends PersistentDraggablePanel {
 
     _renderRankList(container, elementCache, rankedRules, totalInvocations, ruleset) {
         const topRules = rankedRules.slice(0, 20);
-
-        // Release extra elements back to the pool
         while (elementCache.length > topRules.length) {
             const el = elementCache.pop();
             container.removeChild(el);
             this.ruleItemPool.release(el);
         }
-
-        // Get or create elements for the current view
         while (elementCache.length < topRules.length) {
             elementCache.push(this.ruleItemPool.get());
         }
-
-        // Update and append elements
         topRules.forEach((rule, rank) => {
             const element = elementCache[rank];
             this._updateRuleItem(element, rule, rank, totalInvocations, ruleset);
@@ -196,8 +190,8 @@ export class RuleRankPanel extends PersistentDraggablePanel {
         });
     }
 
-    show(saveState = true) {
-        super.show(saveState);
+    show() {
+        super.show();
         this.refreshViews();
     }
 }

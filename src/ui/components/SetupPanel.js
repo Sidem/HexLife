@@ -1,13 +1,13 @@
 import * as Config from '../../core/config.js';
-import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
+import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js'; 
 
-export class SetupPanel extends PersistentDraggablePanel {
+export class SetupPanel extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) { 
-        super(panelElement, 'h3', 'setup', options);
+        super(panelElement, 'h3', { ...options, persistence: { identifier: 'setup' } });
 
         if (!worldManagerInterface) {
             console.error('SetupPanel: worldManagerInterface is null.');
@@ -116,8 +116,8 @@ export class SetupPanel extends PersistentDraggablePanel {
         grid.appendChild(fragment);
     }
 
-    show(save = true) {
-        super.show(save);
+    show() {
+        super.show();
         this.refreshViews();
     }
 
