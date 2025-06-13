@@ -13,8 +13,6 @@ const hidePanels = () => {
     UI.getRuleRankPanel()?.hide();
 };
 
-// --- Tour Definitions ---
-
 const coreTour = [
     {
         element: '[data-tour-id="hex-grid-canvas"]',
@@ -202,15 +200,7 @@ const libraryTour = [
         onBeforeShow: () => { document.querySelector('[data-tab="rulesets"]').click(); },
         primaryAction: { text: 'Click \'Load\'' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
-    }//,
-    //{
-    //    element: '.library-item .place-pattern-btn',
-    //    title: 'Placing a Pattern',
-    //    content: "Placing a <span class=\"onboarding-highlight-text\">Pattern</span> seeds the grid with a specific shape, like the famous 'Glider', using the current ruleset. <span class=\"onboarding-highlight-text\">Click 'Place' to enter placing mode.</span>",
-    //    onBeforeShow: () => { document.querySelector('[data-tab="patterns"]').click(); },
-    //    primaryAction: { text: 'Click \'Place\'' },
-    //    advanceOn: { type: 'event', eventName: EVENTS.COMMAND_ENTER_PLACING_MODE }
-    //}
+    }
 ];
 
 const historyTour = [
@@ -346,9 +336,172 @@ const ruleRankTour = [
     }
 ];
 
+const coreMobileTour = [
+    {
+        element: 'body',
+        title: 'Welcome, Explorer',
+        content: "I'm the Chief Scientist at the HexLife Observatory. Before you are nine parallel universes, each waiting for a spark of life. Your mission: to explore and discover the rules that govern them. This orientation will cover the essentials.",
+        primaryAction: { text: 'Begin Orientation' },
+        onBeforeShow: () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
+        },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#mobilePlayPauseButton',
+        title: 'The Universal Clock',
+        content: "Time in all universes is controlled by this button. A single tap starts or stops the flow of every 'tick'. Let's see what these worlds are currently doing.",
+        primaryAction: { text: 'Click the Play Button' },
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
+    },
+    {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'The Observatory',
+        content: "This provides an overview of all nine universes. Your main screen shows the selected world, but you can tap any world here to focus on it.",
+        primaryAction: { text: 'Select a Different World' },
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+    },
+    {
+        element: '#interaction-mode-toggle',
+        title: 'Critical Tool: The Interactor',
+        content: "This is your most important tool. The **Hand (🖐️)** lets you pan and zoom the view. The **Pencil (✏️)** lets you draw cells directly onto the grid. You must switch modes to perform these actions.",
+        primaryAction: { text: 'Tap the Hand to Switch to Draw Mode' },
+        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' }
+    },
+    {
+        element: '#selected-world-guide',
+        highlightType: 'canvas',
+        title: 'The Spark of Creation',
+        content: "Now that your Brush is active, you can directly influence a universe. The simulation will pause automatically when you draw. Touch and drag on the grid to bring new cells to life.",
+        primaryAction: { text: 'Try Drawing on the Grid' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+    },
+    {
+        element: '.tab-bar-button[data-view="more"]',
+        title: 'Your Datapad',
+        content: "This is your Datapad, where you'll find all your tools. If you ever need a refresher, the **Help / Tour** option is located in the 'More' tab. Your research awaits.",
+        primaryAction: { text: 'Begin My Research' },
+        advanceOn: { type: 'click' }
+    }
+];
+
+const commandDeckTour = [
+    {
+        element: '#mobile-fab-container-right',
+        title: 'The Command FABs',
+        content: "These are your primary controls. You've already used **Play/Pause** and the **Pan/Draw** toggle. The **Tools (🛠️)** button is your gateway to adjusting core simulation parameters.",
+        primaryAction: { text: `Let's See` },
+        onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#mobileToolsFab',
+        title: 'The Tools Menu',
+        content: "Tapping the Tools FAB brings up a menu for adjusting simulation **Speed** and your drawing **Brush Size**. It also allows you to customize the Quick Action FABs on the left. Tap it now to see.",
+        primaryAction: { text: 'Open the Tools Menu' },
+        advanceOn: { type: 'event', eventName: 'bottomsheet:show' }
+    },
+    {
+        element: '.tools-bottom-sheet-content',
+        title: 'Adjusting Parameters',
+        content: "Simple and direct. From here you can fine-tune the simulation. You can close this menu by tapping the overlay or the close button.",
+        primaryAction: { text: 'Got It' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#mobile-fab-container-left',
+        title: 'Quick Actions',
+        content: "These are your customizable shortcuts for advanced ruleset commands. They let you run complex experiments, like evolving a ruleset, with a single tap. Let's learn how to use them.",
+        primaryAction: { text: 'Continue' },
+        advanceOn: { type: 'click' }
+    }
+];
+
+const appliedEvolutionTour = [
+    {
+        element: '.tab-bar-button[data-view="rules"]',
+        title: 'Mission: Applied Evolution',
+        content: "Let's run a full experiment. The goal is to discover a new, interesting ruleset by evolving an existing one. First, tap the **Rules** tab.",
+        primaryAction: { text: 'Open the Rules Tab' },
+        onBeforeShow: () => {
+            document.querySelector('[data-view="simulate"]').click();
+        },
+        advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
+    },
+    {
+        element: '.rules-view-segment[data-pane="library-rulesets"]',
+        title: 'Step 1: Find a Specimen',
+        content: "Every great discovery builds on prior research. Go to the **Rulesets Library** to find a stable starting point for our experiment.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="library-rulesets"]').click(),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.library-item-mobile:nth-child(10)', // Targets "Amoeba 1" based on the JSON file
+        title: "Select 'Amoeba 1'",
+        content: "This ruleset produces interesting, self-sustaining patterns. Tap **'Load Ruleset'**. This will apply its laws to all nine universes and reset them.",
+        primaryAction: { text: 'Load the Ruleset' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
+    },
+    {
+        element: '.rules-history-controls',
+        title: 'Your Safety Net',
+        content: "Excellent. Before we continue, note these buttons. Every ruleset change is tracked. You can always **Undo (↶)** and **Redo (↷)**. Don't be afraid to experiment!",
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.rules-view-segment[data-pane="mutate"]',
+        title: 'Step 2: Prepare for Mutation',
+        content: "Now, let's evolve this 'Amoeba'. Go to the **Mutate** tab to access the DNA splicer.",
+        primaryAction: { text: 'Open the Mutate Pane' },
+        onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="mutate"]').click(),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#mobileMutateSliderMount',
+        title: 'Set Mutation Parameters',
+        content: "Set the **Mutation Rate to 5%** and ensure the **Mode is 'R-Sym'**. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: 'button[data-action="clone-mutate"]',
+        title: 'Step 3: Run the Experiment',
+        content: "This is the **Clone & Mutate** command. It will copy our 'Amoeba' ruleset to all nine worlds and apply a unique, small mutation to each. **Press it now.**",
+        primaryAction: { text: 'Clone & Mutate' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+    },
+    {
+        element: '.tab-bar-button[data-view="simulate"]',
+        title: 'Step 4: Observe',
+        content: "The experiment is running! Tap the **Simulate** tab to go back to the main view and see the results.",
+        primaryAction: { text: 'Go to Simulator' },
+        advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'simulate' }
+    },
+    {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Step 5: Discover!',
+        content: "You now have nine parallel evolutions. Some may die out, some may explode, and some may form incredible new patterns. <br><br>Let them run. Use the **Clone & Mutate FAB (🧬)** to re-run the experiment. When you find a world you like, tap it to select it, then **press 'Continue' below.**",
+        primaryAction: { text: 'Continue' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: 'body',
+        title: 'Mission Complete',
+        content: "You have successfully run a guided evolution experiment. You now have the core skills for discovery. Continue exploring, and see what you can create!",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }
+];
+
 export const tours = {
     core: coreTour,
-    coreMobile: coreTourMobile,
+    coreMobile: coreMobileTour,
+    commandDeck: commandDeckTour,
+    appliedEvolution: appliedEvolutionTour,
     speedAndBrush: speedAndBrushTour,
     rulesetGeneration: rulesetGenerationTour,
     mutation: mutationTour,
