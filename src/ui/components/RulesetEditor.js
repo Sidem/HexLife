@@ -1,5 +1,4 @@
-import { PersistentDraggablePanel } from './PersistentDraggablePanel.js';
-import * as PersistenceService from '../../services/PersistenceService.js';
+import { DraggablePanel } from './DraggablePanel.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
