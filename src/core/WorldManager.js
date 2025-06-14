@@ -115,6 +115,7 @@ export class WorldManager {
 
     _handleProxyInitialized = (worldIndex) => {
         console.log(`World ${worldIndex} worker initialized and sent initial state.`);
+        EventBus.dispatch(EVENTS.WORKER_INITIALIZED, { worldIndex }); // Dispatch event
         if (worldIndex === this.selectedWorldIndex) {
             this.dispatchSelectedWorldUpdates();
         }

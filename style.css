@@ -10,6 +10,7 @@
 
 /* 2. Main Layout */
 @import url('src/styles/layout.css');
+@import url('src/styles/loader.css');
 
 /* 3. Core UI Element Areas */
 @import url('src/ui/TopInfoBar.css');

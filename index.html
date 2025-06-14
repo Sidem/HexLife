@@ -40,16 +40,27 @@
     <link rel="preload" href="style.css?v=1.8" as="style">
     <link rel="preload" href="src/main.js" as="script" crossorigin="">
     <link rel="stylesheet" href="style.css?v=1.8">
+    <link rel="stylesheet" href="src/styles/loader.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
 </head>
 
 <body>
-    <div id="loading-indicator" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1e1e1e; display: flex; align-items: center; justify-content: center; z-index: 10000; color: #e0e0e0; font-size: 1.2em;">
-        <div style="text-align: center;">
-            <div style="font-size: 2em; margin-bottom: 10px;">⬡</div>
-            <div>Loading HexLife Explorer...</div>
-            <div id="loading-status" style="font-size: 0.8em; color: #aaa; margin-top: 15px; min-height: 20px;">Initializing...</div>
+    <div id="loading-indicator">
+        <div class="loading-content">
+            <div class="loader-grid">
+                <div class="loader-hex" id="loader-hex-0"></div>
+                <div class="loader-hex" id="loader-hex-1"></div>
+                <div class="loader-hex" id="loader-hex-2"></div>
+                <div class="loader-hex" id="loader-hex-3"></div>
+                <div class="loader-hex" id="loader-hex-4"></div>
+                <div class="loader-hex" id="loader-hex-5"></div>
+                <div class="loader-hex" id="loader-hex-6"></div>
+                <div class="loader-hex" id="loader-hex-7"></div>
+                <div class="loader-hex" id="loader-hex-8"></div>
+            </div>
+            <div id="loading-title">Loading HexLife Explorer...</div>
+            <div id="loading-status">Initializing...</div>
         </div>
     </div>
     <div id="onboarding-overlay" class="hidden"></div>
@@ -340,6 +351,8 @@
     <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
 
     <script>
+        // This script is no longer needed as main.js controls the loader
+        
         document.addEventListener('touchstart', function(e) {
         }, { passive: true });
         

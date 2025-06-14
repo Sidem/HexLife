@@ -18,6 +18,7 @@ let pausedByVisibilityChange = false;
 let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
+let initializedWorkerCount = 0;
 
 function updateLoadingStatus(message) {
     const statusElement = document.getElementById('loading-status');
@@ -83,7 +84,6 @@ async function initialize() {
     
     const sharedSettings = parseUrlParameters();
 
-    // Fetch library data in parallel with renderer initialization
     updateLoadingStatus("Fetching assets...");
     const libraryPromises = [
         fetch('src/core/library/rulesets.json').then(res => res.json()),
@@ -131,6 +131,16 @@ async function initialize() {
         onboardingManager.startTour('core', true);
     });
 
+    // Event listener for worker initialization progress
+    EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {
+        const hexElement = document.getElementById(`loader-hex-${worldIndex}`);
+        if (hexElement) {
+            hexElement.classList.add('active');
+        }
+        initializedWorkerCount++;
+        updateLoadingStatus(`Spooling up simulation workers... (${initializedWorkerCount}/${Config.NUM_WORLDS})`);
+    });
+
     // Dispatch initial events to sync UI with the starting state
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
     EventBus.dispatch(EVENTS.SIMULATION_PAUSED, simulationController.getState().isPaused);
@@ -145,7 +155,6 @@ async function initialize() {
     lastTimestamp = performance.now();
     lastFpsUpdateTime = lastTimestamp;
 
-    updateLoadingStatus("Finalizing...");
     console.log("Initialization Complete. Starting Render Loop.");
     requestAnimationFrame(renderLoop);
 }
@@ -191,12 +200,19 @@ function renderLoop(timestamp) {
     if (areAllWorkersInitialized) {
         const loadingIndicator = document.getElementById('loading-indicator');
         if (loadingIndicator && loadingIndicator.style.display !== 'none') {
-            loadingIndicator.style.display = 'none';
-            if (uiManager.getMode() === 'mobile') {
-                onboardingManager.startTour('coreMobile');
-            } else {
-                onboardingManager.startTour('core');
-            }
+            updateLoadingStatus("Finalizing...");
+            // Add a small delay before hiding the loader for a smoother transition
+            setTimeout(() => {
+                loadingIndicator.style.opacity = '0';
+                setTimeout(() => { 
+                    loadingIndicator.style.display = 'none'; 
+                    if (uiManager.getMode() === 'mobile') {
+                        onboardingManager.startTour('coreMobile');
+                    } else {
+                        onboardingManager.startTour('core');
+                    }
+                }, 500); // This should match the CSS transition duration
+            }, 250);
         }
     }
     
