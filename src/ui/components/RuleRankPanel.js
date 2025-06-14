@@ -26,7 +26,7 @@ export class RuleRankPanel extends DraggablePanel {
         };
 
         this.lastUpdateTime = 0;
-        this.updateThrottleMs = 500;
+        this.updateThrottleMs = 1000;
         this.lastRuleUsageHash = null;
         this.pendingUpdate = false;
 
@@ -66,7 +66,6 @@ export class RuleRankPanel extends DraggablePanel {
     _createRuleItemElement() {
         const listItem = document.createElement('div');
         listItem.className = 'rank-list-item';
-        // Note: The position: 'relative' style is now handled in style.css
 
         const usageBar = document.createElement('div');
         usageBar.className = 'usage-background-bar';
