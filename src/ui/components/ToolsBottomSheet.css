@@ -1,26 +1,25 @@
 .tools-bottom-sheet-content {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    padding: 16px;
+    gap: 10px;
+    padding: 10px;
 }
 
 .tool-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
 }
 
 .tool-group h5 {
-    margin: 0 0 5px 0;
+    margin: 0;
     font-size: 1em;
     color: #f0c674;
     border-bottom: 1px solid #444;
-    padding-bottom: 8px;
+    padding-bottom: 0px;
 }
 
 .tool-group .slider-component-container {
-    padding: 0 10px;
+    padding: 0 4px;
 }
 
 .reset-clear-buttons {
@@ -78,13 +77,11 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
 }
 
 .fab-action-list li {
     display: flex;
     align-items: center;
-    gap: 15px;
     background-color: rgba(0,0,0,0.2);
     padding: 8px 12px;
     border-radius: 4px;
