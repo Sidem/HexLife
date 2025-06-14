@@ -49,6 +49,7 @@
         <div style="text-align: center;">
             <div style="font-size: 2em; margin-bottom: 10px;">⬡</div>
             <div>Loading HexLife Explorer...</div>
+            <div id="loading-status" style="font-size: 0.8em; color: #aaa; margin-top: 15px; min-height: 20px;">Initializing...</div>
         </div>
     </div>
     <div id="onboarding-overlay" class="hidden"></div>
@@ -225,7 +226,7 @@
             <h4>Settings</h4>
             <div id="vizTypeSwitchMount"></div>
             <div id="vizOverlaySwitchMount"></div>
-            <div id="pauseWhileDrawingSwitchMount"></div>
+            <div id="pauseWhileDrawingSwitchMount" style="margin-top: 10px;"></div>
         </div>
 
         <div id="historyPopout" class="popout-panel hidden">
@@ -339,15 +340,6 @@
     <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                const loadingIndicator = document.getElementById('loading-indicator');
-                if (loadingIndicator) {
-                    loadingIndicator.style.display = 'none';
-                }
-            }, 100);
-        });
-        
         document.addEventListener('touchstart', function(e) {
         }, { passive: true });
         

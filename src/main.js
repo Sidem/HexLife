@@ -1,7 +1,6 @@
 import * as Config from './core/config.js';
 import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
-import * as CanvasLoader from './rendering/canvasLoader.js';
 import * as UI from './ui/ui.js';
 import { onboardingManager } from './ui/ui.js';
 import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
@@ -19,6 +18,13 @@ let pausedByVisibilityChange = false;
 let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
+
+function updateLoadingStatus(message) {
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
+}
 
 function parseUrlParameters() {
     const params = new URLSearchParams(window.location.search);
@@ -65,6 +71,7 @@ function parseUrlParameters() {
 
 async function initialize() {
     console.log("Starting Initialization (Worker Architecture)...");
+    updateLoadingStatus("Parsing configuration...");
     const canvas = document.getElementById('hexGridCanvas');
     if (!canvas) {
         console.error("Canvas element not found!");
@@ -76,24 +83,25 @@ async function initialize() {
     
     const sharedSettings = parseUrlParameters();
 
-    CanvasLoader.startCanvasLoader(canvas);
-
     // Fetch library data in parallel with renderer initialization
+    updateLoadingStatus("Fetching assets...");
     const libraryPromises = [
         fetch('src/core/library/rulesets.json').then(res => res.json()),
         fetch('src/core/library/patterns.json').then(res => res.json())
     ];
 
+    updateLoadingStatus("Initializing rendering engine...");
     gl = await Renderer.initRenderer(canvas);
     if (!gl) {
         console.error("Renderer initialization failed.");
-        CanvasLoader.stopCanvasLoader();
+        updateLoadingStatus("Error: WebGL2 not supported.");
         return;
     }
 
     const [rulesetLibrary, patternLibrary] = await Promise.all(libraryPromises);
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
+    updateLoadingStatus("Spooling up simulation workers...");
     worldManager = new WorldManager(sharedSettings);
 
     const worldManagerInterfaceForUI = {
@@ -112,7 +120,7 @@ async function initialize() {
     
     canvasInputHandler = new CanvasInputHandler(canvas, worldManager, uiManager.isMobile());
 
-
+    updateLoadingStatus("Initializing UI components...");
     if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
         console.error("UI initialization failed.");
         return;
@@ -137,16 +145,12 @@ async function initialize() {
     lastTimestamp = performance.now();
     lastFpsUpdateTime = lastTimestamp;
 
+    updateLoadingStatus("Finalizing...");
     console.log("Initialization Complete. Starting Render Loop.");
     requestAnimationFrame(renderLoop);
 }
 
 function handleResize() {
-    const mainCanvas = document.getElementById('hexGridCanvas');
-    if (mainCanvas) {
-        CanvasLoader.handleLoaderResize(mainCanvas);
-    }
-    
     if (isInitialized) {
         if (gl) Renderer.resizeRenderer();
     }
@@ -184,12 +188,15 @@ function renderLoop(timestamp) {
     }));
     
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
-    if (areAllWorkersInitialized && CanvasLoader.isLoaderActive()) {
-        CanvasLoader.stopCanvasLoader();
-        if (uiManager.getMode() === 'mobile') {
-            onboardingManager.startTour('coreMobile');
-        } else {
-            onboardingManager.startTour('core');
+    if (areAllWorkersInitialized) {
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator && loadingIndicator.style.display !== 'none') {
+            loadingIndicator.style.display = 'none';
+            if (uiManager.getMode() === 'mobile') {
+                onboardingManager.startTour('coreMobile');
+            } else {
+                onboardingManager.startTour('core');
+            }
         }
     }
     
@@ -215,5 +222,6 @@ function renderLoop(timestamp) {
 
 initialize().catch(err => {
     console.error("Initialization failed:", err);
+    updateLoadingStatus("Error during initialization. See console for details.");
     alert("Application failed to initialize. See console for details.");
 });

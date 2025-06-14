@@ -504,53 +504,15 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-function renderLoader() {
-    if (!gl) return;
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearColor(...Config.BACKGROUND_COLOR);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    if (!quadShaderProgram || !quadVAO) return;
-
-    gl.useProgram(quadShaderProgram);
-    gl.bindVertexArray(quadVAO);
-
-    const canvasWidth = gl.canvas.width;
-    const canvasHeight = gl.canvas.height;
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    const time = performance.now() * 0.002;
-    const radius = Math.min(canvasWidth, canvasHeight) * 0.1;
-    const dotSize = Math.min(canvasWidth, canvasHeight) * 0.015;
-
-    const numDots = 8;
-    for (let i = 0; i < numDots; i++) {
-        const angle = (i / numDots) * Math.PI * 2 + time;
-        const dotX = centerX + Math.cos(angle) * radius - dotSize / 2;
-        const dotY = centerY + Math.sin(angle) * radius - dotSize / 2;
-
-        const alpha = 0.3 + 0.7 * (Math.sin(angle - time) + 1) / 2;
-
-        gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
-        gl.uniform4fv(quadUniformLocations.u_color, [1.0, 1.0, 1.0, alpha]);
-        drawQuad(dotX, dotY, dotSize, dotSize);
-    }
-
-    gl.bindVertexArray(null);
-}
-
 export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized, camera) {
-    if (!gl) return;
-
-    if (!areAllWorkersInitialized) {
-        renderLoader();
-    } else {
-        renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
-        renderMainScene(selectedWorldIndex, allWorldsData);
+    if (!gl || !areAllWorkersInitialized) {
+        // Do nothing if not initialized; the HTML loader is visible.
+        return;
     }
+    
+    // Once initialized, proceed with the normal render path.
+    renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
+    renderMainScene(selectedWorldIndex, allWorldsData);
 }
 
 export function resizeRenderer() {
