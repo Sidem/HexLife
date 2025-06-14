@@ -92,7 +92,6 @@ export function precomputeSymmetryGroups() {
         bitmaskToOrbitSize.set(i, orbit);
 
         if (!allCanonicalReps.has(canonical)) {
-            
             allCanonicalReps.set(canonical, { representative: canonical, orbitSize: getOrbitSize(canonical), members: [] });
         }
         allCanonicalReps.get(canonical).members.push(i);
@@ -101,7 +100,6 @@ export function precomputeSymmetryGroups() {
     allCanonicalReps.forEach(group => group.members.sort((a, b) => a - b));
     const canonicalRepresentativesArray = Array.from(allCanonicalReps.values())
         .sort((a, b) => a.representative - b.representative);
-    console.log(`Precomputed ${canonicalRepresentativesArray.length} canonical symmetry groups.`);
 
     return {
         canonicalRepresentatives: canonicalRepresentativesArray,

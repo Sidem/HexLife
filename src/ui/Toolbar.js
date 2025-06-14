@@ -40,10 +40,7 @@ export class Toolbar {
 
     init(uiElements) {
         this.uiElements = uiElements;
-
-        // Initialize library controller
         libraryController.init(this.libraryData);
-
         this._initPopoutPanels();
         this._initPopoutControls();
         this._populateLibraryPanel();
@@ -51,10 +48,7 @@ export class Toolbar {
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
         this._loadAndApplyUISettings();
-
-        // Subscribe to UI mode changes
         EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => this.updateVisibility(mode));
-        // Set initial visibility
         this.updateVisibility(uiManager.getMode());
     }
 
@@ -79,7 +73,6 @@ export class Toolbar {
             }
 
             if (!this.activePopouts.some(p => !p.isHidden())) return;
-
             const clickedInsidePopout = event.target.closest('.popout-panel');
             const clickedTriggerButton = this.activePopouts.some(p => p.triggerElement && p.triggerElement.contains(event.target));
             
@@ -149,12 +142,8 @@ export class Toolbar {
     
     _initPopoutControls() {
         const controllerState = rulesetActionController.getState();
-        
-        // Speed & Brush sliders
         this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: simulationController.getState().speed, unit: 'tps', showValue: true, onChange: simulationController.setSpeed });
         this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: brushController.getState().brushSize, unit: '', showValue: true, onChange: brushController.setBrushSize });
-        
-        // Generation controls using new controller
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
             type: 'radio',
             name: 'generateModePopout',
@@ -199,8 +188,6 @@ export class Toolbar {
         });
 
         this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => rulesetActionController.generate());
-
-        // Mutation controls using new controller
         this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
             id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
             value: controllerState.mutateRate, 
@@ -233,7 +220,6 @@ export class Toolbar {
 
         this.uiElements.triggerMutationButton.addEventListener('click', () => rulesetActionController.mutate());
         this.uiElements.cloneAndMutateButton.addEventListener('click', () => rulesetActionController.cloneAndMutate());
-
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();
             if (!hex || !/^[0-9A-F]{32}$/.test(hex)) { alert("Invalid Hex: Must be 32 hex chars."); this.uiElements.rulesetInputPopout.select(); return; }
@@ -253,8 +239,6 @@ export class Toolbar {
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
-
-        // Settings Popout - use new visualization controller
         const vizState = visualizationController.getState();
 
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizTypeSwitchMount'), {
@@ -327,7 +311,6 @@ export class Toolbar {
             if (success) {
                 this.popoutPanels.share.toggle();
             } else {
-                // Provide feedback to the user if link generation fails
                 alert("Cannot generate share link: The selected world's ruleset is not yet available or is invalid. Please ensure the simulation is running or has been reset.");
             }
         });
@@ -365,23 +348,18 @@ export class Toolbar {
 
     _loadAndApplyUISettings() {
         const controllerState = rulesetActionController.getState();
-        
-        // Update UI components to reflect controller state
         this.uiElements.useCustomBiasCheckboxPopout.checked = controllerState.useCustomBias;
         this.sliderComponents.biasSliderPopout?.setValue(controllerState.bias);
         this.sliderComponents.biasSliderPopout?.setDisabled(!controllerState.useCustomBias);
-
-        // Visualization settings are now handled by the SwitchComponent and visualizationController
-        // No need to manually sync UI state here
     }
 
     _generateAndShowShareLink() {
         const url = generateShareUrl(this.worldManager);
         if (url) {
             this.uiElements.shareLinkInput.value = url;
-            return true; // Indicate success
+            return true; 
         }
-        return false; // Indicate failure
+        return false; 
     }
 
     _copyShareLink() {

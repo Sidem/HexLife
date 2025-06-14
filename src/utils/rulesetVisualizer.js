@@ -16,7 +16,7 @@ function hexToBinary(hex) {
 }
 
 function createSVG(w, h, viewBox) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const svg = document.createElementNS('http:
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
     if (viewBox) {
@@ -28,14 +28,14 @@ function createSVG(w, h, viewBox) {
 
 class RulesetVisualizer {
     constructor() {
-        this.vizType = PersistenceService.loadUISetting('rulesetVizType', 'binary'); // 'binary' is default
+        this.vizType = PersistenceService.loadUISetting('rulesetVizType', 'binary'); 
     }
 
     setVisualizationType(type) {
         if (type === 'binary' || type === 'color') {
             this.vizType = type;
             PersistenceService.saveUISetting('rulesetVizType', type);
-            EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Dispatch event for UI updates
+            EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); 
         }
     }
 
@@ -53,7 +53,7 @@ class RulesetVisualizer {
 
     createDiffSVG(baseHex, compareHex, options = {}) {
         const { width = '100%', height = '100%' } = options;
-        if (!baseHex || !compareHex) return document.createElement('div'); // Return empty element if no hex
+        if (!baseHex || !compareHex) return document.createElement('div'); 
         if (this.vizType === 'color') {
             return this._drawColorDiffSVG(baseHex, compareHex, width, height);
         }
@@ -127,7 +127,7 @@ class RulesetVisualizer {
         for (let i = 0; i < binA.length; i++) {
             const bitA = parseInt(binA[i], 10);
             const bitB = parseInt(binB[i], 10);
-            const diff = bitB - bitA; // compare TO B from A
+            const diff = bitB - bitA; 
             const color = diff > 0 ? '#4ade80' /* green-400 */ : diff < 0 ? '#f87171' /* red-400 */ : '#18181b' /* zinc-900 */;
             const x = (i % cols) * cell;
             const y = Math.floor(i / cols) * cell;
@@ -143,5 +143,5 @@ class RulesetVisualizer {
     }
 }
 
-// Export a singleton instance
+
 export const rulesetVisualizer = new RulesetVisualizer(); 

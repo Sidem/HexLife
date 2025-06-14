@@ -19,9 +19,7 @@ class SimulationController {
         if (this.state.speed === newSpeed) return;
         this.state.speed = newSpeed;
         PersistenceService.saveSimSpeed(newSpeed);
-        // Command for WorldManager
         EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, newSpeed);
-        // Event for UI updates
         EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, newSpeed);
     }
 
@@ -31,13 +29,10 @@ class SimulationController {
     
     setPause = (isPaused) => {
         this.state.isPaused = isPaused;
-        // Command for WorldManager
         EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE, this.state.isPaused);
-        // Event for UI updates
         EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.state.isPaused);
     }
 
-    // Method for external systems (like WorldManager) to sync state back
     _syncPauseState = (isPaused) => {
         if (this.state.isPaused !== isPaused) {
             this.state.isPaused = isPaused;

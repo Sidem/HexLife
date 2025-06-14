@@ -18,16 +18,14 @@ export class InputManager {
         this.worldManager = worldManager;
         this.gl = canvas.getContext('webgl2');
         this.isMobile = isMobile;
-        this.layoutCache = getLayoutCache(); // Initial cache
-
-        // Instantiate all strategies, passing a reference to this manager
+        this.layoutCache = getLayoutCache(); 
         this.strategies = {
             pan: new PanStrategy(this),
             draw: new DrawStrategy(this),
             place: new PlacePatternStrategy(this),
         };
 
-        this.currentStrategyName = 'pan'; // Default strategy
+        this.currentStrategyName = 'pan'; 
         this.previousStrategyName = 'pan';
         this.currentStrategy = this.strategies.pan;
 
@@ -36,38 +34,28 @@ export class InputManager {
     }
 
     _setupListeners() {
-        // --- Core DOM Event Listeners ---
-        // These now simply delegate to the current strategy
         this.canvas.addEventListener('mousedown', (e) => this.currentStrategy.handleMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.currentStrategy.handleMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.currentStrategy.handleMouseUp(e));
         this.canvas.addEventListener('mouseout', (e) => this.currentStrategy.handleMouseOut(e));
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if (this.isMobile) return; // Wheel events are not for mobile
-
+            if (this.isMobile) return; 
             const { viewType } = this.getCoordsFromPointerEvent(e);
             if (viewType !== 'selected') return;
-
-            // Check for either Ctrl or Shift key for brush resizing
             if (e.ctrlKey || e.shiftKey) {
                 const scrollAmount = Math.sign(e.deltaY);
                 const newSize = brushController.getState().brushSize - scrollAmount;
                 brushController.setBrushSize(newSize);
-                
-                // Update the hover preview to reflect the new brush size
                 this.currentStrategy.handleMouseMove(e);
             } else {
-                // Default behavior without modifier keys is to zoom
                 const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
                 this.zoomAtPoint(e.clientX, e.clientY, zoomFactor);
             }
         }, { passive: false });
         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
-        
-        // --- Touch Listeners ---
         this.canvas.addEventListener('touchstart', (e) => {
-            if (e.target.closest('.mobile-fab-container')) return; // Ignore touches on FABs
+            if (e.target.closest('.mobile-fab-container')) return; 
             e.preventDefault();
             this.currentStrategy.handleTouchStart(e);
         }, { passive: false });
@@ -86,11 +74,7 @@ export class InputManager {
             e.preventDefault();
             this.currentStrategy.handleTouchEnd(e);
         }, { passive: false });
-        
-        // --- Keyboard Listener (for ESC key, etc.) ---
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
-
-        // --- EventBus Listeners for Switching Strategies ---
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, interactionController.toggleMode);
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
@@ -106,32 +90,26 @@ export class InputManager {
         if (!this.strategies[name] || this.currentStrategyName === name) {
             return;
         }
-
-        // Store the previous strategy unless we're entering 'place' mode
         if (this.currentStrategyName !== 'place') {
             this.previousStrategyName = this.currentStrategyName;
         }
-        
         this.currentStrategy.exit();
         this.currentStrategyName = name;
         this.currentStrategy = this.strategies[name];
         this.currentStrategy.enter(options);
     }
     
-    // --- Shared Helper Methods (accessible by strategies via `this.manager.*`) ---
+    
 
     getCoordsFromPointerEvent(event) {
-        // This logic remains here as it's a shared utility
         if (!this.gl || !this.gl.canvas || !this.worldManager || !this.layoutCache.selectedView) {
             return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
         }
         const camera = this.worldManager.getCurrentCameraState();
         if (!camera) return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
-
         const rect = this.gl.canvas.getBoundingClientRect();
         const pointerX = event.clientX - rect.left;
         const pointerY = event.clientY - rect.top;
-
         const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
         if (pointerX >= selectedViewX && pointerX < selectedViewX + selectedViewWidth &&
             pointerY >= selectedViewY && pointerY < selectedViewY + selectedViewHeight) {
@@ -139,7 +117,6 @@ export class InputManager {
             const texCoordY = (pointerY - selectedViewY) / selectedViewHeight;
             return { ...textureCoordsToGridCoords(texCoordX, texCoordY, camera), viewType: 'selected', worldIndexAtCursor: this.worldManager.getSelectedWorldIndex() };
         }
-        
         const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = this.layoutCache.miniMap;
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
@@ -154,7 +131,6 @@ export class InputManager {
     }
     
     zoomAtPoint(pivotClientX, pivotClientY, zoomFactor) {
-        // This logic remains here
         const camera = this.worldManager.getCurrentCameraState();
         if (!camera) return;
         const { worldX, worldY } = this.getCoordsFromPointerEvent({ clientX: pivotClientX, clientY: pivotClientY });
@@ -171,7 +147,6 @@ export class InputManager {
     }
     
     handleBrushSizeWheel(event) {
-        // This logic remains here
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
             const newSize = brushController.getState().brushSize - scrollAmount;
@@ -190,7 +165,6 @@ export class InputManager {
     }
     
     clampCameraPan() {
-        // This logic remains here
         const camera = this.worldManager.getCurrentCameraState();
         if (!camera) return;
         const { RENDER_TEXTURE_SIZE } = Config;

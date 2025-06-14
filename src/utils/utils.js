@@ -204,7 +204,7 @@ export function findHexagonsInNeighborhood(startCol, startRow, maxDistance, outA
     outAffectedSet.add(startIndex);
 
     while (_queueHead < _neighborhoodQueue.length) {
-        const [cc, cr, cd] = _neighborhoodQueue[_queueHead++]; // Dequeue without shifting array
+        const [cc, cr, cd] = _neighborhoodQueue[_queueHead++]; 
         if (cd >= maxDistance) continue;
 
         const dirs = (cc % 2 !== 0) ? Config.NEIGHBOR_DIRS_ODD_R : Config.NEIGHBOR_DIRS_EVEN_R;
@@ -282,14 +282,14 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
     const numRules = 128;
     const rate = Math.min(mutationRate, numRules);
 
-    // Create an array of indices [0, 1, ..., 127] and shuffle it
+    
     const indices = Array.from({ length: numRules }, (_, i) => i);
     for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [indices[i], indices[j]] = [indices[j], indices[i]];
     }
 
-    // Flip the bits at the first 'rate' indices from the shuffled array
+    
     for (let i = 0; i < rate; i++) {
         const indexToFlip = indices[i];
         binArray[indexToFlip] = binArray[indexToFlip] === '1' ? '0' : '1';
@@ -300,7 +300,7 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
         return BigInt('0b' + newBin).toString(16).toUpperCase().padStart(32, '0');
     } catch (e) {
         console.error("Error converting mutated binary back to hex:", e);
-        return hexString; // Return original on error
+        return hexString; 
     }
 }
 
@@ -315,7 +315,7 @@ export function generateShareUrl(worldManager) {
     }
     params.set('r', rulesetHex);
 
-    // ... (rest of the parameter setting logic) ...
+    
     const camera = worldManager.getCurrentCameraState();
     if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
         params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
@@ -337,28 +337,28 @@ export function textureCoordsToGridCoords(texX, texY, camera) {
     let pixelX = texX * Config.RENDER_TEXTURE_SIZE;
     let pixelY = texY * Config.RENDER_TEXTURE_SIZE;
 
-    // This is the tricky part. We need to convert screen/texture coords to world coords
-    // by reversing the shader logic.
-    // Simplified approach: find world coordinates of the view center
+    
+    
+    
     const viewCenterX = Config.RENDER_TEXTURE_SIZE / 2;
     const viewCenterY = Config.RENDER_TEXTURE_SIZE / 2;
 
-    // Find how far the mouse is from the center of the view in pixels
+    
     const dxFromCenter = pixelX - viewCenterX;
     const dyFromCenter = pixelY - viewCenterY;
 
-    // Scale this distance by the zoom level to find world-space offset
+    
     const worldX = camera.x + (dxFromCenter / camera.zoom);
     const worldY = camera.y + (dyFromCenter / camera.zoom);
 
-    // Now that we have worldX and worldY, find the closest hex
+    
     const textureHexSize = calculateHexSizeForTexture();
 
     let minDistSq = Infinity;
     let closestCol = null;
     let closestRow = null;
 
-    // Estimate grid position based on world coordinates
+    
     const horizSpacing = textureHexSize * 2 * 3 / 4;
     const vertSpacing = textureHexSize * Math.sqrt(3);
 
@@ -373,7 +373,7 @@ export function textureCoordsToGridCoords(texX, texY, camera) {
             const r = Math.round(estimatedRowRough + rOffset);
             if (c < 0 || c >= Config.GRID_COLS || r < 0 || r >= Config.GRID_ROWS) continue;
 
-            const center = gridToPixelCoords(c, r, textureHexSize); // No startX/Y needed if we work in world space
+            const center = gridToPixelCoords(c, r, textureHexSize); 
             const dx = worldX - center.x;
             const dy = worldY - center.y;
             const distSq = dx * dx + dy * dy;

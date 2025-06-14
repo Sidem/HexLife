@@ -1,5 +1,3 @@
-// src/ui/ui.js
-
 import { OnboardingManager } from './OnboardingManager.js';
 import { tours } from './tourSteps.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
@@ -19,7 +17,6 @@ let panelManager, toolbar, onboardingManager;
 export { onboardingManager };
 
 function getUIElements() {
-    // This function now just serves as a central query for all needed DOM elements.
     return {
         rulesetDisplay: document.getElementById('rulesetDisplay'),
         statTick: document.getElementById('stat-tick'),
@@ -92,8 +89,6 @@ function getUIElements() {
 }
 
 function initMobileUI(worldManagerInterface) {
-    console.log("Mobile UI Initialized with corrected FAB logic");
-
     const bottomTabBarEl = document.getElementById('bottom-tab-bar');
     if (bottomTabBarEl) {
         new BottomTabBar(bottomTabBarEl, panelManager);
@@ -109,16 +104,11 @@ function initMobileUI(worldManagerInterface) {
 
     const fabRightContainer = document.getElementById('mobile-fab-container-right');
     const fabLeftContainer = document.getElementById('mobile-fab-container-left');
-
-    // --- Step 1: Render the STATIC Right-side FABs ---
-    // These buttons are permanent and not part of the customization system.
     fabRightContainer.innerHTML = `
         <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush"><span class="icon">🛠️</span></button>
         <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
         <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
     `;
-
-    // Connect listeners to the permanent right-side FABs
     new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), worldManagerInterface);
     fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
     fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
@@ -131,9 +121,6 @@ function initMobileUI(worldManagerInterface) {
         if (toggleIcon) toggleIcon.textContent = mode === 'pan' ? '🖐️' : '✏️';
     });
 
-
-    // --- Step 2: Render the DYNAMIC Left-side FABs ---
-    // This logic is completely separate from the right side.
     const fabActionMap = {
         'generate': {
             icon: '✨', title: 'Generate', handler: () => {
@@ -171,17 +158,13 @@ function initMobileUI(worldManagerInterface) {
     function renderCustomFabs() {
         fabLeftContainer.innerHTML = '';
         const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone', 'reset-all'], locked: true, order: [] });
-
-        // Use saved order, or default to the order they were enabled in
         const orderedIds = (fabSettings.order && fabSettings.order.length > 0) ? fabSettings.order : fabSettings.enabled;
         const enabledSet = new Set(fabSettings.enabled);
 
         orderedIds.forEach(actionId => {
-            if (!enabledSet.has(actionId)) return; // Only render enabled buttons
-
+            if (!enabledSet.has(actionId)) return; 
             const action = fabActionMap[actionId];
             if (!action) return;
-
             const button = document.createElement('button');
             button.className = 'mobile-fab secondary-fab';
             button.innerHTML = `<span class="icon">${action.icon}</span>`;
@@ -202,7 +185,7 @@ function initMobileUI(worldManagerInterface) {
         });
     }
 
-    // --- Step 3: Initial Render & Event Subscriptions ---
+    
     renderCustomFabs();
     EventBus.subscribe(EVENTS.COMMAND_UPDATE_FAB_UI, renderCustomFabs);
 }
@@ -215,23 +198,15 @@ function initGuidingBoxes() {
     if (canvas && selectedWorldGuide && miniMapGuide) {
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (layout) => {
             if (layout && layout.selectedView && layout.miniMap) {
-                // Get the canvas's position relative to its direct parent (#main-content-area)
-                // This is the correct, dynamic offset that replaces your manual values.
                 const canvasOffsetX = canvas.offsetLeft;
                 const canvasOffsetY = canvas.offsetTop;
-
-                // --- Position the Selected World Guide ---
                 const { x, y, width, height } = layout.selectedView;
                 selectedWorldGuide.style.left = `${x + canvasOffsetX}px`;
                 selectedWorldGuide.style.top = `${y + canvasOffsetY}px`;
                 selectedWorldGuide.style.width = `${width}px`;
                 selectedWorldGuide.style.height = `${height}px`;
                 selectedWorldGuide.style.display = 'block';
-
-                // --- Position the Minimap Guide ---
                 const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = layout.miniMap;
-                
-                // Calculate total grid size dynamically using config variables
                 const miniMapGridWidth = miniMapW * Config.WORLD_LAYOUT_COLS + miniMapSpacing * (Config.WORLD_LAYOUT_COLS - 1);
                 const miniMapGridHeight = miniMapH * Config.WORLD_LAYOUT_ROWS + miniMapSpacing * (Config.WORLD_LAYOUT_ROWS - 1);
 
@@ -249,20 +224,13 @@ export function initUI(worldManagerInterface, libraryData) {
     const uiElements = getUIElements();
     const topInfoBar = new TopInfoBar(worldManagerInterface);
     topInfoBar.init(uiElements);
-
     panelManager = new PanelManager(worldManagerInterface);
     panelManager.init(uiElements, libraryData);
-
     toolbar = new Toolbar(worldManagerInterface, libraryData);
     toolbar.init(uiElements);
-
     const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar);
     keyboardManager.init(uiElements);
-
-    // This function initializes all mobile-specific components.
-    // They will self-regulate their visibility based on UI mode.
     initMobileUI(worldManagerInterface);
-
     onboardingManager = new OnboardingManager({
         overlay: document.getElementById('onboarding-overlay'),
         tooltip: document.getElementById('onboarding-tooltip'),
@@ -282,7 +250,6 @@ export function initUI(worldManagerInterface, libraryData) {
         });
     }
     window.OnboardingManager = onboardingManager;
-
     document.body.addEventListener('click', (event) => {
         const helpTrigger = event.target.closest('.button-help-trigger');
         if (helpTrigger && helpTrigger.dataset.tourName) {
@@ -292,7 +259,6 @@ export function initUI(worldManagerInterface, libraryData) {
     });
 
     EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => downloadFile(data.filename, data.content, data.mimeType));
-
     EventBus.subscribe(EVENTS.TRIGGER_FILE_LOAD, (data) => {
         const reader = new FileReader();
         reader.onload = re => {
@@ -305,15 +271,14 @@ export function initUI(worldManagerInterface, libraryData) {
         reader.readAsText(data.file);
     });
 
-    // Initial UI state sync
-    toolbar.updatePauseButtonVisual(simulationController.getState().isPaused);
     
+    toolbar.updatePauseButtonVisual(simulationController.getState().isPaused);
     initGuidingBoxes();
     console.log(`UI Initialized for: ${uiManager.getMode()}`);
     return true;
 }
 
-// Export accessors for components that might be needed by other systems (like the onboarding manager)
+
 export function getRulesetEditor() { return panelManager?.getPanel('rulesetEditor'); }
 export function getSetupPanel() { return panelManager?.getPanel('setupPanel'); }
 export function getAnalysisPanel() { return panelManager?.getPanel('analysisPanel'); }

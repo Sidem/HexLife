@@ -10,8 +10,6 @@ export class BaseInputStrategy {
     constructor(manager) {
         this.manager = manager;
     }
-
-    // --- Lifecycle Hooks ---
     /**
      * Called when this strategy becomes active.
      * @param {object} [options] - Optional data passed when switching strategies (e.g., pattern data).
@@ -22,9 +20,6 @@ export class BaseInputStrategy {
      * Called when this strategy is deactivated.
      */
     exit() {}
-
-    // --- Event Handlers ---
-    // Each method corresponds to a DOM event and will be called by the InputManager.
     handleMouseDown(event) {}
     handleMouseMove(event) {}
     handleMouseUp(event) {}

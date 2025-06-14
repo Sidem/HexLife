@@ -66,7 +66,7 @@ export class ToolsBottomSheet extends BottomSheet {
 
         this.setContent(content);
 
-        // Initialize Slider Components
+        
         new SliderComponent(content.querySelector('#mobileSpeedSliderMount'), {
             id: 'mobileSpeedSlider',
             min: 1,
@@ -88,7 +88,7 @@ export class ToolsBottomSheet extends BottomSheet {
             onChange: brushController.setBrushSize
         });
 
-        // NEW: Initialize Interaction Setting Switch
+        
         const interactionState = interactionController.getState();
         new SwitchComponent(content.querySelector('#mobilePauseWhileDrawingMount'), {
             type: 'checkbox',
@@ -98,7 +98,7 @@ export class ToolsBottomSheet extends BottomSheet {
             onChange: interactionController.setPauseWhileDrawing
         });
 
-        // Visualization Controls using new controller
+        
         const vizState = visualizationController.getState();
         new SwitchComponent(content.querySelector('#mobileRulesetVizMount'), {
             type: 'radio', 
@@ -120,13 +120,11 @@ export class ToolsBottomSheet extends BottomSheet {
             onChange: visualizationController.setShowMinimapOverlay
         });
 
-        this._syncVisualSettings(); // Sync on initial render
+        this._syncVisualSettings(); 
         this._initCustomizeFabsPane();
     }
 
     _syncVisualSettings() {
-        // This method can now be simplified since SwitchComponent handles its own state
-        // We'll keep it to re-sync if the value is changed from desktop while the sheet is open
         const vizState = visualizationController.getState();
         const vizSwitch = this.sheetContent.querySelector('#mobileRulesetVizMount .switch-group');
         const overlaySwitch = this.sheetContent.querySelector('#mobileShowMinimapOverlayMount .switch-group');
@@ -148,7 +146,6 @@ export class ToolsBottomSheet extends BottomSheet {
     }
 
     _initCustomizeFabsPane() {
-        // NEW METHOD
         const fabActionList = this.sheetContent.querySelector('#fab-action-list');
         const actions = [
             { id: 'generate', icon: '✨', text: 'Generate' },
@@ -161,7 +158,6 @@ export class ToolsBottomSheet extends BottomSheet {
         ];
 
         const savedSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone', 'reset-all'], locked: true });
-
         actions.forEach(action => {
             const isChecked = savedSettings.enabled.includes(action.id);
             const li = document.createElement('li');
@@ -186,8 +182,7 @@ export class ToolsBottomSheet extends BottomSheet {
                 worldsController.clearWorlds('selected');
                 this.hide();
             }
-
-            // Tab switching logic
+            
             if (e.target.matches('.tab-button')) {
                 const tabId = e.target.dataset.tab;
                 this.sheetContent.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
@@ -197,23 +192,18 @@ export class ToolsBottomSheet extends BottomSheet {
             }
         });
 
-        // Visualization controls now handled by SwitchComponent onChange callbacks
-        // No need for manual event listeners
-
-        // Keep mobile UI in sync if changed from desktop
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => {
             if (this.isVisible) {
                 this._syncVisualSettings();
             }
         });
 
-        // Listeners for the new FAB customization tab
+        
         const fabPane = this.sheetContent.querySelector('#customize-fabs-pane');
         fabPane.addEventListener('change', e => {
             if (e.target.matches('.fab-action-toggle')) {
                 const label = e.target.nextElementSibling;
                 label.textContent = e.target.checked ? 'Enabled' : 'Disabled';
-
                 const toggles = fabPane.querySelectorAll('.fab-action-toggle:checked');
                 if (toggles.length > 3) {
                     alert('You can only enable up to 3 custom actions.');

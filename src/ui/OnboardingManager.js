@@ -3,7 +3,6 @@ import { EventBus } from '../services/EventBus.js';
 
 export class OnboardingManager {
     constructor(uiElements) {
-        // --- State Properties ---
         this.tourIsActive = false;
         this.currentTourName = null;
         this.activeTourSteps = [];
@@ -12,7 +11,6 @@ export class OnboardingManager {
         this.highlightedElementParentPanel = null;
         this.allTours = new Map();
 
-        // --- DOM Element References ---
         this.ui = {
             overlay: uiElements.overlay,
             tooltip: uiElements.tooltip,
@@ -28,12 +26,12 @@ export class OnboardingManager {
             return;
         }
 
-        // --- Initial Setup ---
+        
         this._setupEventListeners();
     }
 
     _setupEventListeners() {
-        // The secondary button (Skip/End Tour) always has the same action.
+        
         this.ui.secondaryBtn.addEventListener('click', () => this.endTour());
     }
 
@@ -62,7 +60,7 @@ export class OnboardingManager {
 
         const onboardingStates = loadOnboardingStates();
         if (!force && onboardingStates[tourName]) {
-            return; // Don't start a tour that's already completed, unless forced.
+            return; 
         }
 
         this.currentTourName = tourName;
@@ -96,7 +94,7 @@ export class OnboardingManager {
         return this.tourIsActive;
     }
 
-    // --- Private Methods ---
+    
 
     _showStep(stepIndex) {
         this._cleanupCurrentStep();
@@ -150,7 +148,7 @@ export class OnboardingManager {
             actionTarget.addEventListener('click', () => this._showStep(this.currentStepIndex + 1), { once: true });
         } else if (step.advanceOn.type === 'event') {
             const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, (data) => {
-                 // Optional condition check
+                 
                 if (step.advanceOn.condition && !step.advanceOn.condition(data)) {
                     return;
                 }

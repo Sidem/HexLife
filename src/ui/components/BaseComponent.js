@@ -40,6 +40,5 @@ export class BaseComponent {
          if (this.element && this.element.parentNode) { 
              this.element.parentNode.removeChild(this.element);
          }
-        //console.log(`${this.constructor.name} destroyed.`);
     }
 } 

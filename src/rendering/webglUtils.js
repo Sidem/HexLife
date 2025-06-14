@@ -102,10 +102,10 @@ export function createBuffer(gl, target, data, usage) {
  */
 export function updateBuffer(gl, buffer, target, data, offset = 0) {
     gl.bindBuffer(target, buffer);
-    // OPTIMIZATION: For dynamic, fixed-size attribute buffers that are updated every frame,
-    // gl.bufferSubData is generally the most efficient way to update their contents
-    // after they have been initialized with gl.bufferData (e.g., in createBuffer).
-    // This avoids the overhead of gl.getBufferParameter and conditional logic in the hot path.
+    
+    
+    
+    
     gl.bufferSubData(target, offset, data);
 }
 

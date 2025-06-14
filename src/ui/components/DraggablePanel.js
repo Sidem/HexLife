@@ -20,8 +20,6 @@ export class DraggablePanel {
         }
         
         this._initDragging();
-
-        // If persistence options are provided, load the state.
         if (this.options.persistence) {
             this._loadState();
         }
@@ -39,19 +37,16 @@ export class DraggablePanel {
         this.handleElement.addEventListener('touchstart', this.boundOnTouchStart, { passive: false });
     }
 
-    // --- State Persistence Methods (New/Modified) ---
+    
 
     _loadState() {
         if (!this.panelElement || !this.options.persistence?.identifier) return;
-        
         const s = PersistenceService.loadPanelState(this.options.persistence.identifier);
-        
         if (s.isOpen) {
             this.panelElement.classList.remove('hidden');
         } else {
             this.panelElement.classList.add('hidden');
         }
-
         if (s.x && s.x.endsWith('px')) this.panelElement.style.left = s.x;
         if (s.y && s.y.endsWith('px')) this.panelElement.style.top = s.y;
 
@@ -75,8 +70,6 @@ export class DraggablePanel {
             y: this.panelElement.style.top,
         });
     }
-
-    // --- Drag Handlers (Modified) ---
 
     _onMouseDown(event) {
         if (event.target.closest('input, button, select, textarea, .rule-viz, .neighbor-count-rule-viz, a')) {
@@ -105,7 +98,7 @@ export class DraggablePanel {
     _dragMouseUp() {
         document.removeEventListener('mousemove', this.boundDragMouseMove);
         document.removeEventListener('mouseup', this.boundDragMouseUp);
-        // Call save state and any custom drag end callback
+        
         this._saveState();
         if (this.options.onDragEnd && typeof this.options.onDragEnd === 'function') {
             this.options.onDragEnd();
@@ -116,14 +109,12 @@ export class DraggablePanel {
         event.preventDefault();
         document.removeEventListener('touchmove', this.boundDragTouchMove);
         document.removeEventListener('touchend', this.boundDragTouchEnd);
-        // Call save state and any custom drag end callback
+        
         this._saveState();
         if (this.options.onDragEnd && typeof this.options.onDragEnd === 'function') {
             this.options.onDragEnd();
         }
     }
-
-    // --- Public API Methods (Modified) ---
 
     show() {
         this.panelElement.classList.remove('hidden');
@@ -152,11 +143,8 @@ export class DraggablePanel {
         } else {
             this.hide();
         }
-        // show/hide already save state, so no extra call is needed here.
         return !isHidden; 
     }
-
-    // --- Unchanged Methods ---
 
     isHidden() {
         return this.panelElement.classList.contains('hidden');

@@ -3,27 +3,22 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 class RulesetActionController {
     constructor() {
-        // --- State ---
         this.state = {
-            // Generation
             genMode: PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym'),
             bias: PersistenceService.loadUISetting('biasValue', 0.33),
             useCustomBias: PersistenceService.loadUISetting('useCustomBias', true),
             genScope: PersistenceService.loadUISetting('globalRulesetScopeAll', true) ? 'all' : 'selected',
             genAutoReset: PersistenceService.loadUISetting('resetOnNewRule', true),
-            // Mutation
             mutateRate: PersistenceService.loadUISetting('mutationRate', 1),
             mutateMode: PersistenceService.loadUISetting('mutateMode', 'single'),
             mutateScope: PersistenceService.loadUISetting('mutateScope', 'selected'),
         };
     }
 
-    // --- Getters for UI binding ---
     getState() {
         return { ...this.state };
     }
-
-    // --- Setters for UI events ---
+    
     setGenMode = (mode) => {
         this.state.genMode = mode;
         PersistenceService.saveUISetting('rulesetGenerationMode', mode);
@@ -64,7 +59,7 @@ class RulesetActionController {
         PersistenceService.saveUISetting('mutateScope', scope);
     }
 
-    // --- Actions ---
+    
     generate() {
         const bias = this.state.useCustomBias ? this.state.bias : Math.random();
         EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
@@ -90,5 +85,4 @@ class RulesetActionController {
     }
 }
 
-// Export a singleton instance
 export const rulesetActionController = new RulesetActionController(); 

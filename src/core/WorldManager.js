@@ -41,7 +41,7 @@ export class WorldManager {
                     initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
                     enabled: (enabledMask & (1 << i)) !== 0,
                     rulesetHex: rulesetHex,
-                    rulesetHistory: [rulesetHex], // Start history with the initial ruleset
+                    rulesetHistory: [rulesetHex], 
                     rulesetFuture: []
                 });
             }
@@ -49,7 +49,7 @@ export class WorldManager {
             PersistenceService.saveRuleset(this.initialDefaultRulesetHex);
         } else {
             this.worldSettings = PersistenceService.loadWorldSettings();
-            // Ensure history arrays exist for settings loaded from persistence
+            
             this.worldSettings.forEach(setting => {
                 if (!setting.rulesetHistory) {
                     setting.rulesetHistory = [setting.rulesetHex];
@@ -95,7 +95,6 @@ export class WorldManager {
         const worldSetting = this.worldSettings[worldIndex];
         if (!worldSetting) return;
 
-        // Don't add if it's the same as the last one in history
         if (worldSetting.rulesetHistory[worldSetting.rulesetHistory.length - 1] === rulesetHex) {
             return;
         }
@@ -106,7 +105,6 @@ export class WorldManager {
             worldSetting.rulesetHistory.shift();
         }
 
-        // Any new action clears the "future" (redo) stack.
         if (worldSetting.rulesetFuture.length > 0) {
             worldSetting.rulesetFuture = [];
         }
@@ -114,8 +112,7 @@ export class WorldManager {
     }
 
     _handleProxyInitialized = (worldIndex) => {
-        console.log(`World ${worldIndex} worker initialized and sent initial state.`);
-        EventBus.dispatch(EVENTS.WORKER_INITIALIZED, { worldIndex }); // Dispatch event
+        EventBus.dispatch(EVENTS.WORKER_INITIALIZED, { worldIndex });
         if (worldIndex === this.selectedWorldIndex) {
             this.dispatchSelectedWorldUpdates();
         }
@@ -410,7 +407,7 @@ export class WorldManager {
         const indices = this._getAffectedWorldIndices(targetScope);
 
         indices.forEach(idx => {
-            // Add the new ruleset to history BEFORE applying it
+            
             this._addRulesetToHistory(idx, rulesetHex);
             
             const newRulesetBuffer = newRulesetArray.buffer.slice(0);
@@ -441,21 +438,21 @@ export class WorldManager {
         const rules = hexToRuleset(sourceHex);
 
         if (mutationMode === 'single') {
-            // Each of the 128 rules has a `mutationRate` chance to flip.
+            
             for (let i = 0; i < 128; i++) {
                 if (Math.random() < mutationRate) {
                     rules[i] = 1 - rules[i];
                 }
             }
         } else if (mutationMode === 'r_sym') {
-            // Each of the 28 symmetry groups (14 canonical reps * 2 center states) has a `mutationRate` chance to flip.
+            
             const canonicalGroups = this.symmetryData.canonicalRepresentatives;
             if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
 
             for (const group of canonicalGroups) {
                 for (let cs = 0; cs <= 1; cs++) {
                     if (Math.random() < mutationRate) {
-                        // All rules in this group get the same new output
+                        
                         const currentOutput = rules[(cs << 6) | group.representative];
                         const newOutput = 1 - currentOutput;
                         for (const member of group.members) {
@@ -466,11 +463,11 @@ export class WorldManager {
                 }
             }
         } else if (mutationMode === 'n_count') {
-            // Each of the 14 neighbor-count groups (7 counts * 2 center states) has a `mutationRate` chance to flip.
+            
             for (let cs = 0; cs <= 1; cs++) {
                 for (let nan = 0; nan <= 6; nan++) {
                     if (Math.random() < mutationRate) {
-                        // Determine the new output state for this group and apply it to all rules within that group
+                        
                         const currentEffectiveOutput = this.getEffectiveRuleForNeighborCount(cs, nan);
                         const newOutput = (currentEffectiveOutput === 2) ? Math.round(Math.random()) : 1 - currentEffectiveOutput;
                         
@@ -548,7 +545,7 @@ export class WorldManager {
                 }
             }
             
-            // Add to history for every world, even the source one to keep a coherent history point
+            
             this._addRulesetToHistory(idx, newHex);
             this.worldSettings[idx].rulesetHex = newHex;
 
@@ -565,10 +562,10 @@ export class WorldManager {
             }
         });
 
-        // Save the updated settings and notify the UI of the changes.
+        
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); // This triggers a full UI refresh.
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); 
     }
 
     _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {
@@ -628,7 +625,7 @@ export class WorldManager {
     setGlobalSpeed = (speed) => {
         const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
         this.worlds.forEach(proxy => proxy.setSpeed(newSpeed));
-        // Note: SimulationController handles persistence and events, no need to duplicate here
+        
     }
 
     getWorldsRenderData = () => {
@@ -771,7 +768,7 @@ export class WorldManager {
         const newStateArray = Uint8Array.from(loadedData.state);
 
         if (this.worldSettings[worldIndex]) {
-            this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); // Add loaded ruleset to history
+            this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); 
             this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialDensity = newDensity;
@@ -803,9 +800,9 @@ export class WorldManager {
         if (!settings || historyIndex < 0 || historyIndex >= settings.rulesetHistory.length) return;
 
         const currentIndex = settings.rulesetHistory.length - 1;
-        if (historyIndex === currentIndex) return; // Already at this state
+        if (historyIndex === currentIndex) return; 
 
-        // Move all states after the target state from history to future
+        
         const itemsToMove = settings.rulesetHistory.splice(historyIndex + 1);
         settings.rulesetFuture.unshift(...itemsToMove.reverse());
 
@@ -827,11 +824,11 @@ export class WorldManager {
         const settings = this.worldSettings[worldIndex];
         if (!settings || settings.rulesetHistory.length < 2) return;
 
-        // The state to revert to is the second to last one in the history
+        
         const targetIndex = settings.rulesetHistory.length - 2;
         
         const currentRuleset = settings.rulesetHistory.pop();
-        settings.rulesetFuture.unshift(currentRuleset); // Add to the beginning of future for correct order
+        settings.rulesetFuture.unshift(currentRuleset); 
 
         const previousRuleset = settings.rulesetHistory[targetIndex];
         settings.rulesetHex = previousRuleset;
@@ -851,7 +848,7 @@ export class WorldManager {
         const settings = this.worldSettings[worldIndex];
         if (!settings || settings.rulesetFuture.length === 0) return;
 
-        const nextRuleset = settings.rulesetFuture.shift(); // Get from the beginning
+        const nextRuleset = settings.rulesetFuture.shift(); 
         settings.rulesetHistory.push(nextRuleset);
         settings.rulesetHex = nextRuleset;
 
@@ -870,7 +867,7 @@ export class WorldManager {
         const settings = this.worldSettings[worldIndex];
         if (!settings) return { history: [], future: [] };
         return {
-            history: [...settings.rulesetHistory], // Return copies
+            history: [...settings.rulesetHistory], 
             future: [...settings.rulesetFuture],
         };
     }

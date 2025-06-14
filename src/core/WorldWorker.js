@@ -120,7 +120,7 @@ function processCommandQueue() {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
-                needsGridUpdate = true; // Ruleset change affects the grid
+                needsGridUpdate = true; 
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;
@@ -181,13 +181,13 @@ function processCommandQueue() {
                 break;
             case 'SET_HOVER_STATE':
                 if (setHoverStateLogic(command.data.hoverAffectedIndices)) {
-                    needsVisualUpdate = true; // This is a visual-only update
+                    needsVisualUpdate = true; 
                 }
                 break;
             case 'CLEAR_HOVER_STATE':
                 if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
                     jsHoverStateArray.fill(0);
-                    needsVisualUpdate = true; // This is a visual-only update
+                    needsVisualUpdate = true; 
                 }
                 break;
             case 'SET_ENABLED':
@@ -226,7 +226,7 @@ function processCommandQueue() {
         }
     }
     commandQueue = [];
-    // Return a more detailed object instead of a single boolean
+    
     return { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue };
 }
 
@@ -321,8 +321,6 @@ function runTick() {
     
     const now = performance.now();
     const shouldSendThrottledUpdate = now - lastStatsUpdateTime > STATS_UPDATE_THROTTLE_MS;
-
-    // IMPORTANT: This is the key change. We only bypass the throttle for grid updates.
     if (needsGridUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) { 
         lastSentChecksum = calculateChecksum(jsStateArray);
         sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, needsGridUpdate || simulationPerformedUpdate);
@@ -331,8 +329,8 @@ function runTick() {
             lastStatsUpdateTime = now;
         }
     } else if (needsVisualUpdate) {
-        // For visual-only updates (like hover), send only the state data, not stats.
-        // This prevents the main thread from thinking a tick has occurred.
+        
+        
         const statePayload = {
             type: 'STATE_UPDATE',
             worldIndex: worldIndex,

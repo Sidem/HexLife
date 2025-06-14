@@ -9,7 +9,7 @@ import { uiManager } from '../ui/UIManager.js';
 
 let gl;
 let canvas;
-let layoutCache = {}; // Cache for layout calculations
+let layoutCache = {}; 
 
 let hexShaderProgram;
 let quadShaderProgram;
@@ -48,7 +48,7 @@ export async function initRenderer(canvasElement) {
         instanceState: gl.getAttribLocation(hexShaderProgram, "a_instance_state"),
         instanceHoverState: gl.getAttribLocation(hexShaderProgram, "a_instance_hover_state"),
         instanceRuleIndex: gl.getAttribLocation(hexShaderProgram, "a_instance_rule_index"),
-        instanceGhostState: gl.getAttribLocation(hexShaderProgram, "a_instance_ghost_state"), // NEW
+        instanceGhostState: gl.getAttribLocation(hexShaderProgram, "a_instance_ghost_state"), 
     };
     hexUniformLocations = {
         resolution: gl.getUniformLocation(hexShaderProgram, "u_resolution"),
@@ -56,7 +56,7 @@ export async function initRenderer(canvasElement) {
         hoverFilledDarkenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverFilledDarkenFactor"),
         hoverInactiveLightenFactor: gl.getUniformLocation(hexShaderProgram, "u_hoverInactiveLightenFactor"),
         colorLUT: gl.getUniformLocation(hexShaderProgram, "u_colorLUT"),
-        // NEW: Add locations for pan and zoom uniforms
+        
         pan: gl.getUniformLocation(hexShaderProgram, "u_pan"),
         zoom: gl.getUniformLocation(hexShaderProgram, "u_zoom"),
     };
@@ -142,9 +142,6 @@ function _calculateAndCacheLayout() {
     if (!gl || !gl.canvas) return;
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
-    // ===================================================================
-    //console.log(`%cCalculating layout with dimensions: ${canvasWidth} x ${canvasHeight}`, 'color: lightblue; font-weight: bold;');
-    // ===================================================================
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
 
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
@@ -205,7 +202,7 @@ function initMinimapOverlays() {
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const overlay = document.createElement('div');
         overlay.className = 'minimap-ruleset-overlay';
-        overlay.style.display = 'none'; // Initially hidden
+        overlay.style.display = 'none'; 
         container.appendChild(overlay);
         minimapOverlayElements.push(overlay);
     }
@@ -240,7 +237,7 @@ function setupHexBuffersAndVAO() {
     hexBuffers.stateBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
     hexBuffers.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
     hexBuffers.ruleIndexBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW);
-    hexBuffers.ghostBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW); // NEW
+    hexBuffers.ghostBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, initialZerosUint8, gl.DYNAMIC_DRAW); 
 
     hexVAO = gl.createVertexArray();
     gl.bindVertexArray(hexVAO);
@@ -309,7 +306,7 @@ function setupFBOs() {
 function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
-    // --- PASS 1: Render all ENABLED worlds using the Hexagon Shader ---
+    
     gl.useProgram(hexShaderProgram);
     gl.bindVertexArray(hexVAO);
     
@@ -317,7 +314,7 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
     gl.uniform1i(hexUniformLocations.colorLUT, 1);
 
-    // NEW: Enable blending for ghost transparency
+    
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -327,34 +324,34 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
             const fboData = worldFBOs[i];
             gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
 
-            // Clear the texture for this world
+            
             gl.clearColor(...Config.BACKGROUND_COLOR);
             gl.clear(gl.COLOR_BUFFER_BIT);
 
-            // Skip drawing if data is missing
+            
             if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
                 continue;
             }
 
-            // Set uniforms for hexagon rendering
+            
             const textureHexSize = Utils.calculateHexSizeForTexture();
             gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
             
-            // Apply pan and zoom uniforms
-            // Apply transformation for the selected world, use defaults for others
+            
+            
             if (i === selectedWorldIndex) {
                 gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
                 gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
             } else {
-                // Default view for mini-maps
+                
                 gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
                 gl.uniform1f(hexUniformLocations.zoom, 1.0);
             }
 
-            // Update instance buffers with the latest data
+            
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
@@ -362,23 +359,23 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
                 WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
             }
 
-            // Draw the hexagons for this world
+            
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
         }
     }
 
-    // --- PASS 2: Render all DISABLED worlds using the Quad Shader ---
+    
     if (disabledTextTexture) {
         gl.useProgram(quadShaderProgram);
         gl.bindVertexArray(quadVAO);
 
-        // Bind the "DISABLED" text texture to texture unit 0
+        
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
 
-        // Enable blending for the text overlay
+        
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -388,11 +385,11 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
                 const fboData = worldFBOs[i];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
 
-                // Clear the background to the disabled color
+                
                 gl.clearColor(...Config.DISABLED_WORLD_OVERLAY_COLOR);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 
-                // Draw the "DISABLED" text quad
+                
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
         }
@@ -402,12 +399,12 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
     
-    // Unbind framebuffer and VAO to clean up state
+    
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
 }
 
-// UNCHANGED: This function now just composites the final textures.
+
 function renderMainScene(selectedWorldIndex, allWorldsData) {
     if (!quadShaderProgram || !quadVAO) return;
 
@@ -419,7 +416,7 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
     gl.useProgram(quadShaderProgram);
     gl.bindVertexArray(quadVAO);
 
-    // Use the cached layout instead of recalculating
+    
     const { selectedView, miniMap } = layoutCache;
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
@@ -450,7 +447,7 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
         
-        // Add ruleset visualization overlay
+        
         const overlayEl = minimapOverlayElements[i];
         const worldData = allWorldsData[i];
         const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
@@ -460,7 +457,7 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
             overlayEl.style.left = `${miniX-miniMap.gridContainerX}px`;
             overlayEl.style.top = `${miniY-miniMap.gridContainerY}px`;
             
-            // Avoid re-rendering SVG if ruleset hasn't changed
+            
             const currentSignature = `${i}-${worldData.rulesetHex}-${selectedWorldIndex}-${selectedWorldRuleset}-${rulesetVisualizer.getVisualizationType()}`;
             if (overlayEl.dataset.signature !== currentSignature) {
                 overlayEl.innerHTML = '';
@@ -506,11 +503,11 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
 
 export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized, camera) {
     if (!gl || !areAllWorkersInitialized) {
-        // Do nothing if not initialized; the HTML loader is visible.
+        
         return;
     }
     
-    // Once initialized, proceed with the normal render path.
+    
     renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
     renderMainScene(selectedWorldIndex, allWorldsData);
 }
@@ -518,5 +515,5 @@ export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWor
 export function resizeRenderer() {
     if (!gl || !canvas) return;
     Utils.resizeCanvasToDisplaySize(canvas, gl);
-    _calculateAndCacheLayout(); // Add this line
+    _calculateAndCacheLayout(); 
 }

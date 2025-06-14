@@ -7,7 +7,7 @@ import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/rul
 export class RulesetEditor extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) {
 
-        // Pass persistence config and onDragEnd callback to the DraggablePanel constructor
+        
         super(panelElement, 'h3', { 
             ...options, 
             persistence: { identifier: 'ruleset' },
@@ -44,7 +44,7 @@ export class RulesetEditor extends DraggablePanel {
         this.cachedRotationalSymmetryRules = [];
         this.areGridsCreated = false;
         
-        // Add component storage
+        
         this.scopeSwitch = null;
         this.resetSwitch = null;
 
@@ -57,18 +57,15 @@ export class RulesetEditor extends DraggablePanel {
     _createAllGrids() {
         if (this.areGridsCreated) return;
 
-        // --- 1. Create Detailed Grid ---
         const detailedGrid = this.uiElements.rulesetEditorGrid;
         const detailedFrag = document.createDocumentFragment();
         for (let i = 0; i < 128; i++) {
-            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }); // Create with default state
+            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }); 
             const innerHex = viz.querySelector('.inner-hex');
-            this.cachedDetailedRules[i] = { viz, innerHex }; // Cache the element and its key part
+            this.cachedDetailedRules[i] = { viz, innerHex }; 
             detailedFrag.appendChild(viz);
         }
         detailedGrid.appendChild(detailedFrag);
-
-        // --- 2. Create Neighbor Count Grid ---
         const neighborGrid = this.uiElements.neighborCountRulesetEditorGrid;
         const neighborFrag = document.createDocumentFragment();
         for (let cs = 0; cs <= 1; cs++) {
@@ -92,8 +89,6 @@ export class RulesetEditor extends DraggablePanel {
             }
         }
         neighborGrid.appendChild(neighborFrag);
-
-        // --- 3. Create Rotational Symmetry Grid ---
         const symmetryGrid = this.uiElements.rotationalSymmetryRulesetEditorGrid;
         const symmetryFrag = document.createDocumentFragment();
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
@@ -143,7 +138,7 @@ export class RulesetEditor extends DraggablePanel {
                 PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
             });
         }
-        // Create SwitchComponents for scope and reset controls
+        
         const initialScope = PersistenceService.loadUISetting('editorRulesetApplyScope', 'selected');
         if (this.uiElements.editorScopeSwitchMount) {
             this.scopeSwitch = new SwitchComponent(this.uiElements.editorScopeSwitchMount, {
@@ -320,7 +315,7 @@ export class RulesetEditor extends DraggablePanel {
                 const effectiveOutput = this.worldManager.getEffectiveRuleForNeighborCount(cs, na);
                 const outputDisplay = effectiveOutput === 1 ? 'ON' : (effectiveOutput === 0 ? 'OFF' : 'MIXED');
                 
-                // Update class for color instead of style for better performance
+                
                 innerHex.className = `hexagon inner-hex state-${effectiveOutput}`;
                 label.innerHTML = `C:${cs ? '<b>ON</b>' : 'OFF'}<br>${na}/6 N&rarr;${outputDisplay}`;
                 cacheIndex++;
@@ -354,8 +349,8 @@ export class RulesetEditor extends DraggablePanel {
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
         }
-        // The SwitchComponent constructor now handles loading the initial value from persistence.
-        // So, the logic for 'editorRulesetApplyScope' and 'editorAutoReset' can be removed from here.
+        
+        
     }
 
     show() {

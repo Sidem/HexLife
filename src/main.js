@@ -71,7 +71,7 @@ function parseUrlParameters() {
 }
 
 async function initialize() {
-    console.log("Starting Initialization (Worker Architecture)...");
+    console.log("Initializing...");
     updateLoadingStatus("Parsing configuration...");
     const canvas = document.getElementById('hexGridCanvas');
     if (!canvas) {
@@ -79,7 +79,6 @@ async function initialize() {
         return;
     }
 
-    // Initialize the UI Manager first, as other components depend on it.
     uiManager.init();
     
     const sharedSettings = parseUrlParameters();
@@ -127,12 +126,10 @@ async function initialize() {
         return;
     }
 
-    // Add a 'Help' button listener if you added one to the UI
     document.getElementById('helpButton').addEventListener('click', () => {
         onboardingManager.startTour('core', true);
     });
 
-    // Event listener for worker initialization progress
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {
         const hexElement = document.getElementById(`loader-hex-${worldIndex}`);
         if (hexElement) {
@@ -142,10 +139,8 @@ async function initialize() {
         updateLoadingStatus(`Spooling up simulation workers... (${initializedWorkerCount}/${Config.NUM_WORLDS})`);
     });
 
-    // Dispatch initial events to sync UI with the starting state
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
     EventBus.dispatch(EVENTS.SIMULATION_PAUSED, simulationController.getState().isPaused);
-    
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
@@ -155,8 +150,7 @@ async function initialize() {
     isInitialized = true;
     lastTimestamp = performance.now();
     lastFpsUpdateTime = lastTimestamp;
-
-    console.log("Initialization Complete. Starting Render Loop.");
+    console.log("Initializing render loop.");
     requestAnimationFrame(renderLoop);
 }
 
@@ -191,7 +185,6 @@ function renderLoop(timestamp) {
     const allWorldsData = worldManager.getWorldsRenderData();
     const worldSettings = worldManager.getWorldSettingsForUI();
     
-    // Combine render data with world settings
     const allWorldsWithSettings = allWorldsData.map((data, i) => ({
         ...data,
         rulesetHex: worldSettings[i]?.rulesetHex || "0".repeat(32)
@@ -202,7 +195,6 @@ function renderLoop(timestamp) {
         const loadingIndicator = document.getElementById('loading-indicator');
         if (loadingIndicator && loadingIndicator.style.display !== 'none') {
             updateLoadingStatus("Finalizing...");
-            // Add a small delay before hiding the loader for a smoother transition
             setTimeout(() => {
                 loadingIndicator.style.opacity = '0';
                 setTimeout(() => { 
@@ -212,7 +204,7 @@ function renderLoop(timestamp) {
                     } else {
                         onboardingManager.startTour('core');
                     }
-                }, 500); // This should match the CSS transition duration
+                }, 500);
             }, 250);
         }
     }
@@ -233,7 +225,6 @@ function renderLoop(timestamp) {
         const targetTps = simulationController.getState().speed;
         EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
     }
-
     requestAnimationFrame(renderLoop);
 }
 

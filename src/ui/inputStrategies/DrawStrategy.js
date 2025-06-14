@@ -20,7 +20,7 @@ export class DrawStrategy extends BaseInputStrategy {
     }
 
     exit() {
-        // Ensure simulation is resumed if user switches mode mid-draw
+        
         if (this.wasSimulationRunningBeforeStroke) {
             simulationController.setPause(false);
         }
@@ -28,14 +28,11 @@ export class DrawStrategy extends BaseInputStrategy {
     }
 
     handleMouseDown(event) {
-        if (event.button !== 0) return; // Only handle left clicks
-
+        if (event.button !== 0) return; 
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
         if (viewType !== 'selected' || col === null) return;
-        
         this.isDrawing = true;
         this.resetStrokeState();
-
         if (interactionController.getState().pauseWhileDrawing && !simulationController.getState().isPaused) {
             this.wasSimulationRunningBeforeStroke = true;
             simulationController.setPause(true);
@@ -47,8 +44,6 @@ export class DrawStrategy extends BaseInputStrategy {
     handleMouseMove(event) {
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
         const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
-
-        // Always show hover effect in draw mode
         if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
         } else {
@@ -69,10 +64,6 @@ export class DrawStrategy extends BaseInputStrategy {
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.manager.worldManager.getSelectedWorldIndex() });
     }
 
-
-    
-    // --- Touch Events (delegated from manager) ---
-    
     handleTouchStart(event) {
         const primaryTouch = event.touches[0];
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
@@ -93,8 +84,6 @@ export class DrawStrategy extends BaseInputStrategy {
         const primaryTouch = event.touches[0];
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
         const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
-
-        // Hover effect for touch
         if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
         } else {
@@ -110,8 +99,6 @@ export class DrawStrategy extends BaseInputStrategy {
         this.endDrawing();
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.manager.worldManager.getSelectedWorldIndex() });
     }
-
-    // --- Helper Methods ---
 
     applyBrush(worldIndex, col, row) {
         const currentCellIndex = row * Config.GRID_COLS + col;
@@ -137,10 +124,6 @@ export class DrawStrategy extends BaseInputStrategy {
         }
         this.resetStrokeState();
         this.isDrawing = false;
-        
-        // On desktop, drawing is a temporary state. After drawing,
-        // we always revert to the 'pan' strategy, which is the default idle state.
-        // On mobile, the mode is explicit, so we do not switch back automatically.
         if (!this.manager.isMobile) {
             this.manager.setStrategy('pan');
         }

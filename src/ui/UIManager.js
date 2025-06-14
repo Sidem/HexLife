@@ -28,7 +28,6 @@ class UIManager {
         if (newMode !== this.mode) {
             this.mode = newMode;
             if (dispatchEvent) {
-                console.log(`UI mode changed to: ${this.mode}`);
                 EventBus.dispatch(EVENTS.UI_MODE_CHANGED, { mode: this.mode });
             }
         }

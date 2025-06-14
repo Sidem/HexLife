@@ -15,7 +15,7 @@ export class PlacePatternStrategy extends BaseInputStrategy {
     enter(options) {
         if (!options || !options.cells) {
             console.error("PlacePatternStrategy: No cell data provided.");
-            this.manager.setStrategy('pan'); // Revert to a safe strategy
+            this.manager.setStrategy('pan'); 
             return;
         }
         this.patternToPlace = options.cells;
@@ -29,18 +29,14 @@ export class PlacePatternStrategy extends BaseInputStrategy {
     }
 
     handleMouseDown(event) {
-        if (event.button !== 0) return; // Only left click to place
-
+        if (event.button !== 0) return; 
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
         if (viewType !== 'selected' || col === null) {
-             this.manager.setStrategy('pan'); // Exit placing mode if clicked outside
+             this.manager.setStrategy('pan'); 
             return;
         }
-
         const indicesToSet = this.getTranslatedPatternIndices(col, row);
         EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndexAtCursor, cellIndices: indicesToSet });
-        
-        // Revert to the previous interaction mode (pan or draw)
         this.manager.setStrategy(this.manager.previousStrategyName || 'pan');
     }
 

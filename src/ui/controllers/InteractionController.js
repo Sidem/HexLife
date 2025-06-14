@@ -23,7 +23,6 @@ class InteractionController {
         if (this.state.mode === mode) return;
         
         this.state.mode = mode;
-        console.log(`Interaction mode set to: ${this.state.mode}`);
         EventBus.dispatch(EVENTS.INTERACTION_MODE_CHANGED, this.state.mode);
     }
 
