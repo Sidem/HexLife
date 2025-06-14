@@ -16,7 +16,7 @@ function hexToBinary(hex) {
 }
 
 function createSVG(w, h, viewBox) {
-    const svg = document.createElementNS('http:
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
     if (viewBox) {
