@@ -46,6 +46,7 @@ export class ToolsBottomSheet extends BottomSheet {
                         <h5>Visualization</h5>
                         <div id="mobileRulesetVizMount"></div>
                         <div id="mobileShowMinimapOverlayMount" style="margin-top: 15px;"></div>
+                        <div id="mobileShowCycleIndicatorMount" style="margin-top: 5px;"></div>
                     </div>
                     <div class="tool-group">
                         <h5>Reset / Clear</h5>
@@ -119,6 +120,14 @@ export class ToolsBottomSheet extends BottomSheet {
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: visualizationController.setShowMinimapOverlay
         });
+        
+        new SwitchComponent(content.querySelector('#mobileShowCycleIndicatorMount'), {
+            type: 'checkbox', 
+            name: 'mobileShowCycleIndicator',
+            initialValue: vizState.showCycleIndicator,
+            items: [{ value: 'show', text: 'Show Cycle Indicators' }],
+            onChange: visualizationController.setShowCycleIndicator
+        });
 
         this._syncVisualSettings(); 
         this._initCustomizeFabsPane();
@@ -128,6 +137,7 @@ export class ToolsBottomSheet extends BottomSheet {
         const vizState = visualizationController.getState();
         const vizSwitch = this.sheetContent.querySelector('#mobileRulesetVizMount .switch-group');
         const overlaySwitch = this.sheetContent.querySelector('#mobileShowMinimapOverlayMount .switch-group');
+        const cycleIndicatorSwitch = this.sheetContent.querySelector('#mobileShowCycleIndicatorMount .switch-group');
 
         if(vizSwitch) {
             const radio = vizSwitch.querySelector(`input[value="${vizState.vizType}"]`);
@@ -137,6 +147,11 @@ export class ToolsBottomSheet extends BottomSheet {
         if(overlaySwitch) {
             const checkbox = overlaySwitch.querySelector('input');
             if(checkbox) checkbox.checked = vizState.showMinimapOverlay;
+        }
+
+        if(cycleIndicatorSwitch) {
+            const checkbox = cycleIndicatorSwitch.querySelector('input');
+            if(checkbox) checkbox.checked = vizState.showCycleIndicator;
         }
     }
 

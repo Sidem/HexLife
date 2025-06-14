@@ -632,6 +632,10 @@ export class WorldManager {
         return this.worlds.map(proxy => proxy.getLatestRenderData());
     }
 
+    getWorldsFullStatus = () => {
+        return this.worlds.map(proxy => proxy.getFullStatus());
+    }
+
 
     getSelectedWorldIndex = () => this.selectedWorldIndex;
 

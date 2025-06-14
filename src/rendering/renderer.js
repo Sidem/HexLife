@@ -6,6 +6,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { uiManager } from '../ui/UIManager.js';
+import { visualizationController } from '../ui/controllers/VisualizationController.js';
 
 let gl;
 let canvas;
@@ -25,6 +26,7 @@ let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
 let minimapOverlayElements = [];
+let cycleIndicatorElements = [];
 let lastWorldSettings = [];
 
 export async function initRenderer(canvasElement) {
@@ -117,6 +119,7 @@ export async function initRenderer(canvasElement) {
     setupQuadBuffersAndVAO();
     setupFBOs();
     initMinimapOverlays();
+    initCycleIndicators();
 
     EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
         _handleUIModeChange(mode);
@@ -135,6 +138,9 @@ function _handleUIModeChange(mode) {
     const isMobile = mode === 'mobile';
     minimapOverlayElements.forEach(overlay => {
         overlay.classList.toggle('mini', isMobile);
+    });
+    cycleIndicatorElements.forEach(indicator => {
+        indicator.classList.toggle('mini', isMobile);
     });
 }
 
@@ -205,6 +211,22 @@ function initMinimapOverlays() {
         overlay.style.display = 'none'; 
         container.appendChild(overlay);
         minimapOverlayElements.push(overlay);
+    }
+}
+
+function initCycleIndicators() {
+    const container = document.getElementById('minimap-guide');
+    if (!container) return;
+    cycleIndicatorElements = [];
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        let indicator = container.querySelector(`.cycle-indicator[data-world-id='${i}']`);
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'cycle-indicator hidden';
+            indicator.dataset.worldId = i;
+            container.appendChild(indicator);
+        }
+        cycleIndicatorElements.push(indicator);
     }
 }
 
@@ -303,7 +325,7 @@ function setupFBOs() {
     }
 }
 
-function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
+function renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera) {
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
     
@@ -319,7 +341,8 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const worldData = allWorldsData[i];
+        const worldStatus = allWorldsStatus[i];
+        const worldData = worldStatus ? worldStatus.renderData : null;
         if (worldData && worldData.enabled) {
             const fboData = worldFBOs[i];
             gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
@@ -380,7 +403,8 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const worldData = allWorldsData[i];
+            const worldStatus = allWorldsStatus[i];
+            const worldData = worldStatus ? worldStatus.renderData : null;
             if (!worldData || !worldData.enabled) {
                 const fboData = worldFBOs[i];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
@@ -405,7 +429,7 @@ function renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera) {
 }
 
 
-function renderMainScene(selectedWorldIndex, allWorldsData) {
+function renderMainScene(selectedWorldIndex, allWorldsStatus) {
     if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -427,7 +451,7 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
         drawQuad(selectedView.x, selectedView.y, selectedView.width, selectedView.height);
     }
 
-    const selectedWorldRuleset = allWorldsData[selectedWorldIndex]?.rulesetHex;
+    const selectedWorldRuleset = allWorldsStatus[selectedWorldIndex]?.stats.rulesetHex;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
@@ -447,25 +471,49 @@ function renderMainScene(selectedWorldIndex, allWorldsData) {
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
         
+        const worldStatus = allWorldsStatus[i];
+        
+        // Cycle indicator logic
+        const indicatorEl = cycleIndicatorElements[i];
+        const showIndicators = visualizationController.getState().showCycleIndicator;
+        
+        if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
+            const cycleLength = worldStatus.stats.cycleLength;
+            indicatorEl.classList.remove('hidden');
+            // Use the same relative positioning logic as the ruleset overlay
+            indicatorEl.style.left = `${miniX - miniMap.gridContainerX + miniMap.miniMapW - 20 - miniMap.miniMapSpacing}px`;
+            indicatorEl.style.top = `${miniY - miniMap.gridContainerY}px`;
+            
+            if (indicatorEl.dataset.cycleLength !== String(cycleLength)) {
+                indicatorEl.dataset.cycleLength = String(cycleLength);
+                indicatorEl.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="100%" height="100%">
+                        <path d="M12 2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8V2z" fill="#fff"/>
+                        <path d="M22 12a10 10 0 0 0-10-10v2a8 8 0 0 1 8 8h2z" fill="#fff" transform="rotate(180 12 12)"/>
+                        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${cycleLength}</text>
+                    </svg>
+                `;
+            }
+        } else if (indicatorEl) {
+            indicatorEl.classList.add('hidden');
+        }
         
         const overlayEl = minimapOverlayElements[i];
-        const worldData = allWorldsData[i];
-        const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
+        const showOverlay = visualizationController.getState().showMinimapOverlay;
         
-        if (overlayEl && worldData?.enabled && showOverlay) {
+        if (overlayEl && worldStatus?.renderData.enabled && showOverlay) {
             overlayEl.style.display = 'block';
             overlayEl.style.left = `${miniX-miniMap.gridContainerX}px`;
             overlayEl.style.top = `${miniY-miniMap.gridContainerY}px`;
             
-            
-            const currentSignature = `${i}-${worldData.rulesetHex}-${selectedWorldIndex}-${selectedWorldRuleset}-${rulesetVisualizer.getVisualizationType()}`;
+            const currentSignature = `${i}-${worldStatus.stats.rulesetHex}-${selectedWorldIndex}-${selectedWorldRuleset}-${rulesetVisualizer.getVisualizationType()}`;
             if (overlayEl.dataset.signature !== currentSignature) {
                 overlayEl.innerHTML = '';
                 let svg;
                 if (i === selectedWorldIndex) {
-                    svg = rulesetVisualizer.createRulesetSVG(worldData.rulesetHex);
+                    svg = rulesetVisualizer.createRulesetSVG(worldStatus.stats.rulesetHex);
                 } else {
-                    svg = rulesetVisualizer.createDiffSVG(selectedWorldRuleset, worldData.rulesetHex);
+                    svg = rulesetVisualizer.createDiffSVG(selectedWorldRuleset, worldStatus.stats.rulesetHex);
                 }
                 if (svg) {
                     svg.classList.add('ruleset-viz-svg');
@@ -501,15 +549,15 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-export function renderFrameOrLoader(allWorldsData, selectedWorldIndex, areAllWorkersInitialized, camera) {
+export function renderFrameOrLoader(allWorldsStatus, selectedWorldIndex, areAllWorkersInitialized, camera) {
     if (!gl || !areAllWorkersInitialized) {
         
         return;
     }
     
     
-    renderWorldsToTextures(allWorldsData, selectedWorldIndex, camera);
-    renderMainScene(selectedWorldIndex, allWorldsData);
+    renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera);
+    renderMainScene(selectedWorldIndex, allWorldsStatus);
 }
 
 export function resizeRenderer() {

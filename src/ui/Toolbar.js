@@ -260,6 +260,14 @@ export class Toolbar {
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: visualizationController.setShowMinimapOverlay
         });
+        
+        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizCycleIndicatorSwitchMount'), {
+            type: 'checkbox',
+            name: 'showCycleIndicatorDesktop',
+            initialValue: vizState.showCycleIndicator,
+            items: [{ value: 'show', text: 'Show Cycle Indicators' }],
+            onChange: visualizationController.setShowCycleIndicator
+        });
 
         const interactionState = interactionController.getState();
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#pauseWhileDrawingSwitchMount'), {

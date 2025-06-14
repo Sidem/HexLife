@@ -182,13 +182,7 @@ function renderLoop(timestamp) {
         return;
     }
     
-    const allWorldsData = worldManager.getWorldsRenderData();
-    const worldSettings = worldManager.getWorldSettingsForUI();
-    
-    const allWorldsWithSettings = allWorldsData.map((data, i) => ({
-        ...data,
-        rulesetHex: worldSettings[i]?.rulesetHex || "0".repeat(32)
-    }));
+    const allWorldsStatus = worldManager.getWorldsFullStatus();
     
     const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized) {
@@ -210,7 +204,7 @@ function renderLoop(timestamp) {
     }
     
     Renderer.renderFrameOrLoader(
-        allWorldsWithSettings, 
+        allWorldsStatus, 
         worldManager.getSelectedWorldIndex(), 
         areAllWorkersInitialized, 
         worldManager.getCurrentCameraState()

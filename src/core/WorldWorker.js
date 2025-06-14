@@ -426,7 +426,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             blockEntropy: blockEntropy,
             rulesetHex: currentRulesetHex,
             isEnabled: isEnabled,
-            ruleUsageCounters: ruleUsageCountersBuffer
+            ruleUsageCounters: ruleUsageCountersBuffer,
+            isInCycle: isCyclePlaybackMode,
+            cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0
         }, transferListStats);
     } else if (rulesetHasChanged || !isEnabled || commandInducedGridChange) {
         const currentActiveCount = jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
@@ -448,7 +450,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
             blockEntropy: currentBlockEntropyStats,
             rulesetHex: currentRulesetHex,
             isEnabled: isEnabled,
-            ruleUsageCounters: ruleUsageCountersBuffer
+            ruleUsageCounters: ruleUsageCountersBuffer,
+            isInCycle: isCyclePlaybackMode,
+            cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0
         }, transferListStats);
     }
 }

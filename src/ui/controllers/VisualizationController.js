@@ -7,6 +7,7 @@ class VisualizationController {
         this.state = {
             vizType: PersistenceService.loadUISetting('rulesetVizType', 'binary'),
             showMinimapOverlay: PersistenceService.loadUISetting('showMinimapOverlay', true),
+            showCycleIndicator: PersistenceService.loadUISetting('showCycleIndicator', true),
         };
         // Ensure the visualizer singleton is in sync on startup
         rulesetVisualizer.setVisualizationType(this.state.vizType);
@@ -28,6 +29,12 @@ class VisualizationController {
         this.state.showMinimapOverlay = !!shouldShow;
         PersistenceService.saveUISetting('showMinimapOverlay', this.state.showMinimapOverlay);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // This event triggers a redraw
+    }
+
+    setShowCycleIndicator = (shouldShow) => {
+        this.state.showCycleIndicator = !!shouldShow;
+        PersistenceService.saveUISetting('showCycleIndicator', this.state.showCycleIndicator);
+        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Reuse this event to trigger a redraw
     }
 }
 

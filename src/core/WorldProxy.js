@@ -21,7 +21,9 @@ export class WorldProxy {
             ratioHistory: [],
             entropyHistory: [],
             hexBlockEntropyHistory: [],
-            ruleUsage: new Uint32Array(128)
+            ruleUsage: new Uint32Array(128),
+            isInCycle: false,
+            cycleLength: 0
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -140,7 +142,8 @@ export class WorldProxy {
                     isEnabled: data.isEnabled,
                     tps: smoothedTPS, 
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
-                    
+                    isInCycle: data.isInCycle,
+                    cycleLength: data.cycleLength
                 };
 
                 this.lastTickCountForServerUpdate = data.tick; 
@@ -244,6 +247,13 @@ export class WorldProxy {
     getLatestStats() {
         
         return { ...this.latestStats };
+    }
+
+    getFullStatus() {
+        return {
+            renderData: this.getLatestRenderData(),
+            stats: this.getLatestStats()
+        };
     }
 
     terminate() {
