@@ -18,6 +18,7 @@
 
 /* 4. Reusable UI Components */
 @import url('src/ui/components/SliderComponent.css');
+@import url('src/ui/components/SwitchComponent.css');
 @import url('src/ui/components/DraggablePanel.css');
 @import url('src/ui/components/PopoutPanel.css');
 @import url('src/ui/components/BottomSheet.css');

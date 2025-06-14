@@ -1,0 +1,66 @@
+.switch-component-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0px;
+}
+
+.switch-component-label {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 2px;
+}
+
+.switch-group {
+    display: inline-flex;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #555;
+}
+
+.switch-item {
+    display: contents; /* Allows label to be a direct child of the flex container for styling */
+}
+
+.switch-input {
+    display: none; /* Hide the actual radio/checkbox input */
+}
+
+.switch-label {
+    padding: 6px 12px;
+    cursor: pointer;
+    background-color: #4a4a4a;
+    color: #ccc;
+    font-size: 0.9em;
+    user-select: none;
+    transition: background-color 0.2s, color 0.2s;
+    border-right: 1px solid #555;
+    text-align: center;
+    flex-grow: 1;
+}
+
+.switch-group .switch-item:last-child .switch-label {
+    border-right: none;
+}
+
+.switch-label:hover {
+    background-color: #5a5a5a;
+}
+
+.switch-input:checked + .switch-label {
+    background-color: #0078d4;
+    color: white;
+    font-weight: normal;
+}
+
+.switch-input:checked + .switch-label:hover {
+    background-color: #006ac1;
+}
+
+/* Checkbox specific styles */
+.type-checkbox .switch-group {
+    border: none;
+}
+.type-checkbox .switch-label {
+    border: 1px solid #555;
+    border-radius: 4px;
+} 

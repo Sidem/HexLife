@@ -7,9 +7,7 @@
     justify-content: space-around;
     align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
     flex-wrap: wrap;
-    padding-bottom: 10px;
     border-bottom: 1px solid #333;
 }
 
@@ -47,10 +45,9 @@
 
 .editor-apply-scope-controls {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: flex-end;
+    justify-content: flex-start;
     gap: 10px;
-    margin-bottom: 15px;
     padding-bottom: 15px;
     border-bottom: 1px solid #333;
 }

@@ -144,16 +144,7 @@
             <h4>Generate New Ruleset<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h4>
             <div class="form-group">
                 <label>Mode:</label>
-                <div id="generateModeSwitchPopout" class="three-way-switch">
-                    <input type="radio" id="genModeRandomPopout" name="generateModePopout" value="random" class="radio-switch-input">
-                    <label for="genModeRandomPopout" class="radio-switch-label">Random</label>
-
-                    <input type="radio" id="genModeNCountPopout" name="generateModePopout" value="n_count" class="radio-switch-input">
-                    <label for="genModeNCountPopout" class="radio-switch-label">N-Count</label>
-
-                    <input type="radio" id="genModeRSymPopout" name="generateModePopout" value="r_sym" class="radio-switch-input" checked>
-                    <label for="genModeRSymPopout" class="radio-switch-label">R-Sym</label>
-                </div>
+                <div id="generateModeSwitchPopout"></div>
             </div>
             <div class="form-group bias-controls">
                 <input type="checkbox" id="useCustomBiasCheckboxPopout" class="checkbox-input" checked>
@@ -162,16 +153,10 @@
             </div>
             <div class="form-group">
                 <label>Apply to:</label>
-                <div id="rulesetScopeSwitchPopout" class="three-way-switch">
-                    <input type="radio" id="scopeSelectedPopout" name="rulesetScopePopout" value="selected" class="radio-switch-input">
-                    <label for="scopeSelectedPopout" class="radio-switch-label">Selected</label>
-                    <input type="radio" id="scopeAllPopout" name="rulesetScopePopout" value="all" class="radio-switch-input" checked>
-                    <label for="scopeAllPopout" class="radio-switch-label">All</label>
-                </div>
+                <div id="rulesetScopeSwitchPopout"></div>
             </div>
             <div class="form-group">
-                <input type="checkbox" id="resetOnNewRuleCheckboxPopout" class="checkbox-input" checked>
-                <label for="resetOnNewRuleCheckboxPopout" class="checkbox-label">Auto-Reset World(s)</label>
+                <div id="resetOnNewRuleCheckboxPopout"></div>
             </div>
             <button id="generateRulesetFromPopoutButton" class="button" data-tour-id="generate-ruleset-button">Generate</button>
         </div>
@@ -183,23 +168,11 @@
             </div>
             <div class="form-group">
                 <label>Mutation Mode:</label>
-                <div id="mutateModeSwitch" class="three-way-switch">
-                    <input type="radio" id="mutateModeSingle" name="mutateMode" value="single" class="radio-switch-input" checked>
-                    <label for="mutateModeSingle" class="radio-switch-label">Single</label>
-                    <input type="radio" id="mutateModeRSym" name="mutateMode" value="r_sym" class="radio-switch-input">
-                    <label for="mutateModeRSym" class="radio-switch-label">R-Sym</label>
-                    <input type="radio" id="mutateModeNCount" name="mutateMode" value="n_count" class="radio-switch-input">
-                    <label for="mutateModeNCount" class="radio-switch-label">N-Count</label>
-                </div>
+                <div id="mutateModeSwitch"></div>
             </div>
             <div class="form-group">
                 <label>Apply to:</label>
-                <div id="mutateScopeSwitch" class="three-way-switch">
-                    <input type="radio" id="mutateScopeSelected" name="mutateScope" value="selected" class="radio-switch-input" checked>
-                    <label for="mutateScopeSelected" class="radio-switch-label">Selected</label>
-                    <input type="radio" id="mutateScopeAll" name="mutateScope" value="all" class="radio-switch-input">
-                    <label for="mutateScopeAll" class="radio-switch-label">All</label>
-                </div>
+                <div id="mutateScopeSwitch"></div>
             </div>
             <div class="popout-separator"></div>
             <div class="form-group-buttons">
@@ -250,22 +223,8 @@
 
         <div id="settingsPopout" class="popout-panel hidden">
             <h4>Settings</h4>
-            <div class="form-group">
-                <label>Ruleset Visualization:</label>
-                <div class="radio-group">
-                    <label>
-                        <input type="radio" name="rulesetViz" value="binary" checked> Binary
-                    </label>
-                    <label>
-                        <input type="radio" name="rulesetViz" value="color"> Color
-                    </label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="showMinimapOverlayDesktop" class="checkbox-label" style="display:inline-flex; align-items:center; gap: 8px;">
-                    <input type="checkbox" name="showMinimapOverlay" id="showMinimapOverlayDesktop" checked> Show Minimap Overlays
-                </label>
-            </div>
+            <div id="vizTypeSwitchMount"></div>
+            <div id="vizOverlaySwitchMount"></div>
         </div>
 
         <div id="historyPopout" class="popout-panel hidden">
@@ -291,18 +250,8 @@
                 </select>
             </div>
             <div class="editor-apply-scope-controls">
-                <div class="radio-group" role="radiogroup" aria-label="Apply changes scope">
-                    <input type="radio" id="editorApplyScopeSelected" name="editorApplyScope" value="selected"
-                        class="radio-switch-input" checked>
-                    <label for="editorApplyScopeSelected" class="radio-switch-label">Selected World</label>
-                    <input type="radio" id="editorApplyScopeAll" name="editorApplyScope" value="all"
-                        class="radio-switch-input">
-                    <label for="editorApplyScopeAll" class="radio-switch-label">All Worlds</label>
-                </div>
-                <div class="editor-auto-reset-control">
-                    <input type="checkbox" id="editorAutoResetCheckbox" class="checkbox-input" checked>
-                    <label for="editorAutoResetCheckbox" class="checkbox-label">Auto-Reset on Change</label>
-                </div>
+                <div id="editorScopeSwitchMount"></div>
+                <div id="editorResetSwitchMount"></div>
             </div>
             <div class="panel-content-area">
                 <div id="rulesetEditorGrid" class="hidden"></div>

@@ -1,9 +1,10 @@
 import { BottomSheet } from './BottomSheet.js';
 import { SliderComponent } from './SliderComponent.js';
+import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
-import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
+import { visualizationController } from '../controllers/VisualizationController.js';
 
 
 export class ToolsBottomSheet extends BottomSheet {
@@ -35,19 +36,8 @@ export class ToolsBottomSheet extends BottomSheet {
                     </div>
                     <div class="tool-group">
                         <h5>Visualization</h5>
-                        <div class="form-group" style="display: flex; flex-direction: column; gap: 10px;">
-                            <label>Display Type:</label>
-                            <div id="mobileRulesetVizSwitch" class="three-way-switch" style="justify-content: center;">
-                                <input type="radio" id="mobileVizBinary" name="mobileRulesetViz" value="binary" class="radio-switch-input">
-                                <label for="mobileVizBinary" class="radio-switch-label">Binary</label>
-                                <input type="radio" id="mobileVizColor" name="mobileRulesetViz" value="color" class="radio-switch-input">
-                                <label for="mobileVizColor" class="radio-switch-label">Color</label>
-                            </div>
-                        </div>
-                        <div class="form-group" style="margin-top: 10px;">
-                             <input type="checkbox" id="mobileShowMinimapOverlay" class="checkbox-input">
-                             <label for="mobileShowMinimapOverlay" class="checkbox-label" style="width:100%; text-align:center;">Show Minimap Overlays</label>
-                        </div>
+                        <div id="mobileRulesetVizMount"></div>
+                        <div id="mobileShowMinimapOverlayMount" style="margin-top: 15px;"></div>
                     </div>
                     <div class="tool-group">
                         <h5>Reset / Clear</h5>
@@ -90,20 +80,47 @@ export class ToolsBottomSheet extends BottomSheet {
             onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
         });
 
+        // Visualization Controls using new controller
+        const vizState = visualizationController.getState();
+        new SwitchComponent(content.querySelector('#mobileRulesetVizMount'), {
+            type: 'radio', 
+            name: 'mobileRulesetViz',
+            label: 'Display Type:',
+            initialValue: vizState.vizType,
+            items: [
+                { value: 'binary', text: 'Binary' },
+                { value: 'color', text: 'Color' }
+            ],
+            onChange: visualizationController.setVisualizationType
+        });
+        
+        new SwitchComponent(content.querySelector('#mobileShowMinimapOverlayMount'), {
+            type: 'checkbox', 
+            name: 'mobileShowMinimapOverlay',
+            initialValue: vizState.showMinimapOverlay,
+            items: [{ value: 'show', text: 'Show Minimap Overlays' }],
+            onChange: visualizationController.setShowMinimapOverlay
+        });
+
         this._syncVisualSettings(); // Sync on initial render
         this._initCustomizeFabsPane();
     }
 
     _syncVisualSettings() {
-        const vizType = rulesetVisualizer.getVisualizationType();
-        const radio = this.sheetContent.querySelector(`input[name="mobileRulesetViz"][value="${vizType}"]`);
-        if (radio) radio.checked = true;
+        // This method can now be simplified since SwitchComponent handles its own state
+        // We'll keep it to re-sync if the value is changed from desktop while the sheet is open
+        const vizState = visualizationController.getState();
+        const vizSwitch = this.sheetContent.querySelector('#mobileRulesetVizMount .switch-group');
+        const overlaySwitch = this.sheetContent.querySelector('#mobileShowMinimapOverlayMount .switch-group');
 
-        const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
-        const checkbox = this.sheetContent.querySelector('#mobileShowMinimapOverlay');
-        if (checkbox) {
-            checkbox.checked = showOverlay;
-            checkbox.nextElementSibling.textContent = showOverlay ? 'Enabled' : 'Disabled';
+        if(vizSwitch) {
+            const radio = vizSwitch.querySelector(`input[value="${vizState.vizType}"]`);
+            if(radio) radio.checked = true;
+        }
+
+        if(overlaySwitch) {
+            const checkbox = overlaySwitch.querySelector('input');
+            if(checkbox) checkbox.checked = vizState.showMinimapOverlay;
         }
     }
 
@@ -162,19 +179,8 @@ export class ToolsBottomSheet extends BottomSheet {
             }
         });
 
-        // Add listeners for new visualization controls
-        this.sheetContent.querySelector('#mobileRulesetVizSwitch').addEventListener('change', e => {
-            if (e.target.matches('input[name="mobileRulesetViz"]')) {
-                rulesetVisualizer.setVisualizationType(e.target.value);
-            }
-        });
-
-        this.sheetContent.querySelector('#mobileShowMinimapOverlay').addEventListener('change', e => {
-            const show = e.target.checked;
-            e.target.nextElementSibling.textContent = show ? 'Enabled' : 'Disabled';
-            PersistenceService.saveUISetting('showMinimapOverlay', show);
-            EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
-        });
+        // Visualization controls now handled by SwitchComponent onChange callbacks
+        // No need for manual event listeners
 
         // Keep mobile UI in sync if changed from desktop
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => {

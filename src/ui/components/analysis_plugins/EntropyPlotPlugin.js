@@ -1,5 +1,6 @@
 import { IAnalysisPlugin } from './IAnalysisPlugin.js';
 import { SliderComponent } from '../SliderComponent.js';
+import { SwitchComponent } from '../SwitchComponent.js';
 import * as PersistenceService from '../../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../../services/EventBus.js';
 
@@ -12,10 +13,11 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         this.lastKnownBinaryEntropy = null;
         this.lastKnownBlockEntropy = null;
         this.entropySampleRateSlider = null;
+        this.enableSwitch = null;
         this.isInitialized = false;
         this.selectedEntropyType = 'binary'; 
         this.uiElements = {
-            enableEntropySamplingCheckbox: null,
+            enableSamplingMount: null,
             entropySampleRateSliderMount: null,
             statBinaryEntropy: null,
             statBlockEntropy: null,
@@ -59,10 +61,7 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
                         </div>
                     </div>
                     <div class="entropy-sampling-controls">
-                        <div class="sampling-enable-control">
-                            <input type="checkbox" id="enableEntropySamplingCheckbox" class="checkbox-input">
-                            <label for="enableEntropySamplingCheckbox" class="checkbox-label">Enable Sampling</label>
-                        </div>
+                        <div id="enableSamplingMount" class="sampling-enable-control"></div>
                         <div id="entropySampleRateSliderMount" class="slider-mount"></div>
                     </div>
                 </div>
@@ -73,7 +72,7 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         `;
 
         
-        this.uiElements.enableEntropySamplingCheckbox = this.mountPoint.querySelector('#enableEntropySamplingCheckbox');
+        this.uiElements.enableSamplingMount = this.mountPoint.querySelector('#enableSamplingMount');
         this.uiElements.entropySampleRateSliderMount = this.mountPoint.querySelector('#entropySampleRateSliderMount');
         this.uiElements.statBinaryEntropy = this.mountPoint.querySelector('#stat-binary-entropy-plugin');
         this.uiElements.statBlockEntropy = this.mountPoint.querySelector('#stat-block-entropy-plugin');
@@ -92,17 +91,22 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
     }
 
     _setupEntropyControls() {
-        if (this.uiElements.enableEntropySamplingCheckbox) {
-            this.uiElements.enableEntropySamplingCheckbox.addEventListener('change', (e) => {
-                this._handleSamplingControlsChange();
-                PersistenceService.saveUISetting('entropySamplingEnabled', e.target.checked);
+        const currentState = this.simulationInterface.getEntropySamplingState();
+
+        if (this.uiElements.enableSamplingMount) {
+            this.enableSwitch = new SwitchComponent(this.uiElements.enableSamplingMount, {
+                type: 'checkbox',
+                name: 'enableEntropySampling',
+                initialValue: currentState.enabled,
+                items: [{ value: 'enabled', text: 'Enable Sampling' }],
+                onChange: (isChecked) => {
+                    this._handleSamplingControlsChange(isChecked);
+                    PersistenceService.saveUISetting('entropySamplingEnabled', isChecked);
+                }
             });
         }
 
         if (this.uiElements.entropySampleRateSliderMount) {
-            
-            const currentState = this.simulationInterface.getEntropySamplingState();
-
             this.entropySampleRateSlider = new SliderComponent(this.uiElements.entropySampleRateSliderMount, {
                 id: 'entropySampleRateSliderInPlugin', 
                 label: 'Rate:',
@@ -114,7 +118,7 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
                 value: currentState.rate,
                 disabled: !currentState.enabled,
                 onChange: (value) => {
-                    this._handleSamplingControlsChange();
+                    this._handleSamplingControlsChange(this.enableSwitch ? this.enableSwitch.getValue() : false);
                     PersistenceService.saveUISetting('entropySampleRate', value);
                 }
             });
@@ -171,10 +175,9 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         this._updateCurrentEntropyDisplay();
     }
 
-    _handleSamplingControlsChange() {
-        if (!this.uiElements.enableEntropySamplingCheckbox || !this.entropySampleRateSlider) return;
+    _handleSamplingControlsChange(enabled) {
+        if (!this.entropySampleRateSlider) return;
         
-        const enabled = this.uiElements.enableEntropySamplingCheckbox.checked;
         const rate = this.entropySampleRateSlider.getValue();
         this.entropySampleRateSlider.setDisabled(!enabled);
         
@@ -182,8 +185,8 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
     }
 
     _updateSamplingControlsUI(samplingData) {
-        if (this.uiElements.enableEntropySamplingCheckbox) {
-            this.uiElements.enableEntropySamplingCheckbox.checked = samplingData.enabled;
+        if (this.enableSwitch) {
+            this.enableSwitch.setValue(samplingData.enabled);
         }
         if (this.entropySampleRateSlider) {
             this.entropySampleRateSlider.setValue(samplingData.rate);
@@ -321,6 +324,10 @@ export class EntropyPlotPlugin extends IAnalysisPlugin {
         if (this.entropySampleRateSlider) {
             this.entropySampleRateSlider.destroy();
             this.entropySampleRateSlider = null;
+        }
+        if (this.enableSwitch) {
+            this.enableSwitch.destroy();
+            this.enableSwitch = null;
         }
         this.plotCanvas = null;
         this.isInitialized = false;

@@ -2,6 +2,7 @@ import * as Config from '../../core/config.js';
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
+import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js'; 
@@ -90,10 +91,7 @@ export class SetupPanel extends DraggablePanel {
                 `<div class="world-label">World ${i}</div>` +
                 `<div class="ruleset-viz-container" title="${formattedFullHex}"></div>` +
                 `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
-                `<div class="setting-control enable-control">` +
-                    `<input type="checkbox" id="enableSwitch_${i}" class="enable-switch checkbox-input" ${settings.enabled ? 'checked' : ''} data-world-index="${i}">` +
-                    `<label for="enableSwitch_${i}" class="checkbox-label">${settings.enabled ? 'Enabled' : 'Disabled'}</label>` +
-                `</div>` +
+                `<div class="setting-control enable-control"><div id="enableSwitchMount_${i}"></div></div>` +
                 `<button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>`;
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');
@@ -113,13 +111,23 @@ export class SetupPanel extends DraggablePanel {
             });
             this.worldSliderComponents.push(densitySlider);
 
-            const enableSwitch = cell.querySelector(`#enableSwitch_${i}`);
-            const enableLabel = cell.querySelector(`label[for="enableSwitch_${i}"]`);
-            enableSwitch.addEventListener('change', (event) => {
-                const isEnabled = event.target.checked;
-                enableLabel.textContent = isEnabled ? 'Enabled' : 'Disabled';
-                EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
+            // Create SwitchComponent for world enable/disable
+            const enableSwitchMount = cell.querySelector(`#enableSwitchMount_${i}`);
+            new SwitchComponent(enableSwitchMount, {
+                type: 'checkbox',
+                name: `enableSwitch_${i}`,
+                initialValue: settings.enabled,
+                items: [{ value: 'enabled', text: settings.enabled ? 'Enabled' : 'Disabled' }],
+                onChange: (isEnabled) => {
+                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
+                    // Update the label text to reflect the new state
+                    const label = enableSwitchMount.querySelector('label');
+                    if (label) {
+                        label.textContent = isEnabled ? 'Enabled' : 'Disabled';
+                    }
+                }
             });
+            
             fragment.appendChild(cell);
         }
         grid.appendChild(fragment);

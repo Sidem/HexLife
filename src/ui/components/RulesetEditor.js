@@ -1,4 +1,5 @@
 import { DraggablePanel } from './DraggablePanel.js';
+import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
@@ -34,16 +35,18 @@ export class RulesetEditor extends DraggablePanel {
             rulesetEditorGrid: panelElement.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: panelElement.querySelector('#neighborCountRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'),
-            editorApplyScopeSelectedRadio: panelElement.querySelector('#editorApplyScopeSelected'),
-            editorApplyScopeAllRadio: panelElement.querySelector('#editorApplyScopeAll'),
-            editorApplyScopeControls: panelElement.querySelector('.editor-apply-scope-controls .radio-group'),
-            editorAutoResetCheckbox: panelElement.querySelector('#editorAutoResetCheckbox'),
+            editorScopeSwitchMount: panelElement.querySelector('#editorScopeSwitchMount'),
+            editorResetSwitchMount: panelElement.querySelector('#editorResetSwitchMount'),
         };
 
         this.cachedDetailedRules = [];
         this.cachedNeighborCountRules = [];
         this.cachedRotationalSymmetryRules = [];
         this.areGridsCreated = false;
+        
+        // Add component storage
+        this.scopeSwitch = null;
+        this.resetSwitch = null;
 
         this._loadEditorSettings();
         this._setupInternalListeners();
@@ -122,11 +125,11 @@ export class RulesetEditor extends DraggablePanel {
     }
 
     _getEditorModificationScope() {
-        return this.uiElements.editorApplyScopeAllRadio?.checked ? 'all' : 'selected';
+        return this.scopeSwitch ? this.scopeSwitch.getValue() : 'selected';
     }
 
     _getConditionalResetScopeForEditor() {
-        if (this.uiElements.editorAutoResetCheckbox?.checked) {
+        if (this.resetSwitch && this.resetSwitch.getValue()) {
             return this._getEditorModificationScope();
         }
         return 'none';
@@ -140,19 +143,35 @@ export class RulesetEditor extends DraggablePanel {
                 PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
             });
         }
-        if (this.uiElements.editorApplyScopeControls) {
-            this.uiElements.editorApplyScopeControls.querySelectorAll('input[name="editorApplyScope"]').forEach(radio => {
-                radio.addEventListener('change', () => {
-                    if (radio.checked) {
-                        PersistenceService.saveUISetting('editorRulesetApplyScope', radio.value);
-                        EventBus.dispatch(EVENTS.UI_EDITOR_RULESET_SCOPE_CHANGED, { scope: radio.value });
-                    }
-                });
+        // Create SwitchComponents for scope and reset controls
+        const initialScope = PersistenceService.loadUISetting('editorRulesetApplyScope', 'selected');
+        if (this.uiElements.editorScopeSwitchMount) {
+            this.scopeSwitch = new SwitchComponent(this.uiElements.editorScopeSwitchMount, {
+                label: 'Apply changes to:',
+                type: 'radio',
+                name: 'editorApplyScope',
+                initialValue: initialScope,
+                items: [
+                    { value: 'selected', text: 'Selected World' },
+                    { value: 'all', text: 'All Worlds' }
+                ],
+                onChange: (value) => {
+                    PersistenceService.saveUISetting('editorRulesetApplyScope', value);
+                    EventBus.dispatch(EVENTS.UI_EDITOR_RULESET_SCOPE_CHANGED, { scope: value });
+                }
             });
         }
-        if (this.uiElements.editorAutoResetCheckbox) {
-            this.uiElements.editorAutoResetCheckbox.addEventListener('change', (e) => {
-                PersistenceService.saveUISetting('editorAutoReset', e.target.checked);
+        
+        const initialReset = PersistenceService.loadUISetting('editorAutoReset', true);
+        if (this.uiElements.editorResetSwitchMount) {
+            this.resetSwitch = new SwitchComponent(this.uiElements.editorResetSwitchMount, {
+                type: 'checkbox',
+                name: 'editorAutoReset',
+                initialValue: initialReset,
+                items: [{ value: 'reset', text: 'Auto-Reset on Change' }],
+                onChange: (isChecked) => {
+                    PersistenceService.saveUISetting('editorAutoReset', isChecked);
+                }
             });
         }
 
@@ -332,13 +351,11 @@ export class RulesetEditor extends DraggablePanel {
     }
 
     _loadEditorSettings() {
-        if (this.uiElements.rulesetEditorMode) this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
-        if (this.uiElements.editorApplyScopeControls) {
-            const scopeSetting = PersistenceService.loadUISetting('editorRulesetApplyScope', 'selected');
-            if (scopeSetting === 'all' && this.uiElements.editorApplyScopeAllRadio) this.uiElements.editorApplyScopeAllRadio.checked = true;
-            else if (this.uiElements.editorApplyScopeSelectedRadio) this.uiElements.editorApplyScopeSelectedRadio.checked = true;
+        if (this.uiElements.rulesetEditorMode) {
+            this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
         }
-        if (this.uiElements.editorAutoResetCheckbox) this.uiElements.editorAutoResetCheckbox.checked = PersistenceService.loadUISetting('editorAutoReset', true);
+        // The SwitchComponent constructor now handles loading the initial value from persistence.
+        // So, the logic for 'editorRulesetApplyScope' and 'editorAutoReset' can be removed from here.
     }
 
     show() {

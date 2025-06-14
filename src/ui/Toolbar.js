@@ -3,6 +3,10 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
+import { SwitchComponent } from './components/SwitchComponent.js';
+import { rulesetActionController } from './controllers/RulesetActionController.js';
+import { libraryController } from './controllers/LibraryController.js';
+import { visualizationController } from './controllers/VisualizationController.js';
 import { onboardingManager } from './ui.js';
 import { generateShareUrl } from '../utils/utils.js';
 import { uiManager } from './UIManager.js';
@@ -15,6 +19,7 @@ export class Toolbar {
         
         this.uiElements = null;
         this.sliderComponents = {};
+        this.switchComponents = {};
         this.popoutPanels = {};
         this.activePopouts = [];
         this.toolbarElement = document.getElementById('vertical-toolbar');
@@ -33,6 +38,9 @@ export class Toolbar {
 
     init(uiElements) {
         this.uiElements = uiElements;
+
+        // Initialize library controller
+        libraryController.init(this.libraryData);
 
         this._initPopoutPanels();
         this._initPopoutControls();
@@ -106,8 +114,8 @@ export class Toolbar {
             item.className = 'library-item';
             item.innerHTML = `<div class="library-item-info"><div class="library-item-name">${rule.name}</div><div class="library-item-desc">${rule.description}</div></div><button class="button load-rule-btn">Load</button>`;
             item.querySelector('.load-rule-btn').addEventListener('click', () => {
-                const targetScope = this.uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked')?.value || 'selected';
-                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, { hexString: rule.hex, resetScopeForThisChange: this.uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' });
+                const currentState = rulesetActionController.getState();
+                libraryController.loadRuleset(rule.hex, currentState.genScope, currentState.genAutoReset);
                 this.popoutPanels.library.hide();
             });
             rulesetContent.appendChild(item);
@@ -118,7 +126,7 @@ export class Toolbar {
             item.className = 'library-item';
             item.innerHTML = `<div class="library-item-info"><div class="library-item-name">${pattern.name}</div><div class="library-item-desc">${pattern.description}</div></div><button class="button place-pattern-btn">Place</button>`;
             item.querySelector('.place-pattern-btn').addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: pattern.cells });
+                libraryController.placePattern(pattern.name);
                 this.popoutPanels.library.hide();
             });
             patternContent.appendChild(item);
@@ -135,42 +143,100 @@ export class Toolbar {
         });
     }
 
-    _setupRadioSwitch(switchElement, persistenceKey, valueExtractor = (value => value)) {
-        if (!switchElement) return;
-        switchElement.querySelectorAll('input[type="radio"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.checked) {
-                    PersistenceService.saveUISetting(persistenceKey, valueExtractor(radio.value));
-                }
-            });
-        });
-    }
+
     
     _initPopoutControls() {
+        const controllerState = rulesetActionController.getState();
+        
+        // Speed & Brush sliders (unchanged)
         this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: this.worldManager.getCurrentSimulationSpeed(), unit: 'tps', showValue: true, onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val) });
         this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: this.worldManager.getCurrentBrushSize(), unit: '', showValue: true, onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val) });
         
-        this._setupRadioSwitch(this.uiElements.generateModeSwitchPopout, 'rulesetGenerationMode');
+        // Generation controls using new controller
+        this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
+            type: 'radio',
+            name: 'generateModePopout',
+            initialValue: controllerState.genMode,
+            items: [
+                { value: 'random', text: 'Random' },
+                { value: 'n_count', text: 'N-Count' },
+                { value: 'r_sym', text: 'R-Sym' }
+            ],
+            onChange: rulesetActionController.setGenMode
+        });
+
         this.uiElements.useCustomBiasCheckboxPopout.addEventListener('change', e => {
-            PersistenceService.saveUISetting('useCustomBias', e.target.checked);
+            rulesetActionController.setUseCustomBias(e.target.checked);
             this.sliderComponents.biasSliderPopout?.setDisabled(!e.target.checked);
         });
-        this.sliderComponents.biasSliderPopout = new SliderComponent(this.uiElements.biasSliderMountPopout, { id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, value: PersistenceService.loadUISetting('biasValue', 0.33), showValue: true, unit: '', disabled: !this.uiElements.useCustomBiasCheckboxPopout.checked, onChange: val => PersistenceService.saveUISetting('biasValue', val) });
-        this._setupRadioSwitch(this.uiElements.rulesetScopeSwitchPopout, 'globalRulesetScopeAll', value => value === 'all');
-        this.uiElements.resetOnNewRuleCheckboxPopout.addEventListener('change', e => PersistenceService.saveUISetting('resetOnNewRule', e.target.checked));
-        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => this.triggerGenerate());
+        this.sliderComponents.biasSliderPopout = new SliderComponent(this.uiElements.biasSliderMountPopout, { 
+            id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, 
+            value: controllerState.bias, 
+            showValue: true, unit: '', 
+            disabled: !controllerState.useCustomBias, 
+            onChange: rulesetActionController.setBias 
+        });
 
-        this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { id: 'mutationRateSlider', min: 1, max: 50, step: 1, value: 1, unit: '%', showValue: true, onChange: val => PersistenceService.saveUISetting('mutationRate', val) });
-        this._setupRadioSwitch(this.uiElements.mutateModeSwitch, 'mutateMode');
-        this._setupRadioSwitch(this.uiElements.mutateScopeSwitch, 'mutateScope');
-        this.uiElements.triggerMutationButton.addEventListener('click', () => this.triggerMutation());
-        this.uiElements.cloneAndMutateButton.addEventListener('click', () => this.triggerCloneAndMutate());
+        this.switchComponents.genScope = new SwitchComponent(this.uiElements.rulesetScopeSwitchPopout, {
+            type: 'radio',
+            name: 'rulesetScopePopout',
+            initialValue: controllerState.genScope,
+            items: [
+                { value: 'selected', text: 'Selected' },
+                { value: 'all', text: 'All' }
+            ],
+            onChange: rulesetActionController.setGenScope
+        });
+
+        this.switchComponents.genAutoReset = new SwitchComponent(this.uiElements.resetOnNewRuleCheckboxPopout, {
+            type: 'checkbox',
+            name: 'resetOnNewRulePopout',
+            initialValue: controllerState.genAutoReset,
+            items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
+            onChange: rulesetActionController.setGenAutoReset
+        });
+
+        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => rulesetActionController.generate());
+
+        // Mutation controls using new controller
+        this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
+            id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
+            value: controllerState.mutateRate, 
+            unit: '%', showValue: true, 
+            onChange: rulesetActionController.setMutateRate 
+        });
+
+        this.switchComponents.mutateMode = new SwitchComponent(this.uiElements.mutateModeSwitch, {
+            type: 'radio',
+            name: 'mutateMode',
+            initialValue: controllerState.mutateMode,
+            items: [
+                { value: 'single', text: 'Single' },
+                { value: 'r_sym', text: 'R-Sym' },
+                { value: 'n_count', text: 'N-Count' }
+            ],
+            onChange: rulesetActionController.setMutateMode
+        });
+
+        this.switchComponents.mutateScope = new SwitchComponent(this.uiElements.mutateScopeSwitch, {
+            type: 'radio',
+            name: 'mutateScope',
+            initialValue: controllerState.mutateScope,
+            items: [
+                { value: 'selected', text: 'Selected' },
+                { value: 'all', text: 'All' }
+            ],
+            onChange: rulesetActionController.setMutateScope
+        });
+
+        this.uiElements.triggerMutationButton.addEventListener('click', () => rulesetActionController.mutate());
+        this.uiElements.cloneAndMutateButton.addEventListener('click', () => rulesetActionController.cloneAndMutate());
 
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();
             if (!hex || !/^[0-9A-F]{32}$/.test(hex)) { alert("Invalid Hex: Must be 32 hex chars."); this.uiElements.rulesetInputPopout.select(); return; }
-            const targetScope = this.uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked')?.value || 'selected';
-            EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, { hexString: hex, resetScopeForThisChange: this.uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' });
+            const currentState = rulesetActionController.getState();
+            libraryController.loadRuleset(hex, currentState.genScope, currentState.genAutoReset);
             this.uiElements.rulesetInputPopout.value = '';
             this.popoutPanels.setHex.hide();
         });
@@ -186,22 +252,28 @@ export class Toolbar {
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
 
-        this.uiElements.settingsPopout.querySelectorAll('input[name="rulesetViz"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                if (radio.checked) {
-                    rulesetVisualizer.setVisualizationType(radio.value);
-                }
-            });
-        });
+        // Settings Popout - use new visualization controller
+        const vizState = visualizationController.getState();
 
-        // Add minimap overlay toggle
-        const overlayCheckbox = this.uiElements.settingsPopout.querySelector('input[name="showMinimapOverlay"]');
-        if (overlayCheckbox) {
-            overlayCheckbox.addEventListener('change', (e) => {
-                PersistenceService.saveUISetting('showMinimapOverlay', e.target.checked);
-                EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Trigger redraw
-            });
-        }
+        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizTypeSwitchMount'), {
+            type: 'radio',
+            label: 'Ruleset Visualization:',
+            name: 'rulesetVizDesktop',
+            initialValue: vizState.vizType,
+            items: [
+                { value: 'binary', text: 'Binary' },
+                { value: 'color', text: 'Color' }
+            ],
+            onChange: visualizationController.setVisualizationType
+        });
+        
+        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizOverlaySwitchMount'), {
+            type: 'checkbox',
+            name: 'showMinimapOverlayDesktop',
+            initialValue: vizState.showMinimapOverlay,
+            items: [{ value: 'show', text: 'Show Minimap Overlays' }],
+            onChange: visualizationController.setShowMinimapOverlay
+        });
     }
     
     _copyRuleset() {
@@ -276,34 +348,15 @@ export class Toolbar {
     }
 
     _loadAndApplyUISettings() {
-        const genMode = PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
-        this.uiElements.generateModeSwitchPopout.querySelectorAll('input[name="generateModePopout"]').forEach(r => r.checked = r.value === genMode);
-        this.uiElements.useCustomBiasCheckboxPopout.checked = PersistenceService.loadUISetting('useCustomBias', true);
-        this.sliderComponents.biasSliderPopout?.setValue(PersistenceService.loadUISetting('biasValue', 0.33));
-        this.sliderComponents.biasSliderPopout?.setDisabled(!this.uiElements.useCustomBiasCheckboxPopout.checked);
+        const controllerState = rulesetActionController.getState();
+        
+        // Update UI components to reflect controller state
+        this.uiElements.useCustomBiasCheckboxPopout.checked = controllerState.useCustomBias;
+        this.sliderComponents.biasSliderPopout?.setValue(controllerState.bias);
+        this.sliderComponents.biasSliderPopout?.setDisabled(!controllerState.useCustomBias);
 
-        const scopeAll = PersistenceService.loadUISetting('globalRulesetScopeAll', true);
-        this.uiElements.rulesetScopeSwitchPopout.querySelector(`input[value="${scopeAll ? 'all' : 'selected'}"]`).checked = true;
-        this.uiElements.resetOnNewRuleCheckboxPopout.checked = PersistenceService.loadUISetting('resetOnNewRule', true);
-        this.sliderComponents.mutationRateSlider?.setValue(PersistenceService.loadUISetting('mutationRate', 1));
-
-        const mutateMode = PersistenceService.loadUISetting('mutateMode', 'single');
-        if (this.uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`)) this.uiElements.mutateModeSwitch.querySelector(`input[value="${mutateMode}"]`).checked = true;
-        const mutateScope = PersistenceService.loadUISetting('mutateScope', 'selected');
-        if (this.uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`)) this.uiElements.mutateScopeSwitch.querySelector(`input[value="${mutateScope}"]`).checked = true;
-
-        const vizType = rulesetVisualizer.getVisualizationType();
-        const radioToCheck = this.uiElements.settingsPopout.querySelector(`input[name="rulesetViz"][value="${vizType}"]`);
-        if (radioToCheck) {
-            radioToCheck.checked = true;
-        }
-
-        // Load minimap overlay setting
-        const showOverlay = PersistenceService.loadUISetting('showMinimapOverlay', true);
-        const overlayCheckbox = this.uiElements.settingsPopout.querySelector('input[name="showMinimapOverlay"]');
-        if (overlayCheckbox) {
-            overlayCheckbox.checked = showOverlay;
-        }
+        // Visualization settings are now handled by the SwitchComponent and visualizationController
+        // No need to manually sync UI state here
     }
 
     _generateAndShowShareLink() {
@@ -327,25 +380,7 @@ export class Toolbar {
         }
     }
 
-    triggerGenerate() {
-        const bias = this.uiElements.useCustomBiasCheckboxPopout.checked ? this.sliderComponents.biasSliderPopout.getValue() : Math.random();
-        const mode = this.uiElements.generateModeSwitchPopout.querySelector('input[name="generateModePopout"]:checked')?.value || 'random';
-        const targetScope = this.uiElements.rulesetScopeSwitchPopout.querySelector('input[name="rulesetScopePopout"]:checked')?.value || 'selected';
-        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, { bias, generationMode: mode, resetScopeForThisChange: this.uiElements.resetOnNewRuleCheckboxPopout.checked ? targetScope : 'none' });
-    }
-    
-    triggerMutation() {
-        const mutationRate = this.sliderComponents.mutationRateSlider.getValue() / 100.0;
-        const scope = this.uiElements.mutateScopeSwitch.querySelector('input[name="mutateScope"]:checked')?.value || 'selected';
-        const mode = this.uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
-        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, { mutationRate, scope, mode });
-    }
-    
-    triggerCloneAndMutate() {
-        const mutationRate = this.sliderComponents.mutationRateSlider.getValue() / 100.0;
-        const mode = this.uiElements.mutateModeSwitch.querySelector('input[name="mutateMode"]:checked')?.value || 'single';
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, { mutationRate, mode });
-    }
+
 
     updateVisibility(mode) {
         if (this.toolbarElement) {
