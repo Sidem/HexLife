@@ -39,13 +39,12 @@ let lastSentChecksum = null;
 let stateHistoryChecksums = new Set();
 let stateChecksumQueue = [];
 
-// --- START: NEW CYCLE DETECTION & PLAYBACK VARIABLES ---
+// Cycle detection variables
 let isCyclePlaybackMode = false;
 let isDetectingCycle = false;
-let detectedCycle = [];
+let detectedCycle = []; // Will store objects: { state: Uint8Array, rules: Uint8Array }
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
-// --- END: NEW CYCLE DETECTION & PLAYBACK VARIABLES ---
 
 
 function calculateChecksum(arr) {
@@ -53,9 +52,7 @@ function calculateChecksum(arr) {
     return wasm_world.calculate_checksum(arr);
 }
 
-// --- START: NEW HELPER FUNCTION TO RESET CYCLE STATE ---
 function resetCycleState() {
-    const hadCycle = isCyclePlaybackMode || isDetectingCycle;
     isCyclePlaybackMode = false;
     isDetectingCycle = false;
     detectedCycle = [];
@@ -64,12 +61,7 @@ function resetCycleState() {
     stateHistoryChecksums.clear();
     stateChecksumQueue = [];
     lastSentChecksum = null;
-    
-    if (hadCycle) {
-        console.log(`World ${worldIndex}: Cycle state reset. Returning to normal simulation mode.`);
-    }
 }
-// --- END: NEW HELPER FUNCTION ---
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
@@ -184,7 +176,7 @@ function processCommandQueue() {
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
-                resetCycleState(); // MODIFIED: Reset cycle state
+                resetCycleState();
                 needsGridUpdate = true;
                 break;
             case 'APPLY_BRUSH':
@@ -198,7 +190,7 @@ function processCommandQueue() {
                     brushChanged = applySelectiveBrushLogic(command.data.cellIndices);
                 }
                 if (brushChanged) {
-                    resetCycleState(); // MODIFIED: Reset cycle state
+                    resetCycleState();
                     needsGridUpdate = true;
                 }
                 break;
@@ -218,7 +210,7 @@ function processCommandQueue() {
                  if (!isEnabled && jsStateArray) {
                     jsStateArray.fill(0);
                     if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
-                    resetCycleState(); // MODIFIED: Reset cycle state
+                    resetCycleState();
                     needsGridUpdate = true;
                 } else if (isEnabled && jsStateArray) {
                     lastSentChecksum = null;
@@ -238,7 +230,7 @@ function processCommandQueue() {
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 isEnabled = true;
-                resetCycleState(); // MODIFIED: Reset cycle state
+                resetCycleState();
                 needsGridUpdate = true;
                 rulesetChangedInQueue = true;
                 break;
@@ -253,48 +245,45 @@ function runTick() {
     const { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue } = processCommandQueue();
     let simulationPerformedUpdate = false; 
 
-    // --- START: MODIFIED LOGIC FOR PLAYBACK MODE ---
     if (isCyclePlaybackMode) {
-        if (!isRunning) { // If paused during playback, just send visual updates
+        if (!isRunning) {
              if (needsGridUpdate || needsVisualUpdate) { 
                 sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, false);
             }
             return;
         }
-
         worldTickCounter++;
-        // Load the next state from the recorded cycle, bypassing Wasm computation
-        const nextStateFromCycle = detectedCycle[cyclePlaybackIndex];
-        jsNextStateArray.set(nextStateFromCycle);
-        // We can manually set the rule indices to 0 during playback as they aren't computed
-        jsNextRuleIndexArray.fill(0);
+        
+        // --- START: CORRECTED PLAYBACK LOGIC ---
+        const nextFrame = detectedCycle[cyclePlaybackIndex];
+        jsNextStateArray.set(nextFrame.state);
+        jsNextRuleIndexArray.set(nextFrame.rules); // Also set the rule indices for correct coloring
+        // --- END: CORRECTED PLAYBACK LOGIC ---
         
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
     } 
-    // --- END: MODIFIED LOGIC FOR PLAYBACK MODE ---
     else {
-        // This is the original logic for non-playback modes
-        if (!isEnabled || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) {
-            if (needsGridUpdate || needsVisualUpdate) {
+        if (!isEnabled || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) { 
+            if (needsGridUpdate || needsVisualUpdate) { 
                 const currentGridChecksum = calculateChecksum(jsStateArray);
-                if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || needsGridUpdate || needsVisualUpdate) {
-                    lastSentChecksum = currentGridChecksum;
-                    sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, true);
+                if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || needsGridUpdate || needsVisualUpdate) { 
+                    lastSentChecksum = currentGridChecksum; 
+                    sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, true); 
                 }
             }
             return;
         }
 
-        if (!isRunning) {
-            if (needsGridUpdate || needsVisualUpdate) {
+        if (!isRunning) { 
+            if (needsGridUpdate || needsVisualUpdate) { 
                 sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, false);
             }
             return;
         }
-
+        
         worldTickCounter++;
 
-        if (wasm_world) {
+        if (isRunning && wasm_world) {
             wasm_world.run_tick(
                 ruleset,
                 jsStateArray,
@@ -306,46 +295,46 @@ function runTick() {
     }
 
     let activeCount = 0;
-    for (let i = 0; i < jsNextStateArray.length; i++) {
+    for(let i = 0; i < jsNextStateArray.length; i++) {
         if (jsNextStateArray[i] === 1) activeCount++;
     }
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
 
-    // --- START: NEW CYCLE DETECTION, RECORDING, AND PLAYBACK LOGIC ---
     if (isDetectingCycle) {
         if (newStateChecksum === cycleStartChecksum) {
-            // Full cycle has been recorded, switch to playback mode
-            console.log(`World ${worldIndex}: Cycle recording complete! Detected cycle of length ${detectedCycle.length}. Entering playback mode.`);
             isCyclePlaybackMode = true;
             isDetectingCycle = false;
-            cyclePlaybackIndex = 0; // Start playback from the beginning
+            cyclePlaybackIndex = 0;
         } else {
-            // Still recording, add the new state to our cycle array
-            // A copy (.slice()) is essential as the buffer will be reused
-            detectedCycle.push(jsNextStateArray.slice());
+            // --- START: CORRECTED RECORDING LOGIC ---
+            detectedCycle.push({
+                state: jsNextStateArray.slice(),
+                rules: jsNextRuleIndexArray.slice() // Record rule indices along with state
+            });
+            // --- END: CORRECTED RECORDING LOGIC ---
         }
     } else if (!isCyclePlaybackMode && stateHistoryChecksums.has(newStateChecksum)) {
-        // A cycle is detected for the first time! Start recording.
-        console.log(`World ${worldIndex}: Cycle detected at tick ${worldTickCounter}! Starting cycle recording...`);
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
-        // Start recording with the current state
-        detectedCycle = [jsNextStateArray.slice()];
+        // --- START: CORRECTED RECORDING LOGIC ---
+        detectedCycle = [{
+            state: jsNextStateArray.slice(),
+            rules: jsNextRuleIndexArray.slice() // Record rule indices along with state
+        }];
+        // --- END: CORRECTED RECORDING LOGIC ---
     }
 
-    // Update history only when not in playback mode
     if (!isCyclePlaybackMode) {
         stateHistoryChecksums.add(newStateChecksum);
         stateChecksumQueue.push(newStateChecksum);
-        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
+        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) { 
             const oldestChecksum = stateChecksumQueue.shift();
             if (!stateChecksumQueue.includes(oldestChecksum)) {
                 stateHistoryChecksums.delete(oldestChecksum);
             }
         }
     }
-    // --- END: NEW CYCLE DETECTION ---
 
     let tempState = jsStateArray;
     jsStateArray = jsNextStateArray;
@@ -358,8 +347,8 @@ function runTick() {
     if (newStateChecksum !== lastSentChecksum) {
         simulationPerformedUpdate = true;
     }
-    
-    const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
+
+    const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0; 
     let currentBinaryEntropy = undefined;
     let currentBlockEntropy = undefined;
     const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
@@ -385,7 +374,7 @@ function runTick() {
     
     const now = performance.now();
     const shouldSendThrottledUpdate = now - lastStatsUpdateTime > STATS_UPDATE_THROTTLE_MS;
-    if (needsGridUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) {
+    if (needsGridUpdate || (simulationPerformedUpdate && shouldSendThrottledUpdate)) { 
         lastSentChecksum = calculateChecksum(jsStateArray);
         sendStateUpdate(activeCount, ratio, currentBinaryEntropy, currentBlockEntropy, rulesetChangedInQueue, needsGridUpdate || simulationPerformedUpdate);
         
@@ -404,6 +393,7 @@ function runTick() {
         self.postMessage(statePayload, transferListState);
     }
 }
+
 
 function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulesetHasChanged = false, commandInducedGridChange = false) {
     if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray || !ruleset) {
@@ -440,9 +430,9 @@ function sendStateUpdate(activeCount, ratio, binaryEntropy, blockEntropy, rulese
         }, transferListStats);
     } else if (rulesetHasChanged || !isEnabled || commandInducedGridChange) {
         const currentActiveCount = jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
-        const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0;
+        const currentRatio = workerConfig.NUM_CELLS > 0 ? currentActiveCount / workerConfig.NUM_CELLS : 0; 
         let currentBinaryEntropyStats, currentBlockEntropyStats;
-        if (workerIsEntropySamplingEnabled && jsStateArray) {
+        if (workerIsEntropySamplingEnabled && jsStateArray) { 
             currentBinaryEntropyStats = calculateBinaryEntropy(currentRatio);
             currentBlockEntropyStats = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
         }
@@ -480,11 +470,11 @@ self.onmessage = async function(event) {
 
     switch (command.type) {
         case 'INIT':
-            await init();
+            await init(); 
             wasm_world = new World(command.data.config.GRID_COLS, command.data.config.GRID_ROWS);
             worldIndex = command.data.worldIndex;
             workerConfig = command.data.config;
-            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED;
+            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED; 
             targetTickDurationMs = 1000 / currentSpeedTarget;
             ratioHistory = [];
             entropyHistory = [];
@@ -492,9 +482,9 @@ self.onmessage = async function(event) {
             jsStateArray = new Uint8Array(command.data.initialStateBuffer);
             ruleset = new Uint8Array(command.data.initialRulesetBuffer);
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
-            jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS);
-            jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
-            jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS);
+            jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS); 
+            jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
+            jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
             ruleUsageCounters = new Uint32Array(128);
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
@@ -504,14 +494,14 @@ self.onmessage = async function(event) {
 
             if (isEnabled) {
                 const density = command.data.initialDensity;
-                if (density % 1 === 0) {
+                if(density % 1 === 0) {
                     jsStateArray.fill(density);
-                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + workerConfig.GRID_COLS / 2);
-                    if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
-                        jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
+                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2); 
+                    if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) { 
+                       jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
                     }
                 } else {
-                    for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
+                    for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
                         jsStateArray[i] = Math.random() < density ? 1 : 0;
                     }
                 }
@@ -529,7 +519,7 @@ self.onmessage = async function(event) {
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
             const initialActiveCount = isEnabled && jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
-            const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0;
+            const initialRatio = isEnabled && workerConfig.NUM_CELLS > 0 ? initialActiveCount / workerConfig.NUM_CELLS : 0; 
             let initialBinaryEntropy, initialBlockEntropy;
             if (isEnabled && workerIsEntropySamplingEnabled) {
                 initialBinaryEntropy = calculateBinaryEntropy(initialRatio);
