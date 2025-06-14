@@ -124,3 +124,57 @@
         font-size: 16px !important;
     }
 }
+
+/* NEW: Tooltip for displaying the value during scrubbing */
+.slider-tooltip {
+    position: fixed; /* Fixed position to float above all other UI */
+    background-color: #2a2a2a;
+    color: #f0c674;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #777;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    font-size: 1.2em;
+    font-weight: bold;
+    pointer-events: none; /* The tooltip should not capture events */
+    z-index: 9999;
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.8);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    white-space: nowrap;
+}
+
+.slider-tooltip.visible {
+    opacity: 1;
+    transform: translate(-50%, -15px) scale(1);
+}
+
+.slider-tooltip:not(.hidden) {
+    opacity: 1;
+    transform: translate(-50%, -15px) scale(1);
+}
+
+.slider-tooltip.hidden {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.8);
+}
+
+.slider-tooltip-granularity {
+    display: block;
+    font-size: 0.7em;
+    color: #ccc;
+    text-align: center;
+    margin-top: 2px;
+    font-weight: normal;
+}
+
+/* Style for when the slider is being actively scrubbed */
+.slider-component-container.is-scrubbing input[type="range"]::-webkit-slider-thumb {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(240, 198, 116, 0.7);
+}
+
+.slider-component-container.is-scrubbing input[type="range"]::-moz-range-thumb {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(240, 198, 116, 0.7);
+}
