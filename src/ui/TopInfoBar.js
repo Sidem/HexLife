@@ -2,6 +2,8 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { formatHexCode } from '../utils/utils.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import { brushController } from './controllers/BrushController.js';
+import { simulationController } from './controllers/SimulationController.js';
 
 export class TopInfoBar {
     constructor(worldManagerInterface) {
@@ -17,10 +19,10 @@ export class TopInfoBar {
         // Initial state update
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
-        this.updateBrushSizeDisplay(this.worldManager.getCurrentBrushSize());
+        this.updateBrushSizeDisplay(brushController.getState().brushSize);
         this.updateUndoRedoButtons();
         if (this.uiElements?.statTargetTps) {
-            this.uiElements.statTargetTps.textContent = String(this.worldManager.getCurrentSimulationSpeed());
+            this.uiElements.statTargetTps.textContent = String(simulationController.getState().speed);
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
         

@@ -4,6 +4,8 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRandomBitsInHex } from '../utils/utils.js';
+import { simulationController } from '../ui/controllers/SimulationController.js';
+import { brushController } from '../ui/controllers/BrushController.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -12,8 +14,6 @@ export class WorldManager {
         this.sharedSettings = sharedSettings;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
-        this.currentGlobalSpeed = sharedSettings.speed ?? PersistenceService.loadSimSpeed() ?? Config.DEFAULT_SPEED;
-        this.currentBrushSize = PersistenceService.loadBrushSize() ?? Config.DEFAULT_NEIGHBORHOOD_SIZE;
         this._hoverAffectedIndicesSet = new Set();
 
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
@@ -83,7 +83,7 @@ export class WorldManager {
                 enabled: settings.enabled,
                 rulesetArray: rulesetArray,
                 rulesetHex: settings.rulesetHex,
-                speed: this.currentGlobalSpeed,
+                speed: simulationController.getState().speed,
                 initialEntropySamplingEnabled: this.isEntropySamplingEnabled,
                 initialEntropySampleRate: this.entropySampleRate,
             }, worldManagerCallbacks);
@@ -120,7 +120,7 @@ export class WorldManager {
         }
         if (!this.isGloballyPaused && this.worlds[worldIndex]?.getLatestStats().isEnabled) {
             this.worlds[worldIndex].startSimulation();
-            this.worlds[worldIndex].setSpeed(this.currentGlobalSpeed);
+            this.worlds[worldIndex].setSpeed(simulationController.getState().speed);
         }
     }
 
@@ -160,19 +160,12 @@ export class WorldManager {
     }
 
     _setupEventListeners = () => {
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, () => this.setGlobalPause(!this.isGloballyPaused));
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, (isPaused) => this.setGlobalPause(isPaused));
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
 
-        EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, (size) => {
-            const newSizeValidated = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
-            if (this.currentBrushSize !== newSizeValidated) {
-                this.currentBrushSize = newSizeValidated;
-                PersistenceService.saveBrushSize(this.currentBrushSize);
-                EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, this.currentBrushSize);
-            }
-        });
+
 
         EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
             const newRulesetHex = this._generateRandomRulesetHex(data.bias, data.generationMode);
@@ -307,13 +300,13 @@ export class WorldManager {
         });
 
         EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
-            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.currentBrushSize);
+            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, brushController.getState().brushSize);
         });
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-            findHexagonsInNeighborhood(data.col, data.row, this.currentBrushSize, this._hoverAffectedIndicesSet);
+            findHexagonsInNeighborhood(data.col, data.row, brushController.getState().brushSize, this._hoverAffectedIndicesSet);
             this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
@@ -342,7 +335,7 @@ export class WorldManager {
 
                 if (data.isEnabled && !this.isGloballyPaused) {
                     this.worlds[data.worldIndex].startSimulation();
-                    this.worlds[data.worldIndex].setSpeed(this.currentGlobalSpeed);
+                    this.worlds[data.worldIndex].setSpeed(simulationController.getState().speed);
                 } else if (!data.isEnabled) {
                     this.worlds[data.worldIndex].stopSimulation();
                 }
@@ -618,33 +611,30 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    setGlobalPause = (paused) => {
-        this.isGloballyPaused = paused;
+    setGlobalPause = (isPaused) => {
+        this.isGloballyPaused = isPaused;
         this.worlds.forEach(proxy => {
             if (this.isGloballyPaused || !proxy.getLatestStats().isEnabled) {
                 proxy.stopSimulation();
             } else {
                 proxy.startSimulation();
-                proxy.setSpeed(this.currentGlobalSpeed);
+                proxy.setSpeed(simulationController.getState().speed);
             }
         });
-        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isGloballyPaused);
+        simulationController._syncPauseState(this.isGloballyPaused);
     }
 
     setGlobalSpeed = (speed) => {
-        this.currentGlobalSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
-        this.worlds.forEach(proxy => proxy.setSpeed(this.currentGlobalSpeed));
-        PersistenceService.saveSimSpeed(this.currentGlobalSpeed);
-        EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, this.currentGlobalSpeed);
+        const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
+        this.worlds.forEach(proxy => proxy.setSpeed(newSpeed));
+        // Note: SimulationController handles persistence and events, no need to duplicate here
     }
 
     getWorldsRenderData = () => {
         return this.worlds.map(proxy => proxy.getLatestRenderData());
     }
 
-    isSimulationPaused = () => this.isGloballyPaused;
-    getCurrentSimulationSpeed = () => this.currentGlobalSpeed;
-    getCurrentBrushSize = () => this.currentBrushSize;
+
     getSelectedWorldIndex = () => this.selectedWorldIndex;
 
     getCurrentRulesetHex = () => {
@@ -796,7 +786,7 @@ export class WorldManager {
         proxy.setEnabled(true);
         if (!this.isGloballyPaused) {
             proxy.startSimulation();
-            proxy.setSpeed(this.currentGlobalSpeed);
+            proxy.setSpeed(simulationController.getState().speed);
         }
 
         PersistenceService.saveWorldSettings(this.worldSettings);

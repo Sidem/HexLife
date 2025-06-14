@@ -5,7 +5,8 @@ import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js';
-import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js'; 
+import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
+import { worldsController } from '../controllers/WorldsController.js'; 
 
 export class SetupPanel extends DraggablePanel {
     constructor(panelElement, worldManagerInterface, options = {}) { 
@@ -37,29 +38,20 @@ export class SetupPanel extends DraggablePanel {
             this.uiElements.closeButton.addEventListener('click', () => this.hide());
         }
         if (this.uiElements.applySetupButton) {
-            this.uiElements.applySetupButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
-            });
+            this.uiElements.applySetupButton.addEventListener('click', worldsController.resetAllWorldsToInitialDensities);
         }
         if (this.uiElements.applySelectedDensityButton) {
-            this.uiElements.applySelectedDensityButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
-            });
+            this.uiElements.applySelectedDensityButton.addEventListener('click', worldsController.applySelectedDensityToAll);
         }
         if (this.uiElements.resetDensitiesButton) {
-            this.uiElements.resetDensitiesButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
-            });
+            this.uiElements.resetDensitiesButton.addEventListener('click', worldsController.resetDensitiesToDefault);
         }
         if (this.uiElements.worldSetupGrid) {
             this.uiElements.worldSetupGrid.addEventListener('click', (event) => {
                 if (event.target.classList.contains('set-ruleset-button')) {
                     const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
                     if (!isNaN(worldIndex)) {
-                        EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, {
-                            scope: worldIndex,
-                            copyPrimaryRuleset: true 
-                        });
+                        worldsController.resetWorldsWithCurrentRuleset(worldIndex, true);
                     }
                 }
             });
@@ -106,7 +98,7 @@ export class SetupPanel extends DraggablePanel {
                 id: `densitySlider_${i}`, label: 'Density:', min: 0, max: 1, step: 0.001,
                 value: settings.initialDensity, unit: '', showValue: true,
                 onChange: (newDensity) => {
-                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
+                    worldsController.setWorldInitialDensity(i, newDensity);
                 }
             });
             this.worldSliderComponents.push(densitySlider);
@@ -119,7 +111,7 @@ export class SetupPanel extends DraggablePanel {
                 initialValue: settings.enabled,
                 items: [{ value: 'enabled', text: settings.enabled ? 'Enabled' : 'Disabled' }],
                 onChange: (isEnabled) => {
-                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled: isEnabled });
+                    worldsController.setWorldEnabled(i, isEnabled);
                     // Update the label text to reflect the new state
                     const label = enableSwitchMount.querySelector('label');
                     if (label) {

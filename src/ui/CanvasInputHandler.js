@@ -2,6 +2,9 @@ import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { getLayoutCache } from '../rendering/renderer.js';
 import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoords, calculateHexSizeForTexture } from '../utils/utils.js';
+import { brushController } from './controllers/BrushController.js';
+import { interactionController } from './controllers/InteractionController.js';
+import { simulationController } from './controllers/SimulationController.js';
 
 export class CanvasInputHandler {
     constructor(canvas, worldManager, isMobile = false) {
@@ -11,7 +14,7 @@ export class CanvasInputHandler {
         this.isMobile = isMobile;
 
         // --- Interaction State ---
-        this.interactionMode = 'pan'; // 'pan' or 'draw'
+        this.interactionMode = interactionController.getState().mode;
         this.isMouseDrawing = false;
         this.isPanning = false;
         this.lastPanX = 0;
@@ -45,17 +48,7 @@ export class CanvasInputHandler {
         this._setupListeners();
     }
 
-    toggleInteractionMode() {
-        this.interactionMode = this.interactionMode === 'pan' ? 'draw' : 'pan';
-        console.log(`Interaction mode set to: ${this.interactionMode}`);
-        EventBus.dispatch(EVENTS.INTERACTION_MODE_CHANGED, this.interactionMode);
-    }
 
-    setInteractionMode(mode) {
-        if (mode !== 'pan' && mode !== 'draw') return;
-        this.interactionMode = mode;
-        console.log(`Interaction mode set to: ${this.interactionMode}`);
-    }
 
     _handleEscKey(event) {
         if (event.key === 'Escape' && this.isPlacingPattern) {
@@ -127,8 +120,9 @@ export class CanvasInputHandler {
         this.canvas.addEventListener('touchend', this._handleTouchEnd.bind(this), { passive: false });
         this.canvas.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
 
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, () => this.toggleInteractionMode());
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, interactionController.toggleMode);
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.enterPlacingMode(data));
+        EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => { this.interactionMode = mode; });
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => {
             this.layoutCache = newLayout;
         });
@@ -197,9 +191,14 @@ export class CanvasInputHandler {
             this.isMouseDrawing = true;
             this.strokeAffectedCells.clear();
             this.lastDrawnCellIndex = row * Config.GRID_COLS + col;
-            this.wasSimulationRunningBeforeStroke = !this.worldManager.isSimulationPaused();
-            if (this.wasSimulationRunningBeforeStroke) EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
-            findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), this.strokeAffectedCells);
+            
+            this.wasSimulationRunningBeforeStroke = false; // Reset flag
+            if (interactionController.getState().pauseWhileDrawing && !simulationController.getState().isPaused) {
+                this.wasSimulationRunningBeforeStroke = true;
+                simulationController.setPause(true);
+            }
+
+            findHexagonsInNeighborhood(col, row, brushController.getState().brushSize, this.strokeAffectedCells);
             EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndexAtCursor, cellIndices: this.strokeAffectedCells });
         }
     }
@@ -229,7 +228,7 @@ export class CanvasInputHandler {
             if (currentCellIndex !== this.lastDrawnCellIndex) {
                 this.lastDrawnCellIndex = currentCellIndex;
                 const newCellsInBrush = new Set();
-                findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), newCellsInBrush);
+                findHexagonsInNeighborhood(col, row, brushController.getState().brushSize, newCellsInBrush);
                 const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
                 if (cellsToToggle.length > 0) {
                     cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
@@ -253,8 +252,9 @@ export class CanvasInputHandler {
         if (this.isMouseDrawing) {
             this.isMouseDrawing = false;
             if (this.wasSimulationRunningBeforeStroke) {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+                simulationController.setPause(false);
             }
+            this.wasSimulationRunningBeforeStroke = false; // Reset flag
             this.strokeAffectedCells.clear();
             this.lastDrawnCellIndex = null;
         }
@@ -275,8 +275,8 @@ export class CanvasInputHandler {
 
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
-            const newSize = this.worldManager.getCurrentBrushSize() - scrollAmount;
-            EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
+            const newSize = brushController.getState().brushSize - scrollAmount;
+            brushController.setBrushSize(newSize);
             this._handleMouseMove(event); // Update hover
         } else {
             const zoomFactor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -311,9 +311,10 @@ export class CanvasInputHandler {
                 this.isPanning = true;
             } else { // Draw mode
                 this.isPanning = false;
-                this.wasSimulationRunningBeforeStroke = !this.worldManager.isSimulationPaused();
-                if (this.wasSimulationRunningBeforeStroke) {
-                    EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+                this.wasSimulationRunningBeforeStroke = false; // Reset flag
+                if (interactionController.getState().pauseWhileDrawing && !simulationController.getState().isPaused) {
+                    this.wasSimulationRunningBeforeStroke = true;
+                    simulationController.setPause(true);
                 }
                 
                 // CRITICAL FIX: Pass the correct touch object to get coordinates
@@ -321,7 +322,7 @@ export class CanvasInputHandler {
                 if (viewType === 'selected' && col !== null) {
                     this.strokeAffectedCells.clear();
                     this.lastDrawnCellIndex = row * Config.GRID_COLS + col;
-                    findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), this.strokeAffectedCells);
+                    findHexagonsInNeighborhood(col, row, brushController.getState().brushSize, this.strokeAffectedCells);
                     EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
                         worldIndex: worldIndexAtCursor,
                         cellIndices: this.strokeAffectedCells
@@ -386,7 +387,7 @@ export class CanvasInputHandler {
                     if (currentCellIndex !== this.lastDrawnCellIndex) {
                         this.lastDrawnCellIndex = currentCellIndex;
                         const newCellsInBrush = new Set();
-                        findHexagonsInNeighborhood(col, row, this.worldManager.getCurrentBrushSize(), newCellsInBrush);
+                        findHexagonsInNeighborhood(col, row, brushController.getState().brushSize, newCellsInBrush);
 
                         const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
 
@@ -423,8 +424,8 @@ export class CanvasInputHandler {
         }
 
         // Unpause the simulation if it was running before the stroke began
-        if (this.interactionMode === 'draw' && this.wasSimulationRunningBeforeStroke) {
-            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+        if (this.wasSimulationRunningBeforeStroke) {
+            simulationController.setPause(false);
         }
 
         // Reset all touch and drawing states for the next interaction

@@ -5,6 +5,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { visualizationController } from '../controllers/VisualizationController.js';
+import { simulationController } from '../controllers/SimulationController.js';
+import { brushController } from '../controllers/BrushController.js';
+import { worldsController } from '../controllers/WorldsController.js';
+import { interactionController } from '../controllers/InteractionController.js';
 
 
 export class ToolsBottomSheet extends BottomSheet {
@@ -33,6 +37,10 @@ export class ToolsBottomSheet extends BottomSheet {
                     <div class="tool-group">
                         <h5>Brush Size</h5>
                         <div id="mobileBrushSliderMount"></div>
+                    </div>
+                    <div class="tool-group">
+                        <h5>Interaction</h5>
+                        <div id="mobilePauseWhileDrawingMount"></div>
                     </div>
                     <div class="tool-group">
                         <h5>Visualization</h5>
@@ -64,10 +72,10 @@ export class ToolsBottomSheet extends BottomSheet {
             min: 1,
             max: Config.MAX_SIM_SPEED,
             step: 1,
-            value: this.worldManager.getCurrentSimulationSpeed(),
+            value: simulationController.getState().speed,
             unit: 'tps',
             showValue: true,
-            onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val)
+            onChange: simulationController.setSpeed
         });
 
         new SliderComponent(content.querySelector('#mobileBrushSliderMount'), {
@@ -75,9 +83,19 @@ export class ToolsBottomSheet extends BottomSheet {
             min: 0,
             max: Config.MAX_NEIGHBORHOOD_SIZE,
             step: 1,
-            value: this.worldManager.getCurrentBrushSize(),
+            value: brushController.getState().brushSize,
             showValue: true,
-            onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val)
+            onChange: brushController.setBrushSize
+        });
+
+        // NEW: Initialize Interaction Setting Switch
+        const interactionState = interactionController.getState();
+        new SwitchComponent(content.querySelector('#mobilePauseWhileDrawingMount'), {
+            type: 'checkbox',
+            name: 'mobilePauseWhileDrawing',
+            initialValue: interactionState.pauseWhileDrawing,
+            items: [{ value: 'pause', text: 'Pause While Drawing' }],
+            onChange: interactionController.setPauseWhileDrawing
         });
 
         // Visualization Controls using new controller
@@ -162,10 +180,10 @@ export class ToolsBottomSheet extends BottomSheet {
         this.sheetContent.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
             if (action === 'reset') {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
+                worldsController.resetWorldsWithCurrentRuleset('selected');
                 this.hide();
             } else if (action === 'clear') {
-                EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
+                worldsController.clearWorlds('selected');
                 this.hide();
             }
 
@@ -184,7 +202,7 @@ export class ToolsBottomSheet extends BottomSheet {
 
         // Keep mobile UI in sync if changed from desktop
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => {
-            if (!this.isHidden()) {
+            if (this.isVisible) {
                 this._syncVisualSettings();
             }
         });

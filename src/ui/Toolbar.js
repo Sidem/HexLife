@@ -1,5 +1,4 @@
 import * as Config from '../core/config.js';
-import * as PersistenceService from '../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
@@ -7,10 +6,13 @@ import { SwitchComponent } from './components/SwitchComponent.js';
 import { rulesetActionController } from './controllers/RulesetActionController.js';
 import { libraryController } from './controllers/LibraryController.js';
 import { visualizationController } from './controllers/VisualizationController.js';
+import { simulationController } from './controllers/SimulationController.js';
+import { brushController } from './controllers/BrushController.js';
+import { worldsController } from './controllers/WorldsController.js';
 import { onboardingManager } from './ui.js';
 import { generateShareUrl } from '../utils/utils.js';
 import { uiManager } from './UIManager.js';
-import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import { interactionController } from './controllers/InteractionController.js';
 
 export class Toolbar {
     constructor(worldManagerInterface, libraryData) {
@@ -148,9 +150,9 @@ export class Toolbar {
     _initPopoutControls() {
         const controllerState = rulesetActionController.getState();
         
-        // Speed & Brush sliders (unchanged)
-        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: this.worldManager.getCurrentSimulationSpeed(), unit: 'tps', showValue: true, onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, val) });
-        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: this.worldManager.getCurrentBrushSize(), unit: '', showValue: true, onChange: val => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, val) });
+        // Speed & Brush sliders
+        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: simulationController.getState().speed, unit: 'tps', showValue: true, onChange: simulationController.setSpeed });
+        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: brushController.getState().brushSize, unit: '', showValue: true, onChange: brushController.setBrushSize });
         
         // Generation controls using new controller
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
@@ -247,10 +249,10 @@ export class Toolbar {
             if (hex && hex.length > 0) EventBus.dispatch(EVENTS.UI_RULESET_INPUT_CHANGED, { value: hex });
         });
 
-        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { worldsController.resetWorldsWithCurrentRuleset('selected'); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
 
         // Settings Popout - use new visualization controller
         const vizState = visualizationController.getState();
@@ -274,6 +276,15 @@ export class Toolbar {
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: visualizationController.setShowMinimapOverlay
         });
+
+        const interactionState = interactionController.getState();
+        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#pauseWhileDrawingSwitchMount'), {
+            type: 'checkbox',
+            name: 'pauseWhileDrawingDesktop',
+            initialValue: interactionState.pauseWhileDrawing,
+            items: [{ value: 'pause', text: 'Pause While Drawing' }],
+            onChange: interactionController.setPauseWhileDrawing
+        });
     }
     
     _copyRuleset() {
@@ -287,7 +298,7 @@ export class Toolbar {
     }
 
     _setupToolbarButtonListeners() {
-        this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+        this.uiElements.playPauseButton.addEventListener('click', simulationController.togglePause);
 
         this.popoutConfig.forEach(config => {
             const tourName = {
@@ -316,7 +327,7 @@ export class Toolbar {
             this.popoutPanels.share.toggle();
         });
         
-        this.uiElements.saveStateButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE));
+        this.uiElements.saveStateButton.addEventListener('click', worldsController.saveSelectedWorldState);
         this.uiElements.loadStateButton.addEventListener('click', () => {
             this.uiElements.fileInput.accept = ".txt,.json";
             this.uiElements.fileInput.click();
@@ -334,7 +345,7 @@ export class Toolbar {
                 try {
                     const data = JSON.parse(re.target.result);
                     if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
-                    EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), loadedData: data });
+                    worldsController.loadWorldState(this.worldManager.getSelectedWorldIndex(), data);
                 } catch (err) { alert(`Error processing file: ${err.message}`); }
                 finally { e.target.value = null; }
             };

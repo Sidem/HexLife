@@ -13,6 +13,7 @@ import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
 import { uiManager } from './UIManager.js';
+import { simulationController } from './controllers/SimulationController.js';
 
 let panelManager, toolbar, onboardingManager;
 export { onboardingManager };
@@ -305,7 +306,7 @@ export function initUI(worldManagerInterface, libraryData) {
     });
 
     // Initial UI state sync
-    toolbar.updatePauseButtonVisual(worldManagerInterface.isSimulationPaused());
+    toolbar.updatePauseButtonVisual(simulationController.getState().isPaused);
     
     initGuidingBoxes();
     console.log(`UI Initialized for: ${uiManager.getMode()}`);

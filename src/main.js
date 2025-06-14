@@ -8,6 +8,7 @@ import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 import { tours } from './ui/tourSteps.js'; 
 import { uiManager } from './ui/UIManager.js';
+import { simulationController } from './ui/controllers/SimulationController.js';
 
 let gl;
 let worldManager;
@@ -96,11 +97,8 @@ async function initialize() {
     worldManager = new WorldManager(sharedSettings);
 
     const worldManagerInterfaceForUI = {
-        isSimulationPaused: worldManager.isSimulationPaused.bind(worldManager),
         getCurrentRulesetHex: worldManager.getCurrentRulesetHex.bind(worldManager),
         getCurrentRulesetArray: worldManager.getCurrentRulesetArray.bind(worldManager),
-        getCurrentSimulationSpeed: worldManager.getCurrentSimulationSpeed.bind(worldManager),
-        getCurrentBrushSize: worldManager.getCurrentBrushSize.bind(worldManager),
         getSelectedWorldIndex: worldManager.getSelectedWorldIndex.bind(worldManager),
         getSelectedWorldStats: worldManager.getSelectedWorldStats.bind(worldManager),
         getWorldSettingsForUI: worldManager.getWorldSettingsForUI.bind(worldManager),
@@ -127,7 +125,7 @@ async function initialize() {
 
     // Dispatch initial events to sync UI with the starting state
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
-    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, worldManager.isSimulationPaused());
+    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, simulationController.getState().isPaused);
     
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -157,13 +155,13 @@ function handleResize() {
 function handleVisibilityChange() {
     if (!isInitialized || !worldManager) return;
     if (document.hidden) {
-        if (!worldManager.isSimulationPaused()) {
-            worldManager.setGlobalPause(true);
+        if (!simulationController.getState().isPaused) {
+            simulationController.setPause(true);
             pausedByVisibilityChange = true;
         }
     } else {
         if (pausedByVisibilityChange) {
-            worldManager.setGlobalPause(false);
+            simulationController.setPause(false);
             pausedByVisibilityChange = false;
             lastTimestamp = performance.now();
         }
@@ -208,7 +206,7 @@ function renderLoop(timestamp) {
         frameCount = 0;
         lastFpsUpdateTime = timestamp;
         const selectedStats = worldManager.getSelectedWorldStats();
-        const targetTps = worldManager.getCurrentSimulationSpeed();
+        const targetTps = simulationController.getState().speed;
         EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
     }
 
