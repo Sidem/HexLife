@@ -3,7 +3,7 @@ import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
 import * as UI from './ui/ui.js';
 import { onboardingManager } from './ui/ui.js';
-import { CanvasInputHandler } from './ui/CanvasInputHandler.js';
+import { InputManager } from './ui/InputManager.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 import { tours } from './ui/tourSteps.js'; 
 import { uiManager } from './ui/UIManager.js';
@@ -11,7 +11,6 @@ import { simulationController } from './ui/controllers/SimulationController.js';
 
 let gl;
 let worldManager;
-let canvasInputHandler;
 let isInitialized = false;
 let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
@@ -19,6 +18,7 @@ let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
 let initializedWorkerCount = 0;
+let inputManager;
 
 function updateLoadingStatus(message) {
     const statusElement = document.getElementById('loading-status');
@@ -118,7 +118,8 @@ async function initialize() {
         getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
     };
     
-    canvasInputHandler = new CanvasInputHandler(canvas, worldManager, uiManager.isMobile());
+    inputManager = new InputManager(canvas, worldManager, uiManager.isMobile());
+
 
     updateLoadingStatus("Initializing UI components...");
     if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
