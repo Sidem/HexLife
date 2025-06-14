@@ -306,14 +306,7 @@ export class Toolbar {
             }
         });
         
-        this.uiElements.shareButton.addEventListener('click', () => {
-            const success = this._generateAndShowShareLink();
-            if (success) {
-                this.popoutPanels.share.toggle();
-            } else {
-                alert("Cannot generate share link: The selected world's ruleset is not yet available or is invalid. Please ensure the simulation is running or has been reset.");
-            }
-        });
+        this.uiElements.shareButton.addEventListener('click', () => this._generateAndShowShareLink());
         
         this.uiElements.saveStateButton.addEventListener('click', worldsController.saveSelectedWorldState);
         this.uiElements.loadStateButton.addEventListener('click', () => {
