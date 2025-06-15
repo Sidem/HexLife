@@ -2,7 +2,7 @@ import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-class BrushController {
+export class BrushController {
     constructor() {
         this.state = {
             brushSize: PersistenceService.loadBrushSize() ?? Config.DEFAULT_NEIGHBORHOOD_SIZE,
@@ -21,6 +21,4 @@ class BrushController {
         // Event for UI updates. The input handler will read from this controller directly.
         EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, newSize);
     }
-}
-
-export const brushController = new BrushController(); 
+} 

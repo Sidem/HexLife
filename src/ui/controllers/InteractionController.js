@@ -1,7 +1,7 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
-class InteractionController {
+export class InteractionController {
     constructor() {
         this.state = {
             mode: 'pan', // 'pan' or 'draw'
@@ -31,6 +31,4 @@ class InteractionController {
         this.state.pauseWhileDrawing = shouldPause;
         PersistenceService.saveUISetting('pauseWhileDrawing', shouldPause);
     }
-}
-
-export const interactionController = new InteractionController(); 
+} 

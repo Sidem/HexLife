@@ -11,7 +11,8 @@ import { EditorView } from './views/EditorView.js';
 import { uiManager } from './UIManager.js';
 
 export class PanelManager {
-    constructor(worldManagerInterface) {
+    constructor(appContext, worldManagerInterface) {
+        this.appContext = appContext;
         this.worldManager = worldManagerInterface;
         this.panels = {};
         this.uiElements = null;
@@ -35,6 +36,8 @@ export class PanelManager {
                 const PanelClass = config.constructor;
                 if (PanelClass === AnalysisPanel) {
                     this.panels[config.name] = new PanelClass(panelElement, this.worldManager, this, config.options);
+                } else if (PanelClass === SetupPanel) {
+                    this.panels[config.name] = new PanelClass(panelElement, this.appContext, this.worldManager, config.options);
                 } else {
                     this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
                 }
@@ -48,7 +51,7 @@ export class PanelManager {
                 this.mobileViews.more = new MoreView(mobileViewsContainer, this.worldManager);
                 this.mobileViews.more.render();
 
-                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.libraryData, this.worldManager);
+                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.appContext, this.libraryData, this.worldManager);
                 this.mobileViews.rules.render();
                 
                 this.mobileViews.worlds = new WorldsView(mobileViewsContainer, this.worldManager);

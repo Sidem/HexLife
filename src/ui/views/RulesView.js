@@ -2,12 +2,11 @@ import { BaseComponent } from '../components/BaseComponent.js';
 import { SliderComponent } from '../components/SliderComponent.js';
 import { SwitchComponent } from '../components/SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { rulesetActionController } from '../controllers/RulesetActionController.js';
-import { libraryController } from '../controllers/LibraryController.js';
 
 export class RulesView extends BaseComponent {
-    constructor(mountPoint, libraryData, worldManagerInterface) {
+    constructor(mountPoint, appContext, libraryData, worldManagerInterface) {
         super(mountPoint);
+        this.appContext = appContext;
         this.libraryData = libraryData;
         this.worldManager = worldManagerInterface;
         this.element = null;
@@ -17,7 +16,7 @@ export class RulesView extends BaseComponent {
         this.switches = {};
         
         // Initialize library controller
-        libraryController.init(this.libraryData);
+        this.appContext.libraryController.init(this.libraryData);
     }
 
     render() {
@@ -85,7 +84,7 @@ export class RulesView extends BaseComponent {
             <button class="action-button" data-action="generate">Generate New Ruleset</button>
         `;
         
-        const controllerState = rulesetActionController.getState();
+        const controllerState = this.appContext.rulesetActionController.getState();
 
         this.switches.genMode = new SwitchComponent(pane.querySelector('#mobileGenerateModeMount'), {
             label: 'Generation Mode:',
@@ -97,7 +96,7 @@ export class RulesView extends BaseComponent {
                 { value: 'n_count', text: 'N-Count' },
                 { value: 'r_sym', text: 'R-Sym' }
             ],
-            onChange: rulesetActionController.setGenMode
+            onChange: this.appContext.rulesetActionController.setGenMode
         });
 
         this.sliders.bias = new SliderComponent(pane.querySelector('#mobileBiasSliderMount'), {
@@ -105,7 +104,7 @@ export class RulesView extends BaseComponent {
             min: 0, max: 1, step: 0.01,
             value: controllerState.bias,
             showValue: true,
-            onChange: rulesetActionController.setBias
+            onChange: this.appContext.rulesetActionController.setBias
         });
 
         this.switches.genScope = new SwitchComponent(pane.querySelector('#mobileRulesetScopeMount'), {
@@ -117,7 +116,7 @@ export class RulesView extends BaseComponent {
                 { value: 'selected', text: 'Selected' },
                 { value: 'all', text: 'All' }
             ],
-            onChange: rulesetActionController.setGenScope
+            onChange: this.appContext.rulesetActionController.setGenScope
         });
 
         this.switches.genAutoReset = new SwitchComponent(pane.querySelector('#mobileResetOnNewRuleMount'), {
@@ -125,7 +124,7 @@ export class RulesView extends BaseComponent {
             name: 'mobileResetOnNewRule',
             initialValue: controllerState.genAutoReset,
             items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
-            onChange: rulesetActionController.setGenAutoReset
+            onChange: this.appContext.rulesetActionController.setGenAutoReset
         });
     }
 
@@ -141,14 +140,14 @@ export class RulesView extends BaseComponent {
             </div>
         `;
     
-        const controllerState = rulesetActionController.getState();
+        const controllerState = this.appContext.rulesetActionController.getState();
 
         this.sliders.mutate = new SliderComponent(pane.querySelector('#mobileMutateSliderMount'), {
             label: 'Mutation Rate (%):',
             min: 1, max: 50, step: 1,
             value: controllerState.mutateRate,
             showValue: true, unit: '%',
-            onChange: rulesetActionController.setMutateRate
+            onChange: this.appContext.rulesetActionController.setMutateRate
         });
 
         this.switches.mutateMode = new SwitchComponent(pane.querySelector('#mobileMutateModeMount'), {
@@ -161,7 +160,7 @@ export class RulesView extends BaseComponent {
                 { value: 'r_sym', text: 'R-Sym' },
                 { value: 'n_count', text: 'N-Count' }
             ],
-            onChange: rulesetActionController.setMutateMode
+            onChange: this.appContext.rulesetActionController.setMutateMode
         });
 
         this.switches.mutateScope = new SwitchComponent(pane.querySelector('#mobileMutateScopeMount'), {
@@ -173,7 +172,7 @@ export class RulesView extends BaseComponent {
                 { value: 'selected', text: 'Selected' },
                 { value: 'all', text: 'All' }
             ],
-            onChange: rulesetActionController.setMutateScope
+            onChange: this.appContext.rulesetActionController.setMutateScope
         });
     }
 
@@ -243,21 +242,21 @@ export class RulesView extends BaseComponent {
         });
 
         this.panes.generate.querySelector('[data-action="generate"]').addEventListener('click', () => {
-            rulesetActionController.generate();
+            this.appContext.rulesetActionController.generate();
         });
 
         this.panes.mutate.querySelector('[data-action="mutate"]').addEventListener('click', () => {
-            rulesetActionController.mutate();
+            this.appContext.rulesetActionController.mutate();
         });
 
         this.panes.mutate.querySelector('[data-action="clone-mutate"]').addEventListener('click', () => {
-            rulesetActionController.cloneAndMutate();
+            this.appContext.rulesetActionController.cloneAndMutate();
         });
 
         this.panes["library-rulesets"].addEventListener('click', e => {
             if (e.target.matches('button[data-hex]')) {
-                const controllerState = rulesetActionController.getState();
-                libraryController.loadRuleset(
+                const controllerState = this.appContext.rulesetActionController.getState();
+                this.appContext.libraryController.loadRuleset(
                     e.target.dataset.hex, 
                     controllerState.genScope, 
                     controllerState.genAutoReset
@@ -268,7 +267,7 @@ export class RulesView extends BaseComponent {
         this.panes["library-patterns"].addEventListener('click', e => {
             if (e.target.matches('button[data-action="place-pattern"]')) {
                 const patternName = e.target.dataset.patternName;
-                libraryController.placePattern(patternName);
+                this.appContext.libraryController.placePattern(patternName);
                 document.querySelector('.tab-bar-button[data-view="simulate"]').click(); // Go back to sim view
             }
         });

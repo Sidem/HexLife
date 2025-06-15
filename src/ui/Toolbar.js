@@ -3,19 +3,13 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { SwitchComponent } from './components/SwitchComponent.js';
-import { rulesetActionController } from './controllers/RulesetActionController.js';
-import { libraryController } from './controllers/LibraryController.js';
-import { visualizationController } from './controllers/VisualizationController.js';
-import { simulationController } from './controllers/SimulationController.js';
-import { brushController } from './controllers/BrushController.js';
-import { worldsController } from './controllers/WorldsController.js';
+
 import { onboardingManager } from './ui.js';
 import { generateShareUrl } from '../utils/utils.js';
 import { uiManager } from './UIManager.js';
-import { interactionController } from './controllers/InteractionController.js';
-
 export class Toolbar {
-    constructor(worldManagerInterface, libraryData) {
+    constructor(appContext, worldManagerInterface, libraryData) {
+        this.appContext = appContext;
         this.worldManager = worldManagerInterface;
         this.libraryData = libraryData;
         
@@ -40,7 +34,7 @@ export class Toolbar {
 
     init(uiElements) {
         this.uiElements = uiElements;
-        libraryController.init(this.libraryData);
+        this.appContext.libraryController.init(this.libraryData);
         this._initPopoutPanels();
         this._initPopoutControls();
         this._populateLibraryPanel();
@@ -109,8 +103,8 @@ export class Toolbar {
             item.className = 'library-item';
             item.innerHTML = `<div class="library-item-info"><div class="library-item-name">${rule.name}</div><div class="library-item-desc">${rule.description}</div></div><button class="button load-rule-btn">Load</button>`;
             item.querySelector('.load-rule-btn').addEventListener('click', () => {
-                const currentState = rulesetActionController.getState();
-                libraryController.loadRuleset(rule.hex, currentState.genScope, currentState.genAutoReset);
+                            const currentState = this.appContext.rulesetActionController.getState();
+            this.appContext.libraryController.loadRuleset(rule.hex, currentState.genScope, currentState.genAutoReset);
                 this.popoutPanels.library.hide();
             });
             rulesetContent.appendChild(item);
@@ -121,7 +115,7 @@ export class Toolbar {
             item.className = 'library-item';
             item.innerHTML = `<div class="library-item-info"><div class="library-item-name">${pattern.name}</div><div class="library-item-desc">${pattern.description}</div></div><button class="button place-pattern-btn">Place</button>`;
             item.querySelector('.place-pattern-btn').addEventListener('click', () => {
-                libraryController.placePattern(pattern.name);
+                this.appContext.libraryController.placePattern(pattern.name);
                 this.popoutPanels.library.hide();
             });
             patternContent.appendChild(item);
@@ -141,9 +135,9 @@ export class Toolbar {
 
     
     _initPopoutControls() {
-        const controllerState = rulesetActionController.getState();
-        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: simulationController.getState().speed, unit: 'tps', showValue: true, onChange: simulationController.setSpeed });
-        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: brushController.getState().brushSize, unit: '', showValue: true, onChange: brushController.setBrushSize });
+        const controllerState = this.appContext.rulesetActionController.getState();
+        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: this.appContext.simulationController.getState().speed, unit: 'tps', showValue: true, onChange: this.appContext.simulationController.setSpeed });
+        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: this.appContext.brushController.getState().brushSize, unit: '', showValue: true, onChange: this.appContext.brushController.setBrushSize });
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
             type: 'radio',
             name: 'generateModePopout',
@@ -153,11 +147,11 @@ export class Toolbar {
                 { value: 'n_count', text: 'N-Count' },
                 { value: 'r_sym', text: 'R-Sym' }
             ],
-            onChange: rulesetActionController.setGenMode
+            onChange: this.appContext.rulesetActionController.setGenMode
         });
 
         this.uiElements.useCustomBiasCheckboxPopout.addEventListener('change', e => {
-            rulesetActionController.setUseCustomBias(e.target.checked);
+            this.appContext.rulesetActionController.setUseCustomBias(e.target.checked);
             this.sliderComponents.biasSliderPopout?.setDisabled(!e.target.checked);
         });
         this.sliderComponents.biasSliderPopout = new SliderComponent(this.uiElements.biasSliderMountPopout, { 
@@ -165,7 +159,7 @@ export class Toolbar {
             value: controllerState.bias, 
             showValue: true, unit: '', 
             disabled: !controllerState.useCustomBias, 
-            onChange: rulesetActionController.setBias 
+            onChange: this.appContext.rulesetActionController.setBias 
         });
 
         this.switchComponents.genScope = new SwitchComponent(this.uiElements.rulesetScopeSwitchPopout, {
@@ -176,7 +170,7 @@ export class Toolbar {
                 { value: 'selected', text: 'Selected' },
                 { value: 'all', text: 'All' }
             ],
-            onChange: rulesetActionController.setGenScope
+            onChange: this.appContext.rulesetActionController.setGenScope
         });
 
         this.switchComponents.genAutoReset = new SwitchComponent(this.uiElements.resetOnNewRuleCheckboxPopout, {
@@ -184,15 +178,15 @@ export class Toolbar {
             name: 'resetOnNewRulePopout',
             initialValue: controllerState.genAutoReset,
             items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
-            onChange: rulesetActionController.setGenAutoReset
+            onChange: this.appContext.rulesetActionController.setGenAutoReset
         });
 
-        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => rulesetActionController.generate());
+        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => this.appContext.rulesetActionController.generate());
         this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
             id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
             value: controllerState.mutateRate, 
             unit: '%', showValue: true, 
-            onChange: rulesetActionController.setMutateRate 
+            onChange: this.appContext.rulesetActionController.setMutateRate 
         });
 
         this.switchComponents.mutateMode = new SwitchComponent(this.uiElements.mutateModeSwitch, {
@@ -204,7 +198,7 @@ export class Toolbar {
                 { value: 'r_sym', text: 'R-Sym' },
                 { value: 'n_count', text: 'N-Count' }
             ],
-            onChange: rulesetActionController.setMutateMode
+            onChange: this.appContext.rulesetActionController.setMutateMode
         });
 
         this.switchComponents.mutateScope = new SwitchComponent(this.uiElements.mutateScopeSwitch, {
@@ -215,16 +209,16 @@ export class Toolbar {
                 { value: 'selected', text: 'Selected' },
                 { value: 'all', text: 'All' }
             ],
-            onChange: rulesetActionController.setMutateScope
+            onChange: this.appContext.rulesetActionController.setMutateScope
         });
 
-        this.uiElements.triggerMutationButton.addEventListener('click', () => rulesetActionController.mutate());
-        this.uiElements.cloneAndMutateButton.addEventListener('click', () => rulesetActionController.cloneAndMutate());
+        this.uiElements.triggerMutationButton.addEventListener('click', () => this.appContext.rulesetActionController.mutate());
+        this.uiElements.cloneAndMutateButton.addEventListener('click', () => this.appContext.rulesetActionController.cloneAndMutate());
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();
             if (!hex || !/^[0-9A-F]{32}$/.test(hex)) { alert("Invalid Hex: Must be 32 hex chars."); this.uiElements.rulesetInputPopout.select(); return; }
-            const currentState = rulesetActionController.getState();
-            libraryController.loadRuleset(hex, currentState.genScope, currentState.genAutoReset);
+            const currentState = this.appContext.rulesetActionController.getState();
+            this.appContext.libraryController.loadRuleset(hex, currentState.genScope, currentState.genAutoReset);
             this.uiElements.rulesetInputPopout.value = '';
             this.popoutPanels.setHex.hide();
         });
@@ -235,11 +229,11 @@ export class Toolbar {
             if (hex && hex.length > 0) EventBus.dispatch(EVENTS.UI_RULESET_INPUT_CHANGED, { value: hex });
         });
 
-        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { worldsController.resetWorldsWithCurrentRuleset('selected'); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
-        const vizState = visualizationController.getState();
+        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected'); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
+        const vizState = this.appContext.visualizationController.getState();
 
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizTypeSwitchMount'), {
             type: 'radio',
@@ -250,7 +244,7 @@ export class Toolbar {
                 { value: 'binary', text: 'Binary' },
                 { value: 'color', text: 'Color' }
             ],
-            onChange: visualizationController.setVisualizationType
+            onChange: this.appContext.visualizationController.setVisualizationType
         });
         
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizOverlaySwitchMount'), {
@@ -258,7 +252,7 @@ export class Toolbar {
             name: 'showMinimapOverlayDesktop',
             initialValue: vizState.showMinimapOverlay,
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: visualizationController.setShowMinimapOverlay
+            onChange: this.appContext.visualizationController.setShowMinimapOverlay
         });
         
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizCycleIndicatorSwitchMount'), {
@@ -266,16 +260,16 @@ export class Toolbar {
             name: 'showCycleIndicatorDesktop',
             initialValue: vizState.showCycleIndicator,
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: visualizationController.setShowCycleIndicator
+            onChange: this.appContext.visualizationController.setShowCycleIndicator
         });
 
-        const interactionState = interactionController.getState();
+        const interactionState = this.appContext.interactionController.getState();
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#pauseWhileDrawingSwitchMount'), {
             type: 'checkbox',
             name: 'pauseWhileDrawingDesktop',
             initialValue: interactionState.pauseWhileDrawing,
             items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: interactionController.setPauseWhileDrawing
+            onChange: this.appContext.interactionController.setPauseWhileDrawing
         });
     }
     
@@ -290,7 +284,7 @@ export class Toolbar {
     }
 
     _setupToolbarButtonListeners() {
-        this.uiElements.playPauseButton.addEventListener('click', simulationController.togglePause);
+        this.uiElements.playPauseButton.addEventListener('click', this.appContext.simulationController.togglePause);
 
         this.popoutConfig.forEach(config => {
             const tourName = {
@@ -316,7 +310,7 @@ export class Toolbar {
         
         this.uiElements.shareButton.addEventListener('click', () => this._generateAndShowShareLink());
         
-        this.uiElements.saveStateButton.addEventListener('click', worldsController.saveSelectedWorldState);
+        this.uiElements.saveStateButton.addEventListener('click', this.appContext.worldsController.saveSelectedWorldState);
         this.uiElements.loadStateButton.addEventListener('click', () => {
             this.uiElements.fileInput.accept = ".txt,.json";
             this.uiElements.fileInput.click();
@@ -334,7 +328,7 @@ export class Toolbar {
                 try {
                     const data = JSON.parse(re.target.result);
                     if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
-                    worldsController.loadWorldState(this.worldManager.getSelectedWorldIndex(), data);
+                    this.appContext.worldsController.loadWorldState(this.worldManager.getSelectedWorldIndex(), data);
                 } catch (err) { alert(`Error processing file: ${err.message}`); }
                 finally { e.target.value = null; }
             };
@@ -348,7 +342,7 @@ export class Toolbar {
     }
 
     _loadAndApplyUISettings() {
-        const controllerState = rulesetActionController.getState();
+        const controllerState = this.appContext.rulesetActionController.getState();
         this.uiElements.useCustomBiasCheckboxPopout.checked = controllerState.useCustomBias;
         this.sliderComponents.biasSliderPopout?.setValue(controllerState.bias);
         this.sliderComponents.biasSliderPopout?.setDisabled(!controllerState.useCustomBias);

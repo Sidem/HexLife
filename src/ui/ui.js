@@ -11,7 +11,6 @@ import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
 import { uiManager } from './UIManager.js';
-import { simulationController } from './controllers/SimulationController.js';
 
 let panelManager, toolbar, onboardingManager;
 export { onboardingManager };
@@ -88,7 +87,7 @@ function getUIElements() {
     };
 }
 
-function initMobileUI(worldManagerInterface) {
+function initMobileUI(appContext, worldManagerInterface) {
     const bottomTabBarEl = document.getElementById('bottom-tab-bar');
     if (bottomTabBarEl) {
         new BottomTabBar(bottomTabBarEl, panelManager);
@@ -109,7 +108,7 @@ function initMobileUI(worldManagerInterface) {
         <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
         <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
     `;
-    new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), worldManagerInterface);
+    new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext, worldManagerInterface);
     fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
     fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
@@ -124,29 +123,17 @@ function initMobileUI(worldManagerInterface) {
     const fabActionMap = {
         'generate': {
             icon: '✨', title: 'Generate', handler: () => {
-                const scope = PersistenceService.loadUISetting('globalRulesetScopeAll', true) ? 'all' : 'selected';
-                EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-                    bias: PersistenceService.loadUISetting('biasValue', 0.33),
-                    generationMode: PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym'),
-                    resetScopeForThisChange: PersistenceService.loadUISetting('resetOnNewRule', true) ? scope : 'none'
-                });
+                appContext.rulesetActionController.generate();
             }
         },
         'mutate': {
             icon: '🦠', title: 'Mutate', handler: () => {
-                EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
-                    mutationRate: PersistenceService.loadUISetting('mutationRate', 1) / 100.0,
-                    scope: PersistenceService.loadUISetting('mutateScope', 'selected'),
-                    mode: PersistenceService.loadUISetting('mutateMode', 'single')
-                });
+                appContext.rulesetActionController.mutate();
             }
         },
         'clone': {
             icon: '🧬', title: 'Clone & Mutate', handler: () => {
-                EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
-                    mutationRate: PersistenceService.loadUISetting('mutationRate', 1) / 100.0,
-                    mode: PersistenceService.loadUISetting('mutateMode', 'single')
-                });
+                appContext.rulesetActionController.cloneAndMutate();
             }
         },
         'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
@@ -220,17 +207,17 @@ function initGuidingBoxes() {
     }
 }
 
-export function initUI(worldManagerInterface, libraryData) {
+export function initUI(appContext, worldManagerInterface, libraryData) {
     const uiElements = getUIElements();
-    const topInfoBar = new TopInfoBar(worldManagerInterface);
+    const topInfoBar = new TopInfoBar(appContext, worldManagerInterface);
     topInfoBar.init(uiElements);
-    panelManager = new PanelManager(worldManagerInterface);
+    panelManager = new PanelManager(appContext, worldManagerInterface);
     panelManager.init(uiElements, libraryData);
-    toolbar = new Toolbar(worldManagerInterface, libraryData);
+    toolbar = new Toolbar(appContext, worldManagerInterface, libraryData);
     toolbar.init(uiElements);
-    const keyboardManager = new KeyboardShortcutManager(worldManagerInterface, panelManager, toolbar);
+    const keyboardManager = new KeyboardShortcutManager(appContext, worldManagerInterface, panelManager, toolbar);
     keyboardManager.init(uiElements);
-    initMobileUI(worldManagerInterface);
+    initMobileUI(appContext, worldManagerInterface);
     onboardingManager = new OnboardingManager({
         overlay: document.getElementById('onboarding-overlay'),
         tooltip: document.getElementById('onboarding-tooltip'),
@@ -272,7 +259,7 @@ export function initUI(worldManagerInterface, libraryData) {
     });
 
     
-    toolbar.updatePauseButtonVisual(simulationController.getState().isPaused);
+    toolbar.updatePauseButtonVisual(appContext.simulationController.getState().isPaused);
     initGuidingBoxes();
     console.log(`UI Initialized for: ${uiManager.getMode()}`);
     return true;

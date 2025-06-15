@@ -7,10 +7,11 @@ import { InputManager } from './ui/InputManager.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 import { tours } from './ui/tourSteps.js'; 
 import { uiManager } from './ui/UIManager.js';
-import { simulationController } from './ui/controllers/SimulationController.js';
+import { AppContext } from './core/AppContext.js';
 
 let gl;
 let worldManager;
+let appContext;
 let isInitialized = false;
 let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
@@ -101,7 +102,8 @@ async function initialize() {
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     updateLoadingStatus("Spooling up simulation workers...");
-    worldManager = new WorldManager(sharedSettings);
+    appContext = new AppContext(sharedSettings, libraryData);
+    worldManager = appContext.worldManager; // Overwrite local variable with the one from the context
 
     const worldManagerInterfaceForUI = {
         getCurrentRulesetHex: worldManager.getCurrentRulesetHex.bind(worldManager),
@@ -117,11 +119,11 @@ async function initialize() {
         getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
     };
     
-    inputManager = new InputManager(canvas, worldManager, uiManager.isMobile());
+    inputManager = new InputManager(canvas, worldManager, appContext, uiManager.isMobile());
 
 
     updateLoadingStatus("Initializing UI components...");
-    if (!UI.initUI(worldManagerInterfaceForUI, libraryData)) {
+    if (!UI.initUI(appContext, worldManagerInterfaceForUI, libraryData)) {
         console.error("UI initialization failed.");
         return;
     }
@@ -140,7 +142,7 @@ async function initialize() {
     });
 
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
-    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, simulationController.getState().isPaused);
+    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, appContext.simulationController.getState().isPaused);
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
@@ -163,13 +165,13 @@ function handleResize() {
 function handleVisibilityChange() {
     if (!isInitialized || !worldManager) return;
     if (document.hidden) {
-        if (!simulationController.getState().isPaused) {
-            simulationController.setPause(true);
+        if (!appContext.simulationController.getState().isPaused) {
+            appContext.simulationController.setPause(true);
             pausedByVisibilityChange = true;
         }
     } else {
         if (pausedByVisibilityChange) {
-            simulationController.setPause(false);
+            appContext.simulationController.setPause(false);
             pausedByVisibilityChange = false;
             lastTimestamp = performance.now();
         }
@@ -207,7 +209,8 @@ function renderLoop(timestamp) {
         allWorldsStatus, 
         worldManager.getSelectedWorldIndex(), 
         areAllWorkersInitialized, 
-        worldManager.getCurrentCameraState()
+        worldManager.getCurrentCameraState(),
+        appContext.visualizationController.getState()
     );
 
     frameCount++;
@@ -216,7 +219,7 @@ function renderLoop(timestamp) {
         frameCount = 0;
         lastFpsUpdateTime = timestamp;
         const selectedStats = worldManager.getSelectedWorldStats();
-        const targetTps = simulationController.getState().speed;
+        const targetTps = appContext.simulationController.getState().speed;
         EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
     }
     requestAnimationFrame(renderLoop);

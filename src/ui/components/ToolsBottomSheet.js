@@ -4,16 +4,13 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
-import { visualizationController } from '../controllers/VisualizationController.js';
-import { simulationController } from '../controllers/SimulationController.js';
-import { brushController } from '../controllers/BrushController.js';
-import { worldsController } from '../controllers/WorldsController.js';
-import { interactionController } from '../controllers/InteractionController.js';
+
 
 
 export class ToolsBottomSheet extends BottomSheet {
-    constructor(id, triggerElement, worldManagerInterface) {
+    constructor(id, triggerElement, appContext, worldManagerInterface) {
         super(id, triggerElement, { title: 'Simulation Tools' });
+        this.appContext = appContext;
         this.worldManager = worldManagerInterface;
         this.render();
         this.attachEventListeners();
@@ -73,10 +70,10 @@ export class ToolsBottomSheet extends BottomSheet {
             min: 1,
             max: Config.MAX_SIM_SPEED,
             step: 1,
-            value: simulationController.getState().speed,
+            value: this.appContext.simulationController.getState().speed,
             unit: 'tps',
             showValue: true,
-            onChange: simulationController.setSpeed
+            onChange: this.appContext.simulationController.setSpeed
         });
 
         new SliderComponent(content.querySelector('#mobileBrushSliderMount'), {
@@ -84,23 +81,23 @@ export class ToolsBottomSheet extends BottomSheet {
             min: 0,
             max: Config.MAX_NEIGHBORHOOD_SIZE,
             step: 1,
-            value: brushController.getState().brushSize,
+            value: this.appContext.brushController.getState().brushSize,
             showValue: true,
-            onChange: brushController.setBrushSize
+            onChange: this.appContext.brushController.setBrushSize
         });
 
         
-        const interactionState = interactionController.getState();
+        const interactionState = this.appContext.interactionController.getState();
         new SwitchComponent(content.querySelector('#mobilePauseWhileDrawingMount'), {
             type: 'checkbox',
             name: 'mobilePauseWhileDrawing',
             initialValue: interactionState.pauseWhileDrawing,
             items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: interactionController.setPauseWhileDrawing
+            onChange: this.appContext.interactionController.setPauseWhileDrawing
         });
 
         
-        const vizState = visualizationController.getState();
+        const vizState = this.appContext.visualizationController.getState();
         new SwitchComponent(content.querySelector('#mobileRulesetVizMount'), {
             type: 'radio', 
             name: 'mobileRulesetViz',
@@ -110,7 +107,7 @@ export class ToolsBottomSheet extends BottomSheet {
                 { value: 'binary', text: 'Binary' },
                 { value: 'color', text: 'Color' }
             ],
-            onChange: visualizationController.setVisualizationType
+            onChange: this.appContext.visualizationController.setVisualizationType
         });
         
         new SwitchComponent(content.querySelector('#mobileShowMinimapOverlayMount'), {
@@ -118,7 +115,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobileShowMinimapOverlay',
             initialValue: vizState.showMinimapOverlay,
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: visualizationController.setShowMinimapOverlay
+            onChange: this.appContext.visualizationController.setShowMinimapOverlay
         });
         
         new SwitchComponent(content.querySelector('#mobileShowCycleIndicatorMount'), {
@@ -126,7 +123,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobileShowCycleIndicator',
             initialValue: vizState.showCycleIndicator,
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: visualizationController.setShowCycleIndicator
+            onChange: this.appContext.visualizationController.setShowCycleIndicator
         });
 
         this._syncVisualSettings(); 
@@ -134,7 +131,7 @@ export class ToolsBottomSheet extends BottomSheet {
     }
 
     _syncVisualSettings() {
-        const vizState = visualizationController.getState();
+        const vizState = this.appContext.visualizationController.getState();
         const vizSwitch = this.sheetContent.querySelector('#mobileRulesetVizMount .switch-group');
         const overlaySwitch = this.sheetContent.querySelector('#mobileShowMinimapOverlayMount .switch-group');
         const cycleIndicatorSwitch = this.sheetContent.querySelector('#mobileShowCycleIndicatorMount .switch-group');
@@ -191,10 +188,10 @@ export class ToolsBottomSheet extends BottomSheet {
         this.sheetContent.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
             if (action === 'reset') {
-                worldsController.resetWorldsWithCurrentRuleset('selected');
+                this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected');
                 this.hide();
             } else if (action === 'clear') {
-                worldsController.clearWorlds('selected');
+                this.appContext.worldsController.clearWorlds('selected');
                 this.hide();
             }
             

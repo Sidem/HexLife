@@ -4,14 +4,16 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRandomBitsInHex } from '../utils/utils.js';
-import { simulationController } from '../ui/controllers/SimulationController.js';
-import { brushController } from '../ui/controllers/BrushController.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
         this.worlds = [];
         this.cameraStates = [];
         this.sharedSettings = sharedSettings;
+        
+        // Controller references (set later by AppContext to avoid circular dependencies)
+        this.simulationController = null;
+        this.brushController = null;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
         this._hoverAffectedIndicesSet = new Set();
@@ -26,6 +28,11 @@ export class WorldManager {
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
         this._setupEventListeners();
+    }
+
+    setControllerReferences(simulationController, brushController) {
+        this.simulationController = simulationController;
+        this.brushController = brushController;
     }
 
     _initWorlds = () => {
@@ -83,7 +90,7 @@ export class WorldManager {
                 enabled: settings.enabled,
                 rulesetArray: rulesetArray,
                 rulesetHex: settings.rulesetHex,
-                speed: simulationController.getState().speed,
+                speed: this.simulationController?.getState()?.speed || 1,
                 initialEntropySamplingEnabled: this.isEntropySamplingEnabled,
                 initialEntropySampleRate: this.entropySampleRate,
             }, worldManagerCallbacks);
@@ -118,7 +125,7 @@ export class WorldManager {
         }
         if (!this.isGloballyPaused && this.worlds[worldIndex]?.getLatestStats().isEnabled) {
             this.worlds[worldIndex].startSimulation();
-            this.worlds[worldIndex].setSpeed(simulationController.getState().speed);
+            this.worlds[worldIndex].setSpeed(this.simulationController.getState().speed);
         }
     }
 
@@ -298,13 +305,13 @@ export class WorldManager {
         });
 
         EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
-            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, brushController.getState().brushSize);
+            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.brushController.getState().brushSize);
         });
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-            findHexagonsInNeighborhood(data.col, data.row, brushController.getState().brushSize, this._hoverAffectedIndicesSet);
+            findHexagonsInNeighborhood(data.col, data.row, this.brushController.getState().brushSize, this._hoverAffectedIndicesSet);
             this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
@@ -333,7 +340,7 @@ export class WorldManager {
 
                 if (data.isEnabled && !this.isGloballyPaused) {
                     this.worlds[data.worldIndex].startSimulation();
-                    this.worlds[data.worldIndex].setSpeed(simulationController.getState().speed);
+                    this.worlds[data.worldIndex].setSpeed(this.simulationController.getState().speed);
                 } else if (!data.isEnabled) {
                     this.worlds[data.worldIndex].stopSimulation();
                 }
@@ -616,10 +623,10 @@ export class WorldManager {
                 proxy.stopSimulation();
             } else {
                 proxy.startSimulation();
-                proxy.setSpeed(simulationController.getState().speed);
+                proxy.setSpeed(this.simulationController.getState().speed);
             }
         });
-        simulationController._syncPauseState(this.isGloballyPaused);
+        this.simulationController._syncPauseState(this.isGloballyPaused);
     }
 
     setGlobalSpeed = (speed) => {
@@ -786,10 +793,10 @@ export class WorldManager {
         }, [newStateArray.buffer.slice(0), newRulesetArray.buffer.slice(0)]);
 
         proxy.setEnabled(true);
-        if (!this.isGloballyPaused) {
-            proxy.startSimulation();
-            proxy.setSpeed(simulationController.getState().speed);
-        }
+                    if (!this.isGloballyPaused) {
+                proxy.startSimulation();
+                proxy.setSpeed(this.simulationController.getState().speed);
+            }
 
         PersistenceService.saveWorldSettings(this.worldSettings);
         if (worldIndex === this.selectedWorldIndex) {

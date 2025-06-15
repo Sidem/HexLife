@@ -2,7 +2,7 @@ import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-class SimulationController {
+export class SimulationController {
     constructor() {
         this.state = {
             isPaused: true,
@@ -39,6 +39,4 @@ class SimulationController {
             EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.state.isPaused);
         }
     }
-}
-
-export const simulationController = new SimulationController(); 
+} 

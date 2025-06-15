@@ -1,6 +1,6 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-class WorldsController {
+export class WorldsController {
     constructor() {
         // This controller is action-oriented. State is managed by WorldManager.
     }
@@ -44,6 +44,4 @@ class WorldsController {
     loadWorldState = (worldIndex, loadedData) => {
         EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex, loadedData });
     }
-}
-
-export const worldsController = new WorldsController(); 
+} 

@@ -6,7 +6,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { uiManager } from '../ui/UIManager.js';
-import { visualizationController } from '../ui/controllers/VisualizationController.js';
+// visualizationController access is now provided via the rendering context
 
 let gl;
 let canvas;
@@ -429,7 +429,7 @@ function renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera) {
 }
 
 
-function renderMainScene(selectedWorldIndex, allWorldsStatus) {
+function renderMainScene(selectedWorldIndex, allWorldsStatus, vizState) {
     if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -475,7 +475,7 @@ function renderMainScene(selectedWorldIndex, allWorldsStatus) {
         
         // Cycle indicator logic
         const indicatorEl = cycleIndicatorElements[i];
-        const showIndicators = visualizationController.getState().showCycleIndicator;
+        const showIndicators = vizState?.showCycleIndicator ?? false;
         
         if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
             const cycleLength = worldStatus.stats.cycleLength;
@@ -499,7 +499,7 @@ function renderMainScene(selectedWorldIndex, allWorldsStatus) {
         }
         
         const overlayEl = minimapOverlayElements[i];
-        const showOverlay = visualizationController.getState().showMinimapOverlay;
+        const showOverlay = vizState?.showMinimapOverlay ?? false;
         
         if (overlayEl && worldStatus?.renderData.enabled && showOverlay) {
             overlayEl.style.display = 'block';
@@ -549,7 +549,7 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-export function renderFrameOrLoader(allWorldsStatus, selectedWorldIndex, areAllWorkersInitialized, camera) {
+export function renderFrameOrLoader(allWorldsStatus, selectedWorldIndex, areAllWorkersInitialized, camera, vizState) {
     if (!gl || !areAllWorkersInitialized) {
         
         return;
@@ -557,7 +557,7 @@ export function renderFrameOrLoader(allWorldsStatus, selectedWorldIndex, areAllW
     
     
     renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera);
-    renderMainScene(selectedWorldIndex, allWorldsStatus);
+    renderMainScene(selectedWorldIndex, allWorldsStatus, vizState);
 }
 
 export function resizeRenderer() {

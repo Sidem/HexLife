@@ -2,7 +2,7 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
-class VisualizationController {
+export class VisualizationController {
     constructor() {
         this.state = {
             vizType: PersistenceService.loadUISetting('rulesetVizType', 'binary'),
@@ -36,6 +36,4 @@ class VisualizationController {
         PersistenceService.saveUISetting('showCycleIndicator', this.state.showCycleIndicator);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Reuse this event to trigger a redraw
     }
-}
-
-export const visualizationController = new VisualizationController(); 
+} 

@@ -2,8 +2,7 @@ import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { getLayoutCache } from '../rendering/renderer.js';
 import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoords, calculateHexSizeForTexture } from '../utils/utils.js';
-import { brushController } from './controllers/BrushController.js';
-import { interactionController } from './controllers/InteractionController.js';
+
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
 import { DrawStrategy } from './inputStrategies/DrawStrategy.js';
 import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js';
@@ -13,9 +12,10 @@ import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js'
  * @description Manages all user input on the canvas by delegating to specific strategy classes.
  */
 export class InputManager {
-    constructor(canvas, worldManager, isMobile = false) {
+    constructor(canvas, worldManager, appContext, isMobile = false) {
         this.canvas = canvas;
         this.worldManager = worldManager;
+        this.appContext = appContext;
         this.gl = canvas.getContext('webgl2');
         this.isMobile = isMobile;
         this.layoutCache = getLayoutCache(); 
@@ -45,8 +45,8 @@ export class InputManager {
             if (viewType !== 'selected') return;
             if (e.ctrlKey || e.shiftKey) {
                 const scrollAmount = Math.sign(e.deltaY);
-                const newSize = brushController.getState().brushSize - scrollAmount;
-                brushController.setBrushSize(newSize);
+                const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
+                this.appContext.brushController.setBrushSize(newSize);
                 this.currentStrategy.handleMouseMove(e);
             } else {
                 const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -75,7 +75,7 @@ export class InputManager {
             this.currentStrategy.handleTouchEnd(e);
         }, { passive: false });
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, interactionController.toggleMode);
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, this.appContext.interactionController.toggleMode);
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
@@ -149,8 +149,8 @@ export class InputManager {
     handleBrushSizeWheel(event) {
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
-            const newSize = brushController.getState().brushSize - scrollAmount;
-            brushController.setBrushSize(newSize);
+            const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
+            this.appContext.brushController.setBrushSize(newSize);
         }
     }
 

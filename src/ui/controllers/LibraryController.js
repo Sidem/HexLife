@@ -1,6 +1,6 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-class LibraryController {
+export class LibraryController {
     constructor() {
         this.libraryData = null;
     }
@@ -35,6 +35,4 @@ class LibraryController {
     getPatterns() {
         return this.libraryData ? this.libraryData.patterns : [];
     }
-}
-
-export const libraryController = new LibraryController(); 
+} 

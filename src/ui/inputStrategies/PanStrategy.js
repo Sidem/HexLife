@@ -1,6 +1,5 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { interactionController } from '../controllers/InteractionController.js';
 
 /**
  * @class PanStrategy

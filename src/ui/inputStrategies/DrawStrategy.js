@@ -1,8 +1,6 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import { brushController } from '../controllers/BrushController.js';
-import { interactionController } from '../controllers/InteractionController.js';
-import { simulationController } from '../controllers/SimulationController.js';
+
 import { findHexagonsInNeighborhood } from '../../utils/utils.js';
 import * as Config from '../../core/config.js';
 
@@ -22,7 +20,7 @@ export class DrawStrategy extends BaseInputStrategy {
     exit() {
         
         if (this.wasSimulationRunningBeforeStroke) {
-            simulationController.setPause(false);
+            this.manager.appContext.simulationController.setPause(false);
         }
         this.resetStrokeState();
     }
@@ -33,9 +31,9 @@ export class DrawStrategy extends BaseInputStrategy {
         if (viewType !== 'selected' || col === null) return;
         this.isDrawing = true;
         this.resetStrokeState();
-        if (interactionController.getState().pauseWhileDrawing && !simulationController.getState().isPaused) {
+        if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
             this.wasSimulationRunningBeforeStroke = true;
-            simulationController.setPause(true);
+            this.manager.appContext.simulationController.setPause(true);
         }
 
         this.applyBrush(worldIndexAtCursor, col, row);
@@ -72,9 +70,9 @@ export class DrawStrategy extends BaseInputStrategy {
         this.isDrawing = true;
         this.resetStrokeState();
         
-        if (interactionController.getState().pauseWhileDrawing && !simulationController.getState().isPaused) {
+        if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
             this.wasSimulationRunningBeforeStroke = true;
-            simulationController.setPause(true);
+            this.manager.appContext.simulationController.setPause(true);
         }
         
         this.applyBrush(worldIndexAtCursor, col, row);
@@ -106,7 +104,7 @@ export class DrawStrategy extends BaseInputStrategy {
         this.lastDrawnCellIndex = currentCellIndex;
 
         const newCellsInBrush = new Set();
-        findHexagonsInNeighborhood(col, row, brushController.getState().brushSize, newCellsInBrush);
+        findHexagonsInNeighborhood(col, row, this.manager.appContext.brushController.getState().brushSize, newCellsInBrush);
         
         const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
 
@@ -120,7 +118,7 @@ export class DrawStrategy extends BaseInputStrategy {
         if (!this.isDrawing) return;
         
         if (this.wasSimulationRunningBeforeStroke) {
-            simulationController.setPause(false);
+            this.manager.appContext.simulationController.setPause(false);
         }
         this.resetStrokeState();
         this.isDrawing = false;

@@ -1,7 +1,7 @@
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-class RulesetActionController {
+export class RulesetActionController {
     constructor() {
         this.state = {
             genMode: PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym'),
@@ -83,6 +83,4 @@ class RulesetActionController {
             mode: this.state.mutateMode
         });
     }
-}
-
-export const rulesetActionController = new RulesetActionController(); 
+} 
