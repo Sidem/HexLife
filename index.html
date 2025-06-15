@@ -350,27 +350,6 @@
     </div> 
     
     <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
-
-    <script>
-        // This script is no longer needed as main.js controls the loader
-        
-        document.addEventListener('touchstart', function(e) {
-        }, { passive: true });
-        
-        document.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 1 && e.touches[0].clientY > 50) {
-            }
-            if (document.documentElement.scrollTop === 0 && e.touches[0].clientY > e.touches[0].clientY) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            document.addEventListener('DOMContentLoaded', function() {
-                document.body.style.webkitTapHighlightColor = 'transparent';
-                document.body.style.webkitTouchCallout = 'none';
-            });
-        }
-    </script>
     <div id="mobile-views-container"></div>
     <script type="module" src="src/main.js"></script>
 </body>

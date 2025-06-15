@@ -1,6 +1,8 @@
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
+import { Throttler } from '../../utils/throttler.js';
+import * as Config from '../../core/config.js';
 
 class ElementPool {
     constructor(creator) {
@@ -25,11 +27,9 @@ export class RuleRankPanel extends DraggablePanel {
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };
 
-        this.lastUpdateTime = 0;
-        this.updateThrottleMs = 1000;
-        this.lastRuleUsageHash = null;
-        this.pendingUpdate = false;
+        this.throttler = new Throttler(() => this._actuallyRefreshViews(), Config.UI_UPDATE_THROTTLE_MS);
 
+        this.lastRuleUsageHash = null;
         this.activationRuleItems = [];
         this.deactivationRuleItems = [];
 
@@ -112,18 +112,7 @@ export class RuleRankPanel extends DraggablePanel {
 
     refreshViews() {
         if (this.isHidden() || !this.worldManager) return;
-        const now = Date.now();
-        if (now - this.lastUpdateTime < this.updateThrottleMs) {
-            if (!this.pendingUpdate) {
-                this.pendingUpdate = true;
-                setTimeout(() => {
-                    this.pendingUpdate = false;
-                    this._actuallyRefreshViews();
-                }, this.updateThrottleMs - (now - this.lastUpdateTime));
-            }
-            return;
-        }
-        this._actuallyRefreshViews();
+        this.throttler.schedule();
     }
 
     _actuallyRefreshViews() {
@@ -143,7 +132,6 @@ export class RuleRankPanel extends DraggablePanel {
         if (ruleUsageHash === this.lastRuleUsageHash) return;
 
         this.lastRuleUsageHash = ruleUsageHash;
-        this.lastUpdateTime = Date.now();
 
         let totalActivationInvocations = 0;
         let totalDeactivationInvocations = 0;
@@ -192,5 +180,10 @@ export class RuleRankPanel extends DraggablePanel {
     show() {
         super.show();
         this.refreshViews();
+    }
+
+    destroy() {
+        this.throttler.destroy();
+        super.destroy();
     }
 }

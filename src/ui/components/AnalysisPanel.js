@@ -2,6 +2,7 @@ import * as Config from '../../core/config.js';
 import { DraggablePanel } from './DraggablePanel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { Throttler } from '../../utils/throttler.js';
 
 import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
@@ -21,6 +22,11 @@ export class AnalysisPanel extends DraggablePanel {
         this.worldManager = worldManagerInterface;
         this.uiManager = uiManagerRef;
         this.plugins = [];
+        
+        this.throttler = new Throttler(
+            (stats) => this._distributeThrottledUpdate(stats),
+            Config.UI_UPDATE_THROTTLE_MS
+        );
 
         this.uiElements = {
             closeButton: this.panelElement.querySelector('#closeAnalysisPanelButton') || this.panelElement.querySelector('.close-panel-button'),
@@ -87,7 +93,7 @@ export class AnalysisPanel extends DraggablePanel {
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (statsData) => { 
             if (this.isHidden() || statsData.worldIndex !== this.worldManager.getSelectedWorldIndex()) return;
 
-            this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: statsData }));
+            this.throttler.schedule(statsData);
         });
 
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
@@ -103,6 +109,11 @@ export class AnalysisPanel extends DraggablePanel {
             const stats = this.worldManager.getSelectedWorldStats(); 
             this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: stats })); 
         });
+    }
+
+    _distributeThrottledUpdate(statsData) {
+        if (this.isHidden()) return;
+        this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: statsData }));
     }
 
     refreshViews() {
@@ -130,6 +141,7 @@ export class AnalysisPanel extends DraggablePanel {
     }
 
     destroy() {
+        this.throttler.destroy();
         this.plugins.forEach(plugin => plugin.destroy());
         this.plugins = [];
         super.destroy();
