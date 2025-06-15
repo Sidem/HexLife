@@ -22,10 +22,10 @@ export const DEFAULT_WORLD_ENABLED_STATES = [
 ];
 
 export const DEFAULT_SPEED = 40; 
-export const MAX_SIM_SPEED = 240;
+export const MAX_SIM_SPEED = 250;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 2; 
 export const MAX_NEIGHBORHOOD_SIZE = 40;
-export const STATS_HISTORY_SIZE = 1000; 
+export const STATS_HISTORY_SIZE = 600; // 1000 
 export const CYCLE_DETECTION_HISTORY_SIZE = 500;
 export const RULESET_HISTORY_SIZE = 30;
 export const RENDER_TEXTURE_SIZE = 1280; 
