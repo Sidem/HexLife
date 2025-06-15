@@ -243,14 +243,17 @@ export class RulesView extends BaseComponent {
 
         this.panes.generate.querySelector('[data-action="generate"]').addEventListener('click', () => {
             this.appContext.rulesetActionController.generate();
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
         this.panes.mutate.querySelector('[data-action="mutate"]').addEventListener('click', () => {
             this.appContext.rulesetActionController.mutate();
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
         this.panes.mutate.querySelector('[data-action="clone-mutate"]').addEventListener('click', () => {
             this.appContext.rulesetActionController.cloneAndMutate();
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
         this.panes["library-rulesets"].addEventListener('click', e => {
@@ -261,6 +264,8 @@ export class RulesView extends BaseComponent {
                     controllerState.genScope, 
                     controllerState.genAutoReset
                 );
+                //close the rules view
+                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
             }
         });
 

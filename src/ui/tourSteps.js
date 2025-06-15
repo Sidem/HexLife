@@ -362,7 +362,6 @@ const commandDeckTour = [
     }
 ];
 
-// NEW detailed mobile tours
 const editorTourMobile = [
     {
         element: '#editor-view',
@@ -493,24 +492,61 @@ const appliedEvolutionTour = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '.library-item-mobile:nth-child(10)', // Targets "Amoeba 1"
-        title: "Select 'Amoeba 1'",
-        content: "This ruleset produces interesting patterns. Tap <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
+        element: '.library-item-mobile:nth-child(10)',
+        title: "Select 'Spontaneous Gliders'",
+        content: "This ruleset produces interesting mobile patterns. Tap <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET },
-        delayAfter: 1500
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     },
     {
-        element: '.rules-history-controls',
+        element: '#mobilePlayPauseButton',
+        title: 'Start the Simulation',
+        content: "The simulation is currently paused. Press the play button to see it come to life.",
+        primaryAction: { text: 'Press Play' },
+        condition: (appContext) => appContext.simulationController.getState().isPaused,
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
+        delayAfter: 2500
+    },
+    {
+        element: '#undoButton',
         title: 'Your Safety Net',
         content: "Excellent. Before we continue, note these buttons. Every ruleset change is tracked. You can always <span class=\"onboarding-highlight-text\">Undo (↶)</span> and <span class=\"onboarding-highlight-text\">Redo (↷)</span>. Don't be afraid to experiment!",
         primaryAction: { text: 'Got it' },
         advanceOn: { type: 'click' }
     },
     {
-        element: '.rules-view-segment[data-pane="mutate"]',
-        title: 'Step 2: Prepare for Mutation',
-        content: "Now, let's evolve this 'Amoeba'. Go to the <span class=\"onboarding-highlight-text\">Mutate</span> tab to access the DNA splicer.",
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Select the First World',
+        content: "Select the first world to prepare the experiment.",
+        primaryAction: { text: 'Select the First World' },
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED, condition: (data) => data == 0 }
+    },
+    {
+        element: '.tab-bar-button[data-view="worlds"]',
+        title: 'Open the Worlds View',
+        content: "For a controlled experiment, we need to set equal conditions for all worlds. Open the worlds view to do so.",
+        primaryAction: { text: 'Open the Worlds View' },
+        advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'worlds' }
+    },
+    {
+        element: '.world-card:first-child .density-control',
+        title: 'Set Density',
+        content: "Set the density for the first world to 50%.",
+        primaryAction: { text: 'Set Density' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, condition: (data) => (data.worldIndex === 0 && data.density > 0.49 && data.density < 0.51) }
+    },
+    {
+        element: '.worlds-view-actions button[data-action="apply-density-all"]',
+        title: 'Apply Density to All Worlds',
+        content: "Apply the density to all worlds to ensure controlled conditions for the experiment.",
+        primaryAction: { text: 'Apply Density to All Worlds' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL }
+    },
+    {
+        element: '.tab-bar-button[data-view="rules"]',
+        title: 'Prepare for Mutation',
+        content: "Now, let's evolve these gliders. Go to the <span class=\"onboarding-highlight-text\">Mutate</span> tab under <span class=\"onboarding-highlight-text\">Rules</span> to access the DNA splicer.",
         primaryAction: { text: 'Open the Mutate Pane' },
         onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="mutate"]').click(),
         advanceOn: { type: 'click' }
@@ -518,32 +554,32 @@ const appliedEvolutionTour = [
     {
         element: '#mobileMutateSliderMount',
         title: 'Set Mutation Parameters',
-        content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 5%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span>. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
+        content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 10%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span>. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     },
     {
         element: 'button[data-action="clone-mutate"]',
-        title: 'Step 3: Run the Experiment',
-        content: "This is the <span class=\"onboarding-highlight-text\">Clone & Mutate</span> command. It will copy our 'Amoeba' ruleset to all nine worlds and apply a unique, small mutation to each. <span class=\"onboarding-highlight-text\">Press it now.</span>",
+        title: 'Run the Experiment',
+        content: "This is the <span class=\"onboarding-highlight-text\">Clone & Mutate</span> command. It will copy our 'Gliders' ruleset to all nine worlds and apply a unique, small mutation to each. <span class=\"onboarding-highlight-text\">Press it now.</span>",
         primaryAction: { text: 'Clone & Mutate' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
         delayAfter: 2000
     },
     {
-        element: '.tab-bar-button[data-view="simulate"]',
-        title: 'Step 4: Observe',
-        content: "The experiment is running! Tap the <span class=\"onboarding-highlight-text\">Simulate</span> tab to go back to the main view and see the results.",
-        primaryAction: { text: 'Go to Simulator' },
-        advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'simulate' }
-    },
-    {
-        element: '#minimap-guide',
-        highlightType: 'canvas',
-        title: 'Step 5: Discover!',
-        content: "You now have nine parallel evolutions. Let them run. When you find a world you like, tap it to select it, then press 'Continue'.",
+        element: 'body',
+        title: 'Observe',
+        content: "The experiment is running! In the minimap you can see how each parallel world differs from the others. Pick one that looks interesting and press 'Continue'.",
         primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
+    },
+    {
+        element: '[data-action-id="clone"]',
+        highlightType: 'canvas',
+        title: 'Repeat!',
+        content: "This Quick Action allows you to quickly <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again with your defined parameters. Your selected world remains unaffected as your baseline.",
+        primaryAction: { text: 'Clone & Mutate again!' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
     },
     {
         element: 'body',

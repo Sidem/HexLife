@@ -160,7 +160,7 @@ export function initUI(appContext, worldManagerInterface, libraryData) {
         primaryBtn: document.getElementById('onboarding-action-primary'),
         secondaryBtn: document.getElementById('onboarding-action-secondary'),
         progressBar: document.getElementById('onboarding-progress-bar'),
-    });
+    }, appContext);
     onboardingManager.defineTours(tours);
 
     // Help button is now handled by the Learning Hub panel

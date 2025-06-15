@@ -2,7 +2,7 @@ import { loadOnboardingStates, saveOnboardingStates } from '../services/Persiste
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
 export class OnboardingManager {
-    constructor(uiElements) {
+    constructor(uiElements, appContext) {
         this.tourIsActive = false;
         this.currentTourName = null;
         this.activeTourSteps = [];
@@ -11,7 +11,8 @@ export class OnboardingManager {
         this.highlightedElement = null;
         this.highlightedElementParentPanel = null;
         this.allTours = new Map();
-
+        this.appContext = appContext;
+    
         this.ui = {
             overlay: uiElements.overlay,
             tooltip: uiElements.tooltip,
@@ -21,13 +22,12 @@ export class OnboardingManager {
             secondaryBtn: uiElements.secondaryBtn,
             progressBar: uiElements.progressBar,
         };
-
-        if (Object.values(this.ui).some(el => !el)) {
-            console.error("OnboardingManager: One or more required UI elements were not provided.");
+    
+        if (Object.values(this.ui).some(el => !el) || !this.appContext) {
+            console.error("OnboardingManager: One or more required UI elements or the AppContext were not provided.");
             return;
         }
-
-        
+    
         this._setupEventListeners();
     }
 
@@ -107,14 +107,20 @@ export class OnboardingManager {
             this.endTour();
             return;
         }
-
+    
         this.currentStepIndex = stepIndex;
         const step = this.activeTourSteps[stepIndex];
-
+        if (step.condition && typeof step.condition === 'function') {
+            if (!step.condition(this.appContext)) {
+                this._showStep(stepIndex + 1);
+                return;
+            }
+        }
+    
         if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
             step.onBeforeShow();
         }
-
+    
         setTimeout(() => {
             const targetElement = document.querySelector(step.element);
             if (!targetElement) {
@@ -122,28 +128,28 @@ export class OnboardingManager {
                 this._showStep(stepIndex + 1);
                 return;
             }
-
+    
             this._highlightElement(targetElement);
-
+    
             this.ui.overlay.classList.remove('hidden');
             this.ui.tooltip.classList.remove('hidden');
-
+    
             this.ui.title.innerHTML = step.title || '';
             this.ui.content.innerHTML = step.content || '';
             
             const progress = ((this.currentStepIndex + 1) / this.activeTourSteps.length) * 100;
             this.ui.progressBar.style.width = `${progress}%`;
-
+    
             if (step.primaryAction && step.primaryAction.text) {
                 this.ui.primaryBtn.textContent = step.primaryAction.text;
                 this.ui.primaryBtn.style.display = 'inline-block';
             } else {
                 this.ui.primaryBtn.style.display = 'none';
             }
-
+    
             this._positionTooltip(targetElement);
             this._attachStepAdvanceListener(step, targetElement);
-
+    
         }, 100);
     }
 
@@ -178,6 +184,8 @@ export class OnboardingManager {
     
         } else if (step.advanceOn.type === 'event') {
             const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, (data) => {
+                console.log('advanceOn event received', step.advanceOn.eventName);
+                console.log('event data received', data);
                 if (step.advanceOn.condition && !step.advanceOn.condition(data)) {
                     return;
                 }

@@ -54,6 +54,12 @@
     "hex": "120C11B442568E21134E30A85A40C880"
   },
   {
+    "name": "Spontaneous Gliders",
+    "description": "",
+    "tags": [],
+    "hex": "12482080480080006880800180010117"
+  },
+  {
     "name": "Amoeba 1",
     "description": "",
     "tags": [],
@@ -160,11 +166,5 @@
     "description": "",
     "tags": [],
     "hex": "12080081400181171249219649169669"
-  },
-  {
-    "name": "Spontaneous Gliders 1",
-    "description": "",
-    "tags": [],
-    "hex": "12482080480080006880800180010117"
   }
 ]
