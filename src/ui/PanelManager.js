@@ -17,7 +17,6 @@ export class PanelManager {
         this.appContext = appContext;
         this.worldManager = worldManagerInterface;
         this.panels = {};
-        this.uiElements = null;
         this.mobileViews = {};
         this.libraryData = null;
         this.panelConfig = [
@@ -29,12 +28,11 @@ export class PanelManager {
         ];
     }
 
-    init(uiElements, libraryData) {
-        this.uiElements = uiElements;
+    init(libraryData) {
         this.libraryData = libraryData;
 
         this.panelConfig.forEach(config => {
-            const panelElement = this.uiElements[config.elementId];
+            const panelElement = document.getElementById(config.elementId); // Find element by ID
             if (panelElement) {
                 const PanelClass = config.constructor;
                 if (PanelClass === AnalysisPanel) {
@@ -79,7 +77,7 @@ export class PanelManager {
     
     _setupPanelToggleListeners() {
         this.panelConfig.forEach(config => {
-            const buttonElement = this.uiElements[config.buttonId];
+            const buttonElement = document.getElementById(config.buttonId);
             if (buttonElement) {
                 buttonElement.addEventListener('click', () => this.panels[config.name]?.toggle());
             }
@@ -89,8 +87,9 @@ export class PanelManager {
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
             if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) {
-                if (document.activeElement !== this.uiElements.editorRulesetInput) {
-                    this.uiElements.editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
+                const editorRulesetInput = document.getElementById('editorRulesetInput');
+                if (document.activeElement !== editorRulesetInput) {
+                    editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
                 }
                 this.panels.rulesetEditor.refreshViews();
             }

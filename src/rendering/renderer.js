@@ -325,7 +325,11 @@ function setupFBOs() {
     }
 }
 
-function renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera) {
+function renderWorldsToTextures(appContext) {
+    const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
+    const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
+    const camera = appContext.worldManager.getCurrentCameraState();
+    
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
 
     
@@ -429,7 +433,11 @@ function renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera) {
 }
 
 
-function renderMainScene(selectedWorldIndex, allWorldsStatus, vizState) {
+function renderMainScene(appContext) {
+    const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
+    const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
+    const vizState = appContext.visualizationController.getState();
+    
     if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -549,15 +557,15 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
-export function renderFrameOrLoader(allWorldsStatus, selectedWorldIndex, areAllWorkersInitialized, camera, vizState) {
+export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
-        
+        // Loader is still visible, or an error occurred.
         return;
     }
     
-    
-    renderWorldsToTextures(allWorldsStatus, selectedWorldIndex, camera);
-    renderMainScene(selectedWorldIndex, allWorldsStatus, vizState);
+    // Pass the entire context to the rendering sub-functions.
+    renderWorldsToTextures(appContext);
+    renderMainScene(appContext);
 }
 
 export function resizeRenderer() {

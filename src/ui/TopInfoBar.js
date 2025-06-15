@@ -11,8 +11,20 @@ export class TopInfoBar {
         this.popoutPanels = {};
     }
 
-    init(uiElements) {
-        this.uiElements = uiElements;
+    init() {
+        this.uiElements = {
+            rulesetDisplay: document.getElementById('rulesetDisplay'),
+            statTick: document.getElementById('stat-tick'),
+            statRatio: document.getElementById('stat-ratio'),
+            statBrushSize: document.getElementById('stat-brush-size'),
+            statFps: document.getElementById('stat-fps'),
+            statActualTps: document.getElementById('stat-actual-tps'),
+            statTargetTps: document.getElementById('stat-target-tps'),
+            undoButton: document.getElementById('undoButton'),
+            redoButton: document.getElementById('redoButton'),
+            historyButton: document.getElementById('historyButton'),
+            historyPopout: document.getElementById('historyPopout')
+        };
         this._setupEventListeners();
 
         // Initial state update

@@ -7,8 +7,13 @@ export class KeyboardShortcutManager {
         this.uiElements = null; // Will be set during init
     }
 
-    init(uiElements) {
-        this.uiElements = uiElements;
+    init() {
+        this.uiElements = {
+            undoButton: document.getElementById('undoButton'),
+            redoButton: document.getElementById('redoButton'),
+            rulesetInputPopout: document.getElementById('rulesetInputPopout'),
+            editorRulesetInput: document.getElementById('editorRulesetInput'),
+        };
         document.addEventListener('keydown', this.handleGlobalKeyDown.bind(this));
     }
 

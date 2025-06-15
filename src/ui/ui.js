@@ -15,78 +15,7 @@ import { uiManager } from './UIManager.js';
 let panelManager, toolbar, onboardingManager;
 export { onboardingManager };
 
-function getUIElements() {
-    return {
-        rulesetDisplay: document.getElementById('rulesetDisplay'),
-        statTick: document.getElementById('stat-tick'),
-        statRatio: document.getElementById('stat-ratio'),
-        statBrushSize: document.getElementById('stat-brush-size'),
-        statFps: document.getElementById('stat-fps'),
-        statActualTps: document.getElementById('stat-actual-tps'),
-        statTargetTps: document.getElementById('stat-target-tps'),
-        playPauseButton: document.getElementById('playPauseButton'),
-        speedControlButton: document.getElementById('speedControlButton'),
-        brushToolButton: document.getElementById('brushToolButton'),
-        newRulesButton: document.getElementById('newRulesButton'),
-        mutateButton: document.getElementById('mutateButton'),
-        undoButton: document.getElementById('undoButton'),
-        redoButton: document.getElementById('redoButton'),
-        historyButton: document.getElementById('historyButton'),
-        setRulesetButton: document.getElementById('setRulesetButton'),
-        libraryButton: document.getElementById('libraryButton'),
-        saveStateButton: document.getElementById('saveStateButton'),
-        loadStateButton: document.getElementById('loadStateButton'),
-        resetClearButton: document.getElementById('resetClearButton'),
-        editRuleButton: document.getElementById('editRuleButton'),
-        setupPanelButton: document.getElementById('setupPanelButton'),
-        settingsButton: document.getElementById('settingsButton'),
-        settingsPopout: document.getElementById('settingsPopout'),
-        analysisPanelButton: document.getElementById('analysisPanelButton'),
-        rankPanelButton: document.getElementById('rankPanelButton'),
-        shareButton: document.getElementById('shareButton'),
-        speedPopout: document.getElementById('speedPopout'),
-        brushPopout: document.getElementById('brushPopout'),
-        newRulesPopout: document.getElementById('newRulesPopout'),
-        setHexPopout: document.getElementById('setHexPopout'),
-        resetClearPopout: document.getElementById('resetClearPopout'),
-        libraryPopout: document.getElementById('libraryPopout'),
-        sharePopout: document.getElementById('sharePopout'),
-        historyPopout: document.getElementById('historyPopout'),
-        mutatePopout: document.getElementById('mutatePopout'),
-        speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
-        neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
-        shareLinkInput: document.getElementById('shareLinkInput'),
-        copyShareLinkButton: document.getElementById('copyShareLinkButton'),
-        generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
-        useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
-        biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
-        rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'),
-        mutationRateSliderMount: document.getElementById('mutationRateSliderMount'),
-        mutateModeSwitch: document.getElementById('mutateModeSwitch'),
-        mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
-        triggerMutationButton: document.getElementById('triggerMutationButton'),
-        cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
-        resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
-        generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
-        rulesetInputPopout: document.getElementById('rulesetInputPopout'),
-        setRuleFromPopoutButton: document.getElementById('setRuleFromPopoutButton'),
-        copyRuleFromPopoutButton: document.getElementById('copyRuleFromPopoutButton'),
-        resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
-        resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
-        clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
-        clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
-        editorRulesetInput: document.getElementById('editorRulesetInput'),
-        rulesetEditorPanel: document.getElementById('rulesetEditorPanel'),
-        setupPanel: document.getElementById('setupPanel'),
-        analysisPanel: document.getElementById('analysisPanel'),
-        ruleRankPanel: document.getElementById('ruleRankPanel'),
-        learningPanel: document.getElementById('learningPanel'),
-        fileInput: document.getElementById('fileInput'),
-        canvas: document.getElementById('hexGridCanvas'),
-        mobileViewsContainer: document.getElementById('mobile-views-container'),
-        mobileToolsButton: document.getElementById('mobileToolsButton'),
-    };
-}
+
 
 function initMobileUI(appContext, worldManagerInterface) {
     const bottomTabBarEl = document.getElementById('bottom-tab-bar');
@@ -209,16 +138,20 @@ function initGuidingBoxes() {
 }
 
 export function initUI(appContext, worldManagerInterface, libraryData) {
-    const uiElements = getUIElements();
     const topInfoBar = new TopInfoBar(appContext, worldManagerInterface);
-    topInfoBar.init(uiElements);
+    topInfoBar.init(); // No longer needs uiElements
+
     panelManager = new PanelManager(appContext, worldManagerInterface);
-    panelManager.init(uiElements, libraryData);
+    panelManager.init(libraryData); // No longer needs uiElements
+
     toolbar = new Toolbar(appContext, worldManagerInterface, libraryData);
-    toolbar.init(uiElements);
+    toolbar.init(); // No longer needs uiElements
+
     const keyboardManager = new KeyboardShortcutManager(appContext, worldManagerInterface, panelManager, toolbar);
-    keyboardManager.init(uiElements);
+    keyboardManager.init(); // No longer needs uiElements
+
     initMobileUI(appContext, worldManagerInterface);
+
     onboardingManager = new OnboardingManager({
         overlay: document.getElementById('onboarding-overlay'),
         tooltip: document.getElementById('onboarding-tooltip'),
@@ -253,7 +186,6 @@ export function initUI(appContext, worldManagerInterface, libraryData) {
         reader.readAsText(data.file);
     });
 
-    
     toolbar.updatePauseButtonVisual(appContext.simulationController.getState().isPaused);
     initGuidingBoxes();
     console.log(`UI Initialized for: ${uiManager.getMode()}`);

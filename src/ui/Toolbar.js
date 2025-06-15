@@ -32,8 +32,57 @@ export class Toolbar {
         ];
     }
 
-    init(uiElements) {
-        this.uiElements = uiElements;
+    init() {
+        this.uiElements = {
+            // Main Toolbar Buttons
+            playPauseButton: document.getElementById('playPauseButton'),
+            // Popout Trigger Buttons
+            speedControlButton: document.getElementById('speedControlButton'),
+            brushToolButton: document.getElementById('brushToolButton'),
+            newRulesButton: document.getElementById('newRulesButton'),
+            mutateButton: document.getElementById('mutateButton'),
+            setRulesetButton: document.getElementById('setRulesetButton'),
+            libraryButton: document.getElementById('libraryButton'),
+            resetClearButton: document.getElementById('resetClearButton'),
+            shareButton: document.getElementById('shareButton'),
+            settingsButton: document.getElementById('settingsButton'),
+            // Popout Panels
+            speedPopout: document.getElementById('speedPopout'),
+            brushPopout: document.getElementById('brushPopout'),
+            newRulesPopout: document.getElementById('newRulesPopout'),
+            mutatePopout: document.getElementById('mutatePopout'),
+            setHexPopout: document.getElementById('setHexPopout'),
+            libraryPopout: document.getElementById('libraryPopout'),
+            resetClearPopout: document.getElementById('resetClearPopout'),
+            sharePopout: document.getElementById('sharePopout'),
+            settingsPopout: document.getElementById('settingsPopout'),
+            // Popout Content Mounts and Controls
+            speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
+            neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
+            generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
+            useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
+            biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
+            rulesetScopeSwitchPopout: document.getElementById('rulesetScopeSwitchPopout'),
+            resetOnNewRuleCheckboxPopout: document.getElementById('resetOnNewRuleCheckboxPopout'),
+            generateRulesetFromPopoutButton: document.getElementById('generateRulesetFromPopoutButton'),
+            mutationRateSliderMount: document.getElementById('mutationRateSliderMount'),
+            mutateModeSwitch: document.getElementById('mutateModeSwitch'),
+            mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
+            triggerMutationButton: document.getElementById('triggerMutationButton'),
+            cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
+            rulesetInputPopout: document.getElementById('rulesetInputPopout'),
+            setRuleFromPopoutButton: document.getElementById('setRuleFromPopoutButton'),
+            copyRuleFromPopoutButton: document.getElementById('copyRuleFromPopoutButton'),
+            resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
+            resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
+            clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
+            clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
+            shareLinkInput: document.getElementById('shareLinkInput'),
+            copyShareLinkButton: document.getElementById('copyShareLinkButton'),
+            saveStateButton: document.getElementById('saveStateButton'),
+            loadStateButton: document.getElementById('loadStateButton'),
+            fileInput: document.getElementById('fileInput'),
+        };
         this.appContext.libraryController.init(this.libraryData);
         this._initPopoutPanels();
         this._initPopoutControls();

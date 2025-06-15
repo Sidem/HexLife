@@ -128,10 +128,6 @@ async function initialize() {
         return;
     }
 
-    document.getElementById('helpButton').addEventListener('click', () => {
-        onboardingManager.startTour('core', true);
-    });
-
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {
         const hexElement = document.getElementById(`loader-hex-${worldIndex}`);
         if (hexElement) {
@@ -205,13 +201,7 @@ function renderLoop(timestamp) {
         }
     }
     
-    Renderer.renderFrameOrLoader(
-        allWorldsStatus, 
-        worldManager.getSelectedWorldIndex(), 
-        areAllWorkersInitialized, 
-        worldManager.getCurrentCameraState(),
-        appContext.visualizationController.getState()
-    );
+    Renderer.renderFrameOrLoader(appContext, areAllWorkersInitialized);
 
     frameCount++;
     if (timestamp - lastFpsUpdateTime >= 1000) {
