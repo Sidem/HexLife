@@ -1,5 +1,5 @@
 import { loadOnboardingStates, saveOnboardingStates } from '../services/PersistenceService.js';
-import { EventBus } from '../services/EventBus.js';
+import { EventBus, EVENTS } from '../services/EventBus.js';
 
 export class OnboardingManager {
     constructor(uiElements) {
@@ -7,6 +7,7 @@ export class OnboardingManager {
         this.currentTourName = null;
         this.activeTourSteps = [];
         this.currentStepIndex = -1;
+        this.currentStepUnsubscribe = null;
         this.highlightedElement = null;
         this.highlightedElementParentPanel = null;
         this.allTours = new Map();
@@ -83,6 +84,10 @@ export class OnboardingManager {
 
         this._cleanupCurrentStep();
         this.tourIsActive = false;
+        
+        // Dispatch tour ended event for the Learning Hub to refresh
+        EventBus.dispatch(EVENTS.TOUR_ENDED, { tourName: this.currentTourName });
+        
         this.currentTourName = null;
     }
 
@@ -143,18 +148,44 @@ export class OnboardingManager {
     }
 
     _attachStepAdvanceListener(step, targetElement) {
+        const advance = () => {
+            if (step.delayAfter && typeof step.delayAfter === 'number') {
+                this._cleanupCurrentStep();
+                setTimeout(() => {
+                    if (this.tourIsActive) {
+                        this._showStep(this.currentStepIndex + 1);
+                    }
+                }, step.delayAfter);
+            } else {
+                setTimeout(() => {
+                    if (this.tourIsActive) {
+                        this._showStep(this.currentStepIndex + 1);
+                    }
+                }, 150);
+            }
+        };
+    
         if (step.advanceOn.type === 'click') {
             const actionTarget = step.advanceOn.target === 'element' ? targetElement : this.ui.primaryBtn;
-            actionTarget.addEventListener('click', () => this._showStep(this.currentStepIndex + 1), { once: true });
+            const clickListener = () => {
+                this.currentStepUnsubscribe = null;
+                advance();
+            };
+            actionTarget.addEventListener('click', clickListener, { once: true });
+            this.currentStepUnsubscribe = () => {
+                actionTarget.removeEventListener('click', clickListener);
+            };
+    
         } else if (step.advanceOn.type === 'event') {
             const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, (data) => {
-                 
                 if (step.advanceOn.condition && !step.advanceOn.condition(data)) {
                     return;
                 }
+                this.currentStepUnsubscribe = null;
                 unsubscribe();
-                setTimeout(() => this._showStep(this.currentStepIndex + 1), 500);
+                advance();
             });
+            this.currentStepUnsubscribe = unsubscribe;
         }
     }
     
@@ -167,6 +198,12 @@ export class OnboardingManager {
             this.highlightedElementParentPanel.style.zIndex = '';
             this.highlightedElementParentPanel = null;
         }
+
+        if (this.currentStepUnsubscribe) {
+            this.currentStepUnsubscribe();
+            this.currentStepUnsubscribe = null;
+        }
+        
         this.ui.overlay.classList.add('hidden');
         this.ui.tooltip.classList.add('hidden');
     

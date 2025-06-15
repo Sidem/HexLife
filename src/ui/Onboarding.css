@@ -22,8 +22,8 @@
 }
 
 .onboarding-highlight {
-    position: relative;
-    z-index: 2001 !important;
+    /*position: relative;*/
+    z-index: 5001 !important;
     box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
     animation: pulse-highlight 2s infinite;
     pointer-events: auto !important;

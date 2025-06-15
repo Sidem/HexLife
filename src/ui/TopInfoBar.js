@@ -56,7 +56,11 @@ export class TopInfoBar {
             });
         }
         this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
-        this.uiElements.historyButton?.addEventListener('popoutshown', this._updateHistoryPopout.bind(this));
+        EventBus.subscribe(EVENTS.POPOUT_SHOWN, (data) => {
+            if (data.panel === this.popoutPanels.history) {
+                this._updateHistoryPopout();
+            }
+        });
         EventBus.subscribe(EVENTS.HISTORY_CHANGED, (data) => {
             if (data.worldIndex === this.worldManager.getSelectedWorldIndex() && this.popoutPanels.history && !this.popoutPanels.history.isHidden()) {
                 this._updateHistoryPopout();

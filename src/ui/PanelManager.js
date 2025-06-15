@@ -2,12 +2,14 @@ import { RulesetEditor } from './components/RulesetEditor.js';
 import { SetupPanel } from './components/SetupPanel.js';
 import { AnalysisPanel } from './components/AnalysisPanel.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
+import { LearningPanel } from './components/LearningPanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { MoreView } from './views/MoreView.js';
 import { RulesView } from './views/RulesView.js';
 import { WorldsView } from './views/WorldsView.js';
 import { AnalyzeView } from './views/AnalyzeView.js';
 import { EditorView } from './views/EditorView.js';
+import { LearningView } from './views/LearningView.js';
 import { uiManager } from './UIManager.js';
 
 export class PanelManager {
@@ -22,7 +24,8 @@ export class PanelManager {
             { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: { isMobile: this.isMobile } },
             { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: { isMobile: this.isMobile } },
             { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: { isMobile: this.isMobile } },
-            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: { isMobile: this.isMobile } }
+            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: { isMobile: this.isMobile } },
+            { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} }
         ];
     }
 
@@ -38,6 +41,8 @@ export class PanelManager {
                     this.panels[config.name] = new PanelClass(panelElement, this.worldManager, this, config.options);
                 } else if (PanelClass === SetupPanel) {
                     this.panels[config.name] = new PanelClass(panelElement, this.appContext, this.worldManager, config.options);
+                } else if (PanelClass === LearningPanel) {
+                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
                 } else {
                     this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
                 }
@@ -62,6 +67,9 @@ export class PanelManager {
                 
                 this.mobileViews.editor = new EditorView(mobileViewsContainer, this);
                 this.mobileViews.editor.render();
+                
+                this.mobileViews.learning = new LearningView(mobileViewsContainer);
+                this.mobileViews.learning.render();
             }
         }
 

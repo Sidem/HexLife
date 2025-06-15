@@ -41,6 +41,7 @@
     <link rel="preload" href="src/main.js" as="script" crossorigin="">
     <link rel="stylesheet" href="style.css?v=1.9">
     <link rel="stylesheet" href="src/styles/loader.css">
+    <link rel="stylesheet" href="src/styles/LearningPanel.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
 </head>
@@ -321,6 +322,14 @@
             <div id="ruleRankContent" class="panel-content-area">
             </div>
         </div>
+        <div id="learningPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="learningPanelTitle" aria-modal="true">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="learningPanelTitle">Learning Hub</h3>
+            <div class="panel-content-area">
+                <p class="editor-text info-text" style="text-align: left;">Replay any tutorial to learn more about the explorer's features. Your progress is saved automatically.</p>
+                <ul id="desktop-tour-list" class="learning-center-list"></ul>
+            </div>
+        </div>
         <div id="bottom-tab-bar" class="hidden">
             <button class="tab-bar-button active" data-view="simulate" title="Simulation View">
                 <span class="icon">⬡</span>
@@ -341,6 +350,10 @@
             <button class="tab-bar-button" data-view="analyze" title="Analysis Tools">
                 <span class="icon">📊</span>
                 <span class="label">Analyze</span>
+            </button>
+            <button class="tab-bar-button" data-view="learning" title="Learning Hub">
+                <span class="icon">🎓</span>
+                <span class="label">Learn</span>
             </button>
             <button class="tab-bar-button" data-view="more" title="More Options">
                 <span class="icon">•••</span>

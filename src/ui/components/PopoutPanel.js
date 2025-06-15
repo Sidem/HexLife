@@ -1,4 +1,5 @@
 import { BaseComponent } from './BaseComponent.js';
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class PopoutPanel extends BaseComponent {
     constructor(popoutElement, triggerElement, options = {}) {
@@ -123,8 +124,7 @@ export class PopoutPanel extends BaseComponent {
                 setTimeout(() => document.addEventListener('click', this.boundHandleOutsideClick), 0);
             }
             
-            const event = new CustomEvent('popoutshown', { bubbles: true, detail: { panel: this } });
-            this.triggerElement.dispatchEvent(event);
+            EventBus.dispatch(EVENTS.POPOUT_SHOWN, { panel: this });
         }
     }
 
@@ -141,8 +141,7 @@ export class PopoutPanel extends BaseComponent {
     toggle() {
         if (this.popoutElement) {
             if (this.popoutElement.classList.contains('hidden')) {
-                const event = new CustomEvent('popoutinteraction', { bubbles: true, detail: { panel: this } });
-                this.triggerElement.dispatchEvent(event);
+                EventBus.dispatch(EVENTS.POPOUT_INTERACTION, { panel: this });
                 this.show();
             } else {
                 this.hide();

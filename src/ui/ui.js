@@ -80,6 +80,7 @@ function getUIElements() {
         setupPanel: document.getElementById('setupPanel'),
         analysisPanel: document.getElementById('analysisPanel'),
         ruleRankPanel: document.getElementById('ruleRankPanel'),
+        learningPanel: document.getElementById('learningPanel'),
         fileInput: document.getElementById('fileInput'),
         canvas: document.getElementById('hexGridCanvas'),
         mobileViewsContainer: document.getElementById('mobile-views-container'),
@@ -108,8 +109,8 @@ function initMobileUI(appContext, worldManagerInterface) {
         <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
         <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
     `;
-    new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext, worldManagerInterface);
-    fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+    new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext, worldManagerInterface);// ... inside initMobileUI function
+    fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => appContext.simulationController.togglePause());
     fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
     EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
         const mobilePlayPause = fabRightContainer.querySelector('#mobilePlayPauseButton');
@@ -229,13 +230,7 @@ export function initUI(appContext, worldManagerInterface, libraryData) {
     });
     onboardingManager.defineTours(tours);
 
-    const helpButton = document.getElementById('helpButton');
-    if (helpButton) {
-        helpButton.addEventListener('click', () => {
-            const tour = uiManager.isMobile() ? 'coreMobile' : 'core';
-            onboardingManager.startTour(tour, true);
-        });
-    }
+    // Help button is now handled by the Learning Hub panel
     window.OnboardingManager = onboardingManager;
     document.body.addEventListener('click', (event) => {
         const helpTrigger = event.target.closest('.button-help-trigger');

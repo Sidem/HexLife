@@ -1,4 +1,5 @@
 import { BaseComponent } from './BaseComponent.js';
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class BottomSheet extends BaseComponent {
     constructor(id, triggerElement, options = {}) {
@@ -66,16 +67,14 @@ export class BottomSheet extends BaseComponent {
             this.sheetPanel.classList.add('visible');
         }, 10);
         
-        // Dispatch a global event so other components can react (e.g., close other sheets)
-        const event = new CustomEvent('bottomsheet:show', { detail: { sheet: this } });
-        window.dispatchEvent(event);
+        // Dispatch an EventBus event so other components can react (e.g., close other sheets)
+        EventBus.dispatch(EVENTS.BOTTOM_SHEET_SHOWN, { sheet: this });
     }
 
     hide() {
         if (!this.isVisible) return;
         this.isVisible = false;
         this.sheetPanel.classList.remove('visible');
-        // Wait for the transition to finish before hiding the overlay
         setTimeout(() => {
             this.mountPoint.classList.add('hidden');
         }, 300); // This duration should match the CSS transition duration

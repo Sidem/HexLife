@@ -13,6 +13,8 @@ const hidePanels = () => {
     UI.getRuleRankPanel()?.hide();
 };
 
+
+// --- DESKTOP TOURS (Unchanged) ---
 const coreTour = [
     {
         element: '[data-tour-id="hex-grid-canvas"]',
@@ -53,57 +55,6 @@ const coreTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
-const coreTourMobile = [
-    {
-        element: 'body',
-        title: 'Welcome to the HexLife Explorer',
-        content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
-        primaryAction: { text: 'Begin Orientation' },
-        onBeforeShow: () => { document.querySelector('[data-view="simulate"]').click(); },
-        advanceOn: { type: 'click' }
-    },
-    {
-        element: '#mobilePlayPauseButton',
-        title: 'The Flow of Time',
-        content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock.",
-        primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => !data }
-    },
-    {
-        element: '#minimap-guide',
-        highlightType: 'canvas',
-        title: 'The Observatory',
-        content: "This area shows all nine universes at once. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Tap on any mini-map view</span> to shift your focus to it.",
-        primaryAction: { text: 'Select a Different World' },
-        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
-    },
-    {
-        element: '#interaction-mode-toggle',
-        title: 'Wielding the Brush',
-        content: "To influence a universe, you must first switch from Pan mode to Draw mode. <span class=\"onboarding-highlight-text\">Tap the hand icon</span> to switch to the brush.",
-        primaryAction: null,
-        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' }
-    },
-    {
-        element: '#selected-world-guide',
-        highlightType: 'canvas',
-        title: 'The Spark of Creation',
-        content: "Now, with your Brush active, you can seed life directly onto the main view. The simulation will pause automatically. <span class=\"onboarding-highlight-text\">Touch and drag on the main view</span> to draw.",
-        primaryAction: null,
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
-    },
-    {
-        element: '[data-tour-id="mobile-help-button"]',
-        title: 'Your Lab Assistant',
-        content: "You now have the core skills. To restart this tour, find the <span class=\"onboarding-highlight-text\">Help</span> button in the 'More' tab. The rest is up to you. Good luck.",
-        onBeforeShow: () => { document.querySelector('[data-view="more"]').click(); },
-        primaryAction: { text: 'Begin My Research' },
-        advanceOn: { type: 'click' }
-    }
-];
-
-
 const speedAndBrushTour = [
     {
         element: '[data-tour-id="speed-popout"]',
@@ -122,7 +73,6 @@ const speedAndBrushTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const rulesetGenerationTour = [
     {
         element: '[data-tour-id="new-rules-popout"]',
@@ -147,7 +97,6 @@ const rulesetGenerationTour = [
         advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
     }
 ];
-
 const mutationTour = [
     {
         element: '[data-tour-id="mutatePopout"]',
@@ -165,7 +114,6 @@ const mutationTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const directInputTour = [
     {
         element: '[data-tour-id="set-hex-popout"]',
@@ -183,7 +131,6 @@ const directInputTour = [
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }
 ];
-
 const libraryTour = [
     {
         element: '[data-tour-id="libraryPopout"]',
@@ -202,7 +149,6 @@ const libraryTour = [
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }
 ];
-
 const historyTour = [
     {
         element: '#undoButton',
@@ -227,7 +173,6 @@ const historyTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const saveLoadTour = [
     {
         element: '[data-tour-id="save-state-button"]',
@@ -244,7 +189,6 @@ const saveLoadTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const resetClearTour = [
      {
         element: '[data-tour-id="reset-clear-popout"]',
@@ -255,7 +199,6 @@ const resetClearTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const editorTour = [
     {
         element: '[data-tour-id="ruleset-editor-panel"]',
@@ -281,7 +224,6 @@ const editorTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const setupTour = [
     {
         element: '[data-tour-id="setup-panel"]',
@@ -299,7 +241,6 @@ const setupTour = [
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET }
     }
 ];
-
 const analysisTour = [
     {
         element: '[data-tour-id="analysis-panel"]',
@@ -317,7 +258,6 @@ const analysisTour = [
         advanceOn: { type: 'click' }
     }
 ];
-
 const ruleRankTour = [
     {
         element: '[data-tour-id="rule-rank-panel"]',
@@ -336,11 +276,14 @@ const ruleRankTour = [
     }
 ];
 
+
+// --- MOBILE TOURS ---
+
 const coreMobileTour = [
     {
         element: 'body',
-        title: 'Welcome, Explorer',
-        content: "I'm the Chief Scientist at the HexLife Observatory. Before you are nine parallel universes, each waiting for a spark of life. Your mission: to explore and discover the rules that govern them. This orientation will cover the essentials.",
+        title: 'Welcome to the HexLife Explorer',
+        content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
         primaryAction: { text: 'Begin Orientation' },
         onBeforeShow: () => {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
@@ -350,7 +293,7 @@ const coreMobileTour = [
     {
         element: '#mobilePlayPauseButton',
         title: 'The Universal Clock',
-        content: "Time in all universes is controlled by this button. A single tap starts or stops the flow of every 'tick'. Let's see what these worlds are currently doing.",
+        content: "Time in all universes is controlled by this button. A single tap starts or stops the flow of every 'tick'.",
         primaryAction: { text: 'Click the Play Button' },
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
     },
@@ -365,7 +308,7 @@ const coreMobileTour = [
     {
         element: '#interaction-mode-toggle',
         title: 'Critical Tool: The Interactor',
-        content: "This is your most important tool. The **Hand (🖐️)** lets you pan and zoom the view. The **Pencil (✏️)** lets you draw cells directly onto the grid. You must switch modes to perform these actions.",
+        content: "This is your most important tool. The <span class=\"onboarding-highlight-text\">Hand (🖐️)</span> lets you pan and zoom the view. The <span class=\"onboarding-highlight-text\">Pencil (✏️)</span> lets you draw cells directly onto the grid.",
         primaryAction: { text: 'Tap the Hand to Switch to Draw Mode' },
         advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' }
     },
@@ -374,13 +317,14 @@ const coreMobileTour = [
         highlightType: 'canvas',
         title: 'The Spark of Creation',
         content: "Now that your Brush is active, you can directly influence a universe. The simulation will pause automatically when you draw. Touch and drag on the grid to bring new cells to life.",
-        primaryAction: { text: 'Try Drawing on the Grid' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+        primaryAction: null,
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
+        delayAfter: 2000 // Let user see the result
     },
     {
-        element: '.tab-bar-button[data-view="more"]',
-        title: 'Your Datapad',
-        content: "This is your Datapad, where you'll find all your tools. If you ever need a refresher, the **Help / Tour** option is located in the 'More' tab. Your research awaits.",
+        element: '.tab-bar-button[data-view="learning"]',
+        title: 'Your Learning Hub',
+        content: "This Learning Hub teaches you how to use the HexLife Explorer. If you ever need a refresher, feel free to revisit each tutorial. Your research awaits.",
         primaryAction: { text: 'Begin My Research' },
         advanceOn: { type: 'click' }
     }
@@ -390,7 +334,7 @@ const commandDeckTour = [
     {
         element: '#mobile-fab-container-right',
         title: 'The Command FABs',
-        content: "These are your primary controls. You've already used **Play/Pause** and the **Pan/Draw** toggle. The **Tools (🛠️)** button is your gateway to adjusting core simulation parameters.",
+        content: "These are your primary controls. You've already used <span class=\"onboarding-highlight-text\">Play/Pause</span> and the <span class=\"onboarding-highlight-text\">Pan/Draw</span> toggle. The <span class=\"onboarding-highlight-text\">Tools (🛠️)</span> button is your gateway to adjusting core simulation parameters.",
         primaryAction: { text: `Let's See` },
         onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
         advanceOn: { type: 'click' }
@@ -398,9 +342,9 @@ const commandDeckTour = [
     {
         element: '#mobileToolsFab',
         title: 'The Tools Menu',
-        content: "Tapping the Tools FAB brings up a menu for adjusting simulation **Speed** and your drawing **Brush Size**. It also allows you to customize the Quick Action FABs on the left. Tap it now to see.",
+        content: "Tapping the Tools FAB brings up a menu for adjusting simulation <span class=\"onboarding-highlight-text\">Speed</span> and your drawing <span class=\"onboarding-highlight-text\">Brush Size</span>. It also allows you to customize the Quick Action FABs on the left. Tap it now to see.",
         primaryAction: { text: 'Open the Tools Menu' },
-        advanceOn: { type: 'event', eventName: 'bottomsheet:show' }
+        advanceOn: { type: 'event', eventName: EVENTS.BOTTOM_SHEET_SHOWN }
     },
     {
         element: '.tools-bottom-sheet-content',
@@ -410,10 +354,121 @@ const commandDeckTour = [
         advanceOn: { type: 'click' }
     },
     {
-        element: '#mobile-fab-container-left',
+        element: '[data-tab="customize-fabs"]',
         title: 'Quick Actions',
-        content: "These are your customizable shortcuts for advanced ruleset commands. They let you run complex experiments, like evolving a ruleset, with a single tap. Let's learn how to use them.",
-        primaryAction: { text: 'Continue' },
+        content: "These are your customizable shortcuts for advanced ruleset commands. They let you run complex experiments, like evolving a ruleset, with a single tap. Let's learn how to use them in the next tour.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }
+];
+
+// NEW detailed mobile tours
+const editorTourMobile = [
+    {
+        element: '#editor-view',
+        title: 'The Ruleset Editor',
+        content: 'This is the most powerful tool in the lab, letting you directly edit the DNA of your universe. Let\'s explore its three modes.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'editor' }),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#rulesetEditorMode',
+        title: 'Three Editing Lenses',
+        content: 'You can view the 128 rules in different ways. <span class="onboarding-highlight-text">Rotational Symmetry</span> is the default and groups visually similar rules. <span class="onboarding-highlight-text">Neighbor Count</span> groups them by the number of active neighbors. <span class="onboarding-highlight-text">Detailed</span> shows every single rule.',
+        primaryAction: { text: 'Got it' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#rotationalSymmetryRulesetEditorGrid',
+        title: 'Editing a Rule',
+        content: 'The color of the inner-most hexagon shows the rule\'s outcome (what the center cell will become). <span class="onboarding-highlight-text">Tap any rule visualization</span> to flip its output between active (bright color) and inactive (dark color).',
+        primaryAction: { text: 'Click any Rule' },
+        onBeforeShow: () => { 
+            document.getElementById('rulesetEditorMode').value = 'rotationalSymmetry'; 
+            const editor = UI.getRulesetEditor();
+            if (editor) editor.refreshViews(); 
+        },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE },
+        delayAfter: 1000
+    },
+    {
+        element: '#editorScopeSwitchMount',
+        title: 'Applying Changes',
+        content: 'Your edits can be applied to just the <span class="onboarding-highlight-text">Selected</span> world or to <span class="onboarding-highlight-text">All</span> worlds at once. Be careful with "All"—it will overwrite the rulesets in your other experiments!',
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }
+];
+
+const analysisTourMobile = [
+    {
+        element: '#analyze-view',
+        title: 'The Analysis Dashboard',
+        content: 'This view helps you understand *why* a simulation behaves the way it does by visualizing its data.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'analyze' }),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#plots-pane',
+        title: 'Data Plots',
+        content: 'These charts show the world\'s history. <span class="onboarding-highlight-text">Activity Ratio</span> is the percentage of active cells. <span class="onboarding-highlight-text">Entropy</span> is a measure of complexity. A flat line means the world is stable or in a simple loop.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => {
+            const plotsButton = document.querySelector('.analyze-view-segment[data-pane="plots"]');
+            if (plotsButton) plotsButton.click();
+        },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.analyze-view-segment[data-pane="ranks"]',
+        title: 'Rule Ranks',
+        content: 'Tap here to see which rules are being used the most.',
+        primaryAction: { text: 'Show Ranks' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '#ranks-pane',
+        title: 'Creation vs. Destruction',
+        content: 'This screen ranks rules by usage. <span class="onboarding-highlight-text">Activation</span> rules create life and drive growth. <span class="onboarding-highlight-text">Deactivation</span> rules cause decay. A balance is often key to complex behavior.',
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: () => {
+            const ranksButton = document.querySelector('.analyze-view-segment[data-pane="ranks"]');
+            if (ranksButton) ranksButton.click();
+        },
+        advanceOn: { type: 'click' }
+    }
+];
+
+const worldsTourMobile = [
+    {
+        element: '#worlds-view',
+        title: 'The World Setup Panel',
+        content: 'Here you can configure each of the 9 worlds individually before starting a simulation.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'worlds' }),
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.world-card:first-child .density-control',
+        title: 'Initial Density',
+        content: 'This slider sets the initial percentage of active ("alive") cells when a world is reset. This is perfect for testing how a ruleset behaves in sparse vs. crowded environments.',
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.world-card:first-child .enable-control',
+        title: 'Enable or Disable',
+        content: 'You can disable a world to exclude it from the simulation entirely. This is useful for focusing on a smaller set of experiments.',
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    },
+    {
+        element: '.worlds-view-actions',
+        title: 'Global Actions',
+        content: 'These buttons at the bottom let you apply settings (like density) or reset all worlds at once, saving you time.',
+        primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }
 ];
@@ -422,39 +477,40 @@ const appliedEvolutionTour = [
     {
         element: '.tab-bar-button[data-view="rules"]',
         title: 'Mission: Applied Evolution',
-        content: "Let's run a full experiment. The goal is to discover a new, interesting ruleset by evolving an existing one. First, tap the **Rules** tab.",
+        content: "Let's run a full experiment to discover a new ruleset. First, tap the <span class=\"onboarding-highlight-text\">Rules</span> tab.",
         primaryAction: { text: 'Open the Rules Tab' },
         onBeforeShow: () => {
-            document.querySelector('[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         },
         advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
     },
     {
         element: '.rules-view-segment[data-pane="library-rulesets"]',
         title: 'Step 1: Find a Specimen',
-        content: "Every great discovery builds on prior research. Go to the **Rulesets Library** to find a stable starting point for our experiment.",
+        content: "Go to the <span class=\"onboarding-highlight-text\">Rulesets Library</span> to find a stable starting point for our experiment.",
         primaryAction: { text: 'Next' },
         onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="library-rulesets"]').click(),
         advanceOn: { type: 'click' }
     },
     {
-        element: '.library-item-mobile:nth-child(10)', // Targets "Amoeba 1" based on the JSON file
+        element: '.library-item-mobile:nth-child(10)', // Targets "Amoeba 1"
         title: "Select 'Amoeba 1'",
-        content: "This ruleset produces interesting, self-sustaining patterns. Tap **'Load Ruleset'**. This will apply its laws to all nine universes and reset them.",
+        content: "This ruleset produces interesting patterns. Tap <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET },
+        delayAfter: 1500
     },
     {
         element: '.rules-history-controls',
         title: 'Your Safety Net',
-        content: "Excellent. Before we continue, note these buttons. Every ruleset change is tracked. You can always **Undo (↶)** and **Redo (↷)**. Don't be afraid to experiment!",
+        content: "Excellent. Before we continue, note these buttons. Every ruleset change is tracked. You can always <span class=\"onboarding-highlight-text\">Undo (↶)</span> and <span class=\"onboarding-highlight-text\">Redo (↷)</span>. Don't be afraid to experiment!",
         primaryAction: { text: 'Got it' },
         advanceOn: { type: 'click' }
     },
     {
         element: '.rules-view-segment[data-pane="mutate"]',
         title: 'Step 2: Prepare for Mutation',
-        content: "Now, let's evolve this 'Amoeba'. Go to the **Mutate** tab to access the DNA splicer.",
+        content: "Now, let's evolve this 'Amoeba'. Go to the <span class=\"onboarding-highlight-text\">Mutate</span> tab to access the DNA splicer.",
         primaryAction: { text: 'Open the Mutate Pane' },
         onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="mutate"]').click(),
         advanceOn: { type: 'click' }
@@ -462,21 +518,22 @@ const appliedEvolutionTour = [
     {
         element: '#mobileMutateSliderMount',
         title: 'Set Mutation Parameters',
-        content: "Set the **Mutation Rate to 5%** and ensure the **Mode is 'R-Sym'**. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
+        content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 5%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span>. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     },
     {
         element: 'button[data-action="clone-mutate"]',
         title: 'Step 3: Run the Experiment',
-        content: "This is the **Clone & Mutate** command. It will copy our 'Amoeba' ruleset to all nine worlds and apply a unique, small mutation to each. **Press it now.**",
+        content: "This is the <span class=\"onboarding-highlight-text\">Clone & Mutate</span> command. It will copy our 'Amoeba' ruleset to all nine worlds and apply a unique, small mutation to each. <span class=\"onboarding-highlight-text\">Press it now.</span>",
         primaryAction: { text: 'Clone & Mutate' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        delayAfter: 2000
     },
     {
         element: '.tab-bar-button[data-view="simulate"]',
         title: 'Step 4: Observe',
-        content: "The experiment is running! Tap the **Simulate** tab to go back to the main view and see the results.",
+        content: "The experiment is running! Tap the <span class=\"onboarding-highlight-text\">Simulate</span> tab to go back to the main view and see the results.",
         primaryAction: { text: 'Go to Simulator' },
         advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'simulate' }
     },
@@ -484,24 +541,22 @@ const appliedEvolutionTour = [
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'Step 5: Discover!',
-        content: "You now have nine parallel evolutions. Some may die out, some may explode, and some may form incredible new patterns. <br><br>Let them run. Use the **Clone & Mutate FAB (🧬)** to re-run the experiment. When you find a world you like, tap it to select it, then **press 'Continue' below.**",
+        content: "You now have nine parallel evolutions. Let them run. When you find a world you like, tap it to select it, then press 'Continue'.",
         primaryAction: { text: 'Continue' },
         advanceOn: { type: 'click' }
     },
     {
         element: 'body',
         title: 'Mission Complete',
-        content: "You have successfully run a guided evolution experiment. You now have the core skills for discovery. Continue exploring, and see what you can create!",
+        content: "You have successfully run a guided evolution experiment. You now know the core workflow for discovery!",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }
 ];
 
 export const tours = {
+    // Desktop Tours
     core: coreTour,
-    coreMobile: coreMobileTour,
-    commandDeck: commandDeckTour,
-    appliedEvolution: appliedEvolutionTour,
     speedAndBrush: speedAndBrushTour,
     rulesetGeneration: rulesetGenerationTour,
     mutation: mutationTour,
@@ -514,4 +569,11 @@ export const tours = {
     setup: setupTour,
     analysis: analysisTour,
     ruleRank: ruleRankTour,
+    // Mobile Tours
+    coreMobile: coreMobileTour,
+    commandDeck: commandDeckTour,
+    appliedEvolution: appliedEvolutionTour,
+    editorTour: editorTourMobile,
+    analysisTour: analysisTourMobile,
+    worldsTour: worldsTourMobile,
 };

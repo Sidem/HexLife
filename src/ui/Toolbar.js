@@ -52,7 +52,7 @@ export class Toolbar {
                 if (popout !== excludePanel) popout.hide();
             });
         };
-        document.addEventListener('popoutinteraction', (event) => closeAll(event.detail.panel));
+        EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
         
         const handleClickOutside = (event) => {
             if (onboardingManager.isActive()) {

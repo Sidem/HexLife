@@ -160,4 +160,12 @@ export const EVENTS = {
     COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
     /** @event Emitted with no payload when the ruleset visualization type (e.g., binary, color) changes. */
     RULESET_VISUALIZATION_CHANGED: 'ui:rulesetVisualizationChanged',
+    /** @param {{tourName: string}} data - The name of the tour that was completed. */
+    TOUR_ENDED: 'onboarding:tourEnded',
+    /** @param {{panel: object}} data - The popout panel that was shown. */
+    POPOUT_SHOWN: 'ui:popoutShown',
+    /** @param {{panel: object}} data - The popout panel that had an interaction. */
+    POPOUT_INTERACTION: 'ui:popoutInteraction',
+    /** @param {{sheet: object}} data - The bottom sheet that was shown. */
+    BOTTOM_SHEET_SHOWN: 'ui:bottomSheetShown',
 };

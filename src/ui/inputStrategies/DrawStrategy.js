@@ -15,6 +15,12 @@ export class DrawStrategy extends BaseInputStrategy {
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
+        this.touchState = {
+            isDown: false,
+            isDragging: false,
+            TAP_THRESHOLD: 10,
+            startPoint: { x: 0, y: 0 },
+        };
     }
 
     exit() {
@@ -64,22 +70,41 @@ export class DrawStrategy extends BaseInputStrategy {
 
     handleTouchStart(event) {
         const primaryTouch = event.touches[0];
-        const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
-        if (viewType !== 'selected' || col === null) return;
 
-        this.isDrawing = true;
-        this.resetStrokeState();
-        
-        if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
-            this.wasSimulationRunningBeforeStroke = true;
-            this.manager.appContext.simulationController.setPause(true);
+        // Initialize tap detection state for the new touch
+        this.touchState.isDown = true;
+        this.touchState.isDragging = false;
+        this.touchState.startPoint = { x: primaryTouch.clientX, y: primaryTouch.clientY };
+
+        const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
+
+        // Only begin drawing if the touch starts on the main canvas.
+        // If it starts on the minimap, we will wait until touchend to see if it was a tap.
+        if (viewType === 'selected' && col !== null) {
+            this.isDrawing = true;
+            this.resetStrokeState();
+            
+            if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
+                this.wasSimulationRunningBeforeStroke = true;
+                this.manager.appContext.simulationController.setPause(true);
+            }
+            
+            this.applyBrush(worldIndexAtCursor, col, row);
         }
-        
-        this.applyBrush(worldIndexAtCursor, col, row);
     }
 
     handleTouchMove(event) {
         const primaryTouch = event.touches[0];
+
+        // Check if the movement exceeds the tap threshold, marking it as a drag.
+        if (this.touchState.isDown && !this.touchState.isDragging) {
+            const dist = Math.hypot(primaryTouch.clientX - this.touchState.startPoint.x, primaryTouch.clientY - this.touchState.startPoint.y);
+            if (dist > this.touchState.TAP_THRESHOLD) {
+                this.touchState.isDragging = true;
+            }
+        }
+
+        // The rest of the logic for hover and drawing remains the same.
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
         const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
         if (viewType === 'selected' && col !== null) {
@@ -94,8 +119,23 @@ export class DrawStrategy extends BaseInputStrategy {
     }
 
     handleTouchEnd(event) {
+        // Check if the interaction was a tap (not a drag) on the minimap.
+        if (this.touchState.isDown && !this.touchState.isDragging) {
+            const endTouch = event.changedTouches[0];
+            const { worldIndexAtCursor, viewType } = this.manager.getCoordsFromPointerEvent(endTouch);
+            
+            if (viewType === 'mini' && worldIndexAtCursor !== null) {
+                // It was a tap on the minimap, so select the world.
+                EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
+                this.touchState.isDown = false; // Reset state
+                return; // Exit early, skipping the endDrawing logic.
+            }
+        }
+
+        // If it wasn't a minimap tap, proceed with the normal end-of-drawing logic.
         this.endDrawing();
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.manager.worldManager.getSelectedWorldIndex() });
+        this.touchState.isDown = false; // Reset state
     }
 
     applyBrush(worldIndex, col, row) {
