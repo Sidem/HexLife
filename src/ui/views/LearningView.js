@@ -10,7 +10,7 @@ export class LearningView extends BaseComponent {
         this.availableTours = [
             { id: 'coreMobile', name: 'Main Orientation' },
             { id: 'appliedEvolution', name: 'Mission: Applied Evolution' },
-            { id: 'commandDeck', name: 'Tutorial: Command Deck' },
+            //{ id: 'commandDeck', name: 'Tutorial: Command Deck' },
             { id: 'editorTour', name: 'Tutorial: Ruleset Editor' },
             { id: 'analysisTour', name: 'Tutorial: Analysis Tools' },
             { id: 'worldsTour', name: 'Tutorial: World Setup' }
