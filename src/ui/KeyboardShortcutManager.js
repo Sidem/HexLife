@@ -63,7 +63,7 @@ export class KeyboardShortcutManager {
             'A': () => { this.toolbar.closeAllPopouts(); this.panelManager.getPanel('analysisPanel')?.toggle(); },
             'C': () => this.appContext.worldsController.clearWorlds('all'),
             'R': () => this.appContext.worldsController.resetAllWorldsToInitialDensities(),
-            'G': () => this.toolbar.triggerGenerate(),
+            'G': () => this.appContext.rulesetActionController.generate(),
             'Escape': () => {
                 const aPopoutWasOpen = this.toolbar ? this.toolbar.closeAllPopouts() : false;
                 if (!aPopoutWasOpen) {
