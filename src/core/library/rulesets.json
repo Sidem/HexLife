@@ -166,5 +166,71 @@
     "description": "",
     "tags": [],
     "hex": "12080081400181171249219649169669"
+  },
+  {
+    "name": "Striped curtain",
+    "description": "",
+    "tags": [],
+    "hex": "01020109C0140044A6009A80E3228048"
+  },
+  {
+    "name": "Mutated oscillators",
+    "description": "",
+    "tags": [],
+    "hex": "12482080480080016880811580170737"
+  },
+  {
+    "name": "Organic reduction",
+    "description": "",
+    "tags": [],
+    "hex": "8143200A190050C86993824B950971DF"
+  },
+  {
+    "name": "Organic reduction 2",
+    "description": "",
+    "tags": [],
+    "hex": "8143200A190050C869D3A24B9D0971DF"
+  },
+  {
+    "name": "Organic reduction 3",
+    "description": "",
+    "tags": [],
+    "hex": "81422008180040806993824B950971DF"
+  },
+  {
+    "name": "Burning crystal fractures",
+    "description": "",
+    "tags": [],
+    "hex": "6880801080040200E9D6B2689E486881"
+  },
+  {
+    "name": "Lazers",
+    "description": "",
+    "tags": [],
+    "hex": "2505020A152DFF2CBB21326B0277901F"
+  },
+  {
+    "name": "Stable exchange oscillators",
+    "description": "",
+    "tags": [],
+    "hex": "120900834101915F1249218649129469"
+  },
+  {
+    "name": "Freeze after 15k ticks",
+    "description": "",
+    "tags": [],
+    "hex": "12080081400181177AC9A196C9169669"
+  },
+  {
+    "name": "Bloody rivers",
+    "description": "",
+    "tags": [],
+    "hex": "046368C2290890C9134F30AB5B41D8DF"
+  },
+  {
+    "name": "Burning line (find it)",
+    "description": "",
+    "tags": [],
+    "hex": "120901874113957F68C1A11689161669"
   }
 ]
