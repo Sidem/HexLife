@@ -5,7 +5,7 @@ import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import * as PersistenceService from '../services/PersistenceService.js';
-import { uiManager } from '../ui/UIManager.js';
+
 // visualizationController access is now provided via the rendering context
 
 let gl;
@@ -125,7 +125,7 @@ export async function initRenderer(canvasElement) {
         _handleUIModeChange(mode);
     });
 
-    _handleUIModeChange(uiManager.getMode());
+
 
     requestAnimationFrame(() => resizeRenderer());
 

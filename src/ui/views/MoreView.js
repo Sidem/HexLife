@@ -1,7 +1,7 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
-import { onboardingManager } from '../ui.js';
+
 import { generateShareUrl } from '../../utils/utils.js';
 
 export class MoreView extends BaseComponent {
@@ -64,7 +64,7 @@ export class MoreView extends BaseComponent {
                         break;
                 case 'help':
                     // We can trigger the onboarding tour
-                    onboardingManager.startTour('coreMobile', true);
+                    window.OnboardingManager && window.OnboardingManager.startTour('coreMobile', true);
                     break;
             }
         });

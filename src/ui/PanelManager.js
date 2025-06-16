@@ -4,26 +4,21 @@ import { AnalysisPanel } from './components/AnalysisPanel.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
 import { LearningPanel } from './components/LearningPanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { MoreView } from './views/MoreView.js';
-import { RulesView } from './views/RulesView.js';
-import { WorldsView } from './views/WorldsView.js';
-import { AnalyzeView } from './views/AnalyzeView.js';
-import { EditorView } from './views/EditorView.js';
-import { LearningView } from './views/LearningView.js';
-import { uiManager } from './UIManager.js';
+
+
 
 export class PanelManager {
     constructor(appContext, worldManagerInterface) {
         this.appContext = appContext;
         this.worldManager = worldManagerInterface;
         this.panels = {};
-        this.mobileViews = {};
+
         this.libraryData = null;
         this.panelConfig = [
-            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: { isMobile: this.isMobile } },
-            { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: { isMobile: this.isMobile } },
-            { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: { isMobile: this.isMobile } },
-            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: { isMobile: this.isMobile } },
+            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: {} },
+            { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: {} },
+            { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: {} },
+            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: {} },
             { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} }
         ];
     }
@@ -47,29 +42,7 @@ export class PanelManager {
             }
         });
 
-        // MOBILE VIEW INITIALIZATIONS
-        if (uiManager.isMobile()) {
-            const mobileViewsContainer = document.getElementById('mobile-views-container');
-            if (mobileViewsContainer) {
-                this.mobileViews.more = new MoreView(mobileViewsContainer, this.worldManager);
-                this.mobileViews.more.render();
 
-                this.mobileViews.rules = new RulesView(mobileViewsContainer, this.appContext, this.libraryData, this.worldManager);
-                this.mobileViews.rules.render();
-                
-                this.mobileViews.worlds = new WorldsView(mobileViewsContainer, this.worldManager);
-                this.mobileViews.worlds.render();
-
-                this.mobileViews.analyze = new AnalyzeView(mobileViewsContainer, this.worldManager);
-                this.mobileViews.analyze.render();
-                
-                this.mobileViews.editor = new EditorView(mobileViewsContainer, this);
-                this.mobileViews.editor.render();
-                
-                this.mobileViews.learning = new LearningView(mobileViewsContainer);
-                this.mobileViews.learning.render();
-            }
-        }
 
         this._setupPanelToggleListeners();
         this._setupEventListeners();
@@ -113,34 +86,16 @@ export class PanelManager {
              if (this.panels.analysisPanel && !this.panels.analysisPanel.isHidden()) this.panels.analysisPanel.refreshViews();
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
-        EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
+
     }
     
-    getMobileViews() {
-        return this.mobileViews;
-    }
-    
-    getMobileView(viewName) {
-        return this.mobileViews[viewName];
-    }
+
 
     getPanel(panelName) {
         return this.panels[panelName];
     }
 
-    showMobileView({ targetView, currentView }) {
-        if (!uiManager.isMobile()) return;
-    
-        const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
-    
-        Object.values(this.mobileViews).forEach(v => v.hide());
-    
-        const viewToShow = this.mobileViews[nextView];
-        if (viewToShow) {
-            viewToShow.show();
-        }
-        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: nextView });
-    }
+
     
     hideAllPanels() {
         Object.values(this.panels).forEach(panel => panel.hide());

@@ -10,6 +10,11 @@ import { RulesetActionController } from '../ui/controllers/RulesetActionControll
 import { SimulationController } from '../ui/controllers/SimulationController.js';
 import { VisualizationController } from '../ui/controllers/VisualizationController.js';
 import { WorldsController } from '../ui/controllers/WorldsController.js';
+import { PanelManager } from '../ui/PanelManager.js'; 
+import { Toolbar } from '../ui/Toolbar.js';
+import { OnboardingManager } from '../ui/OnboardingManager.js';
+import { getTours } from '../ui/tourSteps.js';
+
 
 /**
  * @class AppContext
@@ -34,8 +39,22 @@ export class AppContext {
         this.simulationController = new SimulationController();
         this.visualizationController = new VisualizationController();
         this.worldsController = new WorldsController();
+        this.panelManager = new PanelManager(this, this.worldManager);
+        this.panelManager.init(libraryData);
 
-        // Initialize controllers that need access to other parts of the context
+        this.toolbar = new Toolbar(this, this.worldManager, libraryData);
+        this.onboardingManager = new OnboardingManager({
+            overlay: document.getElementById('onboarding-overlay'),
+            tooltip: document.getElementById('onboarding-tooltip'),
+            title: document.getElementById('onboarding-tooltip-title'),
+            content: document.getElementById('onboarding-tooltip-content'),
+            primaryBtn: document.getElementById('onboarding-action-primary'),
+            secondaryBtn: document.getElementById('onboarding-action-secondary'),
+            progressBar: document.getElementById('onboarding-progress-bar'),
+        }, this);
+
+        const tours = getTours(this);
+        this.onboardingManager.defineTours(tours);
         this.libraryController.init(libraryData);
         
         // Set controller references in WorldManager to avoid circular dependencies

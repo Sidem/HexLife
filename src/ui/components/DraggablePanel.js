@@ -1,10 +1,11 @@
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class DraggablePanel {
     constructor(panelElement, handleSelector = 'h3', options = {}) {
         this.panelElement = panelElement;
         this.handleElement = panelElement.querySelector(handleSelector);
-        this.options = { constrainToViewport: true, isMobile: false, ...options };
+        this.options = { constrainToViewport: true, ...options };
         this.offsetX = 0;
         this.offsetY = 0;
 
@@ -23,21 +24,31 @@ export class DraggablePanel {
         if (this.options.persistence) {
             this._loadState();
         }
+
+        // Listen for UI mode changes to enable/disable dragging
+        EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
+            this._setDraggable(mode === 'desktop');
+        });
     }
 
     _initDragging() {
-        if (this.options.isMobile) {
-            this.panelElement.classList.add('is-mobile-panel');
-            return;
-        }
         this.handleElement.style.cursor = 'move';
         this.boundOnMouseDown = this._onMouseDown.bind(this);
         this.boundOnTouchStart = this._onTouchStart.bind(this);
-        this.handleElement.addEventListener('mousedown', this.boundOnMouseDown);
-        this.handleElement.addEventListener('touchstart', this.boundOnTouchStart, { passive: false });
+        // Defer adding listeners until we know the initial mode
     }
 
-    
+    _setDraggable(isDraggable) {
+        if (isDraggable) {
+            this.handleElement.addEventListener('mousedown', this.boundOnMouseDown);
+            this.handleElement.addEventListener('touchstart', this.boundOnTouchStart, { passive: false });
+            this.panelElement.classList.remove('is-mobile-panel');
+        } else {
+            this.handleElement.removeEventListener('mousedown', this.boundOnMouseDown);
+            this.handleElement.removeEventListener('touchstart', this.boundOnTouchStart);
+            this.panelElement.classList.add('is-mobile-panel');
+        }
+    }
 
     _loadState() {
         if (!this.panelElement || !this.options.persistence?.identifier) return;
@@ -129,6 +140,13 @@ export class DraggablePanel {
             this.panelElement.style.top = '50%';
         }
         this._saveState();
+        
+        // Set initial draggable state based on the current mode when shown
+        if (window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches) {
+            this._setDraggable(false);
+        } else {
+            this._setDraggable(true);
+        }
     }
 
     hide() {

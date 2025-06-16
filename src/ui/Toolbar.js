@@ -4,9 +4,9 @@ import { PopoutPanel } from './components/PopoutPanel.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { SwitchComponent } from './components/SwitchComponent.js';
 
-import { onboardingManager } from './ui.js';
+
 import { generateShareUrl } from '../utils/utils.js';
-import { uiManager } from './UIManager.js';
+
 export class Toolbar {
     constructor(appContext, worldManagerInterface, libraryData) {
         this.appContext = appContext;
@@ -92,8 +92,7 @@ export class Toolbar {
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
         this._loadAndApplyUISettings();
-        EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => this.updateVisibility(mode));
-        this.updateVisibility(uiManager.getMode());
+
     }
 
     _setupGlobalPopoutListeners() {
@@ -105,7 +104,7 @@ export class Toolbar {
         EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
         
         const handleClickOutside = (event) => {
-            if (onboardingManager.isActive()) {
+            if (window.OnboardingManager && window.OnboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
                 if (tooltip) {
                     const rect = tooltip.getBoundingClientRect();
@@ -353,7 +352,7 @@ export class Toolbar {
                 buttonElement.addEventListener('click', () => {
                     this.popoutPanels[config.name]?.toggle();
                     if (tourName) {
-                        onboardingManager.startTour(tourName);
+                        window.OnboardingManager && window.OnboardingManager.startTour(tourName);
                     }
                 });
             }
@@ -427,12 +426,7 @@ export class Toolbar {
 
 
 
-    updateVisibility(mode) {
-        if (this.toolbarElement) {
-            const isVisible = (mode === 'desktop');
-            this.toolbarElement.classList.toggle('hidden', !isVisible);
-        }
-    }
+
 
     getPopout(panelName) { return this.popoutPanels[panelName]; }
 

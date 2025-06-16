@@ -1,16 +1,11 @@
 import * as Config from './core/config.js';
-import { WorldManager } from './core/WorldManager.js';
 import * as Renderer from './rendering/renderer.js';
-import * as UI from './ui/ui.js';
-import { onboardingManager } from './ui/ui.js';
 import { InputManager } from './ui/InputManager.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
-import { tours } from './ui/tourSteps.js'; 
-import { uiManager } from './ui/UIManager.js';
 import { AppContext } from './core/AppContext.js';
+import { UIManager } from './ui/UIManager.js';
 
 let gl;
-let worldManager;
 let appContext;
 let isInitialized = false;
 let lastTimestamp = 0;
@@ -19,7 +14,6 @@ let frameCount = 0;
 let lastFpsUpdateTime = 0;
 let actualFps = 0;
 let initializedWorkerCount = 0;
-let inputManager;
 
 function updateLoadingStatus(message) {
     const statusElement = document.getElementById('loading-status');
@@ -80,8 +74,6 @@ async function initialize() {
         return;
     }
 
-    uiManager.init();
-    
     const sharedSettings = parseUrlParameters();
 
     updateLoadingStatus("Fetching assets...");
@@ -102,31 +94,16 @@ async function initialize() {
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     updateLoadingStatus("Spooling up simulation workers...");
-    appContext = new AppContext(sharedSettings, libraryData);
-    worldManager = appContext.worldManager; // Overwrite local variable with the one from the context
-
-    const worldManagerInterfaceForUI = {
-        getCurrentRulesetHex: worldManager.getCurrentRulesetHex.bind(worldManager),
-        getCurrentRulesetArray: worldManager.getCurrentRulesetArray.bind(worldManager),
-        getSelectedWorldIndex: worldManager.getSelectedWorldIndex.bind(worldManager),
-        getSelectedWorldStats: worldManager.getSelectedWorldStats.bind(worldManager),
-        getWorldSettingsForUI: worldManager.getWorldSettingsForUI.bind(worldManager),
-        getEffectiveRuleForNeighborCount: worldManager.getEffectiveRuleForNeighborCount.bind(worldManager),
-        getCanonicalRuleDetails: worldManager.getCanonicalRuleDetails.bind(worldManager),
-        getSymmetryData: worldManager.getSymmetryData.bind(worldManager),
-        getEntropySamplingState: worldManager.getEntropySamplingState.bind(worldManager),
-        getCurrentCameraState: worldManager.getCurrentCameraState.bind(worldManager),
-        getRulesetHistoryArrays: worldManager.getRulesetHistoryArrays.bind(worldManager),
-    };
     
-    inputManager = new InputManager(canvas, worldManager, appContext, uiManager.isMobile());
+    // Step 1: Create the application context. It creates all core components.
+    appContext = new AppContext(sharedSettings, libraryData);
 
-
-    updateLoadingStatus("Initializing UI components...");
-    if (!UI.initUI(appContext, worldManagerInterfaceForUI, libraryData)) {
-        console.error("UI initialization failed.");
-        return;
-    }
+    // Step 2: Create and initialize the UI Orchestrator.
+    const uiManager = new UIManager(appContext);
+    uiManager.init();
+    
+    // Step 3: Setup InputManager, passing the detected mode
+    const inputManager = new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {
         const hexElement = document.getElementById(`loader-hex-${worldIndex}`);
@@ -137,12 +114,12 @@ async function initialize() {
         updateLoadingStatus(`Spooling up simulation workers... (${initializedWorkerCount}/${Config.NUM_WORLDS})`);
     });
 
-    EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, worldManager.getSelectedWorldIndex());
+    EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, appContext.worldManager.getSelectedWorldIndex());
     EventBus.dispatch(EVENTS.SIMULATION_PAUSED, appContext.simulationController.getState().isPaused);
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
-        worldManager.terminateAllWorkers();
+        appContext.worldManager.terminateAllWorkers();
     });
 
     isInitialized = true;
@@ -153,13 +130,13 @@ async function initialize() {
 }
 
 function handleResize() {
-    if (isInitialized) {
-        if (gl) Renderer.resizeRenderer();
+    if (isInitialized && gl) {
+        Renderer.resizeRenderer();
     }
 }
 
 function handleVisibilityChange() {
-    if (!isInitialized || !worldManager) return;
+    if (!isInitialized || !appContext) return;
     if (document.hidden) {
         if (!appContext.simulationController.getState().isPaused) {
             appContext.simulationController.setPause(true);
@@ -175,14 +152,12 @@ function handleVisibilityChange() {
 }
 
 function renderLoop(timestamp) {
-    if (!isInitialized || !worldManager) {
+    if (!isInitialized || !appContext) {
         requestAnimationFrame(renderLoop);
         return;
     }
     
-    const allWorldsStatus = worldManager.getWorldsFullStatus();
-    
-    const areAllWorkersInitialized = worldManager.areAllWorkersInitialized();
+    const areAllWorkersInitialized = appContext.worldManager.areAllWorkersInitialized();
     if (areAllWorkersInitialized) {
         const loadingIndicator = document.getElementById('loading-indicator');
         if (loadingIndicator && loadingIndicator.style.display !== 'none') {
@@ -191,10 +166,11 @@ function renderLoop(timestamp) {
                 loadingIndicator.style.opacity = '0';
                 setTimeout(() => { 
                     loadingIndicator.style.display = 'none'; 
-                    if (uiManager.getMode() === 'mobile') {
-                        onboardingManager.startTour('coreMobile');
+                    const uiManager = new UIManager(appContext);
+                    if (uiManager.isMobile()) {
+                        appContext.onboardingManager.startTour('coreMobile');
                     } else {
-                        onboardingManager.startTour('core');
+                        appContext.onboardingManager.startTour('core');
                     }
                 }, 500);
             }, 250);
@@ -208,7 +184,7 @@ function renderLoop(timestamp) {
         actualFps = frameCount;
         frameCount = 0;
         lastFpsUpdateTime = timestamp;
-        const selectedStats = worldManager.getSelectedWorldStats();
+        const selectedStats = appContext.worldManager.getSelectedWorldStats();
         const targetTps = appContext.simulationController.getState().speed;
         EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
     }
