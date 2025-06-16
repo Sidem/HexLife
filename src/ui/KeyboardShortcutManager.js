@@ -39,10 +39,13 @@ export class KeyboardShortcutManager {
             // Simulation Actions
             { key: 'p', handler: () => this.appContext.simulationController.togglePause() },
             { key: 'g', handler: () => this.appContext.rulesetActionController.generate() },
+            { key: 'o', handler: () => this.appContext.rulesetActionController.clone() },
             { key: 'm', handler: () => this.appContext.rulesetActionController.cloneAndMutate() },
             { key: 'm', shiftKey: true, handler: () => this.appContext.rulesetActionController.mutate() },
             
             // World State Actions
+            { key: 'd', handler: () => { this.appContext.worldsController.resetDensitiesToDefault(); this.appContext.worldsController.resetAllWorldsToInitialDensities(); } },
+            { key: 'd', shiftKey: true, handler: () => { this.appContext.worldsController.applySelectedDensityToAll(); this.appContext.worldsController.resetAllWorldsToInitialDensities(); } },
             { key: 'r', handler: () => this.appContext.worldsController.resetAllWorldsToInitialDensities() },
             { key: 'r', shiftKey: true, handler: () => this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected') },
             { key: 'c', handler: () => this.appContext.worldsController.clearWorlds('all') },
@@ -50,8 +53,7 @@ export class KeyboardShortcutManager {
 
             // History Actions
             { key: 'z', ctrlKey: true, handler: () => document.getElementById('undoButton')?.click() },
-            { key: 'y', ctrlKey: true, handler: () => document.getElementById('redoButton')?.click() },
-            { key: 'z', ctrlKey: true, shiftKey: true, handler: () => document.getElementById('redoButton')?.click() }, // Common alternative for Redo
+            { key: 'z', ctrlKey: true, shiftKey: true, handler: () => document.getElementById('redoButton')?.click() },
 
             // Numeric World Selection (1-9)
             ...Array.from({ length: 9 }, (_, i) => ({

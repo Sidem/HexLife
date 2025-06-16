@@ -84,6 +84,8 @@ export const EVENTS = {
     COMMAND_MUTATE_RULESET: 'command:mutateRuleset',
     /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count'}} data - Parameters for cloning and mutating. */
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
+    /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
+    COMMAND_CLONE_RULESET: 'command:cloneRuleset',
     /** @param {{worldIndex: number}} data - The world index for which to undo a ruleset change. */
     COMMAND_UNDO_RULESET: 'command:undoRuleset',
     /** @param {{worldIndex: number}} data - The world index for which to redo a ruleset change. */

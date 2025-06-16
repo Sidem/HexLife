@@ -162,14 +162,17 @@ export class ToolsBottomSheet extends BottomSheet {
         const actions = [
             { id: 'generate', icon: '✨', text: 'Generate' },
             { id: 'mutate', icon: '🦠', text: 'Mutate' },
-            { id: 'clone', icon: '🧬', text: 'Clone & Mutate' },
+            { id: 'clone', icon: '👯', text: 'Clone' },
+            { id: 'clone-mutate', icon: '🧬', text: 'Clone & Mutate' },
             { id: 'clear-one', icon: '🧹', text: 'Clear' },
-            { id: 'clear-all', icon: '💥', text: 'Clear All' },
+            { id: 'clear-all', icon: '🌍', text: 'Clear All' },
             { id: 'reset-one', icon: '🔄', text: 'Reset' },
-            { id: 'reset-all', icon: '🌍', text: 'Reset All' }
+            { id: 'reset-all', icon: '♻️', text: 'Reset All' },
+            { id: 'reset-densities', icon: '🎨', text: 'Default Densities' },
+            { id: 'apply-density-all', icon: '🎯', text: 'Apply Density' }
         ];
 
-        const savedSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone', 'reset-all'], locked: true });
+        const savedSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true });
         actions.forEach(action => {
             const isChecked = savedSettings.enabled.includes(action.id);
             const li = document.createElement('li');

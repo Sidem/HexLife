@@ -69,6 +69,7 @@ export class Toolbar {
             mutateModeSwitch: document.getElementById('mutateModeSwitch'),
             mutateScopeSwitch: document.getElementById('mutateScopeSwitch'),
             triggerMutationButton: document.getElementById('triggerMutationButton'),
+            cloneButton: document.getElementById('cloneButton'),
             cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
             rulesetInputPopout: document.getElementById('rulesetInputPopout'),
             setRuleFromPopoutButton: document.getElementById('setRuleFromPopoutButton'),
@@ -262,6 +263,7 @@ export class Toolbar {
         });
 
         this.uiElements.triggerMutationButton.addEventListener('click', () => this.appContext.rulesetActionController.mutate());
+        this.uiElements.cloneButton.addEventListener('click', () => this.appContext.rulesetActionController.clone());
         this.uiElements.cloneAndMutateButton.addEventListener('click', () => this.appContext.rulesetActionController.cloneAndMutate());
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();

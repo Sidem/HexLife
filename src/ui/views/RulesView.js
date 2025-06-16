@@ -136,6 +136,7 @@ export class RulesView extends BaseComponent {
             <div class="form-group" id="mobileMutateScopeMount"></div>
             <div class="form-group-buttons" style="display: flex; gap: 10px; margin-top: 10px;">
                 <button class="action-button" data-action="mutate" style="flex: 1;">Mutate</button>
+                <button class="action-button" data-action="clone" style="flex: 1;">Clone</button>
                 <button class="action-button" data-action="clone-mutate" style="flex: 1;">Clone & Mutate</button>
             </div>
         `;
@@ -248,6 +249,11 @@ export class RulesView extends BaseComponent {
 
         this.panes.mutate.querySelector('[data-action="mutate"]').addEventListener('click', () => {
             this.appContext.rulesetActionController.mutate();
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+        });
+
+        this.panes.mutate.querySelector('[data-action="clone"]').addEventListener('click', () => {
+            this.appContext.rulesetActionController.clone();
             document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 

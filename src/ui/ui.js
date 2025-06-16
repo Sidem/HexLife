@@ -62,14 +62,21 @@ function initMobileUI(appContext, worldManagerInterface) {
             }
         },
         'clone': {
+            icon: '👯', title: 'Clone', handler: () => {
+                appContext.rulesetActionController.clone();
+            }
+        },
+        'clone-mutate': {
             icon: '🧬', title: 'Clone & Mutate', handler: () => {
                 appContext.rulesetActionController.cloneAndMutate();
             }
         },
         'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
-        'clear-all': { icon: '💥', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
+        'clear-all': { icon: '🌍', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
         'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
-        'reset-all': { icon: '🌍', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} }
+        'reset-all': { icon: '♻️', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
+        'reset-densities': { icon: '🎨', title: 'Reset to Default Densities', command: EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, payload: {} },
+        'apply-density-all': { icon: '🎯', title: 'Apply Selected Density to All', command: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, payload: {} }
     };
 
     function renderCustomFabs() {

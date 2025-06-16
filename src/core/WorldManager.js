@@ -188,6 +188,10 @@ export class WorldManager {
             this._cloneAndMutateOthers(data.mutationRate, data.mode);
         });
 
+        EventBus.subscribe(EVENTS.COMMAND_CLONE_RULESET, () => {
+            this._cloneRuleset();
+        });
+
         EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REDO_RULESET, (data) => this.redoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, (data) => this.revertToHistoryState(data.worldIndex, data.historyIndex));
@@ -570,6 +574,47 @@ export class WorldManager {
         });
 
         
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); 
+    }
+
+    _cloneRuleset = () => {
+        const selectedProxy = this.worlds[this.selectedWorldIndex];
+        if (!selectedProxy) {
+            console.error("Cannot clone: selected world proxy is not available.");
+            return;
+        }
+
+        const sourceRulesetHex = this.getCurrentRulesetHex();
+        if (sourceRulesetHex === "Error" || sourceRulesetHex === "N/A") {
+             console.error("Cannot clone: selected world's ruleset is invalid.");
+             alert("Selected world has an invalid ruleset and cannot be cloned.");
+             return;
+        }
+
+        this.worlds.forEach((proxy, idx) => {
+            if (idx !== this.selectedWorldIndex) {
+                const newRulesetBuffer = hexToRuleset(sourceRulesetHex).buffer.slice(0);
+                proxy.setRuleset(newRulesetBuffer);
+            }
+            
+            this._addRulesetToHistory(idx, sourceRulesetHex);
+            this.worldSettings[idx].rulesetHex = sourceRulesetHex;
+
+            if (this.worldSettings[idx]) {
+                proxy.resetWorld(this.worldSettings[idx].initialDensity);
+                
+                if (!this.worldSettings[idx].enabled) {
+                    this.worldSettings[idx].enabled = true;
+                    proxy.setEnabled(true);
+                }
+                if (!this.isGloballyPaused) {
+                    proxy.startSimulation();
+                }
+            }
+        });
+
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
         EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); 

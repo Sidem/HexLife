@@ -83,4 +83,8 @@ export class RulesetActionController {
             mode: this.state.mutateMode
         });
     }
+
+    clone() {
+        EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET, {});
+    }
 } 
