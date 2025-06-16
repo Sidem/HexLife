@@ -8,9 +8,9 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 
 
 export class PanelManager {
-    constructor(appContext, worldManagerInterface) {
+    constructor(appContext) {
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.panels = {};
 
         this.libraryData = null;

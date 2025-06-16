@@ -8,10 +8,10 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 
 
 export class ToolsBottomSheet extends BottomSheet {
-    constructor(id, triggerElement, appContext, worldManagerInterface) {
+    constructor(id, triggerElement, appContext) {
         super(id, triggerElement, { title: 'Simulation Tools' });
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.render();
         this.attachEventListeners();
     }

@@ -4,9 +4,9 @@ import { PopoutPanel } from './components/PopoutPanel.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
 export class TopInfoBar {
-    constructor(appContext, worldManagerInterface) {
+    constructor(appContext) {
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.uiElements = null;
         this.popoutPanels = {};
     }

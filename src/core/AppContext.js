@@ -39,10 +39,10 @@ export class AppContext {
         this.simulationController = new SimulationController();
         this.visualizationController = new VisualizationController();
         this.worldsController = new WorldsController();
-        this.panelManager = new PanelManager(this, this.worldManager);
+        this.panelManager = new PanelManager(this);
         this.panelManager.init(libraryData);
 
-        this.toolbar = new Toolbar(this, this.worldManager, libraryData);
+        this.toolbar = new Toolbar(this, libraryData);
         this.onboardingManager = new OnboardingManager({
             overlay: document.getElementById('onboarding-overlay'),
             tooltip: document.getElementById('onboarding-tooltip'),

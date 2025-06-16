@@ -4,9 +4,9 @@
  * improving maintainability and extensibility.
  */
 export class KeyboardShortcutManager {
-    constructor(appContext, worldManagerInterface, panelManager, toolbar) {
+    constructor(appContext, panelManager, toolbar) {
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.panelManager = panelManager;
         this.toolbar = toolbar;
         this.shortcuts = [];

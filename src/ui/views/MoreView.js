@@ -2,9 +2,10 @@ import { BaseComponent } from '../components/BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class MoreView extends BaseComponent {
-    constructor(mountPoint, worldManagerInterface) {
+    constructor(mountPoint, appContext) {
         super(mountPoint);
-        this.worldManager = worldManagerInterface;
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
         this.element = null;
     }
 

@@ -4,9 +4,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class WorldsView extends BaseComponent {
-    constructor(mountPoint, worldManagerInterface) {
+    constructor(mountPoint, appContext) {
         super(mountPoint);
-        this.worldManager = worldManagerInterface;
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
         this.element = null;
         this.worldSliders = [];
     }

@@ -8,9 +8,9 @@ import { SwitchComponent } from './components/SwitchComponent.js';
 import { generateShareUrl } from '../utils/utils.js';
 
 export class Toolbar {
-    constructor(appContext, worldManagerInterface, libraryData) {
+    constructor(appContext, libraryData) {
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.libraryData = libraryData;
         
         this.uiElements = null;

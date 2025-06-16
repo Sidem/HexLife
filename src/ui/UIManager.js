@@ -12,6 +12,7 @@ import { LearningView } from './views/LearningView.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
+import { generateShareUrl } from '../utils/utils.js';
 
 
 // The media query is a constant local to the manager that needs it.
@@ -39,11 +40,11 @@ export class UIManager {
         this.mediaQueryList.addEventListener('change', () => this.updateMode(true));
 
         // 2. Initialize Core UI Components
-        const topInfoBar = new TopInfoBar(appContext, worldManager);
+        const topInfoBar = new TopInfoBar(appContext);
         topInfoBar.init();
         toolbar.init();
 
-        const keyboardManager = new KeyboardShortcutManager(appContext, worldManager, panelManager, toolbar);
+        const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
         keyboardManager.init();
 
         // Add components to the managed list
@@ -128,13 +129,13 @@ export class UIManager {
         // Init container views for mobile
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            this.mobileViews.more = new MoreView(mobileViewsContainer, worldManager);
+            this.mobileViews.more = new MoreView(mobileViewsContainer, appContext);
             this.mobileViews.more.render();
-            this.mobileViews.rules = new RulesView(mobileViewsContainer, appContext, libraryData, worldManager);
+            this.mobileViews.rules = new RulesView(mobileViewsContainer, appContext, libraryData);
             this.mobileViews.rules.render();
-            this.mobileViews.worlds = new WorldsView(mobileViewsContainer, worldManager);
+            this.mobileViews.worlds = new WorldsView(mobileViewsContainer, appContext);
             this.mobileViews.worlds.render();
-            this.mobileViews.analyze = new AnalyzeView(mobileViewsContainer, worldManager);
+            this.mobileViews.analyze = new AnalyzeView(mobileViewsContainer, appContext);
             this.mobileViews.analyze.render();
             this.mobileViews.editor = new EditorView(mobileViewsContainer, panelManager);
             this.mobileViews.editor.render();
@@ -154,7 +155,7 @@ export class UIManager {
                 <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
                 <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
             `;
-            new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext, worldManager);
+            new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext);
             fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => appContext.simulationController.togglePause());
             fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
             
@@ -252,7 +253,6 @@ export class UIManager {
             alert('Could not generate a share link for the current setup.');
             return;
         }
-
         if (this.isMobile() && navigator.share) {
             navigator.share({
                 title: 'HexLife Explorer Setup',

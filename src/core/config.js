@@ -1,5 +1,5 @@
 export const GRID_ROWS = 32*6;
-export const GRID_COLS = 37*6;
+export const GRID_COLS = 37*6; // GRID_ROWS * (1/(sqrt(3)/2))
 export const NUM_CELLS = GRID_ROWS * GRID_COLS;
 export const HEX_SIZE = 50; 
 export const HEX_WIDTH = 2 * HEX_SIZE;

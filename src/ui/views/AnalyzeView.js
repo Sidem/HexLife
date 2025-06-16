@@ -5,9 +5,10 @@ import { EntropyPlotPlugin } from '../components/analysis_plugins/EntropyPlotPlu
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class AnalyzeView extends BaseComponent {
-    constructor(mountPoint, worldManagerInterface) {
+    constructor(mountPoint, appContext) {
         super(mountPoint);
-        this.worldManager = worldManagerInterface;
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
         this.element = null;
         this.plugins = [];
         this.panes = {};

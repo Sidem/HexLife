@@ -4,11 +4,11 @@ import { SwitchComponent } from '../components/SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesView extends BaseComponent {
-    constructor(mountPoint, appContext, libraryData, worldManagerInterface) {
+    constructor(mountPoint, appContext, libraryData) {
         super(mountPoint);
         this.appContext = appContext;
         this.libraryData = libraryData;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.element = null;
         this.panes = {};
         this.segments = {};
