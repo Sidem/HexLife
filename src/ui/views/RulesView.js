@@ -211,7 +211,7 @@ export class RulesView extends BaseComponent {
     attachEventListeners() {
         // Main view close button
         this._addDOMListener(this.element.querySelector('.mobile-view-close-button'), 'click', () => {
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
         // Header segment buttons
@@ -236,21 +236,21 @@ export class RulesView extends BaseComponent {
         // Generate Pane
         this._addDOMListener(this.panes.generate.querySelector('[data-action="generate"]'), 'click', () => {
             this.appContext.rulesetActionController.generate();
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
         // Mutate Pane
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="mutate"]'), 'click', () => {
             this.appContext.rulesetActionController.mutate();
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone"]'), 'click', () => {
             this.appContext.rulesetActionController.clone();
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone-mutate"]'), 'click', () => {
             this.appContext.rulesetActionController.cloneAndMutate();
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
         // Library Panes
@@ -262,13 +262,13 @@ export class RulesView extends BaseComponent {
                     controllerState.genScope,
                     controllerState.genAutoReset
                 );
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
             }
         });
         this._addDOMListener(this.panes["library-patterns"], 'click', e => {
             if (e.target.matches('button[data-action="place-pattern"]')) {
                 this.appContext.libraryController.placePattern(e.target.dataset.patternName);
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
             }
         });
 

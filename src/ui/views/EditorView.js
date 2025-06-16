@@ -1,4 +1,5 @@
 import { BaseComponent } from '../components/BaseComponent.js';
+import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class EditorView extends BaseComponent {
     constructor(mountPoint, panelManager) {
@@ -34,7 +35,7 @@ export class EditorView extends BaseComponent {
 
     attachEventListeners() {
         this.element.querySelector('.mobile-view-close-button').addEventListener('click', () => {
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
     }
 

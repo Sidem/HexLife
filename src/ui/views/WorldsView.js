@@ -39,7 +39,7 @@ export class WorldsView extends BaseComponent {
     
     attachEventListeners() {
         this._addDOMListener(this.element.querySelector('[data-action="close"]'), 'click', () => {
-            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="apply-density-all"]'), 'click', () => {

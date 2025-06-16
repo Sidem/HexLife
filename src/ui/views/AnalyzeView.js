@@ -120,7 +120,7 @@ export class AnalyzeView extends BaseComponent {
     attachEventListeners() {
         this.element.addEventListener('click', e => {
             if (e.target.matches('.mobile-view-close-button')) {
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
                 return;
             }
         });
