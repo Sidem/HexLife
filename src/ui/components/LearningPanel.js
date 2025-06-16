@@ -3,9 +3,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningPanel extends DraggablePanel {
-    constructor(panelElement, worldManagerInterface, options = {}) {
+    constructor(panelElement, appContext, options = {}) {
         super(panelElement, 'h3', { ...options, persistence: { identifier: 'learning' } });
-
+        
+        this.appContext = appContext;
         this.tourListElement = this.panelElement.querySelector('#desktop-tour-list');
         this.availableTours = [
             { id: 'core', name: 'Main Orientation' },

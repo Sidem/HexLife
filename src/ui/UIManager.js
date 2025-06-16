@@ -222,6 +222,7 @@ export class UIManager {
             reader.onerror = () => { alert(`Error reading file.`); };
             reader.readAsText(data.file);
         });
+        EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
     }
 
@@ -243,6 +244,46 @@ export class UIManager {
             }
         });
         this.mobileViews = {};
+    }
+
+    _onShareSetup() {
+        const url = generateShareUrl(this.appContext.worldManager);
+        if (!url) {
+            alert('Could not generate a share link for the current setup.');
+            return;
+        }
+
+        if (this.isMobile() && navigator.share) {
+            navigator.share({
+                title: 'HexLife Explorer Setup',
+                text: 'Check out this cellular automaton setup!',
+                url: url,
+            }).catch(err => {
+                // Ignore AbortError, log others
+                if (err.name !== 'AbortError') {
+                    console.error('Share failed:', err);
+                }
+            });
+        } else {
+            // Desktop logic: open popout and copy to clipboard
+            const sharePopout = this.appContext.toolbar.getPopout('share');
+            const shareLinkInput = document.getElementById('shareLinkInput');
+
+            if (sharePopout && shareLinkInput) {
+                shareLinkInput.value = url;
+                sharePopout.show();
+                // Select the text for easy copying
+                shareLinkInput.select();
+            } else {
+                // Fallback for when popout isn't available
+                navigator.clipboard.writeText(url).then(() => {
+                    alert('Share link copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy share link:', err);
+                    alert('Could not copy link.');
+                });
+            }
+        }
     }
 
     showMobileView({ targetView, currentView }) {

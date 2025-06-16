@@ -38,22 +38,20 @@ export class WorldsView extends BaseComponent {
     }
     
     attachEventListeners() {
-        this.element.addEventListener('click', (e) => {
-            const action = e.target.dataset.action;
-            switch (action) {
-                case 'close':
-                    document.querySelector('.tab-bar-button[data-view="simulate"]').click();
-                    break;
-                case 'apply-density-all':
-                    EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
-                    break;
-                case 'reset-densities':
-                    EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
-                    break;
-                case 'reset-all-worlds':
-                    EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
-                    break;
-            }
+        this._addDOMListener(this.element.querySelector('[data-action="close"]'), 'click', () => {
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="apply-density-all"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="reset-densities"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="reset-all-worlds"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
         });
     }
 

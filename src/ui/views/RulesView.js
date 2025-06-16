@@ -209,70 +209,71 @@ export class RulesView extends BaseComponent {
     }
 
     attachEventListeners() {
-        this.element.addEventListener('click', e => {
-            if (e.target.matches('.mobile-view-close-button')) {
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
-            }
+        // Main view close button
+        this._addDOMListener(this.element.querySelector('.mobile-view-close-button'), 'click', () => {
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
+        // Header segment buttons
         this.element.querySelector('.rules-view-header').addEventListener('click', e => {
             if (e.target.matches('.rules-view-segment')) {
                 this.setActivePane(e.target.dataset.pane);
             }
         });
 
-        this.element.addEventListener('click', e => {
-            const action = e.target.dataset.action;
-            if (action === 'undo' || action === 'redo') {
-                if (!this.worldManager) return;
-                const selectedIndex = this.worldManager.getSelectedWorldIndex();
-                const event = action === 'undo' ? EVENTS.COMMAND_UNDO_RULESET : EVENTS.COMMAND_REDO_RULESET;
-                EventBus.dispatch(event, { worldIndex: selectedIndex });
-            }
+        // History buttons
+        this._addDOMListener(this.element.querySelector('[data-action="undo"]'), 'click', () => {
+            if (!this.worldManager) return;
+            EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
+        });
+        this._addDOMListener(this.element.querySelector('[data-action="redo"]'), 'click', () => {
+            if (!this.worldManager) return;
+            EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
         });
 
-        this.panes.generate.querySelector('[data-action="generate"]').addEventListener('click', () => {
+        // --- Per-Pane Action Buttons ---
+
+        // Generate Pane
+        this._addDOMListener(this.panes.generate.querySelector('[data-action="generate"]'), 'click', () => {
             this.appContext.rulesetActionController.generate();
             document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
-        this.panes.mutate.querySelector('[data-action="mutate"]').addEventListener('click', () => {
+        // Mutate Pane
+        this._addDOMListener(this.panes.mutate.querySelector('[data-action="mutate"]'), 'click', () => {
             this.appContext.rulesetActionController.mutate();
             document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
-
-        this.panes.mutate.querySelector('[data-action="clone"]').addEventListener('click', () => {
+        this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone"]'), 'click', () => {
             this.appContext.rulesetActionController.clone();
             document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
-
-        this.panes.mutate.querySelector('[data-action="clone-mutate"]').addEventListener('click', () => {
+        this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone-mutate"]'), 'click', () => {
             this.appContext.rulesetActionController.cloneAndMutate();
             document.querySelector('.tab-bar-button[data-view="simulate"]').click();
         });
 
-        this.panes["library-rulesets"].addEventListener('click', e => {
+        // Library Panes
+        this._addDOMListener(this.panes["library-rulesets"], 'click', e => {
             if (e.target.matches('button[data-hex]')) {
                 const controllerState = this.appContext.rulesetActionController.getState();
                 this.appContext.libraryController.loadRuleset(
-                    e.target.dataset.hex, 
-                    controllerState.genScope, 
+                    e.target.dataset.hex,
+                    controllerState.genScope,
                     controllerState.genAutoReset
                 );
-                //close the rules view
+                document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+            }
+        });
+        this._addDOMListener(this.panes["library-patterns"], 'click', e => {
+            if (e.target.matches('button[data-action="place-pattern"]')) {
+                this.appContext.libraryController.placePattern(e.target.dataset.patternName);
                 document.querySelector('.tab-bar-button[data-view="simulate"]').click();
             }
         });
 
-        this.panes["library-patterns"].addEventListener('click', e => {
-            if (e.target.matches('button[data-action="place-pattern"]')) {
-                const patternName = e.target.dataset.patternName;
-                this.appContext.libraryController.placePattern(patternName);
-                document.querySelector('.tab-bar-button[data-view="simulate"]').click(); // Go back to sim view
-            }
-        });
-
-        this.panes.direct.querySelector('[data-action="set-hex"]').addEventListener('click', () => {
+        // Direct Pane
+        this._addDOMListener(this.panes.direct.querySelector('[data-action="set-hex"]'), 'click', () => {
             const input = this.panes.direct.querySelector('.hex-input');
             const hex = input.value.trim().toUpperCase();
             if (/^[0-9A-F]{32}$/.test(hex)) {

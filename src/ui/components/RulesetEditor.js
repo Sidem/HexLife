@@ -5,19 +5,20 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditor extends DraggablePanel {
-    constructor(panelElement, worldManagerInterface, options = {}) {
-
-        
+    constructor(panelElement, appContext, options = {}) {
         super(panelElement, 'h3', { 
             ...options, 
             persistence: { identifier: 'ruleset' },
             onDragEnd: () => this._saveEditorSettings() 
         });
 
-        if (!worldManagerInterface) {
-            console.error('RulesetEditor: worldManagerInterface is null.');
+        if (!appContext || !appContext.worldManager) {
+            console.error('RulesetEditor: appContext or worldManager is null.');
             return;
         }
+        
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
 
         if (options.isMobile) {
             const header = this.panelElement.querySelector('h3');
@@ -25,8 +26,6 @@ export class RulesetEditor extends DraggablePanel {
             const closeButton = this.panelElement.querySelector('.close-panel-button');
             if (closeButton) closeButton.classList.add('hidden');
         }
-
-        this.worldManager = worldManagerInterface;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: panelElement.querySelector('#editorRulesetInput'),

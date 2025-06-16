@@ -5,6 +5,9 @@ export class EditorView extends BaseComponent {
         super(mountPoint);
         this.panelManager = panelManager;
         this.element = null;
+        this.editorPanel = null;
+        this.editorPanelOriginalParent = null;
+        this.mobileContentArea = null;
     }
 
     render() {
@@ -19,15 +22,12 @@ export class EditorView extends BaseComponent {
             <div id="mobile-editor-content" class="mobile-view-content-area">
                 </div>
         `;
-
-        // Get the existing desktop panel and move it into our mobile view
-        const editorPanel = this.panelManager.getPanel('rulesetEditor');
-        if (editorPanel) {
-            const contentArea = this.element.querySelector('#mobile-editor-content');
-            // Move the panel element itself, which contains all its UI and logic
-            contentArea.appendChild(editorPanel.panelElement);
+        this.editorPanel = this.panelManager.getPanel('rulesetEditor');
+        if (this.editorPanel) {
+            this.editorPanelOriginalParent = this.editorPanel.panelElement.parentElement;
         }
 
+        this.mobileContentArea = this.element.querySelector('#mobile-editor-content');
         this.mountPoint.appendChild(this.element);
         this.attachEventListeners();
     }
@@ -40,14 +40,18 @@ export class EditorView extends BaseComponent {
 
     show() {
         this.element.classList.remove('hidden');
-        const editorPanel = this.panelManager.getPanel('rulesetEditor');
-        if (editorPanel) {
-            editorPanel.show(false);
-            editorPanel.refreshViews();
+        if (this.editorPanel && this.mobileContentArea) {
+            this.mobileContentArea.appendChild(this.editorPanel.panelElement);
+            this.editorPanel.show(); 
+            this.editorPanel.refreshViews();
         }
     }
 
     hide() {
         this.element.classList.add('hidden');
+        if (this.editorPanel && this.editorPanelOriginalParent) {
+            this.editorPanelOriginalParent.appendChild(this.editorPanel.panelElement);
+            this.editorPanel.hide();
+        }
     }
 }

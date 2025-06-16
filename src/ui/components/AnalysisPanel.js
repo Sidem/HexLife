@@ -1,6 +1,5 @@
 import * as Config from '../../core/config.js';
 import { DraggablePanel } from './DraggablePanel.js';
-import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { Throttler } from '../../utils/throttler.js';
 
@@ -9,18 +8,16 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 
 export class AnalysisPanel extends DraggablePanel {
-    constructor(panelElement, worldManagerInterface, uiManagerRef, options = {}) {
-        
+    constructor(panelElement, appContext, options = {}) {
         super(panelElement, 'h3', { ...options, persistence: { identifier: 'analysis' } });
 
-        if (!worldManagerInterface) {
-            console.error('AnalysisPanel: worldManagerInterface is null.');
+        if (!appContext || !appContext.worldManager) {
+            console.error('AnalysisPanel: appContext or worldManager is null.');
             return;
         }
-
         
-        this.worldManager = worldManagerInterface;
-        this.uiManager = uiManagerRef;
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
         this.plugins = [];
         
         this.throttler = new Throttler(

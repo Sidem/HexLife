@@ -101,8 +101,11 @@ export class Toolbar {
                 if (popout !== excludePanel) popout.hide();
             });
         };
+
+        // This event ensures that opening one popout closes any others.
         EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
         
+        // This single global listener handles clicking outside of any popout to close them all.
         const handleClickOutside = (event) => {
             if (window.OnboardingManager && window.OnboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
@@ -115,16 +118,20 @@ export class Toolbar {
                 }
             }
 
+            // If no popouts are open, there's nothing to do.
             if (!this.activePopouts.some(p => !p.isHidden())) return;
-            const clickedInsidePopout = event.target.closest('.popout-panel');
-            const clickedTriggerButton = this.activePopouts.some(p => p.triggerElement && p.triggerElement.contains(event.target));
-            
-            if (!clickedInsidePopout && !clickedTriggerButton) {
+
+            // Check if the click was inside any of the popout panels or on any of their trigger buttons.
+            const clickedInsidePopout = this.activePopouts.some(p => p.popoutElement.contains(event.target));
+            const clickedOnTrigger = this.activePopouts.some(p => p.triggerElement.contains(event.target));
+
+            if (!clickedInsidePopout && !clickedOnTrigger) {
                 closeAll();
             }
         };
+
+        // Add the single listener to the document.
         document.addEventListener('click', handleClickOutside);
-        document.addEventListener('touchend', handleClickOutside);
     }
     
     _initPopoutPanels() {
@@ -359,7 +366,7 @@ export class Toolbar {
             }
         });
         
-        this.uiElements.shareButton.addEventListener('click', () => this._generateAndShowShareLink());
+        this.uiElements.shareButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP));
         
         this.uiElements.saveStateButton.addEventListener('click', this.appContext.worldsController.saveSelectedWorldState);
         this.uiElements.loadStateButton.addEventListener('click', () => {
@@ -399,14 +406,7 @@ export class Toolbar {
         this.sliderComponents.biasSliderPopout?.setDisabled(!controllerState.useCustomBias);
     }
 
-    _generateAndShowShareLink() {
-        const url = generateShareUrl(this.worldManager);
-        if (url) {
-            this.uiElements.shareLinkInput.value = url;
-            return true; 
-        }
-        return false; 
-    }
+
 
     _copyShareLink() {
         if (this.uiElements.shareLinkInput.value) {

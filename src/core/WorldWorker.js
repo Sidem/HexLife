@@ -305,22 +305,18 @@ function runTick() {
             isDetectingCycle = false;
             cyclePlaybackIndex = 0;
         } else {
-            // --- START: CORRECTED RECORDING LOGIC ---
             detectedCycle.push({
                 state: jsNextStateArray.slice(),
-                rules: jsNextRuleIndexArray.slice() // Record rule indices along with state
+                rules: jsNextRuleIndexArray.slice()
             });
-            // --- END: CORRECTED RECORDING LOGIC ---
         }
     } else if (!isCyclePlaybackMode && stateHistoryChecksums.has(newStateChecksum)) {
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
-        // --- START: CORRECTED RECORDING LOGIC ---
         detectedCycle = [{
             state: jsNextStateArray.slice(),
-            rules: jsNextRuleIndexArray.slice() // Record rule indices along with state
+            rules: jsNextRuleIndexArray.slice()
         }];
-        // --- END: CORRECTED RECORDING LOGIC ---
     }
 
     if (!isCyclePlaybackMode) {

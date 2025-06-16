@@ -22,26 +22,6 @@ export class PopoutPanel extends BaseComponent {
         this.popoutElement.style.position = 'absolute';
         this.popoutElement.style.zIndex = '1050'; 
         this.hide(false); 
-
-        if (this.options.closeOnOutsideClick) {
-            this.boundHandleOutsideClick = this._handleOutsideClick.bind(this);
-        }
-    }
-
-    _handleOutsideClick(event) {
-        if (this.popoutElement && !this.popoutElement.classList.contains('hidden')) {
-            const inOnboarding = event.target.closest('#onboarding-tooltip');
-            if (inOnboarding || event.target.id.includes('action')) {
-                return;
-            }
-
-            const inPopout = this.popoutElement.contains(event.target);
-            const isTrigger = event.target === this.triggerElement || this.triggerElement.contains(event.target);
-
-            if (!inPopout && !isTrigger) {
-                this.hide();
-            }
-        }
     }
 
     _reposition() {
@@ -120,9 +100,6 @@ export class PopoutPanel extends BaseComponent {
             this._reposition();
             this.popoutElement.classList.remove('hidden');
             this.triggerElement.classList.add('active');
-            if (this.options.closeOnOutsideClick) {
-                setTimeout(() => document.addEventListener('click', this.boundHandleOutsideClick), 0);
-            }
             
             EventBus.dispatch(EVENTS.POPOUT_SHOWN, { panel: this });
         }
@@ -132,9 +109,6 @@ export class PopoutPanel extends BaseComponent {
         if (this.popoutElement) {
             this.popoutElement.classList.add('hidden');
             this.triggerElement.classList.remove('active');
-            if (this.options.closeOnOutsideClick) {
-                document.removeEventListener('click', this.boundHandleOutsideClick);
-            }
         }
     }
 
@@ -154,9 +128,6 @@ export class PopoutPanel extends BaseComponent {
     }
 
     destroy() {
-        if (this.options.closeOnOutsideClick) {
-            document.removeEventListener('click', this.boundHandleOutsideClick);
-        }
         super.destroy(); 
     }
 }

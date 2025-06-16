@@ -34,48 +34,28 @@ export class MoreView extends BaseComponent {
     }
 
     attachEventListeners() {
-        this.element.addEventListener('click', (e) => {
-            const action = e.target.dataset.action;
-            switch (action) {
-                case 'close':
-                    document.querySelector('.tab-bar-button[data-view="simulate"]').click();
-                    break;
-                case 'save':
-                    EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
-                    break;
-                    case 'share':
-                        const url = generateShareUrl(this.worldManager);
-                        if (!url) break;
-                    
-                        if (navigator.share) {
-                            navigator.share({
-                                title: 'HexLife Explorer Setup',
-                                text: 'Check out this cellular automaton setup!',
-                                url: url,
-                            }).catch(err => console.error('Share failed:', err));
-                        } else {
-                            navigator.clipboard.writeText(url).then(() => {
-                                alert('Share link copied to clipboard!');
-                            }).catch(err => {
-                                console.error('Failed to copy share link:', err);
-                                alert('Could not copy link. Please copy it manually from the address bar on desktop.');
-                            });
-                        }
-                        break;
-                case 'help':
-                    // We can trigger the onboarding tour
-                    window.OnboardingManager && window.OnboardingManager.startTour('coreMobile', true);
-                    break;
-            }
+        this._addDOMListener(this.element.querySelector('[data-action="close"]'), 'click', () => {
+            document.querySelector('.tab-bar-button[data-view="simulate"]').click();
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="save"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="share"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {
+            window.OnboardingManager && window.OnboardingManager.startTour('coreMobile', true);
         });
 
         const fileInput = this.element.querySelector('#mobileFileInput');
-        fileInput.addEventListener('change', e => {
+        this._addDOMListener(fileInput, 'change', e => {
             const file = e.target.files[0];
             if (!file) return;
-            // This reuses the existing file reading logic from the main thread
             EventBus.dispatch(EVENTS.TRIGGER_FILE_LOAD, { file });
-            e.target.value = null; // Reset for next use
+            e.target.value = null;
         });
     }
 

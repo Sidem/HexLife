@@ -7,15 +7,15 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 export class SetupPanel extends DraggablePanel {
-    constructor(panelElement, appContext, worldManagerInterface, options = {}) { 
+    constructor(panelElement, appContext, options = {}) { 
         super(panelElement, 'h3', { ...options, persistence: { identifier: 'setup' } });
 
-        if (!worldManagerInterface) {
-            console.error('SetupPanel: worldManagerInterface is null.');
+        if (!appContext || !appContext.worldManager) {
+            console.error('SetupPanel: appContext or worldManager is null.');
             return;
         }
         this.appContext = appContext;
-        this.worldManager = worldManagerInterface;
+        this.worldManager = appContext.worldManager;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeSetupPanelButton') || panelElement.querySelector('.close-panel-button'),
             worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),

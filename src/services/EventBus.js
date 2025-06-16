@@ -142,7 +142,9 @@ export const EVENTS = {
     COMMAND_CLEAR_GHOST_PREVIEW: 'command:clearGhostPreview',
     /** @event Emitted with no payload to toggle between pan and draw interaction modes. */
     COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
-    
+    /** @event Emitted with no payload to trigger the share functionality. */
+    COMMAND_SHARE_SETUP: 'command:shareSetup',
+
     // --- UI State Change Events ---
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */
     UI_RULESET_SCOPE_CHANGED: 'ui:rulesetScopeChanged', 

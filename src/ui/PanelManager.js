@@ -27,22 +27,13 @@ export class PanelManager {
         this.libraryData = libraryData;
 
         this.panelConfig.forEach(config => {
-            const panelElement = document.getElementById(config.elementId); // Find element by ID
+            const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
                 const PanelClass = config.constructor;
-                if (PanelClass === AnalysisPanel) {
-                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, this, config.options);
-                } else if (PanelClass === SetupPanel) {
-                    this.panels[config.name] = new PanelClass(panelElement, this.appContext, this.worldManager, config.options);
-                } else if (PanelClass === LearningPanel) {
-                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
-                } else {
-                    this.panels[config.name] = new PanelClass(panelElement, this.worldManager, config.options);
-                }
+                // Standardize constructor call to pass the full appContext
+                this.panels[config.name] = new PanelClass(panelElement, this.appContext, config.options);
             }
         });
-
-
 
         this._setupPanelToggleListeners();
         this._setupEventListeners();

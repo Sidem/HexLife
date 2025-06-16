@@ -18,10 +18,11 @@ class ElementPool {
 }
 
 export class RuleRankPanel extends DraggablePanel {
-    constructor(panelElement, worldManagerInterface, options = {}) {
+    constructor(panelElement, appContext, options = {}) {
         super(panelElement, 'h3', { ...options, persistence: { identifier: 'ruleRank' } });
 
-        this.worldManager = worldManagerInterface;
+        this.appContext = appContext;
+        this.worldManager = appContext.worldManager;
         this.uiElements = {
             closeButton: panelElement.querySelector('#closeRankPanelButton'),
             contentArea: panelElement.querySelector('#ruleRankContent'),

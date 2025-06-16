@@ -928,7 +928,9 @@ export class WorldManager {
         };
     }
 
-    getEntropySamplingState = () => ({ enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
+    getEntropySamplingState = () => {
+        return { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate };
+    }
 
     areAllWorkersInitialized = () => {
         return this.worlds.length > 0 && this.worlds.every(proxy => proxy && proxy.isInitialized);
