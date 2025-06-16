@@ -185,17 +185,28 @@ export class Toolbar {
     
     _initPopoutControls() {
         const controllerState = this.appContext.rulesetActionController.getState();
-        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { id: 'speedSliderPopout', min: 1, max: Config.MAX_SIM_SPEED, step: 1, value: this.appContext.simulationController.getState().speed, unit: 'tps', showValue: true, onChange: this.appContext.simulationController.setSpeed });
-        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { id: 'brushSliderPopout', min: 0, max: Config.MAX_NEIGHBORHOOD_SIZE, step: 1, value: this.appContext.brushController.getState().brushSize, unit: '', showValue: true, onChange: this.appContext.brushController.setBrushSize });
+        const speedConfig = this.appContext.simulationController.getSpeedConfig();
+        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { 
+            id: 'speedSliderPopout', 
+            ...speedConfig,
+            value: this.appContext.simulationController.getState().speed, 
+            showValue: true, 
+            onChange: this.appContext.simulationController.setSpeed 
+        });
+        const brushConfig = this.appContext.brushController.getBrushConfig();
+        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { 
+            id: 'brushSliderPopout', 
+            ...brushConfig,
+            value: this.appContext.brushController.getState().brushSize, 
+            showValue: true, 
+            onChange: this.appContext.brushController.setBrushSize 
+        });
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
             type: 'radio',
             name: 'generateModePopout',
             initialValue: controllerState.genMode,
-            items: [
-                { value: 'random', text: 'Random' },
-                { value: 'n_count', text: 'N-Count' },
-                { value: 'r_sym', text: 'R-Sym' }
-            ],
+            // Fetch the configuration from the controller
+            items: this.appContext.rulesetActionController.getGenerationConfig(),
             onChange: this.appContext.rulesetActionController.setGenMode
         });
 
@@ -242,11 +253,7 @@ export class Toolbar {
             type: 'radio',
             name: 'mutateMode',
             initialValue: controllerState.mutateMode,
-            items: [
-                { value: 'single', text: 'Single' },
-                { value: 'r_sym', text: 'R-Sym' },
-                { value: 'n_count', text: 'N-Count' }
-            ],
+            items: this.appContext.rulesetActionController.getMutationModeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateMode
         });
 
@@ -254,10 +261,7 @@ export class Toolbar {
             type: 'radio',
             name: 'mutateScope',
             initialValue: controllerState.mutateScope,
-            items: [
-                { value: 'selected', text: 'Selected' },
-                { value: 'all', text: 'All' }
-            ],
+            items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
         });
 
@@ -290,10 +294,7 @@ export class Toolbar {
             label: 'Ruleset Visualization:',
             name: 'rulesetVizDesktop',
             initialValue: vizState.vizType,
-            items: [
-                { value: 'binary', text: 'Binary' },
-                { value: 'color', text: 'Color' }
-            ],
+            items: this.appContext.visualizationController.getVisualizationOptions(),
             onChange: this.appContext.visualizationController.setVisualizationType
         });
         

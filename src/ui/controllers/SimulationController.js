@@ -14,6 +14,15 @@ export class SimulationController {
         return { ...this.state };
     }
 
+    getSpeedConfig() {
+        return {
+            min: 1,
+            max: Config.MAX_SIM_SPEED,
+            step: 1,
+            unit: 'tps'
+        };
+    }
+
     setSpeed = (speed) => {
         const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
         if (this.state.speed === newSpeed) return;

@@ -18,6 +18,29 @@ export class RulesetActionController {
     getState() {
         return { ...this.state };
     }
+
+    getGenerationConfig() {
+        return [
+            { value: 'random', text: 'Random' },
+            { value: 'n_count', text: 'N-Count' },
+            { value: 'r_sym', text: 'R-Sym' }
+        ];
+    }
+
+    getMutationModeConfig() {
+        return [
+            { value: 'single', text: 'Single' },
+            { value: 'r_sym', text: 'R-Sym' },
+            { value: 'n_count', text: 'N-Count' }
+        ];
+    }
+
+    getMutationScopeConfig() {
+        return [
+            { value: 'selected', text: 'Selected' },
+            { value: 'all', text: 'All' }
+        ];
+    }
     
     setGenMode = (mode) => {
         this.state.genMode = mode;

@@ -7,6 +7,7 @@ import { UIManager } from './ui/UIManager.js';
 
 let gl;
 let appContext;
+let uiManager;
 let isInitialized = false;
 let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
@@ -99,7 +100,7 @@ async function initialize() {
     appContext = new AppContext(sharedSettings, libraryData);
 
     // Step 2: Create and initialize the UI Orchestrator.
-    const uiManager = new UIManager(appContext);
+    uiManager = new UIManager(appContext);
     uiManager.init();
     
     // Step 3: Setup InputManager, passing the detected mode
@@ -119,6 +120,7 @@ async function initialize() {
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
+        uiManager.destroy();
         appContext.worldManager.terminateAllWorkers();
     });
 

@@ -13,6 +13,15 @@ export class BrushController {
         return { ...this.state };
     }
 
+    getBrushConfig() {
+        return {
+            min: 0,
+            max: Config.MAX_NEIGHBORHOOD_SIZE,
+            step: 1,
+            unit: ''
+        };
+    }
+
     setBrushSize = (size) => {
         const newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
         if (this.state.brushSize === newSize) return;

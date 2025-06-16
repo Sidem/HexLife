@@ -65,22 +65,19 @@ export class ToolsBottomSheet extends BottomSheet {
         this.setContent(content);
 
         
+        const speedConfig = this.appContext.simulationController.getSpeedConfig();
         new SliderComponent(content.querySelector('#mobileSpeedSliderMount'), {
             id: 'mobileSpeedSlider',
-            min: 1,
-            max: Config.MAX_SIM_SPEED,
-            step: 1,
+            ...speedConfig,
             value: this.appContext.simulationController.getState().speed,
-            unit: 'tps',
             showValue: true,
             onChange: this.appContext.simulationController.setSpeed
         });
 
+        const brushConfig = this.appContext.brushController.getBrushConfig();
         new SliderComponent(content.querySelector('#mobileBrushSliderMount'), {
             id: 'mobileBrushSlider',
-            min: 0,
-            max: Config.MAX_NEIGHBORHOOD_SIZE,
-            step: 1,
+            ...brushConfig,
             value: this.appContext.brushController.getState().brushSize,
             showValue: true,
             onChange: this.appContext.brushController.setBrushSize
@@ -103,10 +100,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobileRulesetViz',
             label: 'Display Type:',
             initialValue: vizState.vizType,
-            items: [
-                { value: 'binary', text: 'Binary' },
-                { value: 'color', text: 'Color' }
-            ],
+            items: this.appContext.visualizationController.getVisualizationOptions(),
             onChange: this.appContext.visualizationController.setVisualizationType
         });
         

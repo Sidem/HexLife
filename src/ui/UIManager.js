@@ -23,6 +23,7 @@ export class UIManager {
         this.mode = 'desktop';
         this.mediaQueryList = window.matchMedia(MOBILE_QUERY);
         this.mobileViews = {};
+        this.managedComponents = [];
     }
 
     /**
@@ -44,6 +45,9 @@ export class UIManager {
 
         const keyboardManager = new KeyboardShortcutManager(appContext, worldManager, panelManager, toolbar);
         keyboardManager.init();
+
+        // Add components to the managed list
+        this.managedComponents.push(topInfoBar, toolbar, keyboardManager);
 
         // 3. Initialize Mobile-Specific UI
         this.initMobileUI(libraryData);
@@ -219,6 +223,26 @@ export class UIManager {
             reader.readAsText(data.file);
         });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
+    }
+
+    /**
+     * Destroys all managed UI components to prevent memory leaks.
+     */
+    destroy() {
+        console.log("Destroying UIManager and its components...");
+        this.managedComponents.forEach(component => {
+            if (typeof component.destroy === 'function') {
+                component.destroy();
+            }
+        });
+        this.managedComponents = [];
+
+        Object.values(this.mobileViews).forEach(view => {
+            if(typeof view.destroy === 'function') {
+                view.destroy();
+            }
+        });
+        this.mobileViews = {};
     }
 
     showMobileView({ targetView, currentView }) {

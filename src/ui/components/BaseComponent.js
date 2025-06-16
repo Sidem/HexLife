@@ -4,13 +4,13 @@ export class BaseComponent {
     constructor(mountPoint, options = {}) {
         if (mountPoint) {
             this.mountPoint = typeof mountPoint === 'string' ? document.getElementById(mountPoint) : mountPoint;
-            if (!this.mountPoint && this.constructor.name !== "BaseComponent") { 
+            if (!this.mountPoint && this.constructor.name !== "BaseComponent") {
                 console.warn(`${this.constructor.name}: mountPoint element not found or not provided.`);
             }
         }
         this.options = options;
-        this.eventSubscriptions = []; 
-        this.eventListeners = []; 
+        this.eventSubscriptions = [];
+        this.eventListeners = [];
     }
 
     _addDOMListener(element, eventType, handler, options = {}) {
@@ -25,8 +25,7 @@ export class BaseComponent {
         this.eventSubscriptions.push(unsubscribe);
     }
 
-    render() {
-    }
+    render() { }
 
     destroy() {
         this.eventSubscriptions.forEach(unsubscribe => unsubscribe());
@@ -35,10 +34,8 @@ export class BaseComponent {
             element.removeEventListener(eventType, handler);
         });
         this.eventListeners = [];
-        if (this.mountPoint && this.mountPoint.parentNode) {
+        if (this.element && this.element.parentNode) {
+            this.element.parentNode.removeChild(this.element);
         }
-         if (this.element && this.element.parentNode) { 
-             this.element.parentNode.removeChild(this.element);
-         }
     }
 } 

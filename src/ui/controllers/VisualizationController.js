@@ -17,6 +17,13 @@ export class VisualizationController {
         return { ...this.state };
     }
 
+    getVisualizationOptions() {
+        return [
+            { value: 'binary', text: 'Binary' },
+            { value: 'color', text: 'Color' }
+        ];
+    }
+
     setVisualizationType = (type) => {
         if (type !== 'binary' && type !== 'color') return;
         this.state.vizType = type;

@@ -91,11 +91,7 @@ export class RulesView extends BaseComponent {
             type: 'radio', 
             name: 'mobileGenerateMode',
             initialValue: controllerState.genMode,
-            items: [
-                { value: 'random', text: 'Random' },
-                { value: 'n_count', text: 'N-Count' },
-                { value: 'r_sym', text: 'R-Sym' }
-            ],
+            items: this.appContext.rulesetActionController.getGenerationConfig(),
             onChange: this.appContext.rulesetActionController.setGenMode
         });
 
@@ -156,11 +152,7 @@ export class RulesView extends BaseComponent {
             type: 'radio', 
             name: 'mobileMutateMode',
             initialValue: controllerState.mutateMode,
-            items: [
-                { value: 'single', text: 'Single' },
-                { value: 'r_sym', text: 'R-Sym' },
-                { value: 'n_count', text: 'N-Count' }
-            ],
+            items: this.appContext.rulesetActionController.getMutationModeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateMode
         });
 
@@ -169,10 +161,7 @@ export class RulesView extends BaseComponent {
             type: 'radio', 
             name: 'mobileMutateScope',
             initialValue: controllerState.mutateScope,
-            items: [
-                { value: 'selected', text: 'Selected' },
-                { value: 'all', text: 'All' }
-            ],
+            items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
         });
     }
