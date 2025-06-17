@@ -125,7 +125,7 @@ export class Toolbar {
             const clickedInsidePopout = this.activePopouts.some(p => p.popoutElement.contains(event.target));
             const clickedOnTrigger = this.activePopouts.some(p => p.triggerElement.contains(event.target));
 
-            if (!clickedInsidePopout && !clickedOnTrigger) {
+            if (!clickedInsidePopout && !clickedOnTrigger && !window.OnboardingManager.isActive()) {
                 closeAll();
             }
         };
@@ -139,6 +139,19 @@ export class Toolbar {
                 panel.hide();
             } else {
                 panel.toggle();
+            }
+        });
+
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, (data) => {
+            const popout = this.getPopout(data.popoutName);
+            if (!popout) return;
+        
+            if (data.show === true) {
+                popout.show();
+            } else if (data.show === false) {
+                popout.hide();
+            } else {
+                popout.toggle();
             }
         });
         

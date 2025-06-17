@@ -1,4 +1,37 @@
+import { EVENT_BUS_LOGGING } from '../core/config.js';
+
 const subscriptions = {};
+
+/**
+ * Logs a dispatched event to the console if enabled and not filtered out.
+ * @param {string} eventType The name of the event.
+ * @param {*} data The payload of the event.
+ */
+function logEvent(eventType, data) {
+    // Primary check for efficiency. If disabled, this is the only operation.
+    if (!EVENT_BUS_LOGGING.enabled) {
+        return;
+    }
+
+    const filter = EVENT_BUS_LOGGING.filter;
+    
+    // If a filter array exists and is not empty, apply the filter.
+    if (filter && filter.length > 0) {
+        // .some() is efficient and stops as soon as a match is found.
+        const shouldLog = filter.some(prefix => eventType.startsWith(prefix));
+        if (!shouldLog) {
+            return; // Exit if the event doesn't match any filter prefixes.
+        }
+    }
+
+    // Use console styling to make events easily identifiable during debugging.
+    console.log(
+        `%cEVENT%c ${eventType}`,
+        'background-color: #f0c674; color: #1e1e1e; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+        'font-weight: bold; color: #87CEEB;', // Light blue for the event name
+        data // Log the event payload object
+    );
+}
 
 export const EventBus = {
     subscribe(eventType, callback) {
@@ -15,6 +48,7 @@ export const EventBus = {
     },
 
     dispatch(eventType, data) {
+        logEvent(eventType, data);
         if (subscriptions[eventType]) {
             [...subscriptions[eventType]].forEach(callback => {
                 try {

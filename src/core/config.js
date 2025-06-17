@@ -55,3 +55,21 @@ export const NEIGHBOR_DIRS_EVEN_R = [
     [+1, 0],   // SE (Visual slot 4 - Bottom-right, using E as closest)
     [0, +1]    // S  (Visual slot 5 - Bottom center)
 ];
+
+/**
+ * Configuration for logging EventBus events to the console.
+ * Useful for debugging the flow of information in the application.
+ */
+export const EVENT_BUS_LOGGING = {
+    enabled: false, // Set to true to enable console logging of events
+    
+    /**
+     * An array of event prefixes to log. If empty, all events are logged (if enabled).
+     * This allows for granular debugging without console spam.
+     * Examples:
+     * filter: ['command:'] // Only log commands
+     * filter: ['simulation:worldStatsUpdated', 'ui:'] // Log specific simulation events and all UI events
+     * filter: [] // Log all events
+     */
+    filter: ['command:'] 
+};
