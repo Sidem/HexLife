@@ -1,12 +1,6 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
 export const getTours = (appContext) => {
-    const panelManager = appContext.panelManager;
-    const toolbar = appContext.toolbar;
-    const showPopout = (popoutName) => toolbar.getPopout(popoutName)?.show();
-    const hidePopouts = () => toolbar.closeAllPopouts();
-    const hidePanels = () => panelManager.hideAllPanels();
-    const showPanel = (panelName) => panelManager.getPanel(panelName)?.show();
 
     const coreTour = [
         {
@@ -14,7 +8,10 @@ export const getTours = (appContext) => {
             title: 'Welcome to the HexLife Explorer',
             content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
             primaryAction: { text: 'Begin Orientation' },
-            onBeforeShow: () => { hidePopouts(); hidePanels(); },
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_POPOUTS);
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_PANELS);
+            },
             advanceOn: { type: 'click' }
         },
         {
@@ -22,7 +19,7 @@ export const getTours = (appContext) => {
             title: 'The Flow of Time',
             content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> (or press `P`) to start and stop the universal clock. Let's see what these worlds are currently doing.",
             primaryAction: { text: 'Click the Play Button' },
-            advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => { return !data; } }
+            advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => !data }
         },
         {
             element: '#minimap-guide',
@@ -48,12 +45,13 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         }
     ];
+
     const speedAndBrushTour = [
         {
             element: '[data-tour-id="speed-popout"]',
             title: 'Controlling Time',
             content: "The <span class=\"onboarding-highlight-text\">SPD</span> button opens the controls for the simulation's target Ticks Per Second (TPS). <span class=\"onboarding-highlight-text\">Move the slider to change the speed.</span>",
-            onBeforeShow: () => { showPopout('speed'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'speed', show: true }),
             primaryAction: { text: 'Change Speed' },
             advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_SPEED_CHANGED }
         },
@@ -61,17 +59,18 @@ export const getTours = (appContext) => {
             element: '[data-tour-id="brush-popout"]',
             title: 'Wielding the Brush',
             content: "Excellent. The <span class=\"onboarding-highlight-text\">BRS</span> button opens the controls for the size of your drawing brush. <br><span class=\"onboarding-highlight-text\">Move the slider to change the size.</span> <br><span class=\"onboarding-highlight-text\">Pro-Tip:</span> For faster workflow, hover over the grid and use <span class=\"onboarding-highlight-text\">Ctrl + Mouse Wheel</span> to adjust the brush size on the fly.",
-            onBeforeShow: () => { showPopout('brush'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'brush', show: true }),
             primaryAction: { text: 'Got it' },
             advanceOn: { type: 'click' }
         }
     ];
+
     const rulesetGenerationTour = [
         {
             element: '[data-tour-id="new-rules-popout"]',
             title: 'The Genesis Chamber',
             content: "This is where you create entirely new laws of physics. Each mode generates a 128-bit 'ruleset'—the DNA for a universe.",
-            onBeforeShow: () => { showPopout('newRules'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'newRules', show: true }),
             primaryAction: { text: 'Tell Me About the Modes' },
             advanceOn: { type: 'click' }
         },
@@ -90,12 +89,13 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.RULESET_CHANGED }
         }
     ];
+
     const mutationTour = [
         {
             element: '[data-tour-id="mutatePopout"]',
             title: 'The DNA Splicer',
             content: "Evolution requires mutation. This tool introduces small, random changes to an existing ruleset. A low <span class=\"onboarding-highlight-text\">Mutation Rate</span> (5-10%) is often best for finding interesting variations.",
-            onBeforeShow: () => { showPopout('mutate'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'mutate', show: true }),
             primaryAction: { text: 'What About Cloning?' },
             advanceOn: { type: 'click' }
         },
@@ -107,12 +107,13 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         }
     ];
+
     const directInputTour = [
         {
             element: '[data-tour-id="set-hex-popout"]',
             title: 'The Ruleset Archive',
             content: "Every ruleset can be encoded as a 32-character hex string. If another researcher gives you a code, you can input it here to replicate their findings. <span class=\"onboarding-highlight-text\">Try copying and pasting this code in the input field.</span> <code>01000109C0140044A2009A8023228048</code>",
-            onBeforeShow: () => { showPopout('setHex'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'setHex', show: true }),
             primaryAction: { text: 'Enter a Hex Code' },
             advanceOn: { type: 'event', eventName: EVENTS.UI_RULESET_INPUT_CHANGED }
         },
@@ -124,12 +125,13 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
         }
     ];
+
     const libraryTour = [
         {
             element: '[data-tour-id="libraryPopout"]',
             title: 'The Specimen Library',
             content: "We've cataloged some interesting specimens. The <span class=\"onboarding-highlight-text\">Rulesets</span> tab contains entire sets of universal laws, while the <span class=\"onboarding-highlight-text\">Patterns</span> tab contains specific starting configurations of cells.",
-            onBeforeShow: () => { showPopout('library'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'library', show: true }),
             primaryAction: { text: 'Got It' },
             advanceOn: { type: 'click' }
         },
@@ -142,6 +144,7 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
         }
     ];
+
     const historyTour = [
         {
             element: '#undoButton',
@@ -162,42 +165,48 @@ export const getTours = (appContext) => {
             title: 'Viewing the Full Timeline',
             content: "Click the <span class=\"onboarding-highlight-text\">History (🕒)</span> button to open a list of all rulesets you've used. You can click any entry to instantly revert the world to that point in its history.",
             primaryAction: { text: 'Finish' },
-            onBeforeShow: () => { showPopout('history'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'history', show: true }),
             advanceOn: { type: 'click' }
         }
     ];
+
     const saveLoadTour = [
         {
             element: '[data-tour-id="save-state-button"]',
             title: 'Archiving a Discovery',
-            content: "When you find a truly unique state, use the <span class=\"onboarding-highlight-text\">SAV</span> button to save the selected world's *entire state*—all cell positions and the active ruleset—to a JSON file on your computer.",
+            content: "When you find a truly unique state, use the <span class=\"onboarding-highlight-text\">💾</span> button to save the selected world's *entire state*—all cell positions and the active ruleset—to a JSON file on your computer.",
             primaryAction: { text: 'How Do I Load It?' },
             advanceOn: { type: 'click' }
         },
         {
             element: '[data-tour-id="load-state-button"]',
             title: 'Restoring an Experiment',
-            content: "The <span class=\"onboarding-highlight-text\">LOD</span> button lets you load a previously saved file, perfectly restoring your experiment to continue your research later or share it with others.",
+            content: "The <span class=\"onboarding-highlight-text\">📂</span> button lets you load a previously saved file, perfectly restoring your experiment to continue your research later or share it with others.",
             primaryAction: { text: 'Finish' },
             advanceOn: { type: 'click' }
         }
     ];
+
     const resetClearTour = [
         {
             element: '[data-tour-id="reset-clear-popout"]',
             title: 'Wiping the Slate Clean',
             content: "<span class=\"onboarding-highlight-text\">Reset</span> re-seeds a world with random cells. <span class=\"onboarding-highlight-text\">Clear</span> sets all cells to a single state (clicking again flips it). You can apply these to the selected world or all of them.",
-            onBeforeShow: () => { showPopout('resetClear'); },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'resetClear', show: true }),
             primaryAction: { text: 'Finish' },
             advanceOn: { type: 'click' }
         }
     ];
+
     const editorTour = [
         {
             element: '[data-tour-id="ruleset-editor-panel"]',
             title: 'The Gene Editor',
             content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe. The visualization shows a center cell (large hex) and its six neighbors.",
-            onBeforeShow: () => { hidePanels(); UI.getRulesetEditor()?.show(); },
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_PANELS);
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor', show: true });
+            },
             primaryAction: { text: 'How Do I Edit?' },
             advanceOn: { type: 'click' }
         },
@@ -205,7 +214,13 @@ export const getTours = (appContext) => {
             element: '.r-sym-rule-viz',
             title: 'Toggling Outcomes',
             content: "The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule visualization</span> to flip its output between active (bright color) and inactive (dark color).",
-            onBeforeShow: () => { document.getElementById('rulesetEditorMode').value = 'rotationalSymmetry'; UI.getRulesetEditor()?.refreshViews(); },
+            onBeforeShow: () => {
+                const editor = appContext.panelManager.getPanel('rulesetEditor');
+                if (editor) {
+                    editor.uiElements.rulesetEditorMode.value = 'rotationalSymmetry';
+                    editor.refreshViews();
+                }
+            },
             primaryAction: { text: 'Click any Rule' },
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE }
         },
@@ -217,12 +232,16 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         }
     ];
+
     const setupTour = [
         {
             element: '[data-tour-id="setup-panel"]',
             title: 'The Control Panel',
             content: "Good science requires a control group. Here, you can define the starting <span class=\"onboarding-highlight-text\">Density</span> for each universe or <span class=\"onboarding-highlight-text\">Enable/Disable</span> it entirely. This is essential for comparative analysis.",
-            onBeforeShow: () => { hidePanels(); UI.getSetupPanel()?.show(); },
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_PANELS);
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'setupPanel', show: true });
+            },
             primaryAction: { text: "What's This Button?" },
             advanceOn: { type: 'click' }
         },
@@ -234,12 +253,16 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET }
         }
     ];
+
     const analysisTour = [
         {
             element: '[data-tour-id="analysis-panel"]',
             title: 'The Macroscope',
             content: "This tool gives you the big picture. It charts the universe's overall <span class=\"onboarding-highlight-text\">Activity Ratio</span> and <span class=\"onboarding-highlight-text\">Entropy</span> (a measure of complexity) over time, allowing you to quantify the behavior of a ruleset.",
-            onBeforeShow: () => { hidePanels(); UI.getAnalysisPanel()?.show(); },
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_PANELS);
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysisPanel', show: true });
+            },
             primaryAction: { text: 'How Do I Read the Charts?' },
             advanceOn: { type: 'click' }
         },
@@ -251,12 +274,16 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         }
     ];
+
     const ruleRankTour = [
         {
             element: '[data-tour-id="rule-rank-panel"]',
             title: 'The Microscope',
             content: "This panel answers *why* a universe behaves as it does. It shows you exactly which rules are being used most frequently, updated in real-time.",
-            onBeforeShow: () => { hidePanels(); UI.getRuleRankPanel()?.show(); },
+            onBeforeShow: () => {
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_PANELS);
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleRankPanel', show: true });
+            },
             primaryAction: { text: 'How Is It Organized?' },
             advanceOn: { type: 'click' }
         },
@@ -278,9 +305,7 @@ export const getTours = (appContext) => {
             title: 'Welcome to the HexLife Explorer',
             content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
             primaryAction: { text: 'Begin Orientation' },
-            onBeforeShow: () => {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
-            },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -377,9 +402,11 @@ export const getTours = (appContext) => {
             content: 'The color of the inner-most hexagon shows the rule\'s outcome (what the center cell will become). <span class="onboarding-highlight-text">Tap any rule visualization</span> to flip its output between active (bright color) and inactive (dark color).',
             primaryAction: { text: 'Click any Rule' },
             onBeforeShow: () => {
-                document.getElementById('rulesetEditorMode').value = 'rotationalSymmetry';
-                const editor = UI.getRulesetEditor();
-                if (editor) editor.refreshViews();
+                const editor = appContext.panelManager.getPanel('rulesetEditor');
+                if (editor) {
+                    editor.uiElements.rulesetEditorMode.value = 'rotationalSymmetry';
+                    editor.refreshViews();
+                }
             },
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE },
             delayAfter: 1000
@@ -471,9 +498,7 @@ export const getTours = (appContext) => {
             title: 'Mission: Applied Evolution',
             content: "Let's run a full experiment to discover a new ruleset. First, tap the <span class=\"onboarding-highlight-text\">Rules</span> tab.",
             primaryAction: { text: 'Open the Rules Tab' },
-            onBeforeShow: () => {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
-            },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
             advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
         },
         {

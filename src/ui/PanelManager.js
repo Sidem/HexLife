@@ -78,6 +78,23 @@ export class PanelManager {
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
 
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, (data) => {
+            const panel = this.getPanel(data.panelName);
+            if (!panel) return;
+        
+            if (data.show === true) {
+                panel.show();
+            } else if (data.show === false) {
+                panel.hide();
+            } else {
+                panel.toggle();
+            }
+        });
+        
+        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_PANELS, () => {
+            this.hideAllPanels();
+        });
+
     }
     
 

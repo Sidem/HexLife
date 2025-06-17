@@ -40,8 +40,6 @@ export function coordsToIndex(col, row) {
  */
 export function createFlatTopHexagonVertices() {
     const vertices = [];
-    
-    
     for (let i = 0; i < 6; i++) {
         
         const angle_deg = 60 * i; 
@@ -126,11 +124,8 @@ export function downloadFile(filename, content, mimeType = 'text/plain') {
  * @returns {boolean} True if the canvas was resized.
  */
 export function resizeCanvasToDisplaySize(canvas, gl) {
-    
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
-
-    
     const needResize = canvas.width !== displayWidth || canvas.height !== displayHeight;
 
     if (needResize) {
@@ -333,38 +328,22 @@ export function generateShareUrl(worldManager) {
  */
 export function textureCoordsToGridCoords(texX, texY, camera) {
     if (texX < 0 || texX > 1 || texY < 0 || texY > 1) return { col: null, row: null, worldX: null, worldY: null };
-
     let pixelX = texX * Config.RENDER_TEXTURE_SIZE;
     let pixelY = texY * Config.RENDER_TEXTURE_SIZE;
-
-    
-    
-    
     const viewCenterX = Config.RENDER_TEXTURE_SIZE / 2;
     const viewCenterY = Config.RENDER_TEXTURE_SIZE / 2;
-
-    
     const dxFromCenter = pixelX - viewCenterX;
     const dyFromCenter = pixelY - viewCenterY;
-
-    
     const worldX = camera.x + (dxFromCenter / camera.zoom);
     const worldY = camera.y + (dyFromCenter / camera.zoom);
-
-    
     const textureHexSize = calculateHexSizeForTexture();
-
     let minDistSq = Infinity;
     let closestCol = null;
     let closestRow = null;
-
-    
     const horizSpacing = textureHexSize * 2 * 3 / 4;
     const vertSpacing = textureHexSize * Math.sqrt(3);
-
     const estimatedColRough = worldX / horizSpacing;
     const estimatedRowRough = worldY / vertSpacing;
-
     const searchRadius = 2;
 
     for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
