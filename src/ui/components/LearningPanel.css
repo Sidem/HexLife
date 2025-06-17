@@ -1,5 +1,3 @@
-/* src/styles/LearningPanel.css */
-
 #learningPanel {
     width: clamp(340px, 40vw, 450px);
 }

@@ -23,6 +23,7 @@
 @import url('src/ui/components/DraggablePanel.css');
 @import url('src/ui/components/PopoutPanel.css');
 @import url('src/ui/components/BottomSheet.css');
+@import url('src/ui/components/LearningPanel.css');
 
 /* 5. Feature-Specific Panel Components */
 @import url('src/ui/components/RulesetEditor.css');
