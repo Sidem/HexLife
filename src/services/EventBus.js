@@ -156,6 +156,12 @@ export const EVENTS = {
     COMMAND_SET_SHOW_MINIMAP_OVERLAY: 'command:setShowMinimapOverlay',
     /** @param {boolean} shouldShow - Whether to show the cycle indicators. */
     COMMAND_SET_SHOW_CYCLE_INDICATOR: 'command:setShowCycleIndicator',
+    /** @event A user-initiated command to execute the generate ruleset action with the controller's current settings. */
+    COMMAND_EXECUTE_GENERATE_RULESET: 'command:executeGenerateRuleset',
+    /** @event A user-initiated command to execute the mutate ruleset action with the controller's current settings. */
+    COMMAND_EXECUTE_MUTATE_RULESET: 'command:executeMutateRuleset',
+    /** @event A user-initiated command to execute the clone and mutate action with the controller's current settings. */
+    COMMAND_EXECUTE_CLONE_AND_MUTATE: 'command:executeCloneAndMutate',
 
     // --- UI State Change Events ---
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */

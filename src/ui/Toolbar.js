@@ -249,14 +249,7 @@ export class Toolbar {
         });
 
         this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => {
-            const state = this.appContext.rulesetActionController.getState();
-            const bias = state.useCustomBias ? state.bias : Math.random();
-            EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-                bias,
-                generationMode: state.genMode,
-                applyScope: state.genScope,
-                shouldReset: state.genAutoReset
-            });
+            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
         });
         this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
             id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
@@ -282,20 +275,11 @@ export class Toolbar {
         });
 
         this.uiElements.triggerMutationButton.addEventListener('click', () => {
-            const state = this.appContext.rulesetActionController.getState();
-            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
-                mutationRate: state.mutateRate / 100.0,
-                scope: state.mutateScope,
-                mode: state.mutateMode
-            });
+            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
         });
         this.uiElements.cloneButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET));
         this.uiElements.cloneAndMutateButton.addEventListener('click', () => {
-            const state = this.appContext.rulesetActionController.getState();
-            EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
-                mutationRate: state.mutateRate / 100.0,
-                mode: state.mutateMode
-            });
+            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
         });
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();

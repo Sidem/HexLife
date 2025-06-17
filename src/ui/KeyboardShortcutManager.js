@@ -40,10 +40,10 @@ export class KeyboardShortcutManager {
 
             // Simulation Actions
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
-            { key: 'g', handler: () => this._handleGenerateRuleset() },
+            { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', handler: () => this._handleCloneAndMutate() },
-            { key: 'm', shiftKey: true, handler: () => this._handleMutate() },
+            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE) },
+            { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
             
             // World State Actions
             { key: 'd', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
@@ -161,42 +161,5 @@ export class KeyboardShortcutManager {
         }
     }
 
-    /**
-     * Helper to generate a new ruleset.
-     * @private
-     */
-    _handleGenerateRuleset() {
-        const state = this.appContext.rulesetActionController.getState();
-        const bias = state.useCustomBias ? state.bias : Math.random();
-        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-            bias,
-            generationMode: state.genMode,
-            resetScopeForThisChange: state.genAutoReset ? state.genScope : 'none'
-        });
-    }
 
-    /**
-     * Helper to mutate the current ruleset.
-     * @private
-     */
-    _handleMutate() {
-        const state = this.appContext.rulesetActionController.getState();
-        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
-            mutationRate: state.mutateRate / 100.0,
-            scope: state.mutateScope,
-            mode: state.mutateMode
-        });
-    }
-
-    /**
-     * Helper to clone and mutate the current ruleset.
-     * @private
-     */
-    _handleCloneAndMutate() {
-        const state = this.appContext.rulesetActionController.getState();
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
-            mutationRate: state.mutateRate / 100.0,
-            mode: state.mutateMode
-        });
-    }
 }

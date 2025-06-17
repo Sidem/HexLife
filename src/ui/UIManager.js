@@ -178,10 +178,10 @@ export class UIManager {
         fabLeftContainer.innerHTML = '';
         const { appContext } = this;
         const fabActionMap = {
-            'generate': { icon: '✨', title: 'Generate', handler: () => this._handleGenerateRuleset() },
-            'mutate': { icon: '🦠', title: 'Mutate', handler: () => this._handleMutate() },
-            'clone': { icon: '👯', title: 'Clone', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            'clone-mutate': { icon: '🧬', title: 'Clone & Mutate', handler: () => this._handleCloneAndMutate() },
+            'generate': { icon: '✨', title: 'Generate', command: EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, payload: {} },
+            'mutate': { icon: '🦠', title: 'Mutate', command: EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, payload: {} },
+            'clone': { icon: '👯', title: 'Clone', command: EVENTS.COMMAND_CLONE_RULESET, payload: {} },
+            'clone-mutate': { icon: '🧬', title: 'Clone & Mutate', command: EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, payload: {} },
             'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
             'clear-all': { icon: '🌍', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
             'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
@@ -203,8 +203,7 @@ export class UIManager {
             button.innerHTML = `<span class="icon">${action.icon}</span>`;
             button.title = action.title;
             button.addEventListener('click', () => {
-                if (action.handler) action.handler();
-                else EventBus.dispatch(action.command, action.payload);
+                EventBus.dispatch(action.command, action.payload);
             });
             fabLeftContainer.appendChild(button);
         });
@@ -300,30 +299,5 @@ export class UIManager {
         EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: nextView });
     }
 
-    _handleGenerateRuleset() {
-        const state = this.appContext.rulesetActionController.getState();
-        const bias = state.useCustomBias ? state.bias : Math.random();
-        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-            bias,
-            generationMode: state.genMode,
-            resetScopeForThisChange: state.genAutoReset ? state.genScope : 'none'
-        });
-    }
 
-    _handleMutate() {
-        const state = this.appContext.rulesetActionController.getState();
-        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
-            mutationRate: state.mutateRate / 100.0,
-            scope: state.mutateScope,
-            mode: state.mutateMode
-        });
-    }
-
-    _handleCloneAndMutate() {
-        const state = this.appContext.rulesetActionController.getState();
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
-            mutationRate: state.mutateRate / 100.0,
-            mode: state.mutateMode
-        });
-    }
 }

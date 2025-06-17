@@ -170,8 +170,6 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
 
-
-
         EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
             const newRulesetHex = this._generateRandomRulesetHex(data.bias, data.generationMode);
             this.#applyRulesetToWorlds(newRulesetHex, data.applyScope, data.shouldReset);

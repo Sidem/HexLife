@@ -37,9 +37,12 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_TOGGLE_PAUSE` | `isPaused: boolean` | Command to toggle the global pause state. |
 | `COMMAND_SET_SPEED` | `speed: number` | Command to set the global simulation speed. |
 | `COMMAND_GENERATE_RANDOM_RULESET` | `{ bias, generationMode, ... }`| Command to generate a new, random ruleset. |
+| `COMMAND_EXECUTE_GENERATE_RULESET` | `(none)` | Command to trigger a ruleset generation using the centrally managed `RulesetActionController` state. |
 | `COMMAND_SET_RULESET` | `{ hexString, resetScope... }` | Command to apply a specific ruleset from a hex string. |
 | `COMMAND_MUTATE_RULESET`| `{ mutationRate, scope, mode }` | Command to mutate the ruleset of the target scope. |
+| `COMMAND_EXECUTE_MUTATE_RULESET` | `(none)` | Command to trigger a ruleset mutation using the centrally managed `RulesetActionController` state. |
 | `COMMAND_CLONE_AND_MUTATE` | `{ mutationRate, mode }` | Command to copy the selected ruleset and mutate each clone. |
+| `COMMAND_EXECUTE_CLONE_AND_MUTATE` | `(none)` | Command to trigger a clone & mutate action using the centrally managed `RulesetActionController` state. |
 | `COMMAND_UNDO_RULESET` | `{ worldIndex: number }` | Command to undo a ruleset change for a world. |
 | `COMMAND_REDO_RULESET` | `{ worldIndex: number }` | Command to redo a ruleset change for a world. |
 | `COMMAND_REVERT_TO_HISTORY_STATE` | `{ worldIndex, historyIndex }` | Command to jump to a specific point in a world's ruleset history. |

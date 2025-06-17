@@ -13,6 +13,38 @@ export class RulesetActionController {
             mutateMode: PersistenceService.loadUISetting('mutateMode', 'single'),
             mutateScope: PersistenceService.loadUISetting('mutateScope', 'selected'),
         };
+        
+        this.#registerActionHandlers();
+    }
+
+    #registerActionHandlers = () => {
+        EventBus.subscribe(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, () => {
+            const state = this.getState();
+            const bias = state.useCustomBias ? state.bias : Math.random();
+            EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+                bias,
+                generationMode: state.genMode,
+                applyScope: state.genScope,
+                shouldReset: state.genAutoReset
+            });
+        });
+
+        EventBus.subscribe(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, () => {
+            const state = this.getState();
+            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+                mutationRate: state.mutateRate / 100.0,
+                scope: state.mutateScope,
+                mode: state.mutateMode
+            });
+        });
+
+        EventBus.subscribe(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, () => {
+            const state = this.getState();
+            EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+                mutationRate: state.mutateRate / 100.0,
+                mode: state.mutateMode
+            });
+        });
     }
 
     getState() {
