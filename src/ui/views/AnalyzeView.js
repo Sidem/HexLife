@@ -73,7 +73,7 @@ export class AnalyzeView extends BaseComponent {
         this.panes.ranks.innerHTML = `
             <h4>Activation Rules</h4>
             <div id="mobile-activation-list" class="mobile-rank-list"></div>
-            <h4 style="margin-top: 20px;">Deactivation Rules</h4>
+            <h4>Deactivation Rules</h4>
             <div id="mobile-deactivation-list" class="mobile-rank-list"></div>
          `;
     }

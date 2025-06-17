@@ -95,7 +95,9 @@
     font-size: 0.85em;
     color: #bbb;
 }
-
+#ranks-pane > h4{
+    margin: 0;
+}
 /* Mobile Overrides */
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
     #analysisPanel { 

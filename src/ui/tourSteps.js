@@ -478,7 +478,7 @@ export const getTours = (appContext) => {
         },
         {
             element: '.rules-view-segment[data-pane="library-rulesets"]',
-            title: 'Step 1: Find a Specimen',
+            title: 'Find a Specimen',
             content: "Go to the <span class=\"onboarding-highlight-text\">Rulesets Library</span> to find a stable starting point for our experiment.",
             primaryAction: { text: 'Next' },
             onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="library-rulesets"]').click(),
@@ -542,12 +542,12 @@ export const getTours = (appContext) => {
             content: "Now, let's evolve these gliders. Go to the <span class=\"onboarding-highlight-text\">Mutate</span> tab under <span class=\"onboarding-highlight-text\">Rules</span> to access the DNA splicer.",
             primaryAction: { text: 'Open the Mutate Pane' },
             onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="mutate"]').click(),
-            advanceOn: { type: 'click' }
+            advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
         },
         {
-            element: '#mobileMutateSliderMount',
+            element: '#mutate-pane',
             title: 'Set Mutation Parameters',
-            content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 10%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span>. This will introduce small, structured changes, which is ideal for evolving complex patterns.",
+            content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 10%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span> and <span class=\"onboarding-highlight-text\">Apply to All</span>. This will introduce small, symmetric changes, which is ideal for evolving complex patterns.",
             primaryAction: { text: 'Next' },
             advanceOn: { type: 'click' }
         },
@@ -562,12 +562,12 @@ export const getTours = (appContext) => {
         {
             element: 'body',
             title: 'Observe',
-            content: "The experiment is running! In the minimap you can see how each parallel world differs from the others. Pick one that looks interesting and press 'Continue'.",
+            content: "The experiment is running! In the minimap you can see how each parallel world differs from the others. Pick one that looks interesting.",
             primaryAction: { text: 'Continue' },
             advanceOn: { type: 'click' }
         },
         {
-            element: '[data-action-id="clone"]',
+            element: '[title="Clone & Mutate"]',
             highlightType: 'canvas',
             title: 'Repeat!',
             content: "This Quick Action allows you to quickly <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again with your defined parameters. Your selected world remains unaffected as your baseline.",
