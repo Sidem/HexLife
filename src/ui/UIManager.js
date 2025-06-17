@@ -55,6 +55,7 @@ export class UIManager {
         
         // 4. Bind Global UI Event Listeners
         this.setupGlobalEventListeners();
+        this._setupHelpTriggerListeners();
 
         // Make onboarding manager globally accessible for tours
         window.OnboardingManager = onboardingManager;
@@ -224,6 +225,36 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
+    }
+
+    /**
+     * Sets up a single, delegated event listener on the document body to handle
+     * clicks on all help trigger buttons '[?]'. This is more efficient than
+     * attaching individual listeners.
+     * @private
+     */
+    _setupHelpTriggerListeners() {
+        document.body.addEventListener('click', (event) => {
+            const helpButton = event.target.closest('.button-help-trigger');
+
+            // If the click was not on a help button, do nothing.
+            if (!helpButton) {
+                return;
+            }
+
+            // Prevent the click from bubbling up and, for example,
+            // initiating a drag on the panel header.
+            event.preventDefault();
+            event.stopPropagation();
+
+            const tourName = helpButton.dataset.tourName;
+            if (tourName && window.OnboardingManager) {
+                // The 'true' flag forces the tour to start even if it has been completed before.
+                window.OnboardingManager.startTour(tourName, true);
+            } else {
+                console.warn('Help button clicked, but no tour name found or OnboardingManager is not available.', helpButton);
+            }
+        });
     }
 
     /**
