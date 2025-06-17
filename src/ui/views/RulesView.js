@@ -235,21 +235,37 @@ export class RulesView extends BaseComponent {
 
         // Generate Pane
         this._addDOMListener(this.panes.generate.querySelector('[data-action="generate"]'), 'click', () => {
-            this.appContext.rulesetActionController.generate();
+            const state = this.appContext.rulesetActionController.getState();
+            const bias = state.useCustomBias ? state.bias : Math.random();
+            EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+                bias,
+                generationMode: state.genMode,
+                applyScope: state.genScope,
+                shouldReset: state.genAutoReset
+            });
             EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
         // Mutate Pane
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="mutate"]'), 'click', () => {
-            this.appContext.rulesetActionController.mutate();
+            const state = this.appContext.rulesetActionController.getState();
+            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+                mutationRate: state.mutateRate / 100.0,
+                scope: state.mutateScope,
+                mode: state.mutateMode
+            });
             EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone"]'), 'click', () => {
-            this.appContext.rulesetActionController.clone();
+            EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET);
             EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
         this._addDOMListener(this.panes.mutate.querySelector('[data-action="clone-mutate"]'), 'click', () => {
-            this.appContext.rulesetActionController.cloneAndMutate();
+            const state = this.appContext.rulesetActionController.getState();
+            EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+                mutationRate: state.mutateRate / 100.0,
+                mode: state.mutateMode
+            });
             EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
         });
 
@@ -277,7 +293,11 @@ export class RulesView extends BaseComponent {
             const input = this.panes.direct.querySelector('.hex-input');
             const hex = input.value.trim().toUpperCase();
             if (/^[0-9A-F]{32}$/.test(hex)) {
-                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, { hexString: hex, resetScopeForThisChange: 'all' });
+                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, { 
+                    hexString: hex, 
+                    scope: 'all',
+                    resetOnNewRule: true
+                });
             } else {
                 alert('Invalid Hex Code. Must be 32 hexadecimal characters.');
             }

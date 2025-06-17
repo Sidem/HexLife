@@ -198,7 +198,7 @@ export class Toolbar {
             ...speedConfig,
             value: this.appContext.simulationController.getState().speed, 
             showValue: true, 
-            onChange: this.appContext.simulationController.setSpeed 
+            onChange: (speed) => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, speed)
         });
         const brushConfig = this.appContext.brushController.getBrushConfig();
         this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { 
@@ -206,7 +206,7 @@ export class Toolbar {
             ...brushConfig,
             value: this.appContext.brushController.getState().brushSize, 
             showValue: true, 
-            onChange: this.appContext.brushController.setBrushSize 
+            onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
         });
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
             type: 'radio',
@@ -248,7 +248,16 @@ export class Toolbar {
             onChange: this.appContext.rulesetActionController.setGenAutoReset
         });
 
-        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => this.appContext.rulesetActionController.generate());
+        this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => {
+            const state = this.appContext.rulesetActionController.getState();
+            const bias = state.useCustomBias ? state.bias : Math.random();
+            EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+                bias,
+                generationMode: state.genMode,
+                applyScope: state.genScope,
+                shouldReset: state.genAutoReset
+            });
+        });
         this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
             id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
             value: controllerState.mutateRate, 
@@ -272,14 +281,31 @@ export class Toolbar {
             onChange: this.appContext.rulesetActionController.setMutateScope
         });
 
-        this.uiElements.triggerMutationButton.addEventListener('click', () => this.appContext.rulesetActionController.mutate());
-        this.uiElements.cloneButton.addEventListener('click', () => this.appContext.rulesetActionController.clone());
-        this.uiElements.cloneAndMutateButton.addEventListener('click', () => this.appContext.rulesetActionController.cloneAndMutate());
+        this.uiElements.triggerMutationButton.addEventListener('click', () => {
+            const state = this.appContext.rulesetActionController.getState();
+            EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+                mutationRate: state.mutateRate / 100.0,
+                scope: state.mutateScope,
+                mode: state.mutateMode
+            });
+        });
+        this.uiElements.cloneButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET));
+        this.uiElements.cloneAndMutateButton.addEventListener('click', () => {
+            const state = this.appContext.rulesetActionController.getState();
+            EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+                mutationRate: state.mutateRate / 100.0,
+                mode: state.mutateMode
+            });
+        });
         this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
             const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();
             if (!hex || !/^[0-9A-F]{32}$/.test(hex)) { alert("Invalid Hex: Must be 32 hex chars."); this.uiElements.rulesetInputPopout.select(); return; }
             const currentState = this.appContext.rulesetActionController.getState();
-            this.appContext.libraryController.loadRuleset(hex, currentState.genScope, currentState.genAutoReset);
+            EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
+                hexString: hex,
+                scope: currentState.genScope,
+                resetOnNewRule: currentState.genAutoReset
+            });
             this.uiElements.rulesetInputPopout.value = '';
             this.popoutPanels.setHex.hide();
         });
@@ -302,7 +328,7 @@ export class Toolbar {
             name: 'rulesetVizDesktop',
             initialValue: vizState.vizType,
             items: this.appContext.visualizationController.getVisualizationOptions(),
-            onChange: this.appContext.visualizationController.setVisualizationType
+            onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
         });
         
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizOverlaySwitchMount'), {
@@ -310,7 +336,7 @@ export class Toolbar {
             name: 'showMinimapOverlayDesktop',
             initialValue: vizState.showMinimapOverlay,
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: this.appContext.visualizationController.setShowMinimapOverlay
+            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
         });
         
         new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizCycleIndicatorSwitchMount'), {
@@ -318,7 +344,7 @@ export class Toolbar {
             name: 'showCycleIndicatorDesktop',
             initialValue: vizState.showCycleIndicator,
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: this.appContext.visualizationController.setShowCycleIndicator
+            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
         });
 
         const interactionState = this.appContext.interactionController.getState();
@@ -327,7 +353,7 @@ export class Toolbar {
             name: 'pauseWhileDrawingDesktop',
             initialValue: interactionState.pauseWhileDrawing,
             items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: this.appContext.interactionController.setPauseWhileDrawing
+            onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
         });
     }
     
@@ -342,7 +368,7 @@ export class Toolbar {
     }
 
     _setupToolbarButtonListeners() {
-        this.uiElements.playPauseButton.addEventListener('click', this.appContext.simulationController.togglePause);
+        this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
 
         this.popoutConfig.forEach(config => {
             const tourName = {

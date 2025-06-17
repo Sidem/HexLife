@@ -1,3 +1,5 @@
+import { EventBus, EVENTS } from '../services/EventBus.js';
+
 /**
  * A data-driven keyboard shortcut manager for the HexLife Explorer.
  * This class uses a centralized shortcut registry and a dispatcher to handle key events,
@@ -37,19 +39,19 @@ export class KeyboardShortcutManager {
             { key: 'Escape', handler: () => this._handleEscape() },
 
             // Simulation Actions
-            { key: 'p', handler: () => this.appContext.simulationController.togglePause() },
-            { key: 'g', handler: () => this.appContext.rulesetActionController.generate() },
-            { key: 'o', handler: () => this.appContext.rulesetActionController.clone() },
-            { key: 'm', handler: () => this.appContext.rulesetActionController.cloneAndMutate() },
-            { key: 'm', shiftKey: true, handler: () => this.appContext.rulesetActionController.mutate() },
+            { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
+            { key: 'g', handler: () => this._handleGenerateRuleset() },
+            { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
+            { key: 'm', handler: () => this._handleCloneAndMutate() },
+            { key: 'm', shiftKey: true, handler: () => this._handleMutate() },
             
             // World State Actions
-            { key: 'd', handler: () => { this.appContext.worldsController.resetDensitiesToDefault(); this.appContext.worldsController.resetAllWorldsToInitialDensities(); } },
-            { key: 'd', shiftKey: true, handler: () => { this.appContext.worldsController.applySelectedDensityToAll(); this.appContext.worldsController.resetAllWorldsToInitialDensities(); } },
-            { key: 'r', handler: () => this.appContext.worldsController.resetAllWorldsToInitialDensities() },
-            { key: 'r', shiftKey: true, handler: () => this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected') },
-            { key: 'c', handler: () => this.appContext.worldsController.clearWorlds('all') },
-            { key: 'c', shiftKey: true, handler: () => this.appContext.worldsController.clearWorlds('selected') },
+            { key: 'd', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
+            { key: 'd', shiftKey: true, handler: () => { EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
+            { key: 'r', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES) },
+            { key: 'r', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
+            { key: 'c', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
+            { key: 'c', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
 
             // History Actions
             { key: 'z', ctrlKey: true, handler: () => document.getElementById('undoButton')?.click() },
@@ -142,7 +144,7 @@ export class KeyboardShortcutManager {
     _handleNumericSelect(numKey) {
         const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; // Numpad layout mapping
         const worldIndex = keyToWorldIndex[numKey - 1];
-        this.appContext.worldsController.selectWorld(worldIndex);
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
     }
 
     /**
@@ -155,7 +157,46 @@ export class KeyboardShortcutManager {
         const worldIndex = keyToWorldIndex[numKey - 1];
         const currentSettings = this.worldManager.getWorldSettingsForUI();
         if (currentSettings[worldIndex]) {
-            this.appContext.worldsController.setWorldEnabled(worldIndex, !currentSettings[worldIndex].enabled);
+            EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex, isEnabled: !currentSettings[worldIndex].enabled });
         }
+    }
+
+    /**
+     * Helper to generate a new ruleset.
+     * @private
+     */
+    _handleGenerateRuleset() {
+        const state = this.appContext.rulesetActionController.getState();
+        const bias = state.useCustomBias ? state.bias : Math.random();
+        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+            bias,
+            generationMode: state.genMode,
+            resetScopeForThisChange: state.genAutoReset ? state.genScope : 'none'
+        });
+    }
+
+    /**
+     * Helper to mutate the current ruleset.
+     * @private
+     */
+    _handleMutate() {
+        const state = this.appContext.rulesetActionController.getState();
+        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+            mutationRate: state.mutateRate / 100.0,
+            scope: state.mutateScope,
+            mode: state.mutateMode
+        });
+    }
+
+    /**
+     * Helper to clone and mutate the current ruleset.
+     * @private
+     */
+    _handleCloneAndMutate() {
+        const state = this.appContext.rulesetActionController.getState();
+        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+            mutationRate: state.mutateRate / 100.0,
+            mode: state.mutateMode
+        });
     }
 }

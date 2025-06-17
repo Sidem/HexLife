@@ -50,6 +50,11 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_LOAD_WORLD_STATE` | `{ worldIndex, loadedData }` | Command to load a world state from a JSON object. |
 | `COMMAND_APPLY_SELECTIVE_BRUSH` | `{ worldIndex, cellIndices }` | Command to toggle the state of a specific set of cells. |
 | `COMMAND_ENTER_PLACING_MODE` | `{ cells: Array<[x, y]> }` | Command to switch the input strategy to place a specific pattern. |
+| `COMMAND_SET_INTERACTION_MODE` | `mode: string` | Command to set the interaction mode ('pan', 'draw', 'place'). |
+| `COMMAND_SET_PAUSE_WHILE_DRAWING` | `shouldPause: boolean` | Command to set the pause-while-drawing preference. |
+| `COMMAND_SET_VISUALIZATION_TYPE` | `type: string` | Command to set the visualization type ('binary', 'color'). |
+| `COMMAND_SET_SHOW_MINIMAP_OVERLAY` | `shouldShow: boolean` | Command to show/hide minimap overlays. |
+| `COMMAND_SET_SHOW_CYCLE_INDICATOR` | `shouldShow: boolean` | Command to show/hide cycle indicators. |
 
 ---
 

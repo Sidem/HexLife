@@ -71,7 +71,7 @@ export class ToolsBottomSheet extends BottomSheet {
             ...speedConfig,
             value: this.appContext.simulationController.getState().speed,
             showValue: true,
-            onChange: this.appContext.simulationController.setSpeed
+            onChange: (speed) => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, speed)
         });
 
         const brushConfig = this.appContext.brushController.getBrushConfig();
@@ -80,7 +80,7 @@ export class ToolsBottomSheet extends BottomSheet {
             ...brushConfig,
             value: this.appContext.brushController.getState().brushSize,
             showValue: true,
-            onChange: this.appContext.brushController.setBrushSize
+            onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
         });
 
         
@@ -90,7 +90,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobilePauseWhileDrawing',
             initialValue: interactionState.pauseWhileDrawing,
             items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: this.appContext.interactionController.setPauseWhileDrawing
+            onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
         });
 
         
@@ -101,7 +101,7 @@ export class ToolsBottomSheet extends BottomSheet {
             label: 'Display Type:',
             initialValue: vizState.vizType,
             items: this.appContext.visualizationController.getVisualizationOptions(),
-            onChange: this.appContext.visualizationController.setVisualizationType
+            onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
         });
         
         new SwitchComponent(content.querySelector('#mobileShowMinimapOverlayMount'), {
@@ -109,7 +109,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobileShowMinimapOverlay',
             initialValue: vizState.showMinimapOverlay,
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: this.appContext.visualizationController.setShowMinimapOverlay
+            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
         });
         
         new SwitchComponent(content.querySelector('#mobileShowCycleIndicatorMount'), {
@@ -117,7 +117,7 @@ export class ToolsBottomSheet extends BottomSheet {
             name: 'mobileShowCycleIndicator',
             initialValue: vizState.showCycleIndicator,
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: this.appContext.visualizationController.setShowCycleIndicator
+            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
         });
 
         this._syncVisualSettings(); 

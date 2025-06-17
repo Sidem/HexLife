@@ -9,6 +9,11 @@ export class VisualizationController {
             showMinimapOverlay: PersistenceService.loadUISetting('showMinimapOverlay', true),
             showCycleIndicator: PersistenceService.loadUISetting('showCycleIndicator', true),
         };
+        // Subscribe to command events
+        EventBus.subscribe(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, this.#handleSetVisualizationType);
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, this.#handleSetShowCycleIndicator);
+        
         // Ensure the visualizer singleton is in sync on startup
         rulesetVisualizer.setVisualizationType(this.state.vizType);
     }
@@ -24,23 +29,26 @@ export class VisualizationController {
         ];
     }
 
-    setVisualizationType = (type) => {
+    #handleSetVisualizationType = (type) => {
         if (type !== 'binary' && type !== 'color') return;
+        if (this.state.vizType === type) return;
         this.state.vizType = type;
-        rulesetVisualizer.setVisualizationType(type); // Update the actual visualizer
+        rulesetVisualizer.setVisualizationType(type);
         PersistenceService.saveUISetting('rulesetVizType', type);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 
-    setShowMinimapOverlay = (shouldShow) => {
+    #handleSetShowMinimapOverlay = (shouldShow) => {
+        if (this.state.showMinimapOverlay === !!shouldShow) return;
         this.state.showMinimapOverlay = !!shouldShow;
         PersistenceService.saveUISetting('showMinimapOverlay', this.state.showMinimapOverlay);
-        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // This event triggers a redraw
+        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 
-    setShowCycleIndicator = (shouldShow) => {
+    #handleSetShowCycleIndicator = (shouldShow) => {
+        if (this.state.showCycleIndicator === !!shouldShow) return;
         this.state.showCycleIndicator = !!shouldShow;
         PersistenceService.saveUISetting('showCycleIndicator', this.state.showCycleIndicator);
-        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); // Reuse this event to trigger a redraw
+        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 } 

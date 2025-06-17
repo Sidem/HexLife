@@ -46,7 +46,7 @@ export class InputManager {
             if (e.ctrlKey || e.shiftKey) {
                 const scrollAmount = Math.sign(e.deltaY);
                 const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
-                this.appContext.brushController.setBrushSize(newSize);
+                EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
                 this.currentStrategy.handleMouseMove(e);
             } else {
                 const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -75,7 +75,6 @@ export class InputManager {
             this.currentStrategy.handleTouchEnd(e);
         }, { passive: false });
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, this.appContext.interactionController.toggleMode);
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
@@ -150,7 +149,7 @@ export class InputManager {
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
             const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
-            this.appContext.brushController.setBrushSize(newSize);
+            EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
         }
     }
 

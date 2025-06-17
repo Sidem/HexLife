@@ -26,7 +26,7 @@ export class DrawStrategy extends BaseInputStrategy {
     exit() {
         
         if (this.wasSimulationRunningBeforeStroke) {
-            this.manager.appContext.simulationController.setPause(false);
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
         }
         this.resetStrokeState();
     }
@@ -39,7 +39,7 @@ export class DrawStrategy extends BaseInputStrategy {
         this.resetStrokeState();
         if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
             this.wasSimulationRunningBeforeStroke = true;
-            this.manager.appContext.simulationController.setPause(true);
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
         }
 
         this.applyBrush(worldIndexAtCursor, col, row);
@@ -86,7 +86,7 @@ export class DrawStrategy extends BaseInputStrategy {
             
             if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
                 this.wasSimulationRunningBeforeStroke = true;
-                this.manager.appContext.simulationController.setPause(true);
+                EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
             }
             
             this.applyBrush(worldIndexAtCursor, col, row);
@@ -158,7 +158,7 @@ export class DrawStrategy extends BaseInputStrategy {
         if (!this.isDrawing) return;
         
         if (this.wasSimulationRunningBeforeStroke) {
-            this.manager.appContext.simulationController.setPause(false);
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
         }
         this.resetStrokeState();
         this.isDrawing = false;

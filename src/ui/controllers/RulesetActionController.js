@@ -82,32 +82,5 @@ export class RulesetActionController {
         PersistenceService.saveUISetting('mutateScope', scope);
     }
 
-    
-    generate() {
-        const bias = this.state.useCustomBias ? this.state.bias : Math.random();
-        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-            bias,
-            generationMode: this.state.genMode,
-            resetScopeForThisChange: this.state.genAutoReset ? this.state.genScope : 'none'
-        });
-    }
 
-    mutate() {
-        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
-            mutationRate: this.state.mutateRate / 100.0,
-            scope: this.state.mutateScope,
-            mode: this.state.mutateMode
-        });
-    }
-
-    cloneAndMutate() {
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
-            mutationRate: this.state.mutateRate / 100.0,
-            mode: this.state.mutateMode
-        });
-    }
-
-    clone() {
-        EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET, {});
-    }
 } 

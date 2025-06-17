@@ -137,7 +137,8 @@ function processCommandQueue() {
             case 'SET_RULESET':
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
-                needsGridUpdate = true; 
+                needsGridUpdate = true;
+                resetCycleState();
                 break;
             case 'RESET_WORLD':
                 worldTickCounter = 0;

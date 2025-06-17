@@ -165,7 +165,7 @@ export class WorldManager {
     }
 
     _setupEventListeners = () => {
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, (isPaused) => this.setGlobalPause(isPaused));
+        EventBus.subscribe(EVENTS.SIMULATION_PAUSED, this.setGlobalPause);
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
@@ -174,10 +174,10 @@ export class WorldManager {
 
         EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
             const newRulesetHex = this._generateRandomRulesetHex(data.bias, data.generationMode);
-            this._applyRulesetToWorlds(newRulesetHex, data.resetScopeForThisChange, true, data.resetScopeForThisChange);
+            this.#applyRulesetToWorlds(newRulesetHex, data.applyScope, data.shouldReset);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (data) => {
-            this._applyRulesetToWorlds(data.hexString, data.resetScopeForThisChange, true, data.resetScopeForThisChange);
+            this.#applyRulesetToWorlds(data.hexString, data.scope, data.resetOnNewRule);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_MUTATE_RULESET, (data) => {
@@ -238,7 +238,8 @@ export class WorldManager {
             }, data.conditionalResetScope);
         });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, (data) => {
-            this._applyRulesetToWorlds(data.hexString, data.modificationScope, false, data.conditionalResetScope);
+            const shouldReset = data.conditionalResetScope !== 'none';
+            this.#applyRulesetToWorlds(data.hexString, data.modificationScope, shouldReset);
         });
 
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
@@ -402,6 +403,7 @@ export class WorldManager {
     }
 
     _getAffectedWorldIndices = (scope) => {
+        if (scope === 'none') return [];
         if (scope === 'all') return this.worlds.map((_, i) => i);
         if (scope === 'selected') return [this.selectedWorldIndex];
         if (typeof scope === 'number' && scope >= 0 && scope < this.worlds.length) return [scope];
@@ -409,35 +411,30 @@ export class WorldManager {
         return [];
     }
 
-    _applyRulesetToWorlds = (rulesetHex, targetScope, fromMainBarResetLogic, conditionalResetScopeIfEditor = 'none') => {
+    #applyRulesetToWorlds = (rulesetHex, scope, shouldReset) => {
         const newRulesetArray = hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
             console.error("Cannot apply invalid ruleset hex:", rulesetHex);
             return;
         }
-        const indices = this._getAffectedWorldIndices(targetScope);
 
-        indices.forEach(idx => {
-            
+        const indicesToAffect = this._getAffectedWorldIndices(scope);
+
+        indicesToAffect.forEach(idx => {
+            // Always add to history and apply the new ruleset
             this._addRulesetToHistory(idx, rulesetHex);
             
             const newRulesetBuffer = newRulesetArray.buffer.slice(0);
             this.worlds[idx].setRuleset(newRulesetBuffer);
             this.worldSettings[idx].rulesetHex = rulesetHex;
 
-            const resetScopeForThisChange = fromMainBarResetLogic
-                ? (PersistenceService.loadUISetting('resetOnNewRule', true) ? targetScope : 'none')
-                : conditionalResetScopeIfEditor;
-
-            if (resetScopeForThisChange !== 'none') {
-                const resetTargetIndices = this._getAffectedWorldIndices(resetScopeForThisChange);
-                if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
-                    this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
-                }
+            // Conditionally reset the world based on the flag
+            if (shouldReset && this.worldSettings[idx]) {
+                this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
             }
         });
 
-        if (indices.includes(this.selectedWorldIndex)) {
+        if (indicesToAffect.includes(this.selectedWorldIndex)) {
             EventBus.dispatch(EVENTS.RULESET_CHANGED, rulesetHex);
             PersistenceService.saveRuleset(rulesetHex);
         }

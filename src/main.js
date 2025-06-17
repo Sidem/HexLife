@@ -141,12 +141,12 @@ function handleVisibilityChange() {
     if (!isInitialized || !appContext) return;
     if (document.hidden) {
         if (!appContext.simulationController.getState().isPaused) {
-            appContext.simulationController.setPause(true);
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
             pausedByVisibilityChange = true;
         }
     } else {
         if (pausedByVisibilityChange) {
-            appContext.simulationController.setPause(false);
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
             pausedByVisibilityChange = false;
             lastTimestamp = performance.now();
         }
@@ -167,8 +167,7 @@ function renderLoop(timestamp) {
             setTimeout(() => {
                 loadingIndicator.style.opacity = '0';
                 setTimeout(() => { 
-                    loadingIndicator.style.display = 'none'; 
-                    const uiManager = new UIManager(appContext);
+                    loadingIndicator.style.display = 'none';
                     if (uiManager.isMobile()) {
                         appContext.onboardingManager.startTour('coreMobile');
                     } else {

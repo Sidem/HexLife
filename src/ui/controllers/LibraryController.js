@@ -15,8 +15,9 @@ export class LibraryController {
 
     loadRuleset(hexString, scope = 'all', autoReset = true) {
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
-            hexString,
-            resetScopeForThisChange: autoReset ? scope : 'none'
+            hexString: hexString,
+            scope: scope,
+            resetOnNewRule: autoReset
         });
     }
 

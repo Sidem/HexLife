@@ -72,6 +72,8 @@ export const EVENTS = {
     // --- High-Level UI Commands ---
     /** @param {boolean} isPaused - The desired pause state. */
     COMMAND_TOGGLE_PAUSE: 'command:togglePause',
+    /** @param {boolean} isPaused - The desired explicit pause state. */
+    COMMAND_SET_PAUSE_STATE: 'command:setPauseState',
     /** @param {number} speed - The desired simulation speed. */
     COMMAND_SET_SPEED: 'command:setSpeed', 
     /** @param {number} size - The desired brush size. */
@@ -144,6 +146,16 @@ export const EVENTS = {
     COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
     /** @event Emitted with no payload to trigger the share functionality. */
     COMMAND_SHARE_SETUP: 'command:shareSetup',
+    /** @param {string} mode - The new interaction mode ('pan', 'draw', 'place'). */
+    COMMAND_SET_INTERACTION_MODE: 'command:setInteractionMode',
+    /** @param {boolean} shouldPause - The desired pause-while-drawing state. */
+    COMMAND_SET_PAUSE_WHILE_DRAWING: 'command:setPauseWhileDrawing',
+    /** @param {string} type - The new visualization type ('binary', 'color'). */
+    COMMAND_SET_VISUALIZATION_TYPE: 'command:setVisualizationType',
+    /** @param {boolean} shouldShow - Whether to show the minimap overlays. */
+    COMMAND_SET_SHOW_MINIMAP_OVERLAY: 'command:setShowMinimapOverlay',
+    /** @param {boolean} shouldShow - Whether to show the cycle indicators. */
+    COMMAND_SET_SHOW_CYCLE_INDICATOR: 'command:setShowCycleIndicator',
 
     // --- UI State Change Events ---
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */

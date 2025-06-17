@@ -156,7 +156,7 @@ export class UIManager {
                 <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
             `;
             new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext);
-            fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => appContext.simulationController.togglePause());
+            fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
             fabRightContainer.querySelector('#interaction-mode-toggle').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE));
             
             EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
@@ -178,10 +178,10 @@ export class UIManager {
         fabLeftContainer.innerHTML = '';
         const { appContext } = this;
         const fabActionMap = {
-            'generate': { icon: '✨', title: 'Generate', handler: () => appContext.rulesetActionController.generate() },
-            'mutate': { icon: '🦠', title: 'Mutate', handler: () => appContext.rulesetActionController.mutate() },
-            'clone': { icon: '👯', title: 'Clone', handler: () => appContext.rulesetActionController.clone() },
-            'clone-mutate': { icon: '🧬', title: 'Clone & Mutate', handler: () => appContext.rulesetActionController.cloneAndMutate() },
+            'generate': { icon: '✨', title: 'Generate', handler: () => this._handleGenerateRuleset() },
+            'mutate': { icon: '🦠', title: 'Mutate', handler: () => this._handleMutate() },
+            'clone': { icon: '👯', title: 'Clone', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
+            'clone-mutate': { icon: '🧬', title: 'Clone & Mutate', handler: () => this._handleCloneAndMutate() },
             'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
             'clear-all': { icon: '🌍', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
             'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
@@ -298,5 +298,32 @@ export class UIManager {
             viewToShow.show();
         }
         EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: nextView });
+    }
+
+    _handleGenerateRuleset() {
+        const state = this.appContext.rulesetActionController.getState();
+        const bias = state.useCustomBias ? state.bias : Math.random();
+        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+            bias,
+            generationMode: state.genMode,
+            resetScopeForThisChange: state.genAutoReset ? state.genScope : 'none'
+        });
+    }
+
+    _handleMutate() {
+        const state = this.appContext.rulesetActionController.getState();
+        EventBus.dispatch(EVENTS.COMMAND_MUTATE_RULESET, {
+            mutationRate: state.mutateRate / 100.0,
+            scope: state.mutateScope,
+            mode: state.mutateMode
+        });
+    }
+
+    _handleCloneAndMutate() {
+        const state = this.appContext.rulesetActionController.getState();
+        EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
+            mutationRate: state.mutateRate / 100.0,
+            mode: state.mutateMode
+        });
     }
 }
