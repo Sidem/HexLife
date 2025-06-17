@@ -18,13 +18,13 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
 * **Multi-Worker Simulation:** The application runs 9 concurrent simulation "worlds," arranged in a 3x3 grid. Each world's logic, including its Wasm instance, runs in a dedicated Web Worker (`WorldWorker.js`). This ensures parallel computation and a responsive, non-blocking UI.
 * **Main Thread Orchestration:**
     * `WorldManager.js`: The central controller that manages the lifecycle of all `WorldProxy` instances, handles global settings (speed, pause state, brush size), and processes UI commands via an `EventBus`.
-    * `WorldProxy.js`: A main-thread interface for each `WorldWorker`, facilitating message passing for commands and receiving state and statistics updates.
+    * `WorldProxy.js`: A main-thread interface (Proxy Pattern) for each `WorldWorker`, facilitating message passing for commands and receiving state and statistics updates.
 * **High-Performance Rendering Engine (WebGL2):**
     * `renderer.js`: Manages all WebGL2 operations. It employs a **render-to-texture** technique where each world is first drawn into an offscreen Framebuffer Object (FBO). These textures are then composed onto the main canvas.
-    * **Instanced Rendering:** All hexagons within a world are drawn in a single, highly efficient draw call using instanced rendering, defined in the vertex shader (`vertex.glsl`).
-    * **GLSL Shaders:** Custom shaders handle hexagon positioning, dynamic cell coloring based on the rule that determined its state, and hover effects (`fragment.glsl`).
+    * **Instanced Rendering:** All hexagons within a world are drawn in a single, highly efficient draw call using instanced rendering, defined in the vertex shader (`vertex.glsl.txt`).
+    * **GLSL Shaders:** Custom shaders handle hexagon positioning, dynamic cell coloring based on the rule that determined its state, and hover effects (`fragment.glsl.txt`).
 * **Component-Based UI & State Management:**
-    * `ui.js`: Initializes all UI elements, popouts, and draggable panels, binding them to the `EventBus` for communication.
+    * `UIManager.js` / `PanelManager.js`: These classes initialize and manage all UI components, popouts, and draggable panels, binding them to the `EventBus` for communication.
     * **Draggable Panels:** The UI features draggable panels (`DraggablePanel.js`) for major features like the Ruleset Editor, World Setup, and Analysis tools, providing a flexible user workspace.
     * `EventBus.js`: A publish/subscribe system that decouples all major components, from UI controls to the World Manager, enhancing maintainability.
     * `PersistenceService.js`: Manages saving and loading of user settings—including rulesets, world configurations, and UI panel states—to `localStorage`.
@@ -39,50 +39,65 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
 
 ### 2. Dynamic Cell Coloring & Visualization
 
-* **Rule-Based Coloring:** Cells are colored based on the specific rule (0-127) that determined their current state. This provides a "fingerprint" of the automaton's activity, with the color spectrum defined in `ruleVizUtils.js` and applied in the fragment shader.
+* **Rule-Based Coloring:** Cells are colored based on the specific rule (0-127) that determined their current state. This provides a "fingerprint" of the automaton's activity, with the color spectrum defined in `ruleVizUtils.js` and applied in the fragment shader via a Color Look-Up Table (LUT).
 * **State & Hover Differentiation:** The fragment shader differentiates cell states (active vs. inactive) by adjusting color saturation and brightness. It also applies a highlight effect to cells under the mouse cursor.
 
 ### 3. Interactive Controls & UI
 
 * **Responsive Mobile UI:** Features a distinct mobile interface with a bottom tab bar, quick-action FABs, and touch-friendly controls for a seamless experience on any device.
-* **Advanced Analysis & Onboarding:** Includes an interactive tour system to guide new users, a plugin-based analysis panel for visualizing simulation metrics, and a real-time rule ranking panel to understand automaton dynamics.
+* **Advanced Analysis & Onboarding:** Includes an interactive tour system (`OnboardingManager.js`) to guide new users, a plugin-based analysis panel for visualizing simulation metrics, and a real-time rule ranking panel to understand automaton dynamics.
 * **Toolbar & Popouts:** A vertical toolbar provides quick access to primary functions. Most controls are housed in popout panels (`PopoutPanel.js`) that appear next to their trigger button, keeping the interface clean.
-* **Playback & Speed:** Globally play/pause the simulation (`P` key) and adjust the target Ticks Per Second (TPS) for all worlds.
-* **Brush Interaction:** Draw on the main world's canvas to toggle cell states. Brush size can be adjusted with a slider or the mouse wheel. The simulation automatically pauses during a drawing stroke for precise edits.
+* **Playback & Speed (⏩):** Globally play/pause the simulation (`P` key) and adjust the target Ticks Per Second (TPS) for all worlds.
+* **Brush Interaction (🖌️):** Draw on the main world's canvas to toggle cell states. Brush size can be adjusted with a slider or the mouse wheel (`Ctrl + Wheel`). The simulation can automatically pause during a drawing stroke for precise edits.
 * **Ruleset Management:**
-    * **Generate New Rules (NEW):** Create new rulesets using different modes: **Random** (with a configurable bias), **N-Count** (based on the number of active neighbors), or **R-Sym** (based on rotational symmetry groups).
-    * **Set/Copy Ruleset (HEX):** Directly input a 32-character hex string to apply a ruleset, or copy the current world's ruleset to the clipboard.
+    * **Generate New Rules (✨):** Create new rulesets using different modes: **Random** (with a configurable bias), **N-Count** (based on the number of active neighbors), or **R-Sym** (based on rotational symmetry groups).
+    * **Set/Copy Ruleset (#️⃣):** Directly input a 32-character hex string to apply a ruleset, or copy the current world's ruleset to the clipboard.
+    * **Content Library (📚):** Access the Library of prediscovered rulesets. 
 * **State Management & Sharing:**
-    * **Save/Load (SAV/LOD):** Save the complete state of the selected world (cell states, ruleset, and tick count) to a JSON file. Load a previously saved state to continue a simulation.
-    * **Share Link (SHR):** Generate a unique URL that encodes the current setup (ruleset, selected world, speed, camera position) to share with others.
-* **Reset/Clear (R/C):** Reset worlds to their initial random density or clear them completely to an active or inactive state.
+    * **Save/Load (💾/📂):** Save the complete state of the selected world (cell states, ruleset, and tick count) to a JSON file. Load a previously saved state to continue a simulation.
+    * **Share Link (🔗):** Generate a unique URL that encodes the current setup (ruleset, selected world, speed, camera position) to share with others.
+* **Reset/Clear (🔄):** Reset worlds to their initial random density or clear them completely to an active or inactive state.
 
 ### 4. Advanced Draggable Panels
 
-* **Ruleset Editor ([E]DT):** A powerful interface for viewing and modifying rulesets with multiple modes.
+* **Ruleset Editor (📝):** A powerful interface for viewing and modifying rulesets with multiple modes.
     * **Modes:** View and edit rules individually (**Detailed**), grouped by neighbor count (**Neighbor Count**), or grouped by rotational symmetry (**Rotational Symmetry**), which is the default.
     * **Interactive Editing:** Click on rule visualizations to toggle their output state. Changes can be applied to the selected world or all worlds, with an option to auto-reset upon change.
-* **World Setup Panel ([S]ET):** Configure the initial density and enabled/disabled state for each of the 9 worlds individually. Includes a "Use Main Ruleset" button to quickly propagate the selected world's ruleset to another world.
-* **Analysis Panel ([A]NL):** Houses a plugin system for data visualization and analysis.
+* **World Setup Panel (🌐):** Configure the initial density and enabled/disabled state for each of the 9 worlds individually. Includes a "Use Main Ruleset" button to quickly propagate the selected world's ruleset to another world.
+* **Analysis Panel (📈):** Houses a plugin system for data visualization and analysis.
     * **Ratio History Plot:** Visualizes the history of the active cell ratio for the selected world.
     * **Entropy Plot:** Visualizes the history of **Binary Entropy** (based on activity ratio) or **Block Entropy** (based on 7-cell hexagonal patterns). Includes controls to enable/disable entropy sampling and adjust the sampling rate.
-* **Rule Rank Panel (RNK):** Provides a real-time ranking of which rules are being used most frequently. It features a dual-column layout to separately rank rules that cause cells to become **active** versus those that cause them to become **inactive**, offering deep insight into the automaton's dynamics.
+* **Rule Rank Panel (🏆):** Provides a real-time ranking of which rules are being used most frequently. It features a dual-column layout to separately rank rules that cause cells to become **active** versus those that cause them to become **inactive**, offering deep insight into the automaton's dynamics.
 
 ### 5. Keyboard Shortcuts
 
-A rich set of keyboard shortcuts enhances usability.
+A rich set of keyboard shortcuts enhances usability for power users.
 
-* **Playback:** `P` - Play/Pause
-* **Panels/Popouts:** `N`, `E`, `S`, `A` - Toggle New Rules, Editor, Setup, and Analysis panels.
-* **Actions:**
-    * `G` - Generate new ruleset.
-    * `M` - Mutate selected world's ruleset.
-    * `Shift+M` - Clone selected ruleset to all other worlds and mutate each.
-    * `R` - Reset All worlds to initial densities.
-    * `Shift+R` - Reset Selected world.
-    * `C` - Clear All worlds.
-    * `Shift+C` - Clear Selected world.
-* **World Selection:** `1-9` / `Numpad 1-9` - Select a world.
-* **World Toggle:** `Shift + 1-9` - Toggle a world's enabled state.
-* **History:** `Ctrl+Z` - Undo ruleset change, `Ctrl+Y` - Redo.
-* **General:** `Escape` - Close active popout or panel.
+| Keys | Action | Scope / Notes |
+| :--- | :--- | :--- |
+| `P` | Play / Pause Simulation | Global |
+| `Escape` | Close active popout or panel | Global |
+| `1` - `9` | Select World 1 through 9 | Follows numpad layout |
+| `Shift` + `1`-`9` | Toggle World's Enabled State | Follows numpad layout |
+| | | |
+| **Actions & Panels** | | |
+| `N` | Toggle **✨ New Rules** popout | |
+| `E` | Toggle **📝 Ruleset Editor** panel | |
+| `S` | Toggle **🌐 World Setup** panel | |
+| `A` | Toggle **📈 Analysis** panel | |
+| `G` | **Generate** new ruleset | Uses settings from the ✨ popout |
+| `M` | **Mutate** selected world's ruleset | Uses settings from the 🧬 popout |
+| `Shift`+`M` | **Clone & Mutate** all other worlds | Uses settings from the 🧬 popout |
+| `O` | **Clone** selected ruleset to all others | |
+| | | |
+| **Reset & Clear** | | |
+| `R` | **Reset** all enabled worlds | Reseeds with initial density |
+| `Shift`+`R` | **Reset** the selected world | |
+| `C` | **Clear** all enabled worlds | |
+| `Shift`+`C` | **Clear** the selected world | |
+| `D` | **Reset Densities** to default & Reset All | |
+| `Shift`+`D` | **Apply Selected Density to all worlds** & Reset All | |
+| | | |
+| **History** | | |
+| `Ctrl`+`Z` | **Undo** ruleset change | For the selected world |
+| `Ctrl`+`Shift`+`Z` | **Redo** ruleset change | For the selected world |
