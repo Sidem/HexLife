@@ -58,6 +58,16 @@ export class Throttler {
             this.pendingArgs = [];
         }
     }
+    
+    cancel() {
+        if (this.pendingTimeoutId) {
+            clearTimeout(this.pendingTimeoutId);
+            this.pendingTimeoutId = null;
+        }
+        // Also clear any arguments that were waiting for the cancelled execution
+        this.hasPendingArgs = false;
+        this.pendingArgs = [];
+    }
 
     /**
      * Cleans up any pending timeout to prevent memory leaks.

@@ -1,5 +1,7 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { Throttler } from '../../utils/throttler.js';
+import * as Config from '../../core/config.js';
 
 /**
  * @class PanStrategy
@@ -11,6 +13,8 @@ export class PanStrategy extends BaseInputStrategy {
         this.isPanning = false;
         this.lastPanX = 0;
         this.lastPanY = 0;
+        this.lastMouseEvent = null;
+        this.hoverThrottler = new Throttler(() => this._dispatchHoverState(), Config.SIM_HOVER_THROTTLE_MS);
 
         this.touchState = {
             isDown: false,
@@ -20,6 +24,20 @@ export class PanStrategy extends BaseInputStrategy {
             startPoint: { x: 0, y: 0 },
             lastPoint: { x: 0, y: 0 },
         };
+    }
+
+    // Add this new method to the PanStrategy class  
+    _dispatchHoverState() {
+        if (!this.lastMouseEvent) return;
+
+        const { col, row, viewType } = this.manager.getCoordsFromPointerEvent(this.lastMouseEvent);
+        const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
+
+        if (viewType === 'selected' && col !== null) {
+            EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
+        } else {
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
+        }
     }
 
     handleMouseDown(event) {
@@ -50,14 +68,9 @@ export class PanStrategy extends BaseInputStrategy {
             this.lastPanY = event.clientY;
             this.manager.clampCameraPan();
         } else {
-            
-            const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
-            const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
-            if (viewType === 'selected' && col !== null) {
-                EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
-            }
+            // This is the hover logic path
+            this.lastMouseEvent = event;
+            this.hoverThrottler.schedule();
         }
     }
 
@@ -67,6 +80,7 @@ export class PanStrategy extends BaseInputStrategy {
 
     handleMouseOut(event) {
         this.isPanning = false;
+        this.hoverThrottler.cancel();
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.manager.worldManager.getSelectedWorldIndex() });
     }
 

@@ -1,5 +1,6 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { Throttler } from '../../utils/throttler.js';
 
 import { findHexagonsInNeighborhood } from '../../utils/utils.js';
 import * as Config from '../../core/config.js';
@@ -15,6 +16,10 @@ export class DrawStrategy extends BaseInputStrategy {
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
+
+        // Use the Throttler for hover updates only. 100ms is a good balance.
+        this.hoverThrottler = new Throttler(() => this._dispatchHoverState(), Config.SIM_HOVER_THROTTLE_MS);
+
         this.touchState = {
             isDown: false,
             isDragging: false,
@@ -29,6 +34,20 @@ export class DrawStrategy extends BaseInputStrategy {
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
         }
         this.resetStrokeState();
+    }
+
+    // Add this new method to the DrawStrategy class
+    _dispatchHoverState() {
+        if (!this.lastMouseEvent) return;
+
+        const { col, row, viewType } = this.manager.getCoordsFromPointerEvent(this.lastMouseEvent);
+        const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
+
+        if (viewType === 'selected' && col !== null) {
+            EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
+        } else {
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
+        }
     }
 
     handleMouseDown(event) {
@@ -46,16 +65,18 @@ export class DrawStrategy extends BaseInputStrategy {
     }
 
     handleMouseMove(event) {
-        const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
-        const selectedWorldIdx = this.manager.worldManager.getSelectedWorldIndex();
-        if (viewType === 'selected' && col !== null) {
-            EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
-        } else {
-            EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
-        }
+        // --- Throttled Hover Logic ---
+        // Store the latest event for the throttler to use when it fires.
+        this.lastMouseEvent = event;
+        this.hoverThrottler.schedule();
 
+        // --- Immediate Drawing Logic ---
+        // This part runs instantly on every mouse move, ensuring no drawing lag.
         if (this.isDrawing) {
-            this.applyBrush(worldIndexAtCursor, col, row);
+            const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
+            if (viewType === 'selected' && col !== null) {
+                this.applyBrush(worldIndexAtCursor, col, row);
+            }
         }
     }
 
@@ -65,6 +86,7 @@ export class DrawStrategy extends BaseInputStrategy {
 
     handleMouseOut(event) {
         this.endDrawing();
+        this.hoverThrottler.cancel();
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: this.manager.worldManager.getSelectedWorldIndex() });
     }
 

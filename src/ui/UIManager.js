@@ -21,6 +21,7 @@ const MOBILE_QUERY = '(max-width: 768px), (pointer: coarse) and (hover: none)';
 export class UIManager {
     constructor(appContext) {
         this.appContext = appContext;
+        this.onboardingManager = appContext.onboardingManager; // Add this line
         this.mode = 'desktop';
         this.mediaQueryList = window.matchMedia(MOBILE_QUERY);
         this.mobileViews = {};
@@ -57,8 +58,7 @@ export class UIManager {
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
 
-        // Make onboarding manager globally accessible for tours
-        window.OnboardingManager = onboardingManager;
+
 
         // 5. Dispatch initial UI mode to inform all components
         EventBus.dispatch(EVENTS.UI_MODE_CHANGED, { mode: this.mode });
@@ -140,7 +140,7 @@ export class UIManager {
             this.mobileViews.analyze.render();
             this.mobileViews.editor = new EditorView(mobileViewsContainer, panelManager);
             this.mobileViews.editor.render();
-            this.mobileViews.learning = new LearningView(mobileViewsContainer);
+            this.mobileViews.learning = new LearningView(mobileViewsContainer, this.onboardingManager); // <-- Pass the manager here
             this.mobileViews.learning.render();
         }
 
@@ -211,6 +211,7 @@ export class UIManager {
     }
 
     setupGlobalEventListeners() {
+        // Existing listeners for download/load/share
         EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => downloadFile(data.filename, data.content, data.mimeType));
         EventBus.subscribe(EVENTS.TRIGGER_FILE_LOAD, (data) => {
             const reader = new FileReader();
@@ -225,6 +226,32 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
+
+        // NEW: Logic moved from Toolbar.js
+        const handleClickOutside = (event) => {
+            // Check if onboarding is active AND the click is inside its tooltip.
+            if (this.onboardingManager && this.onboardingManager.isActive()) {
+                const tooltip = document.getElementById('onboarding-tooltip');
+                // Use .contains() to check the entire tooltip element and its children.
+                if (tooltip && tooltip.contains(event.target)) {
+                    return; // Do nothing if clicking inside the onboarding UI.
+                }
+            }
+    
+            const toolbar = this.appContext.toolbar;
+            if (!toolbar || toolbar.activePopouts.every(p => p.isHidden())) return;
+    
+            const clickedInsidePopout = toolbar.activePopouts.some(p => p.popoutElement.contains(event.target));
+            const clickedOnTrigger = toolbar.activePopouts.some(p => p.triggerElement.contains(event.target));
+    
+            if (!clickedInsidePopout && !clickedOnTrigger) {
+                toolbar.closeAllPopouts();
+            }
+        };
+
+        // Manage this global listener within the UIManager's lifecycle
+        this.boundHandleClickOutside = handleClickOutside;
+        document.addEventListener('click', this.boundHandleClickOutside);
     }
 
     /**
@@ -248,9 +275,9 @@ export class UIManager {
             event.stopPropagation();
 
             const tourName = helpButton.dataset.tourName;
-            if (tourName && window.OnboardingManager) {
+            if (tourName && this.onboardingManager) { // <-- CHANGE THIS LINE
                 // The 'true' flag forces the tour to start even if it has been completed before.
-                window.OnboardingManager.startTour(tourName, true);
+                this.onboardingManager.startTour(tourName, true); // <-- CHANGE THIS LINE
             } else {
                 console.warn('Help button clicked, but no tour name found or OnboardingManager is not available.', helpButton);
             }
@@ -262,6 +289,9 @@ export class UIManager {
      */
     destroy() {
         console.log("Destroying UIManager and its components...");
+        if (this.boundHandleClickOutside) { // Add this check and removal
+            document.removeEventListener('click', this.boundHandleClickOutside);
+        }
         this.managedComponents.forEach(component => {
             if (typeof component.destroy === 'function') {
                 component.destroy();

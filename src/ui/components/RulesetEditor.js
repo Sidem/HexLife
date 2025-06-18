@@ -354,7 +354,18 @@ export class RulesetEditor extends DraggablePanel {
 
     show() {
         this._createAllGrids();
-        super.show();
+        super.show(); // Allow the parent DraggablePanel to make the panel visible
+        
+        // DraggablePanel adds the 'is-mobile-panel' class when in mobile mode.
+        // We leverage this to determine the context.
+        if (this.panelElement.classList.contains('is-mobile-panel')) {
+            const closeButton = this.panelElement.querySelector('.close-panel-button');
+            if (closeButton) {
+                // Force the button to be hidden in the mobile context.
+                closeButton.classList.add('hidden');
+            }
+        }
+        
         this.refreshViews();
         this._saveEditorSettings();
     }

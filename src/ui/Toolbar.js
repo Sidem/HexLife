@@ -88,14 +88,14 @@ export class Toolbar {
         this._initPopoutPanels();
         this._initPopoutControls();
         this._populateLibraryPanel();
-        this._setupGlobalPopoutListeners();
+        this._setupEventBusListeners();
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
         this._loadAndApplyUISettings();
 
     }
 
-    _setupGlobalPopoutListeners() {
+    _setupEventBusListeners() {
         const closeAll = (excludePanel = null) => {
             this.activePopouts.forEach(popout => {
                 if (popout !== excludePanel) popout.hide();
@@ -105,30 +105,6 @@ export class Toolbar {
         // This event ensures that opening one popout closes any others.
         EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
         
-        // This single global listener handles clicking outside of any popout to close them all.
-        const handleClickOutside = (event) => {
-            if (window.OnboardingManager && window.OnboardingManager.isActive()) {
-                const tooltip = document.getElementById('onboarding-tooltip');
-                if (tooltip) {
-                    const rect = tooltip.getBoundingClientRect();
-                    if (event.target.id.includes('action') || (event.clientX >= rect.left && event.clientX <= rect.right &&
-                        event.clientY >= rect.top && event.clientY <= rect.bottom)) {
-                        return;
-                    }
-                }
-            }
-
-            // If no popouts are open, there's nothing to do.
-            if (!this.activePopouts.some(p => !p.isHidden())) return;
-
-            // Check if the click was inside any of the popout panels or on any of their trigger buttons.
-            const clickedInsidePopout = this.activePopouts.some(p => p.popoutElement.contains(event.target));
-            const clickedOnTrigger = this.activePopouts.some(p => p.triggerElement.contains(event.target));
-
-            if (!clickedInsidePopout && !clickedOnTrigger && !window.OnboardingManager.isActive()) {
-                closeAll();
-            }
-        };
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, (data) => {
             const panel = this.getPanel(data.panelName);
             if (!panel) return;
@@ -156,11 +132,8 @@ export class Toolbar {
         });
         
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_PANELS, () => {
-            this.hideAllPanels();
+            this.closeAllPopouts();
         });
-
-        // Add the single listener to the document.
-        document.addEventListener('click', handleClickOutside);
     }
     
     _initPopoutPanels() {
@@ -398,9 +371,6 @@ export class Toolbar {
             if (buttonElement) {
                 buttonElement.addEventListener('click', () => {
                     this.popoutPanels[config.name]?.toggle();
-                    if (tourName) {
-                        window.OnboardingManager && window.OnboardingManager.startTour(tourName);
-                    }
                 });
             }
         });

@@ -3,8 +3,9 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningView extends BaseComponent {
-    constructor(mountPoint) {
+    constructor(mountPoint, onboardingManager) {
         super(mountPoint);
+        this.onboardingManager = onboardingManager;
         this.element = null;
         this.tourListElement = null;
         this.availableTours = [
@@ -65,9 +66,8 @@ export class LearningView extends BaseComponent {
             const target = e.target;
             if (target.matches('.tour-start-button')) {
                 const tourName = target.dataset.tourName;
-                // Access onboardingManager through the global window object
-                if (window.OnboardingManager) {
-                    window.OnboardingManager.startTour(tourName, true);
+                if (this.onboardingManager) {
+                    this.onboardingManager.startTour(tourName, true);
                 }
             } else if (target.matches('[data-action="close"]')) {
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
