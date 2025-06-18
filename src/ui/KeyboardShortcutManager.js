@@ -36,7 +36,7 @@ export class KeyboardShortcutManager {
             { key: 's', handler: () => this.panelManager.getPanel('setupPanel')?.toggle() },
             { key: 'a', handler: () => this.panelManager.getPanel('analysisPanel')?.toggle() },
             { key: 'n', handler: () => this.toolbar.getPopout('newRules')?.toggle() },
-            { key: 'Escape', handler: () => this._handleEscape() },
+            { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
             // Simulation Actions
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
@@ -82,7 +82,7 @@ export class KeyboardShortcutManager {
         if (this._isInputFocused(event)) {
             // Allow Escape to work for closing panels/popouts even when an input is focused.
             if (event.key.toLowerCase() === 'escape') {
-                 this._handleEscape();
+                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             }
             return;
         }
@@ -123,17 +123,7 @@ export class KeyboardShortcutManager {
         return isFocusable(activeEl) || isFocusable(targetEl);
     }
     
-    /**
-     * Auxiliary function to handle closing popouts and panels with the Escape key.
-     * @private
-     */
-    _handleEscape() {
-        const wasPopoutOpen = this.toolbar ? this.toolbar.closeAllPopouts() : false;
-        // Only close all panels if a popout wasn't just closed.
-        if (!wasPopoutOpen) {
-            this.panelManager.hideAllPanels();
-        }
-    }
+
 
     /**
      * Auxiliary function to handle world selection via number keys (1-9).

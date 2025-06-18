@@ -24,7 +24,6 @@ export class RuleRankPanel extends DraggablePanel {
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
         this.uiElements = {
-            closeButton: panelElement.querySelector('#closeRankPanelButton'),
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };
 
@@ -42,7 +41,6 @@ export class RuleRankPanel extends DraggablePanel {
     }
 
     _setupInternalListeners() {
-        this.uiElements.closeButton.addEventListener('click', () => this.hide());
     }
 
     _setupPanelLayout() {

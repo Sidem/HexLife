@@ -17,7 +17,6 @@ export class SetupPanel extends DraggablePanel {
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
         this.uiElements = {
-            closeButton: panelElement.querySelector('#closeSetupPanelButton') || panelElement.querySelector('.close-panel-button'),
             worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),
             applySetupButton: panelElement.querySelector('#applySetupButton'),
             applySelectedDensityButton: panelElement.querySelector('#applySelectedDensityButton'),
@@ -33,9 +32,6 @@ export class SetupPanel extends DraggablePanel {
     }
 
     _setupInternalListeners() {
-        if (this.uiElements.closeButton) {
-            this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        }
         if (this.uiElements.applySetupButton) {
             this.uiElements.applySetupButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES));
         }

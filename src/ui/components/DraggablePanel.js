@@ -29,6 +29,12 @@ export class DraggablePanel {
         EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
             this._setDraggable(mode === 'desktop');
         });
+
+        // Handle close button
+        this.closeButton = this.panelElement.querySelector('.close-panel-button');
+        if (this.closeButton) {
+            this.closeButton.addEventListener('click', () => this.hide());
+        }
     }
 
     _initDragging() {

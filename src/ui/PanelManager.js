@@ -91,7 +91,7 @@ export class PanelManager {
             }
         });
         
-        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_PANELS, () => {
+        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
             this.hideAllPanels();
         });
 

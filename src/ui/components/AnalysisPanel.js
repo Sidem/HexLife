@@ -26,7 +26,6 @@ export class AnalysisPanel extends DraggablePanel {
         );
 
         this.uiElements = {
-            closeButton: this.panelElement.querySelector('#closeAnalysisPanelButton') || this.panelElement.querySelector('.close-panel-button'),
             pluginsMountArea: this.panelElement.querySelector('.plugins-mount-area')
         };
 
@@ -79,9 +78,6 @@ export class AnalysisPanel extends DraggablePanel {
     }
 
     _setupInternalListeners() {
-        if (this.uiElements.closeButton) {
-            this.uiElements.closeButton.addEventListener('click', () => this.hide());
-        }
         
     }
 

@@ -6,6 +6,7 @@ import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoord
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
 import { DrawStrategy } from './inputStrategies/DrawStrategy.js';
 import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js';
+import { HoverHandler } from './inputStrategies/HoverHandler.js';
 
 /**
  * @class InputManager
@@ -25,6 +26,9 @@ export class InputManager {
             place: new PlacePatternStrategy(this),
         };
 
+        // Add the hover handler
+        this.hoverHandler = new HoverHandler(this);
+
         this.currentStrategyName = 'pan'; 
         this.previousStrategyName = 'pan';
         this.currentStrategy = this.strategies.pan;
@@ -35,9 +39,31 @@ export class InputManager {
 
     _setupListeners() {
         this.canvas.addEventListener('mousedown', (e) => this.currentStrategy.handleMouseDown(e));
-        this.canvas.addEventListener('mousemove', (e) => this.currentStrategy.handleMouseMove(e));
-        this.canvas.addEventListener('mouseup', (e) => this.currentStrategy.handleMouseUp(e));
-        this.canvas.addEventListener('mouseout', (e) => this.currentStrategy.handleMouseOut(e));
+        
+        // MODIFY the mousemove listener
+        this.canvas.addEventListener('mousemove', (e) => {
+            // Delegate hover logic to the hover handler if the current strategy is pan or draw
+            if (this.currentStrategyName === 'pan' || this.currentStrategyName === 'draw') {
+                this.hoverHandler.scheduleHoverUpdate(e);
+            }
+            // The strategy still handles its own mousemove logic (e.g., for panning or drawing)
+            this.currentStrategy.handleMouseMove(e);
+        });
+
+        // MODIFY the mouseup listener
+        this.canvas.addEventListener('mouseup', (e) => {
+             // Ensure hover state is updated when a drawing stroke finishes
+            if (this.currentStrategyName === 'draw') {
+                this.hoverHandler.scheduleHoverUpdate(e);
+            }
+            this.currentStrategy.handleMouseUp(e);
+        });
+
+        // MODIFY the mouseout listener
+        this.canvas.addEventListener('mouseout', (e) => {
+            this.hoverHandler.cancelHoverUpdate();
+            this.currentStrategy.handleMouseOut(e);
+        });
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (this.isMobile) return; 

@@ -24,15 +24,11 @@ export class LearningPanel extends DraggablePanel {
             { id: 'resetClear', name: 'Tutorial: Reset & Clear' },
         ];
 
-        this.closeButton = this.panelElement.querySelector('.close-panel-button'); // <-- ADD THIS LINE
         this._setupEventListeners();
         this.refreshTourList();
     }
 
     _setupEventListeners() {
-        if (this.closeButton) {
-            this.closeButton.addEventListener('click', () => this.hide());
-        }
         this.panelElement.addEventListener('click', (e) => {
             if (e.target.matches('.tour-start-button')) {
                 const tourName = e.target.dataset.tourName;

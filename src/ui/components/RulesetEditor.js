@@ -27,7 +27,6 @@ export class RulesetEditor extends DraggablePanel {
             if (closeButton) closeButton.classList.add('hidden');
         }
         this.uiElements = {
-            closeButton: panelElement.querySelector('#closeEditorButton') || panelElement.querySelector('.close-panel-button'),
             editorRulesetInput: panelElement.querySelector('#editorRulesetInput'),
             clearRulesButton: panelElement.querySelector('#clearRulesButton'),
             rulesetEditorMode: panelElement.querySelector('#rulesetEditorMode'),
@@ -130,7 +129,6 @@ export class RulesetEditor extends DraggablePanel {
     }
 
     _setupInternalListeners() {
-        if (this.uiElements.closeButton) this.uiElements.closeButton.addEventListener('click', () => this.hide());
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
                 this.refreshViews();

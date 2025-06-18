@@ -245,7 +245,7 @@ export class UIManager {
             const clickedOnTrigger = toolbar.activePopouts.some(p => p.triggerElement.contains(event.target));
     
             if (!clickedInsidePopout && !clickedOnTrigger) {
-                toolbar.closeAllPopouts();
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             }
         };
 

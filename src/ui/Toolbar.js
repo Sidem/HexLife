@@ -131,7 +131,7 @@ export class Toolbar {
             }
         });
         
-        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_PANELS, () => {
+        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
             this.closeAllPopouts();
         });
     }
