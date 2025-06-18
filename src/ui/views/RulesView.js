@@ -96,31 +96,21 @@ export class RulesView extends BaseComponent {
         });
 
         this.sliders.bias = new SliderComponent(pane.querySelector('#mobileBiasSliderMount'), {
-            label: 'Bias (0=OFF, 1=ON):',
-            min: 0, max: 1, step: 0.01,
+            ...this.appContext.rulesetActionController.getBiasSliderConfig(),
+            id: 'mobileBiasSlider',
             value: controllerState.bias,
-            showValue: true,
-            onChange: this.appContext.rulesetActionController.setBias
         });
 
         this.switches.genScope = new SwitchComponent(pane.querySelector('#mobileRulesetScopeMount'), {
-            label: 'Apply to:',
-            type: 'radio', 
+            ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
             name: 'mobileRulesetScope',
-            initialValue: controllerState.genScope,
-            items: [
-                { value: 'selected', text: 'Selected' },
-                { value: 'all', text: 'All' }
-            ],
-            onChange: this.appContext.rulesetActionController.setGenScope
+            initialValue: controllerState.genScope
         });
 
         this.switches.genAutoReset = new SwitchComponent(pane.querySelector('#mobileResetOnNewRuleMount'), {
-            type: 'checkbox', 
+            ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
             name: 'mobileResetOnNewRule',
             initialValue: controllerState.genAutoReset,
-            items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
-            onChange: this.appContext.rulesetActionController.setGenAutoReset
         });
     }
 
@@ -140,11 +130,9 @@ export class RulesView extends BaseComponent {
         const controllerState = this.appContext.rulesetActionController.getState();
 
         this.sliders.mutate = new SliderComponent(pane.querySelector('#mobileMutateSliderMount'), {
-            label: 'Mutation Rate (%):',
-            min: 1, max: 50, step: 1,
-            value: controllerState.mutateRate,
-            showValue: true, unit: '%',
-            onChange: this.appContext.rulesetActionController.setMutateRate
+            ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
+            id: 'mobileMutateSlider',
+            value: controllerState.mutateRate
         });
 
         this.switches.mutateMode = new SwitchComponent(pane.querySelector('#mobileMutateModeMount'), {

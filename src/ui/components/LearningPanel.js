@@ -33,8 +33,8 @@ export class LearningPanel extends DraggablePanel {
             if (e.target.matches('.tour-start-button')) {
                 const tourName = e.target.dataset.tourName;
                 this.hide();
-                if (window.OnboardingManager) {
-                    window.OnboardingManager.startTour(tourName, true);
+                if (this.appContext.onboardingManager) {
+                    this.appContext.onboardingManager.startTour(tourName, true);
                 }
             }
         });

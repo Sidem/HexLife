@@ -45,7 +45,7 @@ export class MoreView extends BaseComponent {
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {
-            window.OnboardingManager && window.OnboardingManager.startTour('coreMobile', true);
+            this.appContext.onboardingManager && this.appContext.onboardingManager.startTour('coreMobile', true);
         });
 
         const fileInput = this.element.querySelector('#mobileFileInput');

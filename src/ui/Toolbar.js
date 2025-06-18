@@ -223,41 +223,32 @@ export class Toolbar {
             this.appContext.rulesetActionController.setUseCustomBias(e.target.checked);
             this.sliderComponents.biasSliderPopout?.setDisabled(!e.target.checked);
         });
-        this.sliderComponents.biasSliderPopout = new SliderComponent(this.uiElements.biasSliderMountPopout, { 
-            id: 'biasSliderPopout', min: 0, max: 1, step: 0.001, 
-            value: controllerState.bias, 
-            showValue: true, unit: '', 
-            disabled: !controllerState.useCustomBias, 
-            onChange: this.appContext.rulesetActionController.setBias 
+        this.sliderComponents.biasSliderPopout = new SliderComponent(this.uiElements.biasSliderMountPopout, {
+            ...this.appContext.rulesetActionController.getBiasSliderConfig(),
+            id: 'biasSliderPopout',
+            value: controllerState.bias,
+            disabled: !controllerState.useCustomBias
         });
 
         this.switchComponents.genScope = new SwitchComponent(this.uiElements.rulesetScopeSwitchPopout, {
-            type: 'radio',
+            ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
             name: 'rulesetScopePopout',
             initialValue: controllerState.genScope,
-            items: [
-                { value: 'selected', text: 'Selected' },
-                { value: 'all', text: 'All' }
-            ],
-            onChange: this.appContext.rulesetActionController.setGenScope
         });
 
         this.switchComponents.genAutoReset = new SwitchComponent(this.uiElements.resetOnNewRuleCheckboxPopout, {
-            type: 'checkbox',
+            ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
             name: 'resetOnNewRulePopout',
             initialValue: controllerState.genAutoReset,
-            items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
-            onChange: this.appContext.rulesetActionController.setGenAutoReset
         });
 
         this.uiElements.generateRulesetFromPopoutButton.addEventListener('click', () => {
             EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
         });
-        this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, { 
-            id: 'mutationRateSlider', min: 1, max: 50, step: 1, 
-            value: controllerState.mutateRate, 
-            unit: '%', showValue: true, 
-            onChange: this.appContext.rulesetActionController.setMutateRate 
+        this.sliderComponents.mutationRateSlider = new SliderComponent(this.uiElements.mutationRateSliderMount, {
+            ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
+            id: 'mutationRateSlider',
+            value: controllerState.mutateRate
         });
 
         this.switchComponents.mutateMode = new SwitchComponent(this.uiElements.mutateModeSwitch, {

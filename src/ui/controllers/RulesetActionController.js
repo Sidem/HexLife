@@ -73,6 +73,52 @@ export class RulesetActionController {
             { value: 'all', text: 'All' }
         ];
     }
+
+    getMutationRateSliderConfig() {
+        return {
+            label: 'Mutation Rate:',
+            min: 1,
+            max: 50,
+            step: 1,
+            unit: '%',
+            showValue: true,
+            onChange: this.setMutateRate
+        };
+    }
+
+    getBiasSliderConfig() {
+        return {
+            label: 'Bias:',
+            min: 0,
+            max: 1,
+            step: 0.001,
+            unit: '',
+            showValue: true,
+            onChange: this.setBias
+        };
+    }
+
+    getGenScopeSwitchConfig() {
+        return {
+            label: 'Apply to:',
+            type: 'radio',
+            name: 'rulesetScope', // Base name, can be overridden
+            items: [
+                { value: 'selected', text: 'Selected' },
+                { value: 'all', text: 'All' }
+            ],
+            onChange: this.setGenScope
+        };
+    }
+
+    getGenAutoResetSwitchConfig() {
+        return {
+            type: 'checkbox',
+            name: 'resetOnNewRule', // Base name, can be overridden
+            items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
+            onChange: this.setGenAutoReset
+        };
+    }
     
     setGenMode = (mode) => {
         this.state.genMode = mode;
