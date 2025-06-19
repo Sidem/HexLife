@@ -1,6 +1,7 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { SliderComponent } from '../components/SliderComponent.js';
 import { SwitchComponent } from '../components/SwitchComponent.js';
+import { RulesetDirectInput } from '../components/RulesetDirectInput.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class RulesView extends BaseComponent {
@@ -187,13 +188,10 @@ export class RulesView extends BaseComponent {
     }
 
     _renderDirectPane() {
-        this.panes.direct.innerHTML = `
-            <div class="form-group">
-                <label>Paste 32-character Hex Code</label>
-                <input type="text" class="hex-input" placeholder="0100...8048" maxlength="32">
-            </div>
-            <button class="action-button" data-action="set-hex">Set Ruleset</button>
-        `;
+        // REPLACED: Use the new component
+        const mountPoint = this.panes.direct;
+        mountPoint.innerHTML = ''; // Clear existing content
+        new RulesetDirectInput(mountPoint, this.appContext, { context: 'mobile-direct' });
     }
 
     attachEventListeners() {
@@ -276,20 +274,7 @@ export class RulesView extends BaseComponent {
             }
         });
 
-        // Direct Pane
-        this._addDOMListener(this.panes.direct.querySelector('[data-action="set-hex"]'), 'click', () => {
-            const input = this.panes.direct.querySelector('.hex-input');
-            const hex = input.value.trim().toUpperCase();
-            if (/^[0-9A-F]{32}$/.test(hex)) {
-                EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, { 
-                    hexString: hex, 
-                    scope: 'all',
-                    resetOnNewRule: true
-                });
-            } else {
-                alert('Invalid Hex Code. Must be 32 hexadecimal characters.');
-            }
-        });
+        // Direct Pane - event handling now done by RulesetDirectInput component
     }
 
     setActivePane(paneName) {

@@ -47,7 +47,9 @@ export class ToolsBottomSheet extends BottomSheet {
 
         // Use the new ControlsComponent for all shared controls
         const mobileControlsMount = content.querySelector('#mobileControlsMount');
-        this.controlsComponent = new ControlsComponent(mobileControlsMount, this.appContext);
+        
+        // MODIFIED: Pass the mobile context
+        this.controlsComponent = new ControlsComponent(mobileControlsMount, this.appContext, { context: 'mobile' });
 
         this._initCustomizeFabsPane();
     }

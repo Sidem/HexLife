@@ -2,6 +2,7 @@ import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
+import { RulesetDirectInput } from './components/RulesetDirectInput.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { SwitchComponent } from './components/SwitchComponent.js';
 import { generateShareUrl } from '../utils/utils.js';
@@ -62,9 +63,7 @@ export class Toolbar {
             triggerMutationButton: document.getElementById('triggerMutationButton'),
             cloneButton: document.getElementById('cloneButton'),
             cloneAndMutateButton: document.getElementById('cloneAndMutateButton'),
-            rulesetInputPopout: document.getElementById('rulesetInputPopout'),
-            setRuleFromPopoutButton: document.getElementById('setRuleFromPopoutButton'),
-            copyRuleFromPopoutButton: document.getElementById('copyRuleFromPopoutButton'),
+            // rulesetInputPopout, setRuleFromPopoutButton, copyRuleFromPopoutButton removed - now handled by RulesetDirectInput component
             resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
             resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
             clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
@@ -187,7 +186,8 @@ export class Toolbar {
         // Initialize the new ControlsComponent for desktop
         const desktopControlsMount = this.uiElements.controlsPopout.querySelector('#desktopControlsMount');
         if (desktopControlsMount) {
-            new ControlsComponent(desktopControlsMount, this.appContext);
+            // MODIFIED: Pass the desktop context
+            new ControlsComponent(desktopControlsMount, this.appContext, { context: 'desktop' });
         }
 
         const controllerState = this.appContext.rulesetActionController.getState();
@@ -255,24 +255,18 @@ export class Toolbar {
         this.uiElements.cloneAndMutateButton.addEventListener('click', () => {
             EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
         });
-        this.uiElements.setRuleFromPopoutButton.addEventListener('click', () => {
-            const hex = this.uiElements.rulesetInputPopout.value.trim().toUpperCase();
-            if (!hex || !/^[0-9A-F]{32}$/.test(hex)) { alert("Invalid Hex: Must be 32 hex chars."); this.uiElements.rulesetInputPopout.select(); return; }
-            const currentState = this.appContext.rulesetActionController.getState();
-            EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
-                hexString: hex,
-                scope: currentState.genScope,
-                resetOnNewRule: currentState.genAutoReset
-            });
-            this.uiElements.rulesetInputPopout.value = '';
-            this.popoutPanels.setHex.hide();
-        });
-        this.uiElements.rulesetInputPopout.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.uiElements.setRuleFromPopoutButton.click(); } });
-        this.uiElements.copyRuleFromPopoutButton.addEventListener('click', this._copyRuleset.bind(this));
-        this.uiElements.rulesetInputPopout.addEventListener('input', () => {
-            const hex = this.uiElements.rulesetInputPopout.value;
-            if (hex && hex.length > 0) EventBus.dispatch(EVENTS.UI_RULESET_INPUT_CHANGED, { value: hex });
-        });
+        
+        // Initialize the setHex popout with the new RulesetDirectInput component
+        const setHexContent = this.uiElements.setHexPopout;
+        if (setHexContent) {
+            // Clear the old, hardcoded HTML from index.html and replace with component
+            setHexContent.innerHTML = `
+                <h4>Set/Copy Ruleset Hex<button class="button-help-trigger" data-tour-name="directInput" title="Help with this feature">[?]</button></h4>
+                <div id="desktop-direct-input-mount"></div>
+            `;
+            const mountPoint = setHexContent.querySelector('#desktop-direct-input-mount');
+            new RulesetDirectInput(mountPoint, this.appContext, { context: 'desktop-direct' });
+        }
 
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected'); this.popoutPanels.resetClear.hide(); });
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
@@ -282,15 +276,7 @@ export class Toolbar {
         // Visualization and interaction settings are now handled by ControlsComponent
     }
     
-    _copyRuleset() {
-        const hex = this.worldManager.getCurrentRulesetHex();
-        if (!hex || hex === "N/A" || hex === "Error") { alert("No ruleset for selected world to copy."); return; }
-        navigator.clipboard.writeText(hex).then(() => {
-            const oldTxt = this.uiElements.copyRuleFromPopoutButton.textContent;
-            this.uiElements.copyRuleFromPopoutButton.textContent = "Copied!";
-            setTimeout(() => this.uiElements.copyRuleFromPopoutButton.textContent = oldTxt, 1500);
-        }).catch(err => alert('Failed to copy ruleset hex.'));
-    }
+    // _copyRuleset method removed - now handled by RulesetDirectInput component
 
     _setupToolbarButtonListeners() {
         this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
