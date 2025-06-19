@@ -108,8 +108,7 @@
         <div id="main-content-area" data-tour-id="main-content-area">
             <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
                 <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" data-tour-id="play-pause-button">▶</button>
-                <button id="speedControlButton" class="toolbar-button" title="Adjust Speed" data-tour-id="speed-control-button">⏩</button>
-                <button id="brushToolButton" class="toolbar-button" title="Brush Tool / Adjust Size" data-tour-id="brush-tool-button">🖌️</button>
+                <button id="controlsButton" class="toolbar-button" title="Simulation Controls" data-tour-id="controls-button">⚙️</button>
                 <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" data-tour-id="new-rules-button">✨</button> 
                 <button id="mutateButton" class="toolbar-button" title="Mutate Ruleset" data-tour-id="mutate-button">🧬</button>
                 <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" data-tour-id="set-ruleset-button">#️⃣</button>
@@ -122,7 +121,7 @@
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">💾</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">📂</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
-                <button id="settingsButton" class="toolbar-button" title="Settings">⚙️</button>
+
                 <button id="helpButton" class="toolbar-button" title="Help">🎓</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">
@@ -135,13 +134,9 @@
             </div>
         </div>
 
-        <div id="speedPopout" class="popout-panel hidden" data-tour-id="speed-popout">
-            <label for="speedSliderPopout">Speed:</label>
-            <div id="speedSliderMountPopout"></div>
-        </div>
-        <div id="brushPopout" class="popout-panel hidden" data-tour-id="brush-popout">
-            <label for="brushSliderPopout">Brush Size:</label>
-            <div id="neighborhoodSizeSliderMountPopout"></div>
+        <div id="controlsPopout" class="popout-panel hidden" data-tour-id="controls-popout">
+            <h4>Controls</h4>
+            <div id="desktopControlsMount"></div>
         </div>
         <div id="newRulesPopout" class="popout-panel hidden" data-tour-id="new-rules-popout">
             <h4>Generate New Ruleset<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h4>
@@ -223,13 +218,7 @@
             </div>
         </div>
 
-        <div id="settingsPopout" class="popout-panel hidden">
-            <h4>Settings</h4>
-            <div id="vizTypeSwitchMount"></div>
-            <div id="vizOverlaySwitchMount"></div>
-            <div id="vizCycleIndicatorSwitchMount" style="margin-top: 5px;"></div>
-            <div id="pauseWhileDrawingSwitchMount" style="margin-top: 10px;"></div>
-        </div>
+
 
         <div id="historyPopout" class="popout-panel hidden">
             <h4>Ruleset History<button class="button-help-trigger" data-tour-name="history" title="Help with this feature">[?]</button></h4>

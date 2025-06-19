@@ -1,8 +1,6 @@
 import { BottomSheet } from './BottomSheet.js';
-import { SliderComponent } from './SliderComponent.js';
-import { SwitchComponent } from './SwitchComponent.js';
+import { ControlsComponent } from './ControlsComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import * as Config from '../../core/config.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 
@@ -27,24 +25,7 @@ export class ToolsBottomSheet extends BottomSheet {
             </div>
             <div class="bottom-sheet-panes">
                 <div id="tools-pane" class="pane active">
-                    <div class="tool-group">
-                        <h5>Speed</h5>
-                        <div id="mobileSpeedSliderMount"></div>
-                    </div>
-                    <div class="tool-group">
-                        <h5>Brush Size</h5>
-                        <div id="mobileBrushSliderMount"></div>
-                    </div>
-                    <div class="tool-group">
-                        <h5>Interaction</h5>
-                        <div id="mobilePauseWhileDrawingMount"></div>
-                    </div>
-                    <div class="tool-group">
-                        <h5>Visualization</h5>
-                        <div id="mobileRulesetVizMount"></div>
-                        <div id="mobileShowMinimapOverlayMount" style="margin-top: 15px;"></div>
-                        <div id="mobileShowCycleIndicatorMount" style="margin-top: 5px;"></div>
-                    </div>
+                    <div id="mobileControlsMount"></div>
                     <div class="tool-group">
                         <h5>Reset / Clear</h5>
                         <div class="reset-clear-buttons">
@@ -64,91 +45,18 @@ export class ToolsBottomSheet extends BottomSheet {
 
         this.setContent(content);
 
-        
-        const speedConfig = this.appContext.simulationController.getSpeedConfig();
-        new SliderComponent(content.querySelector('#mobileSpeedSliderMount'), {
-            id: 'mobileSpeedSlider',
-            ...speedConfig,
-            value: this.appContext.simulationController.getState().speed,
-            showValue: true,
-            onChange: (speed) => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, speed)
-        });
+        // Use the new ControlsComponent for all shared controls
+        const mobileControlsMount = content.querySelector('#mobileControlsMount');
+        this.controlsComponent = new ControlsComponent(mobileControlsMount, this.appContext);
 
-        const brushConfig = this.appContext.brushController.getBrushConfig();
-        new SliderComponent(content.querySelector('#mobileBrushSliderMount'), {
-            id: 'mobileBrushSlider',
-            ...brushConfig,
-            value: this.appContext.brushController.getState().brushSize,
-            showValue: true,
-            onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
-        });
-
-        
-        const interactionState = this.appContext.interactionController.getState();
-        new SwitchComponent(content.querySelector('#mobilePauseWhileDrawingMount'), {
-            type: 'checkbox',
-            name: 'mobilePauseWhileDrawing',
-            initialValue: interactionState.pauseWhileDrawing,
-            items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
-        });
-
-        
-        const vizState = this.appContext.visualizationController.getState();
-        new SwitchComponent(content.querySelector('#mobileRulesetVizMount'), {
-            type: 'radio', 
-            name: 'mobileRulesetViz',
-            label: 'Display Type:',
-            initialValue: vizState.vizType,
-            items: this.appContext.visualizationController.getVisualizationOptions(),
-            onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
-        });
-        
-        new SwitchComponent(content.querySelector('#mobileShowMinimapOverlayMount'), {
-            type: 'checkbox', 
-            name: 'mobileShowMinimapOverlay',
-            initialValue: vizState.showMinimapOverlay,
-            items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
-        });
-        
-        new SwitchComponent(content.querySelector('#mobileShowCycleIndicatorMount'), {
-            type: 'checkbox', 
-            name: 'mobileShowCycleIndicator',
-            initialValue: vizState.showCycleIndicator,
-            items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
-        });
-
-        this._syncVisualSettings(); 
         this._initCustomizeFabsPane();
     }
 
-    _syncVisualSettings() {
-        const vizState = this.appContext.visualizationController.getState();
-        const vizSwitch = this.sheetContent.querySelector('#mobileRulesetVizMount .switch-group');
-        const overlaySwitch = this.sheetContent.querySelector('#mobileShowMinimapOverlayMount .switch-group');
-        const cycleIndicatorSwitch = this.sheetContent.querySelector('#mobileShowCycleIndicatorMount .switch-group');
-
-        if(vizSwitch) {
-            const radio = vizSwitch.querySelector(`input[value="${vizState.vizType}"]`);
-            if(radio) radio.checked = true;
-        }
-
-        if(overlaySwitch) {
-            const checkbox = overlaySwitch.querySelector('input');
-            if(checkbox) checkbox.checked = vizState.showMinimapOverlay;
-        }
-
-        if(cycleIndicatorSwitch) {
-            const checkbox = cycleIndicatorSwitch.querySelector('input');
-            if(checkbox) checkbox.checked = vizState.showCycleIndicator;
-        }
-    }
+    // _syncVisualSettings() removed - ControlsComponent handles its own state sync
 
     show() {
         super.show();
-        this._syncVisualSettings();
+        // Visual settings sync is now handled by ControlsComponent
     }
 
     _initCustomizeFabsPane() {
@@ -201,11 +109,7 @@ export class ToolsBottomSheet extends BottomSheet {
             }
         });
 
-        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => {
-            if (this.isVisible) {
-                this._syncVisualSettings();
-            }
-        });
+        // Visual settings sync is now handled by ControlsComponent
 
         
         const fabPane = this.sheetContent.querySelector('#customize-fabs-pane');

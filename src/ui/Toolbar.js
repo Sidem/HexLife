@@ -1,10 +1,9 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
+import { ControlsComponent } from './components/ControlsComponent.js';
 import { SliderComponent } from './components/SliderComponent.js';
 import { SwitchComponent } from './components/SwitchComponent.js';
-
-
 import { generateShareUrl } from '../utils/utils.js';
 
 export class Toolbar {
@@ -20,15 +19,13 @@ export class Toolbar {
         this.activePopouts = [];
         this.toolbarElement = document.getElementById('vertical-toolbar');
         this.popoutConfig = [
-            { name: 'speed', buttonId: 'speedControlButton', popoutId: 'speedPopout', options: { position: 'right', alignment: 'start' } },
-            { name: 'brush', buttonId: 'brushToolButton', popoutId: 'brushPopout', options: { position: 'right', alignment: 'start' } },
+            { name: 'controls', buttonId: 'controlsButton', popoutId: 'controlsPopout', options: { position: 'right', alignment: 'start' } },
             { name: 'newRules', buttonId: 'newRulesButton', popoutId: 'newRulesPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'mutate', buttonId: 'mutateButton', popoutId: 'mutatePopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'setHex', buttonId: 'setRulesetButton', popoutId: 'setHexPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'library', buttonId: 'libraryButton', popoutId: 'libraryPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'resetClear', buttonId: 'resetClearButton', popoutId: 'resetClearPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
-            { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } },
-            { name: 'settings', buttonId: 'settingsButton', popoutId: 'settingsPopout', options: { position: 'right', alignment: 'start' } }
+            { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } }
         ];
     }
 
@@ -37,28 +34,22 @@ export class Toolbar {
             // Main Toolbar Buttons
             playPauseButton: document.getElementById('playPauseButton'),
             // Popout Trigger Buttons
-            speedControlButton: document.getElementById('speedControlButton'),
-            brushToolButton: document.getElementById('brushToolButton'),
+            controlsButton: document.getElementById('controlsButton'),
             newRulesButton: document.getElementById('newRulesButton'),
             mutateButton: document.getElementById('mutateButton'),
             setRulesetButton: document.getElementById('setRulesetButton'),
             libraryButton: document.getElementById('libraryButton'),
             resetClearButton: document.getElementById('resetClearButton'),
             shareButton: document.getElementById('shareButton'),
-            settingsButton: document.getElementById('settingsButton'),
             // Popout Panels
-            speedPopout: document.getElementById('speedPopout'),
-            brushPopout: document.getElementById('brushPopout'),
+            controlsPopout: document.getElementById('controlsPopout'),
             newRulesPopout: document.getElementById('newRulesPopout'),
             mutatePopout: document.getElementById('mutatePopout'),
             setHexPopout: document.getElementById('setHexPopout'),
             libraryPopout: document.getElementById('libraryPopout'),
             resetClearPopout: document.getElementById('resetClearPopout'),
             sharePopout: document.getElementById('sharePopout'),
-            settingsPopout: document.getElementById('settingsPopout'),
             // Popout Content Mounts and Controls
-            speedSliderMountPopout: document.getElementById('speedSliderMountPopout'),
-            neighborhoodSizeSliderMountPopout: document.getElementById('neighborhoodSizeSliderMountPopout'),
             generateModeSwitchPopout: document.getElementById('generateModeSwitchPopout'),
             useCustomBiasCheckboxPopout: document.getElementById('useCustomBiasCheckboxPopout'),
             biasSliderMountPopout: document.getElementById('biasSliderMountPopout'),
@@ -193,23 +184,13 @@ export class Toolbar {
 
     
     _initPopoutControls() {
+        // Initialize the new ControlsComponent for desktop
+        const desktopControlsMount = this.uiElements.controlsPopout.querySelector('#desktopControlsMount');
+        if (desktopControlsMount) {
+            new ControlsComponent(desktopControlsMount, this.appContext);
+        }
+
         const controllerState = this.appContext.rulesetActionController.getState();
-        const speedConfig = this.appContext.simulationController.getSpeedConfig();
-        this.sliderComponents.speedSliderPopout = new SliderComponent(this.uiElements.speedSliderMountPopout, { 
-            id: 'speedSliderPopout', 
-            ...speedConfig,
-            value: this.appContext.simulationController.getState().speed, 
-            showValue: true, 
-            onChange: (speed) => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, speed)
-        });
-        const brushConfig = this.appContext.brushController.getBrushConfig();
-        this.sliderComponents.neighborhoodSliderPopout = new SliderComponent(this.uiElements.neighborhoodSizeSliderMountPopout, { 
-            id: 'brushSliderPopout', 
-            ...brushConfig,
-            value: this.appContext.brushController.getState().brushSize, 
-            showValue: true, 
-            onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
-        });
         this.switchComponents.genMode = new SwitchComponent(this.uiElements.generateModeSwitchPopout, {
             type: 'radio',
             name: 'generateModePopout',
@@ -297,41 +278,8 @@ export class Toolbar {
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
-        const vizState = this.appContext.visualizationController.getState();
-
-        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizTypeSwitchMount'), {
-            type: 'radio',
-            label: 'Ruleset Visualization:',
-            name: 'rulesetVizDesktop',
-            initialValue: vizState.vizType,
-            items: this.appContext.visualizationController.getVisualizationOptions(),
-            onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
-        });
         
-        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizOverlaySwitchMount'), {
-            type: 'checkbox',
-            name: 'showMinimapOverlayDesktop',
-            initialValue: vizState.showMinimapOverlay,
-            items: [{ value: 'show', text: 'Show Minimap Overlays' }],
-            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
-        });
-        
-        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#vizCycleIndicatorSwitchMount'), {
-            type: 'checkbox',
-            name: 'showCycleIndicatorDesktop',
-            initialValue: vizState.showCycleIndicator,
-            items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
-        });
-
-        const interactionState = this.appContext.interactionController.getState();
-        new SwitchComponent(this.uiElements.settingsPopout.querySelector('#pauseWhileDrawingSwitchMount'), {
-            type: 'checkbox',
-            name: 'pauseWhileDrawingDesktop',
-            initialValue: interactionState.pauseWhileDrawing,
-            items: [{ value: 'pause', text: 'Pause While Drawing' }],
-            onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
-        });
+        // Visualization and interaction settings are now handled by ControlsComponent
     }
     
     _copyRuleset() {
@@ -395,8 +343,7 @@ export class Toolbar {
         });
 
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => this.updatePauseButtonVisual(isPaused));
-        EventBus.subscribe(EVENTS.SIMULATION_SPEED_CHANGED, (speed) => this.sliderComponents.speedSliderPopout?.setValue(speed, false));
-        EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (size) => this.sliderComponents.neighborhoodSliderPopout?.setValue(size, false));
+        // Speed and brush size changes are now handled by ControlsComponent
     }
 
     _loadAndApplyUISettings() {
