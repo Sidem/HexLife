@@ -140,11 +140,6 @@ export class Toolbar {
     _setupToolbarButtonListeners() {
         this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
 
-        // Single button for all ruleset actions
-        this.uiElements.rulesetActionsButton.addEventListener('click', () => {
-            this.appContext.panelManager.getPanel('rulesetActions')?.toggle();
-        });
-
         // Setup remaining popout buttons
         this.popoutConfig.forEach(config => {
             const buttonElement = this.uiElements[config.buttonId];

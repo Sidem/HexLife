@@ -2,7 +2,7 @@ import { RulesetEditor } from './components/RulesetEditor.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
-import { LearningPanel } from './components/LearningPanel.js';
+import { LearningComponent } from './components/LearningComponent.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
@@ -20,7 +20,7 @@ export class PanelManager {
             { name: 'worldSetup', elementId: 'worldSetupPanel', buttonId: 'setupPanelButton', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
             { name: 'analysis', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
             { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: {} },
-            { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} },
+            { name: 'learning', elementId: 'learningPanel', buttonId: 'helpButton', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
             { name: 'rulesetActions', elementId: 'rulesetActionsPanel', buttonId: 'rulesetActionsButton', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
         ];
     }
@@ -32,24 +32,36 @@ export class PanelManager {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
                 const PresenterClass = config.constructor;
+                
+                // Instantiate the content component first
+                let contentInstance = null;
+                if (config.contentComponent) {
+                    contentInstance = new config.contentComponent(null, { appContext: this.appContext });
+                }
+
                 const presenterInstance = new PresenterClass(panelElement, {
                     appContext: this.appContext,
                     ...config.options,
-                    persistence: { identifier: config.persistenceKey || config.name }
+                    persistence: { identifier: config.persistenceKey || config.name },
+                    contentComponent: contentInstance // Pass the content instance to the presenter
                 });
 
                 if (config.contentComponent) {
                     const contentContainer = panelElement.querySelector('.panel-content-area');
                     if (contentContainer) {
-                        // Instantiate the content component, passing null for the mountPoint
-                        // as we are manually placing its element.
-                        const contentInstance = new config.contentComponent(null, { appContext: this.appContext });
-
-                        // Append the component's rendered element to the panel's content area.
-                        contentContainer.appendChild(contentInstance.getElement());
-                        
-                        // Store reference to content component for potential future use
-                        presenterInstance.contentComponent = contentInstance;
+                        // We've already created contentInstance, so we just append its element
+                        if (contentInstance) {
+                            contentContainer.innerHTML = '';
+                            const componentElement = contentInstance.getElement();
+                            if (componentElement) {
+                                contentContainer.appendChild(componentElement);
+                            } else {
+                                console.error(`Failed to get element from ${config.contentComponent.name} for panel ${config.name}`);
+                            }
+                            
+                            // Store reference to content component for potential future use
+                            presenterInstance.contentComponent = contentInstance;
+                        }
                     }
                 }
                 
@@ -120,13 +132,9 @@ export class PanelManager {
 
     }
     
-
-
     getPanel(panelName) {
         return this.panels[panelName];
     }
-
-
     
     hideAllPanels() {
         Object.values(this.panels).forEach(panel => panel.hide());

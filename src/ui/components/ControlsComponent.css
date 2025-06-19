@@ -1,21 +1,18 @@
 .controls-component-content {
     display: flex;
     flex-direction: column;
-    gap: 15px;
 }
 
 .controls-component-content .tool-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
 }
 
 .controls-component-content .tool-group h5 {
-    margin: 0 0 5px 0;
+    margin: 0;
     font-size: 1em;
     color: #f0c674;
     border-bottom: 1px solid #444;
-    padding-bottom: 5px;
 }
 
 .controls-component-content .slider-component-container {

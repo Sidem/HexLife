@@ -30,8 +30,8 @@ export class ControlsComponent extends BaseComponent {
             <div class="tool-group">
                 <h5>Visualization</h5>
                 <div id="${this.context}-ruleset-viz-mount"></div>
-                <div id="${this.context}-show-minimap-overlay-mount" style="margin-top: 15px;"></div>
-                <div id="${this.context}-show-cycle-indicator-mount" style="margin-top: 5px;"></div>
+                <div id="${this.context}-show-minimap-overlay-mount"></div>
+                <div id="${this.context}-show-cycle-indicator-mount"></div>
             </div>
         `;
 

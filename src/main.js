@@ -103,6 +103,9 @@ async function initialize() {
     uiManager = new UIManager(appContext);
     uiManager.init();
     
+    // Step 2.1: Attach UIManager reference to appContext for components to query UI mode
+    appContext.uiManager = uiManager;
+    
     // Step 3: Setup InputManager, passing the detected mode
     const inputManager = new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 

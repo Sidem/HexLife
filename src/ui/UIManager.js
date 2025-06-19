@@ -9,7 +9,7 @@ import { MobileView } from './views/MobileView.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { EditorView } from './views/EditorView.js';
-import { LearningView } from './views/LearningView.js';
+import { LearningComponent } from './components/LearningComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
@@ -139,8 +139,7 @@ export class UIManager {
             // analyze view will be created dynamically when needed
             this.mobileViews.editor = new EditorView(mobileViewsContainer, panelManager);
             this.mobileViews.editor.render();
-            this.mobileViews.learning = new LearningView(mobileViewsContainer, this.onboardingManager); // <-- Pass the manager here
-            this.mobileViews.learning.render();
+            // learning view will be created dynamically when needed
         }
 
         const bottomTabBarEl = document.getElementById('bottom-tab-bar');
@@ -383,6 +382,25 @@ export class UIManager {
                     mobileViewPresenter.render();
                     mobileViewPresenter.setContentComponent(analysisContent);
                     this.mobileViews.analyze = mobileViewPresenter;
+                }
+            }
+        }
+
+        // Handle dynamic creation of learning view
+        if (nextView === 'learning') {
+            if (!this.mobileViews.learning) {
+                const mobileViewsContainer = document.getElementById('mobile-views-container');
+                if (mobileViewsContainer) {
+                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Learning Hub' });
+                    const learningContent = new LearningComponent(null, { appContext: this.appContext });
+                    mobileViewPresenter.render();
+                    mobileViewPresenter.setContentComponent(learningContent);
+                    this.mobileViews.learning = mobileViewPresenter;
+                }
+            } else {
+                // If view exists, ensure its content is up-to-date
+                if (this.mobileViews.learning.contentComponent && this.mobileViews.learning.contentComponent.refreshTourList) {
+                    this.mobileViews.learning.contentComponent.refreshTourList();
                 }
             }
         }

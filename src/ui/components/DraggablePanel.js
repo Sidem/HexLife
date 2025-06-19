@@ -9,6 +9,7 @@ export class DraggablePanel {
         const handleSelector = options.handleSelector || 'h3';
         this.handleElement = panelElement.querySelector(handleSelector);
         this.options = { constrainToViewport: true, ...options };
+        this.contentComponent = options.contentComponent || null;
         this.offsetX = 0;
         this.offsetY = 0;
 
@@ -155,6 +156,11 @@ export class DraggablePanel {
             this._setDraggable(false);
         } else {
             this._setDraggable(true);
+        }
+
+        // Refresh content component when panel becomes visible
+        if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
+            this.contentComponent.refresh();
         }
     }
 
