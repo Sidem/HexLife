@@ -205,20 +205,10 @@
             </div>
         </div>
 
-        <div id="setupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true" data-tour-id="setup-panel">
-            <button id="closeSetupPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
+        <div id="worldSetupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" aria-modal="true" data-tour-id="setup-panel">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="setupPanelTitle">World Setup<button class="button-help-trigger" data-tour-name="setup" title="Help with this feature">[?]</button></h3>
             <div class="panel-content-area">
-                <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click
-                    "Use Main Ruleset" to apply the selected world's (main view) ruleset to a specific world here and
-                    reset it.</p>
-                <div id="worldSetupGrid" class="world-config-grid">
-                </div>
-                <div class="panel-actions">
-                    <button id="applySelectedDensityButton" class="button">Apply Selected Density to All</button>
-                    <button id="resetDensitiesButton" class="button">Reset Densities to Default</button>
-                    <button id="applySetupButton" class="button">Apply & Reset All Enabled Worlds</button>
-                </div>
             </div>
         </div>
 
@@ -226,8 +216,7 @@
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="analysisPanelTitle">Analysis Tools<button class="button-help-trigger" data-tour-name="analysis" title="Help with this feature">[?]</button></h3>
             <div class="panel-content-area">
-                <div class="plugins-mount-area">
-                </div>
+                <!-- This will be populated by AnalysisComponent -->
             </div>
         </div>
 

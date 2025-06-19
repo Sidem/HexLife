@@ -1,23 +1,18 @@
 import * as Config from '../../core/config.js';
-import { DraggablePanel } from './DraggablePanel.js';
+import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { Throttler } from '../../utils/throttler.js';
 
 import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
-
-export class AnalysisPanel extends DraggablePanel {
-    constructor(panelElement, options = {}) {
-        super(panelElement, { 
-            handleSelector: 'h3', 
-            ...options, 
-            persistence: { identifier: 'analysis' } 
-        });
+export class AnalysisComponent extends BaseComponent {
+    constructor(mountPoint, options = {}) {
+        super(mountPoint, options); // Call BaseComponent constructor
 
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
-            console.error('AnalysisPanel: appContext or worldManager is null.');
+            console.error('AnalysisComponent: appContext or worldManager is null.');
             return;
         }
         
@@ -29,26 +24,30 @@ export class AnalysisPanel extends DraggablePanel {
             (stats) => this._distributeThrottledUpdate(stats),
             Config.UI_UPDATE_THROTTLE_MS
         );
+        
+        // Create the root element for this component
+        this.element = document.createElement('div');
+        this.element.className = 'analysis-component-content';
+        this.element.innerHTML = `<div class="plugins-mount-area"></div>`;
 
         this.uiElements = {
-            pluginsMountArea: this.panelElement.querySelector('.plugins-mount-area')
+            pluginsMountArea: this.element.querySelector('.plugins-mount-area')
         };
 
-        if (!this.uiElements.pluginsMountArea) {
-            console.error('AnalysisPanel: .plugins-mount-area not found in panel HTML.');
-        }
-
-        this._setupInternalListeners();
         this._registerPlugins();
         this._initializePluginsUI();
         this._setupEventSubscriptions(); 
-        this.refreshViews(); 
+        this.refresh();
+    }
+
+    getElement() {
+        return this.element;
     }
 
     _registerPlugins() {
         this.plugins.push(new RatioHistoryPlugin());
         this.plugins.push(new EntropyPlotPlugin());
-        console.log(`AnalysisPanel: Registered ${this.plugins.length} plugins.`);
+        console.log(`AnalysisComponent: Registered ${this.plugins.length} plugins.`);
     }
 
     _initializePluginsUI() {
@@ -82,60 +81,31 @@ export class AnalysisPanel extends DraggablePanel {
         });
     }
 
-    _setupInternalListeners() {
-        
-    }
-
     _setupEventSubscriptions() {
-        
-        EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (statsData) => { 
-            if (this.isHidden() || statsData.worldIndex !== this.worldManager.getSelectedWorldIndex()) return;
-
+        this._subscribeToEvent(EVENTS.WORLD_STATS_UPDATED, (statsData) => { 
+            if (statsData.worldIndex !== this.worldManager.getSelectedWorldIndex()) return;
             this.throttler.schedule(statsData);
         });
 
-        EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-            if (this.isHidden()) return;
-            
+        this._subscribeToEvent(EVENTS.ALL_WORLDS_RESET, () => {
             const stats = this.worldManager.getSelectedWorldStats();
             this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'allWorldsReset', payload: stats }));
         });
 
-        EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (newIndex) => {
-            if (this.isHidden()) return;
-            
+        this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, (newIndex) => {
             const stats = this.worldManager.getSelectedWorldStats(); 
             this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: stats })); 
         });
     }
 
     _distributeThrottledUpdate(statsData) {
-        if (this.isHidden()) return;
         this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: statsData }));
     }
 
-    refreshViews() {
-        if (this.isHidden() || !this.worldManager) return;
-
+    refresh() {
+        if (!this.worldManager) return;
         const currentSelectedStats = this.worldManager.getSelectedWorldStats();
         this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: currentSelectedStats }));
-    }
-
-    show() {
-        super.show();
-        this.refreshViews();
-    }
-
-    hide() {
-        super.hide();
-    }
-
-    toggle() {
-        const isVisible = super.toggle();
-        if (isVisible) {
-            this.refreshViews();
-        }
-        return isVisible;
     }
 
     destroy() {
@@ -144,6 +114,4 @@ export class AnalysisPanel extends DraggablePanel {
         this.plugins = [];
         super.destroy();
     }
-
-    
-}
+} 

@@ -1,6 +1,6 @@
 import { RulesetEditor } from './components/RulesetEditor.js';
-import { SetupPanel } from './components/SetupPanel.js';
-import { AnalysisPanel } from './components/AnalysisPanel.js';
+import { WorldSetupComponent } from './components/WorldSetupComponent.js';
+import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
 import { LearningPanel } from './components/LearningPanel.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
@@ -17,8 +17,8 @@ export class PanelManager {
         this.libraryData = null;
         this.panelConfig = [
             { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: {} },
-            { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: {} },
-            { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: {} },
+            { name: 'worldSetup', elementId: 'worldSetupPanel', buttonId: 'setupPanelButton', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
+            { name: 'analysis', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
             { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: {} },
             { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} },
             { name: 'rulesetActions', elementId: 'rulesetActionsPanel', buttonId: 'rulesetActionsButton', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
@@ -31,14 +31,30 @@ export class PanelManager {
         this.panelConfig.forEach(config => {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
-                const PanelClass = config.constructor;
-                
-                // Standardized call that works for DraggablePanel and all its subclasses
-                // The appContext is passed within the options object
-                this.panels[config.name] = new PanelClass(panelElement, { 
-                    appContext: this.appContext, 
-                    ...config.options 
+                const PresenterClass = config.constructor;
+                const presenterInstance = new PresenterClass(panelElement, {
+                    appContext: this.appContext,
+                    ...config.options,
+                    persistence: { identifier: config.persistenceKey || config.name }
                 });
+
+                if (config.contentComponent) {
+                    const contentContainer = panelElement.querySelector('.panel-content-area');
+                    if (contentContainer) {
+                        // Instantiate the content component, passing null for the mountPoint
+                        // as we are manually placing its element.
+                        const contentInstance = new config.contentComponent(null, { appContext: this.appContext });
+
+                        // Append the component's rendered element to the panel's content area.
+                        contentContainer.appendChild(contentInstance.getElement());
+                        
+                        // Store reference to content component for potential future use
+                        presenterInstance.contentComponent = contentInstance;
+                    }
+                }
+                
+                // Store the presenter, which is the main handle for showing/hiding
+                this.panels[config.name] = presenterInstance;
             }
         });
 
@@ -71,17 +87,17 @@ export class PanelManager {
         });
 
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-            this.panels.setupPanel?.refreshViews();
+            this.panels.worldSetup?.contentComponent?.refresh();
             this.panels.ruleRankPanel?.refreshViews();
         });
 
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => {
-            this.panels.setupPanel?.refreshViews();
+            this.panels.worldSetup?.contentComponent?.refresh();
         });
 
         EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, () => {
              if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) this.panels.rulesetEditor.refreshViews();
-             if (this.panels.analysisPanel && !this.panels.analysisPanel.isHidden()) this.panels.analysisPanel.refreshViews();
+             if (this.panels.analysis && !this.panels.analysis.isHidden()) this.panels.analysis.contentComponent.refresh();
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
 

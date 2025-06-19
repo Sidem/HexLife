@@ -27,10 +27,14 @@ export class SwitchComponent extends BaseComponent {
                 ? this.options.initialValue
                 : this.options.initialValue === item.value;
             
+            // Create a unique ID for the input. For checkboxes, the name itself is unique.
+            // For radio buttons, the name + value is needed.
+            const inputId = this.options.type === 'checkbox' ? this.options.name : `${this.options.name}-${item.value}`;
+
             return `
                 <div class="switch-item">
-                    <input type="${this.options.type}" id="${this.options.name}-${item.value}" name="${this.options.name}" value="${item.value}" class="switch-input" ${isChecked ? 'checked' : ''}>
-                    <label for="${this.options.name}-${item.value}" class="switch-label">${item.text}</label>
+                    <input type="${this.options.type}" id="${inputId}" name="${this.options.name}" value="${item.value}" class="switch-input" ${isChecked ? 'checked' : ''}>
+                    <label for="${inputId}" class="switch-label">${item.text}</label>
                 </div>
             `;
         }).join('');

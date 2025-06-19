@@ -33,8 +33,8 @@ export class KeyboardShortcutManager {
         this.shortcuts = [
             // Panel & Popout Toggles
             { key: 'e', handler: () => this.panelManager.getPanel('rulesetEditor')?.toggle() },
-            { key: 's', handler: () => this.panelManager.getPanel('setupPanel')?.toggle() },
-            { key: 'a', handler: () => this.panelManager.getPanel('analysisPanel')?.toggle() },
+            { key: 's', handler: () => this.panelManager.getPanel('worldSetup')?.toggle() },
+            { key: 'a', handler: () => this.panelManager.getPanel('analysis')?.toggle() },
             { key: 'n', handler: () => this.panelManager.getPanel('rulesetActions')?.toggle() },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 

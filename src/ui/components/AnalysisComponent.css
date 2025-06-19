@@ -1,12 +1,14 @@
-#analysisPanel {
-    width: clamp(400px, 60vw, 550px);
+.analysis-component-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%;
 }
 
 .plugins-mount-area {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-top: 10px;
 }
 
 .analysis-plugin-container {
@@ -16,18 +18,88 @@
     background-color: rgba(0,0,0,0.1);
 }
 
-.analysis-plugin-container .plot-container {
-    margin-top: 0;
-    padding: 0;
-    border: none;
-}
-
 .analysis-plugin-container .plugin-canvas {
     display: block;
     width: 100%;
     height: 100px;
     background-color: #2a2a2a;
     border-radius: 2px;
+}
+
+/* Styles previously in AnalyzeView.css */
+.analyze-view-header {
+    display: flex;
+    justify-content: stretch;
+    background-color: #2a2a2a;
+    padding: 10px;
+    flex-shrink: 0;
+}
+
+.analyze-view-segment {
+    flex-grow: 1;
+    padding: 12px 5px;
+    font-size: 0.9em;
+    text-align: center;
+    background-color: #3a3a3a;
+    color: #ccc;
+    border: none;
+    border-right: 1px solid #555;
+}
+
+.analyze-view-segment:last-child {
+    border-right: none;
+}
+
+.analyze-view-segment.active {
+    background-color: #f0c674;
+    color: #1e1e1e;
+    font-weight: bold;
+}
+
+.analyze-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Make canvas plots responsive */
+.analyze-pane .plugin-canvas {
+    width: 100%;
+    height: auto;
+    max-height: 150px;
+}
+
+/* Styles for the rule rank list */
+.mobile-rank-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-rank-item {
+    display: grid;
+    grid-template-columns: 20px 50px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    background-color: #2a2a2a;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.mobile-rank-item .rank {
+    font-weight: bold;
+    color: #888;
+}
+
+.mobile-rank-item .viz {
+    transform: scale(0.3) translate(-80px, -85px);
+    height: 35px; /* Contain the scaled element */
+}
+
+.mobile-rank-item .usage {
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.9em;
 }
 
 /* Entropy Plugin Specific Styling */
@@ -95,9 +167,16 @@
     font-size: 0.85em;
     color: #bbb;
 }
-#ranks-pane > h4{
+
+#ranks-pane > h4 {
     margin: 0;
 }
+
+/* Panel specific styles */
+#analysisPanel {
+    width: clamp(400px, 60vw, 550px);
+}
+
 /* Mobile Overrides */
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
     #analysisPanel { 
@@ -109,4 +188,4 @@
      #analysisPanel {
          width: clamp(250px, 90vw, 300px);
      }
-}
+} 

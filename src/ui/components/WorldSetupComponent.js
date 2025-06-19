@@ -1,65 +1,89 @@
 import * as Config from '../../core/config.js';
-import { DraggablePanel } from './DraggablePanel.js';
+import { BaseComponent } from './BaseComponent.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
-export class SetupPanel extends DraggablePanel {
-    constructor(panelElement, options = {}) { 
-        super(panelElement, { 
-            handleSelector: 'h3', 
-            ...options, 
-            persistence: { identifier: 'setup' } 
-        });
+
+export class WorldSetupComponent extends BaseComponent {
+    constructor(mountPoint, options = {}) {
+        super(mountPoint, options); // Call BaseComponent constructor
 
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
-            console.error('SetupPanel: appContext or worldManager is null.');
+            console.error('WorldSetupComponent: appContext or worldManager is null.');
             return;
         }
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        this.uiElements = {
-            worldSetupGrid: panelElement.querySelector('#worldSetupGrid'),
-            applySetupButton: panelElement.querySelector('#applySetupButton'),
-            applySelectedDensityButton: panelElement.querySelector('#applySelectedDensityButton'),
-            resetDensitiesButton: panelElement.querySelector('#resetDensitiesButton'),
-        };
+        
+        // Create the root element for this component's content
+        this.element = document.createElement('div');
+        this.element.className = 'world-setup-component-content';
+        
+        this.uiElements = {}; // To be populated by render()
         this.worldSliderComponents = [];
+        
+        this.render(); // Render the content into this.element
         this._setupInternalListeners();
-        if (!this.isHidden()) this.refreshViews();
 
-        EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refreshViews());
-        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refreshViews());
-        EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refreshViews());
+        // Subscribe to events that require a re-render
+        EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refresh());
+        EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refresh());
+        EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refresh());
+    }
+
+    getElement() {
+        return this.element;
+    }
+
+    render() {
+        this.element.innerHTML = `
+            <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's ruleset and reset.</p>
+            <div class="world-config-grid"></div>
+            <div class="panel-actions">
+                <button class="button" data-action="apply-density-all">Apply Selected Density to All</button>
+                <button class="button" data-action="reset-densities">Reset Densities to Default</button>
+                <button class="button" data-action="reset-all-worlds">Apply & Reset All Enabled Worlds</button>
+            </div>
+        `;
+        
+        // Mount the element to the provided mount point
+        if (this.mountPoint) {
+            this.mountPoint.appendChild(this.element);
+        }
+        
+        // Cache the uiElements from the newly created DOM
+        this.uiElements.worldSetupGrid = this.element.querySelector('.world-config-grid');
+        this.uiElements.applySetupButton = this.element.querySelector('[data-action="reset-all-worlds"]');
+        this.uiElements.applySelectedDensityButton = this.element.querySelector('[data-action="apply-density-all"]');
+        this.uiElements.resetDensitiesButton = this.element.querySelector('[data-action="reset-densities"]');
+        
+        this.refresh(); // Initial population of the grid
     }
 
     _setupInternalListeners() {
-        if (this.uiElements.applySetupButton) {
-            this.uiElements.applySetupButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES));
-        }
-        if (this.uiElements.applySelectedDensityButton) {
-            this.uiElements.applySelectedDensityButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL));
-        }
-        if (this.uiElements.resetDensitiesButton) {
-            this.uiElements.resetDensitiesButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT));
-        }
-        if (this.uiElements.worldSetupGrid) {
-            this.uiElements.worldSetupGrid.addEventListener('click', (event) => {
-                if (event.target.classList.contains('set-ruleset-button')) {
-                    const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
-                    if (!isNaN(worldIndex)) {
-                        EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: worldIndex, copyPrimaryRuleset: true });
-                    }
+        this.element.addEventListener('click', (event) => {
+            const action = event.target.dataset.action;
+            if (action === 'reset-all-worlds') {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+            } else if (action === 'apply-density-all') {
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
+            } else if (action === 'reset-densities') {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
+            } else if (event.target.classList.contains('set-ruleset-button')) {
+                const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
+                if (!isNaN(worldIndex)) {
+                    EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: worldIndex, copyPrimaryRuleset: true });
                 }
-            });
-        }
+            }
+        });
     }
 
-    refreshViews() {
-        if (!this.worldManager || !this.uiElements.worldSetupGrid || this.isHidden()) return;
+    refresh() {
+        if (!this.worldManager || !this.uiElements.worldSetupGrid) return;
         this._populateWorldSetupGrid();
     }
 
@@ -125,22 +149,9 @@ export class SetupPanel extends DraggablePanel {
         grid.appendChild(fragment);
     }
 
-    show() {
-        super.show();
-        this.refreshViews();
-    }
-
-    toggle() {
-        const isVisible = super.toggle();
-        if (isVisible) {
-            this.refreshViews();
-        }
-        return isVisible;
-    }
-
     destroy() {
         super.destroy();
         this.worldSliderComponents.forEach(s => s.destroy());
         this.worldSliderComponents = [];
     }
-}
+} 

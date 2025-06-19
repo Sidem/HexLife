@@ -5,8 +5,9 @@ import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import { MoreView } from './views/MoreView.js';
 import { RulesView } from './views/RulesView.js';
-import { WorldsView } from './views/WorldsView.js';
-import { AnalyzeView } from './views/AnalyzeView.js';
+import { MobileView } from './views/MobileView.js';
+import { WorldSetupComponent } from './components/WorldSetupComponent.js';
+import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { EditorView } from './views/EditorView.js';
 import { LearningView } from './views/LearningView.js';
 import { downloadFile } from '../utils/utils.js';
@@ -134,10 +135,8 @@ export class UIManager {
             this.mobileViews.more.render();
             this.mobileViews.rules = new RulesView(mobileViewsContainer, appContext, libraryData);
             this.mobileViews.rules.render();
-            this.mobileViews.worlds = new WorldsView(mobileViewsContainer, appContext);
-            this.mobileViews.worlds.render();
-            this.mobileViews.analyze = new AnalyzeView(mobileViewsContainer, appContext);
-            this.mobileViews.analyze.render();
+            // worlds view will be created dynamically when needed
+            // analyze view will be created dynamically when needed
             this.mobileViews.editor = new EditorView(mobileViewsContainer, panelManager);
             this.mobileViews.editor.render();
             this.mobileViews.learning = new LearningView(mobileViewsContainer, this.onboardingManager); // <-- Pass the manager here
@@ -353,6 +352,40 @@ export class UIManager {
         let nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
     
         Object.values(this.mobileViews).forEach(v => v.hide());
+    
+        // Handle dynamic creation of worlds view
+        if (nextView === 'worlds') {
+            if (!this.mobileViews.worlds) {
+                const mobileViewsContainer = document.getElementById('mobile-views-container');
+                if (mobileViewsContainer) {
+                    // Create a generic MobileView presenter
+                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'World Setup' });
+                    
+                    // Create the content component
+                    const worldSetupContent = new WorldSetupComponent(null, { appContext: this.appContext });
+                    
+                    // Render the presenter and mount the content
+                    mobileViewPresenter.render();
+                    mobileViewPresenter.setContentComponent(worldSetupContent);
+                    
+                    this.mobileViews.worlds = mobileViewPresenter;
+                }
+            }
+        }
+
+        // Handle dynamic creation of analyze view
+        if (nextView === 'analyze') {
+            if (!this.mobileViews.analyze) {
+                const mobileViewsContainer = document.getElementById('mobile-views-container');
+                if (mobileViewsContainer) {
+                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Analysis' });
+                    const analysisContent = new AnalysisComponent(null, { appContext: this.appContext });
+                    mobileViewPresenter.render();
+                    mobileViewPresenter.setContentComponent(analysisContent);
+                    this.mobileViews.analyze = mobileViewPresenter;
+                }
+            }
+        }
     
         const viewToShow = this.mobileViews[nextView];
         if (viewToShow) {

@@ -1,0 +1,138 @@
+.world-setup-component-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%; /* Allow flex to work */
+}
+
+.world-config-grid {
+    display: grid;
+    gap: 10px;
+    padding: 10px 0;
+    grid-template-columns: repeat(3, 1fr); /* Desktop-first: 3 columns */
+    overflow-y: auto; /* Make grid scrollable if content overflows */
+    flex-grow: 1; /* Allow grid to take available space */
+}
+
+.world-config-cell > :nth-child(3) {
+    grid-column: span 2;
+}
+
+.world-config-cell {
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 5px;
+    background-color: rgba(255, 255, 255, 0.03);
+    display: grid;
+    grid-template-columns: 0.5fr 0.5fr;
+    align-items: center;
+}
+
+.world-label {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #bbb;
+}
+
+.world-config-cell .ruleset-viz-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.world-config-cell .ruleset-hex {
+    font-family: monospace;
+    font-size: 0.9em;
+    background-color: #3a3a3a;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.setting-control {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+}
+
+.setting-control label {
+    font-size: 0.8em;
+    color: #aaa;
+    text-align: center;
+}
+
+.density-control .slider-component-container {
+    width: 100%;
+}
+
+.density-control .slider-component-container input[type="range"] {
+    width: 100%;
+    min-width: 0;
+}
+
+.enable-control label.checkbox-label {
+    padding: 6px 12px;
+    font-size: 0.85em;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.world-config-cell .button.set-ruleset-button {
+    height: auto;
+    padding: 6px 10px;
+    font-size: 0.8em;
+    min-width: 0;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.panel-actions {
+    border-top: 1px solid #444;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.panel-actions .button {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+}
+
+/* Mobile Overrides */
+@media (max-width: 768px) {
+    .world-config-grid {
+        grid-template-columns: repeat(2, 1fr); /* Mobile: 2 columns */
+        gap: 8px;
+    }
+    
+    .world-config-cell {
+        padding: 8px;
+        gap: 6px;
+    }
+    
+    .world-label {
+        font-size: 0.85em;
+    }
+    
+    .panel-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .panel-actions .button {
+        padding: 10px;
+        font-size: 0.9em;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .world-config-grid {
+        grid-template-columns: 1fr; /* Very small screens: 1 column */
+    }
+} 
