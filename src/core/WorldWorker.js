@@ -580,7 +580,7 @@ self.onmessage = async function(event) {
         case 'APPLY_SELECTIVE_BRUSH':
         case 'LOAD_STATE':
             commandQueue.push(command);
-            const { needsStateUpdate: inducedUpdateOnGrid, rulesetChangedInQueue: rsChangedByGridCmd } = processCommandQueue();
+            const { needsGridUpdate: inducedUpdateOnGrid, rulesetChangedInQueue: rsChangedByGridCmd } = processCommandQueue();
             if (inducedUpdateOnGrid) {
                 lastSentChecksum = calculateChecksum(jsStateArray);
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
@@ -598,15 +598,12 @@ self.onmessage = async function(event) {
         case 'CLEAR_HOVER_STATE':
         case 'SET_RULESET':
             commandQueue.push(command);
-            processQueueAndForceTickForPausedState = true;
+            if (!isRunning || !isEnabled) {
+                runTick();
+            }
             break;
-
         default:
             commandQueue.push(command);
             break;
-    }
-
-    if (processQueueAndForceTickForPausedState && (!isRunning || !isEnabled)) {
-        runTick();
     }
 };

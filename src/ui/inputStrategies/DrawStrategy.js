@@ -49,8 +49,6 @@ export class DrawStrategy extends BaseInputStrategy {
     }
 
     handleMouseMove(event) {
-        // --- Immediate Drawing Logic ---
-        // This part runs instantly on every mouse move, ensuring no drawing lag.
         if (this.isDrawing) {
             const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
             if (viewType === 'selected' && col !== null) {
@@ -70,15 +68,11 @@ export class DrawStrategy extends BaseInputStrategy {
     handleTouchStart(event) {
         const primaryTouch = event.touches[0];
 
-        // Initialize tap detection state for the new touch
         this.touchState.isDown = true;
         this.touchState.isDragging = false;
         this.touchState.startPoint = { x: primaryTouch.clientX, y: primaryTouch.clientY };
 
         const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
-
-        // Only begin drawing if the touch starts on the main canvas.
-        // If it starts on the minimap, we will wait until touchend to see if it was a tap.
         if (viewType === 'selected' && col !== null) {
             this.isDrawing = true;
             this.resetStrokeState();
@@ -94,39 +88,36 @@ export class DrawStrategy extends BaseInputStrategy {
 
     handleTouchMove(event) {
         const primaryTouch = event.touches[0];
-
-        // Check if the movement exceeds the tap threshold, marking it as a drag.
         if (this.touchState.isDown && !this.touchState.isDragging) {
             const dist = Math.hypot(primaryTouch.clientX - this.touchState.startPoint.x, primaryTouch.clientY - this.touchState.startPoint.y);
             if (dist > this.touchState.TAP_THRESHOLD) {
                 this.touchState.isDragging = true;
             }
         }
-
-        // The rest of the logic for drawing remains the same.
-        
         if (this.isDrawing) {
-            this.applyBrush(worldIndexAtCursor, col, row);
+            const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
+            if (viewType === 'selected' && col !== null) {
+                this.applyBrush(worldIndexAtCursor, col, row);
+            }
         }
     }
 
     handleTouchEnd(event) {
-        // Check if the interaction was a tap (not a drag) on the minimap.
         if (this.touchState.isDown && !this.touchState.isDragging) {
             const endTouch = event.changedTouches[0];
             const { worldIndexAtCursor, viewType } = this.manager.getCoordsFromPointerEvent(endTouch);
             
             if (viewType === 'mini' && worldIndexAtCursor !== null) {
-                // It was a tap on the minimap, so select the world.
                 EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-                this.touchState.isDown = false; // Reset state
-                return; // Exit early, skipping the endDrawing logic.
+                this.isDrawing = false;
+                this.resetStrokeState();
+                this.touchState.isDown = false;
+                return;
             }
         }
 
-        // If it wasn't a minimap tap, proceed with the normal end-of-drawing logic.
         this.endDrawing();
-        this.touchState.isDown = false; // Reset state
+        this.touchState.isDown = false;
     }
 
     applyBrush(worldIndex, col, row) {
