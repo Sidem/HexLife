@@ -7,9 +7,14 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 export class SetupPanel extends DraggablePanel {
-    constructor(panelElement, appContext, options = {}) { 
-        super(panelElement, 'h3', { ...options, persistence: { identifier: 'setup' } });
+    constructor(panelElement, options = {}) { 
+        super(panelElement, { 
+            handleSelector: 'h3', 
+            ...options, 
+            persistence: { identifier: 'setup' } 
+        });
 
+        const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('SetupPanel: appContext or worldManager is null.');
             return;

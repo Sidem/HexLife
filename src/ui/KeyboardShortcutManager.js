@@ -35,14 +35,14 @@ export class KeyboardShortcutManager {
             { key: 'e', handler: () => this.panelManager.getPanel('rulesetEditor')?.toggle() },
             { key: 's', handler: () => this.panelManager.getPanel('setupPanel')?.toggle() },
             { key: 'a', handler: () => this.panelManager.getPanel('analysisPanel')?.toggle() },
-            { key: 'n', handler: () => this.toolbar.getPopout('newRules')?.toggle() },
+            { key: 'n', handler: () => this.panelManager.getPanel('rulesetActions')?.toggle() },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
             // Simulation Actions
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE) },
+            { key: 'm', handler: () => this.panelManager.getPanel('rulesetActions')?.toggle() },
             { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
             
             // World State Actions

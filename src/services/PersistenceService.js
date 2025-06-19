@@ -11,6 +11,7 @@ const KEYS = {
     ANALYSIS_PANEL_STATE: `${LS_KEY_PREFIX}analysisPanelState`,
     RULERANK_PANEL_STATE: `${LS_KEY_PREFIX}ruleRankPanelState`,
     LEARNING_PANEL_STATE: `${LS_KEY_PREFIX}learningPanelState`,
+    RULESETACTIONS_PANEL_STATE: `${LS_KEY_PREFIX}rulesetActionsPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`

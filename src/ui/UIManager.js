@@ -348,8 +348,9 @@ export class UIManager {
 
     showMobileView({ targetView, currentView }) {
         if (!this.isMobile()) return;
+        console.log('showMobileView', targetView, currentView);
     
-        const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
+        let nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
     
         Object.values(this.mobileViews).forEach(v => v.hide());
     

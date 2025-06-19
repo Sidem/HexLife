@@ -18,11 +18,15 @@ class ElementPool {
 }
 
 export class RuleRankPanel extends DraggablePanel {
-    constructor(panelElement, appContext, options = {}) {
-        super(panelElement, 'h3', { ...options, persistence: { identifier: 'ruleRank' } });
+    constructor(panelElement, options = {}) {
+        super(panelElement, { 
+            handleSelector: 'h3', 
+            ...options, 
+            persistence: { identifier: 'ruleRank' } 
+        });
 
-        this.appContext = appContext;
-        this.worldManager = appContext.worldManager;
+        this.appContext = options.appContext;
+        this.worldManager = this.appContext?.worldManager;
         this.uiElements = {
             contentArea: panelElement.querySelector('#ruleRankContent'),
         };

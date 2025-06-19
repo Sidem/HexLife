@@ -8,9 +8,14 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 
 export class AnalysisPanel extends DraggablePanel {
-    constructor(panelElement, appContext, options = {}) {
-        super(panelElement, 'h3', { ...options, persistence: { identifier: 'analysis' } });
+    constructor(panelElement, options = {}) {
+        super(panelElement, { 
+            handleSelector: 'h3', 
+            ...options, 
+            persistence: { identifier: 'analysis' } 
+        });
 
+        const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('AnalysisPanel: appContext or worldManager is null.');
             return;

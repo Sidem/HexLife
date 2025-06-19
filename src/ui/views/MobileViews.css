@@ -80,7 +80,7 @@
 }
 
 /* Ensure content inside the views is scrollable */
-#rules-view .rules-view-content,
+#rules-view .mobile-view-content-area,
 #worlds-view .worlds-list,
 #analyze-view .analyze-view-content,
 #more-view #more-view-content {

@@ -2,8 +2,11 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class DraggablePanel {
-    constructor(panelElement, handleSelector = 'h3', options = {}) {
+    constructor(panelElement, options = {}) {
         this.panelElement = panelElement;
+        
+        // Extract handleSelector from options, with a default
+        const handleSelector = options.handleSelector || 'h3';
         this.handleElement = panelElement.querySelector(handleSelector);
         this.options = { constrainToViewport: true, ...options };
         this.offsetX = 0;

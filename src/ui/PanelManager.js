@@ -3,6 +3,7 @@ import { SetupPanel } from './components/SetupPanel.js';
 import { AnalysisPanel } from './components/AnalysisPanel.js';
 import { RuleRankPanel } from './components/RuleRankPanel.js';
 import { LearningPanel } from './components/LearningPanel.js';
+import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
 
@@ -19,7 +20,8 @@ export class PanelManager {
             { name: 'setupPanel', elementId: 'setupPanel', buttonId: 'setupPanelButton', constructor: SetupPanel, options: {} },
             { name: 'analysisPanel', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: AnalysisPanel, options: {} },
             { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: {} },
-            { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} }
+            { name: 'learningPanel', elementId: 'learningPanel', buttonId: 'helpButton', constructor: LearningPanel, options: {} },
+            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', buttonId: 'rulesetActionsButton', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
         ];
     }
 
@@ -30,8 +32,13 @@ export class PanelManager {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
                 const PanelClass = config.constructor;
-                // Standardize constructor call to pass the full appContext
-                this.panels[config.name] = new PanelClass(panelElement, this.appContext, config.options);
+                
+                // Standardized call that works for DraggablePanel and all its subclasses
+                // The appContext is passed within the options object
+                this.panels[config.name] = new PanelClass(panelElement, { 
+                    appContext: this.appContext, 
+                    ...config.options 
+                });
             }
         });
 

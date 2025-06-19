@@ -109,10 +109,7 @@
             <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
                 <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" data-tour-id="play-pause-button">▶</button>
                 <button id="controlsButton" class="toolbar-button" title="Simulation Controls" data-tour-id="controls-button">⚙️</button>
-                <button id="newRulesButton" class="toolbar-button" title="[N]ew Ruleset Options" data-tour-id="new-rules-button">✨</button> 
-                <button id="mutateButton" class="toolbar-button" title="Mutate Ruleset" data-tour-id="mutate-button">🧬</button>
-                <button id="setRulesetButton" class="toolbar-button" title="Set/Copy Ruleset Hex" data-tour-id="set-ruleset-button">#️⃣</button>
-                <button id="libraryButton" class="toolbar-button" title="Content Library" data-tour-id="library-button">📚</button>
+                <button id="rulesetActionsButton" class="toolbar-button" title="Ruleset Actions (Generate, Mutate, Library)" data-tour-id="ruleset-actions-button">🧬</button>
                 <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" data-tour-id="reset-clear-button">🔄</button>
                 <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" data-tour-id="edit-rule-button">📝</button> 
                 <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" data-tour-id="setup-panel-button">🌐</button> 
@@ -138,48 +135,6 @@
             <h4>Controls</h4>
             <div id="desktopControlsMount"></div>
         </div>
-        <div id="newRulesPopout" class="popout-panel hidden" data-tour-id="new-rules-popout">
-            <h4>Generate New Ruleset<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h4>
-            <div class="form-group">
-                <label>Mode:</label>
-                <div id="generateModeSwitchPopout"></div>
-            </div>
-            <div class="form-group bias-controls">
-                <input type="checkbox" id="useCustomBiasCheckboxPopout" class="checkbox-input" checked>
-                <label for="useCustomBiasCheckboxPopout" class="checkbox-label">Custom Bias:</label>
-                <div id="biasSliderMountPopout"></div>
-            </div>
-            <div class="form-group">
-                <div id="rulesetScopeSwitchPopout"></div>
-            </div>
-            <div class="form-group">
-                <div id="resetOnNewRuleCheckboxPopout"></div>
-            </div>
-            <button id="generateRulesetFromPopoutButton" class="button" data-tour-id="generate-ruleset-button">Generate</button>
-        </div>
-        <div id="mutatePopout" class="popout-panel hidden" data-tour-id="mutatePopout">
-            <h4>Mutate Ruleset<button class="button-help-trigger" data-tour-name="mutation" title="Help with this feature">[?]</button></h4>
-            <div class="form-group">
-                <div id="mutationRateSliderMount"></div>
-            </div>
-            <div class="form-group">
-                <label>Mutation Mode:</label>
-                <div id="mutateModeSwitch"></div>
-            </div>
-            <div class="form-group">
-                <label>Apply to:</label>
-                <div id="mutateScopeSwitch"></div>
-            </div>
-            <div class="popout-separator"></div>
-            <div class="form-group-buttons">
-                <button id="triggerMutationButton" class="button">Mutate</button>
-                <button id="cloneButton" class="button">Clone</button>
-                <button id="cloneAndMutateButton" class="button">Clone & Mutate Others</button>
-            </div>
-        </div>
-        <div id="setHexPopout" class="popout-panel hidden" data-tour-id="set-hex-popout">
-            <!-- Content will be populated by RulesetDirectInput component -->
-        </div>
         <div id="resetClearPopout" class="popout-panel hidden" data-tour-id="reset-clear-popout">
             <h4>Reset / Clear<button class="button-help-trigger" data-tour-name="resetClear" title="Help with this feature">[?]</button></h4>
             <button id="resetCurrentButtonPopout" class="button">Reset Selected</button>
@@ -187,17 +142,6 @@
             <div class="popout-separator"></div>
             <button id="clearCurrentButtonPopout" class="button">Clear Selected</button>
             <button id="clearAllButtonPopout" class="button">Clear All</button>
-        </div>
-        <div id="libraryPopout" class="popout-panel hidden" data-tour-id="libraryPopout">
-            <h4>Content Library<button class="button-help-trigger" data-tour-name="library" title="Help with this feature">[?]</button></h4>
-            <div class="popout-tabs">
-                <button class="tab-button active" data-tab="rulesets">Rulesets</button>
-                <button class="tab-button" data-tab="patterns">Patterns</button>
-            </div>
-            <div id="rulesetsLibraryContent" class="tab-content active">
-                </div>
-            <div id="patternsLibraryContent" class="tab-content hidden">
-                </div>
         </div>
 
         <div id="sharePopout" class="popout-panel hidden">
@@ -299,6 +243,13 @@
             <div class="panel-content-area">
                 <p class="editor-text info-text" style="text-align: left;">Replay any tutorial to learn more about the explorer's features. Your progress is saved automatically.</p>
                 <ul id="desktop-tour-list" class="learning-center-list"></ul>
+            </div>
+        </div>
+        
+        <div id="rulesetActionsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetActionsTitle" aria-modal="true" data-tour-id="ruleset-actions-panel">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="rulesetActionsTitle">Ruleset Actions<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h3>
+            <div class="panel-content-area" id="ruleset-actions-content-mount">
             </div>
         </div>
         <div id="bottom-tab-bar" class="hidden">

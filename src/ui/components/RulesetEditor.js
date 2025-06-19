@@ -5,13 +5,17 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditor extends DraggablePanel {
-    constructor(panelElement, appContext, options = {}) {
-        super(panelElement, 'h3', { 
+    constructor(panelElement, options = {}) {
+        super(panelElement, { 
+            handleSelector: 'h3',
             ...options, 
-            persistence: { identifier: 'ruleset' },
-            onDragEnd: () => this._saveEditorSettings() 
+            persistence: { identifier: 'ruleset' }
         });
 
+        // Set up the onDragEnd callback after super() call
+        this.options.onDragEnd = () => this._saveEditorSettings();
+
+        const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('RulesetEditor: appContext or worldManager is null.');
             return;

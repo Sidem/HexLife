@@ -7,6 +7,7 @@ export class RulesetDirectInput extends BaseComponent {
         this.appContext = appContext;
         this.context = options.context || 'shared';
         this.render();
+        this._updateInputValue();
     }
 
     render() {
@@ -40,8 +41,24 @@ export class RulesetDirectInput extends BaseComponent {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this._handleSetHex();
+                this.inputElement.blur();
             }
         });
+
+        // Listen for state changes to keep the input in sync
+        this._subscribeToEvent(EVENTS.RULESET_CHANGED, this._updateInputValue.bind(this));
+        this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, this._updateInputValue.bind(this));
+    }
+    
+    _updateInputValue() {
+        // Prevent updating if the user is currently typing in this specific input
+        if (document.activeElement === this.inputElement) {
+            return;
+        }
+        const currentHex = this.appContext.worldManager.getCurrentRulesetHex();
+        if (this.inputElement) {
+             this.inputElement.value = (currentHex === "Error" || currentHex === "N/A") ? "" : currentHex;
+        }
     }
 
     _handleSetHex = () => {
