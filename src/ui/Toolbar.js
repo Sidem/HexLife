@@ -62,9 +62,7 @@ export class Toolbar {
 
     _setupEventBusListeners() {
         const closeAll = (excludePanel = null) => {
-            this.activePopouts.forEach(popout => {
-                if (popout !== excludePanel) popout.hide();
-            });
+            this.closeAllPopouts(excludePanel);
         };
 
         // This event ensures that opening one popout closes any others.
@@ -177,27 +175,10 @@ export class Toolbar {
         return this.popoutPanels[panelName]; 
     }
 
-    closeAllPopouts() {
+    closeAllPopouts(excludePopout = null) {
         let wasOpen = false;
         this.activePopouts.forEach(p => {
-            if (!p.isHidden()) {
-                p.hide();
-                wasOpen = true;
-            }
-        });
-        return wasOpen;
-    }
-
-
-
-
-
-    getPopout(panelName) { return this.popoutPanels[panelName]; }
-
-    closeAllPopouts() {
-        let wasOpen = false;
-        this.activePopouts.forEach(p => {
-            if (!p.isHidden()) {
+            if (p !== excludePopout && !p.isHidden()) {
                 p.hide();
                 wasOpen = true;
             }

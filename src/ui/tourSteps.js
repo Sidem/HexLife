@@ -202,7 +202,7 @@ export const getTours = (appContext) => {
             content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe. The visualization shows a center cell (large hex) and its six neighbors.",
             onBeforeShow: () => {
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor', show: true });
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetEditor', show: true });
             },
             primaryAction: { text: 'How Do I Edit?' },
             advanceOn: { type: 'click' }
@@ -237,7 +237,7 @@ export const getTours = (appContext) => {
             content: "Good science requires a control group. Here, you can define the starting <span class=\"onboarding-highlight-text\">Density</span> for each universe or <span class=\"onboarding-highlight-text\">Enable/Disable</span> it entirely. This is essential for comparative analysis.",
             onBeforeShow: () => {
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup', show: true });
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup', show: true });
             },
             primaryAction: { text: "What's This Button?" },
             advanceOn: { type: 'click' }
@@ -258,7 +258,7 @@ export const getTours = (appContext) => {
             content: "This tool gives you the big picture. It charts the universe's overall <span class=\"onboarding-highlight-text\">Activity Ratio</span> and <span class=\"onboarding-highlight-text\">Entropy</span> (a measure of complexity) over time, allowing you to quantify the behavior of a ruleset.",
             onBeforeShow: () => {
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis', show: true });
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis', show: true });
             },
             primaryAction: { text: 'How Do I Read the Charts?' },
             advanceOn: { type: 'click' }
@@ -279,7 +279,7 @@ export const getTours = (appContext) => {
             content: "This panel answers *why* a universe behaves as it does. It shows you exactly which rules are being used most frequently, updated in real-time.",
             onBeforeShow: () => {
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleRankPanel', show: true });
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'ruleRankPanel', show: true });
             },
             primaryAction: { text: 'How Is It Organized?' },
             advanceOn: { type: 'click' }

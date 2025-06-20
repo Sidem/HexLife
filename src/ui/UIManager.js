@@ -232,6 +232,12 @@ export class UIManager {
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_VIEW, this._handleToggleView.bind(this));
+        
+        // This is the updated handler for the Escape key
+        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
+            // New behavior: Only hide popouts, not draggable panels.
+            this.appContext.toolbar.closeAllPopouts();
+        });
 
         // NEW: Logic moved from Toolbar.js
         const handleClickOutside = (event) => {
@@ -247,11 +253,14 @@ export class UIManager {
             const toolbar = this.appContext.toolbar;
             if (!toolbar || toolbar.activePopouts.every(p => p.isHidden())) return;
     
-            const clickedInsidePopout = toolbar.activePopouts.some(p => p.popoutElement.contains(event.target));
+            // Check if the click was inside ANY popout or on its trigger button.
+            // We only care about closing popouts on outside clicks.
+            const clickedInsidePopout = toolbar.activePopouts.some(p => !p.isHidden() && p.popoutElement.contains(event.target));
             const clickedOnTrigger = toolbar.activePopouts.some(p => p.triggerElement.contains(event.target));
     
             if (!clickedInsidePopout && !clickedOnTrigger) {
-                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+                // Directly close popouts instead of dispatching a broad event.
+                toolbar.closeAllPopouts();
             }
         };
 
@@ -355,29 +364,36 @@ export class UIManager {
      */
     _handleToggleView({ viewName, show }) {
         if (this.isMobile()) {
-            // Mobile logic: delegate to the mobile view manager
+            // Mobile logic remains the same.
             const currentView = this.activeMobileViewName || 'simulate';
             const targetView = (currentView === viewName && show === undefined) ? 'simulate' : viewName;
             this._showMobileViewInternal({ targetView });
         } else {
-            const panel = this.appContext.panelManager.getPanel(viewName) || this.appContext.toolbar.getPopout(viewName);
-            if (!panel) {
+            // Desktop logic change: Differentiate between panels and popouts.
+            const popout = this.appContext.toolbar.getPopout(viewName);
+            const panel = this.appContext.panelManager.getPanel(viewName);
+
+            if (popout) {
+                // It's a popout. Close all OTHER popouts before toggling this one.
+                const shouldShow = show !== undefined ? show : popout.isHidden();
+                if (shouldShow) {
+                    this.appContext.toolbar.closeAllPopouts(popout); // Pass popout to exclude it
+                }
+
+                // Toggle the specific popout
+                if (show === true) popout.show();
+                else if (show === false) popout.hide();
+                else popout.toggle();
+
+            } else if (panel) {
+                // It's a draggable panel. Just toggle it without affecting others.
+                if (show === true) panel.show();
+                else if (show === false) panel.hide();
+                else panel.toggle();
+
+            } else {
                 console.warn(`No view or panel found with name: ${viewName}`);
-                return;
             }
-
-            const shouldShow = show !== undefined ? show : panel.isHidden();
-
-            // Close all other panels/popouts before showing a new one
-            if (shouldShow) {
-                this.appContext.panelManager.hideAllPanels();
-                this.appContext.toolbar.closeAllPopouts();
-            }
-
-            // Toggle the specific panel
-            if (show === true) panel.show();
-            else if (show === false) panel.hide();
-            else panel.toggle();
         }
     }
 

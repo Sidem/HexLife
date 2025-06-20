@@ -58,6 +58,8 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_SET_VISUALIZATION_TYPE` | `type: string` | Command to set the visualization type ('binary', 'color'). |
 | `COMMAND_SET_SHOW_MINIMAP_OVERLAY` | `shouldShow: boolean` | Command to show/hide minimap overlays. |
 | `COMMAND_SET_SHOW_CYCLE_INDICATOR` | `shouldShow: boolean` | Command to show/hide cycle indicators. |
+| `COMMAND_TOGGLE_VIEW` | `{ viewName: string, show?: boolean }` | Unified command to show, hide, or toggle any view/panel/popout. On desktop, differentiates between draggable panels (multiple can be open) and popouts (only one at a time). |
+| `COMMAND_HIDE_ALL_OVERLAYS` | `(none)` | Command to hide all transient UI overlays. On desktop, only closes popouts, leaving draggable panels open. |
 
 ---
 

@@ -198,8 +198,6 @@ export const EVENTS = {
     COMMAND_EXECUTE_CLONE_AND_MUTATE: 'command:executeCloneAndMutate',
     /** @param {{viewName: string, show?: boolean}} data - Command to show, hide, or toggle a view/panel/popout. If 'show' is omitted, it toggles. */
     COMMAND_TOGGLE_VIEW: 'command:toggleView',
-    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{panelName: string, show?: boolean}} data - Command to show, hide, or toggle a draggable panel. If 'show' is omitted, it toggles. */
-    COMMAND_TOGGLE_PANEL: 'command:togglePanel',
     /** @event Emitted with no payload to command all popout and draggable panels to hide. */
     COMMAND_HIDE_ALL_OVERLAYS: 'command:hideAllOverlays',
     /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. If 'show' is omitted, it toggles. */
