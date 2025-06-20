@@ -7,7 +7,7 @@ export class BrushController {
         this.state = {
             brushSize: PersistenceService.loadBrushSize() ?? Config.DEFAULT_NEIGHBORHOOD_SIZE,
         };
-        // Subscribe to the new command event
+        
         EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_SIZE, this.#handleSetBrushSize);
     }
 
@@ -24,13 +24,13 @@ export class BrushController {
         };
     }
 
-    // Private handler for setting brush size
+    
     #handleSetBrushSize = (size) => {
         const newSize = Math.max(0, Math.min(Config.MAX_NEIGHBORHOOD_SIZE, size));
         if (this.state.brushSize === newSize) return;
         this.state.brushSize = newSize;
         PersistenceService.saveBrushSize(newSize);
-        // Dispatch state change event for UI updates
+        
         EventBus.dispatch(EVENTS.BRUSH_SIZE_CHANGED, newSize);
     }
 } 

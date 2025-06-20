@@ -1,8 +1,6 @@
 import { EventBus } from '../services/EventBus.js';
 import { WorldManager } from './WorldManager.js';
 import * as PersistenceService from '../services/PersistenceService.js';
-
-// Import Controller CLASSES, not instances
 import { BrushController } from '../ui/controllers/BrushController.js';
 import { InteractionController } from '../ui/controllers/InteractionController.js';
 import { LibraryController } from '../ui/controllers/LibraryController.js';
@@ -27,12 +25,10 @@ import { getTours } from '../ui/tourSteps.js';
  */
 export class AppContext {
     constructor(sharedSettings, libraryData) {
-        // Core Services
-        this.eventBus = EventBus; // EventBus remains a true singleton for global communication
+        this.eventBus = EventBus;
         this.persistenceService = PersistenceService;
         this.worldManager = new WorldManager(sharedSettings);
 
-        // Controllers - instantiated here
         this.brushController = new BrushController();
         this.interactionController = new InteractionController();
         this.libraryController = new LibraryController();
@@ -58,8 +54,6 @@ export class AppContext {
         const tours = getTours(this);
         this.onboardingManager.defineTours(tours);
         this.libraryController.init(libraryData);
-        
-        // Set controller references in WorldManager to avoid circular dependencies
         this.worldManager.setControllerReferences(this.simulationController, this.brushController);
     }
 } 

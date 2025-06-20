@@ -29,41 +29,35 @@ export class KeyboardShortcutManager {
      * @private
      */
     _registerShortcuts() {
-        // This array maps key combinations to specific commands, implementing the Command Pattern.
+        
         this.shortcuts = [
-            // Panel & Popout Toggles
+            
             { key: 'e', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor' }) },
             { key: 's', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup' }) },
             { key: 'a', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
             { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }) },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
-
-            // Simulation Actions
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
             { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },
             { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
-            
-            // World State Actions
             { key: 'd', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
             { key: 'd', shiftKey: true, handler: () => { EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
             { key: 'r', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES) },
             { key: 'r', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
             { key: 'c', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
             { key: 'c', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
-
-            // History Actions
             { key: 'z', ctrlKey: true, handler: () => document.getElementById('undoButton')?.click() },
             { key: 'z', ctrlKey: true, shiftKey: true, handler: () => document.getElementById('redoButton')?.click() },
 
-            // Numeric World Selection (1-9)
+            
             ...Array.from({ length: 9 }, (_, i) => ({
                 key: `${i + 1}`,
                 handler: () => this._handleNumericSelect(i + 1)
             })),
             
-            // Numeric World Toggle (Shift + 1-9)
+            
             ...Array.from({ length: 9 }, (_, i) => ({
                 key: `${i + 1}`,
                 shiftKey: true,
@@ -80,7 +74,7 @@ export class KeyboardShortcutManager {
      */
     _handleKeyDown(event) {
         if (this._isInputFocused(event)) {
-            // Allow Escape to work for closing panels/popouts even when an input is focused.
+            
             if (event.key.toLowerCase() === 'escape') {
                  EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             }
@@ -92,7 +86,7 @@ export class KeyboardShortcutManager {
         const shortcut = this.shortcuts.find(s => {
             const keyMatch = s.key.toLowerCase() === pressedKey;
             const shiftMatch = (s.shiftKey || false) === event.shiftKey;
-            const ctrlMatch = (s.ctrlKey || false) === (event.ctrlKey || event.metaKey); // metaKey for macOS
+            const ctrlMatch = (s.ctrlKey || false) === (event.ctrlKey || event.metaKey); 
             return keyMatch && shiftMatch && ctrlMatch;
         });
 
@@ -110,7 +104,7 @@ export class KeyboardShortcutManager {
      */
     _isInputFocused(event) {
         const activeEl = document.activeElement;
-        // The check for the event target handles cases where focus might not have shifted yet.
+        
         const targetEl = event.target; 
         
         const isFocusable = (el) => el && (
@@ -132,7 +126,7 @@ export class KeyboardShortcutManager {
      * @private
      */
     _handleNumericSelect(numKey) {
-        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; // Numpad layout mapping
+        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; 
         const worldIndex = keyToWorldIndex[numKey - 1];
         EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
     }
@@ -143,7 +137,7 @@ export class KeyboardShortcutManager {
      * @private
      */
     _handleNumericToggle(numKey) {
-        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; // Numpad layout mapping
+        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; 
         const worldIndex = keyToWorldIndex[numKey - 1];
         const currentSettings = this.worldManager.getWorldSettingsForUI();
         if (currentSettings[worldIndex]) {

@@ -8,7 +8,7 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 export class AnalysisComponent extends BaseComponent {
     constructor(mountPoint, options = {}) {
-        super(mountPoint, options); // Call BaseComponent constructor
+        super(mountPoint, options); 
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('AnalysisComponent: appContext or worldManager is null.');
@@ -24,7 +24,6 @@ export class AnalysisComponent extends BaseComponent {
             Config.UI_UPDATE_THROTTLE_MS
         );
         
-        // Create the root element for this component
         this.element = document.createElement('div');
         this.element.className = 'analysis-component-content';
         this.element.innerHTML = `<div class="plugins-mount-area"></div>`;

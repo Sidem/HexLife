@@ -20,27 +20,21 @@ let currentSpeedTarget = Config.DEFAULT_SPEED;
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
 let worldTickCounter = 0;
 let ruleUsageCounters = null;
-
 let ratioHistory = [];
 let entropyHistory = [];
 let hexBlockEntropyHistory = [];
 const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
-
 let workerIsEntropySamplingEnabled = false;
 let workerEntropySampleRate = 10;
-
 const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
 const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
-
-
 let lastSentChecksum = null;
 let stateHistoryChecksums = new Set();
 let stateChecksumQueue = [];
 
-// Cycle detection variables
 let isCyclePlaybackMode = false;
 let isDetectingCycle = false;
-let detectedCycle = []; // Will store objects: { state: Uint8Array, rules: Uint8Array }
+let detectedCycle = []; 
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
 
@@ -253,11 +247,11 @@ function runTick() {
         }
         worldTickCounter++;
         
-        // --- START: CORRECTED PLAYBACK LOGIC ---
+        
         const nextFrame = detectedCycle[cyclePlaybackIndex];
         jsNextStateArray.set(nextFrame.state);
-        jsNextRuleIndexArray.set(nextFrame.rules); // Also set the rule indices for correct coloring
-        // --- END: CORRECTED PLAYBACK LOGIC ---
+        jsNextRuleIndexArray.set(nextFrame.rules); 
+        
         
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
     } 

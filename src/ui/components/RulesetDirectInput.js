@@ -45,13 +45,13 @@ export class RulesetDirectInput extends BaseComponent {
             }
         });
 
-        // Listen for state changes to keep the input in sync
+        
         this._subscribeToEvent(EVENTS.RULESET_CHANGED, this._updateInputValue.bind(this));
         this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, this._updateInputValue.bind(this));
     }
     
     _updateInputValue() {
-        // Prevent updating if the user is currently typing in this specific input
+        
         if (document.activeElement === this.inputElement) {
             return;
         }
@@ -68,14 +68,14 @@ export class RulesetDirectInput extends BaseComponent {
             this.inputElement.select();
             return;
         }
-        // Assuming 'all' scope and 'reset' is a sensible default for direct input
+        
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
             hexString: hex,
             scope: 'all',
             resetOnNewRule: true
         });
         this.inputElement.value = '';
-        EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS); // Hide popout/view on success
+        EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS); 
     }
 
     _handleCopyHex = () => {

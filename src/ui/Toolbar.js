@@ -64,8 +64,6 @@ export class Toolbar {
         const closeAll = (excludePanel = null) => {
             this.closeAllPopouts(excludePanel);
         };
-
-        // This event ensures that opening one popout closes any others.
         EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
     }
     
@@ -85,22 +83,18 @@ export class Toolbar {
 
     
     _initPopoutControls() {
-        // Initialize the new ControlsComponent for desktop
+        
         const desktopControlsMount = this.uiElements.controlsPopout.querySelector('#desktopControlsMount');
         if (desktopControlsMount) {
             new ControlsComponent(desktopControlsMount, this.appContext, { context: 'desktop' });
         }
-
-
-
-        // Initialize reset/clear popout controls
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
     }
     
-    // _copyRuleset method removed - now handled by RulesetDirectInput component
+    
 
     _setupToolbarButtonListeners() {
         const buttonToActionMap = {
@@ -147,12 +141,8 @@ export class Toolbar {
         });
 
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => this.updatePauseButtonVisual(isPaused));
-        // Speed and brush size changes are now handled by ControlsComponent
+        
     }
-
-
-
-
 
     _copyShareLink() {
         if (this.uiElements.shareLinkInput.value) {

@@ -8,7 +8,7 @@ export class SliderComponent extends BaseComponent {
         this.options.max = this.options.max === undefined ? 100 : parseFloat(this.options.max);
         this.options.value = this.options.value === undefined ? (this.options.min + this.options.max) / 2 : parseFloat(this.options.value);
         
-        // NEW: State for fine-scrubbing interaction
+        
         this.isScrubbing = false;
         this.scrubStartY = 0;
         this.scrubStartX = 0;
@@ -78,7 +78,7 @@ export class SliderComponent extends BaseComponent {
              this.element.appendChild(this.unitDisplayElement);
          }
 
-        // NEW: Create tooltip element and append to body
+        
         this.tooltipElement = document.createElement('div');
         this.tooltipElement.className = 'slider-tooltip hidden';
         document.body.appendChild(this.tooltipElement);
@@ -125,11 +125,11 @@ export class SliderComponent extends BaseComponent {
              this.sliderElement.dispatchEvent(new Event('change', { bubbles: true }));
         }, { passive: false });
 
-        // NEW: Touch event listeners for fine scrubbing
+        
         this._addDOMListener(this.sliderElement, 'touchstart', this._handleTouchStart.bind(this), { passive: false });
     }
 
-    // NEW: Touch handler methods
+    
     _handleTouchStart(event) {
         event.preventDefault();
         this.isScrubbing = true;
@@ -144,7 +144,7 @@ export class SliderComponent extends BaseComponent {
         this._updateTooltip(touch, this.scrubStartValue);
         this.tooltipElement.classList.remove('hidden');
 
-        // Add move/end listeners to the document to capture movement outside the element
+        
         this._boundHandleTouchMove = this._handleTouchMove.bind(this);
         this._boundHandleTouchEnd = this._handleTouchEnd.bind(this);
         document.addEventListener('touchmove', this._boundHandleTouchMove, { passive: false });
@@ -157,9 +157,9 @@ export class SliderComponent extends BaseComponent {
 
         const touch = event.touches[0];
         const deltaX = touch.clientX - this.scrubStartX;
-        const deltaY = this.scrubStartY - touch.clientY; // Up is positive
+        const deltaY = this.scrubStartY - touch.clientY; 
 
-        // Determine granularity based on vertical drag distance
+        
         if (deltaY < 15)      this.granularity = 1.0;
         else if (deltaY < 70) this.granularity = 0.1;
         else                  this.granularity = 0.01;
@@ -170,10 +170,10 @@ export class SliderComponent extends BaseComponent {
         
         let newValue = this.scrubStartValue + valueChange;
         
-        // Clamp and step the new value
+        
         newValue = Math.max(this.options.min, Math.min(this.options.max, newValue));
         const precision = this._getStepPrecision();
-        newValue = parseFloat(newValue.toFixed(precision + 2)); // Keep extra precision while dragging
+        newValue = parseFloat(newValue.toFixed(precision + 2)); 
 
         this.sliderElement.value = String(newValue);
         this._updateValueDisplay(newValue);
@@ -193,22 +193,22 @@ export class SliderComponent extends BaseComponent {
         document.removeEventListener('touchmove', this._boundHandleTouchMove);
         document.removeEventListener('touchend', this._boundHandleTouchEnd);
         
-        // Dispatch the final change event
+        
         const finalValue = this._parseValue(this.sliderElement.value);
-        this.setValue(finalValue); // Finalize value with correct stepping
+        this.setValue(finalValue); 
         if (this.options.onChange) {
             this.options.onChange(finalValue);
         }
     }
 
-    // NEW: Tooltip update method
+    
     _updateTooltip(touchEvent, value) {
         const precision = this._getStepPrecision();
         const granularityText = this.granularity < 1.0 ? `<span class="slider-tooltip-granularity">${this.granularity}x speed</span>` : '';
         
         this.tooltipElement.innerHTML = `${value.toFixed(precision + 1)}${granularityText}`;
         this.tooltipElement.style.left = `${touchEvent.clientX}px`;
-        this.tooltipElement.style.top = `${touchEvent.clientY - 45}px`; // Position above the finger
+        this.tooltipElement.style.top = `${touchEvent.clientY - 45}px`; 
     }
 
     _updateValueDisplay(value) {
@@ -254,7 +254,7 @@ export class SliderComponent extends BaseComponent {
     }
 
     destroy() {
-        // NEW: Ensure tooltip is removed from the DOM on destroy
+        
         if (this.tooltipElement && this.tooltipElement.parentElement) {
             this.tooltipElement.parentElement.removeChild(this.tooltipElement);
         }

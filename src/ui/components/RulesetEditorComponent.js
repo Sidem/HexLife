@@ -17,7 +17,7 @@ export class RulesetEditorComponent extends BaseComponent {
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
 
-        // Create the component's root element
+        
         this.element = document.createElement('div');
         this.element.className = 'ruleset-editor-component-content';
         

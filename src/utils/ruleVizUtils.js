@@ -31,7 +31,7 @@ function hsvToRgb(h, s, v) {
  * @returns {number[]} An array of [r, g, b] values (0-255).
  */
 function generateRuleColor(ruleIndex, state) {
-    const hueOffset = 0.1667; // Yellow offset
+    const hueOffset = 0.1667; 
     const calculatedHue = ruleIndex / 128.0;
     const hue = (calculatedHue + hueOffset) % 1.0;
 
@@ -56,14 +56,14 @@ export function generateColorLUT() {
     const height = 2;
     const data = new Uint8Array(width * height * 4);
 
-    for (let state = 0; state < height; state++) { // 0 for inactive, 1 for active
+    for (let state = 0; state < height; state++) { 
         for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
             const color = generateRuleColor(ruleIndex, state);
             const dataIndex = (state * width + ruleIndex) * 4;
-            data[dataIndex] = color[0];     // R
-            data[dataIndex + 1] = color[1]; // G
-            data[dataIndex + 2] = color[2]; // B
-            data[dataIndex + 3] = 255;      // A
+            data[dataIndex] = color[0];     
+            data[dataIndex + 1] = color[1]; 
+            data[dataIndex + 2] = color[2]; 
+            data[dataIndex + 3] = 255;      
         }
     }
     return data;

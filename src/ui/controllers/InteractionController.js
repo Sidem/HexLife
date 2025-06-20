@@ -4,10 +4,10 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 export class InteractionController {
     constructor() {
         this.state = {
-            mode: 'pan', // 'pan', 'draw', or 'place'
+            mode: 'pan', 
             pauseWhileDrawing: PersistenceService.loadUISetting('pauseWhileDrawing', true)
         };
-        // Subscribe to command events
+        
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, this.#handleToggleMode);
         EventBus.subscribe(EVENTS.COMMAND_SET_INTERACTION_MODE, this.#handleSetMode);
         EventBus.subscribe(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, this.#handleSetPauseWhileDrawing);

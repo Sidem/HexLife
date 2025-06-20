@@ -27,7 +27,7 @@ export class TopInfoBar {
         };
         this._setupEventListeners();
 
-        // Initial state update
+        
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
         this.updateBrushSizeDisplay(this.appContext.brushController.getState().brushSize);

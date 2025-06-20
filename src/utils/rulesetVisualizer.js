@@ -28,19 +28,19 @@ function createSVG(w, h, viewBox) {
 class RulesetVisualizer {
     constructor(initialVizType = 'binary') {
         this.vizType = initialVizType;
-        // Listen for changes after initialization
+        
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => {
-             // We get the new type from the controller that dispatched the event,
-             // but for simplicity, we assume the controller will update us via setVisualizationType.
-             // The main goal is to remove the initial read from persistence.
+             
+             
+             
         });
     }
 
     setVisualizationType(type) {
         if (type === 'binary' || type === 'color') {
-            if (this.vizType === type) return; // Prevent unnecessary event dispatches
+            if (this.vizType === type) return; 
             this.vizType = type;
-            // The controller now handles persistence. This just updates internal state and broadcasts.
+            
             EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED); 
         }
     }
@@ -150,7 +150,7 @@ class RulesetVisualizer {
 }
 
 
-export let rulesetVisualizer; // a placeholder
+export let rulesetVisualizer; 
 export function initRulesetVisualizer(initialType) {
     if (!rulesetVisualizer) {
         rulesetVisualizer = new RulesetVisualizer(initialType);

@@ -47,7 +47,7 @@ export class HoverHandler {
         if (viewType === 'selected' && col !== null) {
             EventBus.dispatch(EVENTS.COMMAND_SET_HOVER_STATE, { worldIndex: selectedWorldIdx, col, row });
         } else {
-            // This case handles when the mouse is over the main view but not on a specific hex
+            
             EventBus.dispatch(EVENTS.COMMAND_CLEAR_HOVER_STATE, { worldIndex: selectedWorldIdx });
         }
     }

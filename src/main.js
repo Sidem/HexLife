@@ -95,18 +95,10 @@ async function initialize() {
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     updateLoadingStatus("Spooling up simulation workers...");
-    
-    // Step 1: Create the application context. It creates all core components.
     appContext = new AppContext(sharedSettings, libraryData);
-
-    // Step 2: Create and initialize the UI Orchestrator.
     uiManager = new UIManager(appContext);
     uiManager.init();
-    
-    // Step 2.1: Attach UIManager reference to appContext for components to query UI mode
     appContext.uiManager = uiManager;
-    
-    // Step 3: Setup InputManager, passing the detected mode
     const inputManager = new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {

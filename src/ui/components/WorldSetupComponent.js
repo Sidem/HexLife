@@ -9,7 +9,7 @@ import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class WorldSetupComponent extends BaseComponent {
     constructor(mountPoint, options = {}) {
-        super(mountPoint, options); // Call BaseComponent constructor
+        super(mountPoint, options); 
 
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
@@ -19,17 +19,15 @@ export class WorldSetupComponent extends BaseComponent {
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
         
-        // Create the root element for this component's content
+        
         this.element = document.createElement('div');
         this.element.className = 'world-setup-component-content';
         
-        this.uiElements = {}; // To be populated by render()
+        this.uiElements = {}; 
         this.worldSliderComponents = [];
         
-        this.render(); // Render the content into this.element
+        this.render(); 
         this._setupInternalListeners();
-
-        // Subscribe to events that require a re-render
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refresh());
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refresh());
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refresh());
@@ -50,18 +48,18 @@ export class WorldSetupComponent extends BaseComponent {
             </div>
         `;
         
-        // Mount the element to the provided mount point
+        
         if (this.mountPoint) {
             this.mountPoint.appendChild(this.element);
         }
         
-        // Cache the uiElements from the newly created DOM
+        
         this.uiElements.worldSetupGrid = this.element.querySelector('.world-config-grid');
         this.uiElements.applySetupButton = this.element.querySelector('[data-action="reset-all-worlds"]');
         this.uiElements.applySelectedDensityButton = this.element.querySelector('[data-action="apply-density-all"]');
         this.uiElements.resetDensitiesButton = this.element.querySelector('[data-action="reset-densities"]');
         
-        this.refresh(); // Initial population of the grid
+        this.refresh(); 
     }
 
     _setupInternalListeners() {
@@ -127,7 +125,7 @@ export class WorldSetupComponent extends BaseComponent {
             });
             this.worldSliderComponents.push(densitySlider);
 
-            // Create SwitchComponent for world enable/disable
+            
             const enableSwitchMount = cell.querySelector(`#enableSwitchMount_${i}`);
             new SwitchComponent(enableSwitchMount, {
                 type: 'checkbox',
@@ -136,7 +134,7 @@ export class WorldSetupComponent extends BaseComponent {
                 items: [{ value: 'enabled', text: settings.enabled ? 'Enabled' : 'Disabled' }],
                 onChange: (isEnabled) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled });
-                    // Update the label text to reflect the new state
+                    
                     const label = enableSwitchMount.querySelector('label');
                     if (label) {
                         label.textContent = isEnabled ? 'Enabled' : 'Disabled';

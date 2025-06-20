@@ -7,7 +7,7 @@ export class BottomTabBar extends BaseComponent {
         super(mountPoint);
         this.panelManager = panelManager;
         this.buttons = {};
-        this.activeView = 'simulate'; // Default view
+        this.activeView = 'simulate'; 
 
         this._initButtons();
         this._setupEventListeners();

@@ -2,7 +2,7 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class WorldsController {
     constructor() {
-        // This controller is action-oriented. State is managed by WorldManager.
+        
     }
 
     selectWorld = (worldIndex) => {

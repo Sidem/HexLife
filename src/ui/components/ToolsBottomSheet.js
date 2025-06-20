@@ -44,21 +44,14 @@ export class ToolsBottomSheet extends BottomSheet {
         `;
 
         this.setContent(content);
-
-        // Use the new ControlsComponent for all shared controls
         const mobileControlsMount = content.querySelector('#mobileControlsMount');
-        
-        // MODIFIED: Pass the mobile context
         this.controlsComponent = new ControlsComponent(mobileControlsMount, this.appContext, { context: 'mobile' });
-
         this._initCustomizeFabsPane();
     }
 
-    // _syncVisualSettings() removed - ControlsComponent handles its own state sync
-
     show() {
         super.show();
-        // Visual settings sync is now handled by ControlsComponent
+        
     }
 
     _initCustomizeFabsPane() {
@@ -111,7 +104,7 @@ export class ToolsBottomSheet extends BottomSheet {
             }
         });
 
-        // Visual settings sync is now handled by ControlsComponent
+        
 
         
         const fabPane = this.sheetContent.querySelector('#customize-fabs-pane');

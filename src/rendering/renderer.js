@@ -4,9 +4,6 @@ import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
-import * as PersistenceService from '../services/PersistenceService.js';
-
-// visualizationController access is now provided via the rendering context
 
 let gl;
 let canvas;
@@ -481,14 +478,14 @@ function renderMainScene(appContext) {
         
         const worldStatus = allWorldsStatus[i];
         
-        // Cycle indicator logic
+        
         const indicatorEl = cycleIndicatorElements[i];
         const showIndicators = vizState?.showCycleIndicator ?? false;
         
         if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
             const cycleLength = worldStatus.stats.cycleLength;
             indicatorEl.classList.remove('hidden');
-            // Use the same relative positioning logic as the ruleset overlay
+            
             indicatorEl.style.left = `${miniX - miniMap.gridContainerX + miniMap.miniMapW - 20 - miniMap.miniMapSpacing}px`;
             indicatorEl.style.top = `${miniY - miniMap.gridContainerY}px`;
             
@@ -559,11 +556,11 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
 
 export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
-        // Loader is still visible, or an error occurred.
+        
         return;
     }
     
-    // Pass the entire context to the rendering sub-functions.
+    
     renderWorldsToTextures(appContext);
     renderMainScene(appContext);
 }

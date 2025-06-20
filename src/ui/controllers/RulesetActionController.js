@@ -102,7 +102,7 @@ export class RulesetActionController {
         return {
             label: 'Apply to:',
             type: 'radio',
-            name: 'rulesetScope', // Base name, can be overridden
+            name: 'rulesetScope', 
             items: [
                 { value: 'selected', text: 'Selected' },
                 { value: 'all', text: 'All' }
@@ -114,7 +114,7 @@ export class RulesetActionController {
     getGenAutoResetSwitchConfig() {
         return {
             type: 'checkbox',
-            name: 'resetOnNewRule', // Base name, can be overridden
+            name: 'resetOnNewRule', 
             items: [{ value: 'reset', text: 'Auto-Reset World(s)' }],
             onChange: this.setGenAutoReset
         };

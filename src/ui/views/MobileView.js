@@ -51,7 +51,7 @@ export class MobileView extends BaseComponent {
             this.render();
         }
         this.element.classList.remove('hidden');
-        // Refresh content if the component supports it
+        
         if (this.contentComponent && this.contentComponent.refresh) {
             this.contentComponent.refresh();
         }

@@ -36,9 +36,7 @@ export class Panel extends BaseComponent {
         return this.panelElement ? this.panelElement.classList.contains('hidden') : true;
     }
     
-    // Persistence logic can be added here if needed, or kept in subclasses.
-    // For this refactor, we assume subclasses will handle their specific state saving.
     _saveState() {
-        // To be implemented by subclasses that require persistence.
+        
     }
 } 

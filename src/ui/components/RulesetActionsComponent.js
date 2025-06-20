@@ -104,7 +104,7 @@ export class RulesetActionsComponent extends BaseComponent {
             initialValue: controllerState.genAutoReset,
         });
 
-        // Set up bias checkbox
+        
         const biasCheckbox = pane.querySelector(`#${this.context}-use-custom-bias`);
         biasCheckbox.checked = controllerState.useCustomBias;
         biasCheckbox.addEventListener('change', e => {
@@ -164,7 +164,7 @@ export class RulesetActionsComponent extends BaseComponent {
             <div id="${this.context}-library-patterns-content" class="library-list hidden"></div>
         `;
 
-        // Populate library data if available
+        
         this.populateLibraryData();
     }
 
@@ -236,7 +236,7 @@ export class RulesetActionsComponent extends BaseComponent {
         const data = libraryData || this.libraryData;
         if (!data) return;
 
-        // Populate rulesets
+        
         const rulesetsList = this.element.querySelector(`#${this.context}-library-rulesets-content`);
         if (rulesetsList && data.rulesets) {
             rulesetsList.innerHTML = '';
@@ -252,7 +252,7 @@ export class RulesetActionsComponent extends BaseComponent {
             });
         }
 
-        // Populate patterns
+        
         const patternsList = this.element.querySelector(`#${this.context}-library-patterns-content`);
         if (patternsList && data.patterns) {
             patternsList.innerHTML = '';
@@ -268,7 +268,7 @@ export class RulesetActionsComponent extends BaseComponent {
             });
         }
 
-        // Update stored library data
+        
         if (libraryData) {
             this.libraryData = libraryData;
         }

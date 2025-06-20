@@ -16,13 +16,13 @@ import * as Config from '../core/config.js';
 import { generateShareUrl } from '../utils/utils.js';
 
 
-// The media query is a constant local to the manager that needs it.
+
 const MOBILE_QUERY = '(max-width: 768px), (pointer: coarse) and (hover: none)';
 
 export class UIManager {
     constructor(appContext) {
         this.appContext = appContext;
-        this.onboardingManager = appContext.onboardingManager; // Add this line
+        this.onboardingManager = appContext.onboardingManager; 
         this.mode = 'desktop';
         this.mediaQueryList = window.matchMedia(MOBILE_QUERY);
         this.mobileViews = {};
@@ -46,11 +46,11 @@ export class UIManager {
         const { appContext, appContext: { worldManager, panelManager, toolbar, onboardingManager, libraryController } } = this;
         const libraryData = libraryController.getLibraryData();
 
-        // 1. Initialize Mode Detection
-        this.updateMode(false); // Set initial mode without dispatching event yet
+        
+        this.updateMode(false); 
         this.mediaQueryList.addEventListener('change', () => this.updateMode(true));
 
-        // 2. Initialize Core UI Components
+        
         const topInfoBar = new TopInfoBar(appContext);
         topInfoBar.init();
         toolbar.init();
@@ -58,19 +58,19 @@ export class UIManager {
         const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
         keyboardManager.init();
 
-        // Add components to the managed list
+        
         this.managedComponents.push(topInfoBar, toolbar, keyboardManager);
 
-        // 3. Initialize Mobile-Specific UI
+        
         this.initMobileUI(libraryData);
         
-        // 4. Bind Global UI Event Listeners
+        
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
 
 
 
-        // 5. Dispatch initial UI mode to inform all components
+        
         EventBus.dispatch(EVENTS.UI_MODE_CHANGED, { mode: this.mode });
         this.#initGuidingBoxes();
 
@@ -119,7 +119,7 @@ export class UIManager {
             this.mode = newMode;
             console.log(`UI mode changed to: ${this.mode}`);
             
-            // Toggle visibility of persistent mobile/desktop elements
+            
             document.getElementById('bottom-tab-bar')?.classList.toggle('hidden', !this.isMobile());
             document.getElementById('mobile-canvas-controls')?.classList.toggle('hidden', !this.isMobile());
             document.getElementById('vertical-toolbar')?.classList.toggle('hidden', this.isMobile());
@@ -137,16 +137,11 @@ export class UIManager {
     initMobileUI(libraryData) {
         const { appContext, appContext: { worldManager, panelManager } } = this;
 
-        // Init container views for mobile
+        
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
             this.mobileViews.more = new MoreView(mobileViewsContainer, appContext);
             this.mobileViews.more.render();
-            // rules view will be created dynamically when needed
-            // worlds view will be created dynamically when needed
-            // analyze view will be created dynamically when needed
-            // editor view will be created dynamically when needed
-            // learning view will be created dynamically when needed
         }
 
         const bottomTabBarEl = document.getElementById('bottom-tab-bar');
@@ -216,7 +211,7 @@ export class UIManager {
     }
 
     setupGlobalEventListeners() {
-        // Existing listeners for download/load/share
+        
         EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => downloadFile(data.filename, data.content, data.mimeType));
         EventBus.subscribe(EVENTS.TRIGGER_FILE_LOAD, (data) => {
             const reader = new FileReader();
@@ -234,38 +229,38 @@ export class UIManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
         
-        // This is the updated handler for the Escape key
+        
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
-            // New behavior: Only hide popouts, not draggable panels.
+            
             this.appContext.toolbar.closeAllPopouts();
         });
 
-        // NEW: Logic moved from Toolbar.js
+        
         const handleClickOutside = (event) => {
-            // Check if onboarding is active AND the click is inside its tooltip.
+            
             if (this.onboardingManager && this.onboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
-                // Use .contains() to check the entire tooltip element and its children.
+                
                 if (tooltip && tooltip.contains(event.target)) {
-                    return; // Do nothing if clicking inside the onboarding UI.
+                    return; 
                 }
             }
     
             const toolbar = this.appContext.toolbar;
             if (!toolbar || toolbar.activePopouts.every(p => p.isHidden())) return;
     
-            // Check if the click was inside ANY popout or on its trigger button.
-            // We only care about closing popouts on outside clicks.
+            
+            
             const clickedInsidePopout = toolbar.activePopouts.some(p => !p.isHidden() && p.popoutElement.contains(event.target));
             const clickedOnTrigger = toolbar.activePopouts.some(p => p.triggerElement.contains(event.target));
     
             if (!clickedInsidePopout && !clickedOnTrigger) {
-                // Directly close popouts instead of dispatching a broad event.
+                
                 toolbar.closeAllPopouts();
             }
         };
 
-        // Manage this global listener within the UIManager's lifecycle
+        
         this.boundHandleClickOutside = handleClickOutside;
         document.addEventListener('click', this.boundHandleClickOutside);
     }
@@ -280,20 +275,20 @@ export class UIManager {
         document.body.addEventListener('click', (event) => {
             const helpButton = event.target.closest('.button-help-trigger');
 
-            // If the click was not on a help button, do nothing.
+            
             if (!helpButton) {
                 return;
             }
 
-            // Prevent the click from bubbling up and, for example,
-            // initiating a drag on the panel header.
+            
+            
             event.preventDefault();
             event.stopPropagation();
 
             const tourName = helpButton.dataset.tourName;
-            if (tourName && this.onboardingManager) { // <-- CHANGE THIS LINE
-                // The 'true' flag forces the tour to start even if it has been completed before.
-                this.onboardingManager.startTour(tourName, true); // <-- CHANGE THIS LINE
+            if (tourName && this.onboardingManager) { 
+                
+                this.onboardingManager.startTour(tourName, true); 
             } else {
                 console.warn('Help button clicked, but no tour name found or OnboardingManager is not available.', helpButton);
             }
@@ -305,7 +300,7 @@ export class UIManager {
      */
     destroy() {
         console.log("Destroying UIManager and its components...");
-        if (this.boundHandleClickOutside) { // Add this check and removal
+        if (this.boundHandleClickOutside) { 
             document.removeEventListener('click', this.boundHandleClickOutside);
         }
         this.managedComponents.forEach(component => {
@@ -335,7 +330,7 @@ export class UIManager {
                 text: 'Check out this cellular automaton setup!',
                 url: url,
             }).catch(err => {
-                // Ignore AbortError, log others
+                
                 if (err.name !== 'AbortError') {
                     console.error('Share failed:', err);
                 }
@@ -363,7 +358,7 @@ export class UIManager {
      * @private
      */
     _handleTogglePanel({ panelName, show }) {
-        if (this.isMobile()) return; // This logic is for desktop only
+        if (this.isMobile()) return; 
         const panel = this.appContext.panelManager.getPanel(panelName);
         if (panel) {
             if (show === true) panel.show();
@@ -380,12 +375,12 @@ export class UIManager {
      * @private
      */
     _handleTogglePopout({ popoutName, show }) {
-        if (this.isMobile()) return; // This logic is for desktop only
+        if (this.isMobile()) return; 
         const popout = this.appContext.toolbar.getPopout(popoutName);
         if (popout) {
             const shouldShow = show !== undefined ? show : popout.isHidden();
             if (shouldShow) {
-                this.appContext.toolbar.closeAllPopouts(popout); // Exclude the current popout
+                this.appContext.toolbar.closeAllPopouts(popout); 
             }
             if (show === true) popout.show();
             else if (show === false) popout.hide();
@@ -399,14 +394,13 @@ export class UIManager {
 
     _showMobileViewInternal({ targetView }) {
         if (!this.isMobile()) return;
-        console.log('showMobileViewInternal', targetView);
-        // Hide all other views first.
+        
         Object.values(this.mobileViews).forEach(v => v.hide());
     
-        // Use the factory to create the view if it doesn't exist.
+        
         this.#createMobileView(targetView);
     
-        // Show the target view.
+        
         const viewToShow = this.mobileViews[targetView];
         if (viewToShow) {
             viewToShow.show();
@@ -417,10 +411,10 @@ export class UIManager {
     }
 
     #createMobileView(viewName) {
-        // Check if the view already exists.
+        
         if (this.mobileViews[viewName]) {
-            // If the view exists, handle any necessary refresh logic.
-            // Currently, only the Learning Hub needs this on subsequent views.
+            
+            
             if (viewName === 'learning' && this.mobileViews.learning.contentComponent?.refreshTourList) {
                 this.mobileViews.learning.contentComponent.refreshTourList();
             }
@@ -428,24 +422,24 @@ export class UIManager {
         }
 
         const config = this.#mobileViewConfig[viewName];
-        if (!config) return; // Exit if the view is not in our dynamic config.
+        if (!config) return; 
 
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            // 1. Create the generic MobileView presenter/container.
+            
             const presenter = new MobileView(mobileViewsContainer, { title: config.title });
             
-            // 2. Create the specific content component (e.g., WorldSetupComponent).
+            
             const content = new config.constructor(null, { 
                 appContext: this.appContext,
-                libraryData: this.appContext.libraryController.getLibraryData() // Pass library data for components that need it
+                libraryData: this.appContext.libraryController.getLibraryData() 
             });
             
-            // 3. Render the presenter and inject the content into it.
+            
             presenter.render();
             presenter.setContentComponent(content);
             
-            // 4. Store the newly created view presenter.
+            
             this.mobileViews[viewName] = presenter;
         }
     }

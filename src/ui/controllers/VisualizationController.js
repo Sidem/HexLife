@@ -9,12 +9,12 @@ export class VisualizationController {
             showMinimapOverlay: PersistenceService.loadUISetting('showMinimapOverlay', true),
             showCycleIndicator: PersistenceService.loadUISetting('showCycleIndicator', true),
         };
-        // Subscribe to command events
+        
         EventBus.subscribe(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, this.#handleSetVisualizationType);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, this.#handleSetShowCycleIndicator);
         
-        // Note: The visualizer singleton is now initialized by AppContext with the correct state
+        
     }
 
     getState() {
@@ -34,7 +34,7 @@ export class VisualizationController {
         this.state.vizType = type;
         rulesetVisualizer.setVisualizationType(type);
         PersistenceService.saveUISetting('rulesetVizType', type);
-        // The event dispatch is now handled by the visualizer's setVisualizationType method
+        
     }
 
     #handleSetShowMinimapOverlay = (shouldShow) => {

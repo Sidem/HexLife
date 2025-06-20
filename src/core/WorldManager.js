@@ -10,21 +10,16 @@ export class WorldManager {
         this.worlds = [];
         this.cameraStates = [];
         this.sharedSettings = sharedSettings;
-        
-        // Controller references (set later by AppContext to avoid circular dependencies)
         this.simulationController = null;
         this.brushController = null;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
         this._hoverAffectedIndicesSet = new Set();
-
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
-
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
         this.worldSettings = [];
         this.initialDefaultRulesetHex = "";
-
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
         this._setupEventListeners();
@@ -419,14 +414,14 @@ export class WorldManager {
         const indicesToAffect = this._getAffectedWorldIndices(scope);
 
         indicesToAffect.forEach(idx => {
-            // Always add to history and apply the new ruleset
+            
             this._addRulesetToHistory(idx, rulesetHex);
             
             const newRulesetBuffer = newRulesetArray.buffer.slice(0);
             this.worlds[idx].setRuleset(newRulesetBuffer);
             this.worldSettings[idx].rulesetHex = rulesetHex;
 
-            // Conditionally reset the world based on the flag
+            
             if (shouldReset && this.worldSettings[idx]) {
                 this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
             }

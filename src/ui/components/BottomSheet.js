@@ -62,12 +62,9 @@ export class BottomSheet extends Panel {
         if (this.isVisible) return;
         this.isVisible = true;
         super.show();
-        // Delay adding the 'visible' class to allow the CSS transition to work
         setTimeout(() => {
             this.sheetPanel.classList.add('visible');
         }, 10);
-        
-        // Dispatch an EventBus event so other components can react (e.g., close other sheets)
         EventBus.dispatch(EVENTS.BOTTOM_SHEET_SHOWN, { sheet: this });
     }
 
@@ -77,10 +74,10 @@ export class BottomSheet extends Panel {
         this.sheetPanel.classList.remove('visible');
         setTimeout(() => {
             super.hide();
-        }, 300); // This duration should match the CSS transition duration
+        }, 300); 
     }
     
-    // Method to allow external code to add content to the sheet
+    
     setContent(element) {
         this.sheetContent.innerHTML = '';
         this.sheetContent.appendChild(element);

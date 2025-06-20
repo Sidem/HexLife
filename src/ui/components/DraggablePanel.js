@@ -7,7 +7,7 @@ export class DraggablePanel extends Panel {
         super(panelElement, options);
         this.panelElement = panelElement;
         
-        // Extract handleSelector from options, with a default
+        
         const handleSelector = options.handleSelector || 'h3';
         this.handleElement = panelElement.querySelector(handleSelector);
         this.options = { constrainToViewport: true, ...options };
@@ -30,13 +30,11 @@ export class DraggablePanel extends Panel {
         if (this.options.persistence) {
             this._loadState();
         }
-
-        // Listen for UI mode changes to enable/disable dragging
         EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
             this._setDraggable(mode === 'desktop');
         });
 
-        // Handle close button
+        
         this.closeButton = this.panelElement.querySelector('.close-panel-button');
         if (this.closeButton) {
             this.closeButton.addEventListener('click', () => this.hide());
@@ -47,7 +45,7 @@ export class DraggablePanel extends Panel {
         this.handleElement.style.cursor = 'move';
         this.boundOnMouseDown = this._onMouseDown.bind(this);
         this.boundOnTouchStart = this._onTouchStart.bind(this);
-        // Defer adding listeners until we know the initial mode
+        
     }
 
     _setDraggable(isDraggable) {
@@ -152,14 +150,14 @@ export class DraggablePanel extends Panel {
             this.panelElement.style.top = '50%';
         }
         
-        // Set initial draggable state based on the current mode when shown
+        
         if (window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches) {
             this._setDraggable(false);
         } else {
             this._setDraggable(true);
         }
 
-        // Refresh content component when panel becomes visible
+        
         if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
             this.contentComponent.refresh();
         }

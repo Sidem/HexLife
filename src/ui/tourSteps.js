@@ -294,7 +294,7 @@ export const getTours = (appContext) => {
     ];
 
 
-    // --- MOBILE TOURS ---
+    
 
     const coreMobileTour = [
         {
@@ -302,7 +302,7 @@ export const getTours = (appContext) => {
             title: 'Welcome to the HexLife Explorer',
             content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
             primaryAction: { text: 'Begin Orientation' },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -334,7 +334,7 @@ export const getTours = (appContext) => {
             content: "Now that your Brush is active, you can directly influence a universe. The simulation will pause automatically when you draw. Touch and drag on the grid to bring new cells to life.",
             primaryAction: null,
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
-            delayAfter: 2000 // Let user see the result
+            delayAfter: 2000 
         },
         {
             element: '.tab-bar-button[data-view="learning"]',
@@ -351,7 +351,7 @@ export const getTours = (appContext) => {
             title: 'The Command FABs',
             content: "These are your primary controls. You've already used <span class=\"onboarding-highlight-text\">Play/Pause</span> and the <span class=\"onboarding-highlight-text\">Pan/Draw</span> toggle. The <span class=\"onboarding-highlight-text\">Tools (🛠️)</span> button is your gateway to adjusting core simulation parameters.",
             primaryAction: { text: `Let's See` },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -383,7 +383,7 @@ export const getTours = (appContext) => {
             title: 'The Ruleset Editor',
             content: 'This is the most powerful tool in the lab, letting you directly edit the DNA of your universe. Let\'s explore its three modes.',
             primaryAction: { text: 'Next' },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'editor' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'editor' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -423,7 +423,7 @@ export const getTours = (appContext) => {
             title: 'The Analysis Dashboard',
             content: 'This view helps you understand *why* a simulation behaves the way it does by visualizing its data.',
             primaryAction: { text: 'Next' },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'analyze' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'analyze' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -463,7 +463,7 @@ export const getTours = (appContext) => {
             title: 'The World Setup Panel',
             content: 'Here you can configure each of the 9 worlds individually before starting a simulation.',
             primaryAction: { text: 'Next' },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'worlds' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'worlds' }),
             advanceOn: { type: 'click' }
         },
         {
@@ -495,15 +495,15 @@ export const getTours = (appContext) => {
             title: 'Mission: Applied Evolution',
             content: "Let's run a full experiment to discover a new ruleset. First, tap the <span class=\"onboarding-highlight-text\">Rules</span> tab.",
             primaryAction: { text: 'Open the Rules Tab' },
-            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' }),
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' }),
             advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
         },
         {
-            element: '.rules-view-segment[data-pane="library-rulesets"]',
+            element: '.ruleset-actions-segment[data-pane="library"]',
             title: 'Find a Specimen',
             content: "Go to the <span class=\"onboarding-highlight-text\">Rulesets Library</span> to find a stable starting point for our experiment.",
             primaryAction: { text: 'Next' },
-            onBeforeShow: () => document.querySelector('.rules-view-segment[data-pane="library-rulesets"]').click(),
+            
             advanceOn: { type: 'click' }
         },
         {
@@ -606,7 +606,7 @@ export const getTours = (appContext) => {
     ];
 
     return {
-        // Desktop Tours
+        
         core: coreTour,
         speedAndBrush: speedAndBrushTour,
         rulesetGeneration: rulesetGenerationTour,
@@ -620,7 +620,7 @@ export const getTours = (appContext) => {
         setup: setupTour,
         analysis: analysisTour,
         ruleRank: ruleRankTour,
-        // Mobile Tours
+        
         coreMobile: coreMobileTour,
         commandDeck: commandDeckTour,
         appliedEvolution: appliedEvolutionTour,

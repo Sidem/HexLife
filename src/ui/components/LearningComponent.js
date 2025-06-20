@@ -4,7 +4,7 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningComponent extends BaseComponent {
     constructor(mountPoint, options = {}) {
-        super(mountPoint, options); // Call BaseComponent constructor
+        super(mountPoint, options); 
 
         this.appContext = options.appContext;
         if (!this.appContext) {
@@ -12,7 +12,7 @@ export class LearningComponent extends BaseComponent {
             return;
         }
 
-        // Create the root element for this component's content
+        
         this.element = document.createElement('div');
         this.element.className = 'learning-component-content';
         this.element.innerHTML = `
@@ -21,8 +21,6 @@ export class LearningComponent extends BaseComponent {
         `;
 
         this.tourListElement = this.element.querySelector('.learning-center-list');
-        
-        // Define all available tours, flagging them for mobile if necessary
         this.availableTours = [
             { id: 'core', name: 'Desktop Orientation', desktopOnly: true },
             { id: 'coreMobile', name: 'Mobile Orientation', mobileOnly: true },
@@ -56,7 +54,7 @@ export class LearningComponent extends BaseComponent {
         this.element.addEventListener('click', (e) => {
             if (e.target.matches('.tour-start-button')) {
                 const tourName = e.target.dataset.tourName;
-                // Hide the panel/view before starting the tour for a cleaner UX
+                
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
                 if (this.appContext.onboardingManager) {
                     this.appContext.onboardingManager.startTour(tourName, true);
@@ -64,7 +62,7 @@ export class LearningComponent extends BaseComponent {
             }
         });
 
-        // Subscribe to event to refresh the list when a tour is completed
+        
         this._subscribeToEvent(EVENTS.TOUR_ENDED, () => this.refreshTourList());
     }
 
@@ -77,9 +75,9 @@ export class LearningComponent extends BaseComponent {
 
         const toursToShow = this.availableTours.filter(tour => {
             if (isMobile) {
-                return !tour.desktopOnly; // Show mobile-only and common tours
+                return !tour.desktopOnly; 
             } else {
-                return !tour.mobileOnly; // Show desktop-only and common tours
+                return !tour.mobileOnly; 
             }
         });
 
@@ -98,7 +96,7 @@ export class LearningComponent extends BaseComponent {
         });
     }
 
-    // Add refresh method that can be called by the DraggablePanel presenter
+    
     refresh() {
         this.refreshTourList();
     }

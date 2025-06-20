@@ -34,12 +34,11 @@ export class PanelManager {
             if (panelElement) {
                 const PresenterClass = config.constructor;
                 
-                // Instantiate the content component first
                 let contentInstance = null;
                 if (config.contentComponent) {
                     contentInstance = new config.contentComponent(null, { 
                         appContext: this.appContext, 
-                        libraryData: this.libraryData // Add library data for components that need it
+                        libraryData: this.libraryData 
                     });
                 }
 
@@ -47,13 +46,13 @@ export class PanelManager {
                     appContext: this.appContext,
                     ...config.options,
                     persistence: { identifier: config.persistenceKey || config.name },
-                    contentComponent: contentInstance // Pass the content instance to the presenter
+                    contentComponent: contentInstance 
                 });
 
                 if (config.contentComponent) {
                     const contentContainer = panelElement.querySelector('.panel-content-area');
                     if (contentContainer) {
-                        // We've already created contentInstance, so we just append its element
+                        
                         if (contentInstance) {
                             contentContainer.innerHTML = '';
                             const componentElement = contentInstance.getElement();
@@ -63,13 +62,13 @@ export class PanelManager {
                                 console.error(`Failed to get element from ${config.contentComponent.name} for panel ${config.name}`);
                             }
                             
-                            // Store reference to content component for potential future use
+                            
                             presenterInstance.contentComponent = contentInstance;
                         }
                     }
                 }
                 
-                // Store the presenter, which is the main handle for showing/hiding
+                
                 this.panels[config.name] = presenterInstance;
             }
         });

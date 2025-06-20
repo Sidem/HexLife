@@ -3,7 +3,7 @@ import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 import { Throttler } from '../../utils/throttler.js';
 import * as Config from '../../core/config.js';
 
-// The ElementPool is a utility class local to this component.
+
 class ElementPool {
     constructor(creator) {
         this.pool = [];
@@ -27,24 +27,18 @@ export class RuleRankComponent extends BaseComponent {
             return;
         }
         this.worldManager = this.appContext.worldManager;
-
-        // --- Create the component's root element ---
         this.element = document.createElement('div');
         this.element.className = 'rule-rank-component-content';
-        
         this.throttler = new Throttler(() => this.refresh(), Config.UI_UPDATE_THROTTLE_MS);
-
         this.lastRuleUsageHash = null;
         this.activationRuleItems = [];
         this.deactivationRuleItems = [];
-
         this.ruleItemPool = new ElementPool(() => this._createRuleItemElement());
-        
         this.render();
         this.refresh();
     }
 
-    // Method for the container to get this component's DOM
+    
     getElement() {
         return this.element;
     }
@@ -71,7 +65,7 @@ export class RuleRankComponent extends BaseComponent {
         };
     }
 
-    // Public method for containers to call to trigger a refresh
+    
     refresh() {
         if (!this.worldManager) return;
 
@@ -114,7 +108,7 @@ export class RuleRankComponent extends BaseComponent {
         this._renderRankList(this.uiElements.deactivationRankContent, this.deactivationRuleItems, deactivationRules, totalDeactivationInvocations, ruleset);
     }
     
-    // Schedule a throttled refresh. Called by external event listeners.
+    
     scheduleRefresh() {
         this.throttler.schedule();
     }

@@ -31,15 +31,15 @@ export class Throttler {
         const timeSinceLastExecution = now - this.lastExecutionTime;
 
         if (this.pendingTimeoutId) {
-            // A timeout is already scheduled. We've updated the pending args, so we can wait.
+            
             return;
         }
 
         if (timeSinceLastExecution >= this.intervalMs) {
-            // Interval has passed, execute immediately.
+            
             this._execute();
         } else {
-            // Schedule for future execution.
+            
             const delay = this.intervalMs - timeSinceLastExecution;
             this.pendingTimeoutId = setTimeout(() => this._execute(), delay);
         }
@@ -64,7 +64,7 @@ export class Throttler {
             clearTimeout(this.pendingTimeoutId);
             this.pendingTimeoutId = null;
         }
-        // Also clear any arguments that were waiting for the cancelled execution
+        
         this.hasPendingArgs = false;
         this.pendingArgs = [];
     }

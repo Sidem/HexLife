@@ -3,12 +3,12 @@ import { BaseComponent } from './BaseComponent.js';
 export class SwitchComponent extends BaseComponent {
     constructor(mountPoint, options) {
         super(mountPoint, options);
-        // Default options
+        
         this.options = {
-            type: 'radio', // 'radio' or 'checkbox'
+            type: 'radio', 
             label: '',
             name: `switch-${Date.now()}`,
-            items: [], // [{ value, text, checked }]
+            items: [], 
             initialValue: null,
             onChange: () => {},
             ...this.options
@@ -27,8 +27,8 @@ export class SwitchComponent extends BaseComponent {
                 ? this.options.initialValue
                 : this.options.initialValue === item.value;
             
-            // Create a unique ID for the input. For checkboxes, the name itself is unique.
-            // For radio buttons, the name + value is needed.
+            
+            
             const inputId = this.options.type === 'checkbox' ? this.options.name : `${this.options.name}-${item.value}`;
 
             return `

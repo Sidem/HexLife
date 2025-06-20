@@ -85,7 +85,7 @@ export class OnboardingManager {
         this._cleanupCurrentStep();
         this.tourIsActive = false;
         
-        // Dispatch tour ended event for the Learning Hub to refresh
+        
         EventBus.dispatch(EVENTS.TOUR_ENDED, { tourName: this.currentTourName });
         
         this.currentTourName = null;
@@ -120,6 +120,8 @@ export class OnboardingManager {
         if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
             step.onBeforeShow();
         }
+        console.log('OnboardingManager: showing step', stepIndex, step);
+        console.log('OnboardingManager: document.querySelector(step.element)', document.querySelector(step.element));
     
         setTimeout(() => {
             const targetElement = document.querySelector(step.element);
