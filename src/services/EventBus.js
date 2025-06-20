@@ -196,12 +196,16 @@ export const EVENTS = {
     COMMAND_EXECUTE_MUTATE_RULESET: 'command:executeMutateRuleset',
     /** @event A user-initiated command to execute the clone and mutate action with the controller's current settings. */
     COMMAND_EXECUTE_CLONE_AND_MUTATE: 'command:executeCloneAndMutate',
-    /** @param {{viewName: string, show?: boolean}} data - Command to show, hide, or toggle a view/panel/popout. If 'show' is omitted, it toggles. */
-    COMMAND_TOGGLE_VIEW: 'command:toggleView',
+    /** @param {{panelName: string, show?: boolean}} data - Command to show, hide, or toggle a draggable panel. */
+    COMMAND_TOGGLE_PANEL: 'command:togglePanel',
+    /** @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. */
+    COMMAND_TOGGLE_POPOUT: 'command:togglePopout',
+    /** @param {{viewName: string}} data - Command to switch to a specific full-screen mobile view. */
+    COMMAND_SHOW_MOBILE_VIEW: 'command:showMobileView',
     /** @event Emitted with no payload to command all popout and draggable panels to hide. */
     COMMAND_HIDE_ALL_OVERLAYS: 'command:hideAllOverlays',
-    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. If 'show' is omitted, it toggles. */
-    COMMAND_TOGGLE_POPOUT: 'command:togglePopout',
+    /** @deprecated Use COMMAND_TOGGLE_PANEL, COMMAND_TOGGLE_POPOUT, or COMMAND_SHOW_MOBILE_VIEW. */
+    COMMAND_TOGGLE_VIEW: 'command:toggleView', // Keep for now to avoid breaking changes during refactor
 
     // --- UI State Change Events ---
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */

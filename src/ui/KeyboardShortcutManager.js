@@ -32,10 +32,10 @@ export class KeyboardShortcutManager {
         // This array maps key combinations to specific commands, implementing the Command Pattern.
         this.shortcuts = [
             // Panel & Popout Toggles
-            { key: 'e', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetEditor' }) },
-            { key: 's', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup' }) },
-            { key: 'a', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis' }) },
-            { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }) },
+            { key: 'e', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor' }) },
+            { key: 's', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup' }) },
+            { key: 'a', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
+            { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }) },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
             // Simulation Actions

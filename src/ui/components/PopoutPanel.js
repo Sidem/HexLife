@@ -1,7 +1,7 @@
-import { BaseComponent } from './BaseComponent.js';
+import { Panel } from './Panel.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-export class PopoutPanel extends BaseComponent {
+export class PopoutPanel extends Panel {
     constructor(popoutElement, triggerElement, options = {}) {
         super(popoutElement, options); 
         this.triggerElement = triggerElement;
@@ -98,7 +98,7 @@ export class PopoutPanel extends BaseComponent {
     show() {
         if (this.popoutElement) {
             this._reposition();
-            this.popoutElement.classList.remove('hidden');
+            super.show();
             this.triggerElement.classList.add('active');
             
             EventBus.dispatch(EVENTS.POPOUT_SHOWN, { panel: this });
@@ -107,7 +107,7 @@ export class PopoutPanel extends BaseComponent {
 
     hide(propagate = true) {
         if (this.popoutElement) {
-            this.popoutElement.classList.add('hidden');
+            super.hide();
             this.triggerElement.classList.remove('active');
         }
     }
@@ -121,10 +121,6 @@ export class PopoutPanel extends BaseComponent {
                 this.hide();
             }
         }
-    }
-
-    isHidden() {
-        return this.popoutElement ? this.popoutElement.classList.contains('hidden') : true;
     }
 
     destroy() {

@@ -1,7 +1,7 @@
-import { BaseComponent } from './BaseComponent.js';
+import { Panel } from './Panel.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-export class BottomSheet extends BaseComponent {
+export class BottomSheet extends Panel {
     constructor(id, triggerElement, options = {}) {
         const mountPoint = document.createElement('div');
         mountPoint.id = id;
@@ -61,7 +61,7 @@ export class BottomSheet extends BaseComponent {
     show() {
         if (this.isVisible) return;
         this.isVisible = true;
-        this.mountPoint.classList.remove('hidden');
+        super.show();
         // Delay adding the 'visible' class to allow the CSS transition to work
         setTimeout(() => {
             this.sheetPanel.classList.add('visible');
@@ -76,16 +76,8 @@ export class BottomSheet extends BaseComponent {
         this.isVisible = false;
         this.sheetPanel.classList.remove('visible');
         setTimeout(() => {
-            this.mountPoint.classList.add('hidden');
+            super.hide();
         }, 300); // This duration should match the CSS transition duration
-    }
-
-    toggle() {
-        if (this.isVisible) {
-            this.hide();
-        } else {
-            this.show();
-        }
     }
     
     // Method to allow external code to add content to the sheet

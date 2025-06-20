@@ -1,8 +1,10 @@
+import { Panel } from './Panel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-export class DraggablePanel {
+export class DraggablePanel extends Panel {
     constructor(panelElement, options = {}) {
+        super(panelElement, options);
         this.panelElement = panelElement;
         
         // Extract handleSelector from options, with a default
@@ -138,7 +140,7 @@ export class DraggablePanel {
     }
 
     show() {
-        this.panelElement.classList.remove('hidden');
+        super.show();
         const computedStyle = window.getComputedStyle(this.panelElement);
         if (computedStyle.transform.includes('translate') &&
             (computedStyle.left === '50%' || computedStyle.top === '50%')) {
@@ -149,7 +151,6 @@ export class DraggablePanel {
             this.panelElement.style.left = '50%';
             this.panelElement.style.top = '50%';
         }
-        this._saveState();
         
         // Set initial draggable state based on the current mode when shown
         if (window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches) {
@@ -162,25 +163,6 @@ export class DraggablePanel {
         if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
             this.contentComponent.refresh();
         }
-    }
-
-    hide() {
-        this.panelElement.classList.add('hidden');
-        this._saveState();
-    }
-
-    toggle() {
-        const isHidden = this.panelElement.classList.contains('hidden');
-        if (isHidden) {
-            this.show();
-        } else {
-            this.hide();
-        }
-        return !isHidden; 
-    }
-
-    isHidden() {
-        return this.panelElement.classList.contains('hidden');
     }
     
     _onTouchStart(event) {
@@ -244,6 +226,15 @@ export class DraggablePanel {
         }
         this.panelElement.style.left = `${newLeft}px`;
         this.panelElement.style.top = `${newTop}px`;
+    }
+
+    _saveState() {
+        if (!this.panelElement || !this.options.persistence?.identifier) return;
+        PersistenceService.savePanelState(this.options.persistence.identifier, {
+            isOpen: !this.isHidden(),
+            x: this.panelElement.style.left,
+            y: this.panelElement.style.top,
+        });
     }
 
     destroy() {

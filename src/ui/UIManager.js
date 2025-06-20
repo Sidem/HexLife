@@ -230,8 +230,9 @@ export class UIManager {
             reader.readAsText(data.file);
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
-        EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_VIEW, this._handleToggleView.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
         
         // This is the updated handler for the Escape key
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
@@ -357,56 +358,48 @@ export class UIManager {
     }
 
     /**
-     * Central handler for showing, hiding, or toggling all major UI views.
-     * This includes desktop panels, popouts, and mobile full-screen views.
-     * @param {{viewName: string, show?: boolean}} data
+     * Handles toggling of draggable panels on desktop.
+     * @param {{panelName: string, show?: boolean}} data
      * @private
      */
-    _handleToggleView({ viewName, show }) {
-        if (this.isMobile()) {
-            // Mobile logic remains the same.
-            const currentView = this.activeMobileViewName || 'simulate';
-            const targetView = (currentView === viewName && show === undefined) ? 'simulate' : viewName;
-            this._showMobileViewInternal({ targetView });
+    _handleTogglePanel({ panelName, show }) {
+        if (this.isMobile()) return; // This logic is for desktop only
+        const panel = this.appContext.panelManager.getPanel(panelName);
+        if (panel) {
+            if (show === true) panel.show();
+            else if (show === false) panel.hide();
+            else panel.toggle();
         } else {
-            // Desktop logic change: Differentiate between panels and popouts.
-            const popout = this.appContext.toolbar.getPopout(viewName);
-            const panel = this.appContext.panelManager.getPanel(viewName);
-
-            if (popout) {
-                // It's a popout. Close all OTHER popouts before toggling this one.
-                const shouldShow = show !== undefined ? show : popout.isHidden();
-                if (shouldShow) {
-                    this.appContext.toolbar.closeAllPopouts(popout); // Pass popout to exclude it
-                }
-
-                // Toggle the specific popout
-                if (show === true) popout.show();
-                else if (show === false) popout.hide();
-                else popout.toggle();
-
-            } else if (panel) {
-                // It's a draggable panel. Just toggle it without affecting others.
-                if (show === true) panel.show();
-                else if (show === false) panel.hide();
-                else panel.toggle();
-
-            } else {
-                console.warn(`No view or panel found with name: ${viewName}`);
-            }
+            console.warn(`No draggable panel found with name: ${panelName}`);
         }
     }
 
-    showMobileView({ targetView, currentView }) {
-        // Legacy method for backward compatibility - delegate to internal method
-        if (!this.isMobile()) return;
-        const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
-        this._showMobileViewInternal({ targetView: nextView });
+    /**
+     * Handles toggling of popout panels on desktop.
+     * @param {{popoutName: string, show?: boolean}} data
+     * @private
+     */
+    _handleTogglePopout({ popoutName, show }) {
+        if (this.isMobile()) return; // This logic is for desktop only
+        const popout = this.appContext.toolbar.getPopout(popoutName);
+        if (popout) {
+            const shouldShow = show !== undefined ? show : popout.isHidden();
+            if (shouldShow) {
+                this.appContext.toolbar.closeAllPopouts(popout); // Exclude the current popout
+            }
+            if (show === true) popout.show();
+            else if (show === false) popout.hide();
+            else popout.toggle();
+        } else {
+            console.warn(`No popout panel found with name: ${popoutName}`);
+        }
     }
+
+
 
     _showMobileViewInternal({ targetView }) {
         if (!this.isMobile()) return;
-    
+        console.log('showMobileViewInternal', targetView);
         // Hide all other views first.
         Object.values(this.mobileViews).forEach(v => v.hide());
     

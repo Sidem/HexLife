@@ -105,15 +105,15 @@ export class Toolbar {
     _setupToolbarButtonListeners() {
         const buttonToActionMap = {
             playPauseButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE),
-            controlsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'controls' }),
-            rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }),
-            resetClearButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'resetClear' }),
-            editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetEditor' }),
-            analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis' }),
-            rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'ruleRankPanel' }),
-            setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup' }),
-            helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'learning' }),
-            shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
+            controlsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'controls' }),
+            rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }),
+            resetClearButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'resetClear' }),
+            editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor' }),
+            analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }),
+            rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleRankPanel' }),
+            setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup' }),
+            helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
+            shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
             loadStateButton: () => {
                 this.uiElements.fileInput.accept = ".txt,.json";
