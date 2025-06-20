@@ -118,11 +118,12 @@ export class OnboardingManager {
         }
     
         if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
-            step.onBeforeShow();
+            step.onBeforeShow(step);
         }
     
         setTimeout(() => {
-            const targetElement = document.querySelector(step.element);
+            const selector = typeof step.element === 'function' ? step.element() : step.element;
+            const targetElement = document.querySelector(selector);
             if (!targetElement) {
                 console.warn(`Onboarding element not found: ${step.element}. Skipping step.`);
                 this._showStep(stepIndex + 1);
@@ -135,7 +136,7 @@ export class OnboardingManager {
             this.ui.tooltip.classList.remove('hidden');
     
             this.ui.title.innerHTML = step.title || '';
-            this.ui.content.innerHTML = step.content || '';
+            this.ui.content.innerHTML = typeof step.content === 'function' ? step.content() : (step.content || '');
             
             const progress = ((this.currentStepIndex + 1) / this.activeTourSteps.length) * 100;
             this.ui.progressBar.style.width = `${progress}%`;

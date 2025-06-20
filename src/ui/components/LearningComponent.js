@@ -4,7 +4,7 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningComponent extends BaseComponent {
     constructor(mountPoint, options = {}) {
-        super(mountPoint, options); 
+        super(mountPoint, options);
 
         this.appContext = options.appContext;
         if (!this.appContext) {
@@ -12,7 +12,6 @@ export class LearningComponent extends BaseComponent {
             return;
         }
 
-        
         this.element = document.createElement('div');
         this.element.className = 'learning-component-content';
         this.element.innerHTML = `
@@ -21,25 +20,18 @@ export class LearningComponent extends BaseComponent {
         `;
 
         this.tourListElement = this.element.querySelector('.learning-center-list');
+
+        // --- UPDATED: Unified tour list ---
+        // This list no longer needs device-specific flags. Each tour is now adaptive.
         this.availableTours = [
-            { id: 'core', name: 'Desktop Orientation', desktopOnly: true },
-            { id: 'coreMobile', name: 'Mobile Orientation', mobileOnly: true },
-            { id: 'appliedEvolution', name: 'Mission: Applied Evolution', mobileOnly: true },
-            { id: 'editorTour', name: 'Tutorial: Ruleset Editor', mobileOnly: true },
-            { id: 'analysisTour', name: 'Tutorial: Analysis Tools', mobileOnly: true  },
-            { id: 'worldsTour', name: 'Tutorial: World Setup', mobileOnly: true  },
-            { id: 'speedAndBrush', name: 'Speed & Brush Controls', desktopOnly: true },
-            { id: 'rulesetGeneration', name: 'Generating & Mutating Rules', desktopOnly: true },
-            { id: 'mutation', name: 'Tutorial: Mutation & Cloning', desktopOnly: true },
-            { id: 'editor', name: 'The Ruleset Editor', desktopOnly: true },
-            { id: 'analysis', name: 'Analysis Tools', desktopOnly: true },
-            { id: 'ruleRank', name: 'Rule Ranking Panel', desktopOnly: true },
-            { id: 'setup', name: 'World Setup Panel', desktopOnly: true },
-            { id: 'history', name: 'Ruleset History', desktopOnly: true },
-            { id: 'saveLoad', name: 'Save & Load', desktopOnly: true },
-            { id: 'directInput', name: 'Tutorial: Direct Ruleset Input', desktopOnly: true },
-            { id: 'resetClear', name: 'Tutorial: Reset & Clear', desktopOnly: true },
-            { id: 'library', name: 'Tutorial: Content Library', desktopOnly: true },
+            { id: 'core', name: 'Core Orientation' },
+            { id: 'appliedEvolution', name: 'Mission: Applied Evolution' },
+            { id: 'controls', name: 'Tutorial: Simulation Controls' },
+            { id: 'ruleset_actions', name: 'Tutorial: Ruleset Actions' },
+            { id: 'editor', name: 'Tutorial: The Ruleset Editor' },
+            // { id: 'analysis', name: 'Tutorial: Analysis Tools' },
+            // { id: 'worlds', name: 'Tutorial: World Setup' },
+            // { id: 'file_management', name: 'Tutorial: Save, Load & Share' },
         ];
 
         this._setupEventListeners();
@@ -54,34 +46,25 @@ export class LearningComponent extends BaseComponent {
         this.element.addEventListener('click', (e) => {
             if (e.target.matches('.tour-start-button')) {
                 const tourName = e.target.dataset.tourName;
-                
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
                 if (this.appContext.onboardingManager) {
                     this.appContext.onboardingManager.startTour(tourName, true);
                 }
             }
         });
-
         
         this._subscribeToEvent(EVENTS.TOUR_ENDED, () => this.refreshTourList());
     }
 
     refreshTourList() {
         if (!this.tourListElement || !this.appContext.uiManager) return;
-        
+
         this.tourListElement.innerHTML = '';
         const completedTours = PersistenceService.loadOnboardingStates();
-        const isMobile = this.appContext.uiManager.isMobile();
 
-        const toursToShow = this.availableTours.filter(tour => {
-            if (isMobile) {
-                return !tour.desktopOnly; 
-            } else {
-                return !tour.mobileOnly; 
-            }
-        });
-
-        toursToShow.forEach(tour => {
+        // --- UPDATED: Simplified rendering logic ---
+        // No longer needs to filter by device, as tours are unified.
+        this.availableTours.forEach(tour => {
             const isCompleted = completedTours[tour.id];
             const li = document.createElement('li');
             li.className = 'learning-center-item';
@@ -96,8 +79,7 @@ export class LearningComponent extends BaseComponent {
         });
     }
 
-    
     refresh() {
         this.refreshTourList();
     }
-} 
+}
