@@ -4,6 +4,7 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 export class MobileView extends BaseComponent {
     constructor(mountPoint, options = {}) {
         super(mountPoint);
+        this.options = options;
         this.title = options.title || 'Mobile View';
         this.element = null;
         this.contentComponent = null;
@@ -11,6 +12,9 @@ export class MobileView extends BaseComponent {
 
     render() {
         this.element = document.createElement('div');
+        if (this.options.id) {
+            this.element.id = this.options.id;
+        }
         this.element.className = 'mobile-view hidden';
         this.element.innerHTML = `
             <div class="mobile-view-header">

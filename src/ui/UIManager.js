@@ -35,7 +35,7 @@ export class UIManager {
         worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
-        learning: { constructor: LearningComponent, title: 'Learning Hub' },
+        learning: { constructor: LearningComponent, title: 'Learning Hub (Alpha)' },
     };
 
     /**
@@ -411,10 +411,9 @@ export class UIManager {
     }
 
     #createMobileView(viewName) {
-        
+        // Check if view already exists
         if (this.mobileViews[viewName]) {
-            
-            
+            // Refresh learning component if needed
             if (viewName === 'learning' && this.mobileViews.learning.contentComponent?.refreshTourList) {
                 this.mobileViews.learning.contentComponent.refreshTourList();
             }
@@ -426,20 +425,24 @@ export class UIManager {
 
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            
-            const presenter = new MobileView(mobileViewsContainer, { title: config.title });
-            
-            
-            const content = new config.constructor(null, { 
-                appContext: this.appContext,
-                libraryData: this.appContext.libraryController.getLibraryData() 
+            // Pass the viewName as an ID, prefixed for clarity
+            const presenter = new MobileView(mobileViewsContainer, { 
+                id: `${viewName}-mobile-view`,
+                title: config.title 
             });
             
+            // Create content component
+            const content = new config.constructor(null, { 
+                appContext: this.appContext,
+                libraryData: this.appContext.libraryController.getLibraryData(),
+                context: 'mobile'
+            });
             
+            // Set up the view
             presenter.render();
             presenter.setContentComponent(content);
             
-            
+            // Store the view
             this.mobileViews[viewName] = presenter;
         }
     }

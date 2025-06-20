@@ -197,7 +197,7 @@ export const getTours = (appContext) => {
 
     const editorTour = [
         {
-            element: '[data-tour-id="ruleset-editor-panel"]',
+            element: () => appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel',
             title: 'The Gene Editor',
             content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe. The visualization shows a center cell (large hex) and its six neighbors.",
             onBeforeShow: () => {
@@ -208,7 +208,7 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         },
         {
-            element: '.r-sym-rule-viz',
+            element: () => (appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
             title: 'Toggling Outcomes',
             content: "The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule visualization</span> to flip its output between active (bright color) and inactive (dark color).",
             onBeforeShow: () => {
@@ -222,7 +222,7 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE }
         },
         {
-            element: '#rulesetEditorMode',
+            element: () => '#' + (appContext.uiManager.isMobile() ? 'mobile' : 'desktop') + '-rulesetEditorMode',
             title: 'Analytical Lenses',
             content: "Change your 'lens' to view the rules differently. <span class=\"onboarding-highlight-text\">Rotational Symmetry</span> is great for understanding patterns, while <span class=\"onboarding-highlight-text\">Neighbor Count</span> groups rules by their local conditions. This helps you make broad changes quickly.",
             primaryAction: { text: 'Finish' },
@@ -232,7 +232,7 @@ export const getTours = (appContext) => {
 
     const setupTour = [
         {
-            element: '[data-tour-id="setup-panel"]',
+            element: () => appContext.uiManager.isMobile() ? '#worlds-mobile-view' : '#worldSetupPanel',
             title: 'The Control Panel',
             content: "Good science requires a control group. Here, you can define the starting <span class=\"onboarding-highlight-text\">Density</span> for each universe or <span class=\"onboarding-highlight-text\">Enable/Disable</span> it entirely. This is essential for comparative analysis.",
             onBeforeShow: () => {
@@ -253,7 +253,7 @@ export const getTours = (appContext) => {
 
     const analysisTour = [
         {
-            element: '[data-tour-id="analysis-panel"]',
+            element: () => appContext.uiManager.isMobile() ? '#analyze-mobile-view' : '#analysisPanel',
             title: 'The Macroscope',
             content: "This tool gives you the big picture. It charts the universe's overall <span class=\"onboarding-highlight-text\">Activity Ratio</span> and <span class=\"onboarding-highlight-text\">Entropy</span> (a measure of complexity) over time, allowing you to quantify the behavior of a ruleset.",
             onBeforeShow: () => {
@@ -274,7 +274,7 @@ export const getTours = (appContext) => {
 
     const ruleRankTour = [
         {
-            element: '[data-tour-id="rule-rank-panel"]',
+            element: () => appContext.uiManager.isMobile() ? '#analyze-mobile-view' : '#ruleRankPanel',
             title: 'The Microscope',
             content: "This panel answers *why* a universe behaves as it does. It shows you exactly which rules are being used most frequently, updated in real-time.",
             onBeforeShow: () => {
@@ -379,7 +379,7 @@ export const getTours = (appContext) => {
 
     const editorTourMobile = [
         {
-            element: '#editor-view',
+            element: '#editor-mobile-view',
             title: 'The Ruleset Editor',
             content: 'This is the most powerful tool in the lab, letting you directly edit the DNA of your universe. Let\'s explore its three modes.',
             primaryAction: { text: 'Next' },
@@ -387,7 +387,7 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'click' }
         },
         {
-            element: '#rulesetEditorMode',
+            element: () => '#' + (appContext.uiManager.isMobile() ? 'mobile' : 'desktop') + '-rulesetEditorMode',
             title: 'Three Editing Lenses',
             content: 'You can view the 128 rules in different ways. <span class="onboarding-highlight-text">Rotational Symmetry</span> is the default and groups visually similar rules. <span class="onboarding-highlight-text">Neighbor Count</span> groups them by the number of active neighbors. <span class="onboarding-highlight-text">Detailed</span> shows every single rule.',
             primaryAction: { text: 'Got it' },
@@ -419,7 +419,7 @@ export const getTours = (appContext) => {
 
     const analysisTourMobile = [
         {
-            element: '#analyze-view',
+            element: '#analyze-mobile-view',
             title: 'The Analysis Dashboard',
             content: 'This view helps you understand *why* a simulation behaves the way it does by visualizing its data.',
             primaryAction: { text: 'Next' },
@@ -459,7 +459,7 @@ export const getTours = (appContext) => {
 
     const worldsTourMobile = [
         {
-            element: '#worlds-view',
+            element: '#worlds-mobile-view',
             title: 'The World Setup Panel',
             content: 'Here you can configure each of the 9 worlds individually before starting a simulation.',
             primaryAction: { text: 'Next' },
@@ -499,15 +499,14 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
         },
         {
-            element: '.ruleset-actions-segment[data-pane="library"]',
+            element: '#mobile-library-tab',
             title: 'Find a Specimen',
             content: "Go to the <span class=\"onboarding-highlight-text\">Rulesets Library</span> to find a stable starting point for our experiment.",
             primaryAction: { text: 'Next' },
-            
             advanceOn: { type: 'click' }
         },
         {
-            element: '.library-item-mobile:nth-child(10)',
+            element: '#mobile-load-12482080480080006880800180010117',
             title: "Select 'Spontaneous Gliders'",
             content: "This ruleset produces interesting mobile patterns. Tap <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
             primaryAction: { text: 'Load the Ruleset' },
@@ -518,6 +517,7 @@ export const getTours = (appContext) => {
             title: 'Start the Simulation',
             content: "The simulation is currently paused. Press the play button to see it come to life.",
             primaryAction: { text: 'Press Play' },
+            onBeforeShow: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' }),
             condition: (appContext) => appContext.simulationController.getState().isPaused,
             advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
             delayAfter: 2500
@@ -545,14 +545,14 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'worlds' }
         },
         {
-            element: '.world-card:first-child .density-control',
+            element: '#mobile-world-config-grid > :first-child .density-control',
             title: 'Set Density',
             content: "Set the density for the first world to 50%.",
             primaryAction: { text: 'Set Density' },
             advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, condition: (data) => (data.worldIndex === 0 && data.density > 0.49 && data.density < 0.51) }
         },
         {
-            element: '.worlds-view-actions button[data-action="apply-density-all"]',
+            element: '#mobile-panel-actions button[data-action="apply-density-all"]',
             title: 'Apply Density to All Worlds',
             content: "Apply the density to all worlds to ensure controlled conditions for the experiment.",
             primaryAction: { text: 'Apply Density to All Worlds' },
@@ -567,14 +567,14 @@ export const getTours = (appContext) => {
             advanceOn: { type: 'event', eventName: EVENTS.MOBILE_VIEW_CHANGED, condition: (data) => data.activeView === 'rules' }
         },
         {
-            element: '#mutate-pane',
+            element: '#mobile-mutate-pane',
             title: 'Set Mutation Parameters',
             content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to 10%</span> and ensure the <span class=\"onboarding-highlight-text\">Mode is 'R-Sym'</span> and <span class=\"onboarding-highlight-text\">Apply to All</span>. This will introduce small, symmetric changes, which is ideal for evolving complex patterns.",
             primaryAction: { text: 'Next' },
             advanceOn: { type: 'click' }
         },
         {
-            element: 'button[data-action="clone-mutate"]',
+            element: '#mobile-mutate-pane button[data-action="clone-mutate"]',
             title: 'Run the Experiment',
             content: "This is the <span class=\"onboarding-highlight-text\">Clone & Mutate</span> command. It will copy our 'Gliders' ruleset to all nine worlds and apply a unique, small mutation to each. <span class=\"onboarding-highlight-text\">Press it now.</span>",
             primaryAction: { text: 'Clone & Mutate' },

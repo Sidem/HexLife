@@ -16,6 +16,7 @@ export class RulesetEditorComponent extends BaseComponent {
         
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
+        this.context = this.options.context || 'desktop';
 
         
         this.element = document.createElement('div');
@@ -42,13 +43,13 @@ export class RulesetEditorComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <div class="editor-controls">
-                <input type="text" id="editorRulesetInput" class="editor-hex-input"
+                <input type="text" id="${this.context}-editorRulesetInput" class="editor-hex-input"
                     placeholder="32 hex chars (e.g., FFFFFF...000000)"
                     title="Current ruleset hex code. Edit and press Enter or click away to apply."
                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <button id="clearRulesButton" class="button"
+                <button id="${this.context}-clearRulesButton" class="button"
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
-                <select id="rulesetEditorMode" title="Choose editor mode">
+                <select id="${this.context}-rulesetEditorMode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
@@ -81,9 +82,9 @@ export class RulesetEditorComponent extends BaseComponent {
         `;
         
         this.uiElements = {
-            editorRulesetInput: this.element.querySelector('#editorRulesetInput'),
-            clearRulesButton: this.element.querySelector('#clearRulesButton'),
-            rulesetEditorMode: this.element.querySelector('#rulesetEditorMode'),
+            editorRulesetInput: this.element.querySelector(`#${this.context}-editorRulesetInput`),
+            clearRulesButton: this.element.querySelector(`#${this.context}-clearRulesButton`),
+            rulesetEditorMode: this.element.querySelector(`#${this.context}-rulesetEditorMode`),
             rulesetEditorGrid: this.element.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: this.element.querySelector('#neighborCountRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),

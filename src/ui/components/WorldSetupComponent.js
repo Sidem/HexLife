@@ -1,6 +1,5 @@
 import * as Config from '../../core/config.js';
 import { BaseComponent } from './BaseComponent.js';
-import * as PersistenceService from '../../services/PersistenceService.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
@@ -18,8 +17,7 @@ export class WorldSetupComponent extends BaseComponent {
         }
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        
-        
+        this.context = this.options.context || 'desktop';
         this.element = document.createElement('div');
         this.element.className = 'world-setup-component-content';
         
@@ -40,8 +38,8 @@ export class WorldSetupComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's ruleset and reset.</p>
-            <div class="world-config-grid"></div>
-            <div class="panel-actions">
+            <div id="${this.context}-world-config-grid" class="world-config-grid"></div>
+            <div id="${this.context}-panel-actions" class="panel-actions">
                 <button class="button" data-action="apply-density-all">Apply Selected Density to All</button>
                 <button class="button" data-action="reset-densities">Reset Densities to Default</button>
                 <button class="button" data-action="reset-all-worlds">Apply & Reset All Enabled Worlds</button>

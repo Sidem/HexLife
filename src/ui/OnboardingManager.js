@@ -120,8 +120,6 @@ export class OnboardingManager {
         if (step.onBeforeShow && typeof step.onBeforeShow === 'function') {
             step.onBeforeShow();
         }
-        console.log('OnboardingManager: showing step', stepIndex, step);
-        console.log('OnboardingManager: document.querySelector(step.element)', document.querySelector(step.element));
     
         setTimeout(() => {
             const targetElement = document.querySelector(step.element);
@@ -186,8 +184,6 @@ export class OnboardingManager {
     
         } else if (step.advanceOn.type === 'event') {
             const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, (data) => {
-                console.log('advanceOn event received', step.advanceOn.eventName);
-                console.log('event data received', data);
                 if (step.advanceOn.condition && !step.advanceOn.condition(data)) {
                     return;
                 }

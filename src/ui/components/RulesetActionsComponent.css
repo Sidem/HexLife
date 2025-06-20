@@ -41,7 +41,6 @@
 }
 
 .ruleset-actions-content {
-    padding: 20px 0px;
     flex-grow: 1;
     overflow-y: auto;
 }
@@ -207,9 +206,6 @@
 
 /* Mobile specific adjustments */
 @media (max-width: 768px) {
-    .ruleset-actions-content {
-        padding: 15px;
-    }
     
     .ruleset-actions-segment {
         padding: 10px 4px;

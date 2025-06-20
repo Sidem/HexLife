@@ -27,10 +27,10 @@ export class RulesetActionsComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <div class="ruleset-actions-header">
-                <button class="ruleset-actions-segment active" data-pane="generate">Generate</button>
-                <button class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
-                <button class="ruleset-actions-segment" data-pane="library">Library</button>
-                <button class="ruleset-actions-segment" data-pane="direct">Direct</button>
+                <button id="${this.context}-generate-tab" class="ruleset-actions-segment active" data-pane="generate">Generate</button>
+                <button id="${this.context}-mutate-tab" class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
+                <button id="${this.context}-library-tab" class="ruleset-actions-segment" data-pane="library">Library</button>
+                <button id="${this.context}-direct-tab" class="ruleset-actions-segment" data-pane="direct">Direct</button>
             </div>
             <div class="ruleset-actions-content">
                 <div id="${this.context}-generate-pane" class="ruleset-pane"></div>
@@ -246,7 +246,7 @@ export class RulesetActionsComponent extends BaseComponent {
                 item.innerHTML = `
                     <div class="name">${rule.name}</div>
                     <div class="description">${rule.description}</div>
-                    <button class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
+                    <button id="${this.context}-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
                 `;
                 rulesetsList.appendChild(item);
             });

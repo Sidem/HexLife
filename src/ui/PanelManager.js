@@ -38,7 +38,8 @@ export class PanelManager {
                 if (config.contentComponent) {
                     contentInstance = new config.contentComponent(null, { 
                         appContext: this.appContext, 
-                        libraryData: this.libraryData 
+                        libraryData: this.libraryData,
+                        context: 'desktop'
                     });
                 }
 
@@ -81,7 +82,7 @@ export class PanelManager {
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
             if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) {
-                const editorRulesetInput = document.getElementById('editorRulesetInput');
+                const editorRulesetInput = document.getElementById('desktop-editorRulesetInput');
                 if (document.activeElement !== editorRulesetInput) {
                     editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
                 }
