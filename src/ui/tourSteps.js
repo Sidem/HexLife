@@ -1,5 +1,11 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
+// Import component classes for content-aware tour logic
+import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
+import { AnalysisComponent } from './components/AnalysisComponent.js';
+import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
+import { WorldSetupComponent } from './components/WorldSetupComponent.js';
+
 /**
  * Provides the tour definitions for the application's onboarding process.
  * This unified structure uses functional steps to adapt to both desktop and mobile UI contexts.
@@ -78,7 +84,8 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Next' },
         onBeforeShow: () => {
              if (appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.BOTTOM_SHEET_SHOWN, {});
+                // The bottom sheet will automatically dispatch VIEW_SHOWN when it opens
+                // No need to manually dispatch the event
             } else {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'controls', show: true });
             }
@@ -98,7 +105,12 @@ export const getTours = (appContext) => {
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'click' }
+        // The condition is now elegant, robust, and completely independent of UI mode
+        advanceOn: { 
+            type: 'event', 
+            eventName: EVENTS.VIEW_SHOWN, 
+            condition: (data) => data.contentComponent instanceof RulesetActionsComponent 
+        }
     }, {
         element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-generate-tab`,
         title: 'Generate',
@@ -134,7 +146,12 @@ export const getTours = (appContext) => {
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'click' }
+        // Content-aware condition - works regardless of whether it's in a panel or mobile view
+        advanceOn: { 
+            type: 'event', 
+            eventName: EVENTS.VIEW_SHOWN, 
+            condition: (data) => data.contentComponent instanceof RulesetEditorComponent 
+        }
     }, {
         element: () => (appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
         title: 'Toggling Outcomes',
@@ -171,7 +188,12 @@ export const getTours = (appContext) => {
         title: 'Step 1: Get a Baseline',
         content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel to access the library.",
         primaryAction: { text: 'Open Ruleset Actions' },
-        advanceOn: { type: 'click' }
+        // Content-aware condition - elegant and independent of UI implementation
+        advanceOn: { 
+            type: 'event', 
+            eventName: EVENTS.VIEW_SHOWN, 
+            condition: (data) => data.contentComponent instanceof RulesetActionsComponent 
+        }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobile-library-tab' : '#desktop-library-tab',
         title: 'Step 2: Open the Library',
@@ -208,7 +230,12 @@ export const getTours = (appContext) => {
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
         primaryAction: { text: 'Open World Setup' },
-        advanceOn: { type: 'click' }
+        // Content-aware condition - works for both mobile and desktop
+        advanceOn: { 
+            type: 'event', 
+            eventName: EVENTS.VIEW_SHOWN, 
+            condition: (data) => data.contentComponent instanceof WorldSetupComponent 
+        }
     }, {
         element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-world-config-grid .world-config-cell:first-child .density-control`,
         title: 'Step 6: Set Initial Density',
@@ -303,12 +330,29 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
+    /**
+     * Analysis Tour: Demonstrates the elegant content-aware approach
+     */
+    const analysis = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="analyze"]' : '[data-tour-id="analysis-panel-button"]',
+        title: 'Analysis Tools',
+        content: 'This panel gives you the big picture, charting the universe\'s behavior over time.',
+        primaryAction: { text: 'Open Analysis' },
+        onBeforeShow: resetUIState,
+        // Elegant content-aware condition - no need to know about UI implementation details
+        advanceOn: {
+            type: 'event',
+            eventName: EVENTS.VIEW_SHOWN,
+            condition: (data) => data.contentComponent instanceof AnalysisComponent
+        }
+    }];
+
     return {
         core,
         controls,
         ruleset_actions,
         editor,
-        // analysis,
+        analysis,
         // worlds,
         // file_management,
         appliedEvolution,

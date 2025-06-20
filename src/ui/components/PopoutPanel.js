@@ -98,10 +98,8 @@ export class PopoutPanel extends Panel {
     show() {
         if (this.popoutElement) {
             this._reposition();
-            super.show();
+            super.show(); // Handles removing 'hidden' and dispatching the event
             this.triggerElement.classList.add('active');
-            
-            EventBus.dispatch(EVENTS.POPOUT_SHOWN, { panel: this });
         }
     }
 

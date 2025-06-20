@@ -61,11 +61,12 @@ export class BottomSheet extends Panel {
     show() {
         if (this.isVisible) return;
         this.isVisible = true;
-        super.show();
+        
+        super.show(); // Handles removing 'hidden' and dispatching the event
+        
         setTimeout(() => {
             this.sheetPanel.classList.add('visible');
         }, 10);
-        EventBus.dispatch(EVENTS.BOTTOM_SHEET_SHOWN, { sheet: this });
     }
 
     hide() {

@@ -72,5 +72,5 @@ export const EVENT_BUS_LOGGING = {
      * filter: ['simulation:worldStatsUpdated', 'ui:'] // Log specific simulation events and all UI events
      * filter: [] // Log all events
      */
-    filter: ['command:'] 
+    filter: ['ui:viewShown'] 
 };

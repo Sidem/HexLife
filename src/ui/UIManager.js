@@ -425,22 +425,22 @@ export class UIManager {
 
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            // Pass the viewName as an ID, prefixed for clarity
-            const presenter = new MobileView(mobileViewsContainer, { 
-                id: `${viewName}-mobile-view`,
-                title: config.title 
-            });
-            
-            // Create content component
-            const content = new config.constructor(null, { 
+            // 1. Create the content component instance FIRST.
+            const contentComponent = new config.constructor(null, { 
                 appContext: this.appContext,
                 libraryData: this.appContext.libraryController.getLibraryData(),
                 context: 'mobile'
             });
+
+            // 2. Create the MobileView, passing the contentComponent instance in its options.
+            const presenter = new MobileView(mobileViewsContainer, { 
+                id: `${viewName}-mobile-view`,
+                title: config.title,
+                contentComponent: contentComponent // Pass the instance here
+            });
             
-            // Set up the view
-            presenter.render();
-            presenter.setContentComponent(content);
+            // 3. Now that the view is created, tell it to render the component's element.
+            presenter.setContentComponent(contentComponent);
             
             // Store the view
             this.mobileViews[viewName] = presenter;

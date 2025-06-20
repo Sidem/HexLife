@@ -4,6 +4,7 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class DraggablePanel extends Panel {
     constructor(panelElement, options = {}) {
+        // Pass all options up to the Panel constructor, which will handle contentComponent
         super(panelElement, options);
         this.panelElement = panelElement;
         
@@ -11,7 +12,7 @@ export class DraggablePanel extends Panel {
         const handleSelector = options.handleSelector || 'h3';
         this.handleElement = panelElement.querySelector(handleSelector);
         this.options = { constrainToViewport: true, ...options };
-        this.contentComponent = options.contentComponent || null;
+        // this.contentComponent is now handled by the parent Panel class
         this.offsetX = 0;
         this.offsetY = 0;
 
@@ -138,7 +139,8 @@ export class DraggablePanel extends Panel {
     }
 
     show() {
-        super.show();
+        super.show(); // This now handles removing 'hidden' and dispatching the event
+        
         const computedStyle = window.getComputedStyle(this.panelElement);
         if (computedStyle.transform.includes('translate') &&
             (computedStyle.left === '50%' || computedStyle.top === '50%')) {
