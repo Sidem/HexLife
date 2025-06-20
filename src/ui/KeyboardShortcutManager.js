@@ -42,7 +42,7 @@ export class KeyboardShortcutManager {
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }) },
+            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },
             { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
             
             // World State Actions

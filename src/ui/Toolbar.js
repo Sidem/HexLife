@@ -50,6 +50,7 @@ export class Toolbar {
             setupPanelButton: document.getElementById('setupPanelButton'),
             analysisPanelButton: document.getElementById('analysisPanelButton'),
             rankPanelButton: document.getElementById('rankPanelButton'),
+            helpButton: document.getElementById('helpButton'),
         };
         this._initPopoutPanels();
         this._initPopoutControls();
@@ -117,6 +118,7 @@ export class Toolbar {
             analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis' }),
             rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'ruleRankPanel' }),
             setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup' }),
+            helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
             loadStateButton: () => {
