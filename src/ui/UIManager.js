@@ -331,17 +331,12 @@ export class UIManager {
                 }
             });
         } else {
-            // Desktop logic: open popout and copy to clipboard
-            const sharePopout = this.appContext.toolbar.getPopout('share');
             const shareLinkInput = document.getElementById('shareLinkInput');
 
-            if (sharePopout && shareLinkInput) {
+            if (shareLinkInput) {
                 shareLinkInput.value = url;
-                sharePopout.show();
-                // Select the text for easy copying
                 shareLinkInput.select();
             } else {
-                // Fallback for when popout isn't available
                 navigator.clipboard.writeText(url).then(() => {
                     alert('Share link copied to clipboard!');
                 }).catch(err => {

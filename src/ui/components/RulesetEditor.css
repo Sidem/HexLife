@@ -225,7 +225,7 @@
 }
 .neighbor-count-rule-viz:hover { background-color: #3a3a3a; }
 .neighbor-count-rule-viz .hexagon.center-hex {
-    position: relative; transform: scale(0.8) translate(-53px, -53px);
+    position: relative; transform: scale(0.8) translate(-46px, -53px);
     margin-bottom: 5px; width: 40px; height: calc(40px * 1.154701);
 }
 .neighbor-count-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
@@ -292,6 +292,9 @@
 
 /* Mobile Overrides */
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
+    .neighbor-count-rule-viz .hexagon.center-hex {
+        transform: scale(0.8) translate(-23px, -53px);
+    }
     #rulesetEditorGrid {
         grid-template-columns: repeat(8, 42px);
         grid-template-rows: repeat(16, 56px);

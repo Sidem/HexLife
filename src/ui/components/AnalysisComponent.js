@@ -9,7 +9,6 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 export class AnalysisComponent extends BaseComponent {
     constructor(mountPoint, options = {}) {
         super(mountPoint, options); // Call BaseComponent constructor
-
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('AnalysisComponent: appContext or worldManager is null.');

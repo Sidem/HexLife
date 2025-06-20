@@ -3,6 +3,7 @@ import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
+import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
@@ -21,7 +22,7 @@ export class PanelManager {
             { name: 'analysis', elementId: 'analysisPanel', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
             { name: 'ruleRankPanel', elementId: 'ruleRankPanel', constructor: DraggablePanel, contentComponent: RuleRankComponent, persistenceKey: 'ruleRank', options: { handleSelector: 'h3' } },
             { name: 'learning', elementId: 'learningPanel', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
-            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
+            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', constructor: DraggablePanel, contentComponent: RulesetActionsComponent, persistenceKey: 'rulesetActions', options: { handleSelector: 'h3' } }
         ];
     }
 
@@ -105,20 +106,7 @@ export class PanelManager {
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.contentComponent.refresh();
         });
 
-        // Support for deprecated COMMAND_TOGGLE_PANEL for backward compatibility
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, (data) => {
-            console.warn('COMMAND_TOGGLE_PANEL is deprecated. Use COMMAND_TOGGLE_VIEW instead.');
-            const panel = this.getPanel(data.panelName);
-            if (!panel) return;
-        
-            if (data.show === true) {
-                panel.show();
-            } else if (data.show === false) {
-                panel.hide();
-            } else {
-                panel.toggle();
-            }
-        });
+
         
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
             this.hideAllPanels();

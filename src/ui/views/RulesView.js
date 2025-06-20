@@ -26,7 +26,7 @@ export class RulesView extends BaseComponent {
 
         // Instantiate the unified RulesetActionsComponent for mobile
         const contentArea = this.element.querySelector('.mobile-view-content-area');
-        new RulesetActionsComponent(contentArea, this.appContext, { context: 'mobile', libraryData: this.libraryData });
+        new RulesetActionsComponent(contentArea, { context: 'mobile', libraryData: this.libraryData, appContext: this.appContext });
         
         this.attachEventListeners();
     }

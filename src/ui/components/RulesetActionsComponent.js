@@ -5,9 +5,9 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
 
 export class RulesetActionsComponent extends BaseComponent {
-    constructor(mountPoint, appContext, options = {}) {
+    constructor(mountPoint, options = {}) {
         super(mountPoint, options);
-        this.appContext = appContext;
+        this.appContext = options.appContext;
         this.context = options.context || 'shared';
         this.libraryData = options.libraryData;
         this.sliders = {};
@@ -58,8 +58,6 @@ export class RulesetActionsComponent extends BaseComponent {
         this._renderMutatePane();
         this._renderLibraryPane();
         this._renderDirectPane();
-
-        this.mountPoint.appendChild(this.element);
     }
 
     _renderGeneratePane() {

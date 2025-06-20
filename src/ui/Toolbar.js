@@ -3,7 +3,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RulesetDirectInput } from './components/RulesetDirectInput.js';
-import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
+
 import { SliderComponent } from './components/SliderComponent.js';
 import { SwitchComponent } from './components/SwitchComponent.js';
 import { generateShareUrl } from '../utils/utils.js';
@@ -93,11 +93,7 @@ export class Toolbar {
             new ControlsComponent(desktopControlsMount, this.appContext, { context: 'desktop' });
         }
 
-        // Initialize the new RulesetActionsComponent for desktop
-        const rulesetActionsMount = document.getElementById('ruleset-actions-content-mount');
-        if (rulesetActionsMount) {
-            new RulesetActionsComponent(rulesetActionsMount, this.appContext, { context: 'desktop', libraryData: this.libraryData });
-        }
+
 
         // Initialize reset/clear popout controls
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
