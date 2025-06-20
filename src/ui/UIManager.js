@@ -30,6 +30,13 @@ export class UIManager {
         this.managedComponents = [];
     }
 
+    #mobileViewConfig = {
+        worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
+        analyze: { constructor: AnalysisComponent, title: 'Analysis' },
+        editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
+        learning: { constructor: LearningComponent, title: 'Learning Hub' },
+    };
+
     /**
      * Initializes the entire UI layer, sets up mode detection,
      * and wires all necessary event listeners.
@@ -389,81 +396,51 @@ export class UIManager {
     _showMobileViewInternal({ targetView }) {
         if (!this.isMobile()) return;
     
+        // Hide all other views first.
         Object.values(this.mobileViews).forEach(v => v.hide());
     
-        // Handle dynamic creation of worlds view
-        if (targetView === 'worlds') {
-            if (!this.mobileViews.worlds) {
-                const mobileViewsContainer = document.getElementById('mobile-views-container');
-                if (mobileViewsContainer) {
-                    // Create a generic MobileView presenter
-                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'World Setup' });
-                    
-                    // Create the content component
-                    const worldSetupContent = new WorldSetupComponent(null, { appContext: this.appContext });
-                    
-                    // Render the presenter and mount the content
-                    mobileViewPresenter.render();
-                    mobileViewPresenter.setContentComponent(worldSetupContent);
-                    
-                    this.mobileViews.worlds = mobileViewPresenter;
-                }
-            }
-        }
-
-        // Handle dynamic creation of analyze view
-        if (targetView === 'analyze') {
-            if (!this.mobileViews.analyze) {
-                const mobileViewsContainer = document.getElementById('mobile-views-container');
-                if (mobileViewsContainer) {
-                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Analysis' });
-                    const analysisContent = new AnalysisComponent(null, { appContext: this.appContext });
-                    mobileViewPresenter.render();
-                    mobileViewPresenter.setContentComponent(analysisContent);
-                    this.mobileViews.analyze = mobileViewPresenter;
-                }
-            }
-        }
-
-        // Handle dynamic creation of editor view
-        if (targetView === 'editor') {
-            if (!this.mobileViews.editor) {
-                const mobileViewsContainer = document.getElementById('mobile-views-container');
-                if (mobileViewsContainer) {
-                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Ruleset Editor' });
-                    const editorContent = new RulesetEditorComponent(null, { appContext: this.appContext });
-                    mobileViewPresenter.render();
-                    mobileViewPresenter.setContentComponent(editorContent);
-                    this.mobileViews.editor = mobileViewPresenter;
-                }
-            }
-        }
-
-        // Handle dynamic creation of learning view
-        if (targetView === 'learning') {
-            if (!this.mobileViews.learning) {
-                const mobileViewsContainer = document.getElementById('mobile-views-container');
-                if (mobileViewsContainer) {
-                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Learning Hub' });
-                    const learningContent = new LearningComponent(null, { appContext: this.appContext });
-                    mobileViewPresenter.render();
-                    mobileViewPresenter.setContentComponent(learningContent);
-                    this.mobileViews.learning = mobileViewPresenter;
-                }
-            } else {
-                // If view exists, ensure its content is up-to-date
-                if (this.mobileViews.learning.contentComponent && this.mobileViews.learning.contentComponent.refreshTourList) {
-                    this.mobileViews.learning.contentComponent.refreshTourList();
-                }
-            }
-        }
+        // Use the factory to create the view if it doesn't exist.
+        this.#createMobileView(targetView);
     
+        // Show the target view.
         const viewToShow = this.mobileViews[targetView];
         if (viewToShow) {
             viewToShow.show();
         }
+
         this.activeMobileViewName = targetView;
         EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: targetView });
+    }
+
+    #createMobileView(viewName) {
+        // Check if the view already exists.
+        if (this.mobileViews[viewName]) {
+            // If the view exists, handle any necessary refresh logic.
+            // Currently, only the Learning Hub needs this on subsequent views.
+            if (viewName === 'learning' && this.mobileViews.learning.contentComponent?.refreshTourList) {
+                this.mobileViews.learning.contentComponent.refreshTourList();
+            }
+            return;
+        }
+
+        const config = this.#mobileViewConfig[viewName];
+        if (!config) return; // Exit if the view is not in our dynamic config.
+
+        const mobileViewsContainer = document.getElementById('mobile-views-container');
+        if (mobileViewsContainer) {
+            // 1. Create the generic MobileView presenter/container.
+            const presenter = new MobileView(mobileViewsContainer, { title: config.title });
+            
+            // 2. Create the specific content component (e.g., WorldSetupComponent).
+            const content = new config.constructor(null, { appContext: this.appContext });
+            
+            // 3. Render the presenter and inject the content into it.
+            presenter.render();
+            presenter.setContentComponent(content);
+            
+            // 4. Store the newly created view presenter.
+            this.mobileViews[viewName] = presenter;
+        }
     }
 
 
