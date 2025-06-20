@@ -35,10 +35,7 @@ export class BottomTabBar extends BaseComponent {
     }
 
     handleViewChange(view) {
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, {
-            targetView: view,
-            currentView: this.activeView
-        });
+        EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: view });
     }
 
     updateActiveButton() {

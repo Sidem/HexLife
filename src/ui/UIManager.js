@@ -26,6 +26,7 @@ export class UIManager {
         this.mode = 'desktop';
         this.mediaQueryList = window.matchMedia(MOBILE_QUERY);
         this.mobileViews = {};
+        this.activeMobileViewName = 'simulate';
         this.managedComponents = [];
     }
 
@@ -224,6 +225,7 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_VIEW, this.showMobileView.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_VIEW, this._handleToggleView.bind(this));
 
         // NEW: Logic moved from Toolbar.js
         const handleClickOutside = (event) => {
@@ -344,16 +346,54 @@ export class UIManager {
         }
     }
 
+    /**
+     * Central handler for showing, hiding, or toggling all major UI views.
+     * This includes desktop panels, popouts, and mobile full-screen views.
+     * @param {{viewName: string, show?: boolean}} data
+     * @private
+     */
+    _handleToggleView({ viewName, show }) {
+        if (this.isMobile()) {
+            // Mobile logic: delegate to the mobile view manager
+            const currentView = this.activeMobileViewName || 'simulate';
+            const targetView = (currentView === viewName && show === undefined) ? 'simulate' : viewName;
+            this._showMobileViewInternal({ targetView });
+        } else {
+            const panel = this.appContext.panelManager.getPanel(viewName) || this.appContext.toolbar.getPopout(viewName);
+            if (!panel) {
+                console.warn(`No view or panel found with name: ${viewName}`);
+                return;
+            }
+
+            const shouldShow = show !== undefined ? show : panel.isHidden();
+
+            // Close all other panels/popouts before showing a new one
+            if (shouldShow) {
+                this.appContext.panelManager.hideAllPanels();
+                this.appContext.toolbar.closeAllPopouts();
+            }
+
+            // Toggle the specific panel
+            if (show === true) panel.show();
+            else if (show === false) panel.hide();
+            else panel.toggle();
+        }
+    }
+
     showMobileView({ targetView, currentView }) {
+        // Legacy method for backward compatibility - delegate to internal method
         if (!this.isMobile()) return;
-        console.log('showMobileView', targetView, currentView);
-    
-        let nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
+        const nextView = (targetView === currentView && targetView !== 'simulate') ? 'simulate' : targetView;
+        this._showMobileViewInternal({ targetView: nextView });
+    }
+
+    _showMobileViewInternal({ targetView }) {
+        if (!this.isMobile()) return;
     
         Object.values(this.mobileViews).forEach(v => v.hide());
     
         // Handle dynamic creation of worlds view
-        if (nextView === 'worlds') {
+        if (targetView === 'worlds') {
             if (!this.mobileViews.worlds) {
                 const mobileViewsContainer = document.getElementById('mobile-views-container');
                 if (mobileViewsContainer) {
@@ -373,7 +413,7 @@ export class UIManager {
         }
 
         // Handle dynamic creation of analyze view
-        if (nextView === 'analyze') {
+        if (targetView === 'analyze') {
             if (!this.mobileViews.analyze) {
                 const mobileViewsContainer = document.getElementById('mobile-views-container');
                 if (mobileViewsContainer) {
@@ -387,7 +427,7 @@ export class UIManager {
         }
 
         // Handle dynamic creation of learning view
-        if (nextView === 'learning') {
+        if (targetView === 'learning') {
             if (!this.mobileViews.learning) {
                 const mobileViewsContainer = document.getElementById('mobile-views-container');
                 if (mobileViewsContainer) {
@@ -405,11 +445,12 @@ export class UIManager {
             }
         }
     
-        const viewToShow = this.mobileViews[nextView];
+        const viewToShow = this.mobileViews[targetView];
         if (viewToShow) {
             viewToShow.show();
         }
-        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: nextView });
+        this.activeMobileViewName = targetView;
+        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: targetView });
     }
 
 

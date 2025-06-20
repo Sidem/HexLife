@@ -95,10 +95,10 @@ export class ToolsBottomSheet extends BottomSheet {
         this.sheetContent.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
             if (action === 'reset') {
-                this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected');
+                EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
                 this.hide();
             } else if (action === 'clear') {
-                this.appContext.worldsController.clearWorlds('selected');
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
                 this.hide();
             }
             

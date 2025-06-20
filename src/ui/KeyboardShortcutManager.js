@@ -32,17 +32,17 @@ export class KeyboardShortcutManager {
         // This array maps key combinations to specific commands, implementing the Command Pattern.
         this.shortcuts = [
             // Panel & Popout Toggles
-            { key: 'e', handler: () => this.panelManager.getPanel('rulesetEditor')?.toggle() },
-            { key: 's', handler: () => this.panelManager.getPanel('worldSetup')?.toggle() },
-            { key: 'a', handler: () => this.panelManager.getPanel('analysis')?.toggle() },
-            { key: 'n', handler: () => this.panelManager.getPanel('rulesetActions')?.toggle() },
+            { key: 'e', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetEditor' }) },
+            { key: 's', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup' }) },
+            { key: 'a', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis' }) },
+            { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }) },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
             // Simulation Actions
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', handler: () => this.panelManager.getPanel('rulesetActions')?.toggle() },
+            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }) },
             { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
             
             // World State Actions

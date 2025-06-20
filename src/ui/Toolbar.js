@@ -29,18 +29,14 @@ export class Toolbar {
 
     init() {
         this.uiElements = {
-            // Main Toolbar Buttons
             playPauseButton: document.getElementById('playPauseButton'),
-            // Popout Trigger Buttons
             controlsButton: document.getElementById('controlsButton'),
             rulesetActionsButton: document.getElementById('rulesetActionsButton'),
             resetClearButton: document.getElementById('resetClearButton'),
             shareButton: document.getElementById('shareButton'),
-            // Popout Panels
             controlsPopout: document.getElementById('controlsPopout'),
             resetClearPopout: document.getElementById('resetClearPopout'),
             sharePopout: document.getElementById('sharePopout'),
-            // Reset/Clear Popout Content
             resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
             resetAllButtonPopout: document.getElementById('resetAllButtonPopout'),
             clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
@@ -50,6 +46,10 @@ export class Toolbar {
             saveStateButton: document.getElementById('saveStateButton'),
             loadStateButton: document.getElementById('loadStateButton'),
             fileInput: document.getElementById('fileInput'),
+            editRuleButton: document.getElementById('editRuleButton'),
+            setupPanelButton: document.getElementById('setupPanelButton'),
+            analysisPanelButton: document.getElementById('analysisPanelButton'),
+            rankPanelButton: document.getElementById('rankPanelButton'),
         };
         this._initPopoutPanels();
         this._initPopoutControls();
@@ -68,36 +68,6 @@ export class Toolbar {
 
         // This event ensures that opening one popout closes any others.
         EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
-        
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, (data) => {
-            const panel = this.getPanel(data.panelName);
-            if (!panel) return;
-        
-            if (data.show === true) {
-                panel.show();
-            } else if (data.show === false) {
-                panel.hide();
-            } else {
-                panel.toggle();
-            }
-        });
-
-        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, (data) => {
-            const popout = this.getPopout(data.popoutName);
-            if (!popout) return;
-        
-            if (data.show === true) {
-                popout.show();
-            } else if (data.show === false) {
-                popout.hide();
-            } else {
-                popout.toggle();
-            }
-        });
-        
-        EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
-            this.closeAllPopouts();
-        });
     }
     
     _initPopoutPanels() {
@@ -129,36 +99,38 @@ export class Toolbar {
         }
 
         // Initialize reset/clear popout controls
-        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetWorldsWithCurrentRuleset('selected'); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.resetAllWorldsToInitialDensities(); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('selected'); this.popoutPanels.resetClear.hide(); });
-        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { this.appContext.worldsController.clearWorlds('all'); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
+        this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
     }
     
     // _copyRuleset method removed - now handled by RulesetDirectInput component
 
     _setupToolbarButtonListeners() {
-        this.uiElements.playPauseButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
+        const buttonToActionMap = {
+            playPauseButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE),
+            controlsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'controls' }),
+            rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetActions' }),
+            resetClearButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'resetClear' }),
+            editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'rulesetEditor' }),
+            analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'analysis' }),
+            rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'ruleRankPanel' }),
+            setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'worldSetup' }),
+            shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_VIEW, { viewName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
+            saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
+            loadStateButton: () => {
+                this.uiElements.fileInput.accept = ".txt,.json";
+                this.uiElements.fileInput.click();
+            },
+            copyShareLinkButton: this._copyShareLink.bind(this)
+        };
 
-        // Setup remaining popout buttons
-        this.popoutConfig.forEach(config => {
-            const buttonElement = this.uiElements[config.buttonId];
-            if (buttonElement) {
-                buttonElement.addEventListener('click', () => {
-                    this.popoutPanels[config.name]?.toggle();
-                });
+        for (const [elementId, action] of Object.entries(buttonToActionMap)) {
+            if (this.uiElements[elementId]) {
+                this.uiElements[elementId].addEventListener('click', action);
             }
-        });
-        
-        this.uiElements.shareButton.addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP));
-        
-        this.uiElements.saveStateButton.addEventListener('click', this.appContext.worldsController.saveSelectedWorldState);
-        this.uiElements.loadStateButton.addEventListener('click', () => {
-            this.uiElements.fileInput.accept = ".txt,.json";
-            this.uiElements.fileInput.click();
-        });
-        
-        this.uiElements.copyShareLinkButton.addEventListener('click', this._copyShareLink.bind(this));
+        }
     }
 
     _setupStateListeners() {
@@ -170,7 +142,7 @@ export class Toolbar {
                 try {
                     const data = JSON.parse(re.target.result);
                     if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
-                    this.appContext.worldsController.loadWorldState(this.worldManager.getSelectedWorldIndex(), data);
+                    EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), loadedData: data });
                 } catch (err) { alert(`Error processing file: ${err.message}`); }
                 finally { e.target.value = null; }
             };
@@ -201,6 +173,21 @@ export class Toolbar {
             this.uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚";
             this.uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
         }
+    }
+
+    getPopout(panelName) { 
+        return this.popoutPanels[panelName]; 
+    }
+
+    closeAllPopouts() {
+        let wasOpen = false;
+        this.activePopouts.forEach(p => {
+            if (!p.isHidden()) {
+                p.hide();
+                wasOpen = true;
+            }
+        });
+        return wasOpen;
     }
 
 

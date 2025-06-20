@@ -16,12 +16,12 @@ export class PanelManager {
 
         this.libraryData = null;
         this.panelConfig = [
-            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', buttonId: 'editRuleButton', constructor: RulesetEditor, options: {} },
-            { name: 'worldSetup', elementId: 'worldSetupPanel', buttonId: 'setupPanelButton', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
-            { name: 'analysis', elementId: 'analysisPanel', buttonId: 'analysisPanelButton', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
-            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', buttonId: 'rankPanelButton', constructor: RuleRankPanel, options: {} },
-            { name: 'learning', elementId: 'learningPanel', buttonId: 'helpButton', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
-            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', buttonId: 'rulesetActionsButton', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
+            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', constructor: RulesetEditor, options: {} },
+            { name: 'worldSetup', elementId: 'worldSetupPanel', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
+            { name: 'analysis', elementId: 'analysisPanel', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
+            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', constructor: RuleRankPanel, options: {} },
+            { name: 'learning', elementId: 'learningPanel', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
+            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
         ];
     }
 
@@ -70,18 +70,10 @@ export class PanelManager {
             }
         });
 
-        this._setupPanelToggleListeners();
         this._setupEventListeners();
     }
     
-    _setupPanelToggleListeners() {
-        this.panelConfig.forEach(config => {
-            const buttonElement = document.getElementById(config.buttonId);
-            if (buttonElement) {
-                buttonElement.addEventListener('click', () => this.panels[config.name]?.toggle());
-            }
-        });
-    }
+
 
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
@@ -113,7 +105,9 @@ export class PanelManager {
              if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
         });
 
+        // Support for deprecated COMMAND_TOGGLE_PANEL for backward compatibility
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, (data) => {
+            console.warn('COMMAND_TOGGLE_PANEL is deprecated. Use COMMAND_TOGGLE_VIEW instead.');
             const panel = this.getPanel(data.panelName);
             if (!panel) return;
         

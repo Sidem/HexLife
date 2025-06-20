@@ -196,11 +196,13 @@ export const EVENTS = {
     COMMAND_EXECUTE_MUTATE_RULESET: 'command:executeMutateRuleset',
     /** @event A user-initiated command to execute the clone and mutate action with the controller's current settings. */
     COMMAND_EXECUTE_CLONE_AND_MUTATE: 'command:executeCloneAndMutate',
-    /** @param {{panelName: string, show?: boolean}} data - Command to show, hide, or toggle a draggable panel. If 'show' is omitted, it toggles. */
+    /** @param {{viewName: string, show?: boolean}} data - Command to show, hide, or toggle a view/panel/popout. If 'show' is omitted, it toggles. */
+    COMMAND_TOGGLE_VIEW: 'command:toggleView',
+    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{panelName: string, show?: boolean}} data - Command to show, hide, or toggle a draggable panel. If 'show' is omitted, it toggles. */
     COMMAND_TOGGLE_PANEL: 'command:togglePanel',
     /** @event Emitted with no payload to command all popout and draggable panels to hide. */
     COMMAND_HIDE_ALL_OVERLAYS: 'command:hideAllOverlays',
-    /** @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. If 'show' is omitted, it toggles. */
+    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. If 'show' is omitted, it toggles. */
     COMMAND_TOGGLE_POPOUT: 'command:togglePopout',
 
     // --- UI State Change Events ---
@@ -214,7 +216,7 @@ export const EVENTS = {
     INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged',
     /** @param {{mode: 'desktop'|'mobile'}} data - The new UI mode. */
     UI_MODE_CHANGED: 'ui:modeChanged',
-    /** @param {{targetView: string, currentView: string}} data - Parameters for changing the active mobile view. */
+    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{targetView: string, currentView: string}} data - Parameters for changing the active mobile view. */
     COMMAND_SHOW_VIEW: 'command:showView',
     /** @param {{activeView: string}} data - The name of the mobile view that became active. */
     MOBILE_VIEW_CHANGED: 'ui:mobileViewChanged',
