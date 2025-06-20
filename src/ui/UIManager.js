@@ -4,11 +4,11 @@ import { KeyboardShortcutManager } from './KeyboardShortcutManager.js';
 import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import { MoreView } from './views/MoreView.js';
-import { RulesView } from './views/RulesView.js';
 import { MobileView } from './views/MobileView.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
+import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
@@ -31,6 +31,7 @@ export class UIManager {
     }
 
     #mobileViewConfig = {
+        rules: { constructor: RulesetActionsComponent, title: 'Rulesets' },
         worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
@@ -141,8 +142,7 @@ export class UIManager {
         if (mobileViewsContainer) {
             this.mobileViews.more = new MoreView(mobileViewsContainer, appContext);
             this.mobileViews.more.render();
-            this.mobileViews.rules = new RulesView(mobileViewsContainer, appContext, libraryData);
-            this.mobileViews.rules.render();
+            // rules view will be created dynamically when needed
             // worlds view will be created dynamically when needed
             // analyze view will be created dynamically when needed
             // editor view will be created dynamically when needed
@@ -427,7 +427,10 @@ export class UIManager {
             const presenter = new MobileView(mobileViewsContainer, { title: config.title });
             
             // 2. Create the specific content component (e.g., WorldSetupComponent).
-            const content = new config.constructor(null, { appContext: this.appContext });
+            const content = new config.constructor(null, { 
+                appContext: this.appContext,
+                libraryData: this.appContext.libraryController.getLibraryData() // Pass library data for components that need it
+            });
             
             // 3. Render the presenter and inject the content into it.
             presenter.render();

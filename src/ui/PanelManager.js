@@ -37,7 +37,10 @@ export class PanelManager {
                 // Instantiate the content component first
                 let contentInstance = null;
                 if (config.contentComponent) {
-                    contentInstance = new config.contentComponent(null, { appContext: this.appContext });
+                    contentInstance = new config.contentComponent(null, { 
+                        appContext: this.appContext, 
+                        libraryData: this.libraryData // Add library data for components that need it
+                    });
                 }
 
                 const presenterInstance = new PresenterClass(panelElement, {
