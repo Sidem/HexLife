@@ -159,49 +159,13 @@
 
         <div id="historyPopout" class="popout-panel hidden">
             <h4>Ruleset History<button class="button-help-trigger" data-tour-name="history" title="Help with this feature">[?]</button></h4>
-            <div id="historyList" class="history-list-container">
-            </div>
+            <div id="historyList" class="history-list-container"></div>
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true" data-tour-id="ruleset-editor-panel">
             <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rulesetEditorTitle">Ruleset Editor<button class="button-help-trigger" data-tour-name="editor" title="Help with this feature">[?]</button></h3>
-            <div class="editor-controls">
-                <input type="text" id="editorRulesetInput" class="editor-hex-input"
-                    placeholder="32 hex chars (e.g., FFFFFF...000000)"
-                    title="Current ruleset hex code. Edit and press Enter or click away to apply."
-                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <button id="clearRulesButton" class="button"
-                    title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
-                <select id="rulesetEditorMode" title="Choose editor mode">
-                    <option value="detailed">Detailed (128 rules)</option>
-                    <option value="neighborCount">Neighbor Count (14 groups)</option>
-                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
-                </select>
-            </div>
-            <div class="editor-apply-scope-controls">
-                <div id="editorScopeSwitchMount"></div>
-                <div id="editorResetSwitchMount"></div>
-            </div>
             <div class="panel-content-area">
-                <div id="rulesetEditorGrid" class="hidden"></div>
-                <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
-                <div id="rotationalSymmetryRulesetEditorGrid"></div>
-                <div class="editor-text">
-                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to
-                        propagate these changes.</p>
-                    <p>Click rule visualizations to toggle output states.</p>
-                    <div class="editor-text-rules">
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
-                            inactive</p>
-                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span>
-                            becomes active</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span>
-                            becomes inactive</p>
-                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays
-                            active</p>
-                    </div>
-                </div>
             </div>
         </div>
 

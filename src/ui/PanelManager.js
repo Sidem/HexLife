@@ -1,7 +1,7 @@
-import { RulesetEditor } from './components/RulesetEditor.js';
+import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
-import { RuleRankPanel } from './components/RuleRankPanel.js';
+import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
@@ -16,10 +16,10 @@ export class PanelManager {
 
         this.libraryData = null;
         this.panelConfig = [
-            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', constructor: RulesetEditor, options: {} },
+            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', constructor: DraggablePanel, contentComponent: RulesetEditorComponent, persistenceKey: 'ruleset', options: { handleSelector: 'h3' } },
             { name: 'worldSetup', elementId: 'worldSetupPanel', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
             { name: 'analysis', elementId: 'analysisPanel', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
-            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', constructor: RuleRankPanel, options: {} },
+            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', constructor: DraggablePanel, contentComponent: RuleRankComponent, persistenceKey: 'ruleRank', options: { handleSelector: 'h3' } },
             { name: 'learning', elementId: 'learningPanel', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
             { name: 'rulesetActions', elementId: 'rulesetActionsPanel', constructor: DraggablePanel, options: { handleSelector: 'h3', persistence: { identifier: 'rulesetActions' } } }
         ];
@@ -82,17 +82,17 @@ export class PanelManager {
                 if (document.activeElement !== editorRulesetInput) {
                     editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
                 }
-                this.panels.rulesetEditor.refreshViews();
+                this.panels.rulesetEditor.contentComponent?.refresh();
             }
         });
         
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, () => {
-            this.panels.ruleRankPanel?.refreshViews();
+            this.panels.ruleRankPanel?.contentComponent?.scheduleRefresh();
         });
 
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
             this.panels.worldSetup?.contentComponent?.refresh();
-            this.panels.ruleRankPanel?.refreshViews();
+            this.panels.ruleRankPanel?.contentComponent?.scheduleRefresh();
         });
 
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => {
@@ -100,9 +100,9 @@ export class PanelManager {
         });
 
         EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, () => {
-             if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) this.panels.rulesetEditor.refreshViews();
+             if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) this.panels.rulesetEditor.contentComponent?.refresh();
              if (this.panels.analysis && !this.panels.analysis.isHidden()) this.panels.analysis.contentComponent.refresh();
-             if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.refreshViews();
+             if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.contentComponent.refresh();
         });
 
         // Support for deprecated COMMAND_TOGGLE_PANEL for backward compatibility

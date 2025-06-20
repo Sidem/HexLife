@@ -1,9 +1,9 @@
-import { DraggablePanel } from './DraggablePanel.js';
-import * as PersistenceService from '../../services/PersistenceService.js';
+import { BaseComponent } from './BaseComponent.js';
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 import { Throttler } from '../../utils/throttler.js';
 import * as Config from '../../core/config.js';
 
+// The ElementPool is a utility class local to this component.
 class ElementPool {
     constructor(creator) {
         this.pool = [];
@@ -17,38 +17,40 @@ class ElementPool {
     }
 }
 
-export class RuleRankPanel extends DraggablePanel {
-    constructor(panelElement, options = {}) {
-        super(panelElement, { 
-            handleSelector: 'h3', 
-            ...options, 
-            persistence: { identifier: 'ruleRank' } 
-        });
+export class RuleRankComponent extends BaseComponent {
+    constructor(mountPoint, options = {}) {
+        super(mountPoint, options);
 
         this.appContext = options.appContext;
-        this.worldManager = this.appContext?.worldManager;
-        this.uiElements = {
-            contentArea: panelElement.querySelector('#ruleRankContent'),
-        };
+        if (!this.appContext || !this.appContext.worldManager) {
+            console.error('RuleRankComponent: appContext or worldManager is null.');
+            return;
+        }
+        this.worldManager = this.appContext.worldManager;
 
-        this.throttler = new Throttler(() => this._actuallyRefreshViews(), Config.UI_UPDATE_THROTTLE_MS);
+        // --- Create the component's root element ---
+        this.element = document.createElement('div');
+        this.element.className = 'rule-rank-component-content';
+        
+        this.throttler = new Throttler(() => this.refresh(), Config.UI_UPDATE_THROTTLE_MS);
 
         this.lastRuleUsageHash = null;
         this.activationRuleItems = [];
         this.deactivationRuleItems = [];
 
         this.ruleItemPool = new ElementPool(() => this._createRuleItemElement());
-
-        this._setupInternalListeners();
-        this._setupPanelLayout();
-        if (!this.isHidden()) this.refreshViews();
+        
+        this.render();
+        this.refresh();
     }
 
-    _setupInternalListeners() {
+    // Method for the container to get this component's DOM
+    getElement() {
+        return this.element;
     }
 
-    _setupPanelLayout() {
-        this.uiElements.contentArea.innerHTML = `
+    render() {
+        this.element.innerHTML = `
             <div class="dual-rank-container">
                 <div class="rank-column" id="activation-rank">
                     <div class="rank-column-header">Activation Rules</div>
@@ -62,10 +64,61 @@ export class RuleRankPanel extends DraggablePanel {
                 </div>
             </div>
         `;
-        this.uiElements.activationRankContent = this.panelElement.querySelector('#activation-rank .rank-list-content');
-        this.uiElements.deactivationRankContent = this.panelElement.querySelector('#deactivation-rank .rank-list-content');
+
+        this.uiElements = {
+            activationRankContent: this.element.querySelector('#activation-rank .rank-list-content'),
+            deactivationRankContent: this.element.querySelector('#deactivation-rank .rank-list-content'),
+        };
     }
 
+    // Public method for containers to call to trigger a refresh
+    refresh() {
+        if (!this.worldManager) return;
+
+        const stats = this.worldManager.getSelectedWorldStats();
+        const ruleset = this.worldManager.getCurrentRulesetArray();
+        const ruleUsage = stats.ruleUsage;
+
+        if (!ruleUsage || !ruleset) {
+            this.element.querySelector('.dual-rank-container').innerHTML = '<p class="empty-state-text">No rule usage data available.</p>';
+            return;
+        }
+
+        const ruleUsageHash = Array.from(ruleUsage).join(',');
+        if (ruleUsageHash === this.lastRuleUsageHash) return;
+
+        this.lastRuleUsageHash = ruleUsageHash;
+
+        let totalActivationInvocations = 0;
+        let totalDeactivationInvocations = 0;
+        const activationRules = [];
+        const deactivationRules = [];
+
+        for (let i = 0; i < ruleUsage.length; i++) {
+            if (ruleUsage[i] > 0) {
+                const rule = { index: i, count: ruleUsage[i] };
+                if (ruleset[i] === 1) {
+                    activationRules.push(rule);
+                    totalActivationInvocations += rule.count;
+                } else {
+                    deactivationRules.push(rule);
+                    totalDeactivationInvocations += rule.count;
+                }
+            }
+        }
+
+        activationRules.sort((a, b) => b.count - a.count);
+        deactivationRules.sort((a, b) => b.count - a.count);
+
+        this._renderRankList(this.uiElements.activationRankContent, this.activationRuleItems, activationRules, totalActivationInvocations, ruleset);
+        this._renderRankList(this.uiElements.deactivationRankContent, this.deactivationRuleItems, deactivationRules, totalDeactivationInvocations, ruleset);
+    }
+    
+    // Schedule a throttled refresh. Called by external event listeners.
+    scheduleRefresh() {
+        this.throttler.schedule();
+    }
+    
     _createRuleItemElement() {
         const listItem = document.createElement('div');
         listItem.className = 'rank-list-item';
@@ -113,54 +166,6 @@ export class RuleRankPanel extends DraggablePanel {
         usageEl.innerHTML = `<div class="usage-percent">${usagePercent.toFixed(2)}%</div><div class="usage-count">${rule.count} calls</div>`;
     }
 
-    refreshViews() {
-        if (this.isHidden() || !this.worldManager) return;
-        this.throttler.schedule();
-    }
-
-    _actuallyRefreshViews() {
-        if (this.isHidden() || !this.worldManager) return;
-
-        const stats = this.worldManager.getSelectedWorldStats();
-        const ruleset = this.worldManager.getCurrentRulesetArray();
-        const ruleUsage = stats.ruleUsage;
-
-        if (!ruleUsage || !ruleset) {
-            this._setupPanelLayout();
-            this.uiElements.contentArea.querySelector('.dual-rank-container').innerHTML = '<p class="empty-state-text">No rule usage data available.</p>';
-            return;
-        }
-
-        const ruleUsageHash = Array.from(ruleUsage).join(',');
-        if (ruleUsageHash === this.lastRuleUsageHash) return;
-
-        this.lastRuleUsageHash = ruleUsageHash;
-
-        let totalActivationInvocations = 0;
-        let totalDeactivationInvocations = 0;
-        const activationRules = [];
-        const deactivationRules = [];
-
-        for (let i = 0; i < ruleUsage.length; i++) {
-            if (ruleUsage[i] > 0) {
-                const rule = { index: i, count: ruleUsage[i] };
-                if (ruleset[i] === 1) {
-                    activationRules.push(rule);
-                    totalActivationInvocations += rule.count;
-                } else {
-                    deactivationRules.push(rule);
-                    totalDeactivationInvocations += rule.count;
-                }
-            }
-        }
-
-        activationRules.sort((a, b) => b.count - a.count);
-        deactivationRules.sort((a, b) => b.count - a.count);
-
-        this._renderRankList(this.uiElements.activationRankContent, this.activationRuleItems, activationRules, totalActivationInvocations, ruleset);
-        this._renderRankList(this.uiElements.deactivationRankContent, this.deactivationRuleItems, deactivationRules, totalDeactivationInvocations, ruleset);
-    }
-
     _renderRankList(container, elementCache, rankedRules, totalInvocations, ruleset) {
         const topRules = rankedRules.slice(0, 20);
         while (elementCache.length > topRules.length) {
@@ -180,13 +185,8 @@ export class RuleRankPanel extends DraggablePanel {
         });
     }
 
-    show() {
-        super.show();
-        this.refreshViews();
-    }
-
     destroy() {
         this.throttler.destroy();
         super.destroy();
     }
-}
+} 

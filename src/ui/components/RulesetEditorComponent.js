@@ -1,59 +1,107 @@
-import { DraggablePanel } from './DraggablePanel.js';
+import { BaseComponent } from './BaseComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
-export class RulesetEditor extends DraggablePanel {
-    constructor(panelElement, options = {}) {
-        super(panelElement, { 
-            handleSelector: 'h3',
-            ...options, 
-            persistence: { identifier: 'ruleset' }
-        });
-
-        // Set up the onDragEnd callback after super() call
-        this.options.onDragEnd = () => this._saveEditorSettings();
-
+export class RulesetEditorComponent extends BaseComponent {
+    constructor(mountPoint, options = {}) {
+        super(mountPoint, options); 
+        
         const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
-            console.error('RulesetEditor: appContext or worldManager is null.');
+            console.error('RulesetEditorComponent: appContext or worldManager is null.');
             return;
         }
         
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
 
-        if (options.isMobile) {
-            const header = this.panelElement.querySelector('h3');
-            if (header) header.classList.add('hidden');
-            const closeButton = this.panelElement.querySelector('.close-panel-button');
-            if (closeButton) closeButton.classList.add('hidden');
-        }
-        this.uiElements = {
-            editorRulesetInput: panelElement.querySelector('#editorRulesetInput'),
-            clearRulesButton: panelElement.querySelector('#clearRulesButton'),
-            rulesetEditorMode: panelElement.querySelector('#rulesetEditorMode'),
-            rulesetEditorGrid: panelElement.querySelector('#rulesetEditorGrid'),
-            neighborCountRulesetEditorGrid: panelElement.querySelector('#neighborCountRulesetEditorGrid'),
-            rotationalSymmetryRulesetEditorGrid: panelElement.querySelector('#rotationalSymmetryRulesetEditorGrid'),
-            editorScopeSwitchMount: panelElement.querySelector('#editorScopeSwitchMount'),
-            editorResetSwitchMount: panelElement.querySelector('#editorResetSwitchMount'),
-        };
-
+        // Create the component's root element
+        this.element = document.createElement('div');
+        this.element.className = 'ruleset-editor-component-content';
+        
         this.cachedDetailedRules = [];
         this.cachedNeighborCountRules = [];
         this.cachedRotationalSymmetryRules = [];
         this.areGridsCreated = false;
         
-        
         this.scopeSwitch = null;
         this.resetSwitch = null;
 
+        this.render();
         this._loadEditorSettings();
         this._setupInternalListeners();
+        this.refresh();
+    }
+    
+    getElement() {
+        return this.element;
+    }
 
-        if (!this.isHidden()) this.refreshViews();
+    render() {
+        this.element.innerHTML = `
+            <div class="editor-controls">
+                <input type="text" id="editorRulesetInput" class="editor-hex-input"
+                    placeholder="32 hex chars (e.g., FFFFFF...000000)"
+                    title="Current ruleset hex code. Edit and press Enter or click away to apply."
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <button id="clearRulesButton" class="button"
+                    title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
+                <select id="rulesetEditorMode" title="Choose editor mode">
+                    <option value="detailed">Detailed (128 rules)</option>
+                    <option value="neighborCount">Neighbor Count (14 groups)</option>
+                    <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
+                </select>
+            </div>
+            <div class="editor-apply-scope-controls">
+                <div id="editorScopeSwitchMount"></div>
+                <div id="editorResetSwitchMount"></div>
+            </div>
+            <div class="panel-content-area">
+                <div id="rulesetEditorGrid" class="hidden"></div>
+                <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
+                <div id="rotationalSymmetryRulesetEditorGrid"></div>
+                <div class="editor-text">
+                    <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to
+                        propagate these changes.</p>
+                    <p>Click rule visualizations to toggle output states.</p>
+                    <div class="editor-text-rules">
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-0"></span></span> stays
+                            inactive</p>
+                        <p><span class="inline-hex state-0"><span class="inline-hex-inner state-1"></span></span>
+                            becomes active</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-0"></span></span>
+                            becomes inactive</p>
+                        <p><span class="inline-hex state-1"><span class="inline-hex-inner state-1"></span></span> stays
+                            active</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        this.uiElements = {
+            editorRulesetInput: this.element.querySelector('#editorRulesetInput'),
+            clearRulesButton: this.element.querySelector('#clearRulesButton'),
+            rulesetEditorMode: this.element.querySelector('#rulesetEditorMode'),
+            rulesetEditorGrid: this.element.querySelector('#rulesetEditorGrid'),
+            neighborCountRulesetEditorGrid: this.element.querySelector('#neighborCountRulesetEditorGrid'),
+            rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),
+            editorScopeSwitchMount: this.element.querySelector('#editorScopeSwitchMount'),
+            editorResetSwitchMount: this.element.querySelector('#editorResetSwitchMount'),
+        };
+    }
+
+    refresh() {
+        if (!this.worldManager) return;
+        if (!this.areGridsCreated) {
+            this._createAllGrids();
+        }
+        const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex();
+        if (this.uiElements.editorRulesetInput) {
+            this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
+        }
+        this._updateEditorGrids();
     }
 
     _createAllGrids() {
@@ -135,7 +183,7 @@ export class RulesetEditor extends DraggablePanel {
     _setupInternalListeners() {
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
-                this.refreshViews();
+                this._updateEditorGrids();
                 PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
             });
         }
@@ -252,7 +300,6 @@ export class RulesetEditor extends DraggablePanel {
                     const cb = parseInt(el.dataset.canonicalBitmask, 10);
                     const cs = parseInt(el.dataset.centerState, 10);
 
-
                     const canonicalDetails = wm.getCanonicalRuleDetails();
                     const detail = canonicalDetails.find(d => d.canonicalBitmask === cb && d.centerState === cs);
                     const currentOut = detail ? detail.effectiveOutput : 2;
@@ -260,18 +307,6 @@ export class RulesetEditor extends DraggablePanel {
                 }
             }));
         }
-    }
-
-    refreshViews() {
-        if (!this.worldManager || this.isHidden()) return;
-        if (!this.areGridsCreated) {
-            this._createAllGrids();
-        }
-        const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex();
-        if (this.uiElements.editorRulesetInput) {
-            this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
-        }
-        this._updateEditorGrids();
     }
 
     _updateEditorGrids() {
@@ -316,7 +351,6 @@ export class RulesetEditor extends DraggablePanel {
                 const effectiveOutput = this.worldManager.getEffectiveRuleForNeighborCount(cs, na);
                 const outputDisplay = effectiveOutput === 1 ? 'ON' : (effectiveOutput === 0 ? 'OFF' : 'MIXED');
                 
-                
                 innerHex.className = `hexagon inner-hex state-${effectiveOutput}`;
                 label.innerHTML = `C:${cs ? '<b>ON</b>' : 'OFF'}<br>${na}/6 N&rarr;${outputDisplay}`;
                 cacheIndex++;
@@ -342,52 +376,21 @@ export class RulesetEditor extends DraggablePanel {
 
     _saveEditorSettings() {
         if (this.uiElements.rulesetEditorMode) PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
-        if (this.uiElements.editorApplyScopeControls) PersistenceService.saveUISetting('editorRulesetApplyScope', this._getEditorModificationScope());
-        if (this.uiElements.editorAutoResetCheckbox) PersistenceService.saveUISetting('editorAutoReset', this.uiElements.editorAutoResetCheckbox.checked);
     }
 
     _loadEditorSettings() {
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
         }
-        
-        
-    }
-
-    show() {
-        this._createAllGrids();
-        super.show(); // Allow the parent DraggablePanel to make the panel visible
-        
-        // DraggablePanel adds the 'is-mobile-panel' class when in mobile mode.
-        // We leverage this to determine the context.
-        if (this.panelElement.classList.contains('is-mobile-panel')) {
-            const closeButton = this.panelElement.querySelector('.close-panel-button');
-            if (closeButton) {
-                // Force the button to be hidden in the mobile context.
-                closeButton.classList.add('hidden');
-            }
-        }
-        
-        this.refreshViews();
-        this._saveEditorSettings();
-    }
-
-    hide() {
-        super.hide();
-        this._saveEditorSettings();
-    }
-
-    toggle() {
-        this._createAllGrids();
-        const isVisible = super.toggle();
-        if (isVisible) {
-            this.refreshViews();
-        }
-        this._saveEditorSettings();
-        return isVisible;
     }
 
     destroy() {
-        super.destroy();
+        if (this.scopeSwitch) {
+            this.scopeSwitch.destroy?.();
+        }
+        if (this.resetSwitch) {
+            this.resetSwitch.destroy?.();
+        }
+        super.destroy?.();
     }
-}
+} 

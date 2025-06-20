@@ -8,7 +8,7 @@ import { RulesView } from './views/RulesView.js';
 import { MobileView } from './views/MobileView.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
-import { EditorView } from './views/EditorView.js';
+import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
@@ -138,8 +138,7 @@ export class UIManager {
             this.mobileViews.rules.render();
             // worlds view will be created dynamically when needed
             // analyze view will be created dynamically when needed
-            this.mobileViews.editor = new EditorView(mobileViewsContainer, panelManager);
-            this.mobileViews.editor.render();
+            // editor view will be created dynamically when needed
             // learning view will be created dynamically when needed
         }
 
@@ -422,6 +421,20 @@ export class UIManager {
                     mobileViewPresenter.render();
                     mobileViewPresenter.setContentComponent(analysisContent);
                     this.mobileViews.analyze = mobileViewPresenter;
+                }
+            }
+        }
+
+        // Handle dynamic creation of editor view
+        if (targetView === 'editor') {
+            if (!this.mobileViews.editor) {
+                const mobileViewsContainer = document.getElementById('mobile-views-container');
+                if (mobileViewsContainer) {
+                    const mobileViewPresenter = new MobileView(mobileViewsContainer, { title: 'Ruleset Editor' });
+                    const editorContent = new RulesetEditorComponent(null, { appContext: this.appContext });
+                    mobileViewPresenter.render();
+                    mobileViewPresenter.setContentComponent(editorContent);
+                    this.mobileViews.editor = mobileViewPresenter;
                 }
             }
         }
