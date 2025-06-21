@@ -12,6 +12,10 @@ export class ToolsBottomSheet extends BottomSheet {
         this.worldManager = appContext.worldManager;
         this.render();
         this.attachEventListeners();
+        
+        // Set up content container for reparenting after render
+        this.contentContainer = this.sheetContent.querySelector('#mobileControlsMount');
+        this.contentComponentType = ControlsComponent;
     }
 
     render() {
@@ -45,7 +49,11 @@ export class ToolsBottomSheet extends BottomSheet {
 
         this.setContent(content);
         const mobileControlsMount = content.querySelector('#mobileControlsMount');
-        this.controlsComponent = new ControlsComponent(mobileControlsMount, this.appContext, { context: 'mobile' });
+        if (mobileControlsMount) {
+            // Just ensure it's empty. The UIManager will handle populating it.
+            mobileControlsMount.innerHTML = '';
+        }
+        this.controlsComponent = null; // No longer needed
         this._initCustomizeFabsPane();
     }
 

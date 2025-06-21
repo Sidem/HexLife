@@ -14,6 +14,8 @@ import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
 import { generateShareUrl } from '../utils/utils.js';
+import { ControlsComponent } from './components/ControlsComponent.js';
+import { RuleRankComponent } from './components/RuleRankComponent.js';
 
 
 
@@ -28,6 +30,7 @@ export class UIManager {
         this.mobileViews = {};
         this.activeMobileViewName = 'simulate';
         this.managedComponents = [];
+        this.sharedComponents = {}; // NEW: Property to hold singleton instances
     }
 
     #mobileViewConfig = {
@@ -46,6 +49,17 @@ export class UIManager {
         const { appContext, appContext: { worldManager, panelManager, toolbar, onboardingManager, libraryController } } = this;
         const libraryData = libraryController.getLibraryData();
 
+        // NEW: Instantiate all shared components ONCE
+        this.sharedComponents = {
+            controls: new ControlsComponent(appContext),
+            rulesetActions: new RulesetActionsComponent(appContext, { libraryData }),
+            rulesetEditor: new RulesetEditorComponent(appContext),
+            worldSetup: new WorldSetupComponent(appContext),
+            analysis: new AnalysisComponent(appContext),
+            ruleRank: new RuleRankComponent(appContext),
+            learning: new LearningComponent(appContext)
+        };
+
         
         this.updateMode(false); 
         this.mediaQueryList.addEventListener('change', () => this.updateMode(true));
@@ -54,6 +68,7 @@ export class UIManager {
         const topInfoBar = new TopInfoBar(appContext);
         topInfoBar.init();
         toolbar.init();
+        panelManager.init(); // No longer needs libraryData
 
         const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
         keyboardManager.init();
@@ -210,6 +225,33 @@ export class UIManager {
         });
     }
 
+    // NEW: Method to handle reparenting
+    _placeComponentInView({ view, contentComponentType, contentContainer }) {
+        if (!contentComponentType || !contentContainer) return;
+
+        // Find the singleton component instance based on its constructor (type)
+        const componentToPlace = Object.values(this.sharedComponents).find(
+            component => component.constructor === contentComponentType
+        );
+
+        if (componentToPlace) {
+            // Clear the container first
+            contentContainer.innerHTML = '';
+            contentContainer.appendChild(componentToPlace.getElement());
+
+            // NEW: Apply context class for styling
+            const contextClass = this.isMobile() ? 'mobile-context' : 'desktop-context';
+            const oppositeClass = this.isMobile() ? 'desktop-context' : 'mobile-context';
+            componentToPlace.getElement().classList.add(contextClass);
+            componentToPlace.getElement().classList.remove(oppositeClass);
+
+            // Refresh component if it has a refresh method
+            if (typeof componentToPlace.refresh === 'function') {
+                componentToPlace.refresh();
+            }
+        }
+    }
+
     setupGlobalEventListeners() {
         
         EventBus.subscribe(EVENTS.TRIGGER_DOWNLOAD, (data) => downloadFile(data.filename, data.content, data.mimeType));
@@ -228,6 +270,11 @@ export class UIManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
+
+        // NEW: Add the listener for the VIEW_SHOWN event
+        EventBus.subscribe(EVENTS.VIEW_SHOWN, (data) => {
+            this._placeComponentInView(data);
+        });
         
         
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
@@ -309,6 +356,14 @@ export class UIManager {
             }
         });
         this.managedComponents = [];
+
+        // NEW: Destroy shared components
+        Object.values(this.sharedComponents).forEach(component => {
+            if (typeof component.destroy === 'function') {
+                component.destroy();
+            }
+        });
+        this.sharedComponents = {};
 
         Object.values(this.mobileViews).forEach(view => {
             if(typeof view.destroy === 'function') {
@@ -413,10 +468,6 @@ export class UIManager {
     #createMobileView(viewName) {
         // Check if view already exists
         if (this.mobileViews[viewName]) {
-            // Refresh learning component if needed
-            if (viewName === 'learning' && this.mobileViews.learning.contentComponent?.refreshTourList) {
-                this.mobileViews.learning.contentComponent.refreshTourList();
-            }
             return;
         }
 
@@ -425,22 +476,12 @@ export class UIManager {
 
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            // 1. Create the content component instance FIRST.
-            const contentComponent = new config.constructor(null, { 
-                appContext: this.appContext,
-                libraryData: this.appContext.libraryController.getLibraryData(),
-                context: 'mobile'
-            });
-
-            // 2. Create the MobileView, passing the contentComponent instance in its options.
+            // Create the MobileView shell without content component
             const presenter = new MobileView(mobileViewsContainer, { 
                 id: `${viewName}-mobile-view`,
                 title: config.title,
-                contentComponent: contentComponent // Pass the instance here
+                contentComponentType: config.constructor // Pass the constructor as type identifier
             });
-            
-            // 3. Now that the view is created, tell it to render the component's element.
-            presenter.setContentComponent(contentComponent);
             
             // Store the view
             this.mobileViews[viewName] = presenter;

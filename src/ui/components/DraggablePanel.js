@@ -4,7 +4,14 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class DraggablePanel extends Panel {
     constructor(panelElement, options = {}) {
-        // Pass all options up to the Panel constructor, which will handle contentComponent
+        // Find the content container within the panel element
+        const contentContainer = panelElement.querySelector('.panel-content-area');
+        // Pass it up to the Panel's options
+        if (contentContainer) {
+            options.contentContainer = contentContainer;
+        }
+
+        // Pass all options up to the Panel constructor
         super(panelElement, options);
         this.panelElement = panelElement;
         

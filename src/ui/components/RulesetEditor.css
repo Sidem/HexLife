@@ -1,6 +1,4 @@
-#rulesetEditorPanel {
-    width: clamp(320px, 90vw, 700px);
-}
+/* Panel size should be a property of the panel, not its content - removing this style */
 
 .editor-controls {
     display: flex;
@@ -335,19 +333,8 @@
     }
 }
 
-@media screen and (max-width: 768px) {
-    #rulesetEditorPanel {
-        /* Override fixed positioning and dimensions */
-        position: relative;
-        width: 100% !important;
-        height: 100% !important;
-        border: none;
-        box-shadow: none;
-        background-color: transparent;
-    }
-
-    #rulesetEditorPanel .panel-content-area {
-         /* Adjust padding/scrolling for mobile screen */
-        padding-right: 0;
-    }
+/* Let the UIManager's context class handle mobile styling */
+.ruleset-editor-component-content.mobile-context {
+    /* Add any mobile-specific layout styles for the component here */
+    padding-right: 0;
 }

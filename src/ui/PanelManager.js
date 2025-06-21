@@ -14,66 +14,38 @@ export class PanelManager {
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
         this.panels = {};
-
-        this.libraryData = null;
+        
+        // The config now just maps a name to a panel shell and identifies its content type
         this.panelConfig = [
-            { name: 'rulesetEditor', elementId: 'rulesetEditorPanel', constructor: DraggablePanel, contentComponent: RulesetEditorComponent, persistenceKey: 'ruleset', options: { handleSelector: 'h3' } },
-            { name: 'worldSetup', elementId: 'worldSetupPanel', constructor: DraggablePanel, contentComponent: WorldSetupComponent, persistenceKey: 'worldSetup', options: { handleSelector: 'h3' } },
-            { name: 'analysis', elementId: 'analysisPanel', constructor: DraggablePanel, contentComponent: AnalysisComponent, persistenceKey: 'analysis', options: { handleSelector: 'h3' } },
-            { name: 'ruleRankPanel', elementId: 'ruleRankPanel', constructor: DraggablePanel, contentComponent: RuleRankComponent, persistenceKey: 'ruleRank', options: { handleSelector: 'h3' } },
-            { name: 'learning', elementId: 'learningPanel', constructor: DraggablePanel, contentComponent: LearningComponent, persistenceKey: 'learning', options: { handleSelector: 'h3' } },
-            { name: 'rulesetActions', elementId: 'rulesetActionsPanel', constructor: DraggablePanel, contentComponent: RulesetActionsComponent, persistenceKey: 'rulesetActions', options: { handleSelector: 'h3' } }
+            { name: 'ruleset', elementId: 'rulesetEditorPanel', presenter: DraggablePanel, contentType: RulesetEditorComponent, options: { handleSelector: 'h3' } },
+            { name: 'worldsetup', elementId: 'worldSetupPanel', presenter: DraggablePanel, contentType: WorldSetupComponent, options: { handleSelector: 'h3' } },
+            { name: 'analysis', elementId: 'analysisPanel', presenter: DraggablePanel, contentType: AnalysisComponent, options: { handleSelector: 'h3' } },
+            { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, options: { handleSelector: 'h3' } },
+            { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, options: { handleSelector: 'h3' } },
+            { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, options: { handleSelector: 'h3' } }
         ];
     }
 
-    init(libraryData) {
-        this.libraryData = libraryData;
-
+    init() { // No longer needs libraryData
         this.panelConfig.forEach(config => {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
-                const PresenterClass = config.constructor;
-                
-                let contentInstance = null;
-                if (config.contentComponent) {
-                    contentInstance = new config.contentComponent(null, { 
-                        appContext: this.appContext, 
-                        libraryData: this.libraryData,
-                        context: 'desktop'
-                    });
-                }
+                const PresenterClass = config.presenter;
+                const contentContainer = panelElement.querySelector('.panel-content-area');
 
+                // Create the Panel/DraggablePanel SHELL.
+                // It does NOT get a content component instance anymore.
                 const presenterInstance = new PresenterClass(panelElement, {
-                    appContext: this.appContext,
                     ...config.options,
-                    persistence: { identifier: config.persistenceKey || config.name },
-                    contentComponent: contentInstance 
+                    persistence: { identifier: config.name },
+                    // Pass the constructor as a type identifier and the content mount point
+                    contentComponentType: config.contentType,
+                    contentContainer: contentContainer
                 });
 
-                if (config.contentComponent) {
-                    const contentContainer = panelElement.querySelector('.panel-content-area');
-                    if (contentContainer) {
-                        
-                        if (contentInstance) {
-                            contentContainer.innerHTML = '';
-                            const componentElement = contentInstance.getElement();
-                            if (componentElement) {
-                                contentContainer.appendChild(componentElement);
-                            } else {
-                                console.error(`Failed to get element from ${config.contentComponent.name} for panel ${config.name}`);
-                            }
-                            
-                            
-                            presenterInstance.contentComponent = contentInstance;
-                        }
-                    }
-                }
-                
-                
                 this.panels[config.name] = presenterInstance;
             }
         });
-
         this._setupEventListeners();
     }
     
@@ -81,34 +53,17 @@ export class PanelManager {
 
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
-            if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) {
-                const editorRulesetInput = document.getElementById('desktop-editorRulesetInput');
+            if (this.panels.ruleset && !this.panels.ruleset.isHidden()) {
+                const editorRulesetInput = document.getElementById('ruleset-editor-input');
                 if (document.activeElement !== editorRulesetInput) {
                     editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
                 }
-                this.panels.rulesetEditor.contentComponent?.refresh();
+                // The UIManager will handle refreshing the component when it's visible
             }
         });
         
-        EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, () => {
-            this.panels.ruleRankPanel?.contentComponent?.scheduleRefresh();
-        });
-
-        EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => {
-            this.panels.worldSetup?.contentComponent?.refresh();
-            this.panels.ruleRankPanel?.contentComponent?.scheduleRefresh();
-        });
-
-        EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => {
-            this.panels.worldSetup?.contentComponent?.refresh();
-        });
-
-        EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, () => {
-             if (this.panels.rulesetEditor && !this.panels.rulesetEditor.isHidden()) this.panels.rulesetEditor.contentComponent?.refresh();
-             if (this.panels.analysis && !this.panels.analysis.isHidden()) this.panels.analysis.contentComponent.refresh();
-             if (this.panels.ruleRankPanel && !this.panels.ruleRankPanel.isHidden()) this.panels.ruleRankPanel.contentComponent.refresh();
-        });
-
+        // Note: Component-specific events are now handled by the UIManager's shared components
+        // These events will be processed by the UIManager since it owns the singleton components
 
         
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {

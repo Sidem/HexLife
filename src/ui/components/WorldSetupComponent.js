@@ -7,17 +7,16 @@ import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class WorldSetupComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options); 
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
 
-        const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('WorldSetupComponent: appContext or worldManager is null.');
             return;
         }
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        this.context = this.options.context || 'desktop';
+        // No more this.context
         this.element = document.createElement('div');
         this.element.className = 'world-setup-component-content';
         
@@ -41,18 +40,13 @@ export class WorldSetupComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's ruleset and reset.</p>
-            <div id="${this.context}-world-config-grid" class="world-config-grid"></div>
-            <div id="${this.context}-panel-actions" class="panel-actions">
+            <div id="world-setup-config-grid" class="world-config-grid"></div>
+            <div id="world-setup-panel-actions" class="panel-actions">
                 <button class="button" data-action="apply-density-all">Apply Selected Density to All</button>
                 <button class="button" data-action="reset-densities">Reset Densities to Default</button>
                 <button class="button" data-action="reset-all-worlds">Apply & Reset All Enabled Worlds</button>
             </div>
         `;
-        
-        
-        if (this.mountPoint) {
-            this.mountPoint.appendChild(this.element);
-        }
         
         
         this.uiElements.worldSetupGrid = this.element.querySelector('.world-config-grid');
@@ -93,16 +87,17 @@ export class WorldSetupComponent extends BaseComponent {
             cell.innerHTML =
                 `<div class="world-label">World ${i}</div>` +
                 `<div class="ruleset-viz-container"></div>` +
-                `<div class="setting-control density-control"><div id="${this.context}-densitySliderMount_${i}"></div></div>` +
-                `<div class="setting-control enable-control"><div id="${this.context}-enableSwitchMount_${i}"></div></div>` +
+                `<div class="setting-control density-control"><div id="world-setup-density-slider-mount-${i}"></div></div>` +
+                `<div class="setting-control enable-control"><div id="world-setup-enable-switch-mount-${i}"></div></div>` +
                 `<button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>`;
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');
-            const sliderMount = cell.querySelector(`#${this.context}-densitySliderMount_${i}`);
-            const enableSwitchMount = cell.querySelector(`#${this.context}-enableSwitchMount_${i}`);
+            const sliderMount = cell.querySelector(`#world-setup-density-slider-mount-${i}`);
+            const enableSwitchMount = cell.querySelector(`#world-setup-enable-switch-mount-${i}`);
 
             const densitySlider = new SliderComponent(sliderMount, {
-                id: `${this.context}-densitySlider_${i}`, label: 'Density:', min: 0, max: 1, step: 0.001,
+                id: `world-setup-density-slider-${i}`, // Static ID with index
+                label: 'Density:', min: 0, max: 1, step: 0.001,
                 value: 0.5, unit: '', showValue: true,
                 onChange: (newDensity) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
@@ -111,7 +106,7 @@ export class WorldSetupComponent extends BaseComponent {
 
             const enableSwitch = new SwitchComponent(enableSwitchMount, {
                 type: 'checkbox',
-                name: `${this.context}-enableSwitch_${i}`,
+                name: `world-setup-enable-switch-${i}`, // Static name with index
                 initialValue: true,
                 items: [{ value: 'enabled', text: 'Enabled' }],
                 onChange: (isEnabled) => {

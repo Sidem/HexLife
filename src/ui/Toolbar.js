@@ -72,7 +72,17 @@ export class Toolbar {
             const buttonElement = this.uiElements[config.buttonId];
             const popoutElement = this.uiElements[config.popoutId];
             if (buttonElement && popoutElement) {
-                this.popoutPanels[config.name] = new PopoutPanel(popoutElement, buttonElement, config.options);
+                // Special handling for controls popout to support reparenting
+                const options = { ...config.options };
+                if (config.name === 'controls') {
+                    const controlsMount = popoutElement.querySelector('#desktopControlsMount');
+                    if (controlsMount) {
+                        options.contentContainer = controlsMount;
+                        options.contentComponentType = ControlsComponent;
+                    }
+                }
+                
+                this.popoutPanels[config.name] = new PopoutPanel(popoutElement, buttonElement, options);
             }
         });
         this.activePopouts = Object.values(this.popoutPanels);
@@ -86,7 +96,8 @@ export class Toolbar {
         
         const desktopControlsMount = this.uiElements.controlsPopout.querySelector('#desktopControlsMount');
         if (desktopControlsMount) {
-            new ControlsComponent(desktopControlsMount, this.appContext, { context: 'desktop' });
+            // The mount point is now empty. The UIManager will fill it.
+            desktopControlsMount.innerHTML = '';
         }
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
@@ -100,12 +111,12 @@ export class Toolbar {
         const buttonToActionMap = {
             playPauseButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE),
             controlsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'controls' }),
-            rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }),
+            rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }),
             resetClearButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'resetClear' }),
-            editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor' }),
+            editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }),
             analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }),
-            rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleRankPanel' }),
-            setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup' }),
+            rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulerank' }),
+            setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }),
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),

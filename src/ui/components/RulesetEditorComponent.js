@@ -5,10 +5,9 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
 export class RulesetEditorComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options); 
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
         
-        const appContext = options.appContext;
         if (!appContext || !appContext.worldManager) {
             console.error('RulesetEditorComponent: appContext or worldManager is null.');
             return;
@@ -16,7 +15,7 @@ export class RulesetEditorComponent extends BaseComponent {
         
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        this.context = this.options.context || 'desktop';
+        // No more this.context
 
         
         this.element = document.createElement('div');
@@ -43,21 +42,21 @@ export class RulesetEditorComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <div class="editor-controls">
-                <input type="text" id="${this.context}-editorRulesetInput" class="editor-hex-input"
+                <input type="text" id="ruleset-editor-input" class="editor-hex-input"
                     placeholder="32 hex chars (e.g., FFFFFF...000000)"
                     title="Current ruleset hex code. Edit and press Enter or click away to apply."
                     autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <button id="${this.context}-clearRulesButton" class="button"
+                <button id="ruleset-editor-clear-button" class="button"
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
-                <select id="${this.context}-rulesetEditorMode" title="Choose editor mode">
+                <select id="ruleset-editor-mode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
                 </select>
             </div>
             <div class="editor-apply-scope-controls">
-                <div id="editorScopeSwitchMount"></div>
-                <div id="editorResetSwitchMount"></div>
+                <div id="ruleset-editor-scope-switch-mount"></div>
+                <div id="ruleset-editor-reset-switch-mount"></div>
             </div>
             <div class="panel-content-area">
                 <div id="rulesetEditorGrid" class="hidden"></div>
@@ -82,14 +81,14 @@ export class RulesetEditorComponent extends BaseComponent {
         `;
         
         this.uiElements = {
-            editorRulesetInput: this.element.querySelector(`#${this.context}-editorRulesetInput`),
-            clearRulesButton: this.element.querySelector(`#${this.context}-clearRulesButton`),
-            rulesetEditorMode: this.element.querySelector(`#${this.context}-rulesetEditorMode`),
+            editorRulesetInput: this.element.querySelector(`#ruleset-editor-input`),
+            clearRulesButton: this.element.querySelector(`#ruleset-editor-clear-button`),
+            rulesetEditorMode: this.element.querySelector(`#ruleset-editor-mode`),
             rulesetEditorGrid: this.element.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: this.element.querySelector('#neighborCountRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),
-            editorScopeSwitchMount: this.element.querySelector('#editorScopeSwitchMount'),
-            editorResetSwitchMount: this.element.querySelector('#editorResetSwitchMount'),
+            editorScopeSwitchMount: this.element.querySelector('#ruleset-editor-scope-switch-mount'),
+            editorResetSwitchMount: this.element.querySelector('#ruleset-editor-reset-switch-mount'),
         };
     }
 
@@ -194,7 +193,7 @@ export class RulesetEditorComponent extends BaseComponent {
             this.scopeSwitch = new SwitchComponent(this.uiElements.editorScopeSwitchMount, {
                 label: 'Apply changes to:',
                 type: 'radio',
-                name: 'editorApplyScope',
+                name: 'ruleset-editor-apply-scope', // Static name
                 initialValue: initialScope,
                 items: [
                     { value: 'selected', text: 'Selected World' },
@@ -211,7 +210,7 @@ export class RulesetEditorComponent extends BaseComponent {
         if (this.uiElements.editorResetSwitchMount) {
             this.resetSwitch = new SwitchComponent(this.uiElements.editorResetSwitchMount, {
                 type: 'checkbox',
-                name: 'editorAutoReset',
+                name: 'ruleset-editor-auto-reset', // Static name
                 initialValue: initialReset,
                 items: [{ value: 'reset', text: 'Auto-Reset on Change' }],
                 onChange: (isChecked) => {

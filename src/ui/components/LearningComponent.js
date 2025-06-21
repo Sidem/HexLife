@@ -3,10 +3,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options);
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
 
-        this.appContext = options.appContext;
+        this.appContext = appContext;
         if (!this.appContext) {
             console.error('LearningComponent: appContext was not provided.');
             return;

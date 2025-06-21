@@ -19,8 +19,13 @@ export class MobileView extends Panel {
 
         // 4. Now, populate the inner HTML of our panel.
         this.title = options.title || 'Mobile View';
-        this.contentComponent = null;
         this._renderInnerContent();
+        
+        // 5. Set up the content container for reparenting
+        if (options.contentComponentType) {
+            this.contentComponentType = options.contentComponentType;
+            this.contentContainer = this.panelElement.querySelector('.mobile-view-content');
+        }
     }
 
     /**
@@ -55,18 +60,12 @@ export class MobileView extends Panel {
     }
 
     setContentComponent(component) {
-        this.contentComponent = component;
-        if (component && component.getElement) {
-            this.setContent(component.getElement());
-        }
+        // This method is deprecated - components are now managed by UIManager
+        console.warn('MobileView.setContentComponent is deprecated. Components are now managed by UIManager.');
     }
 
     show() {
-        super.show(); // This now handles removing 'hidden' and dispatching the event
-        
-        if (this.contentComponent && this.contentComponent.refresh) {
-            this.contentComponent.refresh();
-        }
+        super.show(); // This handles removing 'hidden' and dispatching the VIEW_SHOWN event for reparenting
     }
 
     // show() and hide() are now correctly inherited from Panel.js and can be removed from this file.

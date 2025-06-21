@@ -5,10 +5,10 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
 
 export class RulesetActionsComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options);
-        this.appContext = options.appContext;
-        this.context = options.context || 'shared';
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
+        this.appContext = appContext;
+        // No more this.context
         this.libraryData = options.libraryData;
         this.sliders = {};
         this.switches = {};
@@ -27,24 +27,24 @@ export class RulesetActionsComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <div class="ruleset-actions-header">
-                <button id="${this.context}-generate-tab" class="ruleset-actions-segment active" data-pane="generate">Generate</button>
-                <button id="${this.context}-mutate-tab" class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
-                <button id="${this.context}-library-tab" class="ruleset-actions-segment" data-pane="library">Library</button>
-                <button id="${this.context}-direct-tab" class="ruleset-actions-segment" data-pane="direct">Direct</button>
+                <button id="ruleset-actions-generate-tab" class="ruleset-actions-segment active" data-pane="generate">Generate</button>
+                <button id="ruleset-actions-mutate-tab" class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
+                <button id="ruleset-actions-library-tab" class="ruleset-actions-segment" data-pane="library">Library</button>
+                <button id="ruleset-actions-direct-tab" class="ruleset-actions-segment" data-pane="direct">Direct</button>
             </div>
             <div class="ruleset-actions-content">
-                <div id="${this.context}-generate-pane" class="ruleset-pane"></div>
-                <div id="${this.context}-mutate-pane" class="ruleset-pane hidden"></div>
-                <div id="${this.context}-library-pane" class="ruleset-pane hidden"></div>
-                <div id="${this.context}-direct-pane" class="ruleset-pane hidden"></div>
+                <div id="ruleset-actions-generate-pane" class="ruleset-pane"></div>
+                <div id="ruleset-actions-mutate-pane" class="ruleset-pane hidden"></div>
+                <div id="ruleset-actions-library-pane" class="ruleset-pane hidden"></div>
+                <div id="ruleset-actions-direct-pane" class="ruleset-pane hidden"></div>
             </div>
         `;
 
         this.panes = {
-            generate: this.element.querySelector(`#${this.context}-generate-pane`),
-            mutate: this.element.querySelector(`#${this.context}-mutate-pane`),
-            library: this.element.querySelector(`#${this.context}-library-pane`),
-            direct: this.element.querySelector(`#${this.context}-direct-pane`),
+            generate: this.element.querySelector(`#ruleset-actions-generate-pane`),
+            mutate: this.element.querySelector(`#ruleset-actions-mutate-pane`),
+            library: this.element.querySelector(`#ruleset-actions-library-pane`),
+            direct: this.element.querySelector(`#ruleset-actions-direct-pane`),
         };
 
         this.segments = {
@@ -65,47 +65,47 @@ export class RulesetActionsComponent extends BaseComponent {
         const controllerState = this.appContext.rulesetActionController.getState();
         
         pane.innerHTML = `
-            <div class="form-group" id="${this.context}-gen-mode-mount"></div>
+            <div class="form-group" id="ruleset-actions-gen-mode-mount"></div>
             <div class="form-group bias-controls">
-                <input type="checkbox" id="${this.context}-use-custom-bias" class="checkbox-input" checked>
-                <label for="${this.context}-use-custom-bias" class="checkbox-label">Custom Bias:</label>
-                <div id="${this.context}-bias-slider-mount"></div>
+                <input type="checkbox" id="ruleset-actions-use-custom-bias" class="checkbox-input" checked>
+                <label for="ruleset-actions-use-custom-bias" class="checkbox-label">Custom Bias:</label>
+                <div id="ruleset-actions-bias-slider-mount"></div>
             </div>
-            <div class="form-group" id="${this.context}-gen-scope-mount"></div>
-            <div class="form-group" id="${this.context}-gen-reset-mount"></div>
+            <div class="form-group" id="ruleset-actions-gen-scope-mount"></div>
+            <div class="form-group" id="ruleset-actions-gen-reset-mount"></div>
             <button class="button action-button" data-action="generate">Generate New Ruleset</button>
         `;
 
-        new SwitchComponent(pane.querySelector(`#${this.context}-gen-mode-mount`), {
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-mode-mount`), {
             label: 'Generation Mode:', 
             type: 'radio', 
-            name: `${this.context}-gen-mode`,
+            name: `ruleset-actions-gen-mode`, // Static name
             initialValue: controllerState.genMode,
             items: this.appContext.rulesetActionController.getGenerationConfig(),
             onChange: this.appContext.rulesetActionController.setGenMode
         });
         
-        this.sliders.bias = new SliderComponent(pane.querySelector(`#${this.context}-bias-slider-mount`), {
+        this.sliders.bias = new SliderComponent(pane.querySelector(`#ruleset-actions-bias-slider-mount`), {
             ...this.appContext.rulesetActionController.getBiasSliderConfig(),
-            id: `${this.context}-bias-slider`, 
+            id: `ruleset-actions-bias-slider`, // Static ID
             value: controllerState.bias,
             disabled: !controllerState.useCustomBias
         });
 
-        new SwitchComponent(pane.querySelector(`#${this.context}-gen-scope-mount`), {
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-scope-mount`), {
             ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
-            name: `${this.context}-gen-scope`, 
+            name: `ruleset-actions-gen-scope`, // Static name
             initialValue: controllerState.genScope,
         });
 
-        new SwitchComponent(pane.querySelector(`#${this.context}-gen-reset-mount`), {
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-reset-mount`), {
             ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
-            name: `${this.context}-gen-reset`, 
+            name: `ruleset-actions-gen-reset`, // Static name
             initialValue: controllerState.genAutoReset,
         });
 
         
-        const biasCheckbox = pane.querySelector(`#${this.context}-use-custom-bias`);
+        const biasCheckbox = pane.querySelector(`#ruleset-actions-use-custom-bias`);
         biasCheckbox.checked = controllerState.useCustomBias;
         biasCheckbox.addEventListener('change', e => {
             this.appContext.rulesetActionController.setUseCustomBias(e.target.checked);
@@ -118,9 +118,9 @@ export class RulesetActionsComponent extends BaseComponent {
         const controllerState = this.appContext.rulesetActionController.getState();
         
         pane.innerHTML = `
-            <div class="form-group" id="${this.context}-mutate-rate-mount"></div>
-            <div class="form-group" id="${this.context}-mutate-mode-mount"></div>
-            <div class="form-group" id="${this.context}-mutate-scope-mount"></div>
+            <div class="form-group" id="ruleset-actions-mutate-rate-mount"></div>
+            <div class="form-group" id="ruleset-actions-mutate-mode-mount"></div>
+            <div class="form-group" id="ruleset-actions-mutate-scope-mount"></div>
             <div class="form-group-buttons">
                 <button class="button" data-action="mutate">Mutate</button>
                 <button class="button" data-action="clone">Clone</button>
@@ -128,25 +128,25 @@ export class RulesetActionsComponent extends BaseComponent {
             </div>
         `;
         
-        new SliderComponent(pane.querySelector(`#${this.context}-mutate-rate-mount`), {
+        new SliderComponent(pane.querySelector(`#ruleset-actions-mutate-rate-mount`), {
             ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
-            id: `${this.context}-mutate-rate`, 
+            id: `ruleset-actions-mutate-rate`, // Static ID
             value: controllerState.mutateRate,
         });
 
-        new SwitchComponent(pane.querySelector(`#${this.context}-mutate-mode-mount`), {
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-mode-mount`), {
             label: 'Mutation Mode:', 
             type: 'radio', 
-            name: `${this.context}-mutate-mode`,
+            name: `ruleset-actions-mutate-mode`, // Static name
             initialValue: controllerState.mutateMode,
             items: this.appContext.rulesetActionController.getMutationModeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateMode
         });
 
-        new SwitchComponent(pane.querySelector(`#${this.context}-mutate-scope-mount`), {
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-scope-mount`), {
             label: 'Apply to:',
             type: 'radio',
-            name: `${this.context}-mutate-scope`,
+            name: `ruleset-actions-mutate-scope`, // Static name
             initialValue: controllerState.mutateScope,
             items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
@@ -160,14 +160,14 @@ export class RulesetActionsComponent extends BaseComponent {
                 <button class="sub-tab-button active" data-sub-pane="rulesets">Rulesets</button>
                 <button class="sub-tab-button" data-sub-pane="patterns">Patterns</button>
             </div>
-            <div id="${this.context}-library-rulesets-content" class="library-list"></div>
-            <div id="${this.context}-library-patterns-content" class="library-list hidden"></div>
+            <div id="ruleset-actions-library-rulesets-content" class="library-list"></div>
+            <div id="ruleset-actions-library-patterns-content" class="library-list hidden"></div>
         `;
         
         // Populate static content once
         if (!this.libraryData) return;
 
-        const rulesetsList = this.element.querySelector(`#${this.context}-library-rulesets-content`);
+        const rulesetsList = this.element.querySelector(`#ruleset-actions-library-rulesets-content`);
         if (rulesetsList && this.libraryData.rulesets) {
             this.libraryData.rulesets.forEach(rule => {
                 const item = document.createElement('div');
@@ -175,13 +175,13 @@ export class RulesetActionsComponent extends BaseComponent {
                 item.innerHTML = `
                     <div class="name">${rule.name}</div>
                     <div class="description">${rule.description}</div>
-                    <button id="${this.context}-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
+                    <button id="ruleset-actions-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
                 `;
                 rulesetsList.appendChild(item);
             });
         }
 
-        const patternsList = this.element.querySelector(`#${this.context}-library-patterns-content`);
+        const patternsList = this.element.querySelector(`#ruleset-actions-library-patterns-content`);
         if (patternsList && this.libraryData.patterns) {
             this.libraryData.patterns.forEach(pattern => {
                 const item = document.createElement('div');
@@ -199,7 +199,7 @@ export class RulesetActionsComponent extends BaseComponent {
     _renderDirectPane() {
         const mountPoint = this.panes.direct;
         mountPoint.innerHTML = '';
-        new RulesetDirectInput(mountPoint, this.appContext, { context: `${this.context}-direct` });
+        new RulesetDirectInput(mountPoint, this.appContext, { context: `ruleset-actions-direct` });
     }
 
     attachEventListeners() {
@@ -209,14 +209,14 @@ export class RulesetActionsComponent extends BaseComponent {
             }
         });
 
-        const libraryPane = this.element.querySelector(`#${this.context}-library-pane`);
+        const libraryPane = this.element.querySelector(`#ruleset-actions-library-pane`);
         libraryPane.addEventListener('click', e => {
             const target = e.target;
             if (target.matches('.sub-tab-button')) {
                 libraryPane.querySelectorAll('.sub-tab-button').forEach(b => b.classList.remove('active'));
                 target.classList.add('active');
                 libraryPane.querySelectorAll('.library-list').forEach(p => p.classList.add('hidden'));
-                libraryPane.querySelector(`#${this.context}-library-${target.dataset.subPane}-content`).classList.remove('hidden');
+                libraryPane.querySelector(`#ruleset-actions-library-${target.dataset.subPane}-content`).classList.remove('hidden');
             } else if (target.matches('[data-action="load-rule"]')) {
                 const controllerState = this.appContext.rulesetActionController.getState();
                 this.appContext.libraryController.loadRuleset(
@@ -236,7 +236,7 @@ export class RulesetActionsComponent extends BaseComponent {
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
         
-        const mutatePane = this.element.querySelector(`#${this.context}-mutate-pane`);
+        const mutatePane = this.element.querySelector(`#ruleset-actions-mutate-pane`);
         mutatePane.querySelector('[data-action="mutate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);

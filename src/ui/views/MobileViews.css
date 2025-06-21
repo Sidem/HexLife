@@ -72,23 +72,9 @@
     flex-grow: 1;
 }
 
-/* This makes the RulesetEditor panel display correctly inside its mobile view */
-#editor-view #rulesetEditorPanel {
-    position: relative; /* Override fixed positioning */
-    width: 100% !important;
-    height: 100% !important;
-    top: 0 !important;
-    left: 0 !important;
-    transform: none !important;
-    border: none;
-    box-shadow: none;
-    background-color: transparent;
-    display: flex; /* Ensure it's visible */
-    flex-direction: column;
-}
-
-#editor-view #rulesetEditorPanel .panel-content-area {
+/* Use component-based selectors instead of panel-specific ones */
+#editor-view .ruleset-editor-component-content {
     /* Ensure content area is scrollable within the mobile view */
-    flex-grow: 1;
+    height: 100%;
     overflow-y: auto;
 }

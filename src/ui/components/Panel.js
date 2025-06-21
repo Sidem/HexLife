@@ -5,20 +5,21 @@ export class Panel extends BaseComponent {
     constructor(mountPoint, options = {}) {
         super(mountPoint, options);
         this.panelElement = this.mountPoint;
-        // Make the base class aware of the content component from its options
-        this.contentComponent = options.contentComponent || null;
+        this.contentComponentType = options.contentComponentType || null; // Store the type identifier
+        // This will be set by subclasses that have a specific content area
+        this.contentContainer = options.contentContainer || this.panelElement;
     }
 
     show() {
         if (this.panelElement && this.isHidden()) {
             this.panelElement.classList.remove('hidden');
-            // Unified event dispatch
+            // Dispatch a richer event for the UIManager
             EventBus.dispatch(EVENTS.VIEW_SHOWN, {
-                view: this,
-                viewType: this.options.viewType || 'panel',
-                viewName: this.options.persistence?.identifier || this.panelElement.id || 'unknown',
-                // Add the content component instance to the event payload
-                contentComponent: this.contentComponent
+                view: this, // The Panel instance itself
+                // The UIManager will use this to know WHAT component to place
+                contentComponentType: this.contentComponentType,
+                // The UIManager will use this to know WHERE to place the component
+                contentContainer: this.contentContainer
             });
         }
         if (this.options.persistence) {

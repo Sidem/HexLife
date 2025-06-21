@@ -18,10 +18,10 @@ class ElementPool {
 }
 
 export class RuleRankComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options);
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
 
-        this.appContext = options.appContext;
+        this.appContext = appContext;
         if (!this.appContext || !this.appContext.worldManager) {
             console.error('RuleRankComponent: appContext or worldManager is null.');
             return;

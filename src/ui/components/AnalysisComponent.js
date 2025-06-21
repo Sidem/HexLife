@@ -7,9 +7,8 @@ import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 export class AnalysisComponent extends BaseComponent {
-    constructor(mountPoint, options = {}) {
-        super(mountPoint, options); 
-        const appContext = options.appContext;
+    constructor(appContext, options = {}) {
+        super(null, options); // No mountPoint
         if (!appContext || !appContext.worldManager) {
             console.error('AnalysisComponent: appContext or worldManager is null.');
             return;

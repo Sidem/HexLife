@@ -172,20 +172,11 @@
     margin: 0;
 }
 
-/* Panel specific styles */
-#analysisPanel {
-    width: clamp(400px, 60vw, 550px);
-}
+/* Panel size should be managed by the panel, not the component */
+/* Removed panel-specific width constraints */
 
-/* Mobile Overrides */
-@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
-    #analysisPanel { 
-        width: clamp(300px, 80vw, 400px); 
-    }
-}
-
-@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
-     #analysisPanel {
-         width: clamp(250px, 90vw, 300px);
-     }
+/* Use component-based styling for mobile context */
+.analysis-component-content.mobile-context {
+    /* Mobile-specific layout styles for the component */
+    padding: 0;
 } 

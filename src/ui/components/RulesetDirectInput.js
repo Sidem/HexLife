@@ -14,7 +14,7 @@ export class RulesetDirectInput extends BaseComponent {
         this.element = document.createElement('div');
         this.element.className = 'ruleset-direct-input-container';
 
-        const inputId = `${this.context}-ruleset-input`;
+        const inputId = `ruleset-input`;
         this.element.innerHTML = `
             <div class="form-group">
                 <label for="${inputId}">Paste 32-character Hex Code</label>
