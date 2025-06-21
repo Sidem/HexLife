@@ -12,15 +12,6 @@ export class LearningComponent extends BaseComponent {
             return;
         }
 
-        this.element = document.createElement('div');
-        this.element.className = 'learning-component-content';
-        this.element.innerHTML = `
-            <p class="editor-text info-text" style="text-align: left;">Replay any tutorial to learn more about the explorer's features. Your progress is saved automatically.</p>
-            <ul class="learning-center-list"></ul>
-        `;
-
-        this.tourListElement = this.element.querySelector('.learning-center-list');
-
         // --- UPDATED: Unified tour list ---
         // This list no longer needs device-specific flags. Each tour is now adaptive.
         this.availableTours = [
@@ -33,13 +24,44 @@ export class LearningComponent extends BaseComponent {
             // { id: 'worlds', name: 'Tutorial: World Setup' },
             // { id: 'file_management', name: 'Tutorial: Save, Load & Share' },
         ];
+        
+        this.tourItemCache = {};
 
-        this._setupEventListeners();
-        this.refreshTourList();
+        this.render(); // Builds the component DOM
+        this.refreshTourList(); // Populates initial dynamic state
     }
 
     getElement() {
         return this.element;
+    }
+
+    render() {
+        this.element = document.createElement('div');
+        this.element.className = 'learning-component-content';
+        this.element.innerHTML = `
+            <p class="editor-text info-text" style="text-align: left;">Replay any tutorial to learn more about the explorer's features. Your progress is saved automatically.</p>
+            <ul class="learning-center-list"></ul>
+        `;
+
+        this.tourListElement = this.element.querySelector('.learning-center-list');
+        
+        this.availableTours.forEach(tour => {
+            const li = document.createElement('li');
+            li.className = 'learning-center-item';
+            li.innerHTML = `
+                <span class="status-icon">🎓</span>
+                <span class="tour-name">${tour.name}</span>
+                <button class="button tour-start-button" data-tour-name="${tour.id}">Start</button>
+            `;
+            
+            this.tourItemCache[tour.id] = {
+                statusIcon: li.querySelector('.status-icon'),
+                startButton: li.querySelector('.tour-start-button')
+            };
+            this.tourListElement.appendChild(li);
+        });
+
+        this._setupEventListeners();
     }
 
     _setupEventListeners() {
@@ -59,23 +81,15 @@ export class LearningComponent extends BaseComponent {
     refreshTourList() {
         if (!this.tourListElement || !this.appContext.uiManager) return;
 
-        this.tourListElement.innerHTML = '';
         const completedTours = PersistenceService.loadOnboardingStates();
 
-        // --- UPDATED: Simplified rendering logic ---
-        // No longer needs to filter by device, as tours are unified.
         this.availableTours.forEach(tour => {
             const isCompleted = completedTours[tour.id];
-            const li = document.createElement('li');
-            li.className = 'learning-center-item';
-            li.innerHTML = `
-                <span class="status-icon">${isCompleted ? '✅' : '🎓'}</span>
-                <span class="tour-name">${tour.name}</span>
-                <button class="button tour-start-button" data-tour-name="${tour.id}">
-                    ${isCompleted ? 'Replay' : 'Start'}
-                </button>
-            `;
-            this.tourListElement.appendChild(li);
+            const cache = this.tourItemCache[tour.id];
+            if (cache) {
+                cache.statusIcon.textContent = isCompleted ? '✅' : '🎓';
+                cache.startButton.textContent = isCompleted ? 'Replay' : 'Start';
+            }
         });
     }
 

@@ -9,6 +9,7 @@ export class TopInfoBar {
         this.worldManager = appContext.worldManager;
         this.uiElements = null;
         this.popoutPanels = {};
+        this.historyItemCache = []; // Add cache for DOM elements
     }
 
     init() {
@@ -70,40 +71,56 @@ export class TopInfoBar {
         this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
         EventBus.subscribe(EVENTS.VIEW_SHOWN, (data) => {
             if (data.view === this.popoutPanels.history) {
-                this._updateHistoryPopout();
+                this._efficientUpdateHistoryPopout();
             }
         });
         EventBus.subscribe(EVENTS.HISTORY_CHANGED, (data) => {
             if (data.worldIndex === this.worldManager.getSelectedWorldIndex() && this.popoutPanels.history && !this.popoutPanels.history.isHidden()) {
-                this._updateHistoryPopout();
+                this._efficientUpdateHistoryPopout();
             }
         });
     }
-    _updateHistoryPopout() {
+    _efficientUpdateHistoryPopout() {
         const listContainer = this.uiElements.historyPopout.querySelector('#historyList');
         if (!listContainer) return;
-        const selectedIndex = this.worldManager.getSelectedWorldIndex();
-        const { history } = this.worldManager.getRulesetHistoryArrays(selectedIndex);
-        const currentIndex = history.length - 1;
+
+        const { history } = this.worldManager.getRulesetHistoryArrays(this.worldManager.getSelectedWorldIndex());
+        const reversedHistory = history.slice().reverse();
+
+        // Ensure cache is the correct size
+        while (this.historyItemCache.length < reversedHistory.length) {
+            const newItem = document.createElement('div');
+            newItem.className = 'history-item';
+            this.historyItemCache.push(newItem);
+        }
+
+        // Hide all elements in the container to start
         listContainer.innerHTML = '';
-        history.slice().reverse().forEach((hex, index) => {
-            const reversedIndex = history.length - 1 - index;
-            const item = document.createElement('div');
-            item.className = 'history-item';
+
+        // Update and show the necessary elements from the cache
+        reversedHistory.forEach((hex, index) => {
+            const item = this.historyItemCache[index];
             item.textContent = formatHexCode(hex);
-            if (reversedIndex === currentIndex) {
-                item.classList.add('is-current');
+            
+            // Clone node to safely remove all previous event listeners
+            const newItem = item.cloneNode(true);
+            this.historyItemCache[index] = newItem;
+
+            if (index === 0) { // First item in reversed list is the current one
+                newItem.classList.add('is-current');
                 const tag = document.createElement('span');
                 tag.className = 'tag';
                 tag.textContent = 'Current';
-                item.appendChild(tag);
+                newItem.appendChild(tag);
             } else {
-                item.addEventListener('click', () => {
-                    EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, { worldIndex: selectedIndex, historyIndex: reversedIndex });
+                newItem.classList.remove('is-current');
+                newItem.addEventListener('click', () => {
+                    const originalIndex = history.length - 1 - index;
+                    EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), historyIndex: originalIndex });
                     this.popoutPanels.history.hide();
                 });
             }
-            listContainer.appendChild(item);
+            listContainer.appendChild(newItem);
         });
     }
     updateMainRulesetDisplay(hex) {

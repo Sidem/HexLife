@@ -56,7 +56,7 @@ export class RulesetActionsComponent extends BaseComponent {
 
         this._renderGeneratePane();
         this._renderMutatePane();
-        this._renderLibraryPane();
+        this._createLibraryPane(); // Changed from _renderLibraryPane
         this._renderDirectPane();
     }
 
@@ -153,7 +153,7 @@ export class RulesetActionsComponent extends BaseComponent {
         });
     }
 
-    _renderLibraryPane() {
+    _createLibraryPane() {
         const pane = this.panes.library;
         pane.innerHTML = `
             <div class="library-sub-tabs">
@@ -163,9 +163,37 @@ export class RulesetActionsComponent extends BaseComponent {
             <div id="${this.context}-library-rulesets-content" class="library-list"></div>
             <div id="${this.context}-library-patterns-content" class="library-list hidden"></div>
         `;
-
         
-        this.populateLibraryData();
+        // Populate static content once
+        if (!this.libraryData) return;
+
+        const rulesetsList = this.element.querySelector(`#${this.context}-library-rulesets-content`);
+        if (rulesetsList && this.libraryData.rulesets) {
+            this.libraryData.rulesets.forEach(rule => {
+                const item = document.createElement('div');
+                item.className = 'library-item-mobile';
+                item.innerHTML = `
+                    <div class="name">${rule.name}</div>
+                    <div class="description">${rule.description}</div>
+                    <button id="${this.context}-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
+                `;
+                rulesetsList.appendChild(item);
+            });
+        }
+
+        const patternsList = this.element.querySelector(`#${this.context}-library-patterns-content`);
+        if (patternsList && this.libraryData.patterns) {
+            this.libraryData.patterns.forEach(pattern => {
+                const item = document.createElement('div');
+                item.className = 'library-item-mobile';
+                item.innerHTML = `
+                    <div class="name">${pattern.name}</div>
+                    <div class="description">${pattern.description}</div>
+                    <button class="button" data-action="place-pattern" data-pattern-name="${pattern.name}">Place Pattern</button>
+                `;
+                patternsList.appendChild(item);
+            });
+        }
     }
 
     _renderDirectPane() {
@@ -232,45 +260,5 @@ export class RulesetActionsComponent extends BaseComponent {
         this.segments[paneName].classList.add('active');
     }
 
-    populateLibraryData(libraryData = null) {
-        const data = libraryData || this.libraryData;
-        if (!data) return;
-
-        
-        const rulesetsList = this.element.querySelector(`#${this.context}-library-rulesets-content`);
-        if (rulesetsList && data.rulesets) {
-            rulesetsList.innerHTML = '';
-            data.rulesets.forEach(rule => {
-                const item = document.createElement('div');
-                item.className = 'library-item-mobile';
-                item.innerHTML = `
-                    <div class="name">${rule.name}</div>
-                    <div class="description">${rule.description}</div>
-                    <button id="${this.context}-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
-                `;
-                rulesetsList.appendChild(item);
-            });
-        }
-
-        
-        const patternsList = this.element.querySelector(`#${this.context}-library-patterns-content`);
-        if (patternsList && data.patterns) {
-            patternsList.innerHTML = '';
-            data.patterns.forEach(pattern => {
-                const item = document.createElement('div');
-                item.className = 'library-item-mobile';
-                item.innerHTML = `
-                    <div class="name">${pattern.name}</div>
-                    <div class="description">${pattern.description}</div>
-                    <button class="button" data-action="place-pattern" data-pattern-name="${pattern.name}">Place Pattern</button>
-                `;
-                patternsList.appendChild(item);
-            });
-        }
-
-        
-        if (libraryData) {
-            this.libraryData = libraryData;
-        }
-    }
+    // The populateLibraryData method is no longer needed and has been deleted.
 } 

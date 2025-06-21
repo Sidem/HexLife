@@ -22,10 +22,13 @@ export class WorldSetupComponent extends BaseComponent {
         this.element.className = 'world-setup-component-content';
         
         this.uiElements = {}; 
-        this.worldSliderComponents = [];
+        this.worldControlCache = [];
         
         this.render(); 
         this._setupInternalListeners();
+        this._createWorldSetupGrid();
+        this.refresh();
+        
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refresh());
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.refresh());
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.refresh());
@@ -56,8 +59,6 @@ export class WorldSetupComponent extends BaseComponent {
         this.uiElements.applySetupButton = this.element.querySelector('[data-action="reset-all-worlds"]');
         this.uiElements.applySelectedDensityButton = this.element.querySelector('[data-action="apply-density-all"]');
         this.uiElements.resetDensitiesButton = this.element.querySelector('[data-action="reset-densities"]');
-        
-        this.refresh(); 
     }
 
     _setupInternalListeners() {
@@ -78,58 +79,41 @@ export class WorldSetupComponent extends BaseComponent {
         });
     }
 
-    refresh() {
-        if (!this.worldManager || !this.uiElements.worldSetupGrid) return;
-        this._populateWorldSetupGrid();
-    }
-
-    _populateWorldSetupGrid() {
+    _createWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
         grid.innerHTML = ''; 
-        this.worldSliderComponents.forEach(slider => slider.destroy());
-        this.worldSliderComponents = [];
+        this.worldControlCache = [];
 
         const fragment = document.createDocumentFragment();
-        const currentWorldSettings = this.worldManager.getWorldSettingsForUI();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
-            
-            const formattedFullHex = formatHexCode(settings.rulesetHex); 
 
             cell.innerHTML =
                 `<div class="world-label">World ${i}</div>` +
-                `<div class="ruleset-viz-container" title="${formattedFullHex}"></div>` +
-                `<div class="setting-control density-control"><div id="densitySliderMount_${i}"></div></div>` +
-                `<div class="setting-control enable-control"><div id="enableSwitchMount_${i}"></div></div>` +
+                `<div class="ruleset-viz-container"></div>` +
+                `<div class="setting-control density-control"><div id="${this.context}-densitySliderMount_${i}"></div></div>` +
+                `<div class="setting-control enable-control"><div id="${this.context}-enableSwitchMount_${i}"></div></div>` +
                 `<button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>`;
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');
-            if (vizContainer) {
-                const svg = rulesetVisualizer.createRulesetSVG(settings.rulesetHex);
-                svg.classList.add('ruleset-viz-svg');
-                vizContainer.appendChild(svg);
-            }
+            const sliderMount = cell.querySelector(`#${this.context}-densitySliderMount_${i}`);
+            const enableSwitchMount = cell.querySelector(`#${this.context}-enableSwitchMount_${i}`);
 
-            const sliderMount = cell.querySelector(`#densitySliderMount_${i}`);
             const densitySlider = new SliderComponent(sliderMount, {
-                id: `densitySlider_${i}`, label: 'Density:', min: 0, max: 1, step: 0.001,
-                value: settings.initialDensity, unit: '', showValue: true,
+                id: `${this.context}-densitySlider_${i}`, label: 'Density:', min: 0, max: 1, step: 0.001,
+                value: 0.5, unit: '', showValue: true,
                 onChange: (newDensity) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
                 }
             });
-            this.worldSliderComponents.push(densitySlider);
 
-            
-            const enableSwitchMount = cell.querySelector(`#enableSwitchMount_${i}`);
-            new SwitchComponent(enableSwitchMount, {
+            const enableSwitch = new SwitchComponent(enableSwitchMount, {
                 type: 'checkbox',
-                name: `enableSwitch_${i}`,
-                initialValue: settings.enabled,
-                items: [{ value: 'enabled', text: settings.enabled ? 'Enabled' : 'Disabled' }],
+                name: `${this.context}-enableSwitch_${i}`,
+                initialValue: true,
+                items: [{ value: 'enabled', text: 'Enabled' }],
                 onChange: (isEnabled) => {
                     EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex: i, isEnabled });
                     
@@ -139,15 +123,55 @@ export class WorldSetupComponent extends BaseComponent {
                     }
                 }
             });
-            
+            this.worldControlCache[i] = {
+                vizContainer,
+                densitySlider,
+                enableSwitch,
+                enableSwitchLabel: enableSwitchMount.querySelector('label')
+            };
+
             fragment.appendChild(cell);
         }
         grid.appendChild(fragment);
     }
 
+    /**
+     * Updates the existing grid elements with new state.
+     * This is now the only method called on state changes.
+     */
+    refresh() {
+        if (!this.worldManager || this.worldControlCache.length === 0) return;
+
+        const currentWorldSettings = this.worldManager.getWorldSettingsForUI();
+
+        for (let i = 0; i < Config.NUM_WORLDS; i++) {
+            const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
+            const cache = this.worldControlCache[i];
+            if (!cache) continue;
+
+            // Update cached elements instead of recreating them
+            const formattedFullHex = formatHexCode(settings.rulesetHex);
+            cache.vizContainer.title = formattedFullHex;
+            
+            const svg = rulesetVisualizer.createRulesetSVG(settings.rulesetHex);
+            svg.classList.add('ruleset-viz-svg');
+            cache.vizContainer.innerHTML = ''; // Clear only the SVG container
+            cache.vizContainer.appendChild(svg);
+
+            cache.densitySlider.setValue(settings.initialDensity, false); // Update slider value without firing its change event
+            cache.enableSwitch.setValue(settings.enabled);
+            if (cache.enableSwitchLabel) {
+                cache.enableSwitchLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';
+            }
+        }
+    }
+
     destroy() {
+        this.worldControlCache.forEach(cache => {
+            if (cache.densitySlider) cache.densitySlider.destroy();
+            if (cache.enableSwitch) cache.enableSwitch.destroy();
+        });
+        this.worldControlCache = [];
         super.destroy();
-        this.worldSliderComponents.forEach(s => s.destroy());
-        this.worldSliderComponents = [];
     }
 } 
