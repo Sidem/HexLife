@@ -11,6 +11,7 @@
     align-items: flex-end;
     opacity: 1;
     transition: opacity 0.3s ease;
+    padding-bottom: var(--bottom-tab-bar-height);
 }
 
 .bottom-sheet-overlay.hidden {

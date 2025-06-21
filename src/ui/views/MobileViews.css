@@ -4,7 +4,7 @@
     top: 0;
     left: 0;
     right: 0;
-    bottom: 110px;
+    bottom: var(--bottom-tab-bar-height);
     background-color: #1e1e1e;
     z-index: 4501;
     display: flex;
