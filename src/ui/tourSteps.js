@@ -1,10 +1,11 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
-// Import component classes for content-aware tour logic
+// Import component classes for content-aware tour logic, a robust pattern.
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
+import { ControlsComponent } from './components/ControlsComponent.js';
 
 /**
  * Provides the tour definitions for the application's onboarding process.
@@ -16,7 +17,7 @@ export const getTours = (appContext) => {
 
     /**
      * A helper function to ensure a consistent state before starting any tour.
-     * Hides all panels and popouts.
+     * Hides all panels and popouts and returns to the main simulation view on mobile.
      */
     const resetUIState = () => {
         EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
@@ -26,8 +27,22 @@ export const getTours = (appContext) => {
     };
 
     /**
-     * Core Tour: The main introduction to the application.
+     * Helper to show the correct view for a tour step.
+     * @param {{desktop: {type: 'panel'|'popout', name: string}, mobile: {view: string}}} config
      */
+    const showView = (config) => {
+        if (appContext.uiManager.isMobile()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: config.mobile.view });
+        } else {
+            const event = config.desktop.type === 'panel' ? EVENTS.COMMAND_TOGGLE_PANEL : EVENTS.COMMAND_TOGGLE_POPOUT;
+            const key = config.desktop.type === 'panel' ? 'panelName' : 'popoutName';
+            EventBus.dispatch(event, { [key]: config.desktop.name, show: true });
+        }
+    };
+    
+    // ==========================================================================================
+    // == CORE TOUR
+    // ==========================================================================================
     const core = [{
         element: 'body',
         title: 'Welcome to the HexLife Explorer',
@@ -40,142 +55,176 @@ export const getTours = (appContext) => {
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock. Let's see what these worlds are currently doing.",
         primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (data) => !data }
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
-        title: 'The Focal Point',
-        content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click on any mini-map view</span> to shift your focus.",
+        title: 'The Observation Deck',
+        content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click any mini-map view</span> to shift your focus.",
         primaryAction: { text: 'Select a Different World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '#interaction-mode-toggle' : 'body',
+        element: 'body',
         title: 'The Spark of Creation',
-        content: () => "The most direct way to influence a universe is by seeding it with life." + (appContext.uiManager.isMobile() ? " First, <span class=\"onboarding-highlight-text\">tap the hand icon</span> to switch to Draw Mode." : " The simulation will pause automatically when you begin to draw."),
-        condition: () => appContext.uiManager.isMobile(),
-        primaryAction: { text: 'Switch to Draw Mode' },
-        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' }
+        condition: (appContext) => appContext.uiManager.isMobile(),
+        content: "The most direct way to influence a universe is to seed it with life. In draw mode, you can toggle cells by clicking. <br><br>On desktop, you are already in draw mode. On mobile, <span class=\"onboarding-highlight-text\">tap the hand icon (🖐️)</span> to switch to draw mode.",
+        primaryAction: { text: 'Continue' },
+        advanceOn: { type: 'click' }
     }, {
         element: '#selected-world-guide',
         highlightType: 'canvas',
         title: 'Draw on the Grid',
-        content: "Now you're in Draw Mode. <span class=\"onboarding-highlight-text\">Click and drag (or touch and drag)</span> on the main view to bring cells to life.",
+        content: "Now, <span class=\"onboarding-highlight-text\">click and drag (or touch and drag)</span> on the main view to bring cells to life. The simulation pauses automatically while you draw.",
         primaryAction: { text: 'Try Drawing on the Grid' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="learning"]' : '#helpButton',
         title: 'Your Lab Assistant',
-        content: "You now have the core skills. For every other tool, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon for a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help/Learn button</span> to restart this orientation at any time. Good luck.",
+        content: "Excellent. For every other tool, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon for a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help/Learn button</span> to restart this orientation at any time. Good luck, Researcher.",
         primaryAction: { text: 'Begin My Research' },
         advanceOn: { type: 'click' }
     }];
 
+    // ==========================================================================================
+    // == CONTROLS TOUR
+    // ==========================================================================================
     const controls = [{
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '[data-tour-id="controls-button"]',
-        title: 'Simulation Controls',
-        content: "This menu contains controls for simulation speed and brush size.",
+        title: 'Tutorial: Simulation Controls',
+        content: "This menu contains global controls for simulation speed, brush size, and interaction preferences.",
         primaryAction: { text: 'Open Controls' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'click' }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "ControlsComponent" }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-speed-slider-mount`,
+        element: '[id*="controls-speed-slider"]',
         title: 'Simulation Speed',
         content: "Adjust the target <span class=\"onboarding-highlight-text\">Ticks Per Second (TPS)</span> for all worlds. Higher values run the simulation faster.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => {
-             if (appContext.uiManager.isMobile()) {
-                // The bottom sheet will automatically dispatch VIEW_SHOWN when it opens
-                // No need to manually dispatch the event
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'controls', show: true });
-            }
-        },
         advanceOn: { type: 'click' }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-brush-slider-mount`,
+        element: '[id*="controls-brush-slider"]',
         title: 'Brush Size',
-        content: "Adjust the size of the drawing brush. <span class=\"onboarding-highlight-text\">Desktop Pro-Tip:</span> Use `Ctrl + Mouse Wheel` on the grid to adjust size on the fly.",
+        content: "Adjust the size of your drawing brush. <br><br><b>Desktop Pro-Tip:</b> Use `Ctrl + Mouse Wheel` over the grid to adjust size on the fly.",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }];
 
+    // ==========================================================================================
+    // == RULESET ACTIONS TOUR
+    // ==========================================================================================
     const ruleset_actions = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
-        title: 'Ruleset Actions',
+        title: 'Tutorial: Ruleset Actions',
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
         onBeforeShow: resetUIState,
-        // The condition is now elegant, robust, and completely independent of UI mode
-        advanceOn: { 
-            type: 'event', 
-            eventName: EVENTS.VIEW_SHOWN, 
-            condition: (data) => data.contentComponent instanceof RulesetActionsComponent 
-        }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-generate-tab`,
+        element: '[data-pane="generate"]',
         title: 'Generate',
-        content: "Create entirely new laws of physics. <span class=\"onboarding-highlight-text\">R-Sym</span> (Rotational Symmetry) is often best for creating structured patterns.",
+        content: "Create entirely new laws of physics. <span class=\"onboarding-highlight-text\">R-Sym</span> (Rotational Symmetry) is often best for creating structured, organic patterns.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => {
-            if (appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'rules' });
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions', show: true });
-            }
-        },
+        onBeforeShow: (step) => { showView({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'rules' } }); document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-mutate-tab`,
+        element: '[data-pane="mutate"]',
         title: 'Mutate',
         content: "Introduce small, random changes to an existing ruleset to evolve it. The <span class=\"onboarding-highlight-text\">Clone & Mutate</span> action is a powerful way to run parallel experiments.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: (step) => { document.querySelector(step.element())?.click() },
+        onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-library-tab`,
+        element: '[data-pane="library"]',
         title: 'Library',
-        content: "Load pre-discovered rulesets or place well-known patterns (like 'Glider') onto the grid.",
+        content: "Load pre-discovered rulesets or place well-known patterns (like a 'Glider') onto the grid.",
         primaryAction: { text: 'Finish' },
-        onBeforeShow: (step) => { document.querySelector(step.element())?.click() },
+        onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }];
 
+    // ==========================================================================================
+    // == EDITOR TOUR
+    // ==========================================================================================
     const editor = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="editor"]' : '[data-tour-id="edit-rule-button"]',
-        title: 'The Ruleset Editor',
+        title: 'Tutorial: The Ruleset Editor',
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
         onBeforeShow: resetUIState,
-        // Content-aware condition - works regardless of whether it's in a panel or mobile view
-        advanceOn: { 
-            type: 'event', 
-            eventName: EVENTS.VIEW_SHOWN, 
-            condition: (data) => data.contentComponent instanceof RulesetEditorComponent 
-        }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetEditorComponent" }
     }, {
         element: () => (appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
         title: 'Toggling Outcomes',
         content: "The visualization shows a center cell and its six neighbors. The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule</span> to flip its output state.",
         primaryAction: { text: 'Click any Rule' },
-        onBeforeShow: () => {
-            if (appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'editor' });
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetEditor', show: true });
-            }
-        },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'editor' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-rulesetEditorMode`,
+        element: '#ruleset-editor-mode',
         title: 'Analytical Lenses',
         content: "Change your 'lens' to view the rules differently. <span class=\"onboarding-highlight-text\">Rotational Symmetry</span> is great for understanding patterns, while <span class=\"onboarding-highlight-text\">Neighbor Count</span> groups rules by their local conditions.",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }];
+    
+    // ==========================================================================================
+    // == NEW: RESET / CLEAR TOUR
+    // ==========================================================================================
+    const resetClear = [{
+        element: '[data-tour-id="reset-clear-popout"]',
+        title: 'Tutorial: Reset & Clear',
+        content: 'These actions manage the state of the cells on the grid.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => { resetUIState(); showView({ desktop: {type: 'popout', name: 'resetClear'}, mobile: {view: 'simulate' /* No mobile equivalent yet */} }) },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '[data-tour-id="reset-clear-popout"] #resetAllButtonPopout',
+        title: 'Reset Worlds',
+        content: "<span class=\"onboarding-highlight-text\">Reset</span> re-seeds the grid with new random cells according to each world's configured density. It's like starting a new petri dish culture.",
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '[data-tour-id="reset-clear-popout"] #clearAllButtonPopout',
+        title: 'Clear Worlds',
+        content: "<span class=\"onboarding-highlight-text\">Clear</span> sets all cells to inactive (or active, if already clear). It's like sterilizing the dish before an experiment.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
 
-    /**
-     * Applied Evolution Tour: A complete, guided workflow for discovering a new ruleset.
-     */
+    // ==========================================================================================
+    // == NEW: SAVE / LOAD TOUR
+    // ==========================================================================================
+    const saveLoad = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="save-state-button"]',
+        title: 'Tutorial: Save, Load & Share',
+        content: 'Preserve your discoveries and share them with others.',
+        primaryAction: { text: 'Next' },
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'click' }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '[data-action="save"]' : '[data-tour-id="save-state-button"]',
+        title: 'Save World State',
+        content: "This saves the <span class=\"onboarding-highlight-text\">complete state</span> of the currently selected world—including its ruleset, cell states, and tick count—to a JSON file on your device.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'none' }, mobile: { view: 'more' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '[for="mobileFileInput"]' : '[data-tour-id="load-state-button"]',
+        title: 'Load World State',
+        content: "This loads a previously saved JSON file, restoring a world to its exact saved state, allowing you to continue an experiment.",
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '[data-action="share"]' : '[data-tour-id="share-button"]',
+        title: 'Share Setup',
+        content: "This generates a <span class=\"onboarding-highlight-text\">unique URL</span> that encodes your current ruleset and camera position, perfect for sharing a cool discovery with others.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
+
+    // ==========================================================================================
+    // == REVISED: APPLIED EVOLUTION
+    // ==========================================================================================
     const appliedEvolution = [{
         element: 'body',
         title: 'Mission: Applied Evolution',
@@ -188,41 +237,28 @@ export const getTours = (appContext) => {
         title: 'Step 1: Get a Baseline',
         content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel to access the library.",
         primaryAction: { text: 'Open Ruleset Actions' },
-        // Content-aware condition - elegant and independent of UI implementation
-        advanceOn: { 
-            type: 'event', 
-            eventName: EVENTS.VIEW_SHOWN, 
-            condition: (data) => data.contentComponent instanceof RulesetActionsComponent 
-        }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '#mobile-library-tab' : '#desktop-library-tab',
+        element: '[data-pane="library"]',
         title: 'Step 2: Open the Library',
         content: "Now, select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
         primaryAction: { text: 'Select Library Tab' },
-        onBeforeShow: () => {
-            // This ensures the panel is open before the step is shown
-            if (!appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions', show: true });
-            } else {
-                 EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'rules' });
-            }
-        },
+        onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
-        element: () => (appContext.uiManager.isMobile() ? '#mobile' : '#desktop') + '-library-rulesets-content .library-item-mobile:nth-child(10) .button',
+        element: () => '#ruleset-actions-library-rulesets-content .library-item-mobile:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
-        content: "This ruleset produces interesting mobile patterns. Tap <span class=\"onboarding-highlight-text\">'Load'</span>. This will apply its laws to all nine universes and reset them.",
+        content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (step) => {
-            const targetElement = document.querySelector(step.element());
-            targetElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        },
+        onBeforeShow: (step) => { document.querySelector(step.element())?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'Step 4: Observe',
         content: "Start the simulation to see the 'Gliders' ruleset in action.",
+        condition: (appContext) => appContext.simulationController.getState().isPaused,
         primaryAction: { text: 'Press Play' },
+        onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
         delayAfter: 2000
     }, {
@@ -230,131 +266,70 @@ export const getTours = (appContext) => {
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
         primaryAction: { text: 'Open World Setup' },
-        // Content-aware condition - works for both mobile and desktop
-        advanceOn: { 
-            type: 'event', 
-            eventName: EVENTS.VIEW_SHOWN, 
-            condition: (data) => data.contentComponent instanceof WorldSetupComponent 
-        }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "WorldSetupComponent" }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-world-config-grid .world-config-cell:first-child .density-control`,
+        element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) .density-control',
         title: 'Step 6: Set Initial Density',
-        content: "Let's test this ruleset in a denser environment. <span class=\"onboarding-highlight-text\">Set the density for the first world to 50%.</span>",
+        content: "Let's test this ruleset in a denser environment. <span class=\"onboarding-highlight-text\">Set the density for the central world to 50%.</span>",
         primaryAction: { text: 'Set Density' },
-         onBeforeShow: () => {
-            if (appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'worlds' });
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup', show: true });
-            }
-        },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, condition: (data) => (data.worldIndex === 0 && data.density > 0.49 && data.density < 0.51) }
+         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, condition: (data) => (data.worldIndex === 4 && data.density > 0.49 && data.density < 0.51) }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-panel-actions button[data-action="apply-density-all"]`,
+        element: () => '#world-setup-panel-actions [data-action="apply-density-all"]',
         title: 'Step 7: Apply to All Worlds',
         content: "Now apply this 50% density to all worlds to create a level playing field for our mutations.",
         primaryAction: { text: 'Apply Density to All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL }
-    },
-    {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-panel-actions button[data-action="reset-all-worlds"]`,
+    }, {
+        element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 8: Reset Worlds',
         content: "Finally, reset all worlds to apply the new density settings.",
-        primaryAction: { text: 'Apply & Reset All Enabled Worlds' },
+        primaryAction: { text: 'Apply & Reset All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
-    },
-     {
+    }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 9: Prepare for Mutation',
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
         primaryAction: { text: 'Open Ruleset Actions' },
-        advanceOn: { type: 'click' }
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-mutate-tab`,
+        element: '[data-pane="mutate"]',
         title: 'Step 10: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
         primaryAction: { text: 'Select Mutate Tab' },
-        onBeforeShow: () => {
-            if (!appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions', show: true });
-            } else {
-                 EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'rules' });
-            }
-        },
+        onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
         advanceOn: { type: 'click' }
-    },
-     {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-mutate-pane`,
-        title: 'Step 11: Set Mutation Parameters',
-        content: "Set the <span class=\"onboarding-highlight-text\">Mutation Rate to ~10%</span> and ensure the Mode is <span class=\"onboarding-highlight-text\">'R-Sym'</span>. This introduces small, symmetric changes, ideal for evolving complex patterns.",
-        primaryAction: { text: 'Next' },
-        onBeforeShow: (step) => {
-             document.querySelector(step.element().replace('-pane', '-tab'))?.click();
-        },
-        advanceOn: { type: 'click' }
-    },
-    {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-mutate-pane button[data-action="clone-mutate"]`,
-        title: 'Step 12: Run the Experiment',
-        content: "This is the <span class=\"onboarding-highlight-text\">Clone & Mutate</span> command. It copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. <span class=\"onboarding-highlight-text\">Press it now.</span>",
+    }, {
+        element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
+        title: 'Step 11: Run the Experiment',
+        content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the Mutation Rate is ~10% and Mode is R-Sym for best results.",
         primaryAction: { text: 'Clone & Mutate' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
         delayAfter: 2000
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
-        title: 'Step 13: Observe and Select',
+        title: 'Step 12: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
         primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
-        element: () => `#${appContext.uiManager.isMobile() ? 'mobile' : 'desktop'}-mutate-pane button[data-action="clone-mutate"]`,
-        title: 'Step 14: Evolve Again!',
-        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection.",
-        primaryAction: { text: 'Clone & Mutate Again' },
-        onBeforeShow: () => {
-             if (appContext.uiManager.isMobile()) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'rules' });
-                setTimeout(() => document.querySelector('#mobile-mutate-tab')?.click(), 100);
-            } else {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions', show: true });
-                 setTimeout(() => document.querySelector('#desktop-mutate-tab')?.click(), 100);
-            }
-        },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
-    }, {
-        element: 'body',
-        title: 'Mission Complete',
-        content: "You have successfully run a guided evolution experiment. You now know the core workflow for discovery: <span class=\"onboarding-highlight-text\">Baseline -> Control -> Mutate -> Observe -> Select -> Repeat</span>. The universe is yours to explore.",
-        primaryAction: { text: 'Finish' },
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        title: 'Step 13: Evolve Again!',
+        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel and press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection.",
+        primaryAction: { text: 'Finish Mission' },
         advanceOn: { type: 'click' }
     }];
 
-    /**
-     * Analysis Tour: Demonstrates the elegant content-aware approach
-     */
-    const analysis = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="analyze"]' : '[data-tour-id="analysis-panel-button"]',
-        title: 'Analysis Tools',
-        content: 'This panel gives you the big picture, charting the universe\'s behavior over time.',
-        primaryAction: { text: 'Open Analysis' },
-        onBeforeShow: resetUIState,
-        // Elegant content-aware condition - no need to know about UI implementation details
-        advanceOn: {
-            type: 'event',
-            eventName: EVENTS.VIEW_SHOWN,
-            condition: (data) => data.contentComponent instanceof AnalysisComponent
-        }
-    }];
 
     return {
         core,
         controls,
         ruleset_actions,
         editor,
-        analysis,
-        // worlds,
-        // file_management,
         appliedEvolution,
+        resetClear,
+        saveLoad
     };
 };

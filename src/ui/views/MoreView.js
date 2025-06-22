@@ -33,7 +33,7 @@ export class MoreView extends BaseComponent {
 
     attachEventListeners() {
         this._addDOMListener(this.element.querySelector('[data-action="close"]'), 'click', () => {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_VIEW, { targetView: 'simulate' });
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="save"]'), 'click', () => {

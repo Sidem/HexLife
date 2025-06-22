@@ -20,6 +20,8 @@ export class LearningComponent extends BaseComponent {
             { id: 'controls', name: 'Tutorial: Simulation Controls' },
             { id: 'ruleset_actions', name: 'Tutorial: Ruleset Actions' },
             { id: 'editor', name: 'Tutorial: The Ruleset Editor' },
+            { id: 'reset-clear', name: 'Tutorial: Reset & Clear' },
+            { id: 'save-load', name: 'Tutorial: Save, Load & Share' },
             // { id: 'analysis', name: 'Tutorial: Analysis Tools' },
             // { id: 'worlds', name: 'Tutorial: World Setup' },
             // { id: 'file_management', name: 'Tutorial: Save, Load & Share' },
