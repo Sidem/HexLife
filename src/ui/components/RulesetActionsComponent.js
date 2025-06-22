@@ -54,6 +54,7 @@ export class RulesetActionsComponent extends BaseComponent {
             direct: this.element.querySelector('[data-pane="direct"]'),
         };
         this.actionsPopover = this.appContext.uiManager.actionsPopover; // Get reference from UIManager
+        this.factory = this.appContext.rulesetDisplayFactory;
         console.log(this.appContext.uiManager);
 
         this._renderGeneratePane();
@@ -176,17 +177,7 @@ export class RulesetActionsComponent extends BaseComponent {
         if (!this.libraryData || !this.libraryData.rulesets) return;
 
         this.libraryData.rulesets.forEach(rule => {
-            const item = document.createElement('div');
-            item.className = 'library-item';
-            item.innerHTML = `
-                <div class="library-item-info">
-                    <div class="name">${rule.name}</div>
-                    <div class="description">${rule.description || 'No description.'}</div>
-                </div>
-                <div class="library-item-actions">
-                    <button class="button" data-action="load-rule" data-hex="${rule.hex}">Load</button>
-                </div>
-            `;
+            const item = this.factory.createLibraryListItem(rule, false);
             rulesetsList.appendChild(item);
         });
     }
@@ -197,23 +188,12 @@ export class RulesetActionsComponent extends BaseComponent {
         const userRulesets = this.appContext.libraryController.getUserLibrary();
 
         if (userRulesets.length === 0) {
-            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the ⭐ icon next to a ruleset to save it!</p>`;
+            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the ⭐ icon to save the current ruleset!</p>`;
             return;
         }
 
         userRulesets.forEach(rule => {
-            const item = document.createElement('div');
-            item.className = 'library-item personal';
-            item.innerHTML = `
-                <div class="library-item-info">
-                    <div class="name">${rule.name}</div>
-                    <div class="description">${rule.description || 'No description.'}</div>
-                </div>
-                <div class="library-item-actions">
-                    <button class="button" data-action="load-personal" data-id="${rule.id}">Load</button>
-                    <button class="button-icon" data-action="manage-personal" data-id="${rule.id}" title="More options">...</button>
-                </div>
-            `;
+            const item = this.factory.createLibraryListItem(rule, true);
             personalList.appendChild(item);
         });
     }
@@ -276,7 +256,10 @@ export class RulesetActionsComponent extends BaseComponent {
             }
             
             // Handle showing the management popover for personal rules
-            if (action === 'manage-personal') {
+            if (target.closest('[data-action="manage-personal"]')) {
+                const manageButton = target.closest('[data-action="manage-personal"]');
+                const actionsContainer = manageButton.parentElement;
+                const id = actionsContainer.dataset.id;
                 const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
                 if (!rule) return;
 
@@ -311,7 +294,7 @@ export class RulesetActionsComponent extends BaseComponent {
                     }
                 ];
                 
-                this.actionsPopover.show(popoverActions, target);
+                this.actionsPopover.show(popoverActions, manageButton);
             }
         });
 
@@ -335,7 +318,7 @@ export class RulesetActionsComponent extends BaseComponent {
         });
 
         // Add this new subscription
-        this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._renderPersonalLibrary.bind(this));
+        this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._renderPersonalLibrary);
     }
 
     setActivePane(paneName) {

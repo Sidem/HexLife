@@ -9,13 +9,14 @@ export class TopInfoBar {
         this.worldManager = appContext.worldManager;
         this.uiElements = null;
         this.popoutPanels = {};
-        this.historyItemCache = []; // Add cache for DOM elements
         this.saveStatus = { isPersonal: false, isPublic: false };
     }
 
     init() {
         this.uiElements = {
             rulesetDisplay: document.getElementById('rulesetDisplay'),
+            rulesetDisplayName: document.getElementById('rulesetDisplayName'),
+            rulesetDisplayCode: document.getElementById('rulesetDisplayCode'),
             statTick: document.getElementById('stat-tick'),
             statRatio: document.getElementById('stat-ratio'),
             statBrushSize: document.getElementById('stat-brush-size'),
@@ -26,17 +27,10 @@ export class TopInfoBar {
             redoButton: document.getElementById('redoButton'),
             historyButton: document.getElementById('historyButton'),
             historyPopout: document.getElementById('historyPopout'),
-            rulesetDisplayContainer: document.getElementById('rulesetDisplayContainer')
+            rulesetDisplayContainer: document.getElementById('rulesetDisplayContainer'),
+            saveRulesetButton: document.getElementById('saveRulesetButton'),
+            rulesetVizContainer: document.querySelector('.ruleset-viz-container')
         };
-
-        const saveBtn = document.createElement('button');
-        saveBtn.id = 'saveRulesetButton';
-        saveBtn.className = 'button-icon save-ruleset-button';
-        saveBtn.setAttribute('data-tour-id', 'save-ruleset-button');
-        saveBtn.title = 'Save this ruleset to your personal library';
-        saveBtn.innerHTML = '⭐';
-        this.uiElements.rulesetDisplayContainer.appendChild(saveBtn);
-        this.uiElements.saveRulesetButton = saveBtn;
         
         this._setupEventListeners();
 
@@ -48,11 +42,6 @@ export class TopInfoBar {
             this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getState().speed);
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
-        
-        const vizContainer = document.createElement('span');
-        vizContainer.className = 'ruleset-viz-container';
-        this.uiElements.rulesetDisplay.parentNode.insertBefore(vizContainer, this.uiElements.rulesetDisplay);
-        this.uiElements.rulesetVizContainer = vizContainer;
         
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
     }
@@ -91,8 +80,15 @@ export class TopInfoBar {
         // Add listener for the save button
         this.uiElements.saveRulesetButton.addEventListener('click', () => {
             const hex = this.worldManager.getCurrentRulesetHex();
-            if (hex && hex !== 'N/A' && hex !== 'Error' && !this.saveStatus.isPersonal) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex });
+            // Only allow saving if it's NOT personal and NOT public.
+            // Or editing if it IS personal. Public rulesets are not editable via this button.
+            if (this.saveStatus.isPersonal) {
+                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
+                if (rule) EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule);
+            } else if (!this.saveStatus.isPublic) {
+                if (hex && hex !== 'N/A' && hex !== 'Error') {
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex });
+                }
             }
         });
 
@@ -119,51 +115,46 @@ export class TopInfoBar {
         const { history } = this.worldManager.getRulesetHistoryArrays(this.worldManager.getSelectedWorldIndex());
         const reversedHistory = history.slice().reverse();
 
-        // Ensure cache is the correct size
-        while (this.historyItemCache.length < reversedHistory.length) {
-            const newItem = document.createElement('div');
-            newItem.className = 'history-item';
-            this.historyItemCache.push(newItem);
-        }
+        listContainer.innerHTML = ''; // Clear previous content
 
-        // Hide all elements in the container to start
-        listContainer.innerHTML = '';
-
-        // Update and show the necessary elements from the cache
         reversedHistory.forEach((hex, index) => {
-            const item = this.historyItemCache[index];
-            item.textContent = formatHexCode(hex);
+            const isCurrent = index === 0;
+            const item = this.appContext.rulesetDisplayFactory.createHistoryListItem(hex, isCurrent);
             
-            // Clone node to safely remove all previous event listeners
-            const newItem = item.cloneNode(true);
-            this.historyItemCache[index] = newItem;
-
-            if (index === 0) { // First item in reversed list is the current one
-                newItem.classList.add('is-current');
-                const tag = document.createElement('span');
-                tag.className = 'tag';
-                tag.textContent = 'Current';
-                newItem.appendChild(tag);
-            } else {
-                newItem.classList.remove('is-current');
-                newItem.addEventListener('click', () => {
+            if (!isCurrent) {
+                item.addEventListener('click', () => {
                     const originalIndex = history.length - 1 - index;
                     EventBus.dispatch(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), historyIndex: originalIndex });
                     this.popoutPanels.history.hide();
                 });
             }
-            listContainer.appendChild(newItem);
+            listContainer.appendChild(item);
         });
     }
     updateMainRulesetDisplay(hex) {
-        if (this.uiElements?.rulesetDisplay) {
-            this.uiElements.rulesetDisplay.textContent = formatHexCode(hex);
-            if (this.uiElements.rulesetVizContainer) {
-                this.uiElements.rulesetVizContainer.innerHTML = '';
-                const svg = rulesetVisualizer.createRulesetSVG(hex, {width: '100%', height: '100%'});
-                svg.classList.add('ruleset-viz-svg');
-                this.uiElements.rulesetVizContainer.appendChild(svg);
-            }
+        if (!this.uiElements?.rulesetDisplay) return;
+
+        // Update the small visualization
+        if (this.uiElements.rulesetVizContainer) {
+            this.uiElements.rulesetVizContainer.innerHTML = '';
+            const svg = rulesetVisualizer.createRulesetSVG(hex, {width: '100%', height: '100%'});
+            svg.classList.add('ruleset-viz-svg');
+            this.uiElements.rulesetVizContainer.appendChild(svg);
+        }
+
+        // Check library for a name
+        const personalRule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
+        const publicRule = this.appContext.libraryController.getLibraryData().rulesets.find(r => r.hex === hex);
+        
+        const ruleName = personalRule?.name || publicRule?.name;
+
+        this.uiElements.rulesetDisplayCode.textContent = formatHexCode(hex);
+        if (ruleName) {
+            this.uiElements.rulesetDisplayName.textContent = ruleName;
+            this.uiElements.rulesetDisplay.classList.add('has-name');
+        } else {
+            this.uiElements.rulesetDisplayName.textContent = '';
+            this.uiElements.rulesetDisplay.classList.remove('has-name');
         }
     }
 
@@ -209,12 +200,15 @@ export class TopInfoBar {
 
         if (status.isPersonal) {
             this.uiElements.saveRulesetButton.classList.add('is-personal');
-            this.uiElements.saveRulesetButton.title = 'This ruleset is in your personal library.';
+            this.uiElements.saveRulesetButton.style.cursor = 'pointer';
+            this.uiElements.saveRulesetButton.title = 'Edit this ruleset in your personal library.';
         } else if (status.isPublic) {
             this.uiElements.saveRulesetButton.classList.add('is-public');
-            this.uiElements.saveRulesetButton.title = 'This is a public ruleset. Click to save to your library.';
+            this.uiElements.saveRulesetButton.style.cursor = 'not-allowed'; // Make it non-clickable
+            this.uiElements.saveRulesetButton.title = 'This is a public ruleset from the library.';
         } else {
             this.uiElements.saveRulesetButton.classList.add('not-saved');
+            this.uiElements.saveRulesetButton.style.cursor = 'pointer'; // Reset cursor
             this.uiElements.saveRulesetButton.title = 'Save this ruleset to your personal library.';
         }
     }

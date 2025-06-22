@@ -19,6 +19,7 @@ import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { SaveRulesetModal } from './components/SaveRulesetModal.js';
 import { ActionsPopover } from './components/ActionsPopover.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
+import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 
 
 
@@ -37,6 +38,7 @@ export class UIManager {
         this.saveRulesetModal = null;
         this.actionsPopover = null;
         this.confirmationDialog = null;
+        this.rulesetDisplayFactory = null;
         appContext.uiManager = this;
         this.init();
     }
@@ -58,6 +60,9 @@ export class UIManager {
         const libraryData = libraryController.getLibraryData();
 
         // NEW: Instantiate all shared components ONCE
+        this.rulesetDisplayFactory = new RulesetDisplayFactory();
+        this.appContext.rulesetDisplayFactory = this.rulesetDisplayFactory;
+        
         this.actionsPopover = new ActionsPopover(document.getElementById('popover-container'));
         this.sharedComponents = {
             controls: new ControlsComponent(appContext),
@@ -384,6 +389,11 @@ export class UIManager {
             }
         });
         this.sharedComponents = {};
+
+        // Destroy the ruleset display factory
+        if (this.rulesetDisplayFactory) {
+            this.rulesetDisplayFactory.destroy();
+        }
 
         Object.values(this.mobileViews).forEach(view => {
             if(typeof view.destroy === 'function') {
