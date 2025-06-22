@@ -25,29 +25,28 @@ function updateLoadingStatus(message) {
 
 function parseUrlParameters() {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has('r')) return {}; 
+    if (params.toString() === '') return {};
 
-    const sharedSettings = {};
+    const sharedSettings = {
+        fromUrl: true // Flag to indicate settings are from URL
+    };
 
-    const rulesetHex = params.get('r');
-    if (/^[0-9a-fA-F]{32}$/.test(rulesetHex)) {
-        sharedSettings.rulesetHex = rulesetHex;
-    }
-
-    if (params.has('w')) {
-        const worldIndex = parseInt(params.get('w'), 10);
-        if (worldIndex >= 0 && worldIndex < Config.NUM_WORLDS) {
-            sharedSettings.selectedWorldIndex = worldIndex;
+    // Rulesets
+    if (params.has('r_all')) {
+        sharedSettings.rulesets = params.get('r_all').split(',');
+    } else if (params.has('r')) {
+        const singleRuleset = params.get('r');
+        if (/^[0-9a-fA-F]{32}$/.test(singleRuleset)) {
+            sharedSettings.rulesetHex = singleRuleset;
         }
     }
 
-    if (params.has('s')) {
-        const speed = parseInt(params.get('s'), 10);
-        if (speed >= 1 && speed <= Config.MAX_SIM_SPEED) {
-            sharedSettings.speed = speed;
-        }
+    // Densities
+    if (params.has('d')) {
+        sharedSettings.densities = params.get('d').split(',').map(Number);
     }
 
+    // Enabled Mask
     if (params.has('e')) {
         const enabledMask = parseInt(params.get('e'), 10);
         if (!isNaN(enabledMask)) {
@@ -55,13 +54,22 @@ function parseUrlParameters() {
         }
     }
 
+    // Selected World
+    if (params.has('w')) {
+        const worldIndex = parseInt(params.get('w'), 10);
+        if (worldIndex >= 0 && worldIndex < Config.NUM_WORLDS) {
+            sharedSettings.selectedWorldIndex = worldIndex;
+        }
+    }
+
+    // Camera
     if (params.has('cam')) {
         const camParts = params.get('cam').split(',').map(Number);
         if (camParts.length === 3 && !camParts.some(isNaN)) {
             sharedSettings.camera = { x: camParts[0], y: camParts[1], zoom: camParts[2] };
         }
     }
-    
+
     window.history.replaceState({}, document.title, window.location.pathname);
     return sharedSettings;
 }

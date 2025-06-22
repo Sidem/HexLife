@@ -132,7 +132,12 @@ export class DrawStrategy extends BaseInputStrategy {
 
         if (cellsToToggle.length > 0) {
             cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
-            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndex, cellIndices: new Set(cellsToToggle) });
+            const brushMode = this.manager.appContext.interactionController.getState().brushMode;
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { 
+                worldIndex: worldIndex, 
+                cellIndices: new Set(cellsToToggle),
+                brushMode: brushMode
+            });
         }
     }
 

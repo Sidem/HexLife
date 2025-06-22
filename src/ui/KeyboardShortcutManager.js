@@ -38,6 +38,7 @@ export class KeyboardShortcutManager {
             { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }) },
             { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
             { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
+            { key: 'i', handler: () => EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET) },
             { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
             { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
             { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },

@@ -224,8 +224,8 @@ export class WorldProxy {
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
     }
-    applySelectiveBrush(cellIndices) {
-        this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices });
+    applySelectiveBrush(cellIndices, brushMode = 'invert') {
+        this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices, brushMode });
     }
     setHoverState(hoverAffectedIndices) {
         this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices });

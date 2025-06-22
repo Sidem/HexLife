@@ -107,7 +107,9 @@ export const EVENTS = {
     /** @param {number} speed - The desired simulation speed. */
     COMMAND_SET_SPEED: 'command:setSpeed', 
     /** @param {number} size - The desired brush size. */
-    COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize', 
+    COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize',
+    /** @param {'invert'|'draw'|'erase'} mode - The desired brush interaction mode. */
+    COMMAND_SET_BRUSH_MODE: 'command:setBrushMode', 
     /** @param {{bias: number, generationMode: 'random'|'n_count'|'r_sym', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
     COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', 
     /** @param {{hexString: string, resetScopeForThisChange: 'all'|'selected'|'none'}} data - The ruleset to set. */
@@ -118,6 +120,8 @@ export const EVENTS = {
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
     /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
     COMMAND_CLONE_RULESET: 'command:cloneRuleset',
+    /** @event Emitted with no payload to invert the ruleset of the selected world. */
+    COMMAND_INVERT_RULESET: 'command:invertRuleset',
     /** @param {{worldIndex: number}} data - The world index for which to undo a ruleset change. */
     COMMAND_UNDO_RULESET: 'command:undoRuleset',
     /** @param {{worldIndex: number}} data - The world index for which to redo a ruleset change. */
@@ -212,6 +216,8 @@ export const EVENTS = {
     UI_RULESET_INPUT_CHANGED: 'ui:rulesetInputPopoutChanged',
     /** @param {'pan'|'draw'|'place'} mode - The new interaction mode. */
     INTERACTION_MODE_CHANGED: 'ui:interactionModeChanged',
+    /** @param {'invert'|'draw'|'erase'} mode - The new brush mode. */
+    BRUSH_MODE_CHANGED: 'ui:brushModeChanged',
     /** @param {{mode: 'desktop'|'mobile'}} data - The new UI mode. */
     UI_MODE_CHANGED: 'ui:modeChanged',
     /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{targetView: string, currentView: string}} data - Parameters for changing the active mobile view. */

@@ -94,14 +94,27 @@ function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_
     return entropy / 7.0;
 }
 
-function applySelectiveBrushLogic(cellIndices) {
+function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
     if (!jsStateArray || !cellIndices || cellIndices.size === 0) return false;
     let changed = false;
     for (const idx of cellIndices) {
         if (idx >= 0 && idx < workerConfig.NUM_CELLS) {
-            jsStateArray[idx] = 1 - jsStateArray[idx];
-            if(jsRuleIndexArray) jsRuleIndexArray[idx] = 0;
-            changed = true;
+            const previousState = jsStateArray[idx];
+            let newState = previousState;
+
+            if (brushMode === 'invert') {
+                newState = 1 - previousState;
+            } else if (brushMode === 'draw') {
+                newState = 1;
+            } else if (brushMode === 'erase') {
+                newState = 0;
+            }
+
+            if (newState !== previousState) {
+                jsStateArray[idx] = newState;
+                if(jsRuleIndexArray) jsRuleIndexArray[idx] = 0;
+                changed = true;
+            }
         }
     }
     return changed;
@@ -180,7 +193,7 @@ function processCommandQueue() {
                     findHexagonsInNeighborhood(command.data.col, command.data.row, command.data.brushSize, affectedIndicesInBrush);
                     brushChanged = applySelectiveBrushLogic(affectedIndicesInBrush);
                 } else {
-                    brushChanged = applySelectiveBrushLogic(command.data.cellIndices);
+                    brushChanged = applySelectiveBrushLogic(command.data.cellIndices, command.data.brushMode);
                 }
                 if (brushChanged) {
                     resetCycleState();

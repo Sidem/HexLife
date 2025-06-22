@@ -34,7 +34,7 @@ export class PanStrategy extends BaseInputStrategy {
             this.isPanning = true;
             this.lastPanX = event.clientX;
             this.lastPanY = event.clientY;
-        } else if (event.button === 0) { 
+        } else if (event.button === 0 && viewType === 'selected') { 
             this.manager.setStrategy('draw');
             this.manager.currentStrategy.handleMouseDown(event);
         }

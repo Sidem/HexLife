@@ -302,15 +302,45 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
 export function generateShareUrl(worldManager) {
     if (!worldManager) return null;
     const params = new URLSearchParams();
+    const worldSettings = worldManager.getWorldSettingsForUI();
 
-    const rulesetHex = worldManager.getCurrentRulesetHex();
-    if (!rulesetHex || rulesetHex === "N/A" || rulesetHex === "Error") {
-        console.error("Cannot generate share link: No valid ruleset.");
-        return null;
+    // 1. Encode Rulesets
+    const allRulesets = worldSettings.map(ws => ws.rulesetHex);
+    const uniqueRulesets = [...new Set(allRulesets)];
+    if (uniqueRulesets.length === 1) {
+        params.set('r', uniqueRulesets[0]); // All worlds have the same ruleset
+    } else {
+        // Use a shorthand if possible, otherwise list all.
+        // For now, we'll list all for simplicity. A more advanced compression could be used here.
+        params.set('r_all', allRulesets.join(','));
     }
-    params.set('r', rulesetHex);
 
-    
+    // 2. Encode Densities
+    const densities = worldSettings.map(ws => ws.initialDensity);
+    // Only include if they differ from the default
+    if (JSON.stringify(densities) !== JSON.stringify(Config.DEFAULT_INITIAL_DENSITIES)) {
+         params.set('d', densities.map(d => d.toFixed(3)).join(','));
+    }
+
+    // 3. Encode Enabled States
+    let enabledMask = 0;
+    worldSettings.forEach((ws, i) => {
+        if (ws.enabled) {
+            enabledMask |= (1 << i);
+        }
+    });
+    // Only include if it's not the default (all enabled)
+    if (enabledMask !== 0b111111111) {
+        params.set('e', enabledMask);
+    }
+
+    // 4. Encode Selected World
+    const selectedIndex = worldManager.getSelectedWorldIndex();
+    if (selectedIndex !== Config.DEFAULT_SELECTED_WORLD_INDEX) {
+        params.set('w', selectedIndex);
+    }
+
+    // 5. Encode Camera
     const camera = worldManager.getCurrentCameraState();
     if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
         params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);

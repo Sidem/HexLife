@@ -33,6 +33,7 @@ export const getTours = (appContext) => {
     const showView = (config) => {
         if (appContext.uiManager.isMobile()) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: config.mobile.view });
+            if(!config.desktop) return;
         } else {
             const event = config.desktop.type === 'panel' ? EVENTS.COMMAND_TOGGLE_PANEL : EVENTS.COMMAND_TOGGLE_POPOUT;
             const key = config.desktop.type === 'panel' ? 'panelName' : 'popoutName';
@@ -246,11 +247,11 @@ export const getTours = (appContext) => {
         onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
-        element: () => '#ruleset-actions-library-rulesets-content .library-item-mobile:nth-child(10) .button',
+        element: '#ruleset-actions-library-rulesets-content .library-item-mobile:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (step) => { document.querySelector(step.element())?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+        onBeforeShow: (step) => { document.querySelector(step.element)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
@@ -303,24 +304,33 @@ export const getTours = (appContext) => {
     }, {
         element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
         title: 'Step 11: Run the Experiment',
-        content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the Mutation Rate is ~10% and Mode is R-Sym for best results.",
+        content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the <span class=\"onboarding-highlight-text\">Mutation Rate is ~10%</span> and <span class=\"onboarding-highlight-text\">Mode is R-Sym</span> for best results.",
         primaryAction: { text: 'Clone & Mutate' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
-        delayAfter: 2000
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'Step 12: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
+        onBeforeShow: () => { showView({ mobile: {view: 'simulate'} }); },
         primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        element: '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 13: Evolve Again!',
-        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel and press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection.",
+        condition: (appContext) => !appContext.uiManager.isMobile(),
+        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel and press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection. <br><br>Pro-tip: Press <span class=\"onboarding-highlight-text\">'M'</span> to quickly Clone & Mutate again.",
         primaryAction: { text: 'Finish Mission' },
         advanceOn: { type: 'click' }
-    }];
+    }, {
+        element: '[title="Clone & Mutate"]',
+        title: 'Step 13: Evolve Again!',
+        condition: (appContext) => appContext.uiManager.isMobile(),
+        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Use this <span class=\"onboarding-highlight-text\">Quick Action Button</span> to quickly <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again.",
+        primaryAction: { text: 'Finish Mission' },
+        advanceOn: { type: 'click' }
+    },
+];
 
 
     return {

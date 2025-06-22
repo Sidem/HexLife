@@ -5,11 +5,13 @@ export class InteractionController {
     constructor() {
         this.state = {
             mode: 'pan', 
+            brushMode: PersistenceService.loadUISetting('brushMode', 'invert'),
             pauseWhileDrawing: PersistenceService.loadUISetting('pauseWhileDrawing', true)
         };
         
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, this.#handleToggleMode);
         EventBus.subscribe(EVENTS.COMMAND_SET_INTERACTION_MODE, this.#handleSetMode);
+        EventBus.subscribe(EVENTS.COMMAND_SET_BRUSH_MODE, this.#handleSetBrushMode);
         EventBus.subscribe(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, this.#handleSetPauseWhileDrawing);
     }
 
@@ -34,5 +36,14 @@ export class InteractionController {
         if (this.state.pauseWhileDrawing === shouldPause) return;
         this.state.pauseWhileDrawing = shouldPause;
         PersistenceService.saveUISetting('pauseWhileDrawing', shouldPause);
+    }
+
+    #handleSetBrushMode = (mode) => {
+        if (mode !== 'invert' && mode !== 'draw' && mode !== 'erase') return;
+        if (this.state.brushMode === mode) return;
+
+        this.state.brushMode = mode;
+        PersistenceService.saveUISetting('brushMode', mode);
+        EventBus.dispatch(EVENTS.BRUSH_MODE_CHANGED, this.state.brushMode);
     }
 } 

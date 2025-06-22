@@ -76,17 +76,17 @@ export class DraggablePanel extends Panel {
         } else {
             this.panelElement.classList.add('hidden');
         }
-        if (s.x && s.x.endsWith('px')) this.panelElement.style.left = s.x;
-        if (s.y && s.y.endsWith('px')) this.panelElement.style.top = s.y;
-
-        const hasPosition = (s.x && s.x.endsWith('px')) || (s.y && s.y.endsWith('px'));
-        
-        if (hasPosition) {
+    
+        const hasSavedPosition = s.x && s.x.endsWith('px') && s.y && s.y.endsWith('px');
+    
+        if (hasSavedPosition) {
+            this.panelElement.style.left = s.x;
+            this.panelElement.style.top = s.y;
             this.panelElement.style.transform = 'none';
-        } else if (s.isOpen) {
-            this.panelElement.style.left = '50%';
-            this.panelElement.style.top = '50%';
-            this.panelElement.style.transform = 'translate(-50%, -50%)';
+        } else {
+            this.panelElement.style.left = '100px';
+            this.panelElement.style.top = '100px';
+            this.panelElement.style.transform = 'none';
         }
     }
 
@@ -147,26 +147,13 @@ export class DraggablePanel extends Panel {
 
     show() {
         super.show(); // This now handles removing 'hidden' and dispatching the event
-        
-        const computedStyle = window.getComputedStyle(this.panelElement);
-        if (computedStyle.transform.includes('translate') &&
-            (computedStyle.left === '50%' || computedStyle.top === '50%')) {
-        } else if ( (computedStyle.left === '0px' || computedStyle.left === '') &&
-                    (computedStyle.top === '0px' || computedStyle.top === '') &&
-                     this.panelElement.style.transform !== 'none') {
-            
-            this.panelElement.style.left = '50%';
-            this.panelElement.style.top = '50%';
-        }
-        
-        
+    
         if (window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches) {
             this._setDraggable(false);
         } else {
             this._setDraggable(true);
         }
-
-        
+    
         if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
             this.contentComponent.refresh();
         }

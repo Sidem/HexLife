@@ -25,6 +25,7 @@ export class ControlsComponent extends BaseComponent {
             </div>
             <div class="tool-group">
                 <h5>Interaction</h5>
+                <div id="controls-brush-mode-mount"></div>
                 <div id="controls-pause-while-drawing-mount"></div>
             </div>
             <div class="tool-group">
@@ -54,6 +55,19 @@ export class ControlsComponent extends BaseComponent {
             value: brushController.getState().brushSize,
             showValue: true,
             onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
+        });
+
+        new SwitchComponent(this.element.querySelector(`#controls-brush-mode-mount`), {
+            type: 'radio',
+            name: `controls-brush-mode`,
+            label: 'Brush Mode:',
+            initialValue: interactionController.getState().brushMode,
+            items: [
+                { value: 'invert', text: 'Invert' },
+                { value: 'draw', text: 'Draw' },
+                { value: 'erase', text: 'Erase' }
+            ],
+            onChange: (mode) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_MODE, mode)
         });
 
         new SwitchComponent(this.element.querySelector(`#controls-pause-while-drawing-mount`), {

@@ -31,24 +31,34 @@ export class WorldManager {
     }
 
     _initWorlds = () => {
-        const hasSharedSettings = this.sharedSettings.rulesetHex;
+        const hasSharedSettings = this.sharedSettings.fromUrl;
 
         if (hasSharedSettings) {
             console.log("Applying shared settings from URL.");
-            this.initialDefaultRulesetHex = this.sharedSettings.rulesetHex;
+            // Prime the world settings array
+            this.worldSettings = [];
+
+            const sharedRulesets = this.sharedSettings.rulesets; // e.g., ['HEX1', 'HEX2', ...]
+            const singleRuleset = this.sharedSettings.rulesetHex; // e.g., 'HEX1'
+            const sharedDensities = this.sharedSettings.densities; // e.g., [0.1, 0.5, ...]
             const enabledMask = this.sharedSettings.enabledMask ?? 0b111111111;
+
             for (let i = 0; i < Config.NUM_WORLDS; i++) {
-                const rulesetHex = this.initialDefaultRulesetHex;
+                const rulesetHex = sharedRulesets ? sharedRulesets[i] : (singleRuleset || Config.INITIAL_RULESET_CODE);
+                const density = sharedDensities ? sharedDensities[i] : (Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5);
+                const enabled = (enabledMask & (1 << i)) !== 0;
+
                 this.worldSettings.push({
-                    initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
-                    enabled: (enabledMask & (1 << i)) !== 0,
+                    initialDensity: density,
+                    enabled: enabled,
                     rulesetHex: rulesetHex,
-                    rulesetHistory: [rulesetHex], 
+                    rulesetHistory: [rulesetHex],
                     rulesetFuture: []
                 });
             }
             PersistenceService.saveWorldSettings(this.worldSettings);
-            PersistenceService.saveRuleset(this.initialDefaultRulesetHex);
+            // Save the selected world's ruleset as the "main" one for persistence consistency
+            PersistenceService.saveRuleset(this.worldSettings[this.selectedWorldIndex].rulesetHex);
         } else {
             this.worldSettings = PersistenceService.loadWorldSettings();
             
@@ -185,6 +195,8 @@ export class WorldManager {
             this._cloneRuleset();
         });
 
+        EventBus.subscribe(EVENTS.COMMAND_INVERT_RULESET, this._invertSelectedRuleset);
+
         EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REDO_RULESET, (data) => this.redoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, (data) => this.revertToHistoryState(data.worldIndex, data.historyIndex));
@@ -306,7 +318,7 @@ export class WorldManager {
             this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.brushController.getState().brushSize);
         });
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
-            this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices);
+            this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices, data.brushMode);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
             findHexagonsInNeighborhood(data.col, data.row, this.brushController.getState().brushSize, this._hoverAffectedIndicesSet);
@@ -920,6 +932,25 @@ export class WorldManager {
 
     getEntropySamplingState = () => {
         return { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate };
+    }
+
+    _invertSelectedRuleset = () => {
+        const selectedIndex = this.selectedWorldIndex;
+        const currentHex = this.worldSettings[selectedIndex]?.rulesetHex;
+
+        if (!currentHex || currentHex === "Error" || currentHex === "N/A") {
+            console.error("Cannot invert ruleset: No valid ruleset on selected world.");
+            return;
+        }
+
+        const rulesetArray = hexToRuleset(currentHex);
+        for (let i = 0; i < rulesetArray.length; i++) {
+            rulesetArray[i] = 1 - rulesetArray[i]; // Invert each bit
+        }
+        const invertedHex = rulesetToHex(rulesetArray);
+
+        // Use the existing #applyRulesetToWorlds private method to handle history and state updates
+        this.#applyRulesetToWorlds(invertedHex, 'selected', false); // Apply to selected world, don't auto-reset
     }
 
     areAllWorkersInitialized = () => {
