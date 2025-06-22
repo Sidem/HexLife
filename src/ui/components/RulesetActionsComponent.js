@@ -232,27 +232,13 @@ export class RulesetActionsComponent extends BaseComponent {
                 return;
             }
 
-            // Handle loading public rule
-            if (action === 'load-rule') {
+            if (action === 'load-rule' || action === 'load-personal') {
                 this.appContext.libraryController.loadRuleset(
-                    target.dataset.hex,
+                    target.parentNode.dataset.hex,
                     controllerState.genScope,
                     controllerState.genAutoReset
                 );
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-            }
-
-            // Handle loading personal rule
-            if (action === 'load-personal') {
-                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
-                if (rule) {
-                    this.appContext.libraryController.loadRuleset(
-                        rule.hex,
-                        controllerState.genScope,
-                        controllerState.genAutoReset
-                    );
-                    EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-                }
             }
             
             // Handle showing the management popover for personal rules
