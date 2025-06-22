@@ -105,8 +105,6 @@ async function initialize() {
     updateLoadingStatus("Spooling up simulation workers...");
     appContext = new AppContext(sharedSettings, libraryData);
     uiManager = new UIManager(appContext);
-    uiManager.init();
-    appContext.uiManager = uiManager;
     const inputManager = new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {

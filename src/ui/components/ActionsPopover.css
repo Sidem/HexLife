@@ -1,0 +1,37 @@
+.actions-popover {
+    position: fixed;
+    background-color: #3a3a3a;
+    border: 1px solid #666;
+    border-radius: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    z-index: 2100;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    pointer-events: none;
+}
+
+.actions-popover.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.actions-popover ul {
+    list-style: none;
+    margin: 0;
+    padding: 5px;
+}
+
+.actions-popover li {
+    padding: 8px 15px;
+    cursor: pointer;
+    border-radius: 3px;
+    color: #eee;
+    font-size: 0.9em;
+}
+
+.actions-popover li:hover {
+    background-color: #0078d4;
+    color: white;
+} 

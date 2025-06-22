@@ -10,6 +10,7 @@ export class TopInfoBar {
         this.uiElements = null;
         this.popoutPanels = {};
         this.historyItemCache = []; // Add cache for DOM elements
+        this.saveStatus = { isPersonal: false, isPublic: false };
     }
 
     init() {
@@ -24,11 +25,21 @@ export class TopInfoBar {
             undoButton: document.getElementById('undoButton'),
             redoButton: document.getElementById('redoButton'),
             historyButton: document.getElementById('historyButton'),
-            historyPopout: document.getElementById('historyPopout')
+            historyPopout: document.getElementById('historyPopout'),
+            rulesetDisplayContainer: document.getElementById('rulesetDisplayContainer')
         };
+
+        const saveBtn = document.createElement('button');
+        saveBtn.id = 'saveRulesetButton';
+        saveBtn.className = 'button-icon save-ruleset-button';
+        saveBtn.setAttribute('data-tour-id', 'save-ruleset-button');
+        saveBtn.title = 'Save this ruleset to your personal library';
+        saveBtn.innerHTML = '⭐';
+        this.uiElements.rulesetDisplayContainer.appendChild(saveBtn);
+        this.uiElements.saveRulesetButton = saveBtn;
+        
         this._setupEventListeners();
 
-        
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
         this.updateBrushSizeDisplay(this.appContext.brushController.getState().brushSize);
@@ -42,10 +53,15 @@ export class TopInfoBar {
         vizContainer.className = 'ruleset-viz-container';
         this.uiElements.rulesetDisplay.parentNode.insertBefore(vizContainer, this.uiElements.rulesetDisplay);
         this.uiElements.rulesetVizContainer = vizContainer;
+        
+        this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
     }
 
     _setupEventListeners() {
-        EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => this.updateMainRulesetDisplay(hex));
+        EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
+            this.updateMainRulesetDisplay(hex);
+            this.updateSaveStatus(hex);
+        });
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex()));
         EventBus.subscribe(EVENTS.HISTORY_CHANGED, () => this.updateUndoRedoButtons());
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (stats) => this.updateStatsDisplay(stats));
@@ -53,9 +69,11 @@ export class TopInfoBar {
         EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (size) => this.updateBrushSizeDisplay(size));
         EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => this.updatePerformanceDisplay(data.fps, data.tps, data.targetTps));
         EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, () => {
-            this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
+            const hex = this.worldManager.getCurrentRulesetHex();
+            this.updateMainRulesetDisplay(hex);
             this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
             this.updateUndoRedoButtons();
+            this.updateSaveStatus(hex);
         });
         if (this.uiElements.undoButton) {
             this.uiElements.undoButton.addEventListener('click', () => {
@@ -69,6 +87,20 @@ export class TopInfoBar {
             });
         }
         this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
+        
+        // Add listener for the save button
+        this.uiElements.saveRulesetButton.addEventListener('click', () => {
+            const hex = this.worldManager.getCurrentRulesetHex();
+            if (hex && hex !== 'N/A' && hex !== 'Error' && !this.saveStatus.isPersonal) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex });
+            }
+        });
+
+        // Add subscription to update the star on library changes
+        EventBus.subscribe(EVENTS.USER_LIBRARY_CHANGED, () => {
+            this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
+        });
+
         EventBus.subscribe(EVENTS.VIEW_SHOWN, (data) => {
             if (data.view === this.popoutPanels.history) {
                 this._efficientUpdateHistoryPopout();
@@ -162,5 +194,28 @@ export class TopInfoBar {
 
         this.uiElements.undoButton.disabled = history.length <= 1;
         this.uiElements.redoButton.disabled = future.length === 0;
+    }
+
+    updateSaveStatus(hex) {
+        if (!hex || hex === "N/A" || hex === "Error") {
+            this.uiElements.saveRulesetButton.classList.add('hidden');
+            return;
+        }
+        this.uiElements.saveRulesetButton.classList.remove('hidden');
+
+        const status = this.appContext.libraryController.getRulesetStatus(hex);
+        this.saveStatus = status; // Cache the status
+        this.uiElements.saveRulesetButton.classList.remove('is-personal', 'is-public', 'not-saved');
+
+        if (status.isPersonal) {
+            this.uiElements.saveRulesetButton.classList.add('is-personal');
+            this.uiElements.saveRulesetButton.title = 'This ruleset is in your personal library.';
+        } else if (status.isPublic) {
+            this.uiElements.saveRulesetButton.classList.add('is-public');
+            this.uiElements.saveRulesetButton.title = 'This is a public ruleset. Click to save to your library.';
+        } else {
+            this.uiElements.saveRulesetButton.classList.add('not-saved');
+            this.uiElements.saveRulesetButton.title = 'Save this ruleset to your personal library.';
+        }
     }
 }

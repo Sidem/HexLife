@@ -234,4 +234,14 @@ export const EVENTS = {
     VIEW_SHOWN: 'ui:viewShown',
     /** @param {{panel: object}} data - The popout panel that had an interaction. */
     POPOUT_INTERACTION: 'ui:popoutInteraction',
+    /** @param {{hex: string, id?: string, name?: string, description?: string}} data - Command to show the save/edit ruleset modal. */
+    COMMAND_SHOW_SAVE_RULESET_MODAL: 'command:showSaveRulesetModal',
+    /** @param {{message: string, type: 'success'|'error'|'info', duration?: number}} data - Command to show a toast notification. */
+    COMMAND_SHOW_TOAST: 'command:showToast',
+    /** @param {{ruleset: object}} data - Fired when a user ruleset is successfully saved or updated. */
+    USER_RULESET_SAVED: 'ui:userRulesetSaved',
+    /** @event Fired when the user library is modified (add, delete, update). */
+    USER_LIBRARY_CHANGED: 'ui:userLibraryChanged',
+    /** @param {{title: string, message: string, onConfirm: function}} data - Command to show a confirmation dialog. */
+    COMMAND_SHOW_CONFIRMATION: 'command:showConfirmation',
 };

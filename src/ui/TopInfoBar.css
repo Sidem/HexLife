@@ -181,3 +181,40 @@
         height: 16px;
     }
 }
+
+.save-ruleset-button {
+    font-size: 1.2em;
+    padding: 0 5px;
+    margin-left: 5px;
+    transition: filter 0.2s ease, opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
+}
+
+.save-ruleset-button.not-saved {
+    filter: grayscale(100%);
+    opacity: 0.5;
+    color: #fff; /* Reset base color */
+    text-shadow: none;
+}
+.save-ruleset-button.not-saved:hover {
+    filter: grayscale(0%);
+    opacity: 1;
+    color: #FFD700; /* Gold on hover */
+}
+
+.save-ruleset-button.is-public {
+    color: #87CEEB; /* Light Sky Blue */
+    text-shadow: 0 0 4px #87CEEB;
+    filter: none;
+    opacity: 1;
+}
+.save-ruleset-button.is-public:hover {
+    color: #add8e6; /* Lighter blue on hover */
+}
+
+.save-ruleset-button.is-personal {
+    color: #FFD700; /* Gold */
+    text-shadow: 0 0 5px #FFD700;
+    cursor: default;
+    filter: none;
+    opacity: 1;
+}

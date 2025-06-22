@@ -53,10 +53,12 @@ export class RulesetActionsComponent extends BaseComponent {
             library: this.element.querySelector('[data-pane="library"]'),
             direct: this.element.querySelector('[data-pane="direct"]'),
         };
+        this.actionsPopover = this.appContext.uiManager.actionsPopover; // Get reference from UIManager
+        console.log(this.appContext.uiManager);
 
         this._renderGeneratePane();
         this._renderMutatePane();
-        this._createLibraryPane(); // Changed from _renderLibraryPane
+        this._renderLibraryPane(); // Note the new name
         this._renderDirectPane();
     }
 
@@ -153,47 +155,67 @@ export class RulesetActionsComponent extends BaseComponent {
         });
     }
 
-    _createLibraryPane() {
+    _renderLibraryPane() {
         const pane = this.panes.library;
         pane.innerHTML = `
-            <div class="library-sub-tabs">
-                <button class="sub-tab-button active" data-sub-pane="rulesets">Rulesets</button>
-                <button class="sub-tab-button" data-sub-pane="patterns">Patterns</button>
+            <div class="library-filter-tabs">
+                <button class="sub-tab-button active" data-library-filter="public">Public</button>
+                <button class="sub-tab-button" data-library-filter="personal">My Rulesets</button>
             </div>
-            <div id="ruleset-actions-library-rulesets-content" class="library-list"></div>
-            <div id="ruleset-actions-library-patterns-content" class="library-list hidden"></div>
+            <div id="ruleset-actions-library-public-content" class="library-list"></div>
+            <div id="ruleset-actions-library-personal-content" class="library-list hidden"></div>
         `;
         
-        // Populate static content once
-        if (!this.libraryData) return;
+        this._renderPublicLibrary();
+        this._renderPersonalLibrary();
+    }
 
-        const rulesetsList = this.element.querySelector(`#ruleset-actions-library-rulesets-content`);
-        if (rulesetsList && this.libraryData.rulesets) {
-            this.libraryData.rulesets.forEach(rule => {
-                const item = document.createElement('div');
-                item.className = 'library-item-mobile';
-                item.innerHTML = `
+    _renderPublicLibrary() {
+        const rulesetsList = this.element.querySelector('#ruleset-actions-library-public-content');
+        rulesetsList.innerHTML = ''; // Clear previous content
+        if (!this.libraryData || !this.libraryData.rulesets) return;
+
+        this.libraryData.rulesets.forEach(rule => {
+            const item = document.createElement('div');
+            item.className = 'library-item';
+            item.innerHTML = `
+                <div class="library-item-info">
                     <div class="name">${rule.name}</div>
-                    <div class="description">${rule.description}</div>
-                    <button id="ruleset-actions-load-${rule.hex}" class="button" data-action="load-rule" data-hex="${rule.hex}">Load Ruleset</button>
-                `;
-                rulesetsList.appendChild(item);
-            });
+                    <div class="description">${rule.description || 'No description.'}</div>
+                </div>
+                <div class="library-item-actions">
+                    <button class="button" data-action="load-rule" data-hex="${rule.hex}">Load</button>
+                </div>
+            `;
+            rulesetsList.appendChild(item);
+        });
+    }
+
+    _renderPersonalLibrary() {
+        const personalList = this.element.querySelector('#ruleset-actions-library-personal-content');
+        personalList.innerHTML = ''; // Clear previous content
+        const userRulesets = this.appContext.libraryController.getUserLibrary();
+
+        if (userRulesets.length === 0) {
+            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the ⭐ icon next to a ruleset to save it!</p>`;
+            return;
         }
 
-        const patternsList = this.element.querySelector(`#ruleset-actions-library-patterns-content`);
-        if (patternsList && this.libraryData.patterns) {
-            this.libraryData.patterns.forEach(pattern => {
-                const item = document.createElement('div');
-                item.className = 'library-item-mobile';
-                item.innerHTML = `
-                    <div class="name">${pattern.name}</div>
-                    <div class="description">${pattern.description}</div>
-                    <button class="button" data-action="place-pattern" data-pattern-name="${pattern.name}">Place Pattern</button>
-                `;
-                patternsList.appendChild(item);
-            });
-        }
+        userRulesets.forEach(rule => {
+            const item = document.createElement('div');
+            item.className = 'library-item personal';
+            item.innerHTML = `
+                <div class="library-item-info">
+                    <div class="name">${rule.name}</div>
+                    <div class="description">${rule.description || 'No description.'}</div>
+                </div>
+                <div class="library-item-actions">
+                    <button class="button" data-action="load-personal" data-id="${rule.id}">Load</button>
+                    <button class="button-icon" data-action="manage-personal" data-id="${rule.id}" title="More options">...</button>
+                </div>
+            `;
+            personalList.appendChild(item);
+        });
     }
 
     _renderDirectPane() {
@@ -212,22 +234,84 @@ export class RulesetActionsComponent extends BaseComponent {
         const libraryPane = this.element.querySelector(`#ruleset-actions-library-pane`);
         libraryPane.addEventListener('click', e => {
             const target = e.target;
-            if (target.matches('.sub-tab-button')) {
+            const action = target.dataset.action;
+            const id = target.dataset.id;
+            const controllerState = this.appContext.rulesetActionController.getState();
+
+            // Handle sub-tab filtering
+            if (target.matches('[data-library-filter]')) {
+                const filter = target.dataset.libraryFilter;
                 libraryPane.querySelectorAll('.sub-tab-button').forEach(b => b.classList.remove('active'));
                 target.classList.add('active');
-                libraryPane.querySelectorAll('.library-list').forEach(p => p.classList.add('hidden'));
-                libraryPane.querySelector(`#ruleset-actions-library-${target.dataset.subPane}-content`).classList.remove('hidden');
-            } else if (target.matches('[data-action="load-rule"]')) {
-                const controllerState = this.appContext.rulesetActionController.getState();
+                
+                const publicPane = libraryPane.querySelector('#ruleset-actions-library-public-content');
+                const personalPane = libraryPane.querySelector('#ruleset-actions-library-personal-content');
+                
+                publicPane.classList.toggle('hidden', filter !== 'public');
+                personalPane.classList.toggle('hidden', filter !== 'personal');
+                return;
+            }
+
+            // Handle loading public rule
+            if (action === 'load-rule') {
                 this.appContext.libraryController.loadRuleset(
                     target.dataset.hex,
                     controllerState.genScope,
                     controllerState.genAutoReset
                 );
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-            } else if (target.matches('[data-action="place-pattern"]')) {
-                this.appContext.libraryController.placePattern(target.dataset.patternName);
-                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+            }
+
+            // Handle loading personal rule
+            if (action === 'load-personal') {
+                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
+                if (rule) {
+                    this.appContext.libraryController.loadRuleset(
+                        rule.hex,
+                        controllerState.genScope,
+                        controllerState.genAutoReset
+                    );
+                    EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+                }
+            }
+            
+            // Handle showing the management popover for personal rules
+            if (action === 'manage-personal') {
+                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
+                if (!rule) return;
+
+                const popoverActions = [
+                    {
+                        label: 'Rename',
+                        callback: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule)
+                    },
+                    {
+                        label: 'Share',
+                        callback: () => {
+                            const url = new URL(window.location.href);
+                            url.search = `?r=${rule.hex}`;
+                            navigator.clipboard.writeText(url.toString()).then(() => {
+                                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Share link copied!', type: 'success' });
+                            });
+                        }
+                    },
+                    {
+                        label: 'Delete',
+                        callback: () => {
+                            EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+                                title: 'Delete Ruleset',
+                                message: `Are you sure you want to permanently delete "${rule.name}"?`,
+                                confirmLabel: 'Delete',
+                                onConfirm: () => {
+                                    this.appContext.libraryController.deleteUserRuleset(rule.id);
+                                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Deleted "${rule.name}".`, type: 'info' });
+                                }
+                            });
+                        }
+                    }
+                ];
+                
+                this.actionsPopover.show(popoverActions, target);
             }
         });
 
@@ -249,6 +333,9 @@ export class RulesetActionsComponent extends BaseComponent {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
+
+        // Add this new subscription
+        this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._renderPersonalLibrary.bind(this));
     }
 
     setActivePane(paneName) {

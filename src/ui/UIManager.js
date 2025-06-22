@@ -16,6 +16,9 @@ import * as Config from '../core/config.js';
 import { generateShareUrl } from '../utils/utils.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
+import { SaveRulesetModal } from './components/SaveRulesetModal.js';
+import { ActionsPopover } from './components/ActionsPopover.js';
+import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 
 
 
@@ -31,6 +34,11 @@ export class UIManager {
         this.activeMobileViewName = 'simulate';
         this.managedComponents = [];
         this.sharedComponents = {}; // NEW: Property to hold singleton instances
+        this.saveRulesetModal = null;
+        this.actionsPopover = null;
+        this.confirmationDialog = null;
+        appContext.uiManager = this;
+        this.init();
     }
 
     #mobileViewConfig = {
@@ -50,6 +58,7 @@ export class UIManager {
         const libraryData = libraryController.getLibraryData();
 
         // NEW: Instantiate all shared components ONCE
+        this.actionsPopover = new ActionsPopover(document.getElementById('popover-container'));
         this.sharedComponents = {
             controls: new ControlsComponent(appContext),
             rulesetActions: new RulesetActionsComponent(appContext, { libraryData }),
@@ -79,6 +88,11 @@ export class UIManager {
         
         this.initMobileUI(libraryData);
         
+        // Initialize the save ruleset modal
+        this.saveRulesetModal = new SaveRulesetModal(document.getElementById('modal-container'), appContext);
+        
+        // Initialize the actions popover and confirmation dialog
+        this.confirmationDialog = new ConfirmationDialog(document.getElementById('dialog-container'));
         
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
@@ -270,6 +284,12 @@ export class UIManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, (data) => {
+            this.saveRulesetModal.show(data);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_CONFIRMATION, (data) => {
+            this.confirmationDialog.show(data);
+        });
 
         // NEW: Add the listener for the VIEW_SHOWN event
         EventBus.subscribe(EVENTS.VIEW_SHOWN, (data) => {

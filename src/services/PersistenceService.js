@@ -14,6 +14,7 @@ const KEYS = {
     RULESETACTIONS_PANEL_STATE: `${LS_KEY_PREFIX}rulesetActionsPanelState`,
     WORLDSETUP_PANEL_STATE: `${LS_KEY_PREFIX}worldSetupPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
+    USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`
 };
@@ -168,4 +169,12 @@ export function loadOnboardingStates() {
 
 export function saveOnboardingStates(statesObject) { 
     _setItem(KEYS.ONBOARDING_STATES, statesObject);
+}
+
+export function loadUserRulesets() {
+    return _getItem(KEYS.USER_RULESETS) || [];
+}
+
+export function saveUserRulesets(userRulesets) {
+    _setItem(KEYS.USER_RULESETS, userRulesets);
 }

@@ -332,6 +332,57 @@ export const getTours = (appContext) => {
     },
 ];
 
+    // ==========================================================================================
+    // == PERSONAL LIBRARY TOUR
+    // ==========================================================================================
+    const personal_library = [{
+        element: 'body',
+        title: 'Mission: Chronicle Your Discoveries',
+        content: "You've created a unique universe! This mission teaches you how to save its ruleset to your personal library so you never lose it.",
+        primaryAction: { text: 'Begin Mission' },
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'click' }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '[data-action="save-ruleset-mobile"]' : '#saveRulesetButton',
+        title: 'Step 1: Save the Ruleset',
+        content: "This star icon (⭐) shows the status of the current ruleset. Since it's dim, it's unsaved. Click the <span class=\"onboarding-highlight-text\">Save button</span> to add it to your personal collection.",
+        primaryAction: { text: 'Click the Star' },
+        onBeforeShow: () => {
+            if (appContext.uiManager.isMobile()) {
+                showView({ mobile: { view: 'more' } });
+            }
+        },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL }
+    }, {
+        element: '#save-ruleset-modal',
+        title: 'Step 2: Name Your Creation',
+        content: "Every great discovery deserves a name. Give your ruleset a memorable <span class=\"onboarding-highlight-text\">Name</span> and an optional description.",
+        primaryAction: { text: 'Save It!' },
+        advanceOn: { type: 'event', eventName: EVENTS.USER_RULESET_SAVED }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        title: 'Step 3: Visit Your Library',
+        content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel.",
+        primaryAction: { text: 'Open Panel' },
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
+    }, {
+        element: '[data-library-filter="personal"]',
+        title: 'Step 4: View Your Rulesets',
+        content: "The library contains both public and personal rules. <span class=\"onboarding-highlight-text\">Click on 'My Rulesets'</span> to see your saved creations.",
+        primaryAction: { text: 'Click My Rulesets' },
+        onBeforeShow: (step) => {
+            showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} });
+            setTimeout(() => { document.querySelector('[data-pane="library"]')?.click(); }, 150);
+        },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '.library-item.personal [data-action="manage-personal"]',
+        title: 'Step 5: Manage & Share',
+        content: "From here, you can <span class=\"onboarding-highlight-text\">Load</span> your ruleset back into the simulator, or use the <span class=\"onboarding-highlight-text\">'...' menu</span> to Rename, Delete, or Share it.",
+        primaryAction: { text: 'Mission Complete!' },
+        advanceOn: { type: 'click' }
+    }];
+
 
     return {
         core,
@@ -340,6 +391,7 @@ export const getTours = (appContext) => {
         editor,
         appliedEvolution,
         resetClear,
-        saveLoad
+        saveLoad,
+        personal_library
     };
 };
