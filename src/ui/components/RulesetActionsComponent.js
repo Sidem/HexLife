@@ -55,11 +55,10 @@ export class RulesetActionsComponent extends BaseComponent {
         };
         this.actionsPopover = this.appContext.uiManager.actionsPopover; // Get reference from UIManager
         this.factory = this.appContext.rulesetDisplayFactory;
-        console.log(this.appContext.uiManager);
 
         this._renderGeneratePane();
         this._renderMutatePane();
-        this._renderLibraryPane(); // Note the new name
+        this._renderLibraryPane();
         this._renderDirectPane();
     }
 
