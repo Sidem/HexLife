@@ -1,12 +1,4 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
-
-// Import component classes for content-aware tour logic, a robust pattern.
-import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
-import { AnalysisComponent } from './components/AnalysisComponent.js';
-import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
-import { WorldSetupComponent } from './components/WorldSetupComponent.js';
-import { ControlsComponent } from './components/ControlsComponent.js';
-
 /**
  * Provides the tour definitions for the application's onboarding process.
  * This unified structure uses functional steps to adapt to both desktop and mobile UI contexts.
@@ -247,7 +239,7 @@ export const getTours = (appContext) => {
         onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
-        element: '#ruleset-actions-library-rulesets-content .library-item-mobile:nth-child(10) .button',
+        element: '#ruleset-actions-library-public-content .library-item:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
