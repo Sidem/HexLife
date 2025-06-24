@@ -310,26 +310,37 @@ export class UIManager {
 
         
         const handleClickOutside = (event) => {
-            
+            // Do nothing if the onboarding tour is active and showing a tooltip
             if (this.onboardingManager && this.onboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
-                
-                if (tooltip && tooltip.contains(event.target)) {
-                    return; 
+                if (tooltip && !tooltip.classList.contains('hidden')) {
+                     // Allow clicks only on the highlighted element during the tour
+                    const highlightedEl = document.querySelector('.onboarding-highlight');
+                    if (highlightedEl && highlightedEl.contains(event.target)) {
+                        return;
+                    }
                 }
             }
-    
+
             const toolbar = this.appContext.toolbar;
-            if (!toolbar || toolbar.activePopouts.every(p => p.isHidden())) return;
-    
-            
-            
-            const clickedInsidePopout = toolbar.activePopouts.some(p => !p.isHidden() && p.popoutElement.contains(event.target));
-            const clickedOnTrigger = toolbar.activePopouts.some(p => p.triggerElement.contains(event.target));
-    
-            if (!clickedInsidePopout && !clickedOnTrigger) {
-                
-                toolbar.closeAllPopouts();
+            const popouts = toolbar ? toolbar.activePopouts : [];
+
+            // Check for clicks inside any active popout panel or its trigger button
+            const clickedInsidePopoutOrTrigger = popouts.some(p => 
+                !p.isHidden() && (p.popoutElement.contains(event.target) || p.triggerElement.contains(event.target))
+            );
+
+            // Check for clicks inside the ActionsPopover
+            const clickedInsideActionsPopover = this.actionsPopover && !this.actionsPopover.isHidden() && this.actionsPopover.element.contains(event.target);
+
+            // If the click is not inside any of these elements, hide them.
+            if (!clickedInsidePopoutOrTrigger && !clickedInsideActionsPopover) {
+                if (toolbar) {
+                    toolbar.closeAllPopouts();
+                }
+                if (this.actionsPopover) {
+                    this.actionsPopover.hide();
+                }
             }
         };
 

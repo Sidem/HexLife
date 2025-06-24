@@ -4,8 +4,7 @@ export class ActionsPopover extends BaseComponent {
     constructor(mountPoint) {
         super(mountPoint);
         this.render();
-        this.hide();
-        this._addDOMListener(document, 'click', this.handleOutsideClick, true);
+        this.element.classList.add('hidden');
     }
 
     render() {
@@ -40,15 +39,9 @@ export class ActionsPopover extends BaseComponent {
         this.element.classList.remove('visible');
     }
 
-    handleOutsideClick = (event) => {
-        if (!this.element.contains(event.target)) {
-            this.hide();
-        }
+    isHidden = () => {
+        return !this.element.classList.contains('visible');
     }
 
-    destroy() {
-        // Clean up document-level listener
-        document.removeEventListener('click', this.handleOutsideClick, true);
-        super.destroy();
-    }
+
 } 

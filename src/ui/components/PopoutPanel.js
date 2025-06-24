@@ -113,7 +113,6 @@ export class PopoutPanel extends Panel {
     toggle() {
         if (this.popoutElement) {
             if (this.popoutElement.classList.contains('hidden')) {
-                EventBus.dispatch(EVENTS.POPOUT_INTERACTION, { panel: this });
                 this.show();
             } else {
                 this.hide();

@@ -7,13 +7,10 @@ export class BottomTabBar extends BaseComponent {
         super(mountPoint);
         this.panelManager = panelManager;
         this.buttons = {};
-        this.activeView = 'simulate'; 
 
         this._initButtons();
         this._setupEventListeners();
-        this.updateActiveButton();
-
-
+        this.updateActiveButton('simulate');
     }
 
     _initButtons() {
@@ -28,19 +25,17 @@ export class BottomTabBar extends BaseComponent {
             this._addDOMListener(button, 'click', () => this.handleViewChange(view));
         });
         this._subscribeToEvent(EVENTS.MOBILE_VIEW_CHANGED, (data) => {
-            this.activeView = data.activeView;
-            this.updateActiveButton();
+            this.updateActiveButton(data.activeView);
         });
-
     }
 
     handleViewChange(view) {
         EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: view });
     }
 
-    updateActiveButton() {
+    updateActiveButton(activeView) {
         Object.entries(this.buttons).forEach(([view, button]) => {
-            if (view === this.activeView) {
+            if (view === activeView) {
                 button.classList.add('active');
             } else {
                 button.classList.remove('active');

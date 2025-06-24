@@ -92,7 +92,6 @@ export class DraggablePanel extends Panel {
 
     _saveState() {
         if (!this.panelElement || !this.options.persistence?.identifier) return;
-        
         PersistenceService.savePanelState(this.options.persistence.identifier, {
             isOpen: !this.isHidden(),
             x: this.panelElement.style.left,
@@ -220,15 +219,6 @@ export class DraggablePanel extends Panel {
         }
         this.panelElement.style.left = `${newLeft}px`;
         this.panelElement.style.top = `${newTop}px`;
-    }
-
-    _saveState() {
-        if (!this.panelElement || !this.options.persistence?.identifier) return;
-        PersistenceService.savePanelState(this.options.persistence.identifier, {
-            isOpen: !this.isHidden(),
-            x: this.panelElement.style.left,
-            y: this.panelElement.style.top,
-        });
     }
 
     destroy() {

@@ -48,18 +48,12 @@ export class Toolbar {
         };
         this._initPopoutPanels();
         this._initPopoutControls();
-        this._setupEventBusListeners();
         this._setupToolbarButtonListeners();
         this._setupStateListeners();
 
     }
 
-    _setupEventBusListeners() {
-        const closeAll = (excludePanel = null) => {
-            this.closeAllPopouts(excludePanel);
-        };
-        EventBus.subscribe(EVENTS.POPOUT_INTERACTION, (data) => closeAll(data.panel));
-    }
+
     
     _initPopoutPanels() {
         this.popoutConfig.forEach(config => {

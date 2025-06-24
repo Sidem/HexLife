@@ -26,17 +26,28 @@ export class PanStrategy extends BaseInputStrategy {
 
     handleMouseDown(event) {
         const { viewType, worldIndexAtCursor } = this.manager.getCoordsFromPointerEvent(event);
-        if (viewType === 'mini' && worldIndexAtCursor !== null) {
-            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-            return;
+
+        // Explicitly handle primary clicks (left-click) first
+        if (event.button === 0) {
+            if (viewType === 'mini' && worldIndexAtCursor !== null) {
+                // ACTION: Select a world from the minimap. This is the primary fix.
+                EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
+                return; // Stop further processing
+            } else if (viewType === 'selected' && !event.ctrlKey) {
+                // ACTION: Switch to draw mode on the main view.
+                this.manager.setStrategy('draw');
+                this.manager.currentStrategy.handleMouseDown(event);
+                return; // Stop further processing
+            }
         }
+
+        // Handle panning (middle-click or ctrl+left-click)
         if (event.button === 1 || (event.button === 0 && event.ctrlKey)) {
-            this.isPanning = true;
-            this.lastPanX = event.clientX;
-            this.lastPanY = event.clientY;
-        } else if (event.button === 0 && viewType === 'selected') { 
-            this.manager.setStrategy('draw');
-            this.manager.currentStrategy.handleMouseDown(event);
+            if (viewType === 'selected') {
+                this.isPanning = true;
+                this.lastPanX = event.clientX;
+                this.lastPanY = event.clientY;
+            }
         }
     }
 
@@ -88,7 +99,7 @@ export class PanStrategy extends BaseInputStrategy {
             }
         }
 
-        if (touches.length >= 2) { 
+        if (touches.length >= 2) {
             const newDist = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
             const pinchCenter = { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
             if (this.touchState.lastDistance > 0) {
@@ -96,7 +107,7 @@ export class PanStrategy extends BaseInputStrategy {
                 this.manager.zoomAtPoint(pinchCenter.x, pinchCenter.y, zoomFactor);
             }
             this.touchState.lastDistance = newDist;
-        } else if (this.touchState.isDragging) { 
+        } else if (this.touchState.isDragging) {
             const dx = newPoint.x - this.touchState.lastPoint.x;
             const dy = newPoint.y - this.touchState.lastPoint.y;
             if (camera) {
@@ -118,7 +129,7 @@ export class PanStrategy extends BaseInputStrategy {
         }
         this.resetTouchState();
     }
-    
+
     resetTouchState() {
         this.touchState.isDown = false;
         this.touchState.isDragging = false;
