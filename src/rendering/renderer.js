@@ -22,8 +22,6 @@ let hexVAO;
 let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
-let minimapOverlayElements = [];
-let cycleIndicatorElements = [];
 let lastWorldSettings = [];
 
 export async function initRenderer(canvasElement) {
@@ -115,14 +113,6 @@ export async function initRenderer(canvasElement) {
     setupHexBuffersAndVAO();
     setupQuadBuffersAndVAO();
     setupFBOs();
-    initMinimapOverlays();
-    initCycleIndicators();
-
-    EventBus.subscribe(EVENTS.UI_MODE_CHANGED, ({ mode }) => {
-        _handleUIModeChange(mode);
-    });
-
-
 
     requestAnimationFrame(() => resizeRenderer());
 
@@ -130,16 +120,7 @@ export async function initRenderer(canvasElement) {
     return gl;
 }
 
-function _handleUIModeChange(mode) {
-    if (!minimapOverlayElements || minimapOverlayElements.length === 0) return;
-    const isMobile = mode === 'mobile';
-    minimapOverlayElements.forEach(overlay => {
-        overlay.classList.toggle('mini', isMobile);
-    });
-    cycleIndicatorElements.forEach(indicator => {
-        indicator.classList.toggle('mini', isMobile);
-    });
-}
+
 
 function _calculateAndCacheLayout() {
     if (!gl || !gl.canvas) return;
@@ -195,37 +176,10 @@ function _calculateAndCacheLayout() {
         miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
     };
     EventBus.dispatch(EVENTS.LAYOUT_CALCULATED, { ...layoutCache });
+    EventBus.dispatch(EVENTS.LAYOUT_UPDATED, { ...layoutCache });
 }
 
-function initMinimapOverlays() {
-    const container = document.getElementById('minimap-guide');
-    if (!container) return;
-    container.innerHTML = '';
-    minimapOverlayElements = [];
-    for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const overlay = document.createElement('div');
-        overlay.className = 'minimap-ruleset-overlay';
-        overlay.style.display = 'none'; 
-        container.appendChild(overlay);
-        minimapOverlayElements.push(overlay);
-    }
-}
 
-function initCycleIndicators() {
-    const container = document.getElementById('minimap-guide');
-    if (!container) return;
-    cycleIndicatorElements = [];
-    for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        let indicator = container.querySelector(`.cycle-indicator[data-world-id='${i}']`);
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.className = 'cycle-indicator hidden';
-            indicator.dataset.worldId = i;
-            container.appendChild(indicator);
-        }
-        cycleIndicatorElements.push(indicator);
-    }
-}
 
 export function getLayoutCache() {
     return layoutCache;
@@ -456,7 +410,6 @@ function renderMainScene(appContext) {
         drawQuad(selectedView.x, selectedView.y, selectedView.width, selectedView.height);
     }
 
-    const selectedWorldRuleset = allWorldsStatus[selectedWorldIndex]?.stats.rulesetHex;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
         const col = i % Config.WORLD_LAYOUT_COLS;
@@ -475,60 +428,6 @@ function renderMainScene(appContext) {
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
         drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
-        
-        const worldStatus = allWorldsStatus[i];
-        
-        
-        const indicatorEl = cycleIndicatorElements[i];
-        const showIndicators = vizState?.showCycleIndicator ?? false;
-        
-        if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
-            const cycleLength = worldStatus.stats.cycleLength;
-            indicatorEl.classList.remove('hidden');
-            
-            indicatorEl.style.left = `${miniX - miniMap.gridContainerX + miniMap.miniMapW - 20 - miniMap.miniMapSpacing}px`;
-            indicatorEl.style.top = `${miniY - miniMap.gridContainerY}px`;
-            
-            if (indicatorEl.dataset.cycleLength !== String(cycleLength)) {
-                indicatorEl.dataset.cycleLength = String(cycleLength);
-                indicatorEl.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="100%" height="100%">
-                        <path d="M12 2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8V2z" fill="#fff"/>
-                        <path d="M22 12a10 10 0 0 0-10-10v2a8 8 0 0 1 8 8h2z" fill="#fff" transform="rotate(180 12 12)"/>
-                        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${cycleLength}</text>
-                    </svg>
-                `;
-            }
-        } else if (indicatorEl) {
-            indicatorEl.classList.add('hidden');
-        }
-        
-        const overlayEl = minimapOverlayElements[i];
-        const showOverlay = vizState?.showMinimapOverlay ?? false;
-        
-        if (overlayEl && worldStatus?.renderData.enabled && showOverlay) {
-            overlayEl.style.display = 'block';
-            overlayEl.style.left = `${miniX-miniMap.gridContainerX}px`;
-            overlayEl.style.top = `${miniY-miniMap.gridContainerY}px`;
-            
-            const currentSignature = `${i}-${worldStatus.stats.rulesetHex}-${selectedWorldIndex}-${selectedWorldRuleset}-${rulesetVisualizer.getVisualizationType()}`;
-            if (overlayEl.dataset.signature !== currentSignature) {
-                overlayEl.innerHTML = '';
-                let svg;
-                if (i === selectedWorldIndex) {
-                    svg = rulesetVisualizer.createRulesetSVG(worldStatus.stats.rulesetHex);
-                } else {
-                    svg = rulesetVisualizer.createDiffSVG(selectedWorldRuleset, worldStatus.stats.rulesetHex);
-                }
-                if (svg) {
-                    svg.classList.add('ruleset-viz-svg');
-                    overlayEl.appendChild(svg);
-                }
-                overlayEl.dataset.signature = currentSignature;
-            }
-        } else if (overlayEl) {
-            overlayEl.style.display = 'none';
-        }
     }
 
     gl.bindVertexArray(null);

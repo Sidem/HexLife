@@ -98,6 +98,8 @@ export const EVENTS = {
     WORKER_INITIALIZED: 'system:workerInitialized',
     /** @param {{selectedView: object, miniMap: object}} layout - The calculated layout for the main canvas views. */
     LAYOUT_CALCULATED: 'system:layoutCalculated',
+    /** @param {{selectedView: object, miniMap: object}} layout - Updated layout information for UI components. */
+    LAYOUT_UPDATED: 'renderer:layoutUpdated',
 
     
     /** @param {boolean} isPaused - The desired pause state. */

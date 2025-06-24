@@ -169,12 +169,36 @@ export class WorldManager {
         }
     }
 
-    _setupEventListeners = () => {
+    _setupEventListeners() {
+        this.#setupSimulationControlHandlers();
+        this.#setupRulesetCommandHandlers();
+        this.#setupEditorCommandHandlers();
+        this.#setupWorldStateCommandHandlers();
+        this.#setupInputAndInteractionHandlers();
+    }
+
+    #setupSimulationControlHandlers() {
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, this.setGlobalPause);
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
-        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
-        EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
+        EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (newIndex) => {
+            this.selectedWorldIndex = newIndex;
+            this.dispatchSelectedWorldUpdates();
+            EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, newIndex);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
+            this.isEntropySamplingEnabled = data.enabled;
+            this.entropySampleRate = data.rate;
+            PersistenceService.saveUISetting('entropySamplingEnabled', data.enabled);
+            PersistenceService.saveUISetting('entropySampleRate', data.rate);
+            this.worlds.forEach(proxy => proxy.sendCommand('SET_ENTROPY_SAMPLING_PARAMS', {
+                enabled: this.isEntropySamplingEnabled,
+                rate: this.entropySampleRate
+            }));
+            EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
+        });
+    }
 
+    #setupRulesetCommandHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
             const newRulesetHex = this._generateRandomRulesetHex(data.bias, data.generationMode);
             this.#applyRulesetToWorlds(newRulesetHex, data.applyScope, data.shouldReset);
@@ -182,25 +206,22 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (data) => {
             this.#applyRulesetToWorlds(data.hexString, data.scope, data.resetOnNewRule);
         });
-
         EventBus.subscribe(EVENTS.COMMAND_MUTATE_RULESET, (data) => {
             this._mutateRulesetForScope(data.scope, data.mutationRate, data.mode);
         });
-
         EventBus.subscribe(EVENTS.COMMAND_CLONE_AND_MUTATE, (data) => {
             this._cloneAndMutateOthers(data.mutationRate, data.mode);
         });
-
         EventBus.subscribe(EVENTS.COMMAND_CLONE_RULESET, () => {
             this._cloneRuleset();
         });
-
         EventBus.subscribe(EVENTS.COMMAND_INVERT_RULESET, this._invertSelectedRuleset);
-
         EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REDO_RULESET, (data) => this.redoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REVERT_TO_HISTORY_STATE, (data) => this.revertToHistoryState(data.worldIndex, data.historyIndex));
+    }
 
+    #setupEditorCommandHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
                 const rules = hexToRuleset(currentRulesetHex);
@@ -246,7 +267,11 @@ export class WorldManager {
             const shouldReset = data.conditionalResetScope !== 'none';
             this.#applyRulesetToWorlds(data.hexString, data.modificationScope, shouldReset);
         });
-
+    }
+    
+    #setupWorldStateCommandHandlers() {
+        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
+        EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
             this.worlds.forEach((proxy, idx) => {
                 if (this.worldSettings[idx]) {
@@ -256,7 +281,6 @@ export class WorldManager {
             });
             EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
         });
-
         EventBus.subscribe(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, (data) => {
             const primaryRulesetHex = this.worldSettings[this.selectedWorldIndex]?.rulesetHex;
             if (!primaryRulesetHex) {
@@ -264,7 +288,6 @@ export class WorldManager {
                 return;
             }
             const indicesToReset = this._getAffectedWorldIndices(data.scope);
-
             indicesToReset.forEach(idx => {
                 if (data.copyPrimaryRuleset && idx !== this.selectedWorldIndex) {
                     const newRulesetBuffer = hexToRuleset(primaryRulesetHex).buffer.slice(0);
@@ -276,14 +299,12 @@ export class WorldManager {
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) this.worlds[idx].startSimulation();
                 }
             });
-
             if (data.scope === 'all' || indicesToReset.includes(this.selectedWorldIndex)) {
                 EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
             }
             this.dispatchSelectedWorldUpdates();
             PersistenceService.saveWorldSettings(this.worldSettings);
         });
-
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_WORLDS, (data) => {
             const indicesToClear = this._getAffectedWorldIndices(data.scope);
             indicesToClear.forEach(idx => {
@@ -291,21 +312,12 @@ export class WorldManager {
                 if (proxy) {
                     let targetStateForClear = 0;
                     if (proxy.latestStateArray) {
-                        const currentState = proxy.latestStateArray;
-                        let allCurrentlyInactive = true;
-                        for (let i = 0; i < currentState.length; i++) {
-                            if (currentState[i] !== 0) {
-                                allCurrentlyInactive = false;
-                                break;
-                            }
-                        }
-                        if (allCurrentlyInactive) {
+                        if (proxy.latestStateArray.every(s => s === 0)) {
                             targetStateForClear = 1;
                         }
                     }
                     proxy.resetWorld({ density: targetStateForClear, isClearOperation: true });
                 }
-
                 if (this.worldSettings[idx] && !this.isGloballyPaused && this.worldSettings[idx].enabled) {
                     this.worlds[idx].startSimulation();
                 }
@@ -313,7 +325,32 @@ export class WorldManager {
             if (data.scope === 'all') EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
             this.dispatchSelectedWorldUpdates();
         });
-
+        EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
+        EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
+        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
+            if (this.worldSettings[data.worldIndex]) {
+                this.worldSettings[data.worldIndex].initialDensity = data.density;
+                PersistenceService.saveWorldSettings(this.worldSettings);
+                EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+            }
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_ENABLED, (data) => {
+            if (this.worldSettings[data.worldIndex] && this.worlds[data.worldIndex]) {
+                this.worldSettings[data.worldIndex].enabled = data.isEnabled;
+                this.worlds[data.worldIndex].setEnabled(data.isEnabled);
+                if (data.isEnabled && !this.isGloballyPaused) {
+                    this.worlds[data.worldIndex].startSimulation();
+                    this.worlds[data.worldIndex].setSpeed(this.simulationController.getState().speed);
+                } else if (!data.isEnabled) {
+                    this.worlds[data.worldIndex].stopSimulation();
+                }
+                PersistenceService.saveWorldSettings(this.worldSettings);
+                EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+            }
+        });
+    }
+    
+    #setupInputAndInteractionHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.brushController.getState().brushSize);
         });
@@ -328,58 +365,10 @@ export class WorldManager {
             this.worlds[data.worldIndex]?.clearHoverState();
         });
         EventBus.subscribe(EVENTS.COMMAND_UPDATE_GHOST_PREVIEW, (data) => {
-            const selectedProxy = this.worlds[this.selectedWorldIndex];
-            selectedProxy?.setGhostState(data.indices);
+            this.worlds[this.selectedWorldIndex]?.setGhostState(data.indices);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW, () => {
-            const selectedProxy = this.worlds[this.selectedWorldIndex];
-            selectedProxy?.clearGhostState();
-        });
-
-        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
-            if (this.worldSettings[data.worldIndex]) {
-                this.worldSettings[data.worldIndex].initialDensity = data.density;
-                PersistenceService.saveWorldSettings(this.worldSettings);
-                EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-            }
-        });
-        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_ENABLED, (data) => {
-            if (this.worldSettings[data.worldIndex] && this.worlds[data.worldIndex]) {
-                this.worldSettings[data.worldIndex].enabled = data.isEnabled;
-                this.worlds[data.worldIndex].setEnabled(data.isEnabled);
-
-                if (data.isEnabled && !this.isGloballyPaused) {
-                    this.worlds[data.worldIndex].startSimulation();
-                    this.worlds[data.worldIndex].setSpeed(this.simulationController.getState().speed);
-                } else if (!data.isEnabled) {
-                    this.worlds[data.worldIndex].stopSimulation();
-                }
-                PersistenceService.saveWorldSettings(this.worldSettings);
-                EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-            }
-        });
-        EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (newIndex) => {
-            this.selectedWorldIndex = newIndex;
-            this.dispatchSelectedWorldUpdates();
-            EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, newIndex);
-        });
-
-        EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
-        EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
-
-        EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
-            this.isEntropySamplingEnabled = data.enabled;
-            this.entropySampleRate = data.rate;
-            PersistenceService.saveUISetting('entropySamplingEnabled', data.enabled);
-            PersistenceService.saveUISetting('entropySampleRate', data.rate);
-
-            this.worlds.forEach(proxy => {
-                proxy.sendCommand('SET_ENTROPY_SAMPLING_PARAMS', {
-                    enabled: this.isEntropySamplingEnabled,
-                    rate: this.entropySampleRate
-                });
-            });
-            EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
+            this.worlds[this.selectedWorldIndex]?.clearGhostState();
         });
     }
 

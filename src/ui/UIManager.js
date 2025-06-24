@@ -20,6 +20,7 @@ import { SaveRulesetModal } from './components/SaveRulesetModal.js';
 import { ActionsPopover } from './components/ActionsPopover.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
+import { MinimapOverlays } from './MinimapOverlays.js';
 
 
 
@@ -88,7 +89,8 @@ export class UIManager {
         keyboardManager.init();
 
         
-        this.managedComponents.push(topInfoBar, toolbar, keyboardManager);
+        const minimapOverlays = new MinimapOverlays(appContext);
+        this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays);
 
         
         this.initMobileUI(libraryData);

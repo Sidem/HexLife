@@ -4,16 +4,12 @@ import { InputManager } from './ui/InputManager.js';
 import { EventBus, EVENTS } from './services/EventBus.js';
 import { AppContext } from './core/AppContext.js';
 import { UIManager } from './ui/UIManager.js';
+import { Application } from './core/Application.js';
 
 let gl;
 let appContext;
 let uiManager;
-let isInitialized = false;
-let lastTimestamp = 0;
 let pausedByVisibilityChange = false;
-let frameCount = 0;
-let lastFpsUpdateTime = 0;
-let actualFps = 0;
 let initializedWorkerCount = 0;
 
 function updateLoadingStatus(message) {
@@ -125,21 +121,18 @@ async function initialize() {
         appContext.worldManager.terminateAllWorkers();
     });
 
-    isInitialized = true;
-    lastTimestamp = performance.now();
-    lastFpsUpdateTime = lastTimestamp;
-    console.log("Initializing render loop.");
-    requestAnimationFrame(renderLoop);
+    const app = new Application(appContext);
+    app.run();
 }
 
 function handleResize() {
-    if (isInitialized && gl) {
+    if (gl) {
         Renderer.resizeRenderer();
     }
 }
 
 function handleVisibilityChange() {
-    if (!isInitialized || !appContext) return;
+    if (!appContext) return;
     if (document.hidden) {
         if (!appContext.simulationController.getState().isPaused) {
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
@@ -149,49 +142,11 @@ function handleVisibilityChange() {
         if (pausedByVisibilityChange) {
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
             pausedByVisibilityChange = false;
-            lastTimestamp = performance.now();
         }
     }
 }
 
-function renderLoop(timestamp) {
-    if (!isInitialized || !appContext) {
-        requestAnimationFrame(renderLoop);
-        return;
-    }
-    
-    const areAllWorkersInitialized = appContext.worldManager.areAllWorkersInitialized();
-    if (areAllWorkersInitialized) {
-        const loadingIndicator = document.getElementById('loading-indicator');
-        if (loadingIndicator && loadingIndicator.style.display !== 'none') {
-            updateLoadingStatus("Finalizing...");
-            setTimeout(() => {
-                loadingIndicator.style.opacity = '0';
-                setTimeout(() => { 
-                    loadingIndicator.style.display = 'none';
-                    if (uiManager.isMobile()) {
-                        appContext.onboardingManager.startTour('coreMobile');
-                    } else {
-                        appContext.onboardingManager.startTour('core');
-                    }
-                }, 500);
-            }, 250);
-        }
-    }
-    
-    Renderer.renderFrameOrLoader(appContext, areAllWorkersInitialized);
 
-    frameCount++;
-    if (timestamp - lastFpsUpdateTime >= 1000) {
-        actualFps = frameCount;
-        frameCount = 0;
-        lastFpsUpdateTime = timestamp;
-        const selectedStats = appContext.worldManager.getSelectedWorldStats();
-        const targetTps = appContext.simulationController.getState().speed;
-        EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
-    }
-    requestAnimationFrame(renderLoop);
-}
 
 initialize().catch(err => {
     console.error("Initialization failed:", err);
