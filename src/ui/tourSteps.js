@@ -25,8 +25,8 @@ export const getTours = (appContext) => {
     const showView = (config) => {
         if (appContext.uiManager.isMobile()) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: config.mobile.view });
-            if(!config.desktop) return;
         } else {
+            if(!config.desktop) return;
             const event = config.desktop.type === 'panel' ? EVENTS.COMMAND_TOGGLE_PANEL : EVENTS.COMMAND_TOGGLE_POPOUT;
             const key = config.desktop.type === 'panel' ? 'panelName' : 'popoutName';
             EventBus.dispatch(event, { [key]: config.desktop.name, show: true });
