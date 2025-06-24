@@ -5,11 +5,11 @@ import { EventBus, EVENTS } from './services/EventBus.js';
 import { AppContext } from './core/AppContext.js';
 import { UIManager } from './ui/UIManager.js';
 import { Application } from './core/Application.js';
+import { SettingsLoader } from './services/SettingsLoader.js';
 
 let gl;
 let appContext;
 let uiManager;
-let pausedByVisibilityChange = false;
 let initializedWorkerCount = 0;
 
 function updateLoadingStatus(message) {
@@ -17,57 +17,6 @@ function updateLoadingStatus(message) {
     if (statusElement) {
         statusElement.textContent = message;
     }
-}
-
-function parseUrlParameters() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.toString() === '') return {};
-
-    const sharedSettings = {
-        fromUrl: true // Flag to indicate settings are from URL
-    };
-
-    // Rulesets
-    if (params.has('r_all')) {
-        sharedSettings.rulesets = params.get('r_all').split(',');
-    } else if (params.has('r')) {
-        const singleRuleset = params.get('r');
-        if (/^[0-9a-fA-F]{32}$/.test(singleRuleset)) {
-            sharedSettings.rulesetHex = singleRuleset;
-        }
-    }
-
-    // Densities
-    if (params.has('d')) {
-        sharedSettings.densities = params.get('d').split(',').map(Number);
-    }
-
-    // Enabled Mask
-    if (params.has('e')) {
-        const enabledMask = parseInt(params.get('e'), 10);
-        if (!isNaN(enabledMask)) {
-            sharedSettings.enabledMask = enabledMask;
-        }
-    }
-
-    // Selected World
-    if (params.has('w')) {
-        const worldIndex = parseInt(params.get('w'), 10);
-        if (worldIndex >= 0 && worldIndex < Config.NUM_WORLDS) {
-            sharedSettings.selectedWorldIndex = worldIndex;
-        }
-    }
-
-    // Camera
-    if (params.has('cam')) {
-        const camParts = params.get('cam').split(',').map(Number);
-        if (camParts.length === 3 && !camParts.some(isNaN)) {
-            sharedSettings.camera = { x: camParts[0], y: camParts[1], zoom: camParts[2] };
-        }
-    }
-
-    window.history.replaceState({}, document.title, window.location.pathname);
-    return sharedSettings;
 }
 
 async function initialize() {
@@ -79,7 +28,7 @@ async function initialize() {
         return;
     }
 
-    const sharedSettings = parseUrlParameters();
+    const sharedSettings = SettingsLoader.loadFromUrl();
 
     updateLoadingStatus("Fetching assets...");
     const libraryPromises = [
@@ -114,8 +63,6 @@ async function initialize() {
 
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, appContext.worldManager.getSelectedWorldIndex());
     EventBus.dispatch(EVENTS.SIMULATION_PAUSED, appContext.simulationController.getIsPaused());
-    window.addEventListener('resize', handleResize);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
         uiManager.destroy();
         appContext.worldManager.terminateAllWorkers();
@@ -123,27 +70,6 @@ async function initialize() {
 
     const app = new Application(appContext);
     app.run();
-}
-
-function handleResize() {
-    if (gl) {
-        Renderer.resizeRenderer();
-    }
-}
-
-function handleVisibilityChange() {
-    if (!appContext) return;
-    if (document.hidden) {
-        if (!appContext.simulationController.getIsPaused()) {
-            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
-            pausedByVisibilityChange = true;
-        }
-    } else {
-        if (pausedByVisibilityChange) {
-            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
-            pausedByVisibilityChange = false;
-        }
-    }
 }
 
 initialize().catch(err => {

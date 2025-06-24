@@ -8,6 +8,7 @@ export class Application {
         this.lastTimestamp = 0;
         this.frameCount = 0;
         this.lastFpsUpdateTime = 0;
+        this.pausedByVisibilityChange = false;
     }
 
     /**
@@ -18,6 +19,8 @@ export class Application {
         this.lastTimestamp = performance.now();
         this.lastFpsUpdateTime = this.lastTimestamp;
         requestAnimationFrame(this.renderLoop.bind(this));
+        window.addEventListener('resize', this.#handleResize);
+        document.addEventListener('visibilitychange', this.#handleVisibilityChange);
         console.log("Application loop started.");
     }
 
@@ -65,5 +68,23 @@ export class Application {
             EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
         }
         requestAnimationFrame(this.renderLoop.bind(this));
+    }
+
+    #handleResize = () => {
+        Renderer.resizeRenderer();
+    }
+
+    #handleVisibilityChange = () => {
+        if (document.hidden) {
+            if (!this.appContext.simulationController.getIsPaused()) {
+                EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+                this.pausedByVisibilityChange = true;
+            }
+        } else {
+            if (this.pausedByVisibilityChange) {
+                EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+                this.pausedByVisibilityChange = false;
+            }
+        }
     }
 } 

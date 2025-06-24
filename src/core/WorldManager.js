@@ -923,6 +923,46 @@ export class WorldManager {
         return { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate };
     }
 
+    generateShareUrl() {
+        const params = new URLSearchParams();
+        const worldSettings = this.getWorldSettingsForUI();
+
+        const allRulesets = worldSettings.map(ws => ws.rulesetHex);
+        const uniqueRulesets = [...new Set(allRulesets)];
+        if (uniqueRulesets.length === 1) {
+            params.set('r', uniqueRulesets[0]);
+        } else {
+            params.set('r_all', allRulesets.join(','));
+        }
+
+        const densities = worldSettings.map(ws => ws.initialDensity);
+        if (JSON.stringify(densities) !== JSON.stringify(Config.DEFAULT_INITIAL_DENSITIES)) {
+             params.set('d', densities.map(d => d.toFixed(3)).join(','));
+        }
+
+        let enabledMask = 0;
+        worldSettings.forEach((ws, i) => {
+            if (ws.enabled) {
+                enabledMask |= (1 << i);
+            }
+        });
+        if (enabledMask !== 0b111111111) {
+            params.set('e', enabledMask);
+        }
+
+        const selectedIndex = this.getSelectedWorldIndex();
+        if (selectedIndex !== Config.DEFAULT_SELECTED_WORLD_INDEX) {
+            params.set('w', selectedIndex);
+        }
+
+        const camera = this.getCurrentCameraState();
+        if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
+            params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
+        }
+
+        return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    }
+
     _invertSelectedRuleset = () => {
         const selectedIndex = this.selectedWorldIndex;
         const currentHex = this.worldSettings[selectedIndex]?.rulesetHex;

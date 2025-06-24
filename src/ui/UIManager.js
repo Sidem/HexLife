@@ -13,7 +13,6 @@ import { LearningComponent } from './components/LearningComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
-import { generateShareUrl } from '../utils/utils.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { SaveRulesetModal } from './components/SaveRulesetModal.js';
@@ -406,7 +405,7 @@ export class UIManager {
     }
 
     _onShareSetup() {
-        const url = generateShareUrl(this.appContext.worldManager);
+        const url = this.appContext.worldManager.generateShareUrl();
         if (!url) {
             alert('Could not generate a share link for the current setup.');
             return;

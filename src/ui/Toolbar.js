@@ -1,12 +1,6 @@
-import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
-import { RulesetDirectInput } from './components/RulesetDirectInput.js';
-
-import { SliderComponent } from './components/SliderComponent.js';
-import { SwitchComponent } from './components/SwitchComponent.js';
-import { generateShareUrl } from '../utils/utils.js';
 
 export class Toolbar {
     constructor(appContext, libraryData) {
