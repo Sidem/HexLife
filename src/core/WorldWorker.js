@@ -253,55 +253,36 @@ function processCommandQueue() {
 
 function runTick() {
     const { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue } = processCommandQueue();
-    let simulationPerformedUpdate = false; 
+    let simulationPerformedUpdate = false;
+
+    // Handle paused or disabled states first
+    if (!isEnabled || !isRunning) {
+        if (needsGridUpdate || needsVisualUpdate || rulesetChangedInQueue) {
+            forceSyncUpdate();
+        }
+        return; // Stop further execution if not running or enabled
+    }
+    
+    // --- Simulation Logic for Running State ---
 
     if (isCyclePlaybackMode) {
-        if (!isRunning) {
-             if (needsGridUpdate || needsVisualUpdate) { 
-                sendStateUpdate(undefined, undefined, undefined, undefined, rulesetChangedInQueue, false);
-            }
-            return;
-        }
         worldTickCounter++;
-        
-        
         const nextFrame = detectedCycle[cyclePlaybackIndex];
         jsNextStateArray.set(nextFrame.state);
-        jsNextRuleIndexArray.set(nextFrame.rules); 
-        
-        
+        jsNextRuleIndexArray.set(nextFrame.rules);
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
-    } 
-    else {
-        if (!isEnabled || !jsStateArray || !ruleset || !workerConfig.NUM_CELLS) { 
-            if (needsGridUpdate || needsVisualUpdate) { 
-                const currentGridChecksum = calculateChecksum(jsStateArray);
-                if (currentGridChecksum !== lastSentChecksum || rulesetChangedInQueue || needsGridUpdate || needsVisualUpdate) {
-                    forceSyncUpdate();
-                }
-            }
-            return;
-        }
-
-        if (!isRunning) { 
-            if (needsGridUpdate || needsVisualUpdate) {
-                forceSyncUpdate();
-            }
-            return;
-        }
-        
+    } else {
         worldTickCounter++;
-
-        if (isRunning && wasm_world) {
-            wasm_world.run_tick(
-                ruleset,
-                jsStateArray,
-                jsNextStateArray,
-                jsNextRuleIndexArray,
-                ruleUsageCounters
-            );
-        }
+        wasm_world.run_tick(
+            ruleset,
+            jsStateArray,
+            jsNextStateArray,
+            jsNextRuleIndexArray,
+            ruleUsageCounters
+        );
     }
+
+    // --- Post-Tick Analysis and State Swap ---
 
     let activeCount = 0;
     for(let i = 0; i < jsNextStateArray.length; i++) {
@@ -310,6 +291,7 @@ function runTick() {
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
 
+    // Cycle Detection Logic
     if (isDetectingCycle) {
         if (newStateChecksum === cycleStartChecksum) {
             isCyclePlaybackMode = true;
@@ -333,65 +315,59 @@ function runTick() {
     if (!isCyclePlaybackMode) {
         stateHistoryChecksums.add(newStateChecksum);
         stateChecksumQueue.push(newStateChecksum);
-        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) { 
+        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
             const oldestChecksum = stateChecksumQueue.shift();
             if (!stateChecksumQueue.includes(oldestChecksum)) {
                 stateHistoryChecksums.delete(oldestChecksum);
             }
         }
     }
-
-    let tempState = jsStateArray;
-    jsStateArray = jsNextStateArray;
-    jsNextStateArray = tempState;
-
-    let tempRuleIndex = jsRuleIndexArray;
-    jsRuleIndexArray = jsNextRuleIndexArray;
-    jsNextRuleIndexArray = tempRuleIndex;
+    
+    // Swap buffers for next tick
+    [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+    [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
 
     if (newStateChecksum !== lastSentChecksum) {
         simulationPerformedUpdate = true;
     }
 
+    // --- Stats Calculation and Update Scheduling ---
+
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
-    let currentBinaryEntropy = undefined;
-    let currentBlockEntropy = undefined;
+    let currentBinaryEntropy, currentBlockEntropy;
     const shouldSampleEntropy = workerIsEntropySamplingEnabled && (worldTickCounter % workerEntropySampleRate === 0);
 
-    if (isEnabled && isRunning) {
-        if (shouldSampleEntropy) {
-            currentBinaryEntropy = calculateBinaryEntropy(ratio);
-            currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
-            entropyHistory.push(currentBinaryEntropy);
-            hexBlockEntropyHistory.push(currentBlockEntropy);
-            if (entropyHistory.length > MAX_HISTORY_SIZE) entropyHistory.shift();
-            if (hexBlockEntropyHistory.length > MAX_HISTORY_SIZE) hexBlockEntropyHistory.shift();
-        }
-        ratioHistory.push(ratio);
-        if (ratioHistory.length > MAX_HISTORY_SIZE) ratioHistory.shift();
+    if (shouldSampleEntropy) {
+        currentBinaryEntropy = calculateBinaryEntropy(ratio);
+        currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+        entropyHistory.push(currentBinaryEntropy);
+        hexBlockEntropyHistory.push(currentBlockEntropy);
+        if (entropyHistory.length > MAX_HISTORY_SIZE) entropyHistory.shift();
+        if (hexBlockEntropyHistory.length > MAX_HISTORY_SIZE) hexBlockEntropyHistory.shift();
     }
 
+    ratioHistory.push(ratio);
+    if (ratioHistory.length > MAX_HISTORY_SIZE) ratioHistory.shift();
+    
     // Update the stats cache on every tick
     lastKnownStats = {
         tick: worldTickCounter,
         activeCount: activeCount,
         ratio: ratio,
-        binaryEntropy: currentBinaryEntropy ?? lastKnownStats.binaryEntropy, // Carry over old value if not sampled
-        blockEntropy: currentBlockEntropy ?? lastKnownStats.blockEntropy, // Carry over old value
+        binaryEntropy: currentBinaryEntropy ?? lastKnownStats.binaryEntropy,
+        blockEntropy: currentBlockEntropy ?? lastKnownStats.blockEntropy,
         rulesetHex: rulesetToHex(ruleset),
         isEnabled: isEnabled,
         isInCycle: isCyclePlaybackMode,
-        cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0
+        cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
     };
 
-    // Schedule the throttled update
+    // Schedule the throttled stats update
     statsThrottler.schedule();
 
-    if (needsGridUpdate || simulationPerformedUpdate) {
-        lastSentChecksum = calculateChecksum(jsStateArray);
-        sendGridUpdate();
-    } else if (needsVisualUpdate) {
-        // For hover, we only need to send the grid update
+    // Send grid update only if the visual state has actually changed
+    if (simulationPerformedUpdate) {
+        lastSentChecksum = newStateChecksum;
         sendGridUpdate();
     }
 }
@@ -432,10 +408,11 @@ function sendStatsUpdate(forceUpdate = false) {
 function forceSyncUpdate() {
     // This function is for when the simulation is paused or disabled,
     // but a command has changed the state and the UI needs an immediate, full update.
+    if (!jsStateArray) return;
     lastSentChecksum = calculateChecksum(jsStateArray);
     sendGridUpdate();
 
-    const active = jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
+    const active = jsStateArray.reduce((s, c) => s + c, 0);
     const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
     let binaryEntropy, blockEntropy;
 
