@@ -64,7 +64,6 @@ export class RulesetActionsComponent extends BaseComponent {
 
     _renderGeneratePane() {
         const pane = this.panes.generate;
-        const controllerState = this.appContext.rulesetActionController.getState();
         
         pane.innerHTML = `
             <div class="form-group" id="ruleset-actions-gen-mode-mount"></div>
@@ -82,7 +81,7 @@ export class RulesetActionsComponent extends BaseComponent {
             label: 'Generation Mode:', 
             type: 'radio', 
             name: `ruleset-actions-gen-mode`, // Static name
-            initialValue: controllerState.genMode,
+            initialValue: this.appContext.rulesetActionController.getGenMode(),
             items: this.appContext.rulesetActionController.getGenerationConfig(),
             onChange: this.appContext.rulesetActionController.setGenMode
         });
@@ -90,25 +89,25 @@ export class RulesetActionsComponent extends BaseComponent {
         this.sliders.bias = new SliderComponent(pane.querySelector(`#ruleset-actions-bias-slider-mount`), {
             ...this.appContext.rulesetActionController.getBiasSliderConfig(),
             id: `ruleset-actions-bias-slider`, // Static ID
-            value: controllerState.bias,
-            disabled: !controllerState.useCustomBias
+            value: this.appContext.rulesetActionController.getBias(),
+            disabled: !this.appContext.rulesetActionController.getUseCustomBias()
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-scope-mount`), {
             ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
             name: `ruleset-actions-gen-scope`, // Static name
-            initialValue: controllerState.genScope,
+            initialValue: this.appContext.rulesetActionController.getGenScope(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-reset-mount`), {
             ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
             name: `ruleset-actions-gen-reset`, // Static name
-            initialValue: controllerState.genAutoReset,
+            initialValue: this.appContext.rulesetActionController.getGenAutoReset(),
         });
 
         
         const biasCheckbox = pane.querySelector(`#ruleset-actions-use-custom-bias`);
-        biasCheckbox.checked = controllerState.useCustomBias;
+        biasCheckbox.checked = this.appContext.rulesetActionController.getUseCustomBias();
         biasCheckbox.addEventListener('change', e => {
             this.appContext.rulesetActionController.setUseCustomBias(e.target.checked);
             this.sliders.bias?.setDisabled(!e.target.checked);
@@ -117,7 +116,6 @@ export class RulesetActionsComponent extends BaseComponent {
 
     _renderMutatePane() {
         const pane = this.panes.mutate;
-        const controllerState = this.appContext.rulesetActionController.getState();
         
         pane.innerHTML = `
             <div class="form-group" id="ruleset-actions-mutate-rate-mount"></div>
@@ -133,14 +131,14 @@ export class RulesetActionsComponent extends BaseComponent {
         new SliderComponent(pane.querySelector(`#ruleset-actions-mutate-rate-mount`), {
             ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
             id: `ruleset-actions-mutate-rate`, // Static ID
-            value: controllerState.mutateRate,
+            value: this.appContext.rulesetActionController.getMutateRate(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-mode-mount`), {
             label: 'Mutation Mode:', 
             type: 'radio', 
             name: `ruleset-actions-mutate-mode`, // Static name
-            initialValue: controllerState.mutateMode,
+            initialValue: this.appContext.rulesetActionController.getMutateMode(),
             items: this.appContext.rulesetActionController.getMutationModeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateMode
         });
@@ -149,7 +147,7 @@ export class RulesetActionsComponent extends BaseComponent {
             label: 'Apply to:',
             type: 'radio',
             name: `ruleset-actions-mutate-scope`, // Static name
-            initialValue: controllerState.mutateScope,
+            initialValue: this.appContext.rulesetActionController.getMutateScope(),
             items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
         });
@@ -215,7 +213,7 @@ export class RulesetActionsComponent extends BaseComponent {
             const target = e.target;
             const action = target.dataset.action;
             const id = target.dataset.id;
-            const controllerState = this.appContext.rulesetActionController.getState();
+            const rulesetActionController = this.appContext.rulesetActionController;
 
             // Handle sub-tab filtering
             if (target.matches('[data-library-filter]')) {
@@ -234,8 +232,8 @@ export class RulesetActionsComponent extends BaseComponent {
             if (action === 'load-rule' || action === 'load-personal') {
                 this.appContext.libraryController.loadRuleset(
                     target.parentNode.dataset.hex,
-                    controllerState.genScope,
-                    controllerState.genAutoReset
+                    rulesetActionController.getGenScope(),
+                    rulesetActionController.getGenAutoReset()
                 );
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             }

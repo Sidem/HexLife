@@ -35,7 +35,7 @@ export class AppContext {
         this.rulesetActionController = new RulesetActionController();
         this.simulationController = new SimulationController();
         this.visualizationController = new VisualizationController();
-        initRulesetVisualizer(this.visualizationController.getState().vizType);
+        initRulesetVisualizer(this.visualizationController.getVizType());
         this.worldsController = new WorldsController();
         this.panelManager = new PanelManager(this);
         this.panelManager.init(libraryData);

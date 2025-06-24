@@ -387,7 +387,11 @@ function renderWorldsToTextures(appContext) {
 function renderMainScene(appContext) {
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
     const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
-    const vizState = appContext.visualizationController.getState();
+    const vizState = {
+        showCycleIndicator: appContext.visualizationController.getShowCycleIndicator(),
+        showMinimapOverlay: appContext.visualizationController.getShowMinimapOverlay(),
+        vizType: appContext.visualizationController.getVizType(),
+    };
     
     if (!quadShaderProgram || !quadVAO) return;
 

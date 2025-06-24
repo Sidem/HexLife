@@ -57,7 +57,11 @@ export class MinimapOverlays extends BaseComponent {
         const allWorldsStatus = this.worldManager.getWorldsFullStatus();
         const selectedWorldIndex = this.worldManager.getSelectedWorldIndex();
         const selectedWorldRuleset = allWorldsStatus[selectedWorldIndex]?.stats.rulesetHex;
-        const vizState = this.visualizationController.getState();
+        const vizState = {
+            showCycleIndicator: this.visualizationController.getShowCycleIndicator(),
+            showMinimapOverlay: this.visualizationController.getShowMinimapOverlay(),
+            vizType: this.visualizationController.getVizType(),
+        };
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const worldStatus = allWorldsStatus[i];

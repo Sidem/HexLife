@@ -66,8 +66,7 @@ export class InputManager {
             if (viewType !== 'selected') return;
             if (e.ctrlKey || e.shiftKey) {
                 const scrollAmount = Math.sign(e.deltaY);
-                const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
-                EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
+                EventBus.dispatch(EVENTS.COMMAND_INCREMENT_BRUSH_SIZE, -scrollAmount);
                 this.currentStrategy.handleMouseMove(e);
             } else {
                 const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -169,7 +168,7 @@ export class InputManager {
     handleBrushSizeWheel(event) {
         if (event.ctrlKey) {
             const scrollAmount = Math.sign(event.deltaY);
-            const newSize = this.appContext.brushController.getState().brushSize - scrollAmount;
+            const newSize = this.appContext.brushController.getBrushSize() - scrollAmount;
             EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, newSize);
         }
     }

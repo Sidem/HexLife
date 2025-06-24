@@ -5,7 +5,6 @@ export class RulesetDirectInput extends BaseComponent {
     constructor(mountPoint, appContext, options = {}) {
         super(mountPoint, options);
         this.appContext = appContext;
-        this.context = options.context || 'shared';
         this.render();
         this._updateInputValue();
     }
@@ -14,7 +13,7 @@ export class RulesetDirectInput extends BaseComponent {
         this.element = document.createElement('div');
         this.element.className = 'ruleset-direct-input-container';
 
-        const inputId = `ruleset-input`;
+        const inputId = 'ruleset-direct-input-field';
         this.element.innerHTML = `
             <div class="form-group">
                 <label for="${inputId}">Paste 32-character Hex Code</label>

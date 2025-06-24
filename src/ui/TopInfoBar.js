@@ -36,10 +36,10 @@ export class TopInfoBar {
 
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
-        this.updateBrushSizeDisplay(this.appContext.brushController.getState().brushSize);
+        this.updateBrushSizeDisplay(this.appContext.brushController.getBrushSize());
         this.updateUndoRedoButtons();
         if (this.uiElements?.statTargetTps) {
-            this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getState().speed);
+            this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getSpeed());
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
         
@@ -169,7 +169,10 @@ export class TopInfoBar {
     updatePerformanceDisplay(fps, tpsOfSelectedWorld, targetTps) {
         if (this.uiElements?.statFps) this.uiElements.statFps.textContent = fps !== undefined ? String(fps) : '--';
         if (this.uiElements?.statActualTps) this.uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(Math.round(tpsOfSelectedWorld)) : '--';
-        if (this.uiElements?.statTargetTps) this.uiElements.statTargetTps.textContent = targetTps !== undefined ? String(targetTps) : '--';
+        if (this.uiElements?.statTargetTps) {
+            const speed = this.appContext.simulationController.getSpeed();
+            this.uiElements.statTargetTps.textContent = targetTps !== undefined ? String(targetTps) : String(speed);
+        }
     }
 
     updateBrushSizeDisplay(brushSize) {

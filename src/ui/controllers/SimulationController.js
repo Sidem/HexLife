@@ -4,19 +4,19 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class SimulationController {
     constructor() {
-        this.state = {
-            isPaused: true,
-            speed: PersistenceService.loadSimSpeed() ?? Config.DEFAULT_SPEED,
-        };
+        this.isPaused = true;
 
-        
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, this.#handleSetSpeed);
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PAUSE, this.#handleTogglePause);
         EventBus.subscribe(EVENTS.COMMAND_SET_PAUSE_STATE, this.#handleSetPauseState);
     }
 
-    getState() {
-        return { ...this.state };
+    getIsPaused() {
+        return this.isPaused;
+    }
+
+    getSpeed() {
+        return PersistenceService.loadSimSpeed() ?? Config.DEFAULT_SPEED;
     }
 
     getSpeedConfig() {
@@ -27,31 +27,28 @@ export class SimulationController {
             unit: 'tps'
         };
     }
+
     #handleSetSpeed = (speed) => {
         const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
-        if (this.state.speed === newSpeed) return;
-        this.state.speed = newSpeed;
         PersistenceService.saveSimSpeed(newSpeed);
         EventBus.dispatch(EVENTS.SIMULATION_SPEED_CHANGED, newSpeed);
     }
 
-    
     #handleTogglePause = () => {
-        this.state.isPaused = !this.state.isPaused;
-        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.state.isPaused);
+        this.isPaused = !this.isPaused;
+        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isPaused);
     }
 
-    
     #handleSetPauseState = (shouldBePaused) => {
-        if (this.state.isPaused === shouldBePaused) return; 
-        this.state.isPaused = shouldBePaused;
-        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.state.isPaused);
+        if (this.isPaused === shouldBePaused) return; 
+        this.isPaused = shouldBePaused;
+        EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isPaused);
     }
 
     _syncPauseState = (isPaused) => {
-        if (this.state.isPaused !== isPaused) {
-            this.state.isPaused = isPaused;
-            EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.state.isPaused);
+        if (this.isPaused !== isPaused) {
+            this.isPaused = isPaused;
+            EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isPaused);
         }
     }
 } 

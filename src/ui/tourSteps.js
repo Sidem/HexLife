@@ -249,7 +249,7 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'Step 4: Observe',
         content: "Start the simulation to see the 'Gliders' ruleset in action.",
-        condition: (appContext) => appContext.simulationController.getState().isPaused,
+        condition: (appContext) => appContext.simulationController.getIsPaused(),
         primaryAction: { text: 'Press Play' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },

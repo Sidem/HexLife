@@ -113,7 +113,7 @@ async function initialize() {
     });
 
     EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, appContext.worldManager.getSelectedWorldIndex());
-    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, appContext.simulationController.getState().isPaused);
+    EventBus.dispatch(EVENTS.SIMULATION_PAUSED, appContext.simulationController.getIsPaused());
     window.addEventListener('resize', handleResize);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', () => {
@@ -134,7 +134,7 @@ function handleResize() {
 function handleVisibilityChange() {
     if (!appContext) return;
     if (document.hidden) {
-        if (!appContext.simulationController.getState().isPaused) {
+        if (!appContext.simulationController.getIsPaused()) {
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
             pausedByVisibilityChange = true;
         }
@@ -145,8 +145,6 @@ function handleVisibilityChange() {
         }
     }
 }
-
-
 
 initialize().catch(err => {
     console.error("Initialization failed:", err);

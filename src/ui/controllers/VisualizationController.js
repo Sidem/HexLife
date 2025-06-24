@@ -4,22 +4,14 @@ import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class VisualizationController {
     constructor() {
-        this.state = {
-            vizType: PersistenceService.loadUISetting('rulesetVizType', 'binary'),
-            showMinimapOverlay: PersistenceService.loadUISetting('showMinimapOverlay', true),
-            showCycleIndicator: PersistenceService.loadUISetting('showCycleIndicator', true),
-        };
-        
         EventBus.subscribe(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, this.#handleSetVisualizationType);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, this.#handleSetShowCycleIndicator);
-        
-        
     }
 
-    getState() {
-        return { ...this.state };
-    }
+    getVizType = () => PersistenceService.loadUISetting('rulesetVizType', 'binary');
+    getShowMinimapOverlay = () => PersistenceService.loadUISetting('showMinimapOverlay', true);
+    getShowCycleIndicator = () => PersistenceService.loadUISetting('showCycleIndicator', true);
 
     getVisualizationOptions() {
         return [
@@ -30,24 +22,17 @@ export class VisualizationController {
 
     #handleSetVisualizationType = (type) => {
         if (type !== 'binary' && type !== 'color') return;
-        if (this.state.vizType === type) return;
-        this.state.vizType = type;
         rulesetVisualizer.setVisualizationType(type);
         PersistenceService.saveUISetting('rulesetVizType', type);
-        
     }
 
     #handleSetShowMinimapOverlay = (shouldShow) => {
-        if (this.state.showMinimapOverlay === !!shouldShow) return;
-        this.state.showMinimapOverlay = !!shouldShow;
-        PersistenceService.saveUISetting('showMinimapOverlay', this.state.showMinimapOverlay);
+        PersistenceService.saveUISetting('showMinimapOverlay', !!shouldShow);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 
     #handleSetShowCycleIndicator = (shouldShow) => {
-        if (this.state.showCycleIndicator === !!shouldShow) return;
-        this.state.showCycleIndicator = !!shouldShow;
-        PersistenceService.saveUISetting('showCycleIndicator', this.state.showCycleIndicator);
+        PersistenceService.saveUISetting('showCycleIndicator', !!shouldShow);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 } 

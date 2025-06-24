@@ -73,12 +73,11 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_TOGGLE_POPOUT` | `{ popoutName, show? }` | Command to show, hide, or toggle a popout panel. |
 | `COMMAND_SHOW_MOBILE_VIEW` | `{ viewName }` | Command to switch to a specific full-screen mobile view. |
 | `COMMAND_HIDE_ALL_OVERLAYS` | `(none)` | Command to hide all transient UI overlays (popouts, panels). |
-| `COMMAND_TOGGLE_VIEW` | `(various)` | **@deprecated** Use `COMMAND_TOGGLE_PANEL`, `COMMAND_TOGGLE_POPOUT`, or `COMMAND_SHOW_MOBILE_VIEW`. |
 | `COMMAND_SHARE_SETUP` | `(none)` | Command to trigger the share functionality. |
 
 -----
 
-### UI & System Events (`ui:*, system:*, onboarding:*`)
+### UI & System Events (`ui:*, system:*, renderer:*, onboarding:*`)
 
 *Events related to UI state, system-level operations, and interactive tours.*
 
@@ -93,7 +92,7 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `SYSTEM:TRIGGER_DOWNLOAD` | `{ filename, content, mimeType }` | A generic command for the UI to trigger a file download. |
 | `SYSTEM:TRIGGER_FILE_LOAD` | `{ file: File }` | Command to trigger loading a user-provided file. |
 | `SYSTEM:WORKER_INITIALIZED` | `{ worldIndex: number }` | Fired when a worker signals it is ready. |
-| `SYSTEM:LAYOUT_CALCULATED` | `layout: object` | Dispatched when the main canvas view layout is calculated. |
+| `LAYOUT_UPDATED` | `{ selectedView: object, miniMap: object }` | Dispatched by the renderer when the main canvas view layout is calculated or recalculated. |
 | `ONBOARDING:TOUR_ENDED` | `{ tourName: string }` | Fired when an interactive tour is completed or skipped. |
 
 -----

@@ -40,7 +40,7 @@ export class DrawStrategy extends BaseInputStrategy {
         if (viewType !== 'selected' || col === null) return;
         this.isDrawing = true;
         this.resetStrokeState();
-        if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
+        if (this.manager.appContext.interactionController.getPauseWhileDrawing() && !this.manager.appContext.simulationController.getIsPaused()) {
             this.wasSimulationRunningBeforeStroke = true;
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
         }
@@ -77,7 +77,7 @@ export class DrawStrategy extends BaseInputStrategy {
             this.isDrawing = true;
             this.resetStrokeState();
             
-            if (this.manager.appContext.interactionController.getState().pauseWhileDrawing && !this.manager.appContext.simulationController.getState().isPaused) {
+            if (this.manager.appContext.interactionController.getPauseWhileDrawing() && !this.manager.appContext.simulationController.getIsPaused()) {
                 this.wasSimulationRunningBeforeStroke = true;
                 EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
             }
@@ -126,13 +126,13 @@ export class DrawStrategy extends BaseInputStrategy {
         this.lastDrawnCellIndex = currentCellIndex;
 
         const newCellsInBrush = new Set();
-        findHexagonsInNeighborhood(col, row, this.manager.appContext.brushController.getState().brushSize, newCellsInBrush);
+        findHexagonsInNeighborhood(col, row, this.manager.appContext.brushController.getBrushSize(), newCellsInBrush);
         
         const cellsToToggle = Array.from(newCellsInBrush).filter(cellIndex => !this.strokeAffectedCells.has(cellIndex));
 
         if (cellsToToggle.length > 0) {
             cellsToToggle.forEach(c => this.strokeAffectedCells.add(c));
-            const brushMode = this.manager.appContext.interactionController.getState().brushMode;
+            const brushMode = this.manager.appContext.interactionController.getBrushMode();
             EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { 
                 worldIndex: worldIndex, 
                 cellIndices: new Set(cellsToToggle),

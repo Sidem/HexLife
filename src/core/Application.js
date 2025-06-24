@@ -61,7 +61,7 @@ export class Application {
             this.frameCount = 0;
             this.lastFpsUpdateTime = timestamp;
             const selectedStats = this.appContext.worldManager.getSelectedWorldStats();
-            const targetTps = this.appContext.simulationController.getState().speed;
+            const targetTps = this.appContext.simulationController.getSpeed();
             EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
         }
         requestAnimationFrame(this.renderLoop.bind(this));

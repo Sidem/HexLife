@@ -110,6 +110,8 @@ export const EVENTS = {
     COMMAND_SET_SPEED: 'command:setSpeed', 
     /** @param {number} size - The desired brush size. */
     COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize',
+    /** @param {number} increment - The amount to increment the brush size by (e.g., 1 or -1). */
+    COMMAND_INCREMENT_BRUSH_SIZE: 'command:incrementBrushSize',
     /** @param {'invert'|'draw'|'erase'} mode - The desired brush interaction mode. */
     COMMAND_SET_BRUSH_MODE: 'command:setBrushMode', 
     /** @param {{bias: number, generationMode: 'random'|'n_count'|'r_sym', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
@@ -206,8 +208,6 @@ export const EVENTS = {
     COMMAND_SHOW_MOBILE_VIEW: 'command:showMobileView',
     /** @event Emitted with no payload to command all popout and draggable panels to hide. */
     COMMAND_HIDE_ALL_OVERLAYS: 'command:hideAllOverlays',
-    /** @deprecated Use COMMAND_TOGGLE_PANEL, COMMAND_TOGGLE_POPOUT, or COMMAND_SHOW_MOBILE_VIEW. */
-    COMMAND_TOGGLE_VIEW: 'command:toggleView', 
 
     
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */
@@ -222,8 +222,6 @@ export const EVENTS = {
     BRUSH_MODE_CHANGED: 'ui:brushModeChanged',
     /** @param {{mode: 'desktop'|'mobile'}} data - The new UI mode. */
     UI_MODE_CHANGED: 'ui:modeChanged',
-    /** @deprecated Use COMMAND_TOGGLE_VIEW. @param {{targetView: string, currentView: string}} data - Parameters for changing the active mobile view. */
-    COMMAND_SHOW_VIEW: 'command:showView',
     /** @param {{activeView: string}} data - The name of the mobile view that became active. */
     MOBILE_VIEW_CHANGED: 'ui:mobileViewChanged',
     /** @event Emitted with no payload to command the FAB UI to re-render based on persisted settings. */

@@ -95,7 +95,7 @@ export class WorldManager {
                 enabled: settings.enabled,
                 rulesetArray: rulesetArray,
                 rulesetHex: settings.rulesetHex,
-                speed: this.simulationController?.getState()?.speed || 1,
+                speed: this.simulationController?.getSpeed() || 1,
                 initialEntropySamplingEnabled: this.isEntropySamplingEnabled,
                 initialEntropySampleRate: this.entropySampleRate,
             }, worldManagerCallbacks);
@@ -130,7 +130,7 @@ export class WorldManager {
         }
         if (!this.isGloballyPaused && this.worlds[worldIndex]?.getLatestStats().isEnabled) {
             this.worlds[worldIndex].startSimulation();
-            this.worlds[worldIndex].setSpeed(this.simulationController.getState().speed);
+            this.worlds[worldIndex].setSpeed(this.simulationController.getSpeed());
         }
     }
 
@@ -340,7 +340,7 @@ export class WorldManager {
                 this.worlds[data.worldIndex].setEnabled(data.isEnabled);
                 if (data.isEnabled && !this.isGloballyPaused) {
                     this.worlds[data.worldIndex].startSimulation();
-                    this.worlds[data.worldIndex].setSpeed(this.simulationController.getState().speed);
+                    this.worlds[data.worldIndex].setSpeed(this.simulationController.getSpeed());
                 } else if (!data.isEnabled) {
                     this.worlds[data.worldIndex].stopSimulation();
                 }
@@ -352,13 +352,13 @@ export class WorldManager {
     
     #setupInputAndInteractionHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_BRUSH, (data) => {
-            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.brushController.getState().brushSize);
+            this.worlds[data.worldIndex]?.applyBrush(data.col, data.row, this.brushController.getBrushSize());
         });
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices, data.brushMode);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
-            findHexagonsInNeighborhood(data.col, data.row, this.brushController.getState().brushSize, this._hoverAffectedIndicesSet);
+            findHexagonsInNeighborhood(data.col, data.row, this.brushController.getBrushSize(), this._hoverAffectedIndicesSet);
             this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_HOVER_STATE, (data) => {
@@ -659,7 +659,7 @@ export class WorldManager {
                 proxy.stopSimulation();
             } else {
                 proxy.startSimulation();
-                proxy.setSpeed(this.simulationController.getState().speed);
+                proxy.setSpeed(this.simulationController.getSpeed());
             }
         });
         this.simulationController._syncPauseState(this.isGloballyPaused);
@@ -831,7 +831,7 @@ export class WorldManager {
         proxy.setEnabled(true);
                     if (!this.isGloballyPaused) {
                 proxy.startSimulation();
-                proxy.setSpeed(this.simulationController.getState().speed);
+                proxy.setSpeed(this.simulationController.getSpeed());
             }
 
         PersistenceService.saveWorldSettings(this.worldSettings);

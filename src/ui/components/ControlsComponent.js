@@ -44,7 +44,7 @@ export class ControlsComponent extends BaseComponent {
         new SliderComponent(this.element.querySelector(`#controls-speed-slider-mount`), {
             id: `controls-speed-slider`, // Static ID
             ...simController.getSpeedConfig(),
-            value: simController.getState().speed,
+            value: simController.getSpeed(),
             showValue: true,
             onChange: (speed) => EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, speed)
         });
@@ -52,7 +52,7 @@ export class ControlsComponent extends BaseComponent {
         new SliderComponent(this.element.querySelector(`#controls-brush-slider-mount`), {
             id: `controls-brush-slider`, // Static ID
             ...brushController.getBrushConfig(),
-            value: brushController.getState().brushSize,
+            value: brushController.getBrushSize(),
             showValue: true,
             onChange: (size) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_SIZE, size)
         });
@@ -61,7 +61,7 @@ export class ControlsComponent extends BaseComponent {
             type: 'radio',
             name: `controls-brush-mode`,
             label: 'Brush Mode:',
-            initialValue: interactionController.getState().brushMode,
+            initialValue: interactionController.getBrushMode(),
             items: [
                 { value: 'invert', text: 'Invert' },
                 { value: 'draw', text: 'Draw' },
@@ -73,7 +73,7 @@ export class ControlsComponent extends BaseComponent {
         new SwitchComponent(this.element.querySelector(`#controls-pause-while-drawing-mount`), {
             type: 'checkbox',
             name: `controls-pause-while-drawing`, // Static name
-            initialValue: interactionController.getState().pauseWhileDrawing,
+            initialValue: interactionController.getPauseWhileDrawing(),
             items: [{ value: 'pause', text: 'Pause While Drawing' }],
             onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
         });
@@ -82,7 +82,7 @@ export class ControlsComponent extends BaseComponent {
             type: 'radio',
             name: `controls-ruleset-viz`, // Static name
             label: 'Display Type:',
-            initialValue: vizController.getState().vizType,
+            initialValue: vizController.getVizType(),
             items: vizController.getVisualizationOptions(),
             onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
         });
@@ -90,7 +90,7 @@ export class ControlsComponent extends BaseComponent {
         new SwitchComponent(this.element.querySelector(`#controls-show-minimap-overlay-mount`), {
             type: 'checkbox',
             name: `controls-show-minimap-overlay`, // Static name
-            initialValue: vizController.getState().showMinimapOverlay,
+            initialValue: vizController.getShowMinimapOverlay(),
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
         });
@@ -98,7 +98,7 @@ export class ControlsComponent extends BaseComponent {
         new SwitchComponent(this.element.querySelector(`#controls-show-cycle-indicator-mount`), {
             type: 'checkbox',
             name: `controls-show-cycle-indicator`, // Static name
-            initialValue: vizController.getState().showCycleIndicator,
+            initialValue: vizController.getShowCycleIndicator(),
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
         });
