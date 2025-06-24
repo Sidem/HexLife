@@ -38,6 +38,7 @@ export const SELECTION_OUTLINE_COLOR = [1.0, 1.0, 0.0, 0.9];
 export const DISABLED_WORLD_OVERLAY_COLOR = [0.25, 0.25, 0.25, 1.0];
 export const UI_UPDATE_THROTTLE_MS = 400;
 export const SIM_HOVER_THROTTLE_MS = 20;
+export const STATS_UPDATE_INTERVAL_MS = 100; // ~10 stats updates per second
 
 
 export const NEIGHBOR_DIRS_ODD_R = [ 
