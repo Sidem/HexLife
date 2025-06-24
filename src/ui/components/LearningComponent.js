@@ -77,7 +77,7 @@ export class LearningComponent extends BaseComponent {
             }
         });
         
-        this._subscribeToEvent(EVENTS.TOUR_ENDED, () => this.refreshTourList());
+        this._subscribeToEvent(EVENTS.ONBOARDING_TOUR_ENDED, () => this.refreshTourList());
     }
 
     refreshTourList() {

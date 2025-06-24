@@ -93,6 +93,6 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `SYSTEM:TRIGGER_FILE_LOAD` | `{ file: File }` | Command to trigger loading a user-provided file. |
 | `SYSTEM:WORKER_INITIALIZED` | `{ worldIndex: number }` | Fired when a worker signals it is ready. |
 | `LAYOUT_UPDATED` | `{ selectedView: object, miniMap: object }` | Dispatched by the renderer when the main canvas view layout is calculated or recalculated. |
-| `ONBOARDING:TOUR_ENDED` | `{ tourName: string }` | Fired when an interactive tour is completed or skipped. |
+| `ONBOARDING:ONBOARDING_TOUR_ENDED` | `{ tourName: string }` | Fired when an interactive tour is completed or skipped. |
 
 -----

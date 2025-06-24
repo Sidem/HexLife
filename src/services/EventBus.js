@@ -229,7 +229,7 @@ export const EVENTS = {
     /** @event Emitted with no payload when the ruleset visualization type (e.g., binary, color) changes. */
     RULESET_VISUALIZATION_CHANGED: 'ui:rulesetVisualizationChanged',
     /** @param {{tourName: string}} data - The name of the tour that was completed. */
-    TOUR_ENDED: 'onboarding:tourEnded',
+    ONBOARDING_TOUR_ENDED: 'onboarding:tourEnded',
     /** @param {{view: object, viewType: string, viewName: string, contentComponent: object|null}} data - The view component that was shown. */
     VIEW_SHOWN: 'ui:viewShown',
     /** @param {{panel: object}} data - The popout panel that had an interaction. */

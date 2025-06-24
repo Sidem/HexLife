@@ -87,12 +87,6 @@ export class Toolbar {
 
     
     _initPopoutControls() {
-        
-        const desktopControlsMount = this.uiElements.controlsPopout.querySelector('#desktopControlsMount');
-        if (desktopControlsMount) {
-            // The mount point is now empty. The UIManager will fill it.
-            desktopControlsMount.innerHTML = '';
-        }
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });

@@ -49,8 +49,8 @@ export class KeyboardShortcutManager {
             { key: 'r', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
             { key: 'c', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
             { key: 'c', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
-            { key: 'z', ctrlKey: true, handler: () => document.getElementById('undoButton')?.click() },
-            { key: 'z', ctrlKey: true, shiftKey: true, handler: () => document.getElementById('redoButton')?.click() },
+            { key: 'z', ctrlKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
+            { key: 'z', ctrlKey: true, shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
 
             
             ...Array.from({ length: 9 }, (_, i) => ({

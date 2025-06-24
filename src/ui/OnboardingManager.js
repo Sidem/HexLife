@@ -86,7 +86,7 @@ export class OnboardingManager {
         this.tourIsActive = false;
         
         
-        EventBus.dispatch(EVENTS.TOUR_ENDED, { tourName: this.currentTourName });
+        EventBus.dispatch(EVENTS.ONBOARDING_TOUR_ENDED, { tourName: this.currentTourName });
         
         this.currentTourName = null;
     }

@@ -59,11 +59,6 @@ export class MobileView extends Panel {
         }
     }
 
-    setContentComponent(component) {
-        // This method is deprecated - components are now managed by UIManager
-        console.warn('MobileView.setContentComponent is deprecated. Components are now managed by UIManager.');
-    }
-
     show() {
         super.show(); // This handles removing 'hidden' and dispatching the VIEW_SHOWN event for reparenting
     }
