@@ -37,31 +37,6 @@ screen and (pointer: coarse) and (hover: none) {
     #top-info-bar {
         order: 1;
         /* Top bar is the first item */
-        height: auto;
-        flex-wrap: wrap;
-        line-height: 1.4;
-        gap: 8px;
-    }
-
-    #statsDisplayContainer {
-        display: flex;
-        width: 100%;
-        justify-content: space-around;
-        font-size: 0.9em;
-        gap: 10px;
-    }
-
-    /* Hide detailed stats on mobile */
-    #rulesetDisplayContainer {
-        order: 2;
-        width: 100%;
-        justify-content: center;
-    }
-
-    #appTitleContainer {
-        order: 1;
-        width: 100%;
-        justify-content: center;
     }
 
 

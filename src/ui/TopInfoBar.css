@@ -1,30 +1,38 @@
 #top-info-bar {
-    height: 2.5rem;
-    line-height: 2.5rem;
-    background-color: #2a2a2a;
-    border-bottom: 1px solid #444;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background-color: #2a2a2a;
+    border-bottom: 1px solid #444;
+    padding: 0 10px;
+    gap: 15px;
     flex-shrink: 0;
     font-size: 0.85em;
     box-sizing: border-box;
+    /* Desktop specific height */
+    height: 2.5rem;
     padding-top: env(safe-area-inset-top);
 }
 
-#appTitleContainer {
+#appMenuButton {
     display: flex;
     align-items: center;
     gap: 8px;
     font-weight: bold;
     color: #f0f0f0;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+#appMenuButton:hover {
+    background-color: #3f3f3f;
 }
 
 #appLogo {
-    font-size: 2.0rem;
+    font-size: 1.5rem;
     color: #FFFF00;
-    text-shadow: 0 0 3px rgba(255, 255, 0, 0.3);
-    font-weight: bolder;
 }
 
 #appTitle {
@@ -33,34 +41,32 @@
     white-space: nowrap;
 }
 
-#githubLink {
-    margin-left: 10px;
-    color: #ccc;
-    text-decoration: none;
-    font-size:0.9em;
-}
-
-#githubLink svg {
-    vertical-align: middle;
-}
-
 #rulesetDisplayContainer {
     display: flex;
     align-items: center;
     background-color: #3c3c3c;
     border-radius: 4px;
-    padding: 0 5px;
+    padding: 2px 5px;
     border: 1px solid #555;
     font-family: monospace;
     font-size: 0.9rem;
+    min-width: 0; /* Allows flex-shrinking */
+}
+
+/* Make this the central element on desktop */
+@media screen and (min-width: 769px) {
+    #rulesetDisplayContainer {
+        flex-grow: 1;
+        justify-content: center;
+    }
 }
 
 .ruleset-display-toggle {
     position: relative;
     display: grid;
     place-items: center;
-    min-width: 250px; /* Set a fixed width to prevent layout jump */
     text-align: center;
+    min-width: 250px;
 }
 
 #rulesetDisplayName, #rulesetDisplayCode {
@@ -122,30 +128,12 @@
 #statsDisplayContainer {
     display: flex;
     gap: 15px;
+    align-items: center;
+    justify-content: flex-end; /* Align to the right on desktop */
 }
 
 #statsDisplayContainer > span {
-    min-width: 60px;
     white-space: nowrap;
-    display: inline-block;
-    text-align: left;
-}
-
-/* Fixed widths for each stat to prevent layout shifts */
-#statsDisplayContainer > span:nth-child(1) { /* Tick */
-    width: 80px;
-}
-#statsDisplayContainer > span:nth-child(2) { /* Ratio */
-    width: 85px;
-}
-#statsDisplayContainer > span:nth-child(3) { /* Brush */
-    width: 65px;
-}
-#statsDisplayContainer > span:nth-child(4) { /* FPS */
-    width: 65px;
-}
-#statsDisplayContainer > span:nth-child(5) { /* TPS */
-    width: 90px;
 }
 
 #statsDisplayContainer span span {
@@ -153,61 +141,53 @@
     color: #f0f0f0;
 }
 
-/* Mobile Overrides */
-@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
-    #top-info-bar {
-        font-size: 0.8em; 
-        height: 30px; 
-    }
-    #statsDisplayContainer { 
-        gap: 8px; 
-    }
-    #appTitle { 
-        font-size: 0.9em; 
-    }
-    #appLogo { 
-        font-size: 1.1em; 
-    }
+/* App Menu Popout */
+#appMenuPopout {
+    z-index: 1100; /* Ensure it's on top */
 }
 
-@media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
+/* Mobile Overrides */
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+
     #top-info-bar {
-        flex-direction: column;
-        height: auto;
-        line-height: 1.3;
+        flex-direction: column; /* Stack items vertically */
+        height: auto;          /* Allow height to adjust to content */
+        padding: 8px;
         gap: 8px;
     }
-    
-    #appTitleContainer {
-        justify-content: center;
-        order: 1;
-    }
-    
-    #rulesetDisplayContainer {
-        order: 2;
-        text-align: center;
-    }
-    
-    #statsDisplayContainer {
-        order: 3;
-        justify-content: center;
-        gap: 4px;
-    }
-    
-    #statsDisplayContainer > span {
-        min-width: auto;
-        font-size: 0.75em;
+
+    /* Hide the App Menu button on mobile, its functionality moves to the 'More' view */
+    #appMenuButton {
+        display: none;
     }
 
-    #appTitle { display: inline; }
-    
-    #githubLink {
-        font-size: 0.9em !important;
+    #rulesetDisplayContainer {
+        order: 1; /* Ruleset display comes first */
+        width: 100%;
+        justify-content: center;
     }
-    
-    #githubLink svg {
-        width: 16px;
-        height: 16px;
+
+    #statsDisplayContainer {
+        order: 2; /* Stats display comes second */
+        width: 100%;
+        justify-content: space-around; /* Space out stats evenly */
+        flex-wrap: wrap; /* Allow stats to wrap if needed */
+        gap: 10px;
+    }
+
+    .ruleset-display-toggle {
+        min-width: 200px; /* Adjust for smaller screens */
+    }
+
+    /* Hide less critical stats on very small screens if necessary */
+    @media (max-width: 360px) {
+        #statsDisplayContainer > span:nth-child(3) { /* Brush */
+            display: none;
+        }
+        #statsDisplayContainer > span:nth-child(4) { /* FPS */
+            display: none;
+        }
     }
 }
 

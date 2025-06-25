@@ -29,7 +29,9 @@ export class TopInfoBar {
             historyPopout: document.getElementById('historyPopout'),
             rulesetDisplayContainer: document.getElementById('rulesetDisplayContainer'),
             saveRulesetButton: document.getElementById('saveRulesetButton'),
-            rulesetVizContainer: document.querySelector('.ruleset-viz-container')
+            rulesetVizContainer: document.querySelector('.ruleset-viz-container'),
+            appMenuButton: document.getElementById('appMenuButton'),
+            appMenuPopout: document.getElementById('appMenuPopout')
         };
         
         this._setupEventListeners();
@@ -42,6 +44,14 @@ export class TopInfoBar {
             this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getSpeed());
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
+        
+        // Initialize the App Menu Popout (desktop only)
+        if (!this.appContext.uiManager.isMobile() && this.uiElements.appMenuButton && this.uiElements.appMenuPopout) {
+            this.popoutPanels.appMenu = new PopoutPanel(this.uiElements.appMenuPopout, this.uiElements.appMenuButton, {
+                position: 'bottom',
+                alignment: 'start'
+            });
+        }
         
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
     }
@@ -76,6 +86,12 @@ export class TopInfoBar {
             });
         }
         this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
+        
+        if (!this.appContext.uiManager.isMobile()) {
+            this.uiElements.appMenuButton?.addEventListener('click', () => {
+                this.popoutPanels.appMenu?.toggle();
+            });
+        }
         
         // Add listener for the save button
         this.uiElements.saveRulesetButton.addEventListener('click', () => {

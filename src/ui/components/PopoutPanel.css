@@ -224,4 +224,47 @@
             box-sizing: border-box;
         }
     }
+
+    /* Popout Menu Styles */
+    .popout-panel.popout-menu {
+        padding: 5px; /* Reduce padding for menu lists */
+        min-width: 180px;
+    }
+
+    .popout-link-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .popout-link-list li a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 15px;
+        color: #e0e0e0;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.2s, color 0.2s;
+        font-size: 0.95em;
+    }
+
+    .popout-link-list li a:hover {
+        background-color: #0078d4;
+        color: #ffffff;
+    }
+
+    .popout-link-list li a .icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .popout-link-list li a .icon svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
 }

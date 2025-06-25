@@ -23,6 +23,7 @@ export class MoreView extends BaseComponent {
         <label for="mobileFileInput" class="button file-input-label">Load World State</label>
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
         <button class="button" data-action="share">Share Setup</button>
+        <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset">⭐ Save Ruleset</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
     </div>
@@ -46,6 +47,21 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {
             this.appContext.onboardingManager && this.appContext.onboardingManager.startTour('coreMobile', true);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="save-ruleset-mobile"]'), 'click', () => {
+            const hex = this.worldManager.getCurrentRulesetHex();
+            const status = this.appContext.libraryController.getRulesetStatus(hex);
+            if (status.isPersonal) {
+                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
+                if (rule) EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule);
+            } else if (!status.isPublic) {
+                if (hex && hex !== 'N/A' && hex !== 'Error') {
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex });
+                }
+            } else {
+                alert("This is a public ruleset from the library and cannot be edited.");
+            }
         });
 
         const fileInput = this.element.querySelector('#mobileFileInput');
