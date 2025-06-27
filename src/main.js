@@ -1,3 +1,4 @@
+import '../style.css';
 import * as Config from './core/config.js';
 import * as Renderer from './rendering/renderer.js';
 import { InputManager } from './ui/InputManager.js';
@@ -6,6 +7,10 @@ import { AppContext } from './core/AppContext.js';
 import { UIManager } from './ui/UIManager.js';
 import { Application } from './core/Application.js';
 import { SettingsLoader } from './services/SettingsLoader.js';
+
+// Import JSON data directly. Vite handles this automatically.
+import rulesetLibrary from './core/library/rulesets.json';
+import patternLibrary from './core/library/patterns.json';
 
 let gl;
 let appContext;
@@ -30,12 +35,9 @@ async function initialize() {
 
     const sharedSettings = SettingsLoader.loadFromUrl();
 
-    updateLoadingStatus("Fetching assets...");
-    const libraryPromises = [
-        fetch('src/core/library/rulesets.json').then(res => res.json()),
-        fetch('src/core/library/patterns.json').then(res => res.json())
-    ];
-
+    // The library data is now imported directly, no need to fetch.
+    const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
+    
     updateLoadingStatus("Initializing rendering engine...");
     gl = await Renderer.initRenderer(canvas);
     if (!gl) {
@@ -43,9 +45,6 @@ async function initialize() {
         updateLoadingStatus("Error: WebGL2 not supported.");
         return;
     }
-
-    const [rulesetLibrary, patternLibrary] = await Promise.all(libraryPromises);
-    const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
 
     updateLoadingStatus("Spooling up simulation workers...");
     appContext = new AppContext(sharedSettings, libraryData);

@@ -2,3 +2,27 @@ combine_files.py
 .tmp*
 move.py
 hexlife-wasm
+/node_modules
+/dist
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust / wasm-pack
+/hexlife-wasm/pkg
+/hexlife-wasm/target
+**/Cargo.lock
+
+# IDE / Editor specific
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Log files
+*.log

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="google-site-verification" content="61Y9kjxqcAt7TYpyxqaFIaPjGP3IktL46ohSLVOZY4c" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-        <title>HexLife Explorer - Interactive Hexagonal Cellular Automata</title>
+    <title>HexLife Explorer - Interactive Hexagonal Cellular Automata</title>
     <meta name="description" content="Explore complex emergent behaviors with HexLife Explorer, an interactive web-based cellular automaton simulator on a hexagonal grid, powered by WebGL2 and Web Workers. Define custom rulesets and observe intricate patterns unfold in multiple concurrent simulations.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sidem.github.io/HexLife/">
@@ -37,9 +37,7 @@
       "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
     }
     </script>
-    <link rel="preload" href="style.css?v=2.1.1" as="style">
-    <link rel="preload" href="src/main.js" as="script" crossorigin="">
-    <link rel="stylesheet" href="style.css?v=2.1.1">
+    <!-- CSS link will be injected by Vite during build -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" href="favicon.ico">
 </head>
@@ -267,7 +265,8 @@
     <div id="modal-container"></div>
     <div id="popover-container"></div>
     <div id="dialog-container"></div>
-    <script type="module" src="src/main.js"></script>
+    <!-- Vite will inject the script tag here during build -->
+    <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>

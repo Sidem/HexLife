@@ -41,39 +41,23 @@ export function createProgram(gl, vertexShader, fragmentShader) {
 }
 
 /**
- * Loads shader source from files and creates a shader program.
+ * Creates a shader program from source strings.
  * @param {WebGL2RenderingContext} gl WebGL context.
- * @param {string} vsPath Path to vertex shader file.
- * @param {string} fsPath Path to fragment shader file.
- * @returns {Promise<WebGLProgram|null>} Linked shader program or null on error.
+ * @param {string} vsSource Vertex shader source code.
+ * @param {string} fsSource Fragment shader source code.
+ * @returns {WebGLProgram|null} Linked shader program or null on error.
  */
-export async function loadShaderProgram(gl, vsPath, fsPath) {
-    try {
-        const responses = await Promise.all([fetch(vsPath), fetch(fsPath)]);
-        if (!responses[0].ok || !responses[1].ok) {
-            let errorMsg = `HTTP error loading shaders! Paths: ${vsPath}, ${fsPath}. Status:`;
-            if (!responses[0].ok) errorMsg += ` VS: ${responses[0].status}`;
-            if (!responses[1].ok) errorMsg += ` FS: ${responses[1].status}`;
-            throw new Error(errorMsg);
-        }
-        const vsSource = await responses[0].text();
-        const fsSource = await responses[1].text();
+export function loadShaderProgram(gl, vsSource, fsSource) {
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    const program = createProgram(gl, vertexShader, fragmentShader);
 
-        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
-        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-        const program = createProgram(gl, vertexShader, fragmentShader);
-
-        if (program) {
-            gl.deleteShader(vertexShader);
-            gl.deleteShader(fragmentShader);
-        }
-        return program;
-
-    } catch (e) {
-        console.error("Failed to load or compile shaders:", e);
-        alert(`Failed to load shaders. Check console for details. Error: ${e.message}`);
-        return null;
+    if (program) {
+        // Shaders are linked into the program and no longer needed individually
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
     }
+    return program;
 }
 
 

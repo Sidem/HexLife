@@ -1,0 +1,16 @@
+{
+    "name": "hexlife-explorer",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build:wasm": "wasm-pack build ./hexlife-wasm --target web --out-dir src/core/wasm-engine --out-name hexlife_wasm",
+        "build": "npm run build:wasm && vite build",
+        "preview": "vite preview"
+    },
+    "devDependencies": {
+        "vite": "^6.3.5",
+        "wasm-pack": "^0.0.0"
+    }
+}

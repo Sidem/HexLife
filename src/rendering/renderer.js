@@ -5,6 +5,12 @@ import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
+// Import shaders as raw text strings
+import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
+import hexFragmentShaderSource from '../../shaders/fragment.glsl?raw';
+import quadVertexShaderSource from '../../shaders/quad_vertex.glsl?raw';
+import quadFragmentShaderSource from '../../shaders/quad_fragment.glsl?raw';
+
 let gl;
 let canvas;
 let layoutCache = {}; 
@@ -24,7 +30,7 @@ let hexLUTTexture = null;
 let disabledTextTexture = null;
 let lastWorldSettings = [];
 
-export async function initRenderer(canvasElement) {
+export function initRenderer(canvasElement) {
     canvas = canvasElement;
     gl = canvas.getContext('webgl2');
     if (!gl) {
@@ -33,8 +39,9 @@ export async function initRenderer(canvasElement) {
         return null;
     }
 
-    hexShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/vertex.glsl', 'shaders/fragment.glsl');
-    quadShaderProgram = await WebGLUtils.loadShaderProgram(gl, 'shaders/quad_vertex.glsl', 'shaders/quad_fragment.glsl');
+    // Pass the imported shader source directly to the loading function
+    hexShaderProgram = WebGLUtils.loadShaderProgram(gl, hexVertexShaderSource, hexFragmentShaderSource);
+    quadShaderProgram = WebGLUtils.loadShaderProgram(gl, quadVertexShaderSource, quadFragmentShaderSource);
 
 
     if (!hexShaderProgram || !quadShaderProgram) return null;
