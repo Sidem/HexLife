@@ -4,7 +4,7 @@ export class ActionsPopover extends BaseComponent {
     constructor(mountPoint) {
         super(mountPoint);
         this.render();
-        this.element.classList.add('hidden');
+        this.triggerElement = null;
     }
 
     render() {
@@ -15,6 +15,7 @@ export class ActionsPopover extends BaseComponent {
     }
 
     show = (actions, targetElement) => {
+        this.triggerElement = targetElement;
         this.element.innerHTML = '';
         const list = document.createElement('ul');
         actions.forEach(action => {
@@ -37,6 +38,7 @@ export class ActionsPopover extends BaseComponent {
 
     hide = () => {
         this.element.classList.remove('visible');
+        this.triggerElement = null;
     }
 
     isHidden = () => {

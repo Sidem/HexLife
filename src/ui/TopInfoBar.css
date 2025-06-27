@@ -103,27 +103,6 @@
 .ruleset-display-toggle:not(.has-name) #rulesetDisplayName { opacity: 0; pointer-events: none; }
 .ruleset-display-toggle:not(.has-name) #rulesetDisplayCode { opacity: 1; }
 
-.ruleset-history-controls .button-icon {
-    background: none;
-    border: none;
-    color: #ccc;
-    font-size: 1.4em;
-    cursor: pointer;
-    padding: 0 5px;
-    border-radius: 3px;
-    line-height: 1;
-    transition: background-color 0.2s, color 0.2s;
-}
-
-.ruleset-history-controls .button-icon:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
-}
-
-.ruleset-history-controls .button-icon:disabled {
-    color: #666;
-    cursor: not-allowed;
-}
 
 #statsDisplayContainer {
     display: flex;
@@ -133,12 +112,20 @@
 }
 
 #statsDisplayContainer > span {
-    white-space: nowrap;
+    min-width: 35px;
+    display: inline-block;
+    text-align: left;
 }
 
 #statsDisplayContainer span span {
     font-weight: bold;
     color: #f0f0f0;
+    display: inline-block;
+    text-align: right;
+}
+
+#statsDisplayContainer > span:first-child {
+    min-width: 60px;
 }
 
 /* App Menu Popout */
@@ -191,43 +178,6 @@ screen and (pointer: coarse) and (hover: none) {
     }
 }
 
-.save-ruleset-button {
-    font-size: 1.2em;
-    padding: 0 5px;
-    margin-left: 5px;
-    transition: filter 0.2s ease, opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease;
-}
-
-.save-ruleset-button.not-saved {
-    filter: grayscale(100%);
-    opacity: 0.5;
-    color: #fff; /* Reset base color */
-    text-shadow: none;
-}
-.save-ruleset-button.not-saved:hover {
-    filter: grayscale(0%);
-    opacity: 1;
-    color: #FFD700; /* Gold on hover */
-}
-
-.save-ruleset-button.is-public {
-    color: #87CEEB; /* Light Sky Blue */
-    text-shadow: 0 0 4px #87CEEB;
-    filter: none;
-    opacity: 1;
-    cursor: not-allowed; /* Make it non-clickable */
-}
-.save-ruleset-button.is-public:hover {
-    color: #add8e6; /* Lighter blue on hover */
-}
-
-.save-ruleset-button.is-personal {
-    color: #FFD700; /* Gold */
-    text-shadow: 0 0 5px #FFD700;
-    cursor: default;
-    filter: none;
-    opacity: 1;
-}
 
 /* History item styles */
 .history-item {
@@ -251,4 +201,79 @@ screen and (pointer: coarse) and (hover: none) {
 
 .history-item-hex {
     flex-grow: 1;
+}
+
+.ruleset-history-controls {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+}
+
+.ruleset-history-controls .button-icon,
+.save-ruleset-button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background-color: #4a4a4a;
+    border: 1px solid #555;
+    color: white;
+    border-radius: 4px;
+    font-size: 1.2em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    user-select: none;
+    margin: 0 4px; /* Add some spacing */
+}
+
+.ruleset-history-controls .button-icon:hover:not(:disabled),
+.save-ruleset-button:hover:not([style*="cursor: not-allowed"]) {
+    background-color: #5a5a5a;
+    transform: scale(1.05);
+}
+
+.ruleset-history-controls .button-icon:active:not(:disabled),
+.save-ruleset-button:active:not([style*="cursor: not-allowed"]) {
+    background-color: #3f3f3f;
+    transform: scale(0.98);
+}
+
+.ruleset-history-controls .button-icon:disabled {
+    color: #666;
+    background-color: #404040;
+    cursor: not-allowed;
+}
+
+/* Specific styles for the save/star button */
+.save-ruleset-button {
+    font-size: 1.4em;
+    transition: filter 0.2s ease, opacity 0.2s ease, color 0.2s ease, text-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.save-ruleset-button.not-saved {
+    background-color: #4a4a4a;
+    color: #999;
+}
+.save-ruleset-button.not-saved:hover {
+    color: #FFD700; /* Gold on hover */
+    background-color: #5a5a5a;
+}
+
+.save-ruleset-button.is-public {
+    background-color: #4a4a4a;
+    color: #87CEEB; /* Light Sky Blue */
+    text-shadow: 0 0 4px #87CEEB;
+    cursor: not-allowed;
+}
+.save-ruleset-button.is-public:hover {
+    background-color: #4a4a4a; /* No hover color change for disabled */
+    transform: none;
+}
+
+.save-ruleset-button.is-personal {
+    background-color: #4a4a4a;
+    color: #FFD700; /* Gold */
+    text-shadow: 0 0 5px #FFD700;
 }

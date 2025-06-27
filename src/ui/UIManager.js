@@ -333,8 +333,11 @@ export class UIManager {
             // Check for clicks inside the ActionsPopover
             const clickedInsideActionsPopover = this.actionsPopover && !this.actionsPopover.isHidden() && this.actionsPopover.element.contains(event.target);
 
-            // If the click is not inside any of these elements, hide them.
-            if (!clickedInsidePopoutOrTrigger && !clickedInsideActionsPopover) {
+            // Check if the click was on the element that triggered the popover
+            const clickedOnActionsPopoverTrigger = this.actionsPopover && this.actionsPopover.triggerElement && this.actionsPopover.triggerElement.contains(event.target);
+
+            // If the click is not inside any of these elements OR their triggers, hide them.
+            if (!clickedInsidePopoutOrTrigger && !clickedInsideActionsPopover && !clickedOnActionsPopoverTrigger) {
                 if (toolbar) {
                     toolbar.closeAllPopouts();
                 }
