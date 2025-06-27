@@ -1,7 +1,6 @@
 combine_files.py
 .tmp*
 move.py
-hexlife-wasm
 /node_modules
 /dist
 .DS_Store
