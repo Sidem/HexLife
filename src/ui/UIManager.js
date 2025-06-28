@@ -10,6 +10,7 @@ import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
+import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
@@ -71,7 +72,8 @@ export class UIManager {
             worldSetup: new WorldSetupComponent(appContext),
             analysis: new AnalysisComponent(appContext),
             ruleRank: new RuleRankComponent(appContext),
-            learning: new LearningComponent(appContext)
+            learning: new LearningComponent(appContext),
+            chromaLab: new ChromaLabComponent(appContext)
         };
 
         

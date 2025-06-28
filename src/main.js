@@ -33,16 +33,16 @@ async function initialize() {
     const sharedSettings = SettingsLoader.loadFromUrl();
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
     
+    updateLoadingStatus("Spooling up simulation workers...");
+    appContext = new AppContext(sharedSettings, libraryData);
+    
     updateLoadingStatus("Initializing rendering engine...");
-    gl = await Renderer.initRenderer(canvas);
+    gl = await Renderer.initRenderer(canvas, appContext);
     if (!gl) {
         console.error("Renderer initialization failed.");
         updateLoadingStatus("Error: WebGL2 not supported.");
         return;
     }
-
-    updateLoadingStatus("Spooling up simulation workers...");
-    appContext = new AppContext(sharedSettings, libraryData);
     uiManager = new UIManager(appContext);
     new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 

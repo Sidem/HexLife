@@ -142,6 +142,7 @@
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">💾</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">📂</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
+                <button id="colorPanelButton" class="toolbar-button" title="Chroma Lab - Color Customization">🎨</button>
 
                 <button id="helpButton" class="toolbar-button" title="Help">🎓</button>
             </div>
@@ -226,6 +227,13 @@
             <button class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="rulesetActionsTitle">Ruleset Actions<button class="button-help-trigger" data-tour-name="rulesetGeneration" title="Help with this feature">[?]</button></h3>
             <div class="panel-content-area" id="ruleset-actions-content-mount">
+            </div>
+        </div>
+        
+        <div id="chromaLabPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="chromaLabTitle" aria-modal="true">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="chromaLabTitle">Chroma Lab</h3>
+            <div class="panel-content-area">
             </div>
         </div>
         <div id="bottom-tab-bar" class="hidden">

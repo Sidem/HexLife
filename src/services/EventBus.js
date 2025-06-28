@@ -241,4 +241,6 @@ export const EVENTS = {
     USER_LIBRARY_CHANGED: 'ui:userLibraryChanged',
     /** @param {{title: string, message: string, onConfirm: function}} data - Command to show a confirmation dialog. */
     COMMAND_SHOW_CONFIRMATION: 'command:showConfirmation',
+    /** @param {object} settings - The complete color settings object from the ColorController. */
+    COLOR_SETTINGS_CHANGED: 'ui:colorSettingsChanged',
 };

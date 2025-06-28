@@ -8,6 +8,7 @@ import { RulesetActionController } from '../ui/controllers/RulesetActionControll
 import { SimulationController } from '../ui/controllers/SimulationController.js';
 import { VisualizationController } from '../ui/controllers/VisualizationController.js';
 import { WorldsController } from '../ui/controllers/WorldsController.js';
+import { ColorController } from '../ui/controllers/ColorController.js';
 import { initRulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { PanelManager } from '../ui/PanelManager.js'; 
 import { Toolbar } from '../ui/Toolbar.js';
@@ -35,6 +36,7 @@ export class AppContext {
         this.rulesetActionController = new RulesetActionController();
         this.simulationController = new SimulationController();
         this.visualizationController = new VisualizationController();
+        this.colorController = new ColorController();
         initRulesetVisualizer(this.visualizationController.getVizType());
         this.worldsController = new WorldsController();
         this.panelManager = new PanelManager(this);

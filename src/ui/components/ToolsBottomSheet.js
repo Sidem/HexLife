@@ -23,6 +23,7 @@ export class ToolsBottomSheet extends BottomSheet {
         content.innerHTML = `
             <div class="bottom-sheet-tabs">
                 <button class="tab-button active" data-tab="tools">Tools</button>
+                <button class="tab-button" data-tab="color">Color</button>
                 <button class="tab-button" data-tab="customize-fabs">Customize FABs</button>
             </div>
             <div class="bottom-sheet-panes">
@@ -36,6 +37,7 @@ export class ToolsBottomSheet extends BottomSheet {
                         </div>
                     </div>
                 </div>
+                <div id="color-pane" class="pane hidden"></div>
                 <div id="customize-fabs-pane" class="pane hidden">
                     <div class="tool-group">
                         <h5>Quick Actions (Select up to 3)</h5>
@@ -57,6 +59,22 @@ export class ToolsBottomSheet extends BottomSheet {
     show() {
         super.show();
         
+        // Mount controls component if not already mounted
+        if (!this.controlsComponent) {
+            this.controlsComponent = new ControlsComponent(this.appContext);
+            if (this.contentContainer) {
+                this.contentContainer.appendChild(this.controlsComponent.getElement());
+            }
+        }
+        
+        // Mount ChromaLab component for color tab
+        const colorPane = this.sheetContent.querySelector('#color-pane');
+        if (colorPane && colorPane.children.length === 0) {
+            const chromaLabComponent = this.appContext.uiManager.sharedComponents.chromaLab;
+            if (chromaLabComponent) {
+                colorPane.appendChild(chromaLabComponent.getElement());
+            }
+        }
     }
 
     _initCustomizeFabsPane() {

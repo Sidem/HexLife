@@ -144,13 +144,15 @@ export class RuleRankComponent extends BaseComponent {
         rankEl.textContent = `#${rank + 1}`;
         usageBar.style.width = `${usagePercent}%`;
 
+        const colorSettings = this.appContext.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
         const vizEl = createOrUpdateRuleVizElement({
             existingElement: vizContainer.firstChild,
             ruleIndex: rule.index,
             outputState: ruleset[rule.index],
             rawUsageCount: rule.count,
             usagePercent: usagePercent,
-        });
+        }, colorSettings, symmetryData);
         vizEl.classList.add('rank-list-viz');
 
         if (!vizContainer.firstChild) {

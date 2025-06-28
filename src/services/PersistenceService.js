@@ -13,10 +13,12 @@ const KEYS = {
     LEARNING_PANEL_STATE: `${LS_KEY_PREFIX}learningPanelState`,
     RULESETACTIONS_PANEL_STATE: `${LS_KEY_PREFIX}rulesetActionsPanelState`,
     WORLDSETUP_PANEL_STATE: `${LS_KEY_PREFIX}worldSetupPanelState`,
+    CHROMALAB_PANEL_STATE: `${LS_KEY_PREFIX}chromaLabPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
     USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
-    ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`
+    ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
+    COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`
 };
 
 function _getItem(key) {
@@ -177,4 +179,20 @@ export function loadUserRulesets() {
 
 export function saveUserRulesets(userRulesets) {
     _setItem(KEYS.USER_RULESETS, userRulesets);
+}
+
+export function loadColorSettings() {
+    const defaults = {
+        mode: 'preset',
+        activePreset: 'default',
+        customGradient: ['#3cb44b', '#ffe119'],
+        customNeighborColors: {},
+        customSymmetryColors: {}
+    };
+    const loaded = _getItem(KEYS.COLOR_SETTINGS);
+    return loaded ? { ...defaults, ...loaded } : defaults;
+}
+
+export function saveColorSettings(settings) {
+    _setItem(KEYS.COLOR_SETTINGS, settings);
 }

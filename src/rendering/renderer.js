@@ -30,7 +30,15 @@ let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
 
-export function initRenderer(canvasElement) {
+function updateColorLUTTexture(colorSettings, symmetryData) {
+    if (!gl || !hexLUTTexture) return;
+    const lutData = generateColorLUT(colorSettings, symmetryData);
+    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+}
+
+export function initRenderer(canvasElement, appContext) {
     canvas = canvasElement;
     gl = canvas.getContext('webgl2');
     if (!gl) {
@@ -71,7 +79,9 @@ export function initRenderer(canvasElement) {
         u_color: gl.getUniformLocation(quadShaderProgram, "u_color"),
         u_useTexture: gl.getUniformLocation(quadShaderProgram, "u_useTexture"),
     };
-    const lutData = generateColorLUT();
+    const colorSettings = appContext.colorController.getSettings();
+    const symmetryData = appContext.worldManager.getSymmetryData();
+    const lutData = generateColorLUT(colorSettings, symmetryData);
     hexLUTTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
@@ -110,6 +120,11 @@ export function initRenderer(canvasElement) {
     setupHexBuffersAndVAO();
     setupQuadBuffersAndVAO();
     setupFBOs();
+    
+    EventBus.subscribe(EVENTS.COLOR_SETTINGS_CHANGED, (settings) => {
+        updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData());
+    });
+    
     requestAnimationFrame(() => resizeRenderer());
 
     console.log("Renderer initialized.");

@@ -1,3 +1,30 @@
+import { PRESET_PALETTES } from '../core/colorPalettes.js';
+import { countSetBits } from '../core/Symmetry.js';
+
+/**
+ * Converts hex color to RGB array.
+ * @param {string} hex - Hex color string (e.g., "#FF0000")
+ * @returns {number[]} Array of RGB values [r, g, b] in the 0-255 range.
+ */
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0, 0, 0];
+}
+
+/**
+ * Interpolates between two RGB colors.
+ * @param {number[]} color1 - First RGB color [r, g, b]
+ * @param {number[]} color2 - Second RGB color [r, g, b]
+ * @param {number} factor - Interpolation factor (0-1)
+ * @returns {number[]} Interpolated RGB color [r, g, b]
+ */
+function interpolateRgb(color1, color2, factor) {
+    const r = color1[0] + factor * (color2[0] - color1[0]);
+    const g = color1[1] + factor * (color2[1] - color1[1]);
+    const b = color1[2] + factor * (color2[2] - color1[2]);
+    return [Math.round(r), Math.round(g), Math.round(b)];
+}
+
 /**
  * Converts HSV color values to an [r, g, b] array.
  * @param {number} h Hue (0-1)
@@ -25,45 +52,63 @@ function hsvToRgb(h, s, v) {
 }
 
 /**
- * Generates the precise color for a rule index and state, matching the shader logic.
- * @param {number} ruleIndex The rule index (0-127).
- * @param {number} state The cell state (0 or 1).
- * @returns {number[]} An array of [r, g, b] values (0-255).
- */
-function generateRuleColor(ruleIndex, state) {
-    const hueOffset = 0.1667; 
-    const calculatedHue = ruleIndex / 128.0;
-    const hue = (calculatedHue + hueOffset) % 1.0;
-
-    let saturation, value;
-    saturation = 1.0;
-    if (state === 1) {
-        value = 1.0;
-    } else {
-        value = 0.075;
-    }
-    return hsvToRgb(hue, saturation, value);
-}
-
-/**
  * Creates a Uint8Array representing a 128x2 RGBA texture for rule colors.
  * Row 0: Inactive states
  * Row 1: Active states
+ * @param {object} colorSettings - The color settings from ColorController
+ * @param {object} symmetryData - Symmetry data from WorldManager
  * @returns {Uint8Array} The texture data.
  */
-export function generateColorLUT() {
+export function generateColorLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2;
     const data = new Uint8Array(width * height * 4);
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
 
-    for (let state = 0; state < height; state++) { 
-        for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
-            const color = generateRuleColor(ruleIndex, state);
+    const getColorForRow = (ruleIndex) => {
+        const centerState = (ruleIndex >> 6) & 1;
+        const neighborMask = ruleIndex & 0x3F;
+
+        if (mode === 'preset') {
+            if (activePreset === 'default' || !PRESET_PALETTES[activePreset]?.gradient) {
+                const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+                return hsvToRgb(hue, 1.0, 1.0);
+            }
+            const gradient = PRESET_PALETTES[activePreset].gradient.map(hexToRgb);
+            const factor = ruleIndex / (width - 1);
+            const segment = Math.floor(factor * (gradient.length - 1));
+            const segmentFactor = (factor * (gradient.length - 1)) - segment;
+            return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+        }
+        if (mode === 'gradient') {
+            const gradient = customGradient.map(hexToRgb);
+            const factor = ruleIndex / (width - 1);
+            const segment = Math.floor(factor * (gradient.length - 1));
+            const segmentFactor = (factor * (gradient.length - 1)) - segment;
+            return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+        }
+        if (mode === 'neighbor_count') {
+            const neighborCount = countSetBits(neighborMask);
+            const key = `${centerState}-${neighborCount}`;
+            return hexToRgb(customNeighborColors[key] || '#808080');
+        }
+        if (mode === 'symmetry') {
+            const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+            const key = `${centerState}-${canonical}`;
+            return hexToRgb(customSymmetryColors[key] || '#808080');
+        }
+        return [128, 128, 128]; // Fallback
+    };
+
+    for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
+        const rgb = getColorForRow(ruleIndex);
+        for (let state = 0; state < height; state++) {
             const dataIndex = (state * width + ruleIndex) * 4;
-            data[dataIndex] = color[0];     
-            data[dataIndex + 1] = color[1]; 
-            data[dataIndex + 2] = color[2]; 
-            data[dataIndex + 3] = 255;      
+            const value = (state === 1) ? 1.0 : 0.075;
+            data[dataIndex] = rgb[0] * value;
+            data[dataIndex + 1] = rgb[1] * value;
+            data[dataIndex + 2] = rgb[2] * value;
+            data[dataIndex + 3] = 255;
         }
     }
     return data;
@@ -71,15 +116,61 @@ export function generateColorLUT() {
 
 
 /**
+ * Generates a single rule color based on color settings.
+ * @param {number} ruleIndex The rule index (0-127)
+ * @param {object} colorSettings The color settings from ColorController
+ * @param {object} symmetryData Symmetry data from WorldManager
+ * @returns {number[]} RGB color [r, g, b]
+ */
+export function generateSingleRuleColor(ruleIndex, colorSettings, symmetryData) {
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
+    const centerState = (ruleIndex >> 6) & 1;
+    const neighborMask = ruleIndex & 0x3F;
+
+    if (mode === 'preset') {
+        if (activePreset === 'default' || !PRESET_PALETTES[activePreset]?.gradient) {
+            const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+            return hsvToRgb(hue, 1.0, 1.0);
+        }
+        const gradient = PRESET_PALETTES[activePreset].gradient.map(hexToRgb);
+        const factor = ruleIndex / 127.0;
+        const segment = Math.floor(factor * (gradient.length - 1));
+        const segmentFactor = (factor * (gradient.length - 1)) - segment;
+        return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+    }
+    if (mode === 'gradient') {
+         const gradient = customGradient.map(hexToRgb);
+         const factor = ruleIndex / 127.0;
+         const segment = Math.floor(factor * (gradient.length - 1));
+         const segmentFactor = (factor * (gradient.length - 1)) - segment;
+         return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+    }
+    if (mode === 'neighbor_count') {
+        const neighborCount = countSetBits(neighborMask);
+        const key = `${centerState}-${neighborCount}`;
+        return hexToRgb(customNeighborColors[key] || '#808080');
+    }
+    if (mode === 'symmetry') {
+         const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+         const key = `${centerState}-${canonical}`;
+         return hexToRgb(customSymmetryColors[key] || '#808080');
+    }
+    return [128, 128, 128];
+}
+
+/**
  * Returns a CSS color string for a given rule and state, for use in the UI.
  * This function now uses the centralized color generator.
  * @param {number} ruleIndex The rule index (0-127)
  * @param {number} state The cell state (0 or 1)
+ * @param {object} colorSettings The color settings from ColorController
+ * @param {object} symmetryData Symmetry data from WorldManager
  * @returns {string} CSS color string
  */
-export function getRuleIndexColor(ruleIndex, state) {
-    const [r, g, b] = generateRuleColor(ruleIndex, state);
-    return `rgb(${r}, ${g}, ${b})`;
+export function getRuleIndexColor(ruleIndex, state, colorSettings, symmetryData) {
+    const rgb = generateSingleRuleColor(ruleIndex, colorSettings, symmetryData);
+    const value = (state === 1) ? 1.0 : 0.25;
+    return `rgb(${Math.round(rgb[0] * value)}, ${Math.round(rgb[1] * value)}, ${Math.round(rgb[2] * value)})`;
 }
 
 /**
@@ -87,6 +178,8 @@ export function getRuleIndexColor(ruleIndex, state) {
  * or updates an existing one for performance.
  * @param {object} options - The configuration for the visualization.
  * @param {HTMLElement} [options.existingElement=null] - An optional existing element to update.
+ * @param {object} colorSettings - The color settings from ColorController
+ * @param {object} symmetryData - Symmetry data from WorldManager
  * @returns {HTMLElement} The complete div element for the rule visualization.
  */
 export function createOrUpdateRuleVizElement({
@@ -97,7 +190,7 @@ export function createOrUpdateRuleVizElement({
     normalizedUsage = 0,
     rawUsageCount = 0,
     showUsageOverlay = false
-}) {
+}, colorSettings, symmetryData) {
     const centerState = (ruleIndex >> 6) & 1;
     const neighborMask = ruleIndex & 0x3F;
 
@@ -118,7 +211,7 @@ export function createOrUpdateRuleVizElement({
     const innerHex = viz.querySelector('.inner-hex');
 
     centerHex.style.backgroundColor = centerState === 1 ? 'rgb(255, 255, 255)' : 'rgb(100, 100, 100)';
-    innerHex.style.backgroundColor = getRuleIndexColor(ruleIndex, outputState);
+    innerHex.style.backgroundColor = getRuleIndexColor(ruleIndex, outputState, colorSettings, symmetryData);
 
     for (let n = 0; n < 6; n++) {
         const neighborHex = viz.querySelector(`.neighbor-${n}`);

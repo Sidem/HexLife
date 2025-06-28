@@ -44,6 +44,7 @@ export class Toolbar {
             setupPanelButton: document.getElementById('setupPanelButton'),
             analysisPanelButton: document.getElementById('analysisPanelButton'),
             rankPanelButton: document.getElementById('rankPanelButton'),
+            colorPanelButton: document.getElementById('colorPanelButton'),
             helpButton: document.getElementById('helpButton'),
         };
         this._initPopoutPanels();
@@ -90,6 +91,7 @@ export class Toolbar {
             analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }),
             rankPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulerank' }),
             setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }),
+            colorPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'chromalab' }),
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),

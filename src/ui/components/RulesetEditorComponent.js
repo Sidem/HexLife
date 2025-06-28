@@ -110,7 +110,9 @@ export class RulesetEditorComponent extends BaseComponent {
         const detailedGrid = this.uiElements.rulesetEditorGrid;
         const detailedFrag = document.createDocumentFragment();
         for (let i = 0; i < 128; i++) {
-            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }); 
+            const colorSettings = this.appContext.colorController.getSettings();
+            const symmetryData = this.appContext.worldManager.getSymmetryData();
+            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }, colorSettings, symmetryData); 
             const innerHex = viz.querySelector('.inner-hex');
             this.cachedDetailedRules[i] = { viz, innerHex }; 
             detailedFrag.appendChild(viz);
@@ -335,10 +337,12 @@ export class RulesetEditorComponent extends BaseComponent {
 
     _updateDetailedGrid(rulesetArray) {
         if (!rulesetArray || this.cachedDetailedRules.length === 0) return;
+        const colorSettings = this.appContext.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
         for (let i = 0; i < 128; i++) {
             const outputState = rulesetArray[i];
             const { innerHex } = this.cachedDetailedRules[i];
-            innerHex.style.backgroundColor = getRuleIndexColor(i, outputState);
+            innerHex.style.backgroundColor = getRuleIndexColor(i, outputState, colorSettings, symmetryData);
         }
     }
 
