@@ -2,7 +2,8 @@ import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { formatHexCode } from '../utils/utils.js';
 
 export class RulesetDisplayFactory {
-    constructor() {
+    constructor(appContext) {
+        this.appContext = appContext;
         this.observer = null;
         this.observedElements = new WeakMap();
         this._initObserver();
@@ -22,7 +23,9 @@ export class RulesetDisplayFactory {
                     const vizPlaceholder = element.querySelector('.viz-placeholder');
                     if (vizPlaceholder) {
                         const { hex } = this.observedElements.get(element);
-                        const svg = rulesetVisualizer.createRulesetSVG(hex, { width: '100%', height: '100%' });
+                        const colorSettings = this.appContext.colorController.getSettings();
+                        const symmetryData = this.appContext.worldManager.getSymmetryData();
+                        const svg = rulesetVisualizer.createRulesetSVG(hex, { width: '100%', height: '100%' }, colorSettings, symmetryData);
                         svg.classList.add('ruleset-viz-svg');
                         vizPlaceholder.replaceWith(svg);
                         observer.unobserve(element); 

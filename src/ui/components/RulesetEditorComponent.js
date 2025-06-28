@@ -309,6 +309,9 @@ export class RulesetEditorComponent extends BaseComponent {
                 }
             }));
         }
+
+        // Subscribe to color settings changes to update visualizations
+        this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
     }
 
     _updateEditorGrids() {

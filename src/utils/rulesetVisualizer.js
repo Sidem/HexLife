@@ -1,4 +1,5 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { generateSingleRuleColor } from './ruleVizUtils.js';
 
 const PALETTE = [
     '#e6194b', '#3cb44b', '#ffe119', '#4363d8',
@@ -49,10 +50,10 @@ class RulesetVisualizer {
         return this.vizType;
     }
 
-    createRulesetSVG(hex, options = {}) {
+    createRulesetSVG(hex, options = {}, colorSettings = null, symmetryData = null) {
         const { width = '100%', height = '100%' } = options;
         if (this.vizType === 'color') {
-            return this._drawColorGridSVG(hex, width, height);
+            return this._drawColorGridSVG(hex, width, height, colorSettings, symmetryData);
         }
         return this._drawBinaryMapSVG(hex, width, height);
     }
@@ -66,11 +67,31 @@ class RulesetVisualizer {
         return this._drawBinaryDiffSVG(baseHex, compareHex, width, height);
     }
 
-    _drawColorGridSVG(hex, width, height) {
+    _drawColorGridSVG(hex, width, height, colorSettings = null, symmetryData = null) {
         const cols = 4, rows = 8, cell = 10;
         const svg = createSVG(width, height, `0 0 ${cols * cell} ${rows * cell}`);
+        
         for (let i = 0; i < 32; i++) {
-            const val = parseInt(hex[i], 16);
+            const hexNibble = parseInt(hex[i], 16);
+            let fillColor;
+            
+            if (colorSettings && symmetryData) {
+                // Use actual color generation based on the dominant rule in this nibble
+                // Find the most significant bit to determine the primary color
+                let dominantRuleIndex = i * 4;
+                for (let bit = 3; bit >= 0; bit--) {
+                    if ((hexNibble >> bit) & 1) {
+                        dominantRuleIndex = i * 4 + (3 - bit);
+                        break;
+                    }
+                }
+                const rgb = generateSingleRuleColor(dominantRuleIndex, colorSettings, symmetryData);
+                fillColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+            } else {
+                // Fallback to the original palette
+                fillColor = PALETTE[hexNibble];
+            }
+            
             const x = (i % cols) * cell;
             const y = Math.floor(i / cols) * cell;
             const rect = document.createElementNS(svg.namespaceURI, 'rect');
@@ -78,7 +99,7 @@ class RulesetVisualizer {
             rect.setAttribute('y', y);
             rect.setAttribute('width', cell);
             rect.setAttribute('height', cell);
-            rect.setAttribute('fill', PALETTE[val]);
+            rect.setAttribute('fill', fillColor);
             svg.appendChild(rect);
         }
         return svg;

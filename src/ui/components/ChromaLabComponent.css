@@ -133,7 +133,7 @@
     border-radius: 8px;
     border: 1px solid #666;
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 10px;
     max-width: 400px;
 }
@@ -150,4 +150,34 @@
 .palette-color:hover {
     transform: scale(1.15);
     border-color: #fff;
-} 
+}
+
+/* Mini-viz for Chroma Lab Symmetry Groups */
+.mini-viz {
+    display: inline-grid;
+    grid-template-areas:
+        ". n1 ."
+        "n0 c n2"
+        ". n3 .";
+    grid-template-columns: 10px 10px 10px;
+    grid-template-rows: 10px 10px 10px;
+    align-items: center;
+    justify-items: center;
+    vertical-align: middle;
+    margin-right: 8px;
+    transform: scale(0.9) translateY(-1px);
+}
+
+.mini-hex {
+    width: 8px;
+    height: 9.2px; /* 8 * sqrt(3)/2 * 1.15 */
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.mini-hex.center { grid-area: c; }
+.mini-viz .mini-hex:nth-of-type(2) { grid-area: n0; } /* Corresponds to neighbor 0 */
+.mini-viz .mini-hex:nth-of-type(3) { grid-area: n1; }
+.mini-viz .mini-hex:nth-of-type(4) { grid-area: n2; }
+.mini-viz .mini-hex:nth-of-type(5) { grid-area: n3; }
+/* These last two are not in the grid-areas but will be placed automatically,
+   you may need to adjust the grid definition if you want perfect hex layout */ 

@@ -2,6 +2,7 @@ import { BaseComponent } from './BaseComponent.js';
 import { createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 import { Throttler } from '../../utils/throttler.js';
 import * as Config from '../../core/config.js';
+import { EVENTS } from '../../services/EventBus.js';
 
 
 class ElementPool {
@@ -36,6 +37,7 @@ export class RuleRankComponent extends BaseComponent {
         this.ruleItemPool = new ElementPool(() => this._createRuleItemElement());
         this.render();
         this.refresh();
+        this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
     }
 
     

@@ -61,7 +61,7 @@ export class UIManager {
         const libraryData = libraryController.getLibraryData();
 
         
-        this.rulesetDisplayFactory = new RulesetDisplayFactory();
+        this.rulesetDisplayFactory = new RulesetDisplayFactory(appContext);
         this.appContext.rulesetDisplayFactory = this.rulesetDisplayFactory;
         
         this.actionsPopover = new ActionsPopover(document.getElementById('popover-container'));

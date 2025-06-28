@@ -2,7 +2,7 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 // The curated palette for the color pickers
-const CURATED_PALETTE = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
+const CURATED_PALETTE = ['#fed4d4', '#fe9494', '#ff3f3f', '#ff0000', '#bf0000', '#6a0000', '#2a0000', '#fee9d4', '#fec994', '#ff9f3f', '#ff7f00', '#bf5f00', '#6a3500', '#2a1500', '#fefed4', '#fefe94', '#feff3f', '#feff00', '#bfbf00', '#6a6a00', '#2a2a00', '#dffed4', '#affe94', '#6fff3f', '#3fff00', '#2fbf00', '#1a6a00', '#0a2a00', '#d4fee9', '#94fec9', '#3fff9f', '#00ff7f', '#00bf5f', '#006a35', '#002a15', '#d4fefe', '#94fefe', '#3ffeff', '#00feff', '#00bfbf', '#006a6a', '#002a2a', '#d4e9fe', '#94c9fe', '#3f9fff', '#007fff', '#005fbf', '#00356a', '#00152a', '#d4d4fe', '#9494fe', '#3f3fff', '#0000ff', '#0000bf', '#00006a', '#00002a', '#e9d4fe', '#c994fe', '#9f3fff', '#7f00ff', '#5f00bf', '#35006a', '#15002a', '#fed4fe', '#fe94fe', '#ff3ffe', '#ff00fe', '#bf00bf', '#6a006a', '#2a002a', '#fed4e9', '#fe94c9', '#ff3f9f', '#ff007f', '#bf005f', '#6a0035', '#2a0015', '#ffffff', '#d4d4d4', '#aaaaaa', '#7f7f7f', '#555555', '#2a2a2a', '#000000'];
 
 export class ChromaLabComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -63,7 +63,7 @@ export class ChromaLabComponent extends BaseComponent {
     _renderNeighborCountSection() {
         let html = '<div class="color-group-grid">';
         ['OFF', 'ON'].forEach(stateName => {
-            html += `<div class="color-group-column"><h5>Center ${stateName}</h5>`;
+            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
             for (let i = 0; i <= 6; i++) {
                 const centerState = (stateName === 'ON' ? 1 : 0);
                 html += `<div class="color-group" data-center-state="${centerState}" data-neighbor-count="${i}">
@@ -81,11 +81,24 @@ export class ChromaLabComponent extends BaseComponent {
         const symmetryData = this.appContext.worldManager.getSymmetryData();
         let html = '<div class="color-group-grid">';
          ['OFF', 'ON'].forEach(stateName => {
-            html += `<div class="color-group-column"><h5>Center ${stateName}</h5>`;
+            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
             const centerState = (stateName === 'ON' ? 1 : 0);
             symmetryData.canonicalRepresentatives.forEach(group => {
-                 html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${group.representative}">
-                           <span class="color-group-label">Group ${group.representative} (Orbit: ${group.orbitSize})</span>
+                const bitmask = group.representative;
+
+                // Create the mini visualization HTML
+                const neighborHexes = Array.from({ length: 6 }, (_, n) => 
+                    `<div class="mini-hex" style="background-color: ${((bitmask >> n) & 1) ? '#FFF' : '#555'};"></div>`
+                ).join('');
+
+                html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}">
+                           <div class="color-group-label">
+                               <div class="mini-viz">
+                                   <div class="mini-hex center" style="background-color: ${centerState ? '#FFF' : '#555'};"></div>
+                                   ${neighborHexes}
+                               </div>
+                               (Orbit: ${group.orbitSize})
+                           </div>
                            <div class="color-swatch" title="Click to change color for this group"></div>
                          </div>`;
             });
