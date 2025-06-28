@@ -195,6 +195,42 @@
     justify-content: center;
 }
 
-#chroma-symmetry-section .color-group {
-    grid-template-columns: 1fr 40px;
-} 
+.chroma-select-all-bar {
+    text-align: right;
+    padding: 0 5px 10px;
+    flex-shrink: 0;
+}
+.button-link {
+    color: #87CEEB;
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+
+.color-group {
+    grid-template-columns: auto 1fr auto; /* Add column for checkbox */
+}
+
+.chroma-group-checkbox {
+    margin-right: 10px;
+}
+
+#chroma-batch-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+#chroma-batch-action-bar span {
+    font-weight: bold;
+    color: #f0c674;
+}
+.batch-swatch {
+    background-color: #555;
+    border: 2px dashed #f0c674;
+}
