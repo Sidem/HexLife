@@ -84,23 +84,23 @@ export class ChromaLabComponent extends BaseComponent {
             html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
             const centerState = (stateName === 'ON' ? 1 : 0);
             symmetryData.canonicalRepresentatives.forEach(group => {
-                const bitmask = group.representative;
+                 const bitmask = group.representative;
+                 const neighborHexes = Array.from({ length: 6 }, (_, n) =>
+                     `<div class="hexagon neighbor-hex neighbor-${n} state-${(bitmask >> n) & 1}"></div>`
+                 ).join('');
 
-                // Create the mini visualization HTML
-                const neighborHexes = Array.from({ length: 6 }, (_, n) => 
-                    `<div class="mini-hex" style="background-color: ${((bitmask >> n) & 1) ? '#FFF' : '#555'};"></div>`
-                ).join('');
-
-                html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}">
-                           <div class="color-group-label">
-                               <div class="mini-viz">
-                                   <div class="mini-hex center" style="background-color: ${centerState ? '#FFF' : '#555'};"></div>
-                                   ${neighborHexes}
-                               </div>
-                               (Orbit: ${group.orbitSize})
-                           </div>
-                           <div class="color-swatch" title="Click to change color for this group"></div>
-                         </div>`;
+                 html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}">
+                            <div class="color-group-label">
+                                <div class="r-sym-rule-viz" style="cursor: default; pointer-events: none; transform: scale(0.8) translate(-10px, -5px); margin-bottom: -15px;">
+                                    <div class="rule-viz-hex-display">
+                                        <div class="hexagon center-hex state-${centerState}"></div>
+                                        ${neighborHexes}
+                                    </div>
+                                    <div class="orbit-size-display">Orbit: ${group.orbitSize}</div>
+                                </div>
+                            </div>
+                            <div class="color-swatch" title="Click to change color for this group"></div>
+                          </div>`;
             });
             html += `</div>`;
         });

@@ -104,10 +104,9 @@ export function generateColorLUT(colorSettings, symmetryData) {
         const rgb = getColorForRow(ruleIndex);
         for (let state = 0; state < height; state++) {
             const dataIndex = (state * width + ruleIndex) * 4;
-            const value = (state === 1) ? 1.0 : 0.075;
-            data[dataIndex] = rgb[0] * value;
-            data[dataIndex + 1] = rgb[1] * value;
-            data[dataIndex + 2] = rgb[2] * value;
+            data[dataIndex] = rgb[0];
+            data[dataIndex + 1] = rgb[1];
+            data[dataIndex + 2] = rgb[2];
             data[dataIndex + 3] = 255;
         }
     }
@@ -167,10 +166,9 @@ export function generateSingleRuleColor(ruleIndex, colorSettings, symmetryData) 
  * @param {object} symmetryData Symmetry data from WorldManager
  * @returns {string} CSS color string
  */
-export function getRuleIndexColor(ruleIndex, state, colorSettings, symmetryData) {
+export function getRuleIndexColor(ruleIndex, _state, colorSettings, symmetryData) {
     const rgb = generateSingleRuleColor(ruleIndex, colorSettings, symmetryData);
-    const value = (state === 1) ? 1.0 : 0.25;
-    return `rgb(${Math.round(rgb[0] * value)}, ${Math.round(rgb[1] * value)}, ${Math.round(rgb[2] * value)})`;
+    return `rgb(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])})`;
 }
 
 /**

@@ -1,7 +1,7 @@
 .chroma-lab-component-content {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 5px;
     height: 100%;
 }
 
@@ -83,7 +83,7 @@
 
 .color-group-column h5 {
     text-align: center;
-    margin-bottom: 10px;
+    margin: 0px;
     color: #ddd;
 }
 
@@ -180,4 +180,21 @@
 .mini-viz .mini-hex:nth-of-type(4) { grid-area: n2; }
 .mini-viz .mini-hex:nth-of-type(5) { grid-area: n3; }
 /* These last two are not in the grid-areas but will be placed automatically,
-   you may need to adjust the grid definition if you want perfect hex layout */ 
+   you may need to adjust the grid definition if you want perfect hex layout */
+
+/* Adjustments for integrated rule visualizations */
+.color-group {
+    display: grid; /* Change to grid */
+    grid-template-columns: 1fr auto; /* Make label take space, swatch is auto-sized */
+    align-items: center;
+}
+
+.color-group-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#chroma-symmetry-section .color-group {
+    grid-template-columns: 1fr 40px;
+} 

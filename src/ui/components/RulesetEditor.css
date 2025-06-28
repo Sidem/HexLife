@@ -181,7 +181,7 @@
 }
 
 .hexagon:not([style*="background-color"]).state-0 { background-color: #404040; }
-.hexagon:not([style*="background-color"]).state-1 { background-color: #FFFF00; }
+.hexagon:not([style*="background-color"]).state-1 { background-color: #FFFFFF; }
 .hexagon:not([style*="background-color"]).state-2 { background: linear-gradient(45deg, #633030, #306330); }
 
 .center-hex {

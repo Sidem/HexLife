@@ -351,15 +351,21 @@ export class RulesetEditorComponent extends BaseComponent {
 
     _updateNeighborCountGrid() {
         if (this.cachedNeighborCountRules.length === 0) return;
+        const colorSettings = this.appContext.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
         let cacheIndex = 0;
         for (let cs = 0; cs <= 1; cs++) {
             for (let na = 0; na <= 6; na++) {
                 const { innerHex, label } = this.cachedNeighborCountRules[cacheIndex];
                 const effectiveOutput = this.worldManager.getEffectiveRuleForNeighborCount(cs, na);
-                const outputDisplay = effectiveOutput === 1 ? 'ON' : (effectiveOutput === 0 ? 'OFF' : 'MIXED');
                 
+                // A representative rule index to sample the color from the LUT logic
+                const representativeRuleIndex = (cs << 6) | (Math.pow(2, na) - 1);
+                innerHex.style.backgroundColor = getRuleIndexColor(representativeRuleIndex, effectiveOutput, colorSettings, symmetryData);
+
                 innerHex.className = `hexagon inner-hex state-${effectiveOutput}`;
-                label.innerHTML = `C:${cs ? '<b>ON</b>' : 'OFF'}<br>${na}/6 N&rarr;${outputDisplay}`;
+                const outputDisplay = effectiveOutput === 1 ? '<b>ON</b>' : (effectiveOutput === 0 ? 'OFF' : '<b>MIXED</b>');
+                label.innerHTML = `Cell:${cs ? '<b>ON</b>' : 'OFF'}<br>${na}/6 N&rarr;${outputDisplay}`;
                 cacheIndex++;
             }
         }
@@ -369,14 +375,18 @@ export class RulesetEditorComponent extends BaseComponent {
         if (this.cachedRotationalSymmetryRules.length === 0) return;
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
         if (!canonicalDetails) return;
-    
-        this.cachedRotationalSymmetryRules.forEach((cachedRule, _index) => {
+        
+        const colorSettings = this.appContext.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
+
+        this.cachedRotationalSymmetryRules.forEach((cachedRule) => {
             const detail = canonicalDetails.find(d => 
                 d.canonicalBitmask === cachedRule.canonicalBitmask && d.centerState === cachedRule.centerState
             );
             if (detail) {
+                const representativeRuleIndex = (detail.centerState << 6) | detail.canonicalBitmask;
+                cachedRule.innerHex.style.backgroundColor = getRuleIndexColor(representativeRuleIndex, detail.effectiveOutput, colorSettings, symmetryData);
                 cachedRule.innerHex.className = `hexagon inner-hex state-${detail.effectiveOutput}`;
-                cachedRule.viz.title = `Center ${detail.centerState ? 'ON' : 'OFF'}, Canonical N ${detail.canonicalBitmask.toString(2).padStart(6, '0')} (Orbit: ${detail.orbitSize}) -> Output ${detail.effectiveOutput === 2 ? 'MIXED' : (detail.effectiveOutput === 1 ? 'ON' : 'OFF')}`;
             }
         });
     }
