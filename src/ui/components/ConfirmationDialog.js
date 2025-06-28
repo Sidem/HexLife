@@ -1,5 +1,4 @@
 import { BaseComponent } from './BaseComponent.js';
-import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class ConfirmationDialog extends BaseComponent {
     constructor(mountPoint) {
@@ -42,7 +41,6 @@ export class ConfirmationDialog extends BaseComponent {
         this.ui.message.textContent = message;
         this.ui.confirmBtn.textContent = confirmLabel;
 
-        // Clone and replace the button to remove old listeners before adding a new one
         const newConfirmBtn = this.ui.confirmBtn.cloneNode(true);
         this.ui.confirmBtn.parentNode.replaceChild(newConfirmBtn, this.ui.confirmBtn);
         this.ui.confirmBtn = newConfirmBtn;

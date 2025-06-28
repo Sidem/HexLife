@@ -1,7 +1,7 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { getLayoutCache } from '../rendering/renderer.js';
-import { textureCoordsToGridCoords, findHexagonsInNeighborhood, gridToPixelCoords, calculateHexSizeForTexture } from '../utils/utils.js';
+import { textureCoordsToGridCoords, calculateHexSizeForTexture } from '../utils/utils.js';
 
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
 import { DrawStrategy } from './inputStrategies/DrawStrategy.js';

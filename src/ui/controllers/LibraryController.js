@@ -52,10 +52,10 @@ export class LibraryController {
         const existingIndex = rulesetData.id ? this.userLibrary.findIndex(r => r.id === rulesetData.id) : -1;
 
         if (existingIndex > -1) {
-            // Update existing
+            
             this.userLibrary[existingIndex] = { ...this.userLibrary[existingIndex], ...rulesetData };
         } else {
-            // Add new
+            
             const newRule = {
                 id: String(Date.now()),
                 createdAt: new Date().toISOString(),
@@ -86,7 +86,7 @@ export class LibraryController {
      */
     getRulesetStatus(hex) {
         if (!hex || hex.length !== 32) return { isPersonal: false, isPublic: false };
-        // Personal library takes precedence for status
+        
         const isPersonal = this.userLibrary.some(r => r.hex === hex);
         if (isPersonal) return { isPersonal: true, isPublic: false };
 

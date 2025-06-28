@@ -3,18 +3,19 @@ import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 
-// Import shaders as raw text strings
+// eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
 import hexFragmentShaderSource from '../../shaders/fragment.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
 import quadVertexShaderSource from '../../shaders/quad_vertex.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
 import quadFragmentShaderSource from '../../shaders/quad_fragment.glsl?raw';
 
 let gl;
 let canvas;
 let layoutCache = {}; 
-
 let hexShaderProgram;
 let quadShaderProgram;
 let hexAttributeLocations;
@@ -28,7 +29,6 @@ let hexVAO;
 let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
-let lastWorldSettings = [];
 
 export function initRenderer(canvasElement) {
     canvas = canvasElement;
@@ -39,11 +39,8 @@ export function initRenderer(canvasElement) {
         return null;
     }
 
-    // Pass the imported shader source directly to the loading function
     hexShaderProgram = WebGLUtils.loadShaderProgram(gl, hexVertexShaderSource, hexFragmentShaderSource);
     quadShaderProgram = WebGLUtils.loadShaderProgram(gl, quadVertexShaderSource, quadFragmentShaderSource);
-
-
     if (!hexShaderProgram || !quadShaderProgram) return null;
 
     hexAttributeLocations = {
@@ -90,19 +87,13 @@ export function initRenderer(canvasElement) {
         tempCanvas.width = texSize;
         tempCanvas.height = texSize;
         const ctx2d = tempCanvas.getContext('2d');
-
         ctx2d.clearRect(0, 0, texSize, texSize);
-        
         ctx2d.translate(-texSize / 2, texSize / 1.95);
         ctx2d.scale(1, -1);
         ctx2d.fillStyle = 'rgba(220, 220, 220, 0.9)';
         const fontSize = texSize / 8; 
         ctx2d.font = `bold ${fontSize}px sans-serif`;
-        
-        
         ctx2d.fillText('DISABLED', texSize / 2, texSize / 2);
-
-
         disabledTextTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
@@ -116,28 +107,22 @@ export function initRenderer(canvasElement) {
         console.error("Failed to create disabledTextTexture:", e);
         disabledTextTexture = null;
     }
-
     setupHexBuffersAndVAO();
     setupQuadBuffersAndVAO();
     setupFBOs();
-
     requestAnimationFrame(() => resizeRenderer());
 
     console.log("Renderer initialized.");
     return gl;
 }
 
-
-
 function _calculateAndCacheLayout() {
     if (!gl || !gl.canvas) return;
     const canvasWidth = gl.canvas.width;
     const canvasHeight = gl.canvas.height;
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
-
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-
     const isLandscape = canvasWidth >= canvasHeight;
     const aspectRatio = canvasWidth / canvasHeight;
     if (isLandscape && aspectRatio > 1.2) {
@@ -185,8 +170,6 @@ function _calculateAndCacheLayout() {
     EventBus.dispatch(EVENTS.LAYOUT_CALCULATED, { ...layoutCache });
     EventBus.dispatch(EVENTS.LAYOUT_UPDATED, { ...layoutCache });
 }
-
-
 
 export function getLayoutCache() {
     return layoutCache;
@@ -259,10 +242,8 @@ function setupQuadBuffersAndVAO() {
     quadBuffers = {};
     const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
     const texCoords = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
-
     quadBuffers.positionBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
     quadBuffers.texCoordBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
-
     quadVAO = gl.createVertexArray();
     gl.bindVertexArray(quadVAO);
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
@@ -289,16 +270,11 @@ function renderWorldsToTextures(appContext) {
     const camera = appContext.worldManager.getCurrentCameraState();
     
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
-
-    
     gl.useProgram(hexShaderProgram);
     gl.bindVertexArray(hexVAO);
-    
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
     gl.uniform1i(hexUniformLocations.colorLUT, 1);
-
-    
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -308,25 +284,17 @@ function renderWorldsToTextures(appContext) {
         if (worldData && worldData.enabled) {
             const fboData = worldFBOs[i];
             gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
-
-            
             gl.clearColor(...Config.BACKGROUND_COLOR);
             gl.clear(gl.COLOR_BUFFER_BIT);
-
-            
             if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
                 continue;
             }
-
             
             const textureHexSize = Utils.calculateHexSizeForTexture();
             gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
             gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
             gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
             gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
-            
-            
-            
             if (i === selectedWorldIndex) {
                 gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
                 gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
@@ -335,16 +303,12 @@ function renderWorldsToTextures(appContext) {
                 gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
                 gl.uniform1f(hexUniformLocations.zoom, 1.0);
             }
-
-            
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
             WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
             if (worldData.jsGhostStateArray) {
                 WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
             }
-
-            
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
         }
     }
@@ -353,14 +317,10 @@ function renderWorldsToTextures(appContext) {
     if (disabledTextTexture) {
         gl.useProgram(quadShaderProgram);
         gl.bindVertexArray(quadVAO);
-
-        
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, disabledTextTexture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-
-        
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -370,12 +330,8 @@ function renderWorldsToTextures(appContext) {
             if (!worldData || !worldData.enabled) {
                 const fboData = worldFBOs[i];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
-
-                
                 gl.clearColor(...Config.DISABLED_WORLD_OVERLAY_COLOR);
                 gl.clear(gl.COLOR_BUFFER_BIT);
-                
-                
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             }
         }
@@ -390,27 +346,16 @@ function renderWorldsToTextures(appContext) {
     gl.bindVertexArray(null);
 }
 
-
 function renderMainScene(appContext) {
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
-    const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
-    const vizState = {
-        showCycleIndicator: appContext.visualizationController.getShowCycleIndicator(),
-        showMinimapOverlay: appContext.visualizationController.getShowMinimapOverlay(),
-        vizType: appContext.visualizationController.getVizType(),
-    };
-    
     if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(...Config.BACKGROUND_COLOR);
     gl.clear(gl.COLOR_BUFFER_BIT);
-
     gl.useProgram(quadShaderProgram);
     gl.bindVertexArray(quadVAO);
-
-    
     const { selectedView, miniMap } = layoutCache;
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
@@ -466,11 +411,8 @@ function drawQuad(pixelX, pixelY, pixelW, pixelH) {
 
 export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
-        
         return;
     }
-    
-    
     renderWorldsToTextures(appContext);
     renderMainScene(appContext);
 }

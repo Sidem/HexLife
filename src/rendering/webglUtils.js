@@ -53,7 +53,6 @@ export function loadShaderProgram(gl, vsSource, fsSource) {
     const program = createProgram(gl, vertexShader, fragmentShader);
 
     if (program) {
-        // Shaders are linked into the program and no longer needed individually
         gl.deleteShader(vertexShader);
         gl.deleteShader(fragmentShader);
     }

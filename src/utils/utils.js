@@ -233,7 +233,7 @@ export function rulesetToHex(rulesetArray) {
     try { 
         return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); 
     }
-    catch (e) { 
+    catch { 
         return "Error"; 
     }
 }
@@ -347,4 +347,52 @@ export function textureCoordsToGridCoords(texX, texY, camera) {
         }
     }
     return { col: closestCol, row: closestRow, worldX: worldX, worldY: worldY };
+}
+
+/**
+ * Calculates all hexagon coordinates on a line between two hexes.
+ * Uses cube coordinates and linear interpolation.
+ * @param {number} x1 Column of the start hex.
+ * @param {number} y1 Row of the start hex.
+ * @param {number} x2 Column of the end hex.
+ * @param {number} y2 Row of the end hex.
+ * @returns {Array<{col: number, row: number}>} An array of hex coordinates.
+ */
+export function getHexLine(x1, y1, x2, y2) {
+    // Convert odd-r coordinates to cube coordinates for linear interpolation
+    const toCube = (r, q) => ({ x: q - (r - (r&1)) / 2, z: r, y: - (q - (r - (r&1)) / 2) - r });
+    const fromCube = (x, _y, z) => ({ col: x + (z - (z&1)) / 2, row: z });
+
+    const p1 = toCube(y1, x1);
+    const p2 = toCube(y2, x2);
+
+    const dist = Math.max(Math.abs(p1.x - p2.x), Math.abs(p1.y - p2.y), Math.abs(p1.z - p2.z));
+    if (dist === 0) return [{col: x1, row: y1}];
+
+    const points = [];
+    for (let i = 0; i <= dist; i++) {
+        const t = i / dist;
+        const cubeX = p1.x + (p2.x - p1.x) * t;
+        const cubeY = p1.y + (p2.y - p1.y) * t;
+        const cubeZ = p1.z + (p2.z - p1.z) * t;
+
+        // Round to the nearest hex cube coordinate
+        let rx = Math.round(cubeX);
+        let ry = Math.round(cubeY);
+        let rz = Math.round(cubeZ);
+        const x_diff = Math.abs(rx - cubeX);
+        const y_diff = Math.abs(ry - cubeY);
+        const z_diff = Math.abs(rz - cubeZ);
+
+        if (x_diff > y_diff && x_diff > z_diff) {
+            rx = -ry - rz;
+        } else if (y_diff > z_diff) {
+            ry = -rx - rz;
+        } else {
+            rz = -rx - ry;
+        }
+
+        points.push(fromCube(rx, ry, rz));
+    }
+    return points;
 }

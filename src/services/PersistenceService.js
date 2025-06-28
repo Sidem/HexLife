@@ -138,7 +138,7 @@ export function savePanelState(panelKey, state) {
 
 export function loadUISetting(settingKey, defaultValue) {
     const allUISettings = _getItem(KEYS.UI_SETTINGS) || {};
-    if (allUISettings.hasOwnProperty(settingKey) && allUISettings[settingKey] !== undefined) {
+    if (Object.prototype.hasOwnProperty.call(allUISettings, settingKey) && allUISettings[settingKey] !== undefined) {
         return allUISettings[settingKey];
     }
     return defaultValue;

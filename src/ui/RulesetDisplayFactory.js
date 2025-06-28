@@ -10,8 +10,8 @@ export class RulesetDisplayFactory {
 
     _initObserver() {
         const options = {
-            root: null, // observes intersections relative to the viewport
-            rootMargin: '100px', // start loading when item is 100px away from viewport
+            root: null, 
+            rootMargin: '100px', 
             threshold: 0.01
         };
 
@@ -25,7 +25,7 @@ export class RulesetDisplayFactory {
                         const svg = rulesetVisualizer.createRulesetSVG(hex, { width: '100%', height: '100%' });
                         svg.classList.add('ruleset-viz-svg');
                         vizPlaceholder.replaceWith(svg);
-                        observer.unobserve(element); // Stop observing once loaded
+                        observer.unobserve(element); 
                         this.observedElements.delete(element);
                     }
                 }

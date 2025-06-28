@@ -5,20 +5,17 @@ export class Panel extends BaseComponent {
     constructor(mountPoint, options = {}) {
         super(mountPoint, options);
         this.panelElement = this.mountPoint;
-        this.contentComponentType = options.contentComponentType || null; // Store the type identifier
-        // This will be set by subclasses that have a specific content area
+        this.contentComponentType = options.contentComponentType || null; 
         this.contentContainer = options.contentContainer || this.panelElement;
     }
 
     show() {
         if (this.panelElement && this.isHidden()) {
             this.panelElement.classList.remove('hidden');
-            // Dispatch a richer event for the UIManager
+            
             EventBus.dispatch(EVENTS.VIEW_SHOWN, {
-                view: this, // The Panel instance itself
-                // The UIManager will use this to know WHAT component to place
+                view: this, 
                 contentComponentType: this.contentComponentType,
-                // The UIManager will use this to know WHERE to place the component
                 contentContainer: this.contentContainer
             });
         }

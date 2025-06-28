@@ -4,16 +4,14 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class LearningComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); // No mountPoint
+        super(null, options); 
 
         this.appContext = appContext;
         if (!this.appContext) {
             console.error('LearningComponent: appContext was not provided.');
             return;
         }
-
-        // --- UPDATED: Unified tour list ---
-        // This list no longer needs device-specific flags. Each tour is now adaptive.
+        
         this.availableTours = [
             { id: 'core', name: 'Core Orientation' },
             { id: 'appliedEvolution', name: 'Mission: Applied Evolution' },
@@ -22,15 +20,12 @@ export class LearningComponent extends BaseComponent {
             { id: 'editor', name: 'Tutorial: The Ruleset Editor' },
             { id: 'reset-clear', name: 'Tutorial: Reset & Clear' },
             { id: 'save-load', name: 'Tutorial: Save, Load & Share' },
-            // { id: 'analysis', name: 'Tutorial: Analysis Tools' },
-            // { id: 'worlds', name: 'Tutorial: World Setup' },
-            // { id: 'file_management', name: 'Tutorial: Save, Load & Share' },
         ];
         
         this.tourItemCache = {};
 
-        this.render(); // Builds the component DOM
-        this.refreshTourList(); // Populates initial dynamic state
+        this.render(); 
+        this.refreshTourList(); 
     }
 
     getElement() {

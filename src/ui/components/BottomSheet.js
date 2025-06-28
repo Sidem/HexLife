@@ -1,5 +1,4 @@
 import { Panel } from './Panel.js';
-import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class BottomSheet extends Panel {
     constructor(id, triggerElement, options = {}) {
@@ -62,7 +61,7 @@ export class BottomSheet extends Panel {
         if (this.isVisible) return;
         this.isVisible = true;
         
-        super.show(); // Handles removing 'hidden' and dispatching the event
+        super.show();
         
         setTimeout(() => {
             this.sheetPanel.classList.add('visible');

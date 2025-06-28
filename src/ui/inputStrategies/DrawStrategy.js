@@ -1,7 +1,7 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
-import { findHexagonsInNeighborhood } from '../../utils/utils.js';
+import { findHexagonsInNeighborhood, getHexLine } from '../../utils/utils.js';
 import * as Config from '../../core/config.js';
 
 /**
@@ -15,6 +15,7 @@ export class DrawStrategy extends BaseInputStrategy {
         this.wasSimulationRunningBeforeStroke = false;
         this.strokeAffectedCells = new Set();
         this.lastDrawnCellIndex = null;
+        this.lastProcessedCoords = null; 
 
         this.touchState = {
             isDown: false,
@@ -45,23 +46,29 @@ export class DrawStrategy extends BaseInputStrategy {
             EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
         }
 
-        this.applyBrush(worldIndexAtCursor, col, row);
+        
+        this.applyBrushToLine(worldIndexAtCursor, col, row, col, row);
+        this.lastProcessedCoords = { col, row };
     }
 
     handleMouseMove(event) {
         if (this.isDrawing) {
             const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(event);
             if (viewType === 'selected' && col !== null) {
-                this.applyBrush(worldIndexAtCursor, col, row);
+                if (this.lastProcessedCoords) {
+                    
+                    this.applyBrushToLine(worldIndexAtCursor, this.lastProcessedCoords.col, this.lastProcessedCoords.row, col, row);
+                }
+                this.lastProcessedCoords = { col, row };
             }
         }
     }
 
-    handleMouseUp(event) {
+    handleMouseUp(_event) {
         this.endDrawing();
     }
 
-    handleMouseOut(event) {
+    handleMouseOut(_event) {
         this.endDrawing();
     }
 
@@ -82,7 +89,9 @@ export class DrawStrategy extends BaseInputStrategy {
                 EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
             }
             
-            this.applyBrush(worldIndexAtCursor, col, row);
+            
+            this.applyBrushToLine(worldIndexAtCursor, col, row, col, row);
+            this.lastProcessedCoords = { col, row };
         }
     }
 
@@ -97,7 +106,11 @@ export class DrawStrategy extends BaseInputStrategy {
         if (this.isDrawing) {
             const { worldIndexAtCursor, col, row, viewType } = this.manager.getCoordsFromPointerEvent(primaryTouch);
             if (viewType === 'selected' && col !== null) {
-                this.applyBrush(worldIndexAtCursor, col, row);
+                if (this.lastProcessedCoords) {
+                    
+                    this.applyBrushToLine(worldIndexAtCursor, this.lastProcessedCoords.col, this.lastProcessedCoords.row, col, row);
+                }
+                this.lastProcessedCoords = { col, row };
             }
         }
     }
@@ -118,6 +131,41 @@ export class DrawStrategy extends BaseInputStrategy {
 
         this.endDrawing();
         this.touchState.isDown = false;
+    }
+
+    /**
+     * Apply brush along a line between two hexagon coordinates.
+     * Uses line interpolation to ensure continuous strokes regardless of event frequency.
+     * @param {number} worldIndex The world index to apply the brush to.
+     * @param {number} x1 Starting column coordinate.
+     * @param {number} y1 Starting row coordinate.
+     * @param {number} x2 Ending column coordinate.
+     * @param {number} y2 Ending row coordinate.
+     */
+    applyBrushToLine(worldIndex, x1, y1, x2, y2) {
+        const hexesOnLine = getHexLine(x1, y1, x2, y2);
+        const allCellsToToggle = new Set();
+
+        for (const { col, row } of hexesOnLine) {
+            const newCellsInBrush = new Set();
+            findHexagonsInNeighborhood(col, row, this.manager.appContext.brushController.getBrushSize(), newCellsInBrush);
+
+            for (const cellIndex of newCellsInBrush) {
+                if (!this.strokeAffectedCells.has(cellIndex)) {
+                    allCellsToToggle.add(cellIndex);
+                    this.strokeAffectedCells.add(cellIndex);
+                }
+            }
+        }
+
+        if (allCellsToToggle.size > 0) {
+            const brushMode = this.manager.appContext.interactionController.getBrushMode();
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+                worldIndex: worldIndex,
+                cellIndices: allCellsToToggle,
+                brushMode: brushMode
+            });
+        }
     }
 
     applyBrush(worldIndex, col, row) {
@@ -157,6 +205,7 @@ export class DrawStrategy extends BaseInputStrategy {
     resetStrokeState() {
         this.strokeAffectedCells.clear();
         this.lastDrawnCellIndex = null;
+        this.lastProcessedCoords = null;
         this.wasSimulationRunningBeforeStroke = false;
     }
 }

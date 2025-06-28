@@ -1,5 +1,4 @@
 import { Panel } from './Panel.js';
-import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class PopoutPanel extends Panel {
     constructor(popoutElement, triggerElement, options = {}) {
@@ -21,7 +20,7 @@ export class PopoutPanel extends Panel {
 
         this.popoutElement.style.position = 'absolute';
         this.popoutElement.style.zIndex = '1050'; 
-        this.hide(false); 
+        this.hide(); 
     }
 
     _reposition() {
@@ -98,12 +97,12 @@ export class PopoutPanel extends Panel {
     show() {
         if (this.popoutElement) {
             this._reposition();
-            super.show(); // Handles removing 'hidden' and dispatching the event
+            super.show(); 
             this.triggerElement.classList.add('active');
         }
     }
 
-    hide(propagate = true) {
+    hide() {
         if (this.popoutElement) {
             super.hide();
             this.triggerElement.classList.remove('active');

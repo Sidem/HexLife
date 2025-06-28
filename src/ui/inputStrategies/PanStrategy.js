@@ -27,21 +27,17 @@ export class PanStrategy extends BaseInputStrategy {
     handleMouseDown(event) {
         const { viewType, worldIndexAtCursor } = this.manager.getCoordsFromPointerEvent(event);
 
-        // Explicitly handle primary clicks (left-click) first
         if (event.button === 0) {
             if (viewType === 'mini' && worldIndexAtCursor !== null) {
-                // ACTION: Select a world from the minimap. This is the primary fix.
                 EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
-                return; // Stop further processing
+                return; 
             } else if (viewType === 'selected' && !event.ctrlKey) {
-                // ACTION: Switch to draw mode on the main view.
                 this.manager.setStrategy('draw');
                 this.manager.currentStrategy.handleMouseDown(event);
-                return; // Stop further processing
+                return; 
             }
         }
-
-        // Handle panning (middle-click or ctrl+left-click)
+        
         if (event.button === 1 || (event.button === 0 && event.ctrlKey)) {
             if (viewType === 'selected') {
                 this.isPanning = true;
@@ -65,11 +61,11 @@ export class PanStrategy extends BaseInputStrategy {
         }
     }
 
-    handleMouseUp(event) {
+    handleMouseUp(_event) {
         this.isPanning = false;
     }
 
-    handleMouseOut(event) {
+    handleMouseOut(_event) {
         this.isPanning = false;
     }
 

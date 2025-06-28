@@ -3,7 +3,7 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 
 export class InteractionController {
     constructor() {
-        this.mode = 'pan'; // Keep ephemeral state directly on the class
+        this.mode = 'pan'; 
         
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_INTERACTION_MODE, this.#handleToggleMode);
         EventBus.subscribe(EVENTS.COMMAND_SET_INTERACTION_MODE, this.#handleSetMode);

@@ -3,25 +3,16 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 
 export class MobileView extends Panel {
     constructor(containerElement, options = {}) {
-        // 1. Create the component's root DOM element first. This will be our panel.
         const viewElement = document.createElement('div');
         if (options.id) {
             viewElement.id = options.id;
         }
         viewElement.className = 'mobile-view hidden';
-
-        // 2. Initialize the parent Panel class, passing OUR newly created element.
-        //    This ensures the parent's `this.panelElement` is correctly set.
         super(viewElement, { ...options, viewType: 'mobile_view' });
-
-        // 3. Append our newly created and properly initialized panel to the main container.
         containerElement.appendChild(viewElement);
-
-        // 4. Now, populate the inner HTML of our panel.
         this.title = options.title || 'Mobile View';
         this._renderInnerContent();
         
-        // 5. Set up the content container for reparenting
         if (options.contentComponentType) {
             this.contentComponentType = options.contentComponentType;
             this.contentContainer = this.panelElement.querySelector('.mobile-view-content');
@@ -60,8 +51,8 @@ export class MobileView extends Panel {
     }
 
     show() {
-        super.show(); // This handles removing 'hidden' and dispatching the VIEW_SHOWN event for reparenting
+        super.show(); 
     }
 
-    // show() and hide() are now correctly inherited from Panel.js and can be removed from this file.
+    
 } 

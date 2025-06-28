@@ -3,7 +3,7 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, mutateRandomBitsInHex } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -35,12 +35,11 @@ export class WorldManager {
 
         if (hasSharedSettings) {
             console.log("Applying shared settings from URL.");
-            // Prime the world settings array
             this.worldSettings = [];
 
-            const sharedRulesets = this.sharedSettings.rulesets; // e.g., ['HEX1', 'HEX2', ...]
-            const singleRuleset = this.sharedSettings.rulesetHex; // e.g., 'HEX1'
-            const sharedDensities = this.sharedSettings.densities; // e.g., [0.1, 0.5, ...]
+            const sharedRulesets = this.sharedSettings.rulesets; 
+            const singleRuleset = this.sharedSettings.rulesetHex; 
+            const sharedDensities = this.sharedSettings.densities; 
             const enabledMask = this.sharedSettings.enabledMask ?? 0b111111111;
 
             for (let i = 0; i < Config.NUM_WORLDS; i++) {
@@ -57,7 +56,7 @@ export class WorldManager {
                 });
             }
             PersistenceService.saveWorldSettings(this.worldSettings);
-            // Save the selected world's ruleset as the "main" one for persistence consistency
+            
             PersistenceService.saveRuleset(this.worldSettings[this.selectedWorldIndex].rulesetHex);
         } else {
             this.worldSettings = PersistenceService.loadWorldSettings();
@@ -74,7 +73,7 @@ export class WorldManager {
         }
 
         const worldManagerCallbacks = {
-            onUpdate: (worldIndex, updateType) => this._handleProxyUpdate(worldIndex, updateType),
+            onUpdate: (worldIndex, _updateType) => this._handleProxyUpdate(worldIndex, _updateType),
             onInitialized: (worldIndex) => this._handleProxyInitialized(worldIndex)
         };
 
@@ -134,7 +133,7 @@ export class WorldManager {
         }
     }
 
-    _handleProxyUpdate = (worldIndex, updateType) => {
+    _handleProxyUpdate = (worldIndex, _updateType) => {
         const proxy = this.worlds[worldIndex];
         if (!proxy) return;
 
@@ -974,12 +973,12 @@ export class WorldManager {
 
         const rulesetArray = hexToRuleset(currentHex);
         for (let i = 0; i < rulesetArray.length; i++) {
-            rulesetArray[i] = 1 - rulesetArray[i]; // Invert each bit
+            rulesetArray[i] = 1 - rulesetArray[i]; 
         }
         const invertedHex = rulesetToHex(rulesetArray);
 
-        // Use the existing #applyRulesetToWorlds private method to handle history and state updates
-        this.#applyRulesetToWorlds(invertedHex, 'selected', false); // Apply to selected world, don't auto-reset
+        
+        this.#applyRulesetToWorlds(invertedHex, 'selected', false); 
     }
 
     areAllWorkersInitialized = () => {

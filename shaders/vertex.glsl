@@ -27,12 +27,10 @@ void main() {
   vec2 clipSpace = zeroToTwo - 1.0;
   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
   
-  // Pass attributes directly to fragment shader
   v_state = a_instance_state;
   v_hover_state = a_instance_hover_state;
   v_ghost_state = a_instance_ghost_state;
   
-  // ADDED: Calculate LUT coordinates here, once per vertex, not per pixel.
   v_lut_x = (a_instance_rule_index + 0.5) / 128.0;
   v_lut_y = (a_instance_state + 0.5) / 2.0;
 }

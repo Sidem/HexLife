@@ -3,7 +3,7 @@ import init, { World } from './wasm-engine/hexlife_wasm.js';
 import { rulesetToHex, findHexagonsInNeighborhood } from '../utils/utils.js';
 import { Throttler } from '../utils/throttler.js';
 
-let wasm_module;
+let _wasm_module;
 let wasm_world;
 let worldIndex = -1;
 let workerConfig = {};
@@ -141,29 +141,27 @@ function processCommandQueue() {
     let needsGridUpdate = false;
     let needsVisualUpdate = false;
     let rulesetChangedInQueue = false;
-    let activeCount = 0;
 
     for (const command of commandQueue) {
         switch (command.type) {
-            case 'SET_RULESET':
+            case 'SET_RULESET': {
                 ruleset = new Uint8Array(command.data.rulesetBuffer);
                 rulesetChangedInQueue = true;
                 needsGridUpdate = true;
                 resetCycleState();
                 break;
-            case 'RESET_WORLD':
+            }
+            case 'RESET_WORLD': {
                 worldTickCounter = 0;
                 ratioHistory = [];
                 entropyHistory = [];
                 hexBlockEntropyHistory = [];
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
-                activeCount = 0;
                 if (ruleUsageCounters) ruleUsageCounters.fill(0);
                 if (jsStateArray) {
                     if (isClearOp) {
                         jsStateArray.fill(density);
-                        activeCount = (density === 1) ? workerConfig.NUM_CELLS : 0;
                     } else {
                         if (density === 0 || density === 1) {
                             jsStateArray.fill(density);
@@ -171,13 +169,9 @@ function processCommandQueue() {
                             if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
                                 jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
                             }
-                            for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
-                                if (jsStateArray[i] === 1) activeCount++;
-                            }
                         } else {
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
                                 jsStateArray[i] = Math.random() < density ? 1 : 0;
-                                if (jsStateArray[i] === 1) activeCount++;
                             }
                         }
                     }
@@ -189,8 +183,9 @@ function processCommandQueue() {
                 resetCycleState();
                 needsGridUpdate = true;
                 break;
+            }
             case 'APPLY_BRUSH':
-            case 'APPLY_SELECTIVE_BRUSH':
+            case 'APPLY_SELECTIVE_BRUSH': {
                 let brushChanged = false;
                 if (command.type === 'APPLY_BRUSH') {
                     const affectedIndicesInBrush = new Set();
@@ -204,18 +199,21 @@ function processCommandQueue() {
                     needsGridUpdate = true;
                 }
                 break;
-            case 'SET_HOVER_STATE':
+            }
+            case 'SET_HOVER_STATE': {
                 if (setHoverStateLogic(command.data.hoverAffectedIndices)) {
                     needsVisualUpdate = true; 
                 }
                 break;
-            case 'CLEAR_HOVER_STATE':
+            }
+            case 'CLEAR_HOVER_STATE': {
                 if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
                     jsHoverStateArray.fill(0);
                     needsVisualUpdate = true; 
                 }
                 break;
-            case 'SET_ENABLED':
+            }
+            case 'SET_ENABLED': {
                 isEnabled = command.data.enabled;
                  if (!isEnabled && jsStateArray) {
                     jsStateArray.fill(0);
@@ -227,7 +225,8 @@ function processCommandQueue() {
                     needsGridUpdate = true;
                 }
                 break;
-            case 'LOAD_STATE':
+            }
+            case 'LOAD_STATE': {
                 jsStateArray = new Uint8Array(command.data.newStateBuffer);
                 ruleset = new Uint8Array(command.data.newRulesetBuffer);
                 worldTickCounter = command.data.worldTick || 0;
@@ -244,6 +243,7 @@ function processCommandQueue() {
                 needsGridUpdate = true;
                 rulesetChangedInQueue = true;
                 break;
+            }
         }
     }
     commandQueue = [];
@@ -254,17 +254,13 @@ function processCommandQueue() {
 function runTick() {
     const { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue } = processCommandQueue();
     let simulationPerformedUpdate = false;
-
-    // Handle paused or disabled states first
     if (!isEnabled || !isRunning) {
         if (needsGridUpdate || needsVisualUpdate || rulesetChangedInQueue) {
             forceSyncUpdate();
         }
-        return; // Stop further execution if not running or enabled
+        return; 
     }
     
-    // --- Simulation Logic for Running State ---
-
     if (isCyclePlaybackMode) {
         worldTickCounter++;
         const nextFrame = detectedCycle[cyclePlaybackIndex];
@@ -282,7 +278,7 @@ function runTick() {
         );
     }
 
-    // --- Post-Tick Analysis and State Swap ---
+    
 
     let activeCount = 0;
     for(let i = 0; i < jsNextStateArray.length; i++) {
@@ -291,7 +287,7 @@ function runTick() {
 
     const newStateChecksum = calculateChecksum(jsNextStateArray);
 
-    // Cycle Detection Logic
+    
     if (isDetectingCycle) {
         if (newStateChecksum === cycleStartChecksum) {
             isCyclePlaybackMode = true;
@@ -323,7 +319,7 @@ function runTick() {
         }
     }
     
-    // Swap buffers for next tick
+    
     [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
     [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
 
@@ -331,7 +327,7 @@ function runTick() {
         simulationPerformedUpdate = true;
     }
 
-    // --- Stats Calculation and Update Scheduling ---
+    
 
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
     let currentBinaryEntropy, currentBlockEntropy;
@@ -349,7 +345,7 @@ function runTick() {
     ratioHistory.push(ratio);
     if (ratioHistory.length > MAX_HISTORY_SIZE) ratioHistory.shift();
     
-    // Update the stats cache on every tick
+    
     lastKnownStats = {
         tick: worldTickCounter,
         activeCount: activeCount,
@@ -362,10 +358,10 @@ function runTick() {
         cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
     };
 
-    // Schedule the throttled stats update
+    
     statsThrottler.schedule();
 
-    // Send grid update only if the visual state has actually changed
+    
     if (simulationPerformedUpdate) {
         lastSentChecksum = newStateChecksum;
         sendGridUpdate();
@@ -391,7 +387,7 @@ function sendGridUpdate() {
 }
 
 function sendStatsUpdate(forceUpdate = false) {
-    // If the simulation isn't running, we don't need to send routine updates unless forced.
+    
     if (!isRunning && !forceUpdate) return;
 
     const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
@@ -406,8 +402,8 @@ function sendStatsUpdate(forceUpdate = false) {
 }
 
 function forceSyncUpdate() {
-    // This function is for when the simulation is paused or disabled,
-    // but a command has changed the state and the UI needs an immediate, full update.
+    
+    
     if (!jsStateArray) return;
     lastSentChecksum = calculateChecksum(jsStateArray);
     sendGridUpdate();
@@ -421,7 +417,7 @@ function forceSyncUpdate() {
         blockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
     }
 
-    // Update the stats cache with the latest information
+    
     lastKnownStats = {
         tick: worldTickCounter,
         activeCount: active,
@@ -434,7 +430,7 @@ function forceSyncUpdate() {
         cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
     };
     
-    // Force the throttler to send the stats update immediately
+    
     sendStatsUpdate(true);
 }
 
@@ -451,10 +447,9 @@ function updateSimulationInterval() {
 
 self.onmessage = async function(event) {
     const command = event.data;
-    let processQueueAndForceTickForPausedState = false;
 
     switch (command.type) {
-        case 'INIT':
+        case 'INIT': {
             await init(); 
             wasm_world = new World(command.data.config.GRID_COLS, command.data.config.GRID_ROWS);
             worldIndex = command.data.worldIndex;
@@ -517,7 +512,7 @@ self.onmessage = async function(event) {
                 ratioHistory.push(initialRatio);
             }
 
-            // Populate the initial stats cache
+            
             lastKnownStats = {
                 tick: worldTickCounter,
                 activeCount: initialActiveCount,
@@ -532,22 +527,26 @@ self.onmessage = async function(event) {
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
             sendGridUpdate();
-            sendStatsUpdate(true); // Force an immediate initial stats update
+            sendStatsUpdate(true); 
             break;
+        }
 
-        case 'START_SIMULATION':
+        case 'START_SIMULATION': {
             isRunning = true;
             updateSimulationInterval();
             break;
-        case 'STOP_SIMULATION':
+        }
+        case 'STOP_SIMULATION': {
             isRunning = false;
             updateSimulationInterval();
             break;
-        case 'SET_SPEED_TARGET':
+        }
+        case 'SET_SPEED_TARGET': {
             currentSpeedTarget = command.data.speed;
             updateSimulationInterval();
             break;
-        case 'SET_ENABLED':
+        }
+        case 'SET_ENABLED': {
             const prevEnabled = isEnabled;
             isEnabled = command.data.enabled;
             let sendUpdateForSetEnabled = false;
@@ -567,7 +566,7 @@ self.onmessage = async function(event) {
                 const activeAfterEnable = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0; 
                 
-                // Update the stats cache immediately
+                
                 lastKnownStats = {
                     tick: worldTickCounter,
                     activeCount: activeAfterEnable,
@@ -581,11 +580,12 @@ self.onmessage = async function(event) {
                 };
 
                 sendGridUpdate();
-                sendStatsUpdate(true); // Force an immediate stats update
+                sendStatsUpdate(true); 
             }
             break;
+        }
 
-        case 'SET_ENTROPY_SAMPLING_PARAMS':
+        case 'SET_ENTROPY_SAMPLING_PARAMS': {
             workerIsEntropySamplingEnabled = command.data.enabled;
             workerEntropySampleRate = command.data.rate || 10;
             if (!workerIsEntropySamplingEnabled) {
@@ -593,19 +593,20 @@ self.onmessage = async function(event) {
                 hexBlockEntropyHistory = [];
             }
             break;
+        }
 
         case 'RESET_WORLD':
         case 'APPLY_BRUSH':
         case 'APPLY_SELECTIVE_BRUSH':
-        case 'LOAD_STATE':
+        case 'LOAD_STATE': {
             commandQueue.push(command);
-            const { needsGridUpdate: inducedUpdateOnGrid, rulesetChangedInQueue: rsChangedByGridCmd } = processCommandQueue();
+            const { needsGridUpdate: inducedUpdateOnGrid } = processCommandQueue();
             if (inducedUpdateOnGrid) {
                 lastSentChecksum = calculateChecksum(jsStateArray);
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
                 
-                // Update the stats cache immediately
+                
                 lastKnownStats = {
                     tick: worldTickCounter,
                     activeCount: active,
@@ -619,20 +620,23 @@ self.onmessage = async function(event) {
                 };
 
                 sendGridUpdate();
-                sendStatsUpdate(true); // Force an immediate stats update
+                sendStatsUpdate(true); 
             }
             break;
+        }
 
         case 'SET_HOVER_STATE':
         case 'CLEAR_HOVER_STATE':
-        case 'SET_RULESET':
+        case 'SET_RULESET': {
             commandQueue.push(command);
             if (!isRunning || !isEnabled) {
                 runTick();
             }
             break;
-        default:
+        }
+        default: {
             commandQueue.push(command);
             break;
+        }
     }
 };

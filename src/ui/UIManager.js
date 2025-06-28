@@ -34,7 +34,7 @@ export class UIManager {
         this.mobileViews = {};
         this.activeMobileViewName = 'simulate';
         this.managedComponents = [];
-        this.sharedComponents = {}; // NEW: Property to hold singleton instances
+        this.sharedComponents = {}; 
         this.saveRulesetModal = null;
         this.actionsPopover = null;
         this.confirmationDialog = null;
@@ -56,10 +56,10 @@ export class UIManager {
      * and wires all necessary event listeners.
      */
     init() {
-        const { appContext, appContext: { worldManager, panelManager, toolbar, onboardingManager, libraryController } } = this;
+        const { appContext, appContext: { panelManager, toolbar, libraryController } } = this;
         const libraryData = libraryController.getLibraryData();
 
-        // NEW: Instantiate all shared components ONCE
+        
         this.rulesetDisplayFactory = new RulesetDisplayFactory();
         this.appContext.rulesetDisplayFactory = this.rulesetDisplayFactory;
         
@@ -82,7 +82,7 @@ export class UIManager {
         const topInfoBar = new TopInfoBar(appContext);
         topInfoBar.init();
         toolbar.init();
-        panelManager.init(); // No longer needs libraryData
+        panelManager.init(); 
 
         const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
         keyboardManager.init();
@@ -92,12 +92,12 @@ export class UIManager {
         this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays);
 
         
-        this.initMobileUI(libraryData);
+        this.initMobileUI();
         
-        // Initialize the save ruleset modal
+        
         this.saveRulesetModal = new SaveRulesetModal(document.getElementById('modal-container'), appContext);
         
-        // Initialize the actions popover and confirmation dialog
+        
         this.confirmationDialog = new ConfirmationDialog(document.getElementById('dialog-container'));
         
         this.setupGlobalEventListeners();
@@ -169,8 +169,8 @@ export class UIManager {
         return this.mode === 'mobile';
     }
 
-    initMobileUI(libraryData) {
-        const { appContext, appContext: { worldManager, panelManager } } = this;
+    initMobileUI() {
+        const { appContext, appContext: { panelManager } } = this;
 
         
         const mobileViewsContainer = document.getElementById('mobile-views-container');
@@ -212,7 +212,6 @@ export class UIManager {
     renderCustomFabs(fabLeftContainer) {
         if (!fabLeftContainer) return;
         fabLeftContainer.innerHTML = '';
-        const { appContext } = this;
         const fabActionMap = {
             'generate': { icon: '✨', title: 'Generate', command: EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, payload: {} },
             'mutate': { icon: '🦠', title: 'Mutate', command: EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, payload: {} },
@@ -245,27 +244,27 @@ export class UIManager {
         });
     }
 
-    // NEW: Method to handle reparenting
-    _placeComponentInView({ view, contentComponentType, contentContainer }) {
+    
+    _placeComponentInView({ _view, contentComponentType, contentContainer }) {
         if (!contentComponentType || !contentContainer) return;
 
-        // Find the singleton component instance based on its constructor (type)
+        
         const componentToPlace = Object.values(this.sharedComponents).find(
             component => component.constructor === contentComponentType
         );
 
         if (componentToPlace) {
-            // Clear the container first
+            
             contentContainer.innerHTML = '';
             contentContainer.appendChild(componentToPlace.getElement());
 
-            // NEW: Apply context class for styling
+            
             const contextClass = this.isMobile() ? 'mobile-context' : 'desktop-context';
             const oppositeClass = this.isMobile() ? 'desktop-context' : 'mobile-context';
             componentToPlace.getElement().classList.add(contextClass);
             componentToPlace.getElement().classList.remove(oppositeClass);
 
-            // Refresh component if it has a refresh method
+            
             if (typeof componentToPlace.refresh === 'function') {
                 componentToPlace.refresh();
             }
@@ -297,7 +296,7 @@ export class UIManager {
             this.confirmationDialog.show(data);
         });
 
-        // NEW: Add the listener for the VIEW_SHOWN event
+        
         EventBus.subscribe(EVENTS.VIEW_SHOWN, (data) => {
             this._placeComponentInView(data);
         });
@@ -310,11 +309,11 @@ export class UIManager {
 
         
         const handleClickOutside = (event) => {
-            // Do nothing if the onboarding tour is active and showing a tooltip
+            
             if (this.onboardingManager && this.onboardingManager.isActive()) {
                 const tooltip = document.getElementById('onboarding-tooltip');
                 if (tooltip && !tooltip.classList.contains('hidden')) {
-                     // Allow clicks only on the highlighted element during the tour
+                     
                     const highlightedEl = document.querySelector('.onboarding-highlight');
                     if (highlightedEl && highlightedEl.contains(event.target)) {
                         return;
@@ -325,18 +324,18 @@ export class UIManager {
             const toolbar = this.appContext.toolbar;
             const popouts = toolbar ? toolbar.activePopouts : [];
 
-            // Check for clicks inside any active popout panel or its trigger button
+            
             const clickedInsidePopoutOrTrigger = popouts.some(p => 
                 !p.isHidden() && (p.popoutElement.contains(event.target) || p.triggerElement.contains(event.target))
             );
 
-            // Check for clicks inside the ActionsPopover
+            
             const clickedInsideActionsPopover = this.actionsPopover && !this.actionsPopover.isHidden() && this.actionsPopover.element.contains(event.target);
 
-            // Check if the click was on the element that triggered the popover
+            
             const clickedOnActionsPopoverTrigger = this.actionsPopover && this.actionsPopover.triggerElement && this.actionsPopover.triggerElement.contains(event.target);
 
-            // If the click is not inside any of these elements OR their triggers, hide them.
+            
             if (!clickedInsidePopoutOrTrigger && !clickedInsideActionsPopover && !clickedOnActionsPopoverTrigger) {
                 if (toolbar) {
                     toolbar.closeAllPopouts();
@@ -397,7 +396,7 @@ export class UIManager {
         });
         this.managedComponents = [];
 
-        // NEW: Destroy shared components
+        
         Object.values(this.sharedComponents).forEach(component => {
             if (typeof component.destroy === 'function') {
                 component.destroy();
@@ -405,7 +404,7 @@ export class UIManager {
         });
         this.sharedComponents = {};
 
-        // Destroy the ruleset display factory
+        
         if (this.rulesetDisplayFactory) {
             this.rulesetDisplayFactory.destroy();
         }
@@ -511,7 +510,7 @@ export class UIManager {
     }
 
     #createMobileView(viewName) {
-        // Check if view already exists
+        
         if (this.mobileViews[viewName]) {
             return;
         }
@@ -521,14 +520,14 @@ export class UIManager {
 
         const mobileViewsContainer = document.getElementById('mobile-views-container');
         if (mobileViewsContainer) {
-            // Create the MobileView shell without content component
+            
             const presenter = new MobileView(mobileViewsContainer, { 
                 id: `${viewName}-mobile-view`,
                 title: config.title,
-                contentComponentType: config.constructor // Pass the constructor as type identifier
+                contentComponentType: config.constructor 
             });
             
-            // Store the view
+            
             this.mobileViews[viewName] = presenter;
         }
     }

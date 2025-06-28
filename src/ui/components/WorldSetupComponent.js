@@ -8,7 +8,7 @@ import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 
 export class WorldSetupComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); // No mountPoint
+        super(null, options); 
 
         if (!appContext || !appContext.worldManager) {
             console.error('WorldSetupComponent: appContext or worldManager is null.');
@@ -16,10 +16,8 @@ export class WorldSetupComponent extends BaseComponent {
         }
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        // No more this.context
         this.element = document.createElement('div');
         this.element.className = 'world-setup-component-content';
-        
         this.uiElements = {}; 
         this.worldControlCache = [];
         
@@ -96,7 +94,7 @@ export class WorldSetupComponent extends BaseComponent {
             const enableSwitchMount = cell.querySelector(`#world-setup-enable-switch-mount-${i}`);
 
             const densitySlider = new SliderComponent(sliderMount, {
-                id: `world-setup-density-slider-${i}`, // Static ID with index
+                id: `world-setup-density-slider-${i}`, 
                 label: 'Density:', min: 0, max: 1, step: 0.001,
                 value: 0.5, unit: '', showValue: true,
                 onChange: (newDensity) => {
@@ -106,7 +104,7 @@ export class WorldSetupComponent extends BaseComponent {
 
             const enableSwitch = new SwitchComponent(enableSwitchMount, {
                 type: 'checkbox',
-                name: `world-setup-enable-switch-${i}`, // Static name with index
+                name: `world-setup-enable-switch-${i}`, 
                 initialValue: true,
                 items: [{ value: 'enabled', text: 'Enabled' }],
                 onChange: (isEnabled) => {
@@ -144,16 +142,16 @@ export class WorldSetupComponent extends BaseComponent {
             const cache = this.worldControlCache[i];
             if (!cache) continue;
 
-            // Update cached elements instead of recreating them
+            
             const formattedFullHex = formatHexCode(settings.rulesetHex);
             cache.vizContainer.title = formattedFullHex;
             
             const svg = rulesetVisualizer.createRulesetSVG(settings.rulesetHex);
             svg.classList.add('ruleset-viz-svg');
-            cache.vizContainer.innerHTML = ''; // Clear only the SVG container
+            cache.vizContainer.innerHTML = ''; 
             cache.vizContainer.appendChild(svg);
 
-            cache.densitySlider.setValue(settings.initialDensity, false); // Update slider value without firing its change event
+            cache.densitySlider.setValue(settings.initialDensity, false); 
             cache.enableSwitch.setValue(settings.enabled);
             if (cache.enableSwitchLabel) {
                 cache.enableSwitchLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';

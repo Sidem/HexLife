@@ -6,7 +6,7 @@ import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/rul
 
 export class RulesetEditorComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); // No mountPoint
+        super(null, options); 
         
         if (!appContext || !appContext.worldManager) {
             console.error('RulesetEditorComponent: appContext or worldManager is null.');
@@ -15,7 +15,7 @@ export class RulesetEditorComponent extends BaseComponent {
         
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        // No more this.context
+        
 
         
         this.element = document.createElement('div');
@@ -193,7 +193,7 @@ export class RulesetEditorComponent extends BaseComponent {
             this.scopeSwitch = new SwitchComponent(this.uiElements.editorScopeSwitchMount, {
                 label: 'Apply changes to:',
                 type: 'radio',
-                name: 'ruleset-editor-apply-scope', // Static name
+                name: 'ruleset-editor-apply-scope', 
                 initialValue: initialScope,
                 items: [
                     { value: 'selected', text: 'Selected World' },
@@ -210,7 +210,7 @@ export class RulesetEditorComponent extends BaseComponent {
         if (this.uiElements.editorResetSwitchMount) {
             this.resetSwitch = new SwitchComponent(this.uiElements.editorResetSwitchMount, {
                 type: 'checkbox',
-                name: 'ruleset-editor-auto-reset', // Static name
+                name: 'ruleset-editor-auto-reset', 
                 initialValue: initialReset,
                 items: [{ value: 'reset', text: 'Auto-Reset on Change' }],
                 onChange: (isChecked) => {
@@ -363,7 +363,7 @@ export class RulesetEditorComponent extends BaseComponent {
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
         if (!canonicalDetails) return;
     
-        this.cachedRotationalSymmetryRules.forEach((cachedRule, index) => {
+        this.cachedRotationalSymmetryRules.forEach((cachedRule, _index) => {
             const detail = canonicalDetails.find(d => 
                 d.canonicalBitmask === cachedRule.canonicalBitmask && d.centerState === cachedRule.centerState
             );

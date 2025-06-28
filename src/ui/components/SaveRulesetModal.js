@@ -55,7 +55,6 @@ export class SaveRulesetModal extends BaseComponent {
         this._addDOMListener(this.ui.saveBtn, 'click', this.handleSave);
         this._addDOMListener(this.ui.cancelBtn, 'click', this.hide);
         this._addDOMListener(this.ui.closeBtn, 'click', this.hide);
-        // Close on overlay click
         this._addDOMListener(this.element, 'click', (e) => {
             if (e.target === this.element) {
                 this.hide();

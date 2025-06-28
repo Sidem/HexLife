@@ -37,9 +37,6 @@ export const EventBus = {
         const index = subscriptions[eventType].push(callback) - 1;
         return () => { 
             subscriptions[eventType].splice(index, 1);
-            if (subscriptions[eventType].length === 0) {
-                
-            }
         };
     },
 

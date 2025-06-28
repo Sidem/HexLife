@@ -1,5 +1,4 @@
 import { BaseComponent } from '../BaseComponent.js';
-import { EventBus } from '../../../services/EventBus.js'; 
 
 export class IAnalysisPlugin extends BaseComponent {
     constructor(pluginId, pluginName) {
@@ -35,7 +34,7 @@ export class IAnalysisPlugin extends BaseComponent {
      * This method should be overridden by concrete plugins.
      * @param {object} data - The data payload from the simulation (e.g., { type: 'worldStats', payload: statsData }).
      */
-    onDataUpdate(data) {
+    onDataUpdate(_data) {
         
         
     }

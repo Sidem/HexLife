@@ -7,8 +7,6 @@ import { AppContext } from './core/AppContext.js';
 import { UIManager } from './ui/UIManager.js';
 import { Application } from './core/Application.js';
 import { SettingsLoader } from './services/SettingsLoader.js';
-
-// Import JSON data directly. Vite handles this automatically.
 import rulesetLibrary from './core/library/rulesets.json';
 import patternLibrary from './core/library/patterns.json';
 
@@ -32,10 +30,7 @@ async function initialize() {
         console.error("Canvas element not found!");
         return;
     }
-
     const sharedSettings = SettingsLoader.loadFromUrl();
-
-    // The library data is now imported directly, no need to fetch.
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
     
     updateLoadingStatus("Initializing rendering engine...");
@@ -49,7 +44,7 @@ async function initialize() {
     updateLoadingStatus("Spooling up simulation workers...");
     appContext = new AppContext(sharedSettings, libraryData);
     uiManager = new UIManager(appContext);
-    const inputManager = new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
+    new InputManager(canvas, appContext.worldManager, appContext, uiManager.isMobile());
 
     EventBus.subscribe(EVENTS.WORKER_INITIALIZED, ({ worldIndex }) => {
         const hexElement = document.getElementById(`loader-hex-${worldIndex}`);

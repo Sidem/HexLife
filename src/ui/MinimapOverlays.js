@@ -1,5 +1,5 @@
 import { BaseComponent } from './components/BaseComponent.js';
-import { EventBus, EVENTS } from '../services/EventBus.js';
+import { EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import * as Config from '../core/config.js';
 
@@ -17,7 +17,7 @@ export class MinimapOverlays extends BaseComponent {
 
     init() {
         if (!this.mountPoint) return;
-        this.mountPoint.innerHTML = ''; // Clear any previous content
+        this.mountPoint.innerHTML = ''; 
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const overlay = document.createElement('div');
@@ -65,13 +65,13 @@ export class MinimapOverlays extends BaseComponent {
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const worldStatus = allWorldsStatus[i];
-            const { miniMapW, miniMapH, miniMapSpacing, gridContainerX, gridContainerY } = this.layoutCache.miniMap;
+            const { miniMapW, miniMapH, miniMapSpacing } = this.layoutCache.miniMap;
             const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
             const col = i % Config.WORLD_LAYOUT_COLS;
             const miniX = col * (miniMapW + miniMapSpacing);
             const miniY = row * (miniMapH + miniMapSpacing);
 
-            // Update Cycle Indicator
+            
             const indicatorEl = this.cycleIndicatorElements[i];
             const showIndicators = vizState?.showCycleIndicator ?? false;
             if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
@@ -93,7 +93,7 @@ export class MinimapOverlays extends BaseComponent {
                 indicatorEl.classList.add('hidden');
             }
 
-            // Update Ruleset Overlay
+            
             const overlayEl = this.overlayElements[i];
             const showOverlay = vizState?.showMinimapOverlay ?? false;
             if (overlayEl && worldStatus?.renderData.enabled && showOverlay) {

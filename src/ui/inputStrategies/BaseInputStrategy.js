@@ -14,19 +14,19 @@ export class BaseInputStrategy {
      * Called when this strategy becomes active.
      * @param {object} [options] - Optional data passed when switching strategies (e.g., pattern data).
      */
-    enter(options) {}
+    enter(_options) {}
 
     /**
      * Called when this strategy is deactivated.
      */
     exit() {}
-    handleMouseDown(event) {}
-    handleMouseMove(event) {}
-    handleMouseUp(event) {}
-    handleMouseOut(event) {}
-    handleMouseWheel(event) {}
-    handleTouchStart(event) {}
-    handleTouchMove(event) {}
-    handleTouchEnd(event) {}
-    handleKeyDown(event) {}
+    handleMouseDown(_event) {}
+    handleMouseMove(_event) {}
+    handleMouseUp(_event) {}
+    handleMouseOut(_event) {}
+    handleMouseWheel(_event) {}
+    handleTouchStart(_event) {}
+    handleTouchMove(_event) {}
+    handleTouchEnd(_event) {}
+    handleKeyDown(_event) {}
 }

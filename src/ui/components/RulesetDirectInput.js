@@ -87,6 +87,6 @@ export class RulesetDirectInput extends BaseComponent {
             const oldTxt = this.copyButton.textContent;
             this.copyButton.textContent = "Copied!";
             setTimeout(() => { this.copyButton.textContent = oldTxt; }, 1500);
-        }).catch(err => alert('Failed to copy ruleset hex.'));
+        }).catch(_err => alert('Failed to copy ruleset hex.'));
     }
 } 

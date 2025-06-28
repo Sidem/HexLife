@@ -52,15 +52,12 @@ export class Toolbar {
         this._setupStateListeners();
 
     }
-
-
     
     _initPopoutPanels() {
         this.popoutConfig.forEach(config => {
             const buttonElement = this.uiElements[config.buttonId];
             const popoutElement = this.uiElements[config.popoutId];
             if (buttonElement && popoutElement) {
-                // Special handling for controls popout to support reparenting
                 const options = { ...config.options };
                 if (config.name === 'controls') {
                     const controlsMount = popoutElement.querySelector('#desktopControlsMount');
@@ -76,18 +73,12 @@ export class Toolbar {
         this.activePopouts = Object.values(this.popoutPanels);
     }
 
-
-
-
-    
     _initPopoutControls() {
         this.uiElements.resetCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.resetAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearCurrentButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }); this.popoutPanels.resetClear.hide(); });
         this.uiElements.clearAllButtonPopout.addEventListener('click', () => { EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }); this.popoutPanels.resetClear.hide(); });
     }
-    
-    
 
     _setupToolbarButtonListeners() {
         const buttonToActionMap = {
@@ -143,7 +134,7 @@ export class Toolbar {
             navigator.clipboard.writeText(this.uiElements.shareLinkInput.value).then(() => {
                 this.uiElements.copyShareLinkButton.textContent = "Copied!";
                 setTimeout(() => this.uiElements.copyShareLinkButton.textContent = "Copy to Clipboard", 1500);
-            }).catch(err => alert('Failed to copy link.'));
+            }).catch(_err => alert('Failed to copy link.'));
         }
     }
 

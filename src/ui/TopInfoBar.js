@@ -45,7 +45,7 @@ export class TopInfoBar {
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
         
-        // Initialize the App Menu Popout (desktop only)
+        
         if (!this.appContext.uiManager.isMobile() && this.uiElements.appMenuButton && this.uiElements.appMenuPopout) {
             this.popoutPanels.appMenu = new PopoutPanel(this.uiElements.appMenuPopout, this.uiElements.appMenuButton, {
                 position: 'bottom',
@@ -93,11 +93,11 @@ export class TopInfoBar {
             });
         }
         
-        // Add listener for the save button
+        
         this.uiElements.saveRulesetButton.addEventListener('click', () => {
             const hex = this.worldManager.getCurrentRulesetHex();
-            // Only allow saving if it's NOT personal and NOT public.
-            // Or editing if it IS personal. Public rulesets are not editable via this button.
+            
+            
             if (this.saveStatus.isPersonal) {
                 const rule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
                 if (rule) EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule);
@@ -108,7 +108,7 @@ export class TopInfoBar {
             }
         });
 
-        // Add subscription to update the star on library changes
+        
         EventBus.subscribe(EVENTS.USER_LIBRARY_CHANGED, () => {
             this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
         });
@@ -131,7 +131,7 @@ export class TopInfoBar {
         const { history } = this.worldManager.getRulesetHistoryArrays(this.worldManager.getSelectedWorldIndex());
         const reversedHistory = history.slice().reverse();
 
-        listContainer.innerHTML = ''; // Clear previous content
+        listContainer.innerHTML = ''; 
 
         reversedHistory.forEach((hex, index) => {
             const isCurrent = index === 0;
@@ -150,7 +150,7 @@ export class TopInfoBar {
     updateMainRulesetDisplay(hex) {
         if (!this.uiElements?.rulesetDisplay) return;
 
-        // Update the small visualization
+        
         if (this.uiElements.rulesetVizContainer) {
             this.uiElements.rulesetVizContainer.innerHTML = '';
             const svg = rulesetVisualizer.createRulesetSVG(hex, {width: '100%', height: '100%'});
@@ -158,7 +158,7 @@ export class TopInfoBar {
             this.uiElements.rulesetVizContainer.appendChild(svg);
         }
 
-        // Check library for a name
+        
         const personalRule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
         const publicRule = this.appContext.libraryController.getLibraryData().rulesets.find(r => r.hex === hex);
         
@@ -214,7 +214,7 @@ export class TopInfoBar {
         this.uiElements.saveRulesetButton.classList.remove('hidden');
 
         const status = this.appContext.libraryController.getRulesetStatus(hex);
-        this.saveStatus = status; // Cache the status
+        this.saveStatus = status; 
         this.uiElements.saveRulesetButton.classList.remove('is-personal', 'is-public', 'not-saved');
 
         if (status.isPersonal) {
@@ -223,11 +223,11 @@ export class TopInfoBar {
             this.uiElements.saveRulesetButton.title = 'Edit this ruleset in your personal library.';
         } else if (status.isPublic) {
             this.uiElements.saveRulesetButton.classList.add('is-public');
-            this.uiElements.saveRulesetButton.style.cursor = 'not-allowed'; // Make it non-clickable
+            this.uiElements.saveRulesetButton.style.cursor = 'not-allowed'; 
             this.uiElements.saveRulesetButton.title = 'This is a public ruleset from the library.';
         } else {
             this.uiElements.saveRulesetButton.classList.add('not-saved');
-            this.uiElements.saveRulesetButton.style.cursor = 'pointer'; // Reset cursor
+            this.uiElements.saveRulesetButton.style.cursor = 'pointer'; 
             this.uiElements.saveRulesetButton.title = 'Save this ruleset to your personal library.';
         }
     }

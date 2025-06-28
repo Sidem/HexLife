@@ -184,7 +184,7 @@ export class SliderComponent extends BaseComponent {
         }
     }
 
-    _handleTouchEnd(event) {
+    _handleTouchEnd(_event) {
         if (!this.isScrubbing) return;
         this.isScrubbing = false;
         this.element.classList.remove('is-scrubbing');

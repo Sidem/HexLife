@@ -33,9 +33,6 @@ export const getTours = (appContext) => {
         }
     };
     
-    // ==========================================================================================
-    // == CORE TOUR
-    // ==========================================================================================
     const core = [{
         element: 'body',
         title: 'Welcome to the HexLife Explorer',
@@ -78,9 +75,6 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
-    // ==========================================================================================
-    // == CONTROLS TOUR
-    // ==========================================================================================
     const controls = [{
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '[data-tour-id="controls-button"]',
         title: 'Tutorial: Simulation Controls',
@@ -102,9 +96,6 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
-    // ==========================================================================================
-    // == RULESET ACTIONS TOUR
-    // ==========================================================================================
     const ruleset_actions = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Tutorial: Ruleset Actions',
@@ -134,10 +125,7 @@ export const getTours = (appContext) => {
         onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }];
-
-    // ==========================================================================================
-    // == EDITOR TOUR
-    // ==========================================================================================
+    
     const editor = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="editor"]' : '[data-tour-id="edit-rule-button"]',
         title: 'Tutorial: The Ruleset Editor',
@@ -160,9 +148,6 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
     
-    // ==========================================================================================
-    // == NEW: RESET / CLEAR TOUR
-    // ==========================================================================================
     const resetClear = [{
         element: '[data-tour-id="reset-clear-popout"]',
         title: 'Tutorial: Reset & Clear',
@@ -184,9 +169,6 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
-    // ==========================================================================================
-    // == NEW: SAVE / LOAD TOUR
-    // ==========================================================================================
     const saveLoad = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="save-state-button"]',
         title: 'Tutorial: Save, Load & Share',
@@ -215,9 +197,6 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
-    // ==========================================================================================
-    // == REVISED: APPLIED EVOLUTION
-    // ==========================================================================================
     const appliedEvolution = [{
         element: 'body',
         title: 'Mission: Applied Evolution',
@@ -236,14 +215,14 @@ export const getTours = (appContext) => {
         title: 'Step 2: Open the Library',
         content: "Now, select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
         primaryAction: { text: 'Select Library Tab' },
-        onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
+        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
         element: '#ruleset-actions-library-public-content .library-item:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (step) => { document.querySelector(step.element)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+        onBeforeShow: (_step) => { document.querySelector('#ruleset-actions-library-public-content .library-item:nth-child(10) .button')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
@@ -291,7 +270,7 @@ export const getTours = (appContext) => {
         title: 'Step 10: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
         primaryAction: { text: 'Select Mutate Tab' },
-        onBeforeShow: (step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector(step.element)?.click(), 100) },
+        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="mutate"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
         element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
@@ -324,9 +303,6 @@ export const getTours = (appContext) => {
     },
 ];
 
-    // ==========================================================================================
-    // == PERSONAL LIBRARY TOUR
-    // ==========================================================================================
     const personal_library = [{
         element: 'body',
         title: 'Mission: Chronicle Your Discoveries',
@@ -362,7 +338,7 @@ export const getTours = (appContext) => {
         title: 'Step 4: View Your Rulesets',
         content: "The library contains both public and personal rules. <span class=\"onboarding-highlight-text\">Click on 'My Rulesets'</span> to see your saved creations.",
         primaryAction: { text: 'Click My Rulesets' },
-        onBeforeShow: (step) => {
+        onBeforeShow: (_step) => {
             showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} });
             setTimeout(() => { document.querySelector('[data-pane="library"]')?.click(); }, 150);
         },
@@ -374,7 +350,6 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Mission Complete!' },
         advanceOn: { type: 'click' }
     }];
-
 
     return {
         core,

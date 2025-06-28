@@ -1,6 +1,6 @@
 import * as Config from '../../core/config.js';
 import { BaseComponent } from './BaseComponent.js';
-import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { EVENTS } from '../../services/EventBus.js';
 import { Throttler } from '../../utils/throttler.js';
 
 import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
@@ -8,7 +8,7 @@ import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
 
 export class AnalysisComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); // No mountPoint
+        super(null, options);
         if (!appContext || !appContext.worldManager) {
             console.error('AnalysisComponent: appContext or worldManager is null.');
             return;
@@ -89,7 +89,7 @@ export class AnalysisComponent extends BaseComponent {
             this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'allWorldsReset', payload: stats }));
         });
 
-        this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, (newIndex) => {
+        this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, (_newIndex) => {
             const stats = this.worldManager.getSelectedWorldStats(); 
             this.plugins.forEach(plugin => plugin.onDataUpdate({ type: 'worldStats', payload: stats })); 
         });

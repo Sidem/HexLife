@@ -70,7 +70,7 @@ export class WorldProxy {
 
     _handleWorkerMessage(data) {
         switch (data.type) {
-            case 'INIT_ACK':
+            case 'INIT_ACK': {
                 this.isInitialized = true;
                 this.tpsAggregator.startTime = performance.now(); 
                 this.lastTickCountForServerUpdate = 0;
@@ -79,7 +79,8 @@ export class WorldProxy {
                 this.latestStats.hexBlockEntropyHistory = [];
                 this.onInitialized(this.worldIndex);
                 break;
-            case 'STATE_UPDATE':
+            }
+            case 'STATE_UPDATE': {
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
                 this.latestHoverStateArray = new Uint8Array(data.hoverStateBuffer);
@@ -88,7 +89,8 @@ export class WorldProxy {
                 }
                 this.onUpdate(this.worldIndex, 'state');
                 break;
-            case 'STATS_UPDATE':
+            }
+            case 'STATS_UPDATE': {
                 const currentTime = performance.now();
                 
                 const ticksSinceLastWorkerUpdate = data.tick - this.lastTickCountForServerUpdate;
@@ -150,6 +152,7 @@ export class WorldProxy {
 
                 this.onUpdate(this.worldIndex, 'stats');
                 break;
+            }
         }
     }
 
@@ -208,7 +211,7 @@ export class WorldProxy {
         this.latestStats.ruleUsage.fill(0);
 
         let commandPayload;
-        if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && optionsOrDensity.hasOwnProperty('density')) {
+        if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && Object.prototype.hasOwnProperty.call(optionsOrDensity, 'density')) {
             commandPayload = {
                 density: optionsOrDensity.density,
                 isClearOperation: optionsOrDensity.isClearOperation || false
