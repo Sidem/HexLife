@@ -273,3 +273,81 @@ export function createOrUpdateRuleVizElement({
 
     return viz;
 }
+
+/**
+ * Generates a 128x2 RGBA texture that visualizes a complete color palette,
+ * with 'off' state colors in the top row and 'on' state colors in the bottom row.
+ * This is independent of any specific ruleset's output states.
+ * @param {object} colorSettings - The color settings from ColorController.
+ * @param {object} symmetryData - Symmetry data from WorldManager.
+ * @returns {Uint8Array} The texture data for visualization.
+ */
+export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
+    const width = 128;
+    const height = 2; // Row 0 for OFF, Row 1 for ON
+    const data = new Uint8Array(width * height * 4);
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
+
+    for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
+        // We will calculate the color for both OFF (0) and ON (1) states for each rule index.
+        for (let outputState = 0; outputState < height; outputState++) {
+            let rgb;
+
+            if (mode === 'preset') {
+                const preset = PRESET_PALETTES[activePreset];
+                if (activePreset === 'default' || !preset) {
+                    const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+                    // For the visualization, we want both to be bright.
+                    // We use a slightly lower value for OFF state to differentiate it subtly.
+                    rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
+                } else {
+                    const factor = ruleIndex / (width - 1);
+                    const onGradient = preset.gradient.map(hexToRgb);
+                    // Use a brighter version of the off-gradient for visualization purposes
+                    const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.5));
+                    rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+                }
+            } else { // For 'neighbor_count' or 'symmetry'
+                const centerState = (ruleIndex >> 6) & 1;
+                const neighborMask = ruleIndex & 0x3F;
+                let colors;
+                if (mode === 'neighbor_count') {
+                    const neighborCount = countSetBits(neighborMask);
+                    const key = `${centerState}-${neighborCount}`;
+                    colors = customNeighborColors[key];
+                } else { // symmetry mode
+                    const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+                    const key = `${centerState}-${canonical}`;
+                    colors = customSymmetryColors[key];
+                }
+                // Here, we directly use the color defined for the specific output state.
+                rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
+            }
+
+            const dataIndex = (outputState * width + ruleIndex) * 4;
+            data[dataIndex] = rgb[0];
+            data[dataIndex + 1] = rgb[1];
+            data[dataIndex + 2] = rgb[2];
+            data[dataIndex + 3] = 255;
+        }
+    }
+    return data;
+}
+
+/**
+ * Converts a 128x2 RGBA LUT into a Base64 encoded PNG data URL.
+ * @param {Uint8Array} lutData The 128x2 RGBA data.
+ * @returns {string} The Base64 encoded PNG string.
+ */
+export function colorLUTtoBase64(lutData) {
+    const width = 128;
+    const height = 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(width, height);
+    imageData.data.set(lutData);
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+}

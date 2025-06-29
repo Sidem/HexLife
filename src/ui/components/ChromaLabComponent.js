@@ -1,5 +1,6 @@
 import { BaseComponent } from './BaseComponent.js';
 import { EVENTS } from '../../services/EventBus.js';
+import { generatePaletteVisualizationLUT, colorLUTtoBase64 } from '../../utils/ruleVizUtils.js';
 
 // The curated palette for the color pickers
 const CURATED_PALETTE = ['#fed4d4', '#fe9494', '#ff3f3f', '#ff0000', '#bf0000', '#6a0000', '#2a0000', '#fee9d4', '#fec994', '#ff9f3f', '#ff7f00', '#bf5f00', '#6a3500', '#2a1500', '#fefed4', '#fefe94', '#feff3f', '#feff00', '#bfbf00', '#6a6a00', '#2a2a00', '#dffed4', '#affe94', '#6fff3f', '#3fff00', '#2fbf00', '#1a6a00', '#0a2a00', '#d4fee9', '#94fec9', '#3fff9f', '#00ff7f', '#00bf5f', '#006a35', '#002a15', '#d4fefe', '#94fefe', '#3ffeff', '#00feff', '#00bfbf', '#006a6a', '#002a2a', '#d4e9fe', '#94c9fe', '#3f9fff', '#007fff', '#005fbf', '#00356a', '#00152a', '#d4d4fe', '#9494fe', '#3f3fff', '#0000ff', '#0000bf', '#00006a', '#00002a', '#e9d4fe', '#c994fe', '#9f3fff', '#7f00ff', '#5f00bf', '#35006a', '#15002a', '#fed4fe', '#fe94fe', '#ff3ffe', '#ff00fe', '#bf00bf', '#6a006a', '#2a002a', '#fed4e9', '#fe94c9', '#ff3f9f', '#ff007f', '#bf005f', '#6a0035', '#2a0015', '#ffffff', '#d4d4d4', '#aaaaaa', '#7f7f7f', '#555555', '#2a2a2a', '#000000'];
@@ -58,10 +59,50 @@ export class ChromaLabComponent extends BaseComponent {
 
     _renderPresetSection() {
         const presets = this.colorController.getPresets();
-        let buttonsHtml = Object.entries(presets).map(([key, preset]) =>
-            `<button class="preset-button" data-preset="${key}">${preset.name}</button>`
-        ).join('');
-        this.uiElements.presetSection.innerHTML = `<div class="preset-buttons">${buttonsHtml}</div>`;
+        const settings = this.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
+
+        let visHtml = '';
+
+        // 1. Generate visualizations for all static presets
+        for (const [key, preset] of Object.entries(presets)) {
+            const tempSettings = { ...settings, mode: 'preset', activePreset: key };
+            const lut = generatePaletteVisualizationLUT(tempSettings, symmetryData);
+            const base64 = colorLUTtoBase64(lut);
+            const isActive = settings.mode === 'preset' && settings.activePreset === key;
+            visHtml += `
+                <div class="preset-vis-container ${isActive ? 'active' : ''}" data-preset="${key}" title="${preset.name}">
+                    <img src="${base64}" alt="${preset.name} Palette Preview">
+                    <span>${preset.name}</span>
+                </div>
+            `;
+        }
+
+        // 2. Generate visualization for the current "Neighbor Count" settings
+        const neighborSettings = { ...settings, mode: 'neighbor_count' };
+        const neighborLut = generatePaletteVisualizationLUT(neighborSettings, symmetryData);
+        const neighborBase64 = colorLUTtoBase64(neighborLut);
+        const isNeighborModeActive = settings.mode === 'neighbor_count';
+        visHtml += `
+            <div class="preset-vis-container ${isNeighborModeActive ? 'active' : ''}" data-preset="neighbor_count" title="Current Custom Neighbor Count Colors">
+                <img src="${neighborBase64}" alt="Custom Neighbor Count Palette Preview">
+                <span>Custom (Neighbors)</span>
+            </div>
+        `;
+
+        // 3. Generate visualization for the current "Symmetry" settings
+        const symmetrySettings = { ...settings, mode: 'symmetry' };
+        const symmetryLut = generatePaletteVisualizationLUT(symmetrySettings, symmetryData);
+        const symmetryBase64 = colorLUTtoBase64(symmetryLut);
+        const isSymmetryModeActive = settings.mode === 'symmetry';
+        visHtml += `
+            <div class="preset-vis-container ${isSymmetryModeActive ? 'active' : ''}" data-preset="symmetry" title="Current Custom Symmetry Group Colors">
+                <img src="${symmetryBase64}" alt="Custom Symmetry Palette Preview">
+                <span>Custom (Symmetry)</span>
+            </div>
+        `;
+        
+        this.uiElements.presetSection.innerHTML = `<div class="preset-visualizations">${visHtml}</div>`;
     }
 
     _renderGroupSection(groupType) {
@@ -71,24 +112,35 @@ export class ChromaLabComponent extends BaseComponent {
             ? Array.from({ length: 7 }, (_, i) => ({ id: i, label: `${i} Neighbors` }))
             : symmetryData.canonicalRepresentatives.map(g => ({
                 id: g.representative,
-                label: `<div class="r-sym-rule-viz">${this._getSymmetryVizHtml(g.representative, g.orbitSize)}</div>`
+                orbitSize: g.orbitSize
             }));
 
         let html = '<div class="color-group-grid">';
         ['OFF', 'ON'].forEach(stateName => {
             const centerState = stateName === 'ON' ? 1 : 0;
-            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
+            html += `<div class="color-group-column" data-center-state="${centerState}">
+                        <h5>
+                            Cell ${stateName}
+                            <div class="select-all-buttons">
+                                <button class="button-link select-all-swatches" data-state-type="off">Select OFFs</button> |
+                                <button class="button-link select-all-swatches" data-state-type="on">Select ONs</button>
+                            </div>
+                        </h5>`;
             groups.forEach(group => {
                 const groupKey = `${centerState}-${group.id}`;
+                const labelHtml = groupType === 'neighbor_count'
+                    ? group.label
+                    : `<div class="r-sym-rule-viz">${this._getSymmetryVizHtml(group.id, group.orbitSize, centerState)}</div>`;
+
                 html += `<div class="color-group" data-group-key="${groupKey}">
-                           <div class="group-label-container">${group.label}</div>
+                           <div class="group-label-container">${labelHtml}</div>
                            <div class="color-swatch-pair">
                                <div class="color-swatch-wrapper" data-state-type="off">
-                                   <span class="swatch-label">OFF</span>
+                                   <span class="swatch-label">🢂OFF</span>
                                    <div class="color-swatch"></div>
                                </div>
                                <div class="color-swatch-wrapper" data-state-type="on">
-                                   <span class="swatch-label">ON</span>
+                                   <span class="swatch-label">🢂ON</span>
                                    <div class="color-swatch"></div>
                                </div>
                            </div>
@@ -100,10 +152,10 @@ export class ChromaLabComponent extends BaseComponent {
         container.innerHTML = html;
     }
 
-    _getSymmetryVizHtml(bitmask, orbitSize) {
+    _getSymmetryVizHtml(bitmask, orbitSize, centerState = 0) {
         const neighborHexes = Array.from({ length: 6 }, (_, n) => `<div class="hexagon neighbor-hex neighbor-${n} state-${(bitmask >> n) & 1}"></div>`).join('');
         return `<div class="rule-viz-hex-display">
-                    <div class="hexagon center-hex state-0"></div> ${neighborHexes}
+                    <div class="hexagon center-hex state-${centerState}"></div> ${neighborHexes}
                 </div>
                 <div class="orbit-size-display">Orbit: ${orbitSize}</div>`;
     }
@@ -111,8 +163,40 @@ export class ChromaLabComponent extends BaseComponent {
     _setupEventListeners() {
         this.uiElements.modeSelect.addEventListener('change', (e) => this.colorController.setMode(e.target.value));
         this.element.addEventListener('click', (e) => {
-            if (e.target.matches('.preset-button')) {
-                this.colorController.applyPreset(e.target.dataset.preset);
+            // Modify the preset button handler
+            const visContainer = e.target.closest('.preset-vis-container');
+            if (visContainer) {
+                const presetName = visContainer.dataset.preset;
+                if (presetName === 'neighbor_count' || presetName === 'symmetry') {
+                    this.colorController.setMode(presetName);
+                } else {
+                    this.colorController.applyPreset(presetName);
+                }
+                return;
+            }
+
+            if (e.target.matches('.select-all-swatches')) {
+                const column = e.target.closest('.color-group-column');
+                const stateTypeToSelect = e.target.dataset.stateType;
+
+                const swatchesInColumn = column.querySelectorAll(`.color-swatch-wrapper[data-state-type="${stateTypeToSelect}"]`);
+                
+                // Determine if we are selecting or deselecting
+                const areAllSelected = Array.from(swatchesInColumn).every(sw => sw.classList.contains('selected'));
+
+                swatchesInColumn.forEach(swatch => {
+                    const groupKey = swatch.closest('.color-group').dataset.groupKey;
+                    const swatchKey = `${groupKey}-${stateTypeToSelect}`;
+
+                    if (areAllSelected) {
+                        swatch.classList.remove('selected');
+                        this.selectedSwatches.delete(swatchKey);
+                    } else {
+                        swatch.classList.add('selected');
+                        this.selectedSwatches.add(swatchKey);
+                    }
+                });
+                this._updateBatchActionBar();
                 return;
             }
 
@@ -166,21 +250,24 @@ export class ChromaLabComponent extends BaseComponent {
         const settings = this.colorController.getSettings();
         this.uiElements.modeSelect.value = settings.mode;
 
+        // Re-render the preset visualizations every time to reflect the latest custom colors.
+        this._renderPresetSection();
+
         this.element.querySelectorAll('.chroma-section').forEach(s => s.classList.add('hidden'));
-        this.element.querySelector(`#chroma-${settings.mode.replace('_count', '')}-section`).classList.remove('hidden');
-        
-        this.element.querySelectorAll('.preset-button.active').forEach(b => b.classList.remove('active'));
-        if (settings.mode === 'preset') {
-            const activeBtn = this.element.querySelector(`[data-preset="${settings.activePreset}"]`);
-            if (activeBtn) activeBtn.classList.add('active');
+        const sectionToShow = this.element.querySelector(`#chroma-${settings.mode.replace('_count', '')}-section`);
+        if(sectionToShow) {
+            sectionToShow.classList.remove('hidden');
         }
 
         const updateSwatches = (groupType, colorMap) => {
-            this.element.querySelectorAll(`#chroma-${groupType}-section .color-group`).forEach(group => {
+            const sectionId = `#chroma-${groupType.replace('_count', '')}-section`;
+            this.element.querySelectorAll(`${sectionId} .color-group`).forEach(group => {
                 const groupKey = group.dataset.groupKey;
                 const colors = colorMap[groupKey] || { on: '#ffffff', off: '#333333' };
-                group.querySelector('[data-state-type="on"] .color-swatch').style.backgroundColor = colors.on;
-                group.querySelector('[data-state-type="off"] .color-swatch').style.backgroundColor = colors.off;
+                const onSwatch = group.querySelector('[data-state-type="on"] .color-swatch');
+                const offSwatch = group.querySelector('[data-state-type="off"] .color-swatch');
+                if (onSwatch) onSwatch.style.backgroundColor = colors.on;
+                if (offSwatch) offSwatch.style.backgroundColor = colors.off;
             });
         };
 
@@ -188,6 +275,7 @@ export class ChromaLabComponent extends BaseComponent {
         updateSwatches('symmetry', settings.customSymmetryColors);
 
         this.selectedSwatches.clear();
+        this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
         this._updateBatchActionBar();
     }
 
@@ -195,10 +283,18 @@ export class ChromaLabComponent extends BaseComponent {
         const bar = this.uiElements.batchActionBar;
         if (this.selectedSwatches.size > 0) {
             bar.innerHTML = `<span>${this.selectedSwatches.size} swatches selected.</span>
-                             <div class="batch-swatch" title="Set color for all selected swatches"></div>`;
+                             <div style="display: flex; gap: 8px; align-items: center;">
+                                 <button class="button-link clear-selection" title="Clear selection">Clear</button>
+                                 <div class="batch-swatch" title="Set color for all selected swatches"></div>
+                             </div>`;
             bar.classList.remove('hidden');
             bar.querySelector('.batch-swatch').addEventListener('click', () => {
                 this._openBatchColorPalette();
+            }, { once: true });
+            bar.querySelector('.clear-selection').addEventListener('click', () => {
+                this.selectedSwatches.clear();
+                this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                this._updateBatchActionBar();
             }, { once: true });
         } else {
             bar.classList.add('hidden');

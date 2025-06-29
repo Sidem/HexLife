@@ -28,11 +28,9 @@ void main() {
     }
 
     if (v_hover_state == 1.0) {
-        if (v_state == 1.0) {
-            base_color_rgb *= u_hoverFilledDarkenFactor;
-        } else {
-            base_color_rgb *= u_hoverInactiveLightenFactor;
-        }
+        vec3 hover_color = vec3(1.0, 1.0, 1.0); // White highlight
+        float hover_strength = 0.3; // 30% blend
+        base_color_rgb = mix(base_color_rgb, hover_color, hover_strength);
     }
 
     float alpha = 1.0;

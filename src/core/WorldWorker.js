@@ -116,7 +116,7 @@ function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
 
             if (newState !== previousState) {
                 jsStateArray[idx] = newState;
-                if(jsRuleIndexArray) jsRuleIndexArray[idx] = 0;
+                if(jsRuleIndexArray) jsRuleIndexArray[idx] = 255; // Use 255 to signal a manual change
                 changed = true;
             }
         }
