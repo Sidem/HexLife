@@ -1,22 +1,26 @@
 export const PRESET_PALETTES = {
     default: {
         name: 'Default Spectrum',
-        // This is a special case that will trigger the original HSV-based logic
+        // Special case handled in ruleVizUtils.js
     },
     volcanic: {
         name: 'Volcanic',
-        gradient: ['#330800', '#FF4500', '#FFD700', '#FFFFFF']
+        gradient: ['#FF4500', '#FFD700', '#FFFFFF'],
+        offGradient: ['#6a1a00', '#8B4513', '#a9a9a9']
     },
     bioluminescent: {
         name: 'Bio-Luminescent',
-        gradient: ['#001a33', '#008080', '#46f0f0', '#aaffc3']
+        gradient: ['#008080', '#46f0f0', '#aaffc3'],
+        offGradient: ['#003333', '#006464', '#00a073']
     },
     monochrome: {
         name: 'Monochrome',
-        gradient: ['#111111', '#FFFFFF']
+        gradient: ['#FFFFFF'],
+        offGradient: ['#333333']
     },
     synthwave: {
         name: 'Synthwave',
-        gradient: ['#2E1A47', '#FF00C1', '#00F0FF', '#FFFFFF']
+        gradient: ['#FF00C1', '#00F0FF', '#FFFFFF'],
+        offGradient: ['#60004d', '#006066', '#a9a9a9']
     }
 }; 

@@ -13,7 +13,7 @@ export class ChromaLabComponent extends BaseComponent {
         }
         this.appContext = appContext;
         this.colorController = appContext.colorController;
-        this.selectedGroups = new Set();
+        this.selectedSwatches = new Set();
         this.element = document.createElement('div');
         this.element.className = 'chroma-lab-component-content';
         this.render();
@@ -52,158 +52,111 @@ export class ChromaLabComponent extends BaseComponent {
 
     _renderAllSections() {
         this._renderPresetSection();
-        this._renderNeighborCountSection();
-        this._renderSymmetrySection();
+        this._renderGroupSection('neighbor_count');
+        this._renderGroupSection('symmetry');
     }
 
     _renderPresetSection() {
         const presets = this.colorController.getPresets();
-        let buttonsHtml = '';
-        for (const key in presets) {
-            buttonsHtml += `<button class="preset-button" data-preset="${key}">${presets[key].name}</button>`;
-        }
+        let buttonsHtml = Object.entries(presets).map(([key, preset]) =>
+            `<button class="preset-button" data-preset="${key}">${preset.name}</button>`
+        ).join('');
         this.uiElements.presetSection.innerHTML = `<div class="preset-buttons">${buttonsHtml}</div>`;
     }
 
-    _renderNeighborCountSection() {
+    _renderGroupSection(groupType) {
+        const container = groupType === 'neighbor_count' ? this.uiElements.neighborSection : this.uiElements.symmetrySection;
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
+        const groups = groupType === 'neighbor_count'
+            ? Array.from({ length: 7 }, (_, i) => ({ id: i, label: `${i} Neighbors` }))
+            : symmetryData.canonicalRepresentatives.map(g => ({
+                id: g.representative,
+                label: `<div class="r-sym-rule-viz">${this._getSymmetryVizHtml(g.representative, g.orbitSize)}</div>`
+            }));
+
         let html = '<div class="color-group-grid">';
         ['OFF', 'ON'].forEach(stateName => {
-            const centerState = (stateName === 'ON' ? 1 : 0);
-            html += `<div class="color-group-column" data-center-state="${centerState}">
-                        <h5>Cell ${stateName}</h5>
-                        <div class="chroma-select-all-bar">
-                            <button class="button-link" data-action="select-all-column">All</button> |
-                            <button class="button-link" data-action="select-none-column">None</button>
-                        </div>`;
-            for (let i = 0; i <= 6; i++) {
-                html += `<div class="color-group" data-center-state="${centerState}" data-neighbor-count="${i}" data-group-key="${centerState}-${i}">
-                           <input type="checkbox" class="chroma-group-checkbox" id="nc-check-${centerState}-${i}">
-                           <label class="color-group-label" for="nc-check-${centerState}-${i}">
-                               <span>${i} Neighbors</span>
-                               <div class="color-swatch" title="Click to change color for this group"></div>
-                           </label>
+            const centerState = stateName === 'ON' ? 1 : 0;
+            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
+            groups.forEach(group => {
+                const groupKey = `${centerState}-${group.id}`;
+                html += `<div class="color-group" data-group-key="${groupKey}">
+                           <div class="group-label-container">${group.label}</div>
+                           <div class="color-swatch-pair">
+                               <div class="color-swatch-wrapper" data-state-type="off">
+                                   <span class="swatch-label">OFF</span>
+                                   <div class="color-swatch"></div>
+                               </div>
+                               <div class="color-swatch-wrapper" data-state-type="on">
+                                   <span class="swatch-label">ON</span>
+                                   <div class="color-swatch"></div>
+                               </div>
+                           </div>
                          </div>`;
-            }
-            html += `</div>`;
+            });
+            html += '</div>';
         });
         html += '</div>';
-        this.uiElements.neighborSection.innerHTML = html;
+        container.innerHTML = html;
     }
 
-    _renderSymmetrySection() {
-        const symmetryData = this.appContext.worldManager.getSymmetryData();
-        let html = '<div class="color-group-grid">';
-         ['OFF', 'ON'].forEach(stateName => {
-            const centerState = (stateName === 'ON' ? 1 : 0);
-            html += `<div class="color-group-column" data-center-state="${centerState}">
-                        <h5>Cell ${stateName}</h5>
-                        <div class="chroma-select-all-bar">
-                            <button class="button-link" data-action="select-all-column">All</button> |
-                            <button class="button-link" data-action="select-none-column">None</button>
-                        </div>`;
-            symmetryData.canonicalRepresentatives.forEach(group => {
-                 const bitmask = group.representative;
-                 const neighborHexes = Array.from({ length: 6 }, (_, n) =>
-                     `<div class="hexagon neighbor-hex neighbor-${n} state-${(bitmask >> n) & 1}"></div>`
-                 ).join('');
-
-                 html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}" data-group-key="${centerState}-${bitmask}">
-                            <input type="checkbox" class="chroma-group-checkbox" id="sym-check-${centerState}-${bitmask}">
-                            <label class="color-group-label" for="sym-check-${centerState}-${bitmask}">
-                                <div class="r-sym-rule-viz" style="cursor: default; pointer-events: none; transform: scale(0.8) translate(-10px, -5px); margin-bottom: -15px;">
-                                    <div class="rule-viz-hex-display">
-                                        <div class="hexagon center-hex state-${centerState}"></div>
-                                        ${neighborHexes}
-                                    </div>
-                                    <div class="orbit-size-display">Orbit: ${group.orbitSize}</div>
-                                </div>
-                                <div class="color-swatch" title="Click to change color for this group"></div>
-                            </label>
-                          </div>`;
-            });
-            html += `</div>`;
-        });
-        html += '</div>';
-        this.uiElements.symmetrySection.innerHTML = html;
+    _getSymmetryVizHtml(bitmask, orbitSize) {
+        const neighborHexes = Array.from({ length: 6 }, (_, n) => `<div class="hexagon neighbor-hex neighbor-${n} state-${(bitmask >> n) & 1}"></div>`).join('');
+        return `<div class="rule-viz-hex-display">
+                    <div class="hexagon center-hex state-0"></div> ${neighborHexes}
+                </div>
+                <div class="orbit-size-display">Orbit: ${orbitSize}</div>`;
     }
 
     _setupEventListeners() {
         this.uiElements.modeSelect.addEventListener('change', (e) => this.colorController.setMode(e.target.value));
-
-        this.element.addEventListener('change', (e) => {
-            if (e.target.matches('.chroma-group-checkbox')) {
-                const groupEl = e.target.closest('.color-group');
-                const groupKey = groupEl.dataset.groupKey;
-                if (e.target.checked) {
-                    this.selectedGroups.add(groupKey);
-                } else {
-                    this.selectedGroups.delete(groupKey);
-                }
-                this._updateBatchActionBar();
-                groupEl.classList.toggle('selected', e.target.checked);
-            }
-        });
-
         this.element.addEventListener('click', (e) => {
             if (e.target.matches('.preset-button')) {
                 this.colorController.applyPreset(e.target.dataset.preset);
-            } else if (e.target.matches('.color-swatch') && !e.target.matches('.batch-swatch')) {
-                // *** FIX: Added '!e.target.matches('.batch-swatch')' to prevent the delegated listener
-                // from firing for the batch swatch, which has its own specific listener.
-                this._openColorPalette(e.target);
-            } else if (e.target.matches('[data-action="select-all-column"]')) {
-                this._selectColumn(e.target.closest('.color-group-column'), true);
-            } else if (e.target.matches('[data-action="select-none-column"]')) {
-                this._selectColumn(e.target.closest('.color-group-column'), false);
+                return;
+            }
+
+            const swatchWrapper = e.target.closest('.color-swatch-wrapper');
+            if (swatchWrapper) {
+                const groupKey = swatchWrapper.closest('.color-group').dataset.groupKey;
+                const stateType = swatchWrapper.dataset.stateType;
+                const swatchKey = `${groupKey}-${stateType}`;
+
+                if (e.metaKey || e.ctrlKey) {
+                    swatchWrapper.classList.toggle('selected');
+                    if (this.selectedSwatches.has(swatchKey)) {
+                        this.selectedSwatches.delete(swatchKey);
+                    } else {
+                        this.selectedSwatches.add(swatchKey);
+                    }
+                } else {
+                    this._openColorPalette(swatchWrapper);
+                }
+                this._updateBatchActionBar();
             }
         });
-
         this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
     }
 
-    _openColorPalette(targetSwatch, isBatch = false) {
+    _openColorPalette(targetWrapper) {
         let modal = document.getElementById('color-palette-modal');
         if (modal) modal.remove();
 
         modal = document.createElement('div');
         modal.id = 'color-palette-modal';
-        let paletteHtml = '<div class="color-palette-content">';
-        CURATED_PALETTE.forEach(color => {
-            paletteHtml += `<div class="palette-color" style="background-color: ${color}" data-color="${color}"></div>`;
-        });
-        paletteHtml += '</div>';
-        modal.innerHTML = paletteHtml;
+        modal.innerHTML = `<div class="color-palette-content">${CURATED_PALETTE.map(c => `<div class="palette-color" style="background-color: ${c}" data-color="${c}"></div>`).join('')}</div>`;
 
-        const close = () => modal.remove();
         modal.addEventListener('click', (e) => {
             if (e.target.matches('.palette-color')) {
                 const color = e.target.dataset.color;
-
-                if (isBatch) {
-                    const mode = this.colorController.getSettings().mode;
-                    const updates = Array.from(this.selectedGroups).map(key => {
-                        const [centerState, groupIdentifier] = key.split('-').map(Number);
-                        return { centerState, groupIdentifier, color };
-                    });
-                    this.colorController.setBatchColors(mode, updates);
-                    this.selectedGroups.clear();
-                    this._selectAllInVisiblePane(false);
-
-                } else {
-                    const group = targetSwatch.closest('.color-group');
-                    const mode = this.colorController.getSettings().mode;
-
-                    if (mode === 'neighbor_count') {
-                        const { centerState, neighborCount } = group.dataset;
-                        this.colorController.setNeighborColor(parseInt(centerState), parseInt(neighborCount), color);
-                    } else if (mode === 'symmetry') {
-                        const { centerState, canonicalBitmask } = group.dataset;
-                        this.colorController.setSymmetryColor(parseInt(centerState), parseInt(canonicalBitmask), color);
-                    }
-                }
-                close();
+                const groupKey = targetWrapper.closest('.color-group').dataset.groupKey;
+                const stateType = targetWrapper.dataset.stateType;
+                const mode = this.colorController.getSettings().mode;
+                
+                this.colorController.setColorForGroup(mode, groupKey, stateType, color);
+                modal.remove();
             } else if (e.target.id === 'color-palette-modal') {
-                close();
+                modal.remove();
             }
         });
         document.body.appendChild(modal);
@@ -215,69 +168,76 @@ export class ChromaLabComponent extends BaseComponent {
 
         this.element.querySelectorAll('.chroma-section').forEach(s => s.classList.add('hidden'));
         this.element.querySelector(`#chroma-${settings.mode.replace('_count', '')}-section`).classList.remove('hidden');
-
-        this.element.querySelectorAll('.preset-button').forEach(btn => btn.classList.remove('active'));
+        
+        this.element.querySelectorAll('.preset-button.active').forEach(b => b.classList.remove('active'));
         if (settings.mode === 'preset') {
             const activeBtn = this.element.querySelector(`[data-preset="${settings.activePreset}"]`);
             if (activeBtn) activeBtn.classList.add('active');
         }
 
-        this.uiElements.neighborSection.querySelectorAll('.color-group').forEach(group => {
-            const { centerState, neighborCount } = group.dataset;
-            const key = `${centerState}-${neighborCount}`;
-            const color = settings.customNeighborColors[key] || '#808080';
-            group.querySelector('.color-swatch').style.backgroundColor = color;
-        });
-
-        this.uiElements.symmetrySection.querySelectorAll('.color-group').forEach(group => {
-            const { centerState, canonicalBitmask } = group.dataset;
-            const key = `${centerState}-${canonicalBitmask}`;
-            const color = settings.customSymmetryColors[key] || '#808080';
-            group.querySelector('.color-swatch').style.backgroundColor = color;
-        });
-
-        this._selectAllInVisiblePane(false);
-        this.selectedGroups.clear();
-        this._updateBatchActionBar();
-    }
-
-    _selectColumn(columnElement, isSelected) {
-        columnElement.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
-            cb.checked = isSelected;
-            const groupEl = cb.closest('.color-group');
-            groupEl.classList.toggle('selected', isSelected);
-            const groupKey = groupEl.dataset.groupKey;
-            if (isSelected) {
-                this.selectedGroups.add(groupKey);
-            } else {
-                this.selectedGroups.delete(groupKey);
-            }
-        });
-        this._updateBatchActionBar();
-    }
-
-    _selectAllInVisiblePane(isSelected) {
-        const visiblePane = this.element.querySelector('.chroma-section:not(.hidden)');
-        if (visiblePane) {
-            visiblePane.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
-                cb.checked = isSelected;
-                const groupEl = cb.closest('.color-group');
-                groupEl.classList.toggle('selected', isSelected);
+        const updateSwatches = (groupType, colorMap) => {
+            this.element.querySelectorAll(`#chroma-${groupType}-section .color-group`).forEach(group => {
+                const groupKey = group.dataset.groupKey;
+                const colors = colorMap[groupKey] || { on: '#ffffff', off: '#333333' };
+                group.querySelector('[data-state-type="on"] .color-swatch').style.backgroundColor = colors.on;
+                group.querySelector('[data-state-type="off"] .color-swatch').style.backgroundColor = colors.off;
             });
-        }
+        };
+
+        updateSwatches('neighbor_count', settings.customNeighborColors);
+        updateSwatches('symmetry', settings.customSymmetryColors);
+
+        this.selectedSwatches.clear();
+        this._updateBatchActionBar();
     }
 
     _updateBatchActionBar() {
         const bar = this.uiElements.batchActionBar;
-        if (this.selectedGroups.size > 0) {
-            bar.innerHTML = `<span>${this.selectedGroups.size} groups selected.</span>
-                             <div class="color-swatch batch-swatch" title="Set color for all selected groups"></div>`;
+        if (this.selectedSwatches.size > 0) {
+            bar.innerHTML = `<span>${this.selectedSwatches.size} swatches selected.</span>
+                             <div class="batch-swatch" title="Set color for all selected swatches"></div>`;
             bar.classList.remove('hidden');
-            bar.querySelector('.batch-swatch').addEventListener('click', (e) => {
-                this._openColorPalette(e.target, true);
+            bar.querySelector('.batch-swatch').addEventListener('click', () => {
+                this._openBatchColorPalette();
             }, { once: true });
         } else {
             bar.classList.add('hidden');
         }
+    }
+    
+    _openBatchColorPalette() {
+        let modal = document.getElementById('color-palette-modal');
+        if (modal) modal.remove();
+
+        modal = document.createElement('div');
+        modal.id = 'color-palette-modal';
+        modal.innerHTML = `<div class="color-palette-content">${CURATED_PALETTE.map(c => `<div class="palette-color" style="background-color: ${c}" data-color="${c}"></div>`).join('')}</div>`;
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target.matches('.palette-color')) {
+                const color = e.target.dataset.color;
+                const mode = this.colorController.getSettings().mode;
+
+                const onKeys = [], offKeys = [];
+                this.selectedSwatches.forEach(swatchKey => {
+                    const parts = swatchKey.split('-');
+                    const stateType = parts.pop();
+                    const groupKey = parts.join('-');
+                    if (stateType === 'on') onKeys.push(groupKey);
+                    else offKeys.push(groupKey);
+                });
+                
+                if (onKeys.length > 0) this.colorController.setBatchColors(mode, onKeys, 'on', color);
+                if (offKeys.length > 0) this.colorController.setBatchColors(mode, offKeys, 'off', color);
+
+                this.selectedSwatches.clear();
+                this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                this._updateBatchActionBar();
+                modal.remove();
+            } else if (e.target.id === 'color-palette-modal') {
+                modal.remove();
+            }
+        });
+        document.body.appendChild(modal);
     }
 } 

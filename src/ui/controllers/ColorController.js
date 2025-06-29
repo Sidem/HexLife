@@ -34,44 +34,34 @@ export class ColorController {
         this.#saveAndDispatch();
     }
 
-    setGradient(colors) {
-        this.settings.mode = 'gradient';
-        this.settings.customGradient = colors;
-        this.#saveAndDispatch();
-    }
-
-    setNeighborColor(centerState, neighborCount, color) {
-        this.settings.mode = 'neighbor_count';
-        const key = `${centerState}-${neighborCount}`;
-        this.settings.customNeighborColors[key] = color;
-        this.#saveAndDispatch();
-    }
-
-    setSymmetryColor(centerState, canonicalBitmask, color) {
-        this.settings.mode = 'symmetry';
-        const key = `${centerState}-${canonicalBitmask}`;
-        this.settings.customSymmetryColors[key] = color;
-        this.#saveAndDispatch();
-    }
-
-    /**
-     * Efficiently updates multiple colors at once and dispatches a single update event.
-     * @param {'neighbor_count' | 'symmetry'} groupType - The type of group being updated.
-     * @param {Array<{centerState: number, groupIdentifier: number, color: string}>} newColors - An array of color updates.
-     */
-    setBatchColors(groupType, newColors) {
-        this.settings.mode = groupType;
+    setColorForGroup(groupType, groupKey, stateType, newColor) {
         if (groupType === 'neighbor_count') {
-            for (const { centerState, groupIdentifier, color } of newColors) {
-                const key = `${centerState}-${groupIdentifier}`;
-                this.settings.customNeighborColors[key] = color;
+            if (!this.settings.customNeighborColors[groupKey]) {
+                this.settings.customNeighborColors[groupKey] = { on: '#ffffff', off: '#333333' };
             }
+            this.settings.customNeighborColors[groupKey][stateType] = newColor;
         } else if (groupType === 'symmetry') {
-            for (const { centerState, groupIdentifier, color } of newColors) {
-                const key = `${centerState}-${groupIdentifier}`;
-                this.settings.customSymmetryColors[key] = color;
+            if (!this.settings.customSymmetryColors[groupKey]) {
+                this.settings.customSymmetryColors[groupKey] = { on: '#ffffff', off: '#333333' };
             }
+            this.settings.customSymmetryColors[groupKey][stateType] = newColor;
         }
+        this.settings.mode = groupType;
+        this.#saveAndDispatch();
+    }
+
+    setBatchColors(groupType, groupKeys, stateType, newColor) {
+        const targetObject = groupType === 'neighbor_count' 
+            ? this.settings.customNeighborColors
+            : this.settings.customSymmetryColors;
+
+        for (const key of groupKeys) {
+            if (!targetObject[key]) {
+                 targetObject[key] = { on: '#ffffff', off: '#333333' };
+            }
+            targetObject[key][stateType] = newColor;
+        }
+        this.settings.mode = groupType;
         this.#saveAndDispatch();
     }
 } 

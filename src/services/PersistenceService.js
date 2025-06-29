@@ -1,9 +1,9 @@
-import * as Config from '../core/config.js'; 
+import * as Config from '../core/config.js';
 
 const LS_KEY_PREFIX = 'hexLifeExplorer_';
 const KEYS = {
-    RULESET: `${LS_KEY_PREFIX}ruleset`, 
-    WORLD_SETTINGS: `${LS_KEY_PREFIX}worldSettings`, 
+    RULESET: `${LS_KEY_PREFIX}ruleset`,
+    WORLD_SETTINGS: `${LS_KEY_PREFIX}worldSettings`,
     SIM_SPEED: `${LS_KEY_PREFIX}simSpeed`,
     BRUSH_SIZE: `${LS_KEY_PREFIX}brushSize`,
     RULESET_PANEL_STATE: `${LS_KEY_PREFIX}rulesetPanelState`,
@@ -39,11 +39,34 @@ function _setItem(key, value) {
     }
 }
 
+// --- MODIFICATION START ---
+// Helper function to migrate old color settings format to the new dual-color format.
+function migrateColorGroups(colorGroups) {
+    if (!colorGroups || typeof colorGroups !== 'object') {
+        return {};
+    }
+    const migratedGroups = {};
+    for (const key in colorGroups) {
+        const value = colorGroups[key];
+        if (typeof value === 'string') {
+            // This is the old format. Convert it.
+            // Use the old color for the 'on' state and a default dark color for 'off'.
+            migratedGroups[key] = { on: value, off: '#333333' };
+        } else if (typeof value === 'object' && value !== null && value.on && value.off) {
+            // This is already the new format. Keep it.
+            migratedGroups[key] = value;
+        }
+    }
+    return migratedGroups;
+}
+// --- MODIFICATION END ---
+
+
 export function loadRuleset() {
     return _getItem(KEYS.RULESET) || Config.INITIAL_RULESET_CODE;
 }
 
-export function saveRuleset(rulesetHex) { 
+export function saveRuleset(rulesetHex) {
     _setItem(KEYS.RULESET, rulesetHex);
 }
 
@@ -53,25 +76,25 @@ export function loadWorldSettings() {
         const isValid = loaded.every(s =>
             typeof s.initialDensity === 'number' &&
             typeof s.enabled === 'boolean' &&
-            (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex)) 
+            (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex))
         );
         if (isValid) return loaded;
         console.warn("Loaded world settings format error or missing rulesetHex, reverting to defaults.");
     }
 
     const defaultSettings = [];
-    const defaultRuleset = loadRuleset() || "0".repeat(32); 
+    const defaultRuleset = loadRuleset() || "0".repeat(32);
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         defaultSettings.push({
             initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
             enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
-            rulesetHex: defaultRuleset 
+            rulesetHex: defaultRuleset
         });
     }
     return defaultSettings;
 }
 
-export function saveWorldSettings(worldSettingsArray) { 
+export function saveWorldSettings(worldSettingsArray) {
     if (Array.isArray(worldSettingsArray) && worldSettingsArray.length === Config.NUM_WORLDS) {
         const isValid = worldSettingsArray.every(s =>
             typeof s.initialDensity === 'number' &&
@@ -114,14 +137,14 @@ export function loadPanelState(panelKey) {
     if (state && typeof state.isOpen === 'boolean') {
         return {
             isOpen: state.isOpen,
-            x: typeof state.x === 'string' ? state.x : null, 
+            x: typeof state.x === 'string' ? state.x : null,
             y: typeof state.y === 'string' ? state.y : null,
         };
     }
-    return { isOpen: false, x: null, y: null }; 
+    return { isOpen: false, x: null, y: null };
 }
 
-export function savePanelState(panelKey, state) { 
+export function savePanelState(panelKey, state) {
     const keyToSave = KEYS[`${panelKey.toUpperCase()}_PANEL_STATE`];
      if (!keyToSave) {
         console.warn(`PersistenceService: Unknown panel key "${panelKey}" for savePanelState.`);
@@ -169,7 +192,7 @@ export function loadOnboardingStates() {
     return _getItem(KEYS.ONBOARDING_STATES) || {};
 }
 
-export function saveOnboardingStates(statesObject) { 
+export function saveOnboardingStates(statesObject) {
     _setItem(KEYS.ONBOARDING_STATES, statesObject);
 }
 
@@ -185,13 +208,36 @@ export function loadColorSettings() {
     const defaults = {
         mode: 'preset',
         activePreset: 'default',
-        customGradient: ['#3cb44b', '#ffe119'],
+        customGradient: {
+            on: ['#3cb44b', '#ffe119'],
+            off: ['#1a4a23', '#665a0a']
+        },
         customNeighborColors: {},
         customSymmetryColors: {}
     };
     const loaded = _getItem(KEYS.COLOR_SETTINGS);
-    return loaded ? { ...defaults, ...loaded } : defaults;
+    
+    // --- MODIFICATION START ---
+    if (loaded) {
+        // Create a new object to ensure we don't mutate the defaults
+        const migratedSettings = { ...defaults, ...loaded };
+
+        // Run the migration function on the loaded custom color groups
+        migratedSettings.customNeighborColors = migrateColorGroups(loaded.customNeighborColors);
+        migratedSettings.customSymmetryColors = migrateColorGroups(loaded.customSymmetryColors);
+
+        // Ensure gradient has the correct structure
+        if (!migratedSettings.customGradient || !migratedSettings.customGradient.on) {
+            migratedSettings.customGradient = defaults.customGradient;
+        }
+        
+        return migratedSettings;
+    }
+    // --- MODIFICATION END ---
+    
+    return defaults;
 }
+
 
 export function saveColorSettings(settings) {
     _setItem(KEYS.COLOR_SETTINGS, settings);

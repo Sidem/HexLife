@@ -51,6 +51,14 @@ function hsvToRgb(h, s, v) {
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+function getGradientColor(factor, gradient) {
+    if (!gradient || gradient.length === 0) return [128, 128, 128];
+    if (gradient.length === 1) return gradient[0];
+    const segment = Math.floor(factor * (gradient.length - 1));
+    const segmentFactor = (factor * (gradient.length - 1)) - segment;
+    return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+}
+
 /**
  * Creates a Uint8Array representing a 128x2 RGBA texture for rule colors.
  * Row 0: Inactive states
@@ -59,69 +67,59 @@ function hsvToRgb(h, s, v) {
  * @param {object} symmetryData - Symmetry data from WorldManager
  * @returns {Uint8Array} The texture data.
  */
-export function generateColorLUT(colorSettings, symmetryData) {
+export function generateColorLUT(colorSettings, symmetryData, currentRuleset) {
     const width = 128;
     const height = 2;
     const data = new Uint8Array(width * height * 4);
     const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
-        // --- MODIFICATION START ---
-        // Special handling for the default preset to create distinct colors for ON and OFF states.
-        if (mode === 'preset' && (activePreset === 'default' || !PRESET_PALETTES[activePreset]?.gradient)) {
-            const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
-            for (let outputState = 0; outputState < height; outputState++) {
-                const saturation = 1.0;
-                // Use high brightness for ON (active) states, and low brightness for OFF (inactive) states.
-                const value = outputState === 1 ? 1.0 : 0.1;
-                const rgb = hsvToRgb(hue, saturation, value);
-                const dataIndex = (outputState * width + ruleIndex) * 4;
-                data[dataIndex] = rgb[0];
-                data[dataIndex + 1] = rgb[1];
-                data[dataIndex + 2] = rgb[2];
-                data[dataIndex + 3] = 255;
+        const outputState = currentRuleset[ruleIndex];
+        let rgb;
+
+        if (mode === 'preset') {
+            const preset = PRESET_PALETTES[activePreset];
+            if (activePreset === 'default' || !preset) {
+                const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+                rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
+            } else {
+                const factor = ruleIndex / (width - 1);
+                const onGradient = preset.gradient.map(hexToRgb);
+                const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.15));
+                rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
             }
+        } else if (mode === 'gradient') {
+            const factor = ruleIndex / (width - 1);
+            const onGradient = customGradient.on.map(hexToRgb);
+            const offGradient = customGradient.off.map(hexToRgb);
+            rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
         } else {
-            // Existing logic for all other custom color modes (gradient, neighbor, symmetry).
             const centerState = (ruleIndex >> 6) & 1;
             const neighborMask = ruleIndex & 0x3F;
-            let rgb;
-
-            if (mode === 'gradient') {
-                const gradient = customGradient.map(hexToRgb);
-                const factor = ruleIndex / (width - 1);
-                const segment = Math.floor(factor * (gradient.length - 1));
-                const segmentFactor = (factor * (gradient.length - 1)) - segment;
-                rgb = interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
-            } else if (mode === 'neighbor_count') {
+            let colors;
+            if (mode === 'neighbor_count') {
                 const neighborCount = countSetBits(neighborMask);
                 const key = `${centerState}-${neighborCount}`;
-                rgb = hexToRgb(customNeighborColors[key] || '#808080');
-            } else if (mode === 'symmetry') {
+                colors = customNeighborColors[key];
+            } else { // symmetry mode
                 const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
                 const key = `${centerState}-${canonical}`;
-                rgb = hexToRgb(customSymmetryColors[key] || '#808080');
-            } else { // Fallback for other presets with gradients
-                const gradient = PRESET_PALETTES[activePreset]?.gradient.map(hexToRgb) || [hexToRgb('#808080')];
-                const factor = ruleIndex / (width - 1);
-                const segment = Math.floor(factor * (gradient.length - 1));
-                const segmentFactor = (factor * (gradient.length - 1)) - segment;
-                rgb = interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+                colors = customSymmetryColors[key];
             }
-
-            for (let state = 0; state < height; state++) {
-                const dataIndex = (state * width + ruleIndex) * 4;
-                data[dataIndex] = rgb[0];
-                data[dataIndex + 1] = rgb[1];
-                data[dataIndex + 2] = rgb[2];
-                data[dataIndex + 3] = 255;
-            }
+            rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
         }
-        // --- MODIFICATION END ---
+
+        // Write color for this rule to both texture rows, as the output state is already factored in
+        for (let state = 0; state < height; state++) {
+            const dataIndex = (state * width + ruleIndex) * 4;
+            data[dataIndex] = rgb[0];
+            data[dataIndex + 1] = rgb[1];
+            data[dataIndex + 2] = rgb[2];
+            data[dataIndex + 3] = 255;
+        }
     }
     return data;
 }
-
 
 /**
  * Generates a single rule color based on color settings.
@@ -137,27 +135,23 @@ export function generateSingleRuleColor(ruleIndex, outputState, colorSettings, s
     const neighborMask = ruleIndex & 0x3F;
 
     if (mode === 'preset') {
-        // --- MODIFICATION START ---
-        // Handle default preset separately to factor in the output state for brightness.
-        if (activePreset === 'default' || !PRESET_PALETTES[activePreset]?.gradient) {
+        const preset = PRESET_PALETTES[activePreset];
+        if (activePreset === 'default' || !preset) {
             const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
             const saturation = 1.0;
             const value = outputState === 1 ? 1.0 : 0.4;
             return hsvToRgb(hue, saturation, value);
         }
-        // --- MODIFICATION END ---
-        const gradient = PRESET_PALETTES[activePreset].gradient.map(hexToRgb);
         const factor = ruleIndex / 127.0;
-        const segment = Math.floor(factor * (gradient.length - 1));
-        const segmentFactor = (factor * (gradient.length - 1)) - segment;
-        return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+        const onGradient = preset.gradient.map(hexToRgb);
+        const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.4));
+        return getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
     }
     if (mode === 'gradient') {
-         const gradient = customGradient.map(hexToRgb);
-         const factor = ruleIndex / 127.0;
-         const segment = Math.floor(factor * (gradient.length - 1));
-         const segmentFactor = (factor * (gradient.length - 1)) - segment;
-         return interpolateRgb(gradient[segment], gradient[segment + 1] || gradient[segment], segmentFactor);
+        const factor = ruleIndex / 127.0;
+        const onGradient = customGradient.on.map(hexToRgb);
+        const offGradient = customGradient.off.map(hexToRgb);
+        return getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
     }
     if (mode === 'neighbor_count') {
         const neighborCount = countSetBits(neighborMask);
@@ -165,9 +159,9 @@ export function generateSingleRuleColor(ruleIndex, outputState, colorSettings, s
         return hexToRgb(customNeighborColors[key] || '#808080');
     }
     if (mode === 'symmetry') {
-         const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
-         const key = `${centerState}-${canonical}`;
-         return hexToRgb(customSymmetryColors[key] || '#808080');
+        const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+        const key = `${centerState}-${canonical}`;
+        return hexToRgb(customSymmetryColors[key] || '#808080');
     }
     return [128, 128, 128];
 }
@@ -176,14 +170,47 @@ export function generateSingleRuleColor(ruleIndex, outputState, colorSettings, s
  * Returns a CSS color string for a given rule and state, for use in the UI.
  * This function now uses the centralized color generator.
  * @param {number} ruleIndex The rule index (0-127)
- * @param {number} state The cell state (0 or 1)
+ * @param {number} outputState The output state of the rule (0 or 1)
  * @param {object} colorSettings The color settings from ColorController
  * @param {object} symmetryData Symmetry data from WorldManager
  * @returns {string} CSS color string
  */
-export function getRuleIndexColor(ruleIndex, state, colorSettings, symmetryData) {
-    // --- MODIFICATION: Pass the state (outputState) to the color generator.
-    const rgb = generateSingleRuleColor(ruleIndex, state, colorSettings, symmetryData);
+export function getRuleIndexColor(ruleIndex, outputState, colorSettings, symmetryData) {
+    let rgb;
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
+    
+    if (mode === 'preset') {
+        const preset = PRESET_PALETTES[activePreset];
+        if (activePreset === 'default' || !preset) {
+            const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+            rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.4);
+        } else {
+            const factor = ruleIndex / 127.0;
+            const onGradient = preset.gradient.map(hexToRgb);
+            const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.4));
+            rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+        }
+    } else if (mode === 'gradient') {
+        const factor = ruleIndex / 127.0;
+        const onGradient = customGradient.on.map(hexToRgb);
+        const offGradient = customGradient.off.map(hexToRgb);
+        rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+    } else {
+        const centerState = (ruleIndex >> 6) & 1;
+        const neighborMask = ruleIndex & 0x3F;
+        let colors;
+        if (mode === 'neighbor_count') {
+            const neighborCount = countSetBits(neighborMask);
+            const key = `${centerState}-${neighborCount}`;
+            colors = customNeighborColors[key];
+        } else { // symmetry mode
+            const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+            const key = `${centerState}-${canonical}`;
+            colors = customSymmetryColors[key];
+        }
+        rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
+    }
+    
     return `rgb(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])})`;
 }
 
