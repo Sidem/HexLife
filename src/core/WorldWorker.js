@@ -176,7 +176,7 @@ function processCommandQueue() {
                         }
                     }
                 }
-                if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
+                if(jsRuleIndexArray) jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 if(jsHoverStateArray) jsHoverStateArray.fill(0);
@@ -487,10 +487,10 @@ self.onmessage = async function(event) {
                         jsStateArray[i] = Math.random() < density ? 1 : 0;
                     }
                 }
-                jsRuleIndexArray.fill(0);
+                jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
             } else {
                 jsStateArray.fill(0);
-                jsRuleIndexArray.fill(0);
+                jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
             }
             jsHoverStateArray.fill(0);
 

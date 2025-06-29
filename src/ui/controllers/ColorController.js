@@ -53,4 +53,25 @@ export class ColorController {
         this.settings.customSymmetryColors[key] = color;
         this.#saveAndDispatch();
     }
+
+    /**
+     * Efficiently updates multiple colors at once and dispatches a single update event.
+     * @param {'neighbor_count' | 'symmetry'} groupType - The type of group being updated.
+     * @param {Array<{centerState: number, groupIdentifier: number, color: string}>} newColors - An array of color updates.
+     */
+    setBatchColors(groupType, newColors) {
+        this.settings.mode = groupType;
+        if (groupType === 'neighbor_count') {
+            for (const { centerState, groupIdentifier, color } of newColors) {
+                const key = `${centerState}-${groupIdentifier}`;
+                this.settings.customNeighborColors[key] = color;
+            }
+        } else if (groupType === 'symmetry') {
+            for (const { centerState, groupIdentifier, color } of newColors) {
+                const key = `${centerState}-${groupIdentifier}`;
+                this.settings.customSymmetryColors[key] = color;
+            }
+        }
+        this.#saveAndDispatch();
+    }
 } 

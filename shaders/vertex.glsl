@@ -13,6 +13,7 @@ out float v_hover_state;
 out float v_lut_x;
 out float v_lut_y;
 out float v_ghost_state;
+out float v_rule_index;
 
 uniform vec2 u_resolution;
 uniform float u_hexSize;
@@ -30,6 +31,8 @@ void main() {
   v_state = a_instance_state;
   v_hover_state = a_instance_hover_state;
   v_ghost_state = a_instance_ghost_state;
+  
+  v_rule_index = a_instance_rule_index;
   
   v_lut_x = (a_instance_rule_index + 0.5) / 128.0;
   v_lut_y = (a_instance_state + 0.5) / 2.0;

@@ -5,12 +5,18 @@
     height: 100%;
 }
 
+.chroma-lab-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
 .chroma-mode-section {
     display: flex;
     align-items: center;
+    margin-bottom: 4px;
     gap: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #444;
     flex-shrink: 0;
 }
 
@@ -79,23 +85,47 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 15px;
+    overflow-y: auto;
+    flex-grow: 1;
+    padding-right: 5px;
+}
+
+.color-group-column {
+    display: flex;
+    flex-direction: column;
 }
 
 .color-group-column h5 {
     text-align: center;
-    margin: 0px;
+    margin: 0 0 5px 0;
     color: #ddd;
 }
 
 .color-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.color-group.selected {
+    background-color: rgba(240, 198, 116, 0.2);
+    border-color: rgba(240, 198, 116, 0.5);
+}
+
+.chroma-group-checkbox {
+    display: none;
 }
 
 .color-group-label {
-    flex-basis: 50%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    width: 100%;
+}
+
+.color-group-label span {
+    flex-grow: 1;
     font-size: 0.9em;
     color: #ccc;
 }
@@ -107,6 +137,7 @@
     border-radius: 4px;
     cursor: pointer;
     transition: transform 0.1s ease;
+    flex-shrink: 0;
 }
 
 .color-swatch:hover {
@@ -152,52 +183,14 @@
     border-color: #fff;
 }
 
-/* Mini-viz for Chroma Lab Symmetry Groups */
-.mini-viz {
-    display: inline-grid;
-    grid-template-areas:
-        ". n1 ."
-        "n0 c n2"
-        ". n3 .";
-    grid-template-columns: 10px 10px 10px;
-    grid-template-rows: 10px 10px 10px;
-    align-items: center;
-    justify-items: center;
-    vertical-align: middle;
-    margin-right: 8px;
-    transform: scale(0.9) translateY(-1px);
-}
-
-.mini-hex {
-    width: 8px;
-    height: 9.2px; /* 8 * sqrt(3)/2 * 1.15 */
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-}
-
-.mini-hex.center { grid-area: c; }
-.mini-viz .mini-hex:nth-of-type(2) { grid-area: n0; } /* Corresponds to neighbor 0 */
-.mini-viz .mini-hex:nth-of-type(3) { grid-area: n1; }
-.mini-viz .mini-hex:nth-of-type(4) { grid-area: n2; }
-.mini-viz .mini-hex:nth-of-type(5) { grid-area: n3; }
-/* These last two are not in the grid-areas but will be placed automatically,
-   you may need to adjust the grid definition if you want perfect hex layout */
-
-/* Adjustments for integrated rule visualizations */
-.color-group {
-    display: grid; /* Change to grid */
-    grid-template-columns: 1fr auto; /* Make label take space, swatch is auto-sized */
-    align-items: center;
-}
-
-.color-group-label {
+/* Symmetry Group Visualization */
+.r-sym-rule-viz {
     display: flex;
     align-items: center;
-    justify-content: center;
 }
 
 .chroma-select-all-bar {
-    text-align: right;
-    padding: 0 5px 10px;
+    text-align: center;
     flex-shrink: 0;
 }
 .button-link {
@@ -206,14 +199,6 @@
     cursor: pointer;
     background: none;
     border: none;
-}
-
-.color-group {
-    grid-template-columns: auto 1fr auto; /* Add column for checkbox */
-}
-
-.chroma-group-checkbox {
-    margin-right: 10px;
 }
 
 #chroma-batch-action-bar {
@@ -225,6 +210,7 @@
     border: 1px solid #555;
     border-radius: 4px;
     margin-bottom: 10px;
+    flex-shrink: 0;
 }
 #chroma-batch-action-bar span {
     font-weight: bold;

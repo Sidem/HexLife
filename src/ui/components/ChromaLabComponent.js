@@ -1,5 +1,5 @@
 import { BaseComponent } from './BaseComponent.js';
-import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { EVENTS } from '../../services/EventBus.js';
 
 // The curated palette for the color pickers
 const CURATED_PALETTE = ['#fed4d4', '#fe9494', '#ff3f3f', '#ff0000', '#bf0000', '#6a0000', '#2a0000', '#fee9d4', '#fec994', '#ff9f3f', '#ff7f00', '#bf5f00', '#6a3500', '#2a1500', '#fefed4', '#fefe94', '#feff3f', '#feff00', '#bfbf00', '#6a6a00', '#2a2a00', '#dffed4', '#affe94', '#6fff3f', '#3fff00', '#2fbf00', '#1a6a00', '#0a2a00', '#d4fee9', '#94fec9', '#3fff9f', '#00ff7f', '#00bf5f', '#006a35', '#002a15', '#d4fefe', '#94fefe', '#3ffeff', '#00feff', '#00bfbf', '#006a6a', '#002a2a', '#d4e9fe', '#94c9fe', '#3f9fff', '#007fff', '#005fbf', '#00356a', '#00152a', '#d4d4fe', '#9494fe', '#3f3fff', '#0000ff', '#0000bf', '#00006a', '#00002a', '#e9d4fe', '#c994fe', '#9f3fff', '#7f00ff', '#5f00bf', '#35006a', '#15002a', '#fed4fe', '#fe94fe', '#ff3ffe', '#ff00fe', '#bf00bf', '#6a006a', '#2a002a', '#fed4e9', '#fe94c9', '#ff3f9f', '#ff007f', '#bf005f', '#6a0035', '#2a0015', '#ffffff', '#d4d4d4', '#aaaaaa', '#7f7f7f', '#555555', '#2a2a2a', '#000000'];
@@ -13,7 +13,7 @@ export class ChromaLabComponent extends BaseComponent {
         }
         this.appContext = appContext;
         this.colorController = appContext.colorController;
-        this.selectedGroups = new Set(); // <-- ADD THIS LINE
+        this.selectedGroups = new Set();
         this.element = document.createElement('div');
         this.element.className = 'chroma-lab-component-content';
         this.render();
@@ -45,7 +45,7 @@ export class ChromaLabComponent extends BaseComponent {
             presetSection: this.element.querySelector('#chroma-preset-section'),
             neighborSection: this.element.querySelector('#chroma-neighbor-section'),
             symmetrySection: this.element.querySelector('#chroma-symmetry-section'),
-            batchActionBar: this.element.querySelector('#chroma-batch-action-bar'), // <-- ADD THIS
+            batchActionBar: this.element.querySelector('#chroma-batch-action-bar'),
         };
         this._renderAllSections();
     }
@@ -66,19 +66,22 @@ export class ChromaLabComponent extends BaseComponent {
     }
 
     _renderNeighborCountSection() {
-        let html = `<div class="chroma-select-all-bar">
-                       <button class="button-link" data-action="select-all">Select All</button> | 
-                       <button class="button-link" data-action="select-none">Select None</button>
-                    </div>
-                    <div class="color-group-grid">`;
+        let html = '<div class="color-group-grid">';
         ['OFF', 'ON'].forEach(stateName => {
-            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
+            const centerState = (stateName === 'ON' ? 1 : 0);
+            html += `<div class="color-group-column" data-center-state="${centerState}">
+                        <h5>Cell ${stateName}</h5>
+                        <div class="chroma-select-all-bar">
+                            <button class="button-link" data-action="select-all-column">All</button> |
+                            <button class="button-link" data-action="select-none-column">None</button>
+                        </div>`;
             for (let i = 0; i <= 6; i++) {
-                const centerState = (stateName === 'ON' ? 1 : 0);
-                html += `<div class="color-group" data-center-state="${centerState}" data-neighbor-count="${i}">
-                           <input type="checkbox" class="chroma-group-checkbox" data-group-key="${centerState}-${i}">
-                           <span class="color-group-label">${i} Neighbors</span>
-                           <div class="color-swatch" title="Click to change color for this group"></div>
+                html += `<div class="color-group" data-center-state="${centerState}" data-neighbor-count="${i}" data-group-key="${centerState}-${i}">
+                           <input type="checkbox" class="chroma-group-checkbox" id="nc-check-${centerState}-${i}">
+                           <label class="color-group-label" for="nc-check-${centerState}-${i}">
+                               <span>${i} Neighbors</span>
+                               <div class="color-swatch" title="Click to change color for this group"></div>
+                           </label>
                          </div>`;
             }
             html += `</div>`;
@@ -89,23 +92,24 @@ export class ChromaLabComponent extends BaseComponent {
 
     _renderSymmetrySection() {
         const symmetryData = this.appContext.worldManager.getSymmetryData();
-        let html = `<div class="chroma-select-all-bar">
-                       <button class="button-link" data-action="select-all">Select All</button> | 
-                       <button class="button-link" data-action="select-none">Select None</button>
-                    </div>
-                    <div class="color-group-grid">`;
+        let html = '<div class="color-group-grid">';
          ['OFF', 'ON'].forEach(stateName => {
-            html += `<div class="color-group-column"><h5>Cell ${stateName}</h5>`;
             const centerState = (stateName === 'ON' ? 1 : 0);
+            html += `<div class="color-group-column" data-center-state="${centerState}">
+                        <h5>Cell ${stateName}</h5>
+                        <div class="chroma-select-all-bar">
+                            <button class="button-link" data-action="select-all-column">All</button> |
+                            <button class="button-link" data-action="select-none-column">None</button>
+                        </div>`;
             symmetryData.canonicalRepresentatives.forEach(group => {
                  const bitmask = group.representative;
                  const neighborHexes = Array.from({ length: 6 }, (_, n) =>
                      `<div class="hexagon neighbor-hex neighbor-${n} state-${(bitmask >> n) & 1}"></div>`
                  ).join('');
 
-                 html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}">
-                            <input type="checkbox" class="chroma-group-checkbox" data-group-key="${centerState}-${bitmask}">
-                            <div class="color-group-label">
+                 html += `<div class="color-group" data-center-state="${centerState}" data-canonical-bitmask="${bitmask}" data-group-key="${centerState}-${bitmask}">
+                            <input type="checkbox" class="chroma-group-checkbox" id="sym-check-${centerState}-${bitmask}">
+                            <label class="color-group-label" for="sym-check-${centerState}-${bitmask}">
                                 <div class="r-sym-rule-viz" style="cursor: default; pointer-events: none; transform: scale(0.8) translate(-10px, -5px); margin-bottom: -15px;">
                                     <div class="rule-viz-hex-display">
                                         <div class="hexagon center-hex state-${centerState}"></div>
@@ -113,8 +117,8 @@ export class ChromaLabComponent extends BaseComponent {
                                     </div>
                                     <div class="orbit-size-display">Orbit: ${group.orbitSize}</div>
                                 </div>
-                            </div>
-                            <div class="color-swatch" title="Click to change color for this group"></div>
+                                <div class="color-swatch" title="Click to change color for this group"></div>
+                            </label>
                           </div>`;
             });
             html += `</div>`;
@@ -128,19 +132,29 @@ export class ChromaLabComponent extends BaseComponent {
 
         this.element.addEventListener('change', (e) => {
             if (e.target.matches('.chroma-group-checkbox')) {
-                this._handleSelectionChange();
+                const groupEl = e.target.closest('.color-group');
+                const groupKey = groupEl.dataset.groupKey;
+                if (e.target.checked) {
+                    this.selectedGroups.add(groupKey);
+                } else {
+                    this.selectedGroups.delete(groupKey);
+                }
+                this._updateBatchActionBar();
+                groupEl.classList.toggle('selected', e.target.checked);
             }
         });
 
         this.element.addEventListener('click', (e) => {
             if (e.target.matches('.preset-button')) {
                 this.colorController.applyPreset(e.target.dataset.preset);
-            } else if (e.target.matches('.color-swatch')) {
+            } else if (e.target.matches('.color-swatch') && !e.target.matches('.batch-swatch')) {
+                // *** FIX: Added '!e.target.matches('.batch-swatch')' to prevent the delegated listener
+                // from firing for the batch swatch, which has its own specific listener.
                 this._openColorPalette(e.target);
-            } else if (e.target.matches('[data-action="select-all"]')) {
-                this._selectAll(e.target.closest('.chroma-section'), true);
-            } else if (e.target.matches('[data-action="select-none"]')) {
-                this._selectAll(e.target.closest('.chroma-section'), false);
+            } else if (e.target.matches('[data-action="select-all-column"]')) {
+                this._selectColumn(e.target.closest('.color-group-column'), true);
+            } else if (e.target.matches('[data-action="select-none-column"]')) {
+                this._selectColumn(e.target.closest('.color-group-column'), false);
             }
         });
 
@@ -164,22 +178,18 @@ export class ChromaLabComponent extends BaseComponent {
         modal.addEventListener('click', (e) => {
             if (e.target.matches('.palette-color')) {
                 const color = e.target.dataset.color;
-                
+
                 if (isBatch) {
-                    // Batch update logic
                     const mode = this.colorController.getSettings().mode;
-                    this.selectedGroups.forEach(key => {
+                    const updates = Array.from(this.selectedGroups).map(key => {
                         const [centerState, groupIdentifier] = key.split('-').map(Number);
-                        if (mode === 'neighbor_count') {
-                            this.colorController.setNeighborColor(centerState, groupIdentifier, color);
-                        } else if (mode === 'symmetry') {
-                            this.colorController.setSymmetryColor(centerState, groupIdentifier, color);
-                        }
+                        return { centerState, groupIdentifier, color };
                     });
+                    this.colorController.setBatchColors(mode, updates);
                     this.selectedGroups.clear();
-                    this._selectAll(this.element.querySelector('.chroma-section:not(.hidden)'), false);
+                    this._selectAllInVisiblePane(false);
+
                 } else {
-                    // ... existing single swatch update logic
                     const group = targetSwatch.closest('.color-group');
                     const mode = this.colorController.getSettings().mode;
 
@@ -211,7 +221,7 @@ export class ChromaLabComponent extends BaseComponent {
             const activeBtn = this.element.querySelector(`[data-preset="${settings.activePreset}"]`);
             if (activeBtn) activeBtn.classList.add('active');
         }
-        
+
         this.uiElements.neighborSection.querySelectorAll('.color-group').forEach(group => {
             const { centerState, neighborCount } = group.dataset;
             const key = `${centerState}-${neighborCount}`;
@@ -226,26 +236,35 @@ export class ChromaLabComponent extends BaseComponent {
             group.querySelector('.color-swatch').style.backgroundColor = color;
         });
 
-        // ADD THIS AT THE END:
-        this.element.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
-            cb.checked = this.selectedGroups.has(cb.dataset.groupKey);
-        });
-        this._updateBatchActionBar();
-    }
-
-    _handleSelectionChange() {
+        this._selectAllInVisiblePane(false);
         this.selectedGroups.clear();
-        this.element.querySelectorAll('.chroma-group-checkbox:checked').forEach(cb => {
-            this.selectedGroups.add(cb.dataset.groupKey);
+        this._updateBatchActionBar();
+    }
+
+    _selectColumn(columnElement, isSelected) {
+        columnElement.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
+            cb.checked = isSelected;
+            const groupEl = cb.closest('.color-group');
+            groupEl.classList.toggle('selected', isSelected);
+            const groupKey = groupEl.dataset.groupKey;
+            if (isSelected) {
+                this.selectedGroups.add(groupKey);
+            } else {
+                this.selectedGroups.delete(groupKey);
+            }
         });
         this._updateBatchActionBar();
     }
 
-    _selectAll(section, isSelected) {
-        section.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
-            cb.checked = isSelected;
-        });
-        this._handleSelectionChange();
+    _selectAllInVisiblePane(isSelected) {
+        const visiblePane = this.element.querySelector('.chroma-section:not(.hidden)');
+        if (visiblePane) {
+            visiblePane.querySelectorAll('.chroma-group-checkbox').forEach(cb => {
+                cb.checked = isSelected;
+                const groupEl = cb.closest('.color-group');
+                groupEl.classList.toggle('selected', isSelected);
+            });
+        }
     }
 
     _updateBatchActionBar() {

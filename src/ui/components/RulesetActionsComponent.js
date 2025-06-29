@@ -234,7 +234,7 @@ export class RulesetActionsComponent extends BaseComponent {
                     rulesetActionController.getGenScope(),
                     rulesetActionController.getGenAutoReset()
                 );
-                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+                //EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             }
             
             
