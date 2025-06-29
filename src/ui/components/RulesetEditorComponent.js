@@ -6,26 +6,24 @@ import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/rul
 
 export class RulesetEditorComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); 
-        
+        super(null, options);
+
         if (!appContext || !appContext.worldManager) {
             console.error('RulesetEditorComponent: appContext or worldManager is null.');
             return;
         }
-        
+
         this.appContext = appContext;
         this.worldManager = appContext.worldManager;
-        
 
-        
         this.element = document.createElement('div');
         this.element.className = 'ruleset-editor-component-content';
-        
+
         this.cachedDetailedRules = [];
         this.cachedNeighborCountRules = [];
         this.cachedRotationalSymmetryRules = [];
         this.areGridsCreated = false;
-        
+
         this.scopeSwitch = null;
         this.resetSwitch = null;
 
@@ -34,7 +32,7 @@ export class RulesetEditorComponent extends BaseComponent {
         this._setupInternalListeners();
         this.refresh();
     }
-    
+
     getElement() {
         return this.element;
     }
@@ -79,7 +77,7 @@ export class RulesetEditorComponent extends BaseComponent {
                 </div>
             </div>
         `;
-        
+
         this.uiElements = {
             editorRulesetInput: this.element.querySelector(`#ruleset-editor-input`),
             clearRulesButton: this.element.querySelector(`#ruleset-editor-clear-button`),
@@ -98,7 +96,7 @@ export class RulesetEditorComponent extends BaseComponent {
             this._createAllGrids();
         }
         const currentSelectedWorldHex = this.worldManager.getCurrentRulesetHex();
-        if (this.uiElements.editorRulesetInput) {
+        if (this.uiElements.editorRulesetInput && document.activeElement !== this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
         }
         this._updateEditorGrids();
@@ -112,12 +110,13 @@ export class RulesetEditorComponent extends BaseComponent {
         for (let i = 0; i < 128; i++) {
             const colorSettings = this.appContext.colorController.getSettings();
             const symmetryData = this.appContext.worldManager.getSymmetryData();
-            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }, colorSettings, symmetryData); 
+            const viz = createOrUpdateRuleVizElement({ ruleIndex: i, outputState: 0 }, colorSettings, symmetryData);
             const innerHex = viz.querySelector('.inner-hex');
-            this.cachedDetailedRules[i] = { viz, innerHex }; 
+            this.cachedDetailedRules[i] = { viz, innerHex };
             detailedFrag.appendChild(viz);
         }
         detailedGrid.appendChild(detailedFrag);
+
         const neighborGrid = this.uiElements.neighborCountRulesetEditorGrid;
         const neighborFrag = document.createDocumentFragment();
         for (let cs = 0; cs <= 1; cs++) {
@@ -141,6 +140,7 @@ export class RulesetEditorComponent extends BaseComponent {
             }
         }
         neighborGrid.appendChild(neighborFrag);
+
         const symmetryGrid = this.uiElements.rotationalSymmetryRulesetEditorGrid;
         const symmetryFrag = document.createDocumentFragment();
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
@@ -183,6 +183,12 @@ export class RulesetEditorComponent extends BaseComponent {
     }
 
     _setupInternalListeners() {
+        // --- MODIFICATION START ---
+        // Add subscriptions to refresh the editor when the underlying data changes.
+        this._subscribeToEvent(EVENTS.RULESET_CHANGED, this.refresh);
+        this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, this.refresh);
+        // --- MODIFICATION END ---
+        
         if (this.uiElements.rulesetEditorMode) {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
                 this._updateEditorGrids();
@@ -195,7 +201,7 @@ export class RulesetEditorComponent extends BaseComponent {
             this.scopeSwitch = new SwitchComponent(this.uiElements.editorScopeSwitchMount, {
                 label: 'Apply changes to:',
                 type: 'radio',
-                name: 'ruleset-editor-apply-scope', 
+                name: 'ruleset-editor-apply-scope',
                 initialValue: initialScope,
                 items: [
                     { value: 'selected', text: 'Selected World' },
@@ -207,12 +213,12 @@ export class RulesetEditorComponent extends BaseComponent {
                 }
             });
         }
-        
+
         const initialReset = PersistenceService.loadUISetting('editorAutoReset', true);
         if (this.uiElements.editorResetSwitchMount) {
             this.resetSwitch = new SwitchComponent(this.uiElements.editorResetSwitchMount, {
                 type: 'checkbox',
-                name: 'ruleset-editor-auto-reset', 
+                name: 'ruleset-editor-auto-reset',
                 initialValue: initialReset,
                 items: [{ value: 'reset', text: 'Auto-Reset on Change' }],
                 onChange: (isChecked) => {
@@ -245,7 +251,7 @@ export class RulesetEditorComponent extends BaseComponent {
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
                 alert("Invalid Hex Code in Editor: Must be 32 hex chars.\nReverting.");
                 this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
-            } else {
+            } else if (hexString !== currentSelectedWorldHex) {
                 EventBus.dispatch(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, {
                     hexString,
                     modificationScope: this._getEditorModificationScope(),
@@ -310,7 +316,6 @@ export class RulesetEditorComponent extends BaseComponent {
             }));
         }
 
-        // Subscribe to color settings changes to update visualizations
         this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
     }
 
@@ -323,23 +328,24 @@ export class RulesetEditorComponent extends BaseComponent {
             rotationalSymmetry: this.uiElements.rotationalSymmetryRulesetEditorGrid
         };
         for (const key in grids) grids[key]?.classList.add('hidden');
-    
+
         const activeGrid = grids[currentMode] || grids.detailed;
         activeGrid.classList.remove('hidden');
-    
+
+        const rulesetArray = this.worldManager.getCurrentRulesetArray();
+        if (!rulesetArray || rulesetArray.length !== 128) return;
+
         if (currentMode === 'detailed') {
-            this._updateDetailedGrid(this.worldManager.getCurrentRulesetArray());
+            this._updateDetailedGrid(rulesetArray);
         } else if (currentMode === 'neighborCount') {
             this._updateNeighborCountGrid();
         } else if (currentMode === 'rotationalSymmetry') {
             this._updateRotationalSymmetryGrid();
-        } else {
-            this._updateDetailedGrid(this.worldManager.getCurrentRulesetArray());
         }
     }
 
     _updateDetailedGrid(rulesetArray) {
-        if (!rulesetArray || this.cachedDetailedRules.length === 0) return;
+        if (this.cachedDetailedRules.length === 0) return;
         const colorSettings = this.appContext.colorController.getSettings();
         const symmetryData = this.appContext.worldManager.getSymmetryData();
         for (let i = 0; i < 128; i++) {
@@ -358,8 +364,7 @@ export class RulesetEditorComponent extends BaseComponent {
             for (let na = 0; na <= 6; na++) {
                 const { innerHex, label } = this.cachedNeighborCountRules[cacheIndex];
                 const effectiveOutput = this.worldManager.getEffectiveRuleForNeighborCount(cs, na);
-                
-                // A representative rule index to sample the color from the LUT logic
+
                 const representativeRuleIndex = (cs << 6) | (Math.pow(2, na) - 1);
                 innerHex.style.backgroundColor = getRuleIndexColor(representativeRuleIndex, effectiveOutput, colorSettings, symmetryData);
 
@@ -375,12 +380,12 @@ export class RulesetEditorComponent extends BaseComponent {
         if (this.cachedRotationalSymmetryRules.length === 0) return;
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
         if (!canonicalDetails) return;
-        
+
         const colorSettings = this.appContext.colorController.getSettings();
         const symmetryData = this.appContext.worldManager.getSymmetryData();
 
         this.cachedRotationalSymmetryRules.forEach((cachedRule) => {
-            const detail = canonicalDetails.find(d => 
+            const detail = canonicalDetails.find(d =>
                 d.canonicalBitmask === cachedRule.canonicalBitmask && d.centerState === cachedRule.centerState
             );
             if (detail) {
@@ -410,4 +415,4 @@ export class RulesetEditorComponent extends BaseComponent {
         }
         super.destroy?.();
     }
-} 
+}
