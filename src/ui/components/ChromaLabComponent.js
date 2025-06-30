@@ -14,7 +14,7 @@ export class ChromaLabComponent extends BaseComponent {
         }
         this.appContext = appContext;
         this.colorController = appContext.colorController;
-        this.selectedSwatches = new Set();
+        this.selectedSwatches = [];
         this.element = document.createElement('div');
         this.element.className = 'chroma-lab-component-content';
         this.render();
@@ -66,10 +66,21 @@ export class ChromaLabComponent extends BaseComponent {
 
         // 1. Generate visualizations for all static presets
         for (const [key, preset] of Object.entries(presets)) {
-            const tempSettings = { ...settings, mode: 'preset', activePreset: key };
-            const lut = generatePaletteVisualizationLUT(tempSettings, symmetryData);
+            // The tempSettings logic for generating the preview image
+            const tempSettingsForViz = { ...settings };
+            if (preset.logic) {
+                tempSettingsForViz.mode = preset.logic;
+            } else {
+                tempSettingsForViz.mode = 'preset';
+                tempSettingsForViz.activePreset = key;
+            }
+            const lut = generatePaletteVisualizationLUT(tempSettingsForViz, symmetryData);
+            
             const base64 = colorLUTtoBase64(lut);
+
+            // An item is active only if the mode is 'preset' and its key matches the activePreset.
             const isActive = settings.mode === 'preset' && settings.activePreset === key;
+            
             visHtml += `
                 <div class="preset-vis-container ${isActive ? 'active' : ''}" data-preset="${key}" title="${preset.name}">
                     <img src="${base64}" alt="${preset.name} Palette Preview">
@@ -78,29 +89,7 @@ export class ChromaLabComponent extends BaseComponent {
             `;
         }
 
-        // 2. Generate visualization for the current "Neighbor Count" settings
-        const neighborSettings = { ...settings, mode: 'neighbor_count' };
-        const neighborLut = generatePaletteVisualizationLUT(neighborSettings, symmetryData);
-        const neighborBase64 = colorLUTtoBase64(neighborLut);
-        const isNeighborModeActive = settings.mode === 'neighbor_count';
-        visHtml += `
-            <div class="preset-vis-container ${isNeighborModeActive ? 'active' : ''}" data-preset="neighbor_count" title="Current Custom Neighbor Count Colors">
-                <img src="${neighborBase64}" alt="Custom Neighbor Count Palette Preview">
-                <span>Custom (Neighbors)</span>
-            </div>
-        `;
 
-        // 3. Generate visualization for the current "Symmetry" settings
-        const symmetrySettings = { ...settings, mode: 'symmetry' };
-        const symmetryLut = generatePaletteVisualizationLUT(symmetrySettings, symmetryData);
-        const symmetryBase64 = colorLUTtoBase64(symmetryLut);
-        const isSymmetryModeActive = settings.mode === 'symmetry';
-        visHtml += `
-            <div class="preset-vis-container ${isSymmetryModeActive ? 'active' : ''}" data-preset="symmetry" title="Current Custom Symmetry Group Colors">
-                <img src="${symmetryBase64}" alt="Custom Symmetry Palette Preview">
-                <span>Custom (Symmetry)</span>
-            </div>
-        `;
         
         this.uiElements.presetSection.innerHTML = `<div class="preset-visualizations">${visHtml}</div>`;
     }
@@ -127,7 +116,7 @@ export class ChromaLabComponent extends BaseComponent {
                             </div>
                         </h5>`;
             groups.forEach(group => {
-                const groupKey = `${centerState}-${group.id}`;
+                const groupKey = `${groupType}-${centerState}-${group.id}`;
                 const labelHtml = groupType === 'neighbor_count'
                     ? group.label
                     : `<div class="r-sym-rule-viz">${this._getSymmetryVizHtml(group.id, group.orbitSize, centerState)}</div>`;
@@ -163,16 +152,14 @@ export class ChromaLabComponent extends BaseComponent {
     _setupEventListeners() {
         this.uiElements.modeSelect.addEventListener('change', (e) => this.colorController.setMode(e.target.value));
         this.element.addEventListener('click', (e) => {
-            // Modify the preset button handler
             const visContainer = e.target.closest('.preset-vis-container');
             if (visContainer) {
                 const presetName = visContainer.dataset.preset;
-                if (presetName === 'neighbor_count' || presetName === 'symmetry') {
-                    this.colorController.setMode(presetName);
-                } else {
-                    this.colorController.applyPreset(presetName);
-                }
-                return;
+                
+                // Simplified logic using the updated controller method
+                this.colorController.applyPreset(presetName);
+                
+                return; // Prevent other handlers from firing
             }
 
             if (e.target.matches('.select-all-swatches')) {
@@ -189,13 +176,17 @@ export class ChromaLabComponent extends BaseComponent {
                     const swatchKey = `${groupKey}-${stateTypeToSelect}`;
 
                     if (areAllSelected) {
-                        swatch.classList.remove('selected');
-                        this.selectedSwatches.delete(swatchKey);
+                        const selectedIndex = this.selectedSwatches.indexOf(swatchKey);
+                        if (selectedIndex > -1) {
+                            this.selectedSwatches.splice(selectedIndex, 1);
+                        }
                     } else {
-                        swatch.classList.add('selected');
-                        this.selectedSwatches.add(swatchKey);
+                        if (!this.selectedSwatches.includes(swatchKey)) {
+                            this.selectedSwatches.push(swatchKey);
+                        }
                     }
                 });
+                this._updateSelectionVisuals();
                 this._updateBatchActionBar();
                 return;
             }
@@ -207,12 +198,17 @@ export class ChromaLabComponent extends BaseComponent {
                 const swatchKey = `${groupKey}-${stateType}`;
 
                 if (e.metaKey || e.ctrlKey) {
-                    swatchWrapper.classList.toggle('selected');
-                    if (this.selectedSwatches.has(swatchKey)) {
-                        this.selectedSwatches.delete(swatchKey);
+                    const selectedIndex = this.selectedSwatches.indexOf(swatchKey);
+                    
+                    if (selectedIndex > -1) {
+                        // If already selected, remove it
+                        this.selectedSwatches.splice(selectedIndex, 1);
                     } else {
-                        this.selectedSwatches.add(swatchKey);
+                        // If not selected, add it to the end
+                        this.selectedSwatches.push(swatchKey);
                     }
+                    // Re-render all selection numbers to maintain correct order
+                    this._updateSelectionVisuals();
                 } else {
                     this._openColorPalette(swatchWrapper);
                 }
@@ -233,17 +229,44 @@ export class ChromaLabComponent extends BaseComponent {
         modal.addEventListener('click', (e) => {
             if (e.target.matches('.palette-color')) {
                 const color = e.target.dataset.color;
-                const groupKey = targetWrapper.closest('.color-group').dataset.groupKey;
-                const stateType = targetWrapper.dataset.stateType;
+                const domKey = targetWrapper.closest('.color-group').dataset.groupKey;
                 const mode = this.colorController.getSettings().mode;
+                const dataKey = domKey.substring(mode.length + 1);
+                const stateType = targetWrapper.dataset.stateType;
                 
-                this.colorController.setColorForGroup(mode, groupKey, stateType, color);
+                this.colorController.setColorForGroup(mode, dataKey, stateType, color);
                 modal.remove();
             } else if (e.target.id === 'color-palette-modal') {
                 modal.remove();
             }
         });
         document.body.appendChild(modal);
+    }
+
+    _updateSelectionVisuals() {
+        // First, remove all existing selection markers
+        this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => {
+            el.classList.remove('selected');
+            const marker = el.querySelector('.selection-order-marker');
+            if (marker) marker.remove();
+        });
+
+        // Then, add new markers based on the ordered array
+        this.selectedSwatches.forEach((swatchKey, index) => {
+            const parts = swatchKey.split('-');
+            const stateType = parts.pop();
+            const groupKey = parts.join('-'); // The rest of the key is the full group key
+            const selector = `[data-group-key="${groupKey}"] [data-state-type="${stateType}"]`;
+            
+            const el = this.element.querySelector(selector);
+            if (el) {
+                el.classList.add('selected');
+                const marker = document.createElement('div');
+                marker.className = 'selection-order-marker';
+                marker.textContent = index + 1;
+                el.appendChild(marker);
+            }
+        });
     }
 
     refresh = () => {
@@ -262,8 +285,11 @@ export class ChromaLabComponent extends BaseComponent {
         const updateSwatches = (groupType, colorMap) => {
             const sectionId = `#chroma-${groupType.replace('_count', '')}-section`;
             this.element.querySelectorAll(`${sectionId} .color-group`).forEach(group => {
-                const groupKey = group.dataset.groupKey;
-                const colors = colorMap[groupKey] || { on: '#ffffff', off: '#333333' };
+                const domKey = group.dataset.groupKey; // e.g., "symmetry-0-12"
+                // The data key is the part AFTER the prefix
+                const dataKey = domKey.substring(groupType.length + 1); // e.g., "0-12"
+                
+                const colors = colorMap[dataKey] || { on: '#ffffff', off: '#333333' };
                 const onSwatch = group.querySelector('[data-state-type="on"] .color-swatch');
                 const offSwatch = group.querySelector('[data-state-type="off"] .color-swatch');
                 if (onSwatch) onSwatch.style.backgroundColor = colors.on;
@@ -274,26 +300,42 @@ export class ChromaLabComponent extends BaseComponent {
         updateSwatches('neighbor_count', settings.customNeighborColors);
         updateSwatches('symmetry', settings.customSymmetryColors);
 
-        this.selectedSwatches.clear();
-        this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
+        this.selectedSwatches = []; // Clear the array
+        this._updateSelectionVisuals(); // Update the UI
         this._updateBatchActionBar();
     }
 
     _updateBatchActionBar() {
         const bar = this.uiElements.batchActionBar;
-        if (this.selectedSwatches.size > 0) {
-            bar.innerHTML = `<span>${this.selectedSwatches.size} swatches selected.</span>
+        if (this.selectedSwatches.length > 0) {
+            bar.innerHTML = `<span>${this.selectedSwatches.length} swatches selected.</span>
                              <div style="display: flex; gap: 8px; align-items: center;">
                                  <button class="button-link clear-selection" title="Clear selection">Clear</button>
                                  <div class="batch-swatch" title="Set color for all selected swatches"></div>
                              </div>`;
             bar.classList.remove('hidden');
-            bar.querySelector('.batch-swatch').addEventListener('click', () => {
-                this._openBatchColorPalette();
-            }, { once: true });
-            bar.querySelector('.clear-selection').addEventListener('click', () => {
-                this.selectedSwatches.clear();
-                this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
+
+            // Find the batch-swatch and clear-selection buttons and add listeners
+            const batchSwatch = bar.querySelector('.batch-swatch');
+            const clearButton = bar.querySelector('.clear-selection');
+
+            if (this.selectedSwatches.length > 1) {
+                batchSwatch.textContent = 'Create Gradient...';
+                batchSwatch.title = 'Create a gradient across selected swatches';
+                batchSwatch.addEventListener('click', () => {
+                    this._openGradientCreator();
+                }, { once: true });
+            } else {
+                batchSwatch.textContent = 'Set Color...';
+                batchSwatch.title = 'Set color for selected swatch';
+                batchSwatch.addEventListener('click', () => {
+                    this._openBatchColorPalette(); // Re-use old logic for single selection
+                }, { once: true });
+            }
+            
+            clearButton.addEventListener('click', () => {
+                this.selectedSwatches = []; // Clear the array
+                this._updateSelectionVisuals(); // Update the UI
                 this._updateBatchActionBar();
             }, { once: true });
         } else {
@@ -318,16 +360,18 @@ export class ChromaLabComponent extends BaseComponent {
                 this.selectedSwatches.forEach(swatchKey => {
                     const parts = swatchKey.split('-');
                     const stateType = parts.pop();
-                    const groupKey = parts.join('-');
-                    if (stateType === 'on') onKeys.push(groupKey);
-                    else offKeys.push(groupKey);
+                    const domKey = parts.join('-');
+                    const mode = this.colorController.getSettings().mode;
+                    const dataKey = domKey.substring(mode.length + 1);
+                    if (stateType === 'on') onKeys.push(dataKey);
+                    else offKeys.push(dataKey);
                 });
                 
                 if (onKeys.length > 0) this.colorController.setBatchColors(mode, onKeys, 'on', color);
                 if (offKeys.length > 0) this.colorController.setBatchColors(mode, offKeys, 'off', color);
 
-                this.selectedSwatches.clear();
-                this.element.querySelectorAll('.color-swatch-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                this.selectedSwatches = [];
+                this._updateSelectionVisuals();
                 this._updateBatchActionBar();
                 modal.remove();
             } else if (e.target.id === 'color-palette-modal') {
@@ -335,5 +379,72 @@ export class ChromaLabComponent extends BaseComponent {
             }
         });
         document.body.appendChild(modal);
+    }
+
+    _openGradientCreator() {
+        let modal = document.getElementById('gradient-creator-modal');
+        if (modal) modal.remove();
+
+        let gradientStops = [];
+
+        modal = document.createElement('div');
+        modal.id = 'gradient-creator-modal';
+        modal.className = 'modal-overlay'; // Use the same styling as other modals
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <h4>Create Gradient</h4>
+                <p>Click colors below in order to define your gradient stops.</p>
+                <div id="gradient-preview-strip"></div>
+                <div class="color-palette-content">${CURATED_PALETTE.map(c => `<div class="palette-color" style="background-color: ${c}" data-color="${c}"></div>`).join('')}</div>
+                <div class="modal-actions">
+                    <button class="button" id="gradient-cancel-btn">Cancel</button>
+                    <button class="button" id="gradient-apply-btn" disabled>Apply Gradient</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const previewStrip = modal.querySelector('#gradient-preview-strip');
+        const applyBtn = modal.querySelector('#gradient-apply-btn');
+        const palette = modal.querySelector('.color-palette-content');
+        
+        const updatePreview = () => {
+            if (gradientStops.length > 0) {
+                previewStrip.style.background = gradientStops.length === 1 
+                    ? gradientStops[0] 
+                    : `linear-gradient(to right, ${gradientStops.join(', ')})`;
+                applyBtn.disabled = false;
+            } else {
+                previewStrip.style.background = '#222';
+                applyBtn.disabled = true;
+            }
+        };
+
+        palette.addEventListener('click', e => {
+            if (e.target.matches('.palette-color')) {
+                gradientStops.push(e.target.dataset.color);
+                updatePreview();
+            }
+        });
+
+        modal.querySelector('#gradient-apply-btn').addEventListener('click', () => {
+            this.appContext.colorController.applyGradientToSelection(
+                this.selectedSwatches,
+                gradientStops
+            );
+            modal.remove();
+        }, { once: true });
+
+        modal.querySelector('#gradient-cancel-btn').addEventListener('click', () => modal.remove(), { once: true });
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+        
+        updatePreview();
     }
 } 

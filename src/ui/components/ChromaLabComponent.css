@@ -177,6 +177,7 @@
 }
 
 .color-swatch-wrapper {
+    position: relative; /* Needed for positioning the marker */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -263,8 +264,10 @@
 }
 
 .batch-swatch {
-    width: 50px;
-    height: 25px;
+    padding: 5px 10px;
+    width: auto;
+    text-align: center;
+    white-space: nowrap;
     background-color: #555;
     border: 2px dashed #f0c674;
     cursor: pointer;
@@ -276,4 +279,46 @@
     cursor: pointer;
     background: none;
     border: none;
+}
+
+/* Selection Order Markers */
+.selection-order-marker {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: rgba(240, 198, 116, 0.9);
+    color: #1e1e1e;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    box-shadow: 0 0 4px black;
+    pointer-events: none; /* Make sure it doesn't interfere with clicks */
+}
+
+/* Gradient Creator Modal */
+#gradient-creator-modal {
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#gradient-preview-strip {
+    height: 30px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    background-color: #222;
+    transition: background 0.3s ease;
 }
