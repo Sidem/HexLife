@@ -29,12 +29,17 @@ export class ColorController {
 
     applyPreset(presetName) {
         if (!this.presets[presetName]) return;
-        
-        // This ensures that selecting ANY preset, including the new logic-based ones,
-        // sets the mode to 'preset'. The rendering logic will handle the different
-        // preset types based on the 'logic' key we defined in colorPalettes.js.
-        this.settings.mode = 'preset';
-        this.settings.activePreset = presetName;
+
+        const selectedPreset = this.presets[presetName];
+
+        if (selectedPreset.logic) {
+            // If the preset has a 'logic' key, switch to that customization mode.
+            this.settings.mode = selectedPreset.logic;
+        } else {
+            // For standard gradient presets, set the mode to 'preset'.
+            this.settings.mode = 'preset';
+            this.settings.activePreset = presetName;
+        }
         
         this.#saveAndDispatch();
     }

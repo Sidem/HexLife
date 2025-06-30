@@ -44,13 +44,13 @@ export const PRESET_PALETTES = {
         offGradient: ['#21123a', '#433c57', '#5a495c']
     },
     neighborGradient: {
-        name: 'Neighbor Gradient',
+        name: 'Neighbor Counts',
         logic: 'neighbor_count', // Special key to identify this as a logic-based preset
         gradient: ['#4A00E0', '#8E2DE2', '#C968A9', '#F8A589'],
         offColor: '#1A1A1A'
     },
     symmetryGradient: {
-        name: 'Symmetry Gradient',
+        name: 'Symmetry Groups',
         logic: 'symmetry', // Special key to identify this as a logic-based preset
         gradient: ['#009FFF', '#36D1DC', '#6EFA7D', '#B4FF64'],
         offColor: '#1A1A1A'

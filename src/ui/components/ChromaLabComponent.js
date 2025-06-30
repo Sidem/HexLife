@@ -64,23 +64,29 @@ export class ChromaLabComponent extends BaseComponent {
 
         let visHtml = '';
 
-        // 1. Generate visualizations for all static presets
+        // Generate visualizations for all presets defined in colorPalettes.js
         for (const [key, preset] of Object.entries(presets)) {
-            // The tempSettings logic for generating the preview image
-            const tempSettingsForViz = { ...settings };
-            if (preset.logic) {
-                tempSettingsForViz.mode = preset.logic;
-            } else {
-                tempSettingsForViz.mode = 'preset';
-                tempSettingsForViz.activePreset = key;
-            }
-            const lut = generatePaletteVisualizationLUT(tempSettingsForViz, symmetryData);
-            
-            const base64 = colorLUTtoBase64(lut);
+            let tempSettingsForViz;
+            let isActive = false;
+            let lut;
 
-            // An item is active only if the mode is 'preset' and its key matches the activePreset.
-            const isActive = settings.mode === 'preset' && settings.activePreset === key;
-            
+            if (preset.logic) {
+                // For logic-based presets ("Symmetry Groups", "Neighbor Counts")
+                // The preview should reflect the CURRENT custom colors for that mode.
+                tempSettingsForViz = { ...settings, mode: preset.logic };
+                lut = generatePaletteVisualizationLUT(tempSettingsForViz, symmetryData);
+                // This preset is active if the app's mode matches its logic type.
+                isActive = settings.mode === preset.logic;
+            } else {
+                // For standard gradient presets ("Volcanic", "Oceanic", etc.)
+                // The preview is based on its own definition.
+                tempSettingsForViz = { ...settings, mode: 'preset', activePreset: key };
+                lut = generatePaletteVisualizationLUT(tempSettingsForViz, symmetryData);
+                // This preset is active if the app's mode is 'preset' and its key matches.
+                isActive = settings.mode === 'preset' && settings.activePreset === key;
+            }
+
+            const base64 = colorLUTtoBase64(lut);
             visHtml += `
                 <div class="preset-vis-container ${isActive ? 'active' : ''}" data-preset="${key}" title="${preset.name}">
                     <img src="${base64}" alt="${preset.name} Palette Preview">
@@ -88,8 +94,6 @@ export class ChromaLabComponent extends BaseComponent {
                 </div>
             `;
         }
-
-
         
         this.uiElements.presetSection.innerHTML = `<div class="preset-visualizations">${visHtml}</div>`;
     }
