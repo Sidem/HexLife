@@ -75,3 +75,56 @@ export const EVENT_BUS_LOGGING = {
      */
     filter: ['command:'] 
 };
+
+/**
+ * Default color schemes for neighbor count and symmetry group modes.
+ * These provide a rich, visually distinct palette for different rule configurations.
+ */
+export const DEFAULT_COLOR_SCHEMES = {
+    customNeighborColors: {
+        "0-0": { "on": "#FF0000", "off": "#2A0000" },
+        "0-1": { "on": "#FED400", "off": "#2A2300" },
+        "0-2": { "on": "#2AFF2A", "off": "#072A07" },
+        "0-3": { "on": "#00FEFF", "off": "#002A2A" },
+        "0-4": { "on": "#002AFF", "off": "#00072A" },
+        "0-5": { "on": "#AA00FF", "off": "#1C002A" },
+        "0-6": { "on": "#FF007F", "off": "#2A0015" },
+        "1-0": { "on": "#FF0000", "off": "#2A0000" },
+        "1-1": { "on": "#FED400", "off": "#2A2300" },
+        "1-2": { "on": "#2AFF2A", "off": "#072A07" },
+        "1-3": { "on": "#00FEFF", "off": "#002A2A" },
+        "1-4": { "on": "#002AFF", "off": "#00072A" },
+        "1-5": { "on": "#AA00FF", "off": "#1C002A" },
+        "1-6": { "on": "#FF007F", "off": "#2A0015" }
+    },
+    customSymmetryColors: {
+        "0-0": { "on": "#FF0000", "off": "#2A0000" },
+        "0-1": { "on": "#FF6200", "off": "#2A1000" },
+        "0-3": { "on": "#FEC400", "off": "#2A2000" },
+        "0-5": { "on": "#C3FF00", "off": "#202A00" },
+        "0-7": { "on": "#3AFF0A", "off": "#092A02" },
+        "0-9": { "on": "#0AFF6B", "off": "#022A12" },
+        "0-11": { "on": "#00FECE", "off": "#002A22" },
+        "0-13": { "on": "#00CDFF", "off": "#00222A" },
+        "0-15": { "on": "#006BFF", "off": "#00122A" },
+        "0-21": { "on": "#000AFF", "off": "#00022A" },
+        "0-23": { "on": "#5800FF", "off": "#0F002A" },
+        "0-27": { "on": "#BA00FF", "off": "#1F002A" },
+        "0-31": { "on": "#FF00E1", "off": "#2A0025" },
+        "0-63": { "on": "#FF007F", "off": "#2A0015" },
+        "1-0": { "on": "#FF0000", "off": "#2A0000" },
+        "1-1": { "on": "#FF6200", "off": "#2A1000" },
+        "1-3": { "on": "#FEC400", "off": "#2A2000" },
+        "1-5": { "on": "#C3FF00", "off": "#202A00" },
+        "1-7": { "on": "#3AFF0A", "off": "#092A02" },
+        "1-9": { "on": "#0AFF6B", "off": "#022A12" },
+        "1-11": { "on": "#00FECE", "off": "#002A22" },
+        "1-13": { "on": "#00CDFF", "off": "#00222A" },
+        "1-15": { "on": "#006BFF", "off": "#00122A" },
+        "1-21": { "on": "#000AFF", "off": "#00022A" },
+        "1-23": { "on": "#5800FF", "off": "#0F002A" },
+        "1-27": { "on": "#BA00FF", "off": "#1F002A" },
+        "1-31": { "on": "#FF00E1", "off": "#2A0025" },
+        "1-63": { "on": "#FF007F", "off": "#2A0015" }
+    }
+};

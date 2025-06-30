@@ -1,6 +1,7 @@
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { PRESET_PALETTES } from '../../core/colorPalettes.js';
+import { DEFAULT_COLOR_SCHEMES } from '../../core/config.js';
 
 export class ColorController {
     constructor() {
@@ -72,6 +73,18 @@ export class ColorController {
             targetObject[key][stateType] = newColor;
         }
         this.settings.mode = groupType;
+        this.#saveAndDispatch();
+    }
+
+    resetToDefaults(mode) {
+        if (mode === 'neighbor_count') {
+            // Use structuredClone for a deep copy to prevent reference issues
+            this.settings.customNeighborColors = structuredClone(DEFAULT_COLOR_SCHEMES.customNeighborColors);
+        } else if (mode === 'symmetry') {
+            this.settings.customSymmetryColors = structuredClone(DEFAULT_COLOR_SCHEMES.customSymmetryColors);
+        }
+        
+        // Save the updated settings and notify the UI
         this.#saveAndDispatch();
     }
 

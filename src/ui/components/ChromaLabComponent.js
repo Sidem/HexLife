@@ -114,9 +114,10 @@ export class ChromaLabComponent extends BaseComponent {
             html += `<div class="color-group-column" data-center-state="${centerState}">
                         <h5>
                             Cell ${stateName}
-                            <div class="select-all-buttons">
+                            <div class="column-actions">
                                 <button class="button-link select-all-swatches" data-state-type="off">Select OFFs</button> |
                                 <button class="button-link select-all-swatches" data-state-type="on">Select ONs</button>
+                                <button class="button-link reset-column-defaults" data-mode="${groupType}" title="Reset all colors for this mode to defaults">Reset Mode</button>
                             </div>
                         </h5>`;
             groups.forEach(group => {
@@ -192,6 +193,15 @@ export class ChromaLabComponent extends BaseComponent {
                 });
                 this._updateSelectionVisuals();
                 this._updateBatchActionBar();
+                return;
+            }
+
+            if (e.target.matches('.reset-column-defaults')) {
+                const mode = e.target.dataset.mode;
+                const modeDisplayName = mode === 'neighbor_count' ? 'Neighbor Count' : 'Symmetry';
+                if (confirm(`Are you sure you want to reset all colors for '${modeDisplayName}' mode to their defaults?`)) {
+                    this.colorController.resetToDefaults(mode);
+                }
                 return;
             }
 

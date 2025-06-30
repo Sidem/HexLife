@@ -121,11 +121,13 @@
     gap: 4px;
 }
 
-.select-all-buttons {
+.column-actions {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     font-size: 0.8em;
+    font-weight: normal; /* Keep action text normal weight */
 }
 
 .select-all-swatches {
@@ -321,4 +323,23 @@
     margin-bottom: 15px;
     background-color: #222;
     transition: background 0.3s ease;
+}
+
+/* Reset Button Styling */
+.reset-column-defaults {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    border: 1px solid #7c3a3a; /* Reddish border */
+    background-color: #4a3a3a;
+    color: #fca5a5; /* Light red text */
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 8px; /* Add some space */
+}
+
+.reset-column-defaults:hover {
+    background-color: #5a4a4a;
+    border-color: #ef4444;
+    color: #fecaca;
 }

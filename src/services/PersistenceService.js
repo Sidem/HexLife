@@ -212,8 +212,8 @@ export function loadColorSettings() {
             on: ['#3cb44b', '#ffe119'],
             off: ['#1a4a23', '#665a0a']
         },
-        customNeighborColors: {},
-        customSymmetryColors: {}
+        customNeighborColors: Config.DEFAULT_COLOR_SCHEMES.customNeighborColors,
+        customSymmetryColors: Config.DEFAULT_COLOR_SCHEMES.customSymmetryColors
     };
     const loaded = _getItem(KEYS.COLOR_SETTINGS);
     
