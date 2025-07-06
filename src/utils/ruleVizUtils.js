@@ -67,51 +67,49 @@ function getGradientColor(factor, gradient) {
  * @param {object} symmetryData - Symmetry data from WorldManager
  * @returns {Uint8Array} The texture data.
  */
-export function generateColorLUT(colorSettings, symmetryData, currentRuleset) {
+export function generateColorLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2;
     const data = new Uint8Array(width * height * 4);
     const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
-        const outputState = currentRuleset[ruleIndex];
-        let rgb;
+        for (let outputState = 0; outputState < height; outputState++) {
+            let rgb;
 
-        if (mode === 'preset') {
-            const preset = PRESET_PALETTES[activePreset];
-            if (activePreset === 'default' || !preset) {
-                const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
-                rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
-            } else {
+            if (mode === 'preset') {
+                const preset = PRESET_PALETTES[activePreset];
+                if (activePreset === 'default' || !preset) {
+                    const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
+                    rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
+                } else {
+                    const factor = ruleIndex / (width - 1);
+                    const onGradient = preset.gradient.map(hexToRgb);
+                    const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.15));
+                    rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+                }
+            } else if (mode === 'gradient') {
                 const factor = ruleIndex / (width - 1);
-                const onGradient = preset.gradient.map(hexToRgb);
-                const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.15));
+                const onGradient = customGradient.on.map(hexToRgb);
+                const offGradient = customGradient.off.map(hexToRgb);
                 rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+            } else {
+                const centerState = (ruleIndex >> 6) & 1;
+                const neighborMask = ruleIndex & 0x3F;
+                let colors;
+                if (mode === 'neighbor_count') {
+                    const neighborCount = countSetBits(neighborMask);
+                    const key = `${centerState}-${neighborCount}`;
+                    colors = customNeighborColors[key];
+                } else { // symmetry mode
+                    const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+                    const key = `${centerState}-${canonical}`;
+                    colors = customSymmetryColors[key];
+                }
+                rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
             }
-        } else if (mode === 'gradient') {
-            const factor = ruleIndex / (width - 1);
-            const onGradient = customGradient.on.map(hexToRgb);
-            const offGradient = customGradient.off.map(hexToRgb);
-            rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
-        } else {
-            const centerState = (ruleIndex >> 6) & 1;
-            const neighborMask = ruleIndex & 0x3F;
-            let colors;
-            if (mode === 'neighbor_count') {
-                const neighborCount = countSetBits(neighborMask);
-                const key = `${centerState}-${neighborCount}`;
-                colors = customNeighborColors[key];
-            } else { // symmetry mode
-                const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
-                const key = `${centerState}-${canonical}`;
-                colors = customSymmetryColors[key];
-            }
-            rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
-        }
 
-        // Write color for this rule to both texture rows, as the output state is already factored in
-        for (let state = 0; state < height; state++) {
-            const dataIndex = (state * width + ruleIndex) * 4;
+            const dataIndex = (outputState * width + ruleIndex) * 4;
             data[dataIndex] = rgb[0];
             data[dataIndex + 1] = rgb[1];
             data[dataIndex + 2] = rgb[2];

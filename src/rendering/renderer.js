@@ -82,8 +82,7 @@ export function initRenderer(canvasElement, appContext) {
     const colorSettings = appContext.colorController.getSettings();
     const symmetryData = appContext.worldManager.getSymmetryData();
     // Get the initial ruleset array to generate the first LUT
-    const initialRuleset = appContext.worldManager.getCurrentRulesetArray();
-    const lutData = generateColorLUT(colorSettings, symmetryData, initialRuleset);
+    const lutData = generateColorLUT(colorSettings, symmetryData);
     hexLUTTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
@@ -124,16 +123,7 @@ export function initRenderer(canvasElement, appContext) {
     setupFBOs();
     
     EventBus.subscribe(EVENTS.COLOR_SETTINGS_CHANGED, (settings) => {
-        // Pass the most current ruleset when updating
-        const currentRuleset = appContext.worldManager.getCurrentRulesetArray();
-        updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData(), currentRuleset);
-    });
-    
-    // Also update when the ruleset itself changes, as this affects the output state
-    EventBus.subscribe(EVENTS.RULESET_CHANGED, () => {
-        const settings = appContext.colorController.getSettings();
-        const currentRuleset = appContext.worldManager.getCurrentRulesetArray();
-        updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData(), currentRuleset);
+        updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData());
     });
     
     requestAnimationFrame(() => resizeRenderer());
