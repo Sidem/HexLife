@@ -66,14 +66,7 @@ export class KeyboardShortcutManager {
                 category: 'Global Controls',
                 handler: () => this._handleNumericSelect(i + 1)
             })),
-            ...Array.from({ length: 9 }, (_, i) => ({
-                key: `${i + 1}`,
-                shiftKey: true,
-                description: `Toggle World ${i + 1} Enabled State`,
-                category: 'Global Controls',
-                handler: () => this._handleNumericToggle(i + 1)
-            }))
-        ];
+            ];
     }
 
     /**
@@ -147,20 +140,6 @@ export class KeyboardShortcutManager {
         const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; 
         const worldIndex = keyToWorldIndex[numKey - 1];
         EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
-    }
-
-    /**
-     * Auxiliary function to toggle a world's enabled state (Shift + 1-9).
-     * @param {number} numKey The number key pressed (1-9).
-     * @private
-     */
-    _handleNumericToggle(numKey) {
-        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; 
-        const worldIndex = keyToWorldIndex[numKey - 1];
-        const currentSettings = this.worldManager.getWorldSettingsForUI();
-        if (currentSettings[worldIndex]) {
-            EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_ENABLED, { worldIndex, isEnabled: !currentSettings[worldIndex].enabled });
-        }
     }
 
 
