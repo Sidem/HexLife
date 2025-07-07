@@ -121,6 +121,7 @@ export class RulesetActionsComponent extends BaseComponent {
             <div class="form-group" id="ruleset-actions-mutate-rate-mount"></div>
             <div class="form-group" id="ruleset-actions-mutate-mode-mount"></div>
             <div class="form-group" id="ruleset-actions-mutate-scope-mount"></div>
+            <div class="form-group" id="ruleset-actions-ensure-mutation-mount"></div>
             <div class="form-group-buttons">
                 <button class="button" data-action="mutate">Mutate</button>
                 <button class="button" data-action="clone">Clone</button>
@@ -150,6 +151,14 @@ export class RulesetActionsComponent extends BaseComponent {
             initialValue: this.appContext.rulesetActionController.getMutateScope(),
             items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
+        });
+
+        new SwitchComponent(pane.querySelector(`#ruleset-actions-ensure-mutation-mount`), {
+            type: 'checkbox',
+            name: `ruleset-actions-ensure-mutation`,
+            initialValue: this.appContext.rulesetActionController.getEnsureMutation(),
+            items: [{ value: 'ensure', text: 'Ensure at least one mutation' }],
+            onChange: this.appContext.rulesetActionController.setEnsureMutation
         });
     }
 

@@ -209,7 +209,7 @@ export class WorldManager {
             this._mutateRulesetForScope(data.scope, data.mutationRate, data.mode);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLONE_AND_MUTATE, (data) => {
-            this._cloneAndMutateOthers(data.mutationRate, data.mode);
+            this._cloneAndMutateOthers(data.mutationRate, data.mode, data.ensureMutation);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLONE_RULESET, () => {
             this._cloneRuleset();
@@ -521,7 +521,7 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     };
 
-    _cloneAndMutateOthers = (mutationRate, mutationMode = 'single') => {
+    _cloneAndMutateOthers = (mutationRate, mutationMode = 'single', ensureMutation = false) => {
         const selectedProxy = this.worlds[this.selectedWorldIndex];
         if (!selectedProxy) {
             console.error("Cannot clone/mutate: selected world proxy is not available.");
@@ -539,7 +539,22 @@ export class WorldManager {
         this.worlds.forEach((proxy, idx) => {
             let newHex = sourceRulesetHex;
             if (idx !== this.selectedWorldIndex) {
-                newHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
+                let attempts = 0;
+                const maxAttempts = 10; // prevent infinite loop
+                do {
+                    newHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
+                    attempts++;
+                } while (ensureMutation && newHex === sourceRulesetHex && attempts < maxAttempts);
+
+                if (ensureMutation && newHex === sourceRulesetHex && attempts >= maxAttempts) {
+                    console.warn(`Could not generate a mutation for ${sourceRulesetHex} after ${maxAttempts} attempts. Forcing one.`);
+                    // Force a single bit flip if still no mutation
+                    const rules = hexToRuleset(newHex);
+                    const randomIndex = Math.floor(Math.random() * 128);
+                    rules[randomIndex] = 1 - rules[randomIndex];
+                    newHex = rulesetToHex(rules);
+                }
+                
                 if (newHex !== "Error") {
                     const newRulesetBuffer = hexToRuleset(newHex).buffer.slice(0);
                     proxy.setRuleset(newRulesetBuffer);

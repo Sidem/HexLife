@@ -117,7 +117,7 @@ export const EVENTS = {
     COMMAND_SET_RULESET: 'command:setRuleset', 
     /** @param {{mutationRate: number, scope: 'all'|'selected', mode: 'single'|'r_sym'|'n_count'}} data - Parameters for mutating a ruleset. */
     COMMAND_MUTATE_RULESET: 'command:mutateRuleset',
-    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count'}} data - Parameters for cloning and mutating. */
+    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count', ensureMutation: boolean}} data - Parameters for cloning and mutating. */
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
     /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
     COMMAND_CLONE_RULESET: 'command:cloneRuleset',

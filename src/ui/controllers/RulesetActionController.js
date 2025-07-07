@@ -28,7 +28,8 @@ export class RulesetActionController {
         EventBus.subscribe(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, () => {
             EventBus.dispatch(EVENTS.COMMAND_CLONE_AND_MUTATE, {
                 mutationRate: this.getMutateRate() / 100.0,
-                mode: this.getMutateMode()
+                mode: this.getMutateMode(),
+                ensureMutation: this.getEnsureMutation()
             });
         });
     }
@@ -41,6 +42,7 @@ export class RulesetActionController {
     getMutateRate = () => PersistenceService.loadUISetting('mutationRate', 1);
     getMutateMode = () => PersistenceService.loadUISetting('mutateMode', 'single');
     getMutateScope = () => PersistenceService.loadUISetting('mutateScope', 'selected');
+    getEnsureMutation = () => PersistenceService.loadUISetting('ensureMutation', true);
 
     getGenerationConfig() {
         return [
@@ -119,4 +121,5 @@ export class RulesetActionController {
     setMutateRate = (rate) => PersistenceService.saveUISetting('mutationRate', rate);
     setMutateMode = (mode) => PersistenceService.saveUISetting('mutateMode', mode);
     setMutateScope = (scope) => PersistenceService.saveUISetting('mutateScope', scope);
+    setEnsureMutation = (shouldEnsure) => PersistenceService.saveUISetting('ensureMutation', shouldEnsure);
 } 

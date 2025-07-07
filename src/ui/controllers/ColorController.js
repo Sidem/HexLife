@@ -99,7 +99,7 @@ export class ColorController {
         if (gradientColors.length === 1) {
             const groupKeys = orderedSwatchKeys.map(key => {
                 const parts = key.split('-');
-                const stateType = parts.pop();
+                parts.pop(); // remove stateType
                 // The remaining parts form the groupKey, including the mode prefix.
                 // We only need the part *after* the mode prefix for the data key.
                 return parts.slice(1).join('-'); // e.g., from [symmetry, 0, 1] -> "0-1"
