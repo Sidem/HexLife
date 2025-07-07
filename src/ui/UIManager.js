@@ -1,6 +1,7 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { TopInfoBar } from './TopInfoBar.js';
 import { KeyboardShortcutManager } from './KeyboardShortcutManager.js';
+import { KeyboardShortcutsComponent } from './components/KeyboardShortcutsComponent.js';
 import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import { MoreView } from './views/MoreView.js';
@@ -65,6 +66,11 @@ export class UIManager {
         this.appContext.rulesetDisplayFactory = this.rulesetDisplayFactory;
         
         this.actionsPopover = new ActionsPopover(document.getElementById('popover-container'));
+
+        const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
+        keyboardManager.init();
+        this.appContext.keyboardShortcutManager = keyboardManager;
+
         this.sharedComponents = {
             controls: new ControlsComponent(appContext),
             rulesetActions: new RulesetActionsComponent(appContext, { libraryData }),
@@ -73,7 +79,8 @@ export class UIManager {
             analysis: new AnalysisComponent(appContext),
             ruleRank: new RuleRankComponent(appContext),
             learning: new LearningComponent(appContext),
-            chromaLab: new ChromaLabComponent(appContext)
+            chromaLab: new ChromaLabComponent(appContext),
+            shortcuts: new KeyboardShortcutsComponent(appContext)
         };
 
         
@@ -85,9 +92,6 @@ export class UIManager {
         topInfoBar.init();
         toolbar.init();
         panelManager.init(); 
-
-        const keyboardManager = new KeyboardShortcutManager(appContext, panelManager, toolbar);
-        keyboardManager.init();
 
         
         const minimapOverlays = new MinimapOverlays(appContext);

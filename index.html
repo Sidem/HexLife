@@ -143,6 +143,7 @@
                 <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">📂</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
                 <button id="colorPanelButton" class="toolbar-button" title="Chroma Lab - Color Customization">🎨</button>
+                <button id="shortcutsButton" class="toolbar-button" title="Keyboard Shortcuts">⌨️</button>
 
                 <button id="helpButton" class="toolbar-button" title="Help">🎓</button>
             </div>
@@ -185,6 +186,12 @@
         <div id="historyPopout" class="popout-panel hidden">
             <h4>Ruleset History<button class="button-help-trigger" data-tour-name="history" title="Help with this feature">[?]</button></h4>
             <div id="historyList" class="history-list-container"></div>
+        </div>
+
+        <div id="shortcutsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="shortcutsPanelTitle" aria-modal="true">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="shortcutsPanelTitle">Keyboard Shortcuts</h3>
+            <div class="panel-content-area"></div>
         </div>
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" aria-modal="true" data-tour-id="ruleset-editor-panel">

@@ -14,6 +14,7 @@ const KEYS = {
     RULESETACTIONS_PANEL_STATE: `${LS_KEY_PREFIX}rulesetActionsPanelState`,
     WORLDSETUP_PANEL_STATE: `${LS_KEY_PREFIX}worldSetupPanelState`,
     CHROMALAB_PANEL_STATE: `${LS_KEY_PREFIX}chromaLabPanelState`,
+    SHORTCUTS_PANEL_STATE: `${LS_KEY_PREFIX}shortcutsPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
     USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,

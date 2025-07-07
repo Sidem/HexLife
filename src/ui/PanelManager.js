@@ -5,6 +5,7 @@ import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
+import { KeyboardShortcutsComponent } from './components/KeyboardShortcutsComponent.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 
@@ -20,7 +21,8 @@ export class PanelManager {
             { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, options: { handleSelector: 'h3' } },
             { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, options: { handleSelector: 'h3' } },
             { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, options: { handleSelector: 'h3' } },
-            { name: 'chromalab', elementId: 'chromaLabPanel', presenter: DraggablePanel, contentType: ChromaLabComponent, options: { handleSelector: 'h3' } }
+            { name: 'chromalab', elementId: 'chromaLabPanel', presenter: DraggablePanel, contentType: ChromaLabComponent, options: { handleSelector: 'h3' } },
+            { name: 'shortcuts', elementId: 'shortcutsPanel', presenter: DraggablePanel, contentType: KeyboardShortcutsComponent, options: { handleSelector: 'h3' } }
         ];
     }
 

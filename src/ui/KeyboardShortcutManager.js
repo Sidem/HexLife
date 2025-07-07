@@ -29,42 +29,59 @@ export class KeyboardShortcutManager {
      * @private
      */
     _registerShortcuts() {
-        
         this.shortcuts = [
-            
-            { key: 'e', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }) },
-            { key: 's', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldSetup' }) },
-            { key: 'a', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
-            { key: 'n', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetActions' }) },
-            { key: 'Escape', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
-            { key: 'p', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
-            { key: 'i', handler: () => EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET) },
-            { key: 'g', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
-            { key: 'o', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },
-            { key: 'm', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
-            { key: 'd', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
-            { key: 'd', shiftKey: true, handler: () => { EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
-            { key: 'r', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES) },
-            { key: 'r', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
-            { key: 'c', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
-            { key: 'c', shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
-            { key: 'z', ctrlKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
-            { key: 'z', ctrlKey: true, shiftKey: true, handler: () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
+            // Panel Toggles
+            { key: 'e', description: 'Toggle Ruleset Editor panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }) },
+            { key: 's', description: 'Toggle World Setup panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }) },
+            { key: 'a', description: 'Toggle Analysis panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
+            { key: 'n', description: 'Toggle Ruleset Actions panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }) },
+            { key: 'Escape', description: 'Close active popout or panel', category: 'Global', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
+            // Simulation Controls
+            { key: 'p', description: 'Play / Pause Simulation', category: 'Global Controls', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             
+            // Ruleset Actions
+            { key: 'i', description: 'Invert the selected world\'s ruleset', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET) },
+            { key: 'g', description: 'Generate new ruleset', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
+            { key: 'o', description: 'Clone selected ruleset to all others', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
+            { key: 'm', description: 'Clone & Mutate all other worlds', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },
+            { key: 'm', shiftKey: true, description: 'Mutate selected/all worlds', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
+
+            // Reset & Clear
+            { key: 'd', description: 'Reset Densities to default & Reset All', category: 'Reset & Clear', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
+            { key: 'd', shiftKey: true, description: 'Apply Selected Density to All & Reset All', category: 'Reset & Clear', handler: () => { EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
+            { key: 'r', description: 'Reset all enabled worlds', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES) },
+            { key: 'r', shiftKey: true, description: 'Reset the selected world only', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
+            { key: 'c', description: 'Clear all enabled worlds', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
+            { key: 'c', shiftKey: true, description: 'Clear the selected world only', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
+
+            // History
+            { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
+            { key: 'z', ctrlKey: true, shiftKey: true, description: 'Redo ruleset change', category: 'History', handler: () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
+
+            // World Selection
             ...Array.from({ length: 9 }, (_, i) => ({
                 key: `${i + 1}`,
+                description: `Select World ${i + 1}`,
+                category: 'Global Controls',
                 handler: () => this._handleNumericSelect(i + 1)
             })),
-            
-            
             ...Array.from({ length: 9 }, (_, i) => ({
                 key: `${i + 1}`,
                 shiftKey: true,
+                description: `Toggle World ${i + 1} Enabled State`,
+                category: 'Global Controls',
                 handler: () => this._handleNumericToggle(i + 1)
             }))
         ];
+    }
+
+    /**
+     * Returns the registered shortcuts.
+     * @returns {Array<object>} A list of shortcut objects.
+     */
+    getShortcuts() {
+        return this.shortcuts;
     }
     
     /**

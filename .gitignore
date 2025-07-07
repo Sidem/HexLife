@@ -25,3 +25,5 @@ pnpm-debug.log*
 
 # Log files
 *.log
+
+GEMINI.md
