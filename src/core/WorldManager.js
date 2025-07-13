@@ -272,9 +272,10 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
+            const seed = Date.now();
             this.worlds.forEach((proxy, idx) => {
                 if (this.worldSettings[idx]) {
-                    proxy.resetWorld(this.worldSettings[idx].initialDensity);
+                    proxy.resetWorld(this.worldSettings[idx].initialDensity, seed);
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
                 }
             });
@@ -536,6 +537,8 @@ export class WorldManager {
              return;
         }
 
+        const generatedHexes = new Set([sourceRulesetHex]);
+
         this.worlds.forEach((proxy, idx) => {
             let newHex = sourceRulesetHex;
             if (idx !== this.selectedWorldIndex) {
@@ -544,18 +547,25 @@ export class WorldManager {
                 do {
                     newHex = this._generateMutatedHex(sourceRulesetHex, mutationRate, mutationMode);
                     attempts++;
-                } while (ensureMutation && newHex === sourceRulesetHex && attempts < maxAttempts);
+                } while (ensureMutation && generatedHexes.has(newHex) && attempts < maxAttempts);
 
-                if (ensureMutation && newHex === sourceRulesetHex && attempts >= maxAttempts) {
-                    console.warn(`Could not generate a mutation for ${sourceRulesetHex} after ${maxAttempts} attempts. Forcing one.`);
+                if (ensureMutation && generatedHexes.has(newHex) && attempts >= maxAttempts) {
+                    console.warn(`Could not generate a unique mutation for ${sourceRulesetHex} after ${maxAttempts} attempts. Forcing one.`);
                     // Force a single bit flip if still no mutation
                     const rules = hexToRuleset(newHex);
-                    const randomIndex = Math.floor(Math.random() * 128);
-                    rules[randomIndex] = 1 - rules[randomIndex];
-                    newHex = rulesetToHex(rules);
+                    let forcedHex;
+                    let forceAttempts = 0;
+                    do {
+                        const randomIndex = Math.floor(Math.random() * 128);
+                        rules[randomIndex] = 1 - rules[randomIndex];
+                        forcedHex = rulesetToHex(rules);
+                        forceAttempts++;
+                    } while (generatedHexes.has(forcedHex) && forceAttempts < 128);
+                    newHex = forcedHex;
                 }
                 
                 if (newHex !== "Error") {
+                    generatedHexes.add(newHex);
                     const newRulesetBuffer = hexToRuleset(newHex).buffer.slice(0);
                     proxy.setRuleset(newRulesetBuffer);
                 }
@@ -566,12 +576,8 @@ export class WorldManager {
             this.worldSettings[idx].rulesetHex = newHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialDensity);
+                proxy.resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
                 
-                if (!this.worldSettings[idx].enabled) {
-                    this.worldSettings[idx].enabled = true;
-                    proxy.setEnabled(true);
-                }
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
                 }
@@ -608,12 +614,8 @@ export class WorldManager {
             this.worldSettings[idx].rulesetHex = sourceRulesetHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialDensity);
+                proxy.resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
                 
-                if (!this.worldSettings[idx].enabled) {
-                    this.worldSettings[idx].enabled = true;
-                    proxy.setEnabled(true);
-                }
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
                 }
@@ -650,7 +652,7 @@ export class WorldManager {
                 if (conditionalResetScope !== 'none') {
                     const resetTargetIndices = this._getAffectedWorldIndices(conditionalResetScope);
                     if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
-                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
+                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
                     }
                 }
             }

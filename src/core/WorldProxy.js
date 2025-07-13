@@ -198,7 +198,7 @@ export class WorldProxy {
     setRuleset(rulesetArrayBuffer) {
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
     }
-    resetWorld(optionsOrDensity) {
+    resetWorld(optionsOrDensity, seed) {
         
         this.tpsAggregator.ticksCounted = 0;
         this.tpsAggregator.startTime = performance.now();
@@ -214,12 +214,14 @@ export class WorldProxy {
         if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && Object.prototype.hasOwnProperty.call(optionsOrDensity, 'density')) {
             commandPayload = {
                 density: optionsOrDensity.density,
-                isClearOperation: optionsOrDensity.isClearOperation || false
+                isClearOperation: optionsOrDensity.isClearOperation || false,
+                seed: seed
             };
         } else {
             commandPayload = {
                 density: optionsOrDensity,
-                isClearOperation: false
+                isClearOperation: false,
+                seed: seed
             };
         }
         this.sendCommand('RESET_WORLD', commandPayload);

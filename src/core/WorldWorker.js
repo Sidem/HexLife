@@ -42,6 +42,14 @@ let detectedCycle = [];
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
 
+function mulberry32(a) {
+    return function() {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
 
 function calculateChecksum(arr) {
     if (!arr || !wasm_world) return 0;
@@ -158,11 +166,14 @@ function processCommandQueue() {
                 hexBlockEntropyHistory = [];
                 const density = command.data.density;
                 const isClearOp = command.data.isClearOperation || false;
+                const seed = command.data.seed;
+
                 if (ruleUsageCounters) ruleUsageCounters.fill(0);
                 if (jsStateArray) {
                     if (isClearOp) {
                         jsStateArray.fill(density);
                     } else {
+                        const rng = seed ? mulberry32(seed) : Math.random;
                         if (density === 0 || density === 1) {
                             jsStateArray.fill(density);
                             const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + (workerConfig.GRID_COLS / 2));
@@ -171,7 +182,7 @@ function processCommandQueue() {
                             }
                         } else {
                             for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
-                                jsStateArray[i] = Math.random() < density ? 1 : 0;
+                                jsStateArray[i] = rng() < density ? 1 : 0;
                             }
                         }
                     }
@@ -476,6 +487,8 @@ self.onmessage = async function(event) {
 
             if (isEnabled) {
                 const density = command.data.initialDensity;
+                const seed = command.data.seed;
+                const rng = seed ? mulberry32(seed) : Math.random;
                 if(density % 1 === 0) {
                     jsStateArray.fill(density);
                     const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2); 
@@ -484,7 +497,7 @@ self.onmessage = async function(event) {
                     }
                 } else {
                     for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
-                        jsStateArray[i] = Math.random() < density ? 1 : 0;
+                        jsStateArray[i] = rng() < density ? 1 : 0;
                     }
                 }
                 jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
