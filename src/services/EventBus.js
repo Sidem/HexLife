@@ -157,18 +157,18 @@ export const EVENTS = {
     COMMAND_SET_HOVER_STATE: 'command:setHoverState', 
     /** @param {{worldIndex: number}} data - The world index for which to clear the hover state. */
     COMMAND_CLEAR_HOVER_STATE: 'command:clearHoverState', 
-    /** @param {{worldIndex: number, density: number}} data - The new initial density for a specific world. */
-    COMMAND_SET_WORLD_INITIAL_DENSITY: 'command:setWorldInitialDensity', 
+    /** @param {{worldIndex: number, initialState: object}} data - The new initial state config for a specific world. */
+    COMMAND_SET_WORLD_INITIAL_STATE: 'command:setWorldInitialState',
     /** @param {{worldIndex: number, isEnabled: boolean}} data - The new enabled state for a specific world. */
     COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled', 
     /** @param {{enabled: boolean, rate: number}} data - New parameters for entropy sampling. */
     COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
     /** @param {number} newIndex - The index of the world to select. */
     COMMAND_SELECT_WORLD: 'command:selectWorld',
-    /** @event Emitted with no payload to apply the selected world's density to all other worlds. */
-    COMMAND_APPLY_SELECTED_DENSITY_TO_ALL: 'command:applySelectedDensityToAll',
-    /** @event Emitted with no payload to reset all world densities to their default values. */
-    COMMAND_RESET_DENSITIES_TO_DEFAULT: 'command:resetDensitiesToDefault',
+    /** @event Emitted with no payload to apply the selected world's initial state to all other worlds. */
+    COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL: 'command:applySelectedInitialStateToAll',
+    /** @event Emitted with no payload to reset all world initial states to their default values. */
+    COMMAND_RESET_INITIAL_STATES_TO_DEFAULT: 'command:resetInitialStatesToDefault',
     /** @param {{panelName: string, shouldShow: boolean}} data - Command to show or hide a specific popout panel. */
     COMMAND_SHOW_POPOUT: 'command:showPopout',
     /** @param {{cells: Array<[number, number]>}} data - The pattern data (relative cell coordinates) for placing mode. */
@@ -225,6 +225,10 @@ export const EVENTS = {
     COMMAND_UPDATE_FAB_UI: 'command:updateFabUI',
     /** @event Emitted with no payload when the ruleset visualization type (e.g., binary, color) changes. */
     RULESET_VISUALIZATION_CHANGED: 'ui:rulesetVisualizationChanged',
+    /** @param {boolean} isDeterministic - The desired state for deterministic resets. */
+    COMMAND_SET_DETERMINISTIC_RESET: 'command:setDeterministicReset',
+    /** @param {{worldIndex: number, config: object}} data - Command to show the initial state config modal. */
+    COMMAND_SHOW_INITIAL_STATE_MODAL: 'command:showInitialStateModal',
     /** @param {{tourName: string}} data - The name of the tour that was completed. */
     ONBOARDING_TOUR_ENDED: 'onboarding:tourEnded',
     /** @param {{view: object, viewType: string, viewName: string, contentComponent: object|null}} data - The view component that was shown. */

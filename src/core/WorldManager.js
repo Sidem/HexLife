@@ -14,6 +14,7 @@ export class WorldManager {
         this.brushController = null;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
+        this.deterministic = PersistenceService.loadUISetting('deterministic', true); // Add this
         this._hoverAffectedIndicesSet = new Set();
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
@@ -90,7 +91,7 @@ export class WorldManager {
 
             const proxy = new WorldProxy(i, {
                 config: { GRID_ROWS: Config.GRID_ROWS, GRID_COLS: Config.GRID_COLS, NUM_CELLS: Config.NUM_CELLS },
-                density: settings.initialDensity,
+                initialState: settings.initialState, // Modify this
                 enabled: settings.enabled,
                 rulesetArray: rulesetArray,
                 rulesetHex: settings.rulesetHex,
@@ -195,6 +196,12 @@ export class WorldManager {
             }));
             EventBus.dispatch(EVENTS.ENTROPY_SAMPLING_CHANGED, { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate });
         });
+        
+        // --- ADD THIS ---
+        EventBus.subscribe(EVENTS.COMMAND_SET_DETERMINISTIC_RESET, (isDeterministic) => {
+            this.deterministic = isDeterministic;
+            PersistenceService.saveUISetting('deterministic', isDeterministic);
+        });
     }
 
     #setupRulesetCommandHandlers() {
@@ -269,16 +276,19 @@ export class WorldManager {
     }
     
     #setupWorldStateCommandHandlers() {
-        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, this._applySelectedDensityToAll);
-        EventBus.subscribe(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, this._resetDensitiesToDefault);
+        EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, this._applySelectedInitialStateToAll);
+        EventBus.subscribe(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, this._resetStatesToDefault);
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
-            const seed = Date.now();
+            // --- MODIFICATION START ---
+            const baseSeed = Date.now();
             this.worlds.forEach((proxy, idx) => {
                 if (this.worldSettings[idx]) {
-                    proxy.resetWorld(this.worldSettings[idx].initialDensity, seed);
+                    const seed = this.deterministic ? baseSeed : baseSeed + idx;
+                    proxy.resetWorld(this.worldSettings[idx].initialState, seed);
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
                 }
             });
+            // --- MODIFICATION END ---
             EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
         });
         EventBus.subscribe(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, (data) => {
@@ -295,7 +305,8 @@ export class WorldManager {
                     this.worldSettings[idx].rulesetHex = primaryRulesetHex;
                 }
                 if (this.worldSettings[idx]) {
-                    this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
+                    // --- MODIFICATION ---
+                    this.worlds[idx].resetWorld(this.worldSettings[idx].initialState);
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) this.worlds[idx].startSimulation();
                 }
             });
@@ -327,9 +338,9 @@ export class WorldManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
         EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
-        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, (data) => {
+        EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, (data) => {
             if (this.worldSettings[data.worldIndex]) {
-                this.worldSettings[data.worldIndex].initialDensity = data.density;
+                this.worldSettings[data.worldIndex].initialState = data.initialState;
                 PersistenceService.saveWorldSettings(this.worldSettings);
                 EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
             }
@@ -372,26 +383,24 @@ export class WorldManager {
         });
     }
 
-    _applySelectedDensityToAll = () => {
-        const selectedDensity = this.worldSettings[this.selectedWorldIndex]?.initialDensity;
-        if (selectedDensity === undefined) {
-            console.error("Could not apply density: selected world's density is not available.");
-            return;
-        }
-
+    _applySelectedInitialStateToAll = () => {
+        const selectedState = this.worldSettings[this.selectedWorldIndex]?.initialState;
+        if (!selectedState) return;
+        const stateCopy = structuredClone(selectedState);
         this.worldSettings.forEach(setting => {
-            setting.initialDensity = selectedDensity;
+            setting.initialState = structuredClone(stateCopy);
         });
-
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    _resetDensitiesToDefault = () => {
+    _resetStatesToDefault = () => {
         this.worldSettings.forEach((setting, idx) => {
-            setting.initialDensity = Config.DEFAULT_INITIAL_DENSITIES[idx] ?? 0.5;
+            setting.initialState = {
+                mode: 'density',
+                params: { density: Config.DEFAULT_INITIAL_DENSITIES[idx] ?? 0.5 }
+            };
         });
-
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
@@ -424,7 +433,7 @@ export class WorldManager {
 
             
             if (shouldReset && this.worldSettings[idx]) {
-                this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity);
+                this.worlds[idx].resetWorld(this.worldSettings[idx].initialState);
             }
         });
 
@@ -576,7 +585,7 @@ export class WorldManager {
             this.worldSettings[idx].rulesetHex = newHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
+                proxy.resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
                 
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
@@ -614,7 +623,7 @@ export class WorldManager {
             this.worldSettings[idx].rulesetHex = sourceRulesetHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
+                proxy.resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
                 
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
@@ -652,7 +661,7 @@ export class WorldManager {
                 if (conditionalResetScope !== 'none') {
                     const resetTargetIndices = this._getAffectedWorldIndices(conditionalResetScope);
                     if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
-                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialDensity, Date.now() + idx);
+                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
                     }
                 }
             }
@@ -715,7 +724,7 @@ export class WorldManager {
         return proxy ? proxy.getLatestStats() : { tick: 0, ratio: 0, entropy: 0, isEnabled: false, rulesetHex: "0".repeat(32), tps: 0, ruleUsage: new Uint32Array(128) };
     }
     getWorldSettingsForUI = () => this.worldSettings.map(ws => ({
-        initialDensity: ws.initialDensity,
+        initialState: ws.initialState,
         enabled: ws.enabled,
         rulesetHex: ws.rulesetHex
     }));
@@ -834,7 +843,10 @@ export class WorldManager {
             this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); 
             this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
-            this.worldSettings[worldIndex].initialDensity = newDensity;
+            this.worldSettings[worldIndex].initialState = {
+                mode: 'density',
+                params: { density: newDensity }
+            };
             this.worldSettings[worldIndex].enabled = true;
         }
 

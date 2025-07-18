@@ -59,9 +59,9 @@ export class WorldProxy {
                 initialStateBuffer: initialStateBuffer,
                 initialRulesetBuffer: initialRulesetBuffer,
                 initialHoverStateBuffer: initialHoverStateBuffer,
-                initialDensity: initialSettings.density,
+                initialState: initialSettings.initialState, // Add this
                 initialIsEnabled: initialSettings.enabled,
-                initialSpeed: initialSettings.speed,
+                speed: initialSettings.speed,
                 initialEntropySamplingEnabled: initialSettings.initialEntropySamplingEnabled,
                 initialEntropySampleRate: initialSettings.initialEntropySampleRate,
             }
@@ -198,7 +198,7 @@ export class WorldProxy {
     setRuleset(rulesetArrayBuffer) {
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
     }
-    resetWorld(optionsOrDensity, seed) {
+    resetWorld(initialState, seed) {
         
         this.tpsAggregator.ticksCounted = 0;
         this.tpsAggregator.startTime = performance.now();
@@ -210,21 +210,7 @@ export class WorldProxy {
         this.latestStats.hexBlockEntropyHistory = [];
         this.latestStats.ruleUsage.fill(0);
 
-        let commandPayload;
-        if (typeof optionsOrDensity === 'object' && optionsOrDensity !== null && Object.prototype.hasOwnProperty.call(optionsOrDensity, 'density')) {
-            commandPayload = {
-                density: optionsOrDensity.density,
-                isClearOperation: optionsOrDensity.isClearOperation || false,
-                seed: seed
-            };
-        } else {
-            commandPayload = {
-                density: optionsOrDensity,
-                isClearOperation: false,
-                seed: seed
-            };
-        }
-        this.sendCommand('RESET_WORLD', commandPayload);
+        this.sendCommand('RESET_WORLD', { initialState, seed });
     }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });

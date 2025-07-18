@@ -37,20 +37,23 @@ export class WorldSetupComponent extends BaseComponent {
 
     render() {
         this.element.innerHTML = `
-            <p class="editor-text info-text">Configure initial density and enable/disable individual worlds. Click "Use Main Ruleset" to apply the selected world's ruleset and reset.</p>
+            <div class="panel-header-controls">
+                <p class="editor-text info-text">Configure the initial state for each world.</p>
+                <div id="world-setup-deterministic-switch-mount"></div>
+            </div>
             <div id="world-setup-config-grid" class="world-config-grid"></div>
             <div id="world-setup-panel-actions" class="panel-actions">
-                <button class="button" data-action="apply-density-all">Apply Selected Density to All</button>
-                <button class="button" data-action="reset-densities">Reset Densities to Default</button>
-                <button class="button" data-action="reset-all-worlds">Apply & Reset All Enabled Worlds</button>
+                <button class="button" data-action="apply-state-all">Apply Initial State to All</button>
+                <button class="button" data-action="reset-states">Reset States to Default</button>
+                <button class="button" data-action="reset-all-worlds">Apply & Reset All Worlds</button>
             </div>
         `;
         
         
         this.uiElements.worldSetupGrid = this.element.querySelector('.world-config-grid');
         this.uiElements.applySetupButton = this.element.querySelector('[data-action="reset-all-worlds"]');
-        this.uiElements.applySelectedDensityButton = this.element.querySelector('[data-action="apply-density-all"]');
-        this.uiElements.resetDensitiesButton = this.element.querySelector('[data-action="reset-densities"]');
+        this.uiElements.applySelectedDensityButton = this.element.querySelector('[data-action="apply-state-all"]');
+        this.uiElements.resetDensitiesButton = this.element.querySelector('[data-action="reset-states"]');
     }
 
     _setupInternalListeners() {
@@ -58,10 +61,19 @@ export class WorldSetupComponent extends BaseComponent {
             const action = event.target.dataset.action;
             if (action === 'reset-all-worlds') {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
-            } else if (action === 'apply-density-all') {
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
-            } else if (action === 'reset-densities') {
-                EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
+            } else if (action === 'apply-state-all') {
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL);
+            } else if (action === 'reset-states') {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT);
+            } else if (action === 'edit-state') {
+                const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
+                const worldSettings = this.worldManager.worldSettings[worldIndex];
+                if (worldSettings) {
+                     EventBus.dispatch(EVENTS.COMMAND_SHOW_INITIAL_STATE_MODAL, {
+                         worldIndex: worldIndex,
+                         config: worldSettings.initialState
+                     });
+                }
             } else if (event.target.classList.contains('set-ruleset-button')) {
                 const worldIndex = parseInt(event.target.dataset.worldIndex, 10);
                 if (!isNaN(worldIndex)) {
@@ -76,31 +88,33 @@ export class WorldSetupComponent extends BaseComponent {
         grid.innerHTML = ''; 
         this.worldControlCache = [];
 
+        const deterministicSwitchMount = this.element.querySelector('#world-setup-deterministic-switch-mount');
+        new SwitchComponent(deterministicSwitchMount, {
+            type: 'checkbox', name: 'deterministic-reset-switch',
+            initialValue: this.worldManager.deterministic,
+            items: [{ value: 'deterministic', text: 'Deterministic Reset' }],
+            onChange: (isChecked) => EventBus.dispatch(EVENTS.COMMAND_SET_DETERMINISTIC_RESET, isChecked)
+        });
+
         const fragment = document.createDocumentFragment();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const cell = document.createElement('div');
             cell.className = 'world-config-cell';
 
-            cell.innerHTML =
-                `<div class="world-label">World ${i}</div>` +
-                `<div class="ruleset-viz-container"></div>` +
-                `<div class="setting-control density-control"><div id="world-setup-density-slider-mount-${i}"></div></div>` +
-                `<div class="setting-control enable-control"><div id="world-setup-enable-switch-mount-${i}"></div></div>` +
-                `<button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>`;
+            cell.innerHTML = `
+                <div class="world-label">World ${i}</div>
+                <div class="ruleset-viz-container"></div>
+                <div class="setting-control state-control">
+                    <span class="state-mode-label">Mode: <b class="state-mode-value">Density</b></span>
+                    <button class="button" data-action="edit-state" data-world-index="${i}">Edit...</button>
+                </div>
+                <div class="setting-control enable-control"><div id="world-setup-enable-switch-mount-${i}"></div></div>
+                <button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>
+            `;
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');
-            const sliderMount = cell.querySelector(`#world-setup-density-slider-mount-${i}`);
             const enableSwitchMount = cell.querySelector(`#world-setup-enable-switch-mount-${i}`);
-
-            const densitySlider = new SliderComponent(sliderMount, {
-                id: `world-setup-density-slider-${i}`, 
-                label: 'Density:', min: 0, max: 1, step: 0.001,
-                value: 0.5, unit: '', showValue: true,
-                onChange: (newDensity) => {
-                    EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex: i, density: newDensity });
-                }
-            });
 
             const enableSwitch = new SwitchComponent(enableSwitchMount, {
                 type: 'checkbox',
@@ -118,7 +132,7 @@ export class WorldSetupComponent extends BaseComponent {
             });
             this.worldControlCache[i] = {
                 vizContainer,
-                densitySlider,
+                stateModeValue: cell.querySelector('.state-mode-value'),
                 enableSwitch,
                 enableSwitchLabel: enableSwitchMount.querySelector('label')
             };
@@ -138,7 +152,7 @@ export class WorldSetupComponent extends BaseComponent {
         const currentWorldSettings = this.worldManager.getWorldSettingsForUI();
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const settings = currentWorldSettings[i] || { initialDensity: 0.5, enabled: true, rulesetHex: "0".repeat(32) };
+            const settings = currentWorldSettings[i] || { initialState: { mode: 'density' }, enabled: true, rulesetHex: "0".repeat(32) };
             const cache = this.worldControlCache[i];
             if (!cache) continue;
 
@@ -151,7 +165,9 @@ export class WorldSetupComponent extends BaseComponent {
             cache.vizContainer.innerHTML = ''; 
             cache.vizContainer.appendChild(svg);
 
-            cache.densitySlider.setValue(settings.initialDensity, false); 
+            const mode = settings.initialState?.mode || 'density';
+            cache.stateModeValue.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+            
             cache.enableSwitch.setValue(settings.enabled);
             if (cache.enableSwitchLabel) {
                 cache.enableSwitchLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';

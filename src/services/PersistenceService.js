@@ -74,12 +74,29 @@ export function saveRuleset(rulesetHex) {
 export function loadWorldSettings() {
     const loaded = _getItem(KEYS.WORLD_SETTINGS);
     if (loaded && Array.isArray(loaded) && loaded.length === Config.NUM_WORLDS) {
+        // --- MODIFICATION START ---
         const isValid = loaded.every(s =>
-            typeof s.initialDensity === 'number' &&
+            (typeof s.initialDensity === 'number' || typeof s.initialState === 'object') &&
             typeof s.enabled === 'boolean' &&
             (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex))
         );
-        if (isValid) return loaded;
+
+        if (isValid) {
+            return loaded.map(s => {
+                if (s.initialState) {
+                    return s; // Already in new format
+                }
+                // Migration for old format
+                return {
+                    ...s,
+                    initialState: {
+                        mode: 'density',
+                        params: { density: s.initialDensity }
+                    }
+                };
+            });
+        }
+        // --- MODIFICATION END ---
         console.warn("Loaded world settings format error or missing rulesetHex, reverting to defaults.");
     }
 
@@ -87,7 +104,12 @@ export function loadWorldSettings() {
     const defaultRuleset = loadRuleset() || "0".repeat(32);
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         defaultSettings.push({
-            initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
+            // --- MODIFICATION START ---
+            initialState: {
+                mode: 'density',
+                params: { density: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5 }
+            },
+            // --- MODIFICATION END ---
             enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
             rulesetHex: defaultRuleset
         });
@@ -97,16 +119,18 @@ export function loadWorldSettings() {
 
 export function saveWorldSettings(worldSettingsArray) {
     if (Array.isArray(worldSettingsArray) && worldSettingsArray.length === Config.NUM_WORLDS) {
+        // --- MODIFICATION START ---
         const isValid = worldSettingsArray.every(s =>
-            typeof s.initialDensity === 'number' &&
+            typeof s.initialState === 'object' &&
             typeof s.enabled === 'boolean' &&
             (typeof s.rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(s.rulesetHex))
         );
         if (isValid) {
             _setItem(KEYS.WORLD_SETTINGS, worldSettingsArray);
         } else {
-            console.error("Attempted to save invalid world settings array format (incl. rulesetHex).");
+            console.error("Attempted to save invalid world settings array format (incl. initialState).");
         }
+        // --- MODIFICATION END ---
     } else {
         console.error("Attempted to save world settings array with incorrect length or type.");
     }

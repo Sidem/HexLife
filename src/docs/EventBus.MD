@@ -25,10 +25,15 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `SELECTED_WORLD_CHANGED`| `newIndex: number` | Dispatched when the user selects a different world as the main view. |
 | `WORLD_STATS_UPDATED` | `{ worldIndex, tick, ratio, ... }` | Dispatched periodically with the latest stats for a specific world. |
 | `ALL_WORLDS_RESET` | `(none)` | Dispatched when an action causes all worlds to be reset simultaneously. |
-| `WORLD_SETTINGS_CHANGED`| `settings: Array<{...}>` | Dispatched when a world's persistent settings (density, etc.) change. |
+| `WORLD_SETTINGS_CHANGED`| `settings: Array<{initialState, enabled, rulesetHex}>` | Dispatched when a world's persistent settings (initial state, etc.) change. |
 | `ENTROPY_SAMPLING_CHANGED`| `{ enabled, rate }` | Dispatched when entropy sampling is enabled/disabled or the rate changes. |
 | `PERFORMANCE_METRICS_UPDATED`| `{ fps, tps, targetTps }` | Dispatched periodically with rendering and simulation performance data. |
 | `HISTORY_CHANGED` | `{ worldIndex: number }` | Dispatched when a world's ruleset history (undo/redo stack) is modified. |
+| `COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL`| `(none)` | Command to apply the selected world's initial state to all other worlds. |
+| `COMMAND_RESET_INITIAL_STATES_TO_DEFAULT`| `(none)` | Command to reset all world initial states to their default values. |
+| `COMMAND_SET_WORLD_INITIAL_STATE` | `{ worldIndex: number, initialState: object }` | Command to set the initial state config for a specific world. |
+| `COMMAND_SET_DETERMINISTIC_RESET` | `isDeterministic: boolean` | Command to set the state for deterministic resets. |
+| `COMMAND_SHOW_INITIAL_STATE_MODAL` | `{ worldIndex: number, config: object }` | Command to show the initial state configuration modal. |
 
 -----
 
@@ -60,6 +65,9 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_SAVE_SELECTED_WORLD_STATE` | `(none)` | Command to trigger a file download of the selected world's state. |
 | `COMMAND_LOAD_WORLD_STATE` | `{ worldIndex, loadedData }` | Command to load a world state from a JSON object. |
 | `COMMAND_APPLY_SELECTIVE_BRUSH` | `{ worldIndex, cellIndices }` | Command to toggle the state of a specific set of cells. |
+| `COMMAND_SET_WORLD_ENABLED` | `{ worldIndex, isEnabled: boolean }` | Command to set the new enabled state for a specific world. |
+| `COMMAND_SET_ENTROPY_SAMPLING` | `{ enabled: boolean, rate: number }` | Command to set new parameters for entropy sampling. |
+| `COMMAND_SELECT_WORLD` | `newIndex: number` | Command to select a different world. |
 | `COMMAND_ENTER_PLACING_MODE` | `{ cells: Array<[x, y]> }` | Command to switch the input strategy to place a specific pattern. |
 | `COMMAND_UPDATE_GHOST_PREVIEW` | `{ indices: Set<number> }` | Command to show a ghost preview for pattern placement. |
 | `COMMAND_CLEAR_GHOST_PREVIEW` | `(none)` | Command to clear any active ghost preview. |

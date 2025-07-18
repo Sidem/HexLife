@@ -28,6 +28,7 @@
 @import url('src/ui/components/RulesetActionsComponent.css');
 @import url('src/ui/components/ChromaLabComponent.css');
 @import url('src/ui/components/SaveRulesetModal.css');
+@import url('src/ui/components/InitialStateConfigModal.css');
 @import url('src/ui/components/ActionsPopover.css');
 
 /* 5. Feature-Specific Panel Components */

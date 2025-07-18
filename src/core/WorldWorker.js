@@ -2,6 +2,8 @@ import * as Config from './config.js';
 import init, { World } from './wasm-engine/hexlife_wasm.js';
 import { rulesetToHex, findHexagonsInNeighborhood } from '../utils/utils.js';
 import { Throttler } from '../utils/throttler.js';
+import { DensityStrategy } from './initialStateStrategies/DensityStrategy.js';
+import { ClusterStrategy } from './initialStateStrategies/ClusterStrategy.js';
 
 let _wasm_module;
 let wasm_world;
@@ -41,6 +43,11 @@ let isDetectingCycle = false;
 let detectedCycle = []; 
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
+
+const strategies = {
+    density: new DensityStrategy(),
+    clusters: new ClusterStrategy()
+};
 
 function mulberry32(a) {
     return function() {
@@ -164,26 +171,22 @@ function processCommandQueue() {
                 ratioHistory = [];
                 entropyHistory = [];
                 hexBlockEntropyHistory = [];
-                const density = command.data.density;
+                const config = command.data.initialState;
                 const isClearOp = command.data.isClearOperation || false;
                 const seed = command.data.seed;
+                const rng = seed ? mulberry32(seed) : Math.random;
 
                 if (ruleUsageCounters) ruleUsageCounters.fill(0);
                 if (jsStateArray) {
                     if (isClearOp) {
-                        jsStateArray.fill(density);
+                        jsStateArray.fill(config.params.density);
                     } else {
-                        const rng = seed ? mulberry32(seed) : Math.random;
-                        if (density === 0 || density === 1) {
-                            jsStateArray.fill(density);
-                            const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2) + (workerConfig.GRID_COLS / 2));
-                            if (centerIdx >= 0 && centerIdx < workerConfig.NUM_CELLS) {
-                                jsStateArray[centerIdx] = (jsStateArray[centerIdx] + 1) % 2;
-                            }
+                        const strategy = strategies[config.mode];
+                        if (strategy) {
+                            strategy.generate(jsStateArray, config.params, rng, workerConfig);
                         } else {
-                            for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
-                                jsStateArray[i] = rng() < density ? 1 : 0;
-                            }
+                            // Fallback to density
+                            strategies.density.generate(jsStateArray, config.params, rng, workerConfig);
                         }
                     }
                 }
@@ -486,19 +489,14 @@ self.onmessage = async function(event) {
             resetCycleState();
 
             if (isEnabled) {
-                const density = command.data.initialDensity;
-                const seed = command.data.seed;
+                const initialState = command.data.initialState;
+                const seed = command.data.seed || Date.now();
                 const rng = seed ? mulberry32(seed) : Math.random;
-                if(density % 1 === 0) {
-                    jsStateArray.fill(density);
-                    const centerIdx = Math.floor((workerConfig.NUM_CELLS / 2)+workerConfig.GRID_COLS/2); 
-                    if (centerIdx >=0 && centerIdx < workerConfig.NUM_CELLS) { 
-                       jsStateArray[centerIdx] = (jsStateArray[centerIdx]+1) % 2;
-                    }
+                const strategy = strategies[initialState.mode];
+                if (strategy) {
+                    strategy.generate(jsStateArray, initialState.params, rng, workerConfig);
                 } else {
-                    for (let i = 0; i < workerConfig.NUM_CELLS; i++) { 
-                        jsStateArray[i] = rng() < density ? 1 : 0;
-                    }
+                    strategies.density.generate(jsStateArray, initialState.params, rng, workerConfig);
                 }
                 jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
             } else {

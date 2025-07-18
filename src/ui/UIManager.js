@@ -22,6 +22,7 @@ import { ActionsPopover } from './components/ActionsPopover.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
+import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
 
 
 
@@ -37,6 +38,7 @@ export class UIManager {
         this.activeMobileViewName = 'simulate';
         this.managedComponents = [];
         this.sharedComponents = {}; 
+        this.initialStateConfigModal = null; // Add this
         this.saveRulesetModal = null;
         this.actionsPopover = null;
         this.confirmationDialog = null;
@@ -105,6 +107,8 @@ export class UIManager {
         
         
         this.confirmationDialog = new ConfirmationDialog(document.getElementById('dialog-container'));
+        
+        this.initialStateConfigModal = new InitialStateConfigModal(document.getElementById('modal-container'), this.appContext);
         
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
@@ -295,6 +299,9 @@ export class UIManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_INITIAL_STATE_MODAL, (data) => {
+            this.initialStateConfigModal.show(data.worldIndex, data.config);
+        });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, (data) => {
             this.saveRulesetModal.show(data);
         });
