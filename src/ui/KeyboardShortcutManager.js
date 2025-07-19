@@ -31,63 +31,65 @@ export class KeyboardShortcutManager {
     _registerShortcuts() {
         this.shortcuts = [
             // Panel Toggles
-            { key: 'e', description: 'Toggle Ruleset Editor panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }) },
-            { key: 's', description: 'Toggle World Setup panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }) },
-            { key: 'a', description: 'Toggle Analysis panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
-            { key: 'n', description: 'Toggle Ruleset Actions panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }) },
+            { key: 'e', description: 'Toggle ruleset editor panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }) },
+            { key: 's', description: 'Toggle world setup panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }) },
+            { key: 'a', description: 'Toggle analysis panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
+            { key: 'n', description: 'Toggle ruleset actions panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }) },
             { key: 'Escape', description: 'Close active popout or panel', category: 'Global', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
 
             // Simulation Controls
-            { key: 'p', description: 'Play / Pause Simulation', category: 'Global Controls', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
+            { key: 'p', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+            } },
             
             // Ruleset Actions
-            { key: 'i', description: 'Invert the selected world\'s ruleset', category: 'Actions & Panels', handler: () => {
+            { key: 'i', description: "Invert the selected world's ruleset", category: 'Actions & Panels', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Ruleset Inverted' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Ruleset inverted' });
             }},
             { key: 'g', description: 'Generate new ruleset', category: 'Actions & Panels', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated New Ruleset' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated new ruleset' });
             }},
             { key: 'o', description: 'Clone selected ruleset to all others', category: 'Actions & Panels', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned Ruleset to All Worlds' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned ruleset to all worlds' });
             }},
-            { key: 'm', description: 'Clone & Mutate all other worlds', category: 'Actions & Panels', handler: () => {
+            { key: 'm', description: 'Clone & mutate all other worlds', category: 'Actions & Panels', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned & Mutated Ruleset' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned ruleset to all worlds & mutated others' });
             }},
             { key: 'm', shiftKey: true, description: 'Mutate selected/all worlds', category: 'Actions & Panels', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Mutated Ruleset' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Mutated ruleset' });
             }},
 
             // Reset & Clear
-            { key: 'd', description: 'Reset Densities to default & Reset All', category: 'Reset & Clear', handler: () => { 
+            { key: 'd', description: 'Reset densities to default & reset all', category: 'Reset & Clear', handler: () => { 
                 EventBus.dispatch(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT); 
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); 
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Default Densities Restored & All Worlds Reset' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Default densities restored & all worlds reset' });
             }},
-            { key: 'd', shiftKey: true, description: 'Apply Selected Initial State to All & Reset All', category: 'Reset & Clear', handler: () => { 
+            { key: 'd', shiftKey: true, description: 'Apply selected initial state to all & reset all', category: 'Reset & Clear', handler: () => { 
                 EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL); 
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); 
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Initial State Applied & All Worlds Reset' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Selected initial state applied to all & all worlds reset' });
             }},
             { key: 'r', description: 'Reset all enabled worlds', category: 'Reset & Clear', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset All Worlds' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset all worlds' });
             }},
             { key: 'r', shiftKey: true, description: 'Reset the selected world only', category: 'Reset & Clear', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset Selected World' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset selected world' });
             }},
             { key: 'c', description: 'Clear all enabled worlds', category: 'Reset & Clear', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' });
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared All Worlds' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared all worlds' });
             }},
             { key: 'c', shiftKey: true, description: 'Clear the selected world only', category: 'Reset & Clear', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared Selected World' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared selected world' });
             }},
 
             // History
@@ -103,11 +105,11 @@ export class KeyboardShortcutManager {
             // World Selection
             ...Array.from({ length: 9 }, (_, i) => ({
                 key: `${i + 1}`,
-                description: `Select World ${i + 1}`,
+                description: `Select world ${i + 1}`,
                 category: 'Global Controls',
                 handler: () => this._handleNumericSelect(i + 1)
             })),
-            ];
+        ];
     }
 
     /**

@@ -37,6 +37,7 @@ export class SimulationController {
     #handleTogglePause = () => {
         this.isPaused = !this.isPaused;
         EventBus.dispatch(EVENTS.SIMULATION_PAUSED, this.isPaused);
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: this.isPaused ? 'Simulation paused' : 'Simulation resumed' });
     }
 
     #handleSetPauseState = (shouldBePaused) => {
