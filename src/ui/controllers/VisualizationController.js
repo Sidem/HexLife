@@ -7,11 +7,13 @@ export class VisualizationController {
         EventBus.subscribe(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, this.#handleSetVisualizationType);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, this.#handleSetShowCycleIndicator);
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, this.#handleSetShowCommandToasts);
     }
 
     getVizType = () => PersistenceService.loadUISetting('rulesetVizType', 'binary');
     getShowMinimapOverlay = () => PersistenceService.loadUISetting('showMinimapOverlay', true);
     getShowCycleIndicator = () => PersistenceService.loadUISetting('showCycleIndicator', true);
+    getShowCommandToasts = () => PersistenceService.loadUISetting('showCommandToasts', true);
 
     getVisualizationOptions() {
         return [
@@ -34,5 +36,9 @@ export class VisualizationController {
     #handleSetShowCycleIndicator = (shouldShow) => {
         PersistenceService.saveUISetting('showCycleIndicator', !!shouldShow);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
+    }
+
+    #handleSetShowCommandToasts = (shouldShow) => {
+        PersistenceService.saveUISetting('showCommandToasts', !!shouldShow);
     }
 } 

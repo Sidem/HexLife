@@ -32,6 +32,7 @@ export class ControlsComponent extends BaseComponent {
                 <div id="controls-ruleset-viz-mount"></div>
                 <div id="controls-show-minimap-overlay-mount"></div>
                 <div id="controls-show-cycle-indicator-mount"></div>
+                <div id="controls-show-command-toasts-mount"></div>
             </div>
         `;
 
@@ -100,6 +101,14 @@ export class ControlsComponent extends BaseComponent {
             initialValue: vizController.getShowCycleIndicator(),
             items: [{ value: 'show', text: 'Show Cycle Indicators' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
+        });
+
+        new SwitchComponent(this.element.querySelector(`#controls-show-command-toasts-mount`), {
+            type: 'checkbox',
+            name: `controls-show-command-toasts`,
+            initialValue: vizController.getShowCommandToasts(),
+            items: [{ value: 'show', text: 'Show Action Toasts' }],
+            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, shouldShow)
         });
     }
 

@@ -112,9 +112,11 @@ export class ToolsBottomSheet extends BottomSheet {
             const action = e.target.dataset.action;
             if (action === 'reset') {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset Selected World' });
                 this.hide();
             } else if (action === 'clear') {
                 EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared Selected World' });
                 this.hide();
             }
             

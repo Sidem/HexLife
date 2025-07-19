@@ -23,6 +23,7 @@ import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
+import { ToastManager } from './ToastManager.js';
 
 
 
@@ -43,6 +44,7 @@ export class UIManager {
         this.actionsPopover = null;
         this.confirmationDialog = null;
         this.rulesetDisplayFactory = null;
+        this.toastManager = null;
         appContext.uiManager = this;
         this.init();
     }
@@ -110,6 +112,8 @@ export class UIManager {
         
         this.initialStateConfigModal = new InitialStateConfigModal(document.getElementById('modal-container'), this.appContext);
         
+        this.toastManager = new ToastManager(document.getElementById('toast-container'));
+
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
 

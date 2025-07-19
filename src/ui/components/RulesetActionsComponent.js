@@ -291,20 +291,24 @@ export class RulesetActionsComponent extends BaseComponent {
 
         this.element.querySelector('[data-action="generate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated New Ruleset' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
         
         const mutatePane = this.element.querySelector(`#ruleset-actions-mutate-pane`);
         mutatePane.querySelector('[data-action="mutate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Mutated Ruleset' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
         mutatePane.querySelector('[data-action="clone"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET);
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned Ruleset' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
         mutatePane.querySelector('[data-action="clone-mutate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned & Mutated Ruleset' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
 

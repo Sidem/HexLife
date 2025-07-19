@@ -247,4 +247,6 @@ export const EVENTS = {
     COMMAND_SHOW_CONFIRMATION: 'command:showConfirmation',
     /** @param {object} settings - The complete color settings object from the ColorController. */
     COLOR_SETTINGS_CHANGED: 'ui:colorSettingsChanged',
+    /** @param {boolean} shouldShow - Whether to show the command toasts. */
+    COMMAND_SET_SHOW_COMMAND_TOASTS: 'command:setShowCommandToasts',
 };

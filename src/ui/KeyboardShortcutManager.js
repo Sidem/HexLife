@@ -41,23 +41,64 @@ export class KeyboardShortcutManager {
             { key: 'p', description: 'Play / Pause Simulation', category: 'Global Controls', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE) },
             
             // Ruleset Actions
-            { key: 'i', description: 'Invert the selected world\'s ruleset', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET) },
-            { key: 'g', description: 'Generate new ruleset', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET) },
-            { key: 'o', description: 'Clone selected ruleset to all others', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET) },
-            { key: 'm', description: 'Clone & Mutate all other worlds', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE)  },
-            { key: 'm', shiftKey: true, description: 'Mutate selected/all worlds', category: 'Actions & Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET) },
+            { key: 'i', description: 'Invert the selected world\'s ruleset', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_INVERT_RULESET);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Ruleset Inverted' });
+            }},
+            { key: 'g', description: 'Generate new ruleset', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated New Ruleset' });
+            }},
+            { key: 'o', description: 'Clone selected ruleset to all others', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CLONE_RULESET);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned Ruleset to All Worlds' });
+            }},
+            { key: 'm', description: 'Clone & Mutate all other worlds', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned & Mutated Ruleset' });
+            }},
+            { key: 'm', shiftKey: true, description: 'Mutate selected/all worlds', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Mutated Ruleset' });
+            }},
 
             // Reset & Clear
-            { key: 'd', description: 'Reset Densities to default & Reset All', category: 'Reset & Clear', handler: () => { EventBus.dispatch(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
-            { key: 'd', shiftKey: true, description: 'Apply Selected Initial State to All & Reset All', category: 'Reset & Clear', handler: () => { EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL); EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); } },
-            { key: 'r', description: 'Reset all enabled worlds', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES) },
-            { key: 'r', shiftKey: true, description: 'Reset the selected world only', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' }) },
-            { key: 'c', description: 'Clear all enabled worlds', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' }) },
-            { key: 'c', shiftKey: true, description: 'Clear the selected world only', category: 'Reset & Clear', handler: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' }) },
+            { key: 'd', description: 'Reset Densities to default & Reset All', category: 'Reset & Clear', handler: () => { 
+                EventBus.dispatch(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT); 
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); 
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Default Densities Restored & All Worlds Reset' });
+            }},
+            { key: 'd', shiftKey: true, description: 'Apply Selected Initial State to All & Reset All', category: 'Reset & Clear', handler: () => { 
+                EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL); 
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES); 
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Initial State Applied & All Worlds Reset' });
+            }},
+            { key: 'r', description: 'Reset all enabled worlds', category: 'Reset & Clear', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset All Worlds' });
+            }},
+            { key: 'r', shiftKey: true, description: 'Reset the selected world only', category: 'Reset & Clear', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, { scope: 'selected' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Reset Selected World' });
+            }},
+            { key: 'c', description: 'Clear all enabled worlds', category: 'Reset & Clear', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared All Worlds' });
+            }},
+            { key: 'c', shiftKey: true, description: 'Clear the selected world only', category: 'Reset & Clear', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared Selected World' });
+            }},
 
             // History
-            { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
-            { key: 'z', ctrlKey: true, shiftKey: true, description: 'Redo ruleset change', category: 'History', handler: () => EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() }) },
+            { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Undo' });
+            }},
+            { key: 'z', ctrlKey: true, shiftKey: true, description: 'Redo ruleset change', category: 'History', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Redo' });
+            }},
 
             // World Selection
             ...Array.from({ length: 9 }, (_, i) => ({
