@@ -23,7 +23,7 @@ function isOverlapping(x, y, diameter, otherClusters, config) {
 export class ClusterStrategy extends BaseStateStrategy {
     generate(stateArray, params, rng, config) {
         stateArray.fill(0);
-        const { count, density, densityVariation, diameter, diameterVariation, eccentricity, orientation, orientationVariation, distribution, gaussianStdDev } = params;
+        const { count, density, densityVariation, diameter, diameterVariation, eccentricity, orientation, orientationVariation, gaussianStdDev } = params;
         const numCols = config.GRID_COLS;
         const numRows = config.GRID_ROWS;
         
@@ -50,7 +50,9 @@ export class ClusterStrategy extends BaseStateStrategy {
             const majorAxis = effectiveDiameter / 2;
             const minorAxis = majorAxis * (1 - eccentricity);
 
-            const searchRadius = Math.ceil(majorAxis);
+            // For gaussian distribution, expand search radius to capture tail
+            const searchRadius = Math.ceil(majorAxis * 2);
+                
             for (let rOffset = -searchRadius; rOffset <= searchRadius; rOffset++) {
                 for (let cOffset = -searchRadius; cOffset <= searchRadius; cOffset++) {
                     const c = Math.round(clusterX + cOffset);
@@ -65,21 +67,20 @@ export class ClusterStrategy extends BaseStateStrategy {
                     
                     const normalizedDist = Math.sqrt(Math.pow(rotX / majorAxis, 2) + Math.pow(rotY / minorAxis, 2));
 
-                    if (normalizedDist <= 1) {
-                        const effectiveDensity = density + (rng() * 2 - 1) * densityVariation;
-                        let probability = Math.max(0, Math.min(1, effectiveDensity));
+                    const effectiveDensity = density + (rng() * 2 - 1) * densityVariation;
+                    let probability = Math.max(0, Math.min(1, effectiveDensity));
 
-                        if (distribution === 'gaussian') {
-                            const stdDev = effectiveDiameter / (gaussianStdDev * 2);
-                            probability *= Math.exp(-0.5 * Math.pow(normalizedDist * majorAxis / stdDev, 2));
-                        }
-                        
-                        if (rng() < probability) {
-                            const wrappedC = (c + numCols) % numCols;
-                            const wrappedR = (r + numRows) % numRows;
-                            const idx = wrappedR * numCols + wrappedC;
-                            stateArray[idx] = 1;
-                        }
+
+                    const stdDev = effectiveDiameter / (gaussianStdDev * 2);
+                    const distance = normalizedDist * majorAxis; // Actual distance from center
+                    probability *= Math.exp(-0.5 * Math.pow(distance / stdDev, 2));
+
+                    
+                    if (probability > 0 && rng() < probability) {
+                        const wrappedC = (c + numCols) % numCols;
+                        const wrappedR = (r + numRows) % numRows;
+                        const idx = wrappedR * numCols + wrappedC;
+                        stateArray[idx] = 1;
                     }
                 }
             }
