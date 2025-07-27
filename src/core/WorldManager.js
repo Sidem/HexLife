@@ -40,16 +40,34 @@ export class WorldManager {
 
             const sharedRulesets = this.sharedSettings.rulesets; 
             const singleRuleset = this.sharedSettings.rulesetHex; 
-            const sharedDensities = this.sharedSettings.densities; 
+            const sharedInitialStates = this.sharedSettings.initialStates;
+            const sharedDensities = this.sharedSettings.densities; // Backward compatibility
             const enabledMask = this.sharedSettings.enabledMask ?? 0b111111111;
 
             for (let i = 0; i < Config.NUM_WORLDS; i++) {
                 const rulesetHex = sharedRulesets ? sharedRulesets[i] : (singleRuleset || Config.INITIAL_RULESET_CODE);
-                const density = sharedDensities ? sharedDensities[i] : (Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5);
                 const enabled = (enabledMask & (1 << i)) !== 0;
 
+                // Determine initial state - prefer new format, fall back to legacy density format
+                let initialState;
+                if (sharedInitialStates && sharedInitialStates[i]) {
+                    initialState = sharedInitialStates[i];
+                } else if (sharedDensities && sharedDensities[i] !== undefined) {
+                    // Backward compatibility: convert density to new format
+                    initialState = {
+                        mode: 'density',
+                        params: { density: sharedDensities[i] }
+                    };
+                } else {
+                    // Default fallback
+                    initialState = {
+                        mode: 'density',
+                        params: { density: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5 }
+                    };
+                }
+
                 this.worldSettings.push({
-                    initialDensity: density,
+                    initialState: initialState,
                     enabled: enabled,
                     rulesetHex: rulesetHex,
                     rulesetHistory: [rulesetHex],
@@ -80,7 +98,10 @@ export class WorldManager {
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = this.worldSettings[i] || {
-                initialDensity: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5,
+                initialState: {
+                    mode: 'density',
+                    params: { density: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5 }
+                },
                 enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
                 rulesetHex: this.initialDefaultRulesetHex,
                 rulesetHistory: [this.initialDefaultRulesetHex],
@@ -960,9 +981,32 @@ export class WorldManager {
             params.set('r_all', allRulesets.join(','));
         }
 
-        const densities = worldSettings.map(ws => ws.initialDensity);
-        if (JSON.stringify(densities) !== JSON.stringify(Config.DEFAULT_INITIAL_DENSITIES)) {
-             params.set('d', densities.map(d => d.toFixed(3)).join(','));
+        // Handle initial states - check if all are simple density mode for backward compatibility
+        const initialStates = worldSettings.map(ws => ws.initialState);
+        const allDensityMode = initialStates.every(state => state && state.mode === 'density');
+        
+        if (allDensityMode) {
+            // Use compact density format for backward compatibility
+            const densities = initialStates.map(state => state.params.density);
+            const defaultDensities = Config.DEFAULT_INITIAL_DENSITIES.slice(0, Config.NUM_WORLDS);
+            
+            // Only include if different from default
+            if (JSON.stringify(densities) !== JSON.stringify(defaultDensities)) {
+                params.set('d', densities.map(d => d.toFixed(3)).join(','));
+            }
+        } else {
+            // Use full initial state format for complex configurations
+            try {
+                const statesJson = JSON.stringify(initialStates);
+                params.set('is', encodeURIComponent(statesJson));
+            } catch (e) {
+                console.error('Failed to encode initial states for URL:', e);
+                // Fallback to density-only format
+                const densities = initialStates.map(state => 
+                    state && state.mode === 'density' ? state.params.density : 0.5
+                );
+                params.set('d', densities.map(d => d.toFixed(3)).join(','));
+            }
         }
 
         let enabledMask = 0;

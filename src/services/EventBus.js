@@ -77,7 +77,7 @@ export const EVENTS = {
     WORLD_STATS_UPDATED: 'simulation:worldStatsUpdated',                              
     /** @event Emitted with no payload when all worlds are reset simultaneously. */
     ALL_WORLDS_RESET: 'simulation:allWorldsReset', 
-    /** @param {Array<{initialDensity: number, enabled: boolean, rulesetHex: string}>} settings - The complete array of settings for all worlds. */
+    /** @param {Array<{initialState: {mode: string, params: object}, enabled: boolean, rulesetHex: string}>} settings - The complete array of settings for all worlds. */
     WORLD_SETTINGS_CHANGED: 'simulation:worldSettingsChanged', 
     /** @param {{enabled: boolean, rate: number}} params - The new entropy sampling parameters. */
     ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged', 

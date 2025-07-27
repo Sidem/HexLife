@@ -245,7 +245,7 @@ export const getTours = (appContext) => {
         content: "Let's test this ruleset in a denser environment. <span class=\"onboarding-highlight-text\">Set the density for the central world to 50%.</span>",
         primaryAction: { text: 'Set Density' },
          onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, condition: (data) => (data.worldIndex === 4 && data.density > 0.49 && data.density < 0.51) }
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-density-all"]',
         title: 'Step 7: Apply to All Worlds',

@@ -139,7 +139,7 @@ export class InitialStateConfigModal extends BaseComponent {
         
         const defaults = {
             density: { density: 0.5 },
-            clusters: { count: 10, density: 0.7, densityVariation: 0.1, diameter: 40, diameterVariation: 10, eccentricity: 0, orientation: 0, orientationVariation: 0.5, distribution: 'flat', gaussianStdDev: 2.0 },
+            clusters: { count: 25, density: 0.7, densityVariation: 0.2, diameter: 10, diameterVariation: 5, eccentricity: 0.33, orientation: 0, orientationVariation: 1.0, distribution: 'gaussian', gaussianStdDev: 2.0 },
         };
         
         this.config.params = { ...defaults[mode], ...this.config.params };

@@ -14,7 +14,11 @@ export class WorldsController {
     }
     
     setWorldInitialDensity = (worldIndex, density) => {
-        EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_DENSITY, { worldIndex, density });
+        const initialState = {
+            mode: 'density',
+            params: { density: density }
+        };
+        EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, { worldIndex, initialState });
     }
 
     resetAllWorldsToInitialDensities = () => {

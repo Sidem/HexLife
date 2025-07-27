@@ -28,9 +28,24 @@ export class SettingsLoader {
             }
         }
 
-        // Densities
-        if (params.has('d')) {
-            sharedSettings.densities = params.get('d').split(',').map(Number);
+        // Initial States - new format with full cluster support
+        if (params.has('is')) {
+            try {
+                const initialStatesJson = decodeURIComponent(params.get('is'));
+                const initialStates = JSON.parse(initialStatesJson);
+                if (Array.isArray(initialStates) && initialStates.length === Config.NUM_WORLDS) {
+                    sharedSettings.initialStates = initialStates;
+                }
+            } catch (e) {
+                console.warn('Failed to parse initial states from URL:', e);
+            }
+        }
+        // Backward compatibility: Densities (old format)
+        else if (params.has('d')) {
+            const densities = params.get('d').split(',').map(Number);
+            if (densities.length === Config.NUM_WORLDS && densities.every(d => !isNaN(d))) {
+                sharedSettings.densities = densities;
+            }
         }
 
         // Enabled Mask
