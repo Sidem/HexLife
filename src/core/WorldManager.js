@@ -320,21 +320,18 @@ export class WorldManager {
             const indicesToClear = this._getAffectedWorldIndices(data.scope);
             indicesToClear.forEach(idx => {
                 const proxy = this.worlds[idx];
-                if (proxy) {
-                    let targetStateForClear = 0;
-                    if (proxy.latestStateArray) {
-                        if (proxy.latestStateArray.every(s => s === 0)) {
-                            targetStateForClear = 1;
-                        }
-                    }
-                    proxy.resetWorld({ density: targetStateForClear, isClearOperation: true });
+                if (!proxy) return;
+
+                const initialState = this.worldSettings[idx]?.initialState;
+                if (!initialState) {
+                    console.warn(`World ${idx} has no initial state, skipping clear.`);
+                    return;
                 }
-                if (this.worldSettings[idx] && !this.isGloballyPaused && this.worldSettings[idx].enabled) {
-                    this.worlds[idx].startSimulation();
-                }
+                const clearStateConfig = { ...initialState, params: { ...initialState.params, density: 0 } };
+                proxy.sendCommand('RESET_WORLD', { isClearOperation: true, initialState: clearStateConfig });
             });
+
             if (data.scope === 'all') EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
-            this.dispatchSelectedWorldUpdates();
         });
         EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
         EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));

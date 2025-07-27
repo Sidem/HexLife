@@ -1,5 +1,6 @@
 #initial-state-config-modal .modal-content {
     max-width: 500px;
+    z-index: 9999;
 }
 
 #initial-state-config-modal .params-container {
