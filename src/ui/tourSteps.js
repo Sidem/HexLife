@@ -44,14 +44,14 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock. Let's see what these worlds are currently doing.",
-        primaryAction: { text: 'Click the Play Button' },
+        //primaryAction: { text: 'Click the Play Button' },
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'The Observation Deck',
         content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click any mini-map view</span> to shift your focus.",
-        primaryAction: { text: 'Select a Different World' },
+        //primaryAction: { text: 'Select a Different World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
         element: 'body',
@@ -65,7 +65,7 @@ export const getTours = (appContext) => {
         highlightType: 'canvas',
         title: 'Draw on the Grid',
         content: "Now, <span class=\"onboarding-highlight-text\">click and drag (or touch and drag)</span> on the main view to bring cells to life. The simulation pauses automatically while you draw.",
-        primaryAction: { text: 'Try Drawing on the Grid' },
+        //primaryAction: { text: 'Try Drawing on the Grid' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="learning"]' : '#helpButton',
@@ -208,20 +208,20 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 1: Get a Baseline',
         content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel to access the library.",
-        primaryAction: { text: 'Open Ruleset Actions' },
+        //primaryAction: { text: 'Open Ruleset Actions' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
     }, {
         element: '[data-pane="library"]',
         title: 'Step 2: Open the Library',
         content: "Now, select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
-        primaryAction: { text: 'Select Library Tab' },
+        primaryAction: { text: 'Done' },
         onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
         element: '#ruleset-actions-library-public-content .library-item:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
-        primaryAction: { text: 'Load the Ruleset' },
+        //primaryAction: { text: 'Load the Ruleset' },
         onBeforeShow: (_step) => { document.querySelector('#ruleset-actions-library-public-content .library-item:nth-child(10) .button')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
@@ -229,7 +229,7 @@ export const getTours = (appContext) => {
         title: 'Step 4: Observe',
         content: "Start the simulation to see the 'Gliders' ruleset in action.",
         condition: (appContext) => appContext.simulationController.getIsPaused(),
-        primaryAction: { text: 'Press Play' },
+        //primaryAction: { text: 'Press Play' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
         delayAfter: 2000
@@ -237,46 +237,46 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="worlds"]' : '[data-tour-id="setup-panel-button"]',
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
-        primaryAction: { text: 'Open World Setup' },
+        //primaryAction: { text: 'Open World Setup' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "WorldSetupComponent" }
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) .density-control',
         title: 'Step 6: Set Initial Density',
         content: "Let's test this ruleset in a denser environment. <span class=\"onboarding-highlight-text\">Set the density for the central world to 50%.</span>",
-        primaryAction: { text: 'Set Density' },
+        //primaryAction: { text: 'Set Density' },
          onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-density-all"]',
         title: 'Step 7: Apply to All Worlds',
         content: "Now apply this 50% density to all worlds to create a level playing field for our mutations.",
-        primaryAction: { text: 'Apply Density to All' },
+        //primaryAction: { text: 'Apply Density to All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 8: Reset Worlds',
         content: "Finally, reset all worlds to apply the new density settings.",
-        primaryAction: { text: 'Apply & Reset All' },
+        //primaryAction: { text: 'Apply & Reset All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 9: Prepare for Mutation',
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
-        primaryAction: { text: 'Open Ruleset Actions' },
+        //primaryAction: { text: 'Open Ruleset Actions' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
     }, {
         element: '[data-pane="mutate"]',
         title: 'Step 10: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
-        primaryAction: { text: 'Select Mutate Tab' },
+        primaryAction: { text: 'Done' },
         onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="mutate"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
         element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
         title: 'Step 11: Run the Experiment',
         content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the <span class=\"onboarding-highlight-text\">Mutation Rate is ~10%</span> and <span class=\"onboarding-highlight-text\">Mode is R-Sym</span> for best results.",
-        primaryAction: { text: 'Clone & Mutate' },
+        //primaryAction: { text: 'Clone & Mutate' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
     }, {
         element: '#minimap-guide',
@@ -284,7 +284,7 @@ export const getTours = (appContext) => {
         title: 'Step 12: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
         onBeforeShow: () => { showView({ mobile: {view: 'simulate'} }); },
-        primaryAction: { text: 'Select a World' },
+        //primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
         element: '[data-tour-id="ruleset-actions-button"]',
