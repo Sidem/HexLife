@@ -63,7 +63,7 @@ export const NEIGHBOR_DIRS_EVEN_R = [
  * Useful for debugging the flow of information in the application.
  */
 export const EVENT_BUS_LOGGING = {
-    enabled: false, // Set to true to enable console logging of events
+    enabled: true, // Set to true to enable console logging of events
     
     /**
      * An array of event prefixes to log. If empty, all events are logged (if enabled).
@@ -73,7 +73,7 @@ export const EVENT_BUS_LOGGING = {
      * filter: ['simulation:worldStatsUpdated', 'ui:'] // Log specific simulation events and all UI events
      * filter: [] // Log all events
      */
-    filter: ['command:'] 
+    filter: ['ui:'] 
 };
 
 /**

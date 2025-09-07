@@ -184,6 +184,7 @@ export class OnboardingManager {
             };
     
         } else if (step.advanceOn.type === 'event') {
+            console.log('advanceOn.type === event', step.advanceOn.eventName);
             const unsubscribe = EventBus.subscribe(step.advanceOn.eventName, (data) => {
                 if (step.advanceOn.condition && !step.advanceOn.condition(data)) {
                     return;
