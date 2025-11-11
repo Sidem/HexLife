@@ -244,23 +244,23 @@ export const getTours = (appContext) => {
         //primaryAction: { text: 'Open World Setup' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
-        element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) .density-control',
-        title: 'Step 6: Set Initial Density',
-        content: "Let's test this ruleset in a denser environment. <span class=\"onboarding-highlight-text\">Set the density for the central world to 50%.</span>",
-        //primaryAction: { text: 'Set Density' },
-         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
+        title: 'Step 6: Configure Central World Density',
+        content: "Click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure 'Density' mode is selected and set the density slider to 50%. Then save the changes.",
+        //primaryAction: { text: 'Configure Density' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
-        element: () => '#world-setup-panel-actions [data-action="apply-density-all"]',
+        element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
         title: 'Step 7: Apply to All Worlds',
-        content: "Now apply this 50% density to all worlds to create a level playing field for our mutations.",
-        //primaryAction: { text: 'Apply Density to All' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL }
+        content: "Now click 'Apply Initial State to All' to set the same 50% density configuration across all worlds, creating a level playing field for our mutations.",
+        //primaryAction: { text: 'Apply to All' },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 8: Reset Worlds',
-        content: "Finally, reset all worlds to apply the new density settings.",
-        //primaryAction: { text: 'Apply & Reset All' },
+        content: "Finally, click 'Apply & Reset All Worlds' to reset all worlds with the new initial density settings.",
+        //primaryAction: { text: 'Reset All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
