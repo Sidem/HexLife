@@ -1,4 +1,8 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { ControlsComponent } from './components/ControlsComponent.js';
+import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
+import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
+import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 /**
  * Provides the tour definitions for the application's onboarding process.
  * This unified structure uses functional steps to adapt to both desktop and mobile UI contexts.
@@ -81,7 +85,7 @@ export const getTours = (appContext) => {
         content: "This menu contains global controls for simulation speed, brush size, and interaction preferences.",
         primaryAction: { text: 'Open Controls' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "ControlsComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ControlsComponent }
     }, {
         element: '[id*="controls-speed-slider"]',
         title: 'Simulation Speed',
@@ -102,7 +106,7 @@ export const getTours = (appContext) => {
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="generate"]',
         title: 'Generate',
@@ -132,7 +136,7 @@ export const getTours = (appContext) => {
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetEditorComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetEditorComponent }
     }, {
         element: () => (appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
         title: 'Toggling Outcomes',
@@ -209,7 +213,7 @@ export const getTours = (appContext) => {
         title: 'Step 1: Get a Baseline',
         content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel to access the library.",
         //primaryAction: { text: 'Open Ruleset Actions' },
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="library"]',
         title: 'Step 2: Open the Library',
@@ -238,7 +242,7 @@ export const getTours = (appContext) => {
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
         //primaryAction: { text: 'Open World Setup' },
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "WorldSetupComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) .density-control',
         title: 'Step 6: Set Initial Density',
@@ -264,7 +268,7 @@ export const getTours = (appContext) => {
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
         //primaryAction: { text: 'Open Ruleset Actions' },
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="mutate"]',
         title: 'Step 10: Access the DNA Splicer',
@@ -332,7 +336,7 @@ export const getTours = (appContext) => {
         title: 'Step 3: Visit Your Library',
         content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel.",
         primaryAction: { text: 'Open Panel' },
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType.name === "RulesetActionsComponent" }
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-library-filter="personal"]',
         title: 'Step 4: View Your Rulesets',
