@@ -238,11 +238,11 @@ export function loadColorSettings() {
             off: ['#1a4a23', '#665a0a']
         },
         customNeighborColors: Config.DEFAULT_COLOR_SCHEMES.customNeighborColors,
-        customSymmetryColors: Config.DEFAULT_COLOR_SCHEMES.customSymmetryColors
+        customSymmetryColors: Config.DEFAULT_COLOR_SCHEMES.customSymmetryColors,
+        flickerProofPresets: true
     };
     const loaded = _getItem(KEYS.COLOR_SETTINGS);
     
-    // --- MODIFICATION START ---
     if (loaded) {
         // Create a new object to ensure we don't mutate the defaults
         const migratedSettings = { ...defaults, ...loaded };
@@ -256,9 +256,13 @@ export function loadColorSettings() {
             migratedSettings.customGradient = defaults.customGradient;
         }
         
+        // Ensure flickerProofPresets
+        if (typeof loaded.flickerProofPresets !== 'boolean') {
+            migratedSettings.flickerProofPresets = defaults.flickerProofPresets;
+        }
+        
         return migratedSettings;
     }
-    // --- MODIFICATION END ---
     
     return defaults;
 }

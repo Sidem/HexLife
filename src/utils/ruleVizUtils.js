@@ -6,7 +6,7 @@ import { countSetBits } from '../core/Symmetry.js';
  * @param {string} hex - Hex color string (e.g., "#FF0000")
  * @returns {number[]} Array of RGB values [r, g, b] in the 0-255 range.
  */
-function hexToRgb(hex) {
+export function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0, 0, 0];
 }
@@ -18,7 +18,7 @@ function hexToRgb(hex) {
  * @param {number} factor - Interpolation factor (0-1)
  * @returns {number[]} Interpolated RGB color [r, g, b]
  */
-function interpolateRgb(color1, color2, factor) {
+export function interpolateRgb(color1, color2, factor) {
     const r = color1[0] + factor * (color2[0] - color1[0]);
     const g = color1[1] + factor * (color2[1] - color1[1]);
     const b = color1[2] + factor * (color2[2] - color1[2]);
@@ -51,7 +51,7 @@ function hsvToRgb(h, s, v) {
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function getGradientColor(factor, gradient) {
+export function getGradientColor(factor, gradient) {
     if (!gradient || gradient.length === 0) return [128, 128, 128];
     if (gradient.length === 1) return gradient[0];
     const segment = Math.floor(factor * (gradient.length - 1));
@@ -71,7 +71,7 @@ export function generateColorLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2;
     const data = new Uint8Array(width * height * 4);
-    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors, flickerProofPresets } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
         for (let outputState = 0; outputState < height; outputState++) {
@@ -82,11 +82,38 @@ export function generateColorLUT(colorSettings, symmetryData) {
                 if (activePreset === 'default' || !preset) {
                     const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
                     rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
+                } else if (preset.logic) {
+                    const centerState = (ruleIndex >> 6) & 1;
+                    const neighborMask = ruleIndex & 0x3F;
+                    if (outputState === 0) {
+                        rgb = hexToRgb(preset.offColor);
+                    } else {
+                        let factor;
+                        if (preset.logic === 'neighbor_count') {
+                            const neighborCount = countSetBits(neighborMask);
+                            factor = (neighborCount / 6.0) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
+                            rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
+                        } else { // symmetry
+                            const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
+                            if (canonical === undefined) {
+                                rgb = [128, 128, 128];
+                            } else {
+                                const groupIndex = symmetryData.canonicalRepresentatives.findIndex(g => g.representative === canonical);
+                                factor = groupIndex >= 0 ? (groupIndex / (symmetryData.canonicalRepresentatives.length - 1)) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1) : 0;
+                                rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
+                            }
+                        }
+                    }
                 } else {
                     const factor = ruleIndex / (width - 1);
                     const onGradient = preset.gradient.map(hexToRgb);
                     const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.15));
                     rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+                }
+
+                // Flicker-proof override for presets
+                if (flickerProofPresets && ((ruleIndex === 0 && outputState === 1) || (ruleIndex === 127 && outputState === 0))) {
+                    rgb = [0, 0, 0];
                 }
             } else if (mode === 'gradient') {
                 const factor = ruleIndex / (width - 1);
@@ -314,7 +341,7 @@ export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2; // Row 0 for OFF, Row 1 for ON
     const data = new Uint8Array(width * height * 4);
-    const { mode, activePreset, customNeighborColors, customSymmetryColors } = colorSettings;
+    const { mode, activePreset, customNeighborColors, customSymmetryColors, flickerProofPresets } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
         // We will calculate the color for both OFF (0) and ON (1) states for each rule index.
@@ -334,6 +361,11 @@ export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
                     // Use a brighter version of the off-gradient for visualization purposes
                     const offGradient = preset.offGradient?.map(hexToRgb) || onGradient.map(c => c.map(ch => ch * 0.5));
                     rgb = getGradientColor(factor, outputState === 1 ? onGradient : offGradient);
+                }
+
+                // Flicker-proof override for presets
+                if (flickerProofPresets && ((ruleIndex === 0 && outputState === 1) || (ruleIndex === 127 && outputState === 0))) {
+                    rgb = [0, 0, 0];
                 }
             } else { // For 'neighbor_count' or 'symmetry'
                 const centerState = (ruleIndex >> 6) & 1;

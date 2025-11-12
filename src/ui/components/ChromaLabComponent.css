@@ -96,6 +96,38 @@
     color: #eee;
 }
 
+.preset-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #444;
+}
+
+.preset-controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    font-size: 0.9em;
+}
+
+.preset-controls input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.preset-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+
 /* Group Color Styles */
 .color-group-grid {
     display: grid;
@@ -342,4 +374,32 @@
     background-color: #5a4a4a;
     border-color: #ef4444;
     color: #fecaca;
+}
+
+/* Flicker Warning */
+.flicker-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 12px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+
+.flicker-warning .deflicker-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.flicker-warning .deflicker-btn:hover {
+    background-color: #218838;
 }

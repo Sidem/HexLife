@@ -82,7 +82,7 @@ export const EVENT_BUS_LOGGING = {
  */
 export const DEFAULT_COLOR_SCHEMES = {
     customNeighborColors: {
-        "0-0": { "on": "#FF0000", "off": "#2A0000" },
+        "0-0": { "on": "#000000", "off": "#2A0000" },
         "0-1": { "on": "#FED400", "off": "#2A2300" },
         "0-2": { "on": "#2AFF2A", "off": "#072A07" },
         "0-3": { "on": "#00FEFF", "off": "#002A2A" },
@@ -95,10 +95,10 @@ export const DEFAULT_COLOR_SCHEMES = {
         "1-3": { "on": "#00FEFF", "off": "#002A2A" },
         "1-4": { "on": "#002AFF", "off": "#00072A" },
         "1-5": { "on": "#AA00FF", "off": "#1C002A" },
-        "1-6": { "on": "#FF007F", "off": "#2A0015" }
+        "1-6": { "on": "#FF007F", "off": "#000000" }
     },
     customSymmetryColors: {
-        "0-0": { "on": "#FF0000", "off": "#2A0000" },
+        "0-0": { "on": "#000000", "off": "#2A0000" },
         "0-1": { "on": "#FF6200", "off": "#2A1000" },
         "0-3": { "on": "#FEC400", "off": "#2A2000" },
         "0-5": { "on": "#C3FF00", "off": "#202A00" },
@@ -125,6 +125,6 @@ export const DEFAULT_COLOR_SCHEMES = {
         "1-23": { "on": "#5800FF", "off": "#0F002A" },
         "1-27": { "on": "#BA00FF", "off": "#1F002A" },
         "1-31": { "on": "#FF00E1", "off": "#2A0025" },
-        "1-63": { "on": "#FF007F", "off": "#2A0015" }
+        "1-63": { "on": "#FF007F", "off": "#000000" }
     }
 };

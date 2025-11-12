@@ -62,6 +62,26 @@ export class ChromaLabComponent extends BaseComponent {
         const settings = this.colorController.getSettings();
         const symmetryData = this.appContext.worldManager.getSymmetryData();
 
+        let html = '';
+
+        // Add controls for flicker-proof
+        const checkedAttr = settings.flickerProofPresets ? 'checked' : '';
+        html += `
+            <div class="preset-controls">
+                <label>
+                    <input type="checkbox" id="flicker-proof-cb" ${checkedAttr}> Ensure flicker-proof presets
+                </label>
+            </div>
+        `;
+
+        if (!settings.flickerProofPresets) {
+            html += `
+                <div class="preset-warning">
+                    <span>⚠️ Warning: Presets may cause flickering in certain rulesets when using neighbor/symmetry simulations.</span>
+                </div>
+            `;
+        }
+
         let visHtml = '';
 
         // Generate visualizations for all presets defined in colorPalettes.js
@@ -80,7 +100,7 @@ export class ChromaLabComponent extends BaseComponent {
             } else {
                 // For standard gradient presets ("Volcanic", "Oceanic", etc.)
                 // The preview is based on its own definition.
-                tempSettingsForViz = { ...settings, mode: 'preset', activePreset: key };
+                tempSettingsForViz = { ...settings, mode: 'preset', activePreset: key, flickerProofPresets: settings.flickerProofPresets };
                 lut = generatePaletteVisualizationLUT(tempSettingsForViz, symmetryData);
                 // This preset is active if the app's mode is 'preset' and its key matches.
                 isActive = settings.mode === 'preset' && settings.activePreset === key;
@@ -95,7 +115,17 @@ export class ChromaLabComponent extends BaseComponent {
             `;
         }
         
-        this.uiElements.presetSection.innerHTML = `<div class="preset-visualizations">${visHtml}</div>`;
+        html += `<div class="preset-visualizations">${visHtml}</div>`;
+        this.uiElements.presetSection.innerHTML = html;
+
+        // Add event listener for the checkbox if it exists
+        const cb = this.element.querySelector('#flicker-proof-cb');
+        if (cb) {
+            cb.addEventListener('change', (e) => {
+                this.colorController.toggleFlickerProofPresets(e.target.checked);
+                this.refresh();
+            }, { once: false });
+        }
     }
 
     _renderGroupSection(groupType) {
@@ -317,6 +347,64 @@ export class ChromaLabComponent extends BaseComponent {
         this.selectedSwatches = []; // Clear the array
         this._updateSelectionVisuals(); // Update the UI
         this._updateBatchActionBar();
+
+        // Flicker warning logic
+        const mode = settings.mode;
+        if (mode === 'neighbor_count' || mode === 'symmetry') {
+            const sectionSelector = `#chroma-${mode.replace('_count', '')}-section`;
+            const section = this.element.querySelector(sectionSelector);
+            let warning = section.querySelector('.flicker-warning');
+            const isProne = this._isFlickerProne(settings);
+            if (isProne) {
+                if (!warning) {
+                    warning = document.createElement('div');
+                    warning.className = 'flicker-warning';
+                    warning.innerHTML = `
+                        <span>⚠️ Potential flickering in all-off/all-on transitions.</span>
+                        <button class="button deflicker-btn">Deflicker</button>
+                    `;
+                    section.insertBefore(warning, section.firstChild);
+                    warning.querySelector('.deflicker-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this._deflicker();
+                    });
+                }
+            } else if (warning) {
+                warning.remove();
+            }
+        }
+    }
+
+    _isFlickerProne(settings) {
+        const { mode, customNeighborColors, customSymmetryColors } = settings;
+        if (mode === 'neighbor_count') {
+            const birthColor = customNeighborColors['0-0']?.on ?? '#ffffff';
+            const deathColor = customNeighborColors['1-6']?.off ?? '#333333';
+            return birthColor.toLowerCase() !== deathColor.toLowerCase();
+        } else if (mode === 'symmetry') {
+            const birthColor = customSymmetryColors['0-0']?.on ?? '#ffffff';
+            const deathColor = customSymmetryColors['1-63']?.off ?? '#333333';
+            return birthColor.toLowerCase() !== deathColor.toLowerCase();
+        }
+        return false;
+    }
+
+    _deflicker() {
+        const settings = this.colorController.getSettings();
+        const mode = settings.mode;
+        let birthKey, deathKey, colorMap;
+        if (mode === 'neighbor_count') {
+            birthKey = '0-0';
+            deathKey = '1-6';
+            colorMap = settings.customNeighborColors;
+        } else {
+            birthKey = '0-0';
+            deathKey = '1-63';
+            colorMap = settings.customSymmetryColors;
+        }
+        const black = '#000000';
+        this.colorController.setColorForGroup(mode, birthKey, 'on', black);
+        this.colorController.setColorForGroup(mode, deathKey, 'off', black);
     }
 
     _updateBatchActionBar() {
