@@ -22,6 +22,39 @@ function updateLoadingStatus(message) {
     }
 }
 
+function detectGraphicsPath() {
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2');
+  if (!gl) {
+    return { status: 'no-webgl2', hint: 'WebGL2 unavailable (could be disabled, blocked, or software-only).' };
+  }
+
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  // Generic strings always exist; detailed strings need the extension.
+  const vendor = gl.getParameter(gl.VENDOR) || 'unknown';
+  const renderer = gl.getParameter(gl.RENDERER) || 'unknown';
+
+  let unmaskedVendor = null, unmaskedRenderer = null;
+  if (ext) {
+    unmaskedVendor   = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+    unmaskedRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+  }
+
+  const info = (unmaskedVendor || vendor) + ' / ' + (unmaskedRenderer || renderer);
+
+  // Common software renderers you might see:
+  const looksSoftware = /swiftshader|llvmpipe|software/i.test(info);
+
+  return {
+    status: looksSoftware ? 'software' : 'likely-hardware',
+    vendor,
+    renderer,
+    unmaskedVendor,
+    unmaskedRenderer,
+    note: ext ? 'Used WEBGL_debug_renderer_info.' : 'Renderer info is masked; result is less certain.'
+  };
+}
+
 async function initialize() {
     console.log("Initializing...");
     updateLoadingStatus("Parsing configuration...");
@@ -30,6 +63,18 @@ async function initialize() {
         console.error("Canvas element not found!");
         return;
     }
+
+    // GPU acceleration detection
+    updateLoadingStatus("Checking GPU acceleration...");
+    const detection = detectGraphicsPath();
+    if (detection.status === 'no-webgl2' || detection.status === 'software') {
+        const message = "Error: This application requires GPU hardware acceleration. Please enable it in your browser settings and restart the browser.";
+        updateLoadingStatus(message);
+        console.error("GPU acceleration not detected:", detection);
+        return;
+    }
+    console.log("GPU detection:", detection);
+
     const sharedSettings = SettingsLoader.loadFromUrl();
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
     

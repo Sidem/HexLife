@@ -244,62 +244,70 @@ export const getTours = (appContext) => {
         //primaryAction: { text: 'Open World Setup' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Step 6: Focus on Central World',
+        content: "If your main view is not focused on the central world (World 4), click on the central cell in the minimap below to select it.",
+        condition: (appContext) => appContext.worldManager.getSelectedWorldIndex() !== 4,
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED, condition: (worldIndex) => worldIndex === 4 }
+    }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
-        title: 'Step 6: Configure Central World Density',
-        content: "Click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure 'Density' mode is selected and set the density slider to 50%. Then save the changes.",
+        title: 'Step 7: Configure Central World Density',
+        content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure 'Density' mode is selected and set the density slider to 50%. Then save the changes.",
         //primaryAction: { text: 'Configure Density' },
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
-        title: 'Step 7: Apply to All Worlds',
+        title: 'Step 8: Apply to All Worlds',
         content: "Now click 'Apply Initial State to All' to set the same 50% density configuration across all worlds, creating a level playing field for our mutations.",
         //primaryAction: { text: 'Apply to All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
-        title: 'Step 8: Reset Worlds',
+        title: 'Step 9: Reset Worlds',
         content: "Finally, click 'Apply & Reset All Worlds' to reset all worlds with the new initial density settings.",
         //primaryAction: { text: 'Reset All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
-        title: 'Step 9: Prepare for Mutation',
+        title: 'Step 10: Prepare for Mutation',
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
         //primaryAction: { text: 'Open Ruleset Actions' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="mutate"]',
-        title: 'Step 10: Access the DNA Splicer',
+        title: 'Step 11: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
         primaryAction: { text: 'Done' },
         onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="mutate"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
         element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
-        title: 'Step 11: Run the Experiment',
+        title: 'Step 12: Run the Experiment',
         content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the <span class=\"onboarding-highlight-text\">Mutation Rate is ~10%</span> and <span class=\"onboarding-highlight-text\">Mode is R-Sym</span> for best results.",
         //primaryAction: { text: 'Clone & Mutate' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
-        title: 'Step 12: Observe and Select',
+        title: 'Step 13: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
         onBeforeShow: () => { showView({ mobile: {view: 'simulate'} }); },
         //primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
     }, {
         element: '[data-tour-id="ruleset-actions-button"]',
-        title: 'Step 13: Evolve Again!',
+        title: 'Step 14: Evolve Again!',
         condition: (appContext) => !appContext.uiManager.isMobile(),
         content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel and press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection. <br><br>Pro-tip: Press <span class=\"onboarding-highlight-text\">'M'</span> to quickly Clone & Mutate again.",
         primaryAction: { text: 'Finish Mission' },
         advanceOn: { type: 'click' }
     }, {
         element: '[title="Clone & Mutate"]',
-        title: 'Step 13: Evolve Again!',
+        title: 'Step 14: Evolve Again!',
         condition: (appContext) => appContext.uiManager.isMobile(),
         content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Use this <span class=\"onboarding-highlight-text\">Quick Action Button</span> to quickly <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again.",
         primaryAction: { text: 'Finish Mission' },
