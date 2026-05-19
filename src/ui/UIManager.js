@@ -235,8 +235,8 @@ export class UIManager {
             'clear-all': { icon: '🌍', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
             'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
             'reset-all': { icon: '♻️', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
-            'reset-densities': { icon: '🎨', title: 'Default Densities', command: EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, payload: {} },
-            'apply-density-all': { icon: '🎯', title: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, payload: {} }
+            'reset-densities': { icon: '🎨', title: 'Default Densities', command: EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, payload: {} },
+            'apply-density-all': { icon: '🎯', title: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, payload: {} }
         };
 
         const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true, order: [] });

@@ -63,7 +63,7 @@ export const NEIGHBOR_DIRS_EVEN_R = [
  * Useful for debugging the flow of information in the application.
  */
 export const EVENT_BUS_LOGGING = {
-    enabled: true, // Set to true to enable console logging of events
+    enabled: false, // Set to true to enable console logging of events
     
     /**
      * An array of event prefixes to log. If empty, all events are logged (if enabled).

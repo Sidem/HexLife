@@ -34,11 +34,11 @@ export class WorldsController {
     }
 
     applySelectedDensityToAll = () => {
-         EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL);
+         EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL);
     }
 
     resetDensitiesToDefault = () => {
-         EventBus.dispatch(EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT);
+         EventBus.dispatch(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT);
     }
     
     saveSelectedWorldState = () => {
