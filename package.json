@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build:wasm": "wasm-pack build ./hexlife-wasm --target web --out-dir src/core/wasm-engine --out-name hexlife_wasm",
+        "build:wasm": "wasm-pack build ./hexlife-wasm --target web --out-dir ../src/core/wasm-engine --out-name hexlife_wasm",
         "build": "npm run build:wasm && vite build",
         "preview": "vite preview",
         "lint": "eslint . --ext .js",

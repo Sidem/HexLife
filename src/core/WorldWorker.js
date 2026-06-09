@@ -29,8 +29,6 @@ let hexBlockEntropyHistory = [];
 const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 let workerIsEntropySamplingEnabled = false;
 let workerEntropySampleRate = 10;
-const NEIGHBOR_DIRS_ODD_R = Config.NEIGHBOR_DIRS_ODD_R;
-const NEIGHBOR_DIRS_EVEN_R = Config.NEIGHBOR_DIRS_EVEN_R;
 let lastSentChecksum = null;
 let stateHistoryChecksums = new Set();
 let stateChecksumQueue = [];
@@ -58,9 +56,32 @@ function mulberry32(a) {
     }
 }
 
-function calculateChecksum(arr) {
-    if (!arr || !wasm_world) return 0;
-    return wasm_world.calculate_checksum(arr);
+// Checksum of the current state buffer. The buffer lives in Wasm linear memory now, so this is
+// computed entirely inside Wasm (no array is copied across the boundary).
+function stateChecksum() {
+    if (!wasm_world) return 0;
+    return wasm_world.checksum_state();
+}
+
+// (Re)build the typed-array views over the World's buffers in Wasm linear memory. Called once after
+// the World is constructed. The views are never copied per-tick; `run_tick` swaps the current/next
+// buffers internally and the worker mirrors that by swapping its view references (see runTick).
+function refreshSimViews() {
+    const mem = _wasm_module.memory.buffer;
+    const n = workerConfig.NUM_CELLS;
+    jsStateArray = new Uint8Array(mem, wasm_world.state_ptr(), n);
+    jsNextStateArray = new Uint8Array(mem, wasm_world.next_state_ptr(), n);
+    jsRuleIndexArray = new Uint8Array(mem, wasm_world.rule_indices_ptr(), n);
+    jsNextRuleIndexArray = new Uint8Array(mem, wasm_world.next_rule_indices_ptr(), n);
+    ruleset = new Uint8Array(mem, wasm_world.ruleset_ptr(), 128);
+    ruleUsageCounters = new Uint32Array(mem, wasm_world.rule_usage_counters_ptr(), 128);
+}
+
+// Copies a view's bytes into a fresh, transferable ArrayBuffer. Required because the views are
+// backed by Wasm linear memory: transferring `view.buffer` directly would detach all of Wasm
+// memory, and slicing `view.buffer` would copy the entire heap rather than just the cells.
+function copyOutBuffer(view) {
+    return view.slice().buffer;
 }
 
 function resetCycleState() {
@@ -76,41 +97,9 @@ function resetCycleState() {
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
-function calculateHexBlockEntropy(currentStateArray, config, N_DIRS_ODD, N_DIRS_EVEN) {
-    if (!currentStateArray || !config || !config.NUM_CELLS || config.NUM_CELLS === 0) {
-        return 0;
-    }
-    const blockCounts = new Map();
-    let totalBlocks = 0;
-    const numCols = config.GRID_COLS;
-    const numRows = config.GRID_ROWS;
-
-    for (let i = 0; i < config.NUM_CELLS; i++) {
-        totalBlocks++;
-        const cCol = i % numCols;
-        const cRow = Math.floor(i / numCols);
-        const cState = currentStateArray[i];
-        let neighborMask = 0;
-        const dirs = (cCol % 2 !== 0) ? N_DIRS_ODD : N_DIRS_EVEN;
-        for (let nOrder = 0; nOrder < 6; nOrder++) {
-            const nCol = (cCol + dirs[nOrder][0] + numCols) % numCols;
-            const nRow = (cRow + dirs[nOrder][1] + numRows) % numRows;
-            if (currentStateArray[nRow * numCols + nCol] === 1) {
-                neighborMask |= (1 << nOrder);
-            }
-        }
-        const blockPattern = (cState << 6) | neighborMask;
-        blockCounts.set(blockPattern, (blockCounts.get(blockPattern) || 0) + 1);
-    }
-    if (totalBlocks === 0) return 0;
-    let entropy = 0;
-    for (const count of blockCounts.values()) {
-        const probability = count / totalBlocks;
-        if (probability > 0) {
-            entropy -= probability * Math.log2(probability);
-        }
-    }
-    return entropy / 7.0;
+// Hex block entropy is computed in Wasm over the state buffer it already owns (see World::block_entropy).
+function calculateHexBlockEntropy() {
+    return wasm_world ? wasm_world.block_entropy() : 0;
 }
 
 function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
@@ -160,7 +149,7 @@ function processCommandQueue() {
     for (const command of commandQueue) {
         switch (command.type) {
             case 'SET_RULESET': {
-                ruleset = new Uint8Array(command.data.rulesetBuffer);
+                ruleset.set(new Uint8Array(command.data.rulesetBuffer));
                 rulesetChangedInQueue = true;
                 needsGridUpdate = true;
                 resetCycleState();
@@ -241,8 +230,8 @@ function processCommandQueue() {
                 break;
             }
             case 'LOAD_STATE': {
-                jsStateArray = new Uint8Array(command.data.newStateBuffer);
-                ruleset = new Uint8Array(command.data.newRulesetBuffer);
+                jsStateArray.set(new Uint8Array(command.data.newStateBuffer));
+                ruleset.set(new Uint8Array(command.data.newRulesetBuffer));
                 worldTickCounter = command.data.worldTick || 0;
                 ratioHistory = [];
                 entropyHistory = [];
@@ -275,33 +264,29 @@ function runTick() {
         return; 
     }
     
+    let activeCount;
     if (isCyclePlaybackMode) {
         worldTickCounter++;
         const nextFrame = detectedCycle[cyclePlaybackIndex];
-        jsNextStateArray.set(nextFrame.state);
-        jsNextRuleIndexArray.set(nextFrame.rules);
+        // Playback writes directly into the current state buffer (no run_tick, no buffer swap),
+        // so the Wasm-owned `state` and the worker's views stay in sync.
+        jsStateArray.set(nextFrame.state);
+        jsRuleIndexArray.set(nextFrame.rules);
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
+        activeCount = jsStateArray.reduce((s, c) => s + c, 0);
     } else {
         worldTickCounter++;
-        wasm_world.run_tick(
-            ruleset,
-            jsStateArray,
-            jsNextStateArray,
-            jsNextRuleIndexArray,
-            ruleUsageCounters
-        );
+        // run_tick advances the simulation inside Wasm and swaps the current/next buffers
+        // internally, returning the active-cell count of the new generation. Mirror that swap on
+        // the worker's views so they keep tracking the now-current buffers in linear memory.
+        activeCount = wasm_world.run_tick();
+        [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+        [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
     }
 
-    
+    const newStateChecksum = stateChecksum();
 
-    let activeCount = 0;
-    for(let i = 0; i < jsNextStateArray.length; i++) {
-        if (jsNextStateArray[i] === 1) activeCount++;
-    }
 
-    const newStateChecksum = calculateChecksum(jsNextStateArray);
-
-    
     if (isDetectingCycle) {
         if (newStateChecksum === cycleStartChecksum) {
             isCyclePlaybackMode = true;
@@ -309,16 +294,16 @@ function runTick() {
             cyclePlaybackIndex = 0;
         } else {
             detectedCycle.push({
-                state: jsNextStateArray.slice(),
-                rules: jsNextRuleIndexArray.slice()
+                state: jsStateArray.slice(),
+                rules: jsRuleIndexArray.slice()
             });
         }
     } else if (!isCyclePlaybackMode && stateHistoryChecksums.has(newStateChecksum)) {
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
         detectedCycle = [{
-            state: jsNextStateArray.slice(),
-            rules: jsNextRuleIndexArray.slice()
+            state: jsStateArray.slice(),
+            rules: jsRuleIndexArray.slice()
         }];
     }
 
@@ -332,10 +317,6 @@ function runTick() {
             }
         }
     }
-    
-    
-    [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
-    [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
 
     if (newStateChecksum !== lastSentChecksum) {
         simulationPerformedUpdate = true;
@@ -349,7 +330,7 @@ function runTick() {
 
     if (shouldSampleEntropy) {
         currentBinaryEntropy = calculateBinaryEntropy(ratio);
-        currentBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+        currentBlockEntropy = calculateHexBlockEntropy();
         entropyHistory.push(currentBinaryEntropy);
         hexBlockEntropyHistory.push(currentBlockEntropy);
         if (entropyHistory.length > MAX_HISTORY_SIZE) entropyHistory.shift();
@@ -389,11 +370,13 @@ function sendGridUpdate() {
         return;
     }
 
+    // State and rule-index views are backed by Wasm linear memory, so copy out just their cells
+    // into fresh transferable buffers (never transfer/slice the whole Wasm heap).
     const statePayload = {
         type: 'STATE_UPDATE',
         worldIndex: worldIndex,
-        stateBuffer: jsStateArray.buffer.slice(0),
-        ruleIndexBuffer: jsRuleIndexArray.buffer.slice(0),
+        stateBuffer: copyOutBuffer(jsStateArray),
+        ruleIndexBuffer: copyOutBuffer(jsRuleIndexArray),
         hoverStateBuffer: jsHoverStateArray.buffer.slice(0),
     };
     const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer, statePayload.hoverStateBuffer];
@@ -404,7 +387,8 @@ function sendStatsUpdate(forceUpdate = false) {
     
     if (!isRunning && !forceUpdate) return;
 
-    const ruleUsageCountersBuffer = ruleUsageCounters ? ruleUsageCounters.buffer.slice(0) : null;
+    // ruleUsageCounters is a view into Wasm memory; copy only its 128 entries out.
+    const ruleUsageCountersBuffer = ruleUsageCounters ? copyOutBuffer(ruleUsageCounters) : null;
     const transferListStats = ruleUsageCountersBuffer ? [ruleUsageCountersBuffer] : [];
 
     self.postMessage({
@@ -419,7 +403,7 @@ function forceSyncUpdate() {
     
     
     if (!jsStateArray) return;
-    lastSentChecksum = calculateChecksum(jsStateArray);
+    lastSentChecksum = stateChecksum();
     sendGridUpdate();
 
     const active = jsStateArray.reduce((s, c) => s + c, 0);
@@ -428,7 +412,7 @@ function forceSyncUpdate() {
 
     if (workerIsEntropySamplingEnabled) {
         binaryEntropy = calculateBinaryEntropy(ratio);
-        blockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+        blockEntropy = calculateHexBlockEntropy();
     }
 
     
@@ -464,22 +448,20 @@ self.onmessage = async function(event) {
 
     switch (command.type) {
         case 'INIT': {
-            await init(); 
+            _wasm_module = await init();
             wasm_world = new World(command.data.config.GRID_COLS, command.data.config.GRID_ROWS);
             worldIndex = command.data.worldIndex;
             workerConfig = command.data.config;
-            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED; 
+            currentSpeedTarget = command.data.initialSpeed || Config.DEFAULT_SPEED;
             targetTickDurationMs = 1000 / currentSpeedTarget;
             ratioHistory = [];
             entropyHistory = [];
             hexBlockEntropyHistory = [];
-            jsStateArray = new Uint8Array(command.data.initialStateBuffer);
-            ruleset = new Uint8Array(command.data.initialRulesetBuffer);
+            // State, next-state, rule-index, ruleset and usage-counter buffers all live in Wasm
+            // linear memory; build typed-array views over them rather than allocating in JS.
+            refreshSimViews();
+            ruleset.set(new Uint8Array(command.data.initialRulesetBuffer));
             jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
-            jsNextStateArray = new Uint8Array(workerConfig.NUM_CELLS); 
-            jsRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
-            jsNextRuleIndexArray = new Uint8Array(workerConfig.NUM_CELLS); 
-            ruleUsageCounters = new Uint32Array(128);
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
             workerEntropySampleRate = command.data.initialEntropySampleRate || 10;
@@ -505,7 +487,7 @@ self.onmessage = async function(event) {
             }
             jsHoverStateArray.fill(0);
 
-            const initialChecksum = calculateChecksum(jsStateArray);
+            const initialChecksum = stateChecksum();
             stateHistoryChecksums.add(initialChecksum);
             stateChecksumQueue.push(initialChecksum);
             lastSentChecksum = initialChecksum;
@@ -515,7 +497,7 @@ self.onmessage = async function(event) {
             let initialBinaryEntropy, initialBlockEntropy;
             if (isEnabled && workerIsEntropySamplingEnabled) {
                 initialBinaryEntropy = calculateBinaryEntropy(initialRatio);
-                initialBlockEntropy = calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R);
+                initialBlockEntropy = calculateHexBlockEntropy();
                 ratioHistory.push(initialRatio);
                 entropyHistory.push(initialBinaryEntropy);
                 hexBlockEntropyHistory.push(initialBlockEntropy);
@@ -573,7 +555,7 @@ self.onmessage = async function(event) {
             }
             updateSimulationInterval(); 
             if (sendUpdateForSetEnabled) {
-                lastSentChecksum = calculateChecksum(jsStateArray); 
+                lastSentChecksum = stateChecksum();
                 const activeAfterEnable = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0; 
                 
@@ -583,7 +565,7 @@ self.onmessage = async function(event) {
                     activeCount: activeAfterEnable,
                     ratio: ratioAfterEnable,
                     binaryEntropy: workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratioAfterEnable) : undefined,
-                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R) : undefined,
+                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined,
                     rulesetHex: rulesetToHex(ruleset),
                     isEnabled: isEnabled,
                     isInCycle: isCyclePlaybackMode,
@@ -613,7 +595,7 @@ self.onmessage = async function(event) {
             commandQueue.push(command);
             const { needsGridUpdate: inducedUpdateOnGrid } = processCommandQueue();
             if (inducedUpdateOnGrid) {
-                lastSentChecksum = calculateChecksum(jsStateArray);
+                lastSentChecksum = stateChecksum();
                 const active = jsStateArray.reduce((s, c) => s + c, 0);
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
                 
@@ -623,7 +605,7 @@ self.onmessage = async function(event) {
                     activeCount: active,
                     ratio: ratio,
                     binaryEntropy: workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratio) : undefined,
-                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy(jsStateArray, workerConfig, NEIGHBOR_DIRS_ODD_R, NEIGHBOR_DIRS_EVEN_R) : undefined,
+                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined,
                     rulesetHex: rulesetToHex(ruleset),
                     isEnabled: isEnabled,
                     isInCycle: isCyclePlaybackMode,

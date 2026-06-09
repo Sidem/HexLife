@@ -7,6 +7,7 @@ import { AppContext } from './core/AppContext.js';
 import { UIManager } from './ui/UIManager.js';
 import { Application } from './core/Application.js';
 import { SettingsLoader } from './services/SettingsLoader.js';
+import * as PersistenceService from './services/PersistenceService.js';
 import rulesetLibrary from './core/library/rulesets.json';
 import patternLibrary from './core/library/patterns.json';
 
@@ -76,6 +77,21 @@ async function initialize() {
     console.log("GPU detection:", detection);
 
     const sharedSettings = SettingsLoader.loadFromUrl();
+
+    // Resolve the grid size before constructing anything that depends on grid dimensions (workers,
+    // renderer buffers). A size from a share URL wins and is persisted; otherwise use the saved
+    // setting, falling back to the default preset.
+    const defaultGridRows = Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY];
+    let gridRows;
+    if (sharedSettings.fromUrl && sharedSettings.gridRows) {
+        gridRows = sharedSettings.gridRows;
+        PersistenceService.saveUISetting('gridRows', gridRows);
+    } else {
+        gridRows = PersistenceService.loadUISetting('gridRows', defaultGridRows);
+    }
+    Config.setGridDimensions(gridRows);
+    console.log(`Grid size: ${Config.GRID_ROWS} rows x ${Config.GRID_COLS} cols (${Config.NUM_CELLS} cells).`);
+
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
     
     updateLoadingStatus("Spooling up simulation workers...");

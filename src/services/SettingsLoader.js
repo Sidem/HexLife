@@ -48,6 +48,14 @@ export class SettingsLoader {
             }
         }
 
+        // Grid size (row count). Columns are derived from this on load.
+        if (params.has('g')) {
+            const gridRows = parseInt(params.get('g'), 10);
+            if (!isNaN(gridRows) && gridRows >= 16 && gridRows <= 2048) {
+                sharedSettings.gridRows = gridRows;
+            }
+        }
+
         // Enabled Mask
         if (params.has('e')) {
             const enabledMask = parseInt(params.get('e'), 10);

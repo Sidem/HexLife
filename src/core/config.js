@@ -1,7 +1,56 @@
-export const GRID_ROWS = 32*6;
-export const GRID_COLS = 37*6; // GRID_ROWS * (1/(sqrt(3)/2))
-export const NUM_CELLS = GRID_ROWS * GRID_COLS;
-export const HEX_SIZE = 50; 
+// --- Grid dimensions ---------------------------------------------------------
+// The grid size is configurable at startup (persisted setting / share-URL `g` param). Dimensions
+// are derived from a single row count so the rendered grid keeps a roughly square aspect ratio,
+// and the column count is forced even so the flat-top odd-r hex layout wraps seamlessly on the
+// torus (an odd column count leaves a half-row jog at the wrap seam).
+//
+// These are intentionally mutable (`let`) and read live via the `Config.*` namespace everywhere.
+// Call setGridDimensions() once, before WorldManager / the renderer are constructed.
+const SQRT3_OVER_2 = Math.sqrt(3) / 2;
+
+/** Named row-count presets. Cols are derived (see deriveGridDimensions). 'medium' is the legacy size. */
+export const GRID_SIZE_PRESETS = {
+    small: 96,
+    medium: 192,
+    large: 384,
+    huge: 576,
+};
+export const DEFAULT_GRID_SIZE_KEY = 'medium';
+
+/**
+ * Derives a seamless, ratio-preserving grid from a desired row count.
+ * @param {number} rows Desired number of rows.
+ * @returns {{rows: number, cols: number}} Sanitized rows and an even column count (cols ≈ rows·2/√3).
+ */
+export function deriveGridDimensions(rows) {
+    const safeRows = Math.max(2, Math.round(rows) || GRID_SIZE_PRESETS[DEFAULT_GRID_SIZE_KEY]);
+    let cols = Math.round(safeRows / SQRT3_OVER_2); // rows * (1/(sqrt(3)/2)) == rows * 2/sqrt(3)
+    if (cols % 2 !== 0) cols += 1; // even columns => seamless toroidal wrap
+    return { rows: safeRows, cols };
+}
+
+export let GRID_ROWS = 0;
+export let GRID_COLS = 0;
+export let NUM_CELLS = 0;
+
+/**
+ * Sets the live grid dimensions from a row count, keeping the aspect ratio and an even column count.
+ * @param {number} rows Desired number of rows.
+ * @returns {{rows: number, cols: number, numCells: number}}
+ */
+export function setGridDimensions(rows) {
+    const { rows: r, cols: c } = deriveGridDimensions(rows);
+    GRID_ROWS = r;
+    GRID_COLS = c;
+    NUM_CELLS = r * c;
+    return { rows: r, cols: c, numCells: NUM_CELLS };
+}
+
+// Initialize to the default so any module consuming these before startup config runs sees valid,
+// legacy-compatible values (192 x 222 = 42624 cells).
+setGridDimensions(GRID_SIZE_PRESETS[DEFAULT_GRID_SIZE_KEY]);
+
+export const HEX_SIZE = 50;
 export const HEX_WIDTH = 2 * HEX_SIZE;
 export const HEX_HEIGHT = Math.sqrt(3) * HEX_SIZE;
 export const WORLD_LAYOUT_ROWS = 3;

@@ -47,7 +47,8 @@ export class WorldProxy {
             NUM_CELLS: initialSettings.config.NUM_CELLS,
         };
         
-        const initialStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
+        // The cell state buffer now lives inside Wasm linear memory (allocated by the worker), so
+        // only the ruleset and hover buffers need to be handed over at init.
         const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0);
         const initialHoverStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
 
@@ -56,7 +57,6 @@ export class WorldProxy {
             data: {
                 worldIndex: this.worldIndex,
                 config: initialConfig,
-                initialStateBuffer: initialStateBuffer,
                 initialRulesetBuffer: initialRulesetBuffer,
                 initialHoverStateBuffer: initialHoverStateBuffer,
                 initialState: initialSettings.initialState, // Add this
@@ -65,7 +65,7 @@ export class WorldProxy {
                 initialEntropySamplingEnabled: initialSettings.initialEntropySamplingEnabled,
                 initialEntropySampleRate: initialSettings.initialEntropySampleRate,
             }
-        }, [initialStateBuffer, initialRulesetBuffer, initialHoverStateBuffer]);
+        }, [initialRulesetBuffer, initialHoverStateBuffer]);
     }
 
     _handleWorkerMessage(data) {

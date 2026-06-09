@@ -1024,6 +1024,11 @@ export class WorldManager {
             params.set('w', selectedIndex);
         }
 
+        // Grid size (only when it differs from the default preset).
+        if (Config.GRID_ROWS !== Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY]) {
+            params.set('g', Config.GRID_ROWS);
+        }
+
         const camera = this.getCurrentCameraState();
         if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
             params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
