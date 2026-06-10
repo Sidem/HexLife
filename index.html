@@ -47,6 +47,9 @@
         // Testing shim: "?headless=1" keeps the render loop and visibility state alive
         // in hidden/headless browsers (rAF is suspended when document.hidden is true).
         if (new URLSearchParams(location.search).has('headless')) {
+            // Captured here because SettingsLoader strips the query string on startup,
+            // so by the time app code runs `location.search` is already empty.
+            window.__headless = true;
             Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
             Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
             window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);

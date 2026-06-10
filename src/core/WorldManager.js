@@ -300,16 +300,13 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, this._applySelectedInitialStateToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, this._resetStatesToDefault);
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
-            // --- MODIFICATION START ---
             const baseSeed = Date.now();
             this.worlds.forEach((proxy, idx) => {
                 if (this.worldSettings[idx]) {
-                    const seed = this.deterministic ? baseSeed : baseSeed + idx;
-                    proxy.resetWorld(this.worldSettings[idx].initialState, seed);
+                    proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
                 }
             });
-            // --- MODIFICATION END ---
             EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
         });
         EventBus.subscribe(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, (data) => {
@@ -319,6 +316,7 @@ export class WorldManager {
                 return;
             }
             const indicesToReset = this._getAffectedWorldIndices(data.scope);
+            const baseSeed = Date.now();
             indicesToReset.forEach(idx => {
                 if (data.copyPrimaryRuleset && idx !== this.selectedWorldIndex) {
                     const newRulesetBuffer = hexToRuleset(primaryRulesetHex).buffer.slice(0);
@@ -326,8 +324,7 @@ export class WorldManager {
                     this.worldSettings[idx].rulesetHex = primaryRulesetHex;
                 }
                 if (this.worldSettings[idx]) {
-                    // --- MODIFICATION ---
-                    this.worlds[idx].resetWorld(this.worldSettings[idx].initialState);
+                    this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
                     if (!this.isGloballyPaused && this.worldSettings[idx].enabled) this.worlds[idx].startSimulation();
                 }
             });
@@ -432,6 +429,20 @@ export class WorldManager {
         return [];
     }
 
+    /**
+     * Computes the RNG seed for a single world reset. In deterministic mode every
+     * world shares `baseSeed`, so worlds with matching initial-state configs reset
+     * to identical grids; otherwise each world is offset by its index. Callers must
+     * capture `baseSeed` once (e.g. `Date.now()`) before the reset loop so a single
+     * operation seeds all worlds consistently.
+     * @param {number} baseSeed - A single seed captured once per reset operation.
+     * @param {number} worldIndex
+     * @returns {number}
+     */
+    _getResetSeed(baseSeed, worldIndex) {
+        return this.deterministic ? baseSeed : baseSeed + worldIndex;
+    }
+
     #applyRulesetToWorlds = (rulesetHex, scope, shouldReset) => {
         const newRulesetArray = hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
@@ -440,18 +451,19 @@ export class WorldManager {
         }
 
         const indicesToAffect = this._getAffectedWorldIndices(scope);
+        const baseSeed = Date.now();
 
         indicesToAffect.forEach(idx => {
-            
+
             this._addRulesetToHistory(idx, rulesetHex);
-            
+
             const newRulesetBuffer = newRulesetArray.buffer.slice(0);
             this.worlds[idx].setRuleset(newRulesetBuffer);
             this.worldSettings[idx].rulesetHex = rulesetHex;
 
-            
+
             if (shouldReset && this.worldSettings[idx]) {
-                this.worlds[idx].resetWorld(this.worldSettings[idx].initialState);
+                this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
             }
         });
 
@@ -565,6 +577,7 @@ export class WorldManager {
         }
 
         const generatedHexes = new Set([sourceRulesetHex]);
+        const baseSeed = Date.now();
 
         this.worlds.forEach((proxy, idx) => {
             let newHex = sourceRulesetHex;
@@ -603,18 +616,18 @@ export class WorldManager {
             this.worldSettings[idx].rulesetHex = newHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
-                
+                proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
+
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
                 }
             }
         });
 
-        
+
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET); 
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
     }
 
     _cloneRuleset = () => {
@@ -631,17 +644,18 @@ export class WorldManager {
              return;
         }
 
+        const baseSeed = Date.now();
         this.worlds.forEach((proxy, idx) => {
             if (idx !== this.selectedWorldIndex) {
                 const newRulesetBuffer = hexToRuleset(sourceRulesetHex).buffer.slice(0);
                 proxy.setRuleset(newRulesetBuffer);
             }
-            
+
             this._addRulesetToHistory(idx, sourceRulesetHex);
             this.worldSettings[idx].rulesetHex = sourceRulesetHex;
 
             if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
+                proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
                 
                 if (!this.isGloballyPaused) {
                     proxy.startSimulation();
@@ -656,6 +670,7 @@ export class WorldManager {
 
     _modifyRulesetForScope = (scope, modifierFunc, conditionalResetScope) => {
         const indices = this._getAffectedWorldIndices(scope);
+        const baseSeed = Date.now();
         indices.forEach(idx => {
             const proxyStats = this.worlds[idx]?.getLatestStats();
             let currentHex = (proxyStats?.rulesetHex && proxyStats.rulesetHex !== "Error")
@@ -679,7 +694,7 @@ export class WorldManager {
                 if (conditionalResetScope !== 'none') {
                     const resetTargetIndices = this._getAffectedWorldIndices(conditionalResetScope);
                     if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
-                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, Date.now() + idx);
+                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
                     }
                 }
             }

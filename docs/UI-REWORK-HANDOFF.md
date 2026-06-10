@@ -62,6 +62,34 @@ All of the above was verified in-preview on desktop (1280×800) and mobile (375�
 bring-to-front, active states, Escape ordering, history outside-click close, the `worldsetup`
 help-trigger tour stepping through all 4 steps, and the grouped Learning Hub. No console errors.
 
+### Deterministic reset fix (re-applying PR #1)
+
+The "Deterministic Reset" toggle (`WorldManager.deterministic`, World Setup panel) only worked on
+the bulk **Reset All** path. Five other reset paths bypassed it — Clone & Mutate, Clone, and
+`_modifyRulesetForScope` reseeded with `Date.now() + idx` (never reproducible), while
+`COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET` and `#applyRulesetToWorlds` called `resetWorld` with
+**no seed at all** (worker falls back to `Math.random`). This is the regression originally fixed in
+[PR #1](https://github.com/Sidem/HexLife/pull/1), which had been lost.
+
+- **`WorldManager._getResetSeed(baseSeed, worldIndex)`** (new): returns the shared `baseSeed` in
+  deterministic mode, else `baseSeed + worldIndex`. Each reset path now captures `baseSeed =
+  Date.now()` **once before its loop** and routes every `resetWorld` call through the helper. All
+  six paths are unified.
+- **Dead FAB constants fixed** (`WorldsController.js`, `UIManager.js`): the mobile density FABs
+  dispatched undefined `COMMAND_RESET_DENSITIES_TO_DEFAULT` / `COMMAND_APPLY_SELECTED_DENSITY_TO_ALL`
+  (silent no-ops) → now `COMMAND_RESET_INITIAL_STATES_TO_DEFAULT` /
+  `COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL`.
+
+Verified in-preview via the real EventBus command path (all worlds set to density 0.5): deterministic
+ON → all 9 worlds produce byte-identical gen-0 grids (paused, same checksum & on-count); OFF → 9
+distinct grids; Clone with deterministic ON → identical grids. No console errors. Note: the worker
+treats a falsy seed as `Math.random`, so every reset path **must** pass a real seed.
+
+**Headless debug handle:** the `?headless=1` shim (`index.html`) now also sets `window.__headless`,
+and `main.js` exposes `window.__hexlife = appContext` when that flag is set. Use it to drive
+commands and read `worldManager.worlds[i].latestStateArray` in-browser. Reads after a reset/clone
+are async (worker round-trip) — read in a **separate** eval call, not the same one that dispatches.
+
 ## Known-good registered tour names (must stay in sync)
 
 `tourSteps.js` exports: `core, controls, ruleset_actions, editor, worldsetup, analysis,

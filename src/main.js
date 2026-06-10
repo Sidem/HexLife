@@ -124,6 +124,7 @@ async function initialize() {
     });
 
     const app = new Application(appContext);
+    if (window.__headless) window.__hexlife = appContext; // headless-only debug handle for in-browser verification
     app.run();
 }
 
