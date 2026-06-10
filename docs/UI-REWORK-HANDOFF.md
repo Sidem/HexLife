@@ -90,6 +90,40 @@ and `main.js` exposes `window.__hexlife = appContext` when that flag is set. Use
 commands and read `worldManager.worlds[i].latestStateArray` in-browser. Reads after a reset/clone
 are async (worker round-trip) — read in a **separate** eval call, not the same one that dispatches.
 
+### Tour polish + calm first-contact + emoji cleanup (this session)
+
+Addresses follow-ups 1, 2, and 6 below.
+
+- **Tour open-gate skip (follow-up 1)** (`tourSteps.js`, `OnboardingManager.js` unchanged):
+  panel/popout tours (`controls`, `ruleset_actions`, `editor`, `worldsetup`, `analysis`,
+  `rulerank`) now carry a `condition` on their step-1 "Open this panel" gate. New
+  `isViewOpen({desktop, mobile})` helper checks `panelManager.getPanel(name).isHidden()` /
+  `toolbar.getPopout(name).isHidden()` / `uiManager.activeMobileViewName`. When the panel is
+  already open (e.g. the tour was launched from that panel's own `[?]` trigger), `condition`
+  returns false → the engine's existing skip-to-next logic drops straight to step 2. Verified
+  in-preview: panel open → tour starts at step index 1; panel closed → step 0.
+- **Calm first-contact via the core tour (follow-up 2)** (`tourSteps.js`): new
+  `focusOrientation()` runs on the core "Welcome" step's `onBeforeShow` — `resetUIState()` +
+  `COMMAND_SET_PAUSE_STATE true` + `COMMAND_SELECT_WORLD` (centre). A brand-new user starts on
+  ONE still, centred universe behind the dimmed welcome card (matching the "Time is currently
+  frozen" copy), and the existing Play → minimap → draw → help steps reveal the rest
+  progressively. No renderer/single-world-canvas changes (worlds+minimap share one WebGL
+  canvas, so a true one-world view would need renderer work — left as a follow-up). The default
+  selected world is already the centre and `INITIAL_RULESET_CODE` is already a fixed curated
+  ruleset, so "curated ruleset" was effectively already satisfied; this just guarantees the
+  frozen, centred focal point (also on tour replays).
+- **Remaining emoji → `icons.js` (follow-up 6)**: added `star`, `starFilled`, `history`,
+  `check` icons. `TopInfoBar.js` injects them at init (the ⭐/🕒 in `index.html` stay as a
+  no-JS fallback, matching the toolbar/tab-bar pattern); `updateSaveStatus` now swaps
+  filled-star (saved: personal/public) vs outline-star (unsaved). Also migrated `MoreView.js`
+  (Save Ruleset), `RulesetActionsComponent.js` empty-state, the `personal_library` tour text,
+  `LearningComponent.js` status icons (🎓/✅ → graduationCap/check), and `ToolsBottomSheet.js`'s
+  FAB-customization list (was a stale emoji duplicate of `UIManager.renderCustomFabs`' icon
+  map). New `.inline-icon` util in `theme.css` sizes in-text SVGs to ~1.1em. Verified: top-bar
+  buttons + Learning Hub rows render `<svg>`, no console errors.
+  - **Still emoji (intentional / out of scope):** `index.html` `#appLogo`/tab `⬡` brand mark;
+    undo/redo `↶ ↷` glyphs; `ChromaLabComponent.js` `⚠️` warnings and `🢂` swatch arrows.
+
 ## Known-good registered tour names (must stay in sync)
 
 `tourSteps.js` exports: `core, controls, ruleset_actions, editor, worldsetup, analysis,
@@ -100,12 +134,10 @@ rulerank, history, appliedEvolution, resetClear, saveLoad, personal_library`.
 
 Higher-value UX work observed but out of scope so far, roughly prioritized:
 
-1. **Tour launched from inside its own panel feels awkward.** `worldsetup`/`analysis`/etc.
-   step 1 runs `resetUIState` (closes the panel) then asks the user to re-open it via the
-   toolbar button to fire `VIEW_SHOWN`. Consider: if the panel is already open, skip step 1's
-   open-gate and start at step 2. (Low risk, good polish.)
-2. **First-contact overwhelm.** New users see 9 worlds of noise + a 14-button toolbar. Consider a
-   "focus mode" that starts on one world with a curated ruleset, revealing the grid progressively.
+1. ✅ **Done (this session).** Tour open-gate skip — see "Tour polish" above.
+2. ✅ **Partially done (this session).** Calm first-contact via the core tour — see above. A
+   true single-world *canvas* focus (hiding the minimap + other 8 worlds and progressively
+   revealing the 3×3) still needs `renderer.js` work and is the remaining piece if desired.
 3. **Mobile parity gaps in tours.** A few steps still reference desktop-only popouts (e.g. the
    `resetClear`/`history` flows). They're now hidden in the Learning Hub on mobile, but the
    `appliedEvolution` mission still has desktop-only `condition` branches worth auditing on a real
@@ -115,8 +147,8 @@ Higher-value UX work observed but out of scope so far, roughly prioritized:
 5. **`z-index` ceiling.** `bringToFront` counts up from 1001; with many open/close cycles it stays
    bounded (it re-sorts existing values), but if popouts (1050) ever need to coexist above a
    focused panel, revisit the band allocation.
-6. **Remaining emoji** in panel *content* (⭐/🕒 top-bar buttons, More view, save-ruleset states)
-   still use emoji; migrate to `icons.js` for full consistency. The toolbar/tabs/FABs are done.
+6. ✅ **Done (this session).** Remaining emoji migrated to `icons.js` — see "Remaining emoji"
+   above. Only the intentional brand/glyph/ChromaLab emoji remain.
 7. **Toolbar tooltips** are native `title=` (slow, unstyled). A lightweight custom tooltip would
    match the new visual language and could show the keyboard shortcut.
 

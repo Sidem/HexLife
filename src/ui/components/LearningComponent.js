@@ -1,6 +1,7 @@
 import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { ICONS } from '../icons.js';
 
 export class LearningComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -61,7 +62,7 @@ export class LearningComponent extends BaseComponent {
             const li = document.createElement('li');
             li.className = 'learning-center-item';
             li.innerHTML = `
-                <span class="status-icon">🎓</span>
+                <span class="status-icon">${ICONS.graduationCap}</span>
                 <span class="tour-name">${tour.name}</span>
                 <button class="button tour-start-button" data-tour-name="${tour.id}">Start</button>
             `;
@@ -101,7 +102,7 @@ export class LearningComponent extends BaseComponent {
             const isCompleted = completedTours[tour.id];
             const cache = this.tourItemCache[tour.id];
             if (cache) {
-                cache.statusIcon.textContent = isCompleted ? '✅' : '🎓';
+                cache.statusIcon.innerHTML = isCompleted ? ICONS.check : ICONS.graduationCap;
                 cache.startButton.textContent = isCompleted ? 'Replay' : 'Start';
                 cache.item.classList.toggle('hidden', Boolean(tour.desktopOnly && isMobile));
             }

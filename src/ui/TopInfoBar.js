@@ -2,6 +2,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { formatHexCode } from '../utils/utils.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import { ICONS } from './icons.js';
 
 export class TopInfoBar {
     constructor(appContext) {
@@ -34,6 +35,11 @@ export class TopInfoBar {
             appMenuPopout: document.getElementById('appMenuPopout')
         };
         
+        // Replace the emoji placeholders (kept in index.html as a no-JS fallback)
+        // with the shared SVG icon set, matching the toolbar/tab-bar treatment.
+        if (this.uiElements.historyButton) this.uiElements.historyButton.innerHTML = ICONS.history;
+        if (this.uiElements.saveRulesetButton) this.uiElements.saveRulesetButton.innerHTML = ICONS.star;
+
         this._setupEventListeners();
 
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
@@ -221,17 +227,22 @@ export class TopInfoBar {
         this.saveStatus = status; 
         this.uiElements.saveRulesetButton.classList.remove('is-personal', 'is-public', 'not-saved');
 
+        // Filled star = this ruleset is known/saved (personal or public);
+        // outline star = unsaved. Colour is driven by the state class in CSS.
         if (status.isPersonal) {
             this.uiElements.saveRulesetButton.classList.add('is-personal');
+            this.uiElements.saveRulesetButton.innerHTML = ICONS.starFilled;
             this.uiElements.saveRulesetButton.style.cursor = 'pointer';
             this.uiElements.saveRulesetButton.title = 'Edit this ruleset in your personal library.';
         } else if (status.isPublic) {
             this.uiElements.saveRulesetButton.classList.add('is-public');
-            this.uiElements.saveRulesetButton.style.cursor = 'not-allowed'; 
+            this.uiElements.saveRulesetButton.innerHTML = ICONS.starFilled;
+            this.uiElements.saveRulesetButton.style.cursor = 'not-allowed';
             this.uiElements.saveRulesetButton.title = 'This is a public ruleset from the library.';
         } else {
             this.uiElements.saveRulesetButton.classList.add('not-saved');
-            this.uiElements.saveRulesetButton.style.cursor = 'pointer'; 
+            this.uiElements.saveRulesetButton.innerHTML = ICONS.star;
+            this.uiElements.saveRulesetButton.style.cursor = 'pointer';
             this.uiElements.saveRulesetButton.title = 'Save this ruleset to your personal library.';
         }
     }

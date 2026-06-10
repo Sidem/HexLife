@@ -259,6 +259,16 @@ select:focus {
     background-color: transparent;
 }
 
+/* Inline SVG icon sized to flow inside body text (icons.js renders at 20px). */
+.inline-icon {
+    display: inline-flex;
+    vertical-align: -0.15em;
+}
+.inline-icon svg {
+    width: 1.1em;
+    height: 1.1em;
+}
+
 /* ---------- Desktop vertical toolbar ---------- */
 
 #vertical-toolbar {

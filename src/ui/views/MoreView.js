@@ -1,5 +1,6 @@
 import { BaseComponent } from '../components/BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { ICONS } from '../icons.js';
 
 export class MoreView extends BaseComponent {
     constructor(mountPoint, appContext) {
@@ -23,7 +24,7 @@ export class MoreView extends BaseComponent {
         <label for="mobileFileInput" class="button file-input-label">Load World State</label>
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
         <button class="button" data-action="share">Share Setup</button>
-        <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset">⭐ Save Ruleset</button>
+        <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.star} Save Ruleset</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
     </div>

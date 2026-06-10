@@ -3,6 +3,7 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
+import { ICONS } from '../icons.js';
 
 export class RulesetActionsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -194,7 +195,7 @@ export class RulesetActionsComponent extends BaseComponent {
         const userRulesets = this.appContext.libraryController.getUserLibrary();
 
         if (userRulesets.length === 0) {
-            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the ⭐ icon to save the current ruleset!</p>`;
+            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the <span class="inline-icon">${ICONS.star}</span> icon to save the current ruleset!</p>`;
             return;
         }
 

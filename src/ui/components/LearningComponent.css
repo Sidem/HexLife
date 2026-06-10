@@ -38,6 +38,14 @@
     font-size: 1.2em;
     margin-right: 12px;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent, #f0c674);
+}
+
+.learning-center-item .status-icon svg {
+    width: 20px;
+    height: 20px;
 }
 
 .learning-center-item .tour-name {

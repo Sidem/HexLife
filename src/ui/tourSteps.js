@@ -1,4 +1,5 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { ICONS } from './icons.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
@@ -25,6 +26,20 @@ export const getTours = (appContext) => {
     };
 
     /**
+     * Calm first-contact focus for the core "Welcome" orientation. Rather than a
+     * separate focus-mode subsystem, we lean on the orientation tour itself: clear
+     * the chrome, freeze time, and centre the big viewer on a single universe so a
+     * brand-new user starts on ONE still world instead of scanning nine noisy ones.
+     * The subsequent steps (Play → minimap → draw → help) then reveal the rest of
+     * the experience progressively. Safe to run on replays too — it just re-centres.
+     */
+    const focusOrientation = () => {
+        resetUIState();
+        EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, Math.floor(appContext.worldManager.worlds.length / 2));
+    };
+
+    /**
      * Helper to show the correct view for a tour step.
      * @param {{desktop: {type: 'panel'|'popout', name: string}, mobile: {view: string}}} config
      */
@@ -38,13 +53,36 @@ export const getTours = (appContext) => {
             EventBus.dispatch(event, { [key]: config.desktop.name, show: true });
         }
     };
+
+    /**
+     * Returns true when the panel/popout/view a tour is about to open is already
+     * visible — so the "Open this panel" intro step can be skipped (it otherwise
+     * closes the panel via resetUIState and awkwardly asks the user to re-open it,
+     * which is especially jarring when the tour was launched from that panel's own
+     * [?] help trigger). A `condition` returning the negation skips step 1 cleanly.
+     * Mirrors the {desktop, mobile} config shape used by showView. Returns false
+     * (i.e. "not open", so don't skip) whenever the state can't be determined, e.g.
+     * mobile controls which live in a FAB sheet rather than a tracked tab view.
+     */
+    const isViewOpen = (config) => {
+        if (appContext.uiManager.isMobile()) {
+            return !!config.mobile && appContext.uiManager.activeMobileViewName === config.mobile.view;
+        }
+        if (!config.desktop) return false;
+        if (config.desktop.type === 'popout') {
+            const popout = appContext.toolbar.getPopout(config.desktop.name);
+            return !!popout && !popout.isHidden();
+        }
+        const panel = appContext.panelManager.getPanel(config.desktop.name);
+        return !!panel && !panel.isHidden();
+    };
     
     const core = [{
         element: 'body',
         title: 'Welcome to the HexLife Explorer',
         content: "You've arrived at the HexLife Observatory. Before you lie nine parallel universes, each waiting for a spark of life. Your mission: to discover the rules that govern them.",
         primaryAction: { text: 'Begin Orientation' },
-        onBeforeShow: resetUIState,
+        onBeforeShow: focusOrientation,
         advanceOn: { type: 'click' }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
@@ -86,6 +124,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Simulation Controls',
         content: "This menu contains global controls for simulation speed, brush size, and interaction preferences.",
         primaryAction: { text: 'Open Controls' },
+        condition: () => !isViewOpen({ desktop: { type: 'popout', name: 'controls' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ControlsComponent }
     }, {
@@ -107,6 +146,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Ruleset Actions',
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'rules' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
@@ -137,6 +177,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: The Ruleset Editor',
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'editor' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetEditorComponent }
     }, {
@@ -159,6 +200,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: World Setup',
         content: "Each of the nine universes can be configured independently. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel to manage them.",
         primaryAction: { text: 'Open Panel' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
@@ -187,6 +229,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Analysis Tools',
         content: "Beyond watching patterns, you can measure them. Open the <span class=\"onboarding-highlight-text\">Analysis</span> panel to see live metrics for the selected world.",
         primaryAction: { text: 'Open Panel' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'analysis' }, mobile: { view: 'analyze' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === AnalysisComponent }
     }, {
@@ -203,6 +246,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Rule Usage Ranking',
         content: "Which of the 128 rules are doing the real work? Open the <span class=\"onboarding-highlight-text\">Rule Rank</span> panel to find out.",
         primaryAction: { text: 'Open Panel' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulerank' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RuleRankComponent }
     }, {
@@ -411,7 +455,7 @@ export const getTours = (appContext) => {
     }, {
         element: () => appContext.uiManager.isMobile() ? '[data-action="save-ruleset-mobile"]' : '#saveRulesetButton',
         title: 'Step 1: Save the Ruleset',
-        content: "This star icon (⭐) shows the status of the current ruleset. Since it's dim, it's unsaved. Click the <span class=\"onboarding-highlight-text\">Save button</span> to add it to your personal collection.",
+        content: "This star icon (<span class=\"inline-icon\">" + ICONS.star + "</span>) shows the status of the current ruleset. Since it's an outline, it's unsaved. Click the <span class=\"onboarding-highlight-text\">Save button</span> to add it to your personal collection.",
         primaryAction: { text: 'Click the Star' },
         onBeforeShow: () => {
             if (appContext.uiManager.isMobile()) {

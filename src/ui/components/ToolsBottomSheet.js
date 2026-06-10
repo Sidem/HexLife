@@ -2,6 +2,7 @@ import { BottomSheet } from './BottomSheet.js';
 import { ControlsComponent } from './ControlsComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { ICONS } from '../icons.js';
 
 
 
@@ -79,17 +80,19 @@ export class ToolsBottomSheet extends BottomSheet {
 
     _initCustomizeFabsPane() {
         const fabActionList = this.sheetContent.querySelector('#fab-action-list');
+        // Icons mirror UIManager.renderCustomFabs' fabActionMap so the
+        // customization list matches the FABs it configures.
         const actions = [
-            { id: 'generate', icon: '✨', text: 'Generate' },
-            { id: 'mutate', icon: '🦠', text: 'Mutate' },
-            { id: 'clone', icon: '👯', text: 'Clone' },
-            { id: 'clone-mutate', icon: '🧬', text: 'Clone & Mutate' },
-            { id: 'clear-one', icon: '🧹', text: 'Clear' },
-            { id: 'clear-all', icon: '🌍', text: 'Clear All' },
-            { id: 'reset-one', icon: '🔄', text: 'Reset' },
-            { id: 'reset-all', icon: '♻️', text: 'Reset All' },
-            { id: 'reset-densities', icon: '🎨', text: 'Default Densities' },
-            { id: 'apply-density-all', icon: '🎯', text: 'Apply Density' }
+            { id: 'generate', icon: ICONS.sparkles, text: 'Generate' },
+            { id: 'mutate', icon: ICONS.shuffle, text: 'Mutate' },
+            { id: 'clone', icon: ICONS.copy, text: 'Clone' },
+            { id: 'clone-mutate', icon: ICONS.copyPlus, text: 'Clone & Mutate' },
+            { id: 'clear-one', icon: ICONS.eraser, text: 'Clear' },
+            { id: 'clear-all', icon: ICONS.trash, text: 'Clear All' },
+            { id: 'reset-one', icon: ICONS.rotateCcw, text: 'Reset' },
+            { id: 'reset-all', icon: ICONS.refreshCw, text: 'Reset All' },
+            { id: 'reset-densities', icon: ICONS.droplet, text: 'Default Densities' },
+            { id: 'apply-density-all', icon: ICONS.target, text: 'Apply Density' }
         ];
 
         const savedSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true });
