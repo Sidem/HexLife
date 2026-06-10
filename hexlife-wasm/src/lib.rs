@@ -4,8 +4,11 @@ use wasm_bindgen::prelude::*;
 // extern crate console_error_panic_hook;
 // use std::panic;
 
-// Define the neighbor directions just like in the JavaScript version.
-// Using 'static' makes them globally available within the module.
+// CANONICAL SOURCE shared with the JS config. These two tables are duplicated verbatim as
+// `NEIGHBOR_DIRS_ODD_R` / `NEIGHBOR_DIRS_EVEN_R` in `src/core/config.js`. They MUST stay
+// byte-for-byte identical on both sides — a mismatch silently changes the simulation. Drift is
+// guarded on each side: Rust by `neighbor_dirs_match_canonical` (in the tests module below); JS by
+// tests/neighborDirs.test.js. If you edit one table, edit the other and update both pinned tests.
 const NEIGHBOR_DIRS_ODD_R: [[i32; 2]; 6] = [[-1, 1], [-1, 0], [0, -1], [1, 0], [1, 1], [0, 1]];
 const NEIGHBOR_DIRS_EVEN_R: [[i32; 2]; 6] = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [0, 1]];
 
@@ -302,6 +305,21 @@ mod tests {
                 assert!(found, "adjacency {i}->{} not mutual", j);
             }
         }
+    }
+
+    #[test]
+    fn neighbor_dirs_match_canonical() {
+        // Pin the Rust copies of the hex neighbor-offset tables to their canonical values. The same
+        // literals live in src/core/config.js (guarded by tests/neighborDirs.test.js). If you change
+        // one side, change the other and update both pinned tests — drift silently alters the sim.
+        assert_eq!(
+            NEIGHBOR_DIRS_ODD_R,
+            [[-1, 1], [-1, 0], [0, -1], [1, 0], [1, 1], [0, 1]],
+        );
+        assert_eq!(
+            NEIGHBOR_DIRS_EVEN_R,
+            [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [0, 1]],
+        );
     }
 
     #[test]

@@ -1,0 +1,188 @@
+import { rulesetToHex, hexToRuleset } from '../utils/utils.js';
+import * as Symmetry from './Symmetry.js';
+
+/**
+ * Pure ruleset algebra extracted from WorldManager: random generation, mutation,
+ * canonical-group inspection, neighbor-count effective output, and inversion.
+ *
+ * Nothing here touches worlds, proxies, persistence, or the EventBus — the only
+ * state is the precomputed `symmetryData` (canonical orbit groups) passed in once.
+ * The random/mutation helpers accept an injectable `rng` (default `Math.random`)
+ * so they stay deterministically testable. WorldManager keeps thin delegators so
+ * its public API (and every UI caller) is unchanged.
+ */
+export class RulesetService {
+    /**
+     * @param {object} symmetryData - Output of `Symmetry.precomputeSymmetryGroups()`.
+     */
+    constructor(symmetryData) {
+        this.symmetryData = symmetryData;
+    }
+
+    /**
+     * Generate a fresh ruleset hex.
+     * - `n_count`: one random output per (centerState × neighbor-count) bucket.
+     * - `r_sym`:   one random output per (centerState × canonical orbit) group.
+     * - default:   each of the 128 entries flipped independently.
+     * @param {number} bias - Probability of a 1 output.
+     * @param {string} generationMode
+     * @param {() => number} [rng=Math.random]
+     * @returns {string} 32-char hex
+     */
+    generateRandomRulesetHex(bias, generationMode, rng = Math.random) {
+        const tempRuleset = new Uint8Array(128);
+        if (generationMode === 'n_count') {
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let nan = 0; nan <= 6; nan++) {
+                    const out = rng() < bias ? 1 : 0;
+                    for (let m = 0; m < 64; m++) if (Symmetry.countSetBits(m) === nan) tempRuleset[(cs << 6) | m] = out;
+                }
+            }
+        } else if (generationMode === 'r_sym') {
+            if (!this.symmetryData || !this.symmetryData.canonicalRepresentatives) {
+                console.warn("generateRandomRulesetHex: symmetryData not available for r_sym, falling back to random.");
+                for (let i = 0; i < 128; i++) tempRuleset[i] = rng() < bias ? 1 : 0;
+            } else {
+                tempRuleset.fill(0);
+                for (const group of this.symmetryData.canonicalRepresentatives) {
+                    for (let cs = 0; cs <= 1; cs++) {
+                        const out = rng() < bias ? 1 : 0;
+                        for (const member of group.members) tempRuleset[(cs << 6) | member] = out;
+                    }
+                }
+            }
+        } else {
+            for (let i = 0; i < 128; i++) tempRuleset[i] = rng() < bias ? 1 : 0;
+        }
+        return rulesetToHex(tempRuleset);
+    }
+
+    /**
+     * Produce a mutated copy of `sourceHex`.
+     * - `single`:  flip each of the 128 entries with probability `mutationRate`.
+     * - `r_sym`:   flip whole canonical orbit groups (per centerState).
+     * - `n_count`: flip whole neighbor-count buckets, seeded from `referenceRuleset`'s
+     *              effective output (matches the legacy behaviour where the n_count
+     *              mode read the *selected* world's effective rule, not the source).
+     * @param {string} sourceHex
+     * @param {number} mutationRate
+     * @param {string} mutationMode
+     * @param {Uint8Array|null} [referenceRuleset=null] - Parsed ruleset whose effective
+     *        per-neighbor-count output seeds `n_count` flips. Falls back to "mixed" (2).
+     * @param {() => number} [rng=Math.random]
+     * @returns {string} 32-char hex
+     */
+    generateMutatedHex(sourceHex, mutationRate, mutationMode, referenceRuleset = null, rng = Math.random) {
+        const rules = hexToRuleset(sourceHex);
+
+        if (mutationMode === 'single') {
+            for (let i = 0; i < 128; i++) {
+                if (rng() < mutationRate) {
+                    rules[i] = 1 - rules[i];
+                }
+            }
+        } else if (mutationMode === 'r_sym') {
+            const canonicalGroups = this.symmetryData.canonicalRepresentatives;
+            if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
+
+            for (const group of canonicalGroups) {
+                for (let cs = 0; cs <= 1; cs++) {
+                    if (rng() < mutationRate) {
+                        const currentOutput = rules[(cs << 6) | group.representative];
+                        const newOutput = 1 - currentOutput;
+                        for (const member of group.members) {
+                            const idx = (cs << 6) | member;
+                            rules[idx] = newOutput;
+                        }
+                    }
+                }
+            }
+        } else if (mutationMode === 'n_count') {
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let nan = 0; nan <= 6; nan++) {
+                    if (rng() < mutationRate) {
+                        const currentEffectiveOutput = RulesetService.getEffectiveRuleForNeighborCount(referenceRuleset, cs, nan);
+                        const newOutput = (currentEffectiveOutput === 2) ? Math.round(rng()) : 1 - currentEffectiveOutput;
+
+                        for (let mask = 0; mask < 64; mask++) {
+                            if (Symmetry.countSetBits(mask) === nan) {
+                                const idx = (cs << 6) | mask;
+                                rules[idx] = newOutput;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return rulesetToHex(rules);
+    }
+
+    /**
+     * The effective output shared by every mask with `numActiveNeighbors` set bits
+     * (for a given centerState), or 2 ("mixed") if the outputs disagree or the
+     * ruleset is missing/invalid.
+     * @param {Uint8Array|null} ruleset
+     * @param {number} centerState
+     * @param {number} numActiveNeighbors
+     * @returns {0|1|2}
+     */
+    static getEffectiveRuleForNeighborCount(ruleset, centerState, numActiveNeighbors) {
+        if (!ruleset) return 2;
+        let firstOutput = -1;
+        for (let mask = 0; mask < 64; mask++) {
+            if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
+                const output = ruleset[(centerState << 6) | mask];
+                if (firstOutput === -1) firstOutput = output;
+                else if (firstOutput !== output) return 2;
+            }
+        }
+        return firstOutput === -1 ? 2 : firstOutput;
+    }
+
+    /**
+     * For each canonical orbit group, the effective output for centerState 0 and 1
+     * (2 when the group's members disagree). Drives the ChromaLab / symmetry editor.
+     * @param {Uint8Array|null} ruleset
+     * @returns {Array<object>}
+     */
+    getCanonicalRuleDetails(ruleset) {
+        if (!this.symmetryData) {
+            console.error("getCanonicalRuleDetails: symmetryData is undefined.");
+            return [];
+        }
+        if (!ruleset) return [];
+
+        return this.symmetryData.canonicalRepresentatives.flatMap(group => {
+            let outputState0 = -1, outputState1 = -1;
+            let mixed0 = false, mixed1 = false;
+
+            for (const member of group.members) {
+                const currentOut0 = ruleset[(0 << 6) | member];
+                if (outputState0 === -1) outputState0 = currentOut0;
+                else if (outputState0 !== currentOut0) mixed0 = true;
+
+                const currentOut1 = ruleset[(1 << 6) | member];
+                if (outputState1 === -1) outputState1 = currentOut1;
+                else if (outputState1 !== currentOut1) mixed1 = true;
+            }
+            return [
+                { canonicalBitmask: group.representative, centerState: 0, orbitSize: group.orbitSize, effectiveOutput: mixed0 ? 2 : outputState0, members: group.members },
+                { canonicalBitmask: group.representative, centerState: 1, orbitSize: group.orbitSize, effectiveOutput: mixed1 ? 2 : outputState1, members: group.members }
+            ];
+        });
+    }
+
+    /**
+     * Bitwise-invert every output in a ruleset hex (1↔0 across all 128 entries).
+     * @param {string} hex
+     * @returns {string} 32-char hex
+     */
+    static invertHex(hex) {
+        const rulesetArray = hexToRuleset(hex);
+        for (let i = 0; i < rulesetArray.length; i++) {
+            rulesetArray[i] = 1 - rulesetArray[i];
+        }
+        return rulesetToHex(rulesetArray);
+    }
+}

@@ -97,7 +97,16 @@ export const DEFAULT_WORLD_ENABLED_STATES = [
     true, true, true
 ];
 
-export const NEIGHBOR_DIRS_ODD_R = [ 
+// ── Hex neighbor offsets ──────────────────────────────────────────────────────
+// CANONICAL SOURCE shared with the Wasm engine. These two tables are duplicated
+// verbatim as `NEIGHBOR_DIRS_ODD_R` / `NEIGHBOR_DIRS_EVEN_R` in
+// `hexlife-wasm/src/lib.rs` (where `compute_neighbor_indices` flattens them into the
+// per-cell neighbor table). They MUST stay byte-for-byte identical on both sides —
+// a mismatch silently changes the simulation. Drift is guarded on each side:
+//   • JS:   tests/neighborDirs.test.js pins these arrays to the canonical values.
+//   • Rust: `neighbor_dirs_match_canonical` in lib.rs pins the Rust copies.
+// If you edit one table, edit the other and update both pinned tests.
+export const NEIGHBOR_DIRS_ODD_R = [
     [-1, +1],  // SW (Visual slot 0 - Bottom-left for odd cells)
     [-1, 0],   // NW (Visual slot 1 - Top-left for odd cells)
     [0, -1],   // N  (Visual slot 2 - Top center for odd cells)

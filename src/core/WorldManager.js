@@ -3,6 +3,8 @@ import { WorldProxy } from './WorldProxy.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
+import { RulesetService } from './RulesetService.js';
+import { ShareCodec } from '../services/ShareCodec.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
 
 export class WorldManager {
@@ -19,6 +21,7 @@ export class WorldManager {
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
         this.entropySampleRate = PersistenceService.loadUISetting('entropySampleRate', 10);
         this.symmetryData = Symmetry.precomputeSymmetryGroups();
+        this.rulesetService = new RulesetService(this.symmetryData);
         this.worldSettings = [];
         this.initialDefaultRulesetHex = "";
         this._initWorlds();
@@ -481,56 +484,11 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    _generateMutatedHex = (sourceHex, mutationRate, mutationMode) => {
-        const rules = hexToRuleset(sourceHex);
-
-        if (mutationMode === 'single') {
-            
-            for (let i = 0; i < 128; i++) {
-                if (Math.random() < mutationRate) {
-                    rules[i] = 1 - rules[i];
-                }
-            }
-        } else if (mutationMode === 'r_sym') {
-            
-            const canonicalGroups = this.symmetryData.canonicalRepresentatives;
-            if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
-
-            for (const group of canonicalGroups) {
-                for (let cs = 0; cs <= 1; cs++) {
-                    if (Math.random() < mutationRate) {
-                        
-                        const currentOutput = rules[(cs << 6) | group.representative];
-                        const newOutput = 1 - currentOutput;
-                        for (const member of group.members) {
-                            const idx = (cs << 6) | member;
-                            rules[idx] = newOutput;
-                        }
-                    }
-                }
-            }
-        } else if (mutationMode === 'n_count') {
-            
-            for (let cs = 0; cs <= 1; cs++) {
-                for (let nan = 0; nan <= 6; nan++) {
-                    if (Math.random() < mutationRate) {
-                        
-                        const currentEffectiveOutput = this.getEffectiveRuleForNeighborCount(cs, nan);
-                        const newOutput = (currentEffectiveOutput === 2) ? Math.round(Math.random()) : 1 - currentEffectiveOutput;
-                        
-                        for (let mask = 0; mask < 64; mask++) {
-                            if (Symmetry.countSetBits(mask) === nan) {
-                                const idx = (cs << 6) | mask;
-                                rules[idx] = newOutput;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        return rulesetToHex(rules);
-    }
+    // Delegates to RulesetService. n_count mode seeds its flips from the *selected* world's
+    // effective per-neighbor-count output (preserving the prior behaviour), hence the parsed
+    // current ruleset is passed as the reference.
+    _generateMutatedHex = (sourceHex, mutationRate, mutationMode) =>
+        this.rulesetService.generateMutatedHex(sourceHex, mutationRate, mutationMode, this._getParsedCurrentRuleset());
 
     _mutateRulesetForScope = (scope, mutationRate, mutationMode = 'single') => {
         const indices = this._getAffectedWorldIndices(scope);
@@ -797,75 +755,14 @@ export class WorldManager {
         return ruleset;
     }
 
-    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => {
-        const ruleset = this._getParsedCurrentRuleset();
-        if (!ruleset) return 2;
-        let firstOutput = -1;
-        for (let mask = 0; mask < 64; mask++) {
-            if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
-                const output = ruleset[(centerState << 6) | mask];
-                if (firstOutput === -1) firstOutput = output;
-                else if (firstOutput !== output) return 2;
-            }
-        }
-        return firstOutput === -1 ? 2 : firstOutput;
-    }
+    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) =>
+        RulesetService.getEffectiveRuleForNeighborCount(this._getParsedCurrentRuleset(), centerState, numActiveNeighbors);
 
-    getCanonicalRuleDetails = () => {
-        if (!this.symmetryData) {
-            console.error("getCanonicalRuleDetails: this.symmetryData is undefined.");
-            return [];
-        }
-        const ruleset = this._getParsedCurrentRuleset();
-        if (!ruleset) return [];
+    getCanonicalRuleDetails = () =>
+        this.rulesetService.getCanonicalRuleDetails(this._getParsedCurrentRuleset());
 
-        return this.symmetryData.canonicalRepresentatives.flatMap(group => {
-            let outputState0 = -1, outputState1 = -1;
-            let mixed0 = false, mixed1 = false;
-
-            for (const member of group.members) {
-                const currentOut0 = ruleset[(0 << 6) | member];
-                if (outputState0 === -1) outputState0 = currentOut0;
-                else if (outputState0 !== currentOut0) mixed0 = true;
-
-                const currentOut1 = ruleset[(1 << 6) | member];
-                if (outputState1 === -1) outputState1 = currentOut1;
-                else if (outputState1 !== currentOut1) mixed1 = true;
-            }
-            return [
-                { canonicalBitmask: group.representative, centerState: 0, orbitSize: group.orbitSize, effectiveOutput: mixed0 ? 2 : outputState0, members: group.members },
-                { canonicalBitmask: group.representative, centerState: 1, orbitSize: group.orbitSize, effectiveOutput: mixed1 ? 2 : outputState1, members: group.members }
-            ];
-        });
-    }
-
-    _generateRandomRulesetHex = (bias, generationMode) => {
-        const tempRuleset = new Uint8Array(128);
-        if (generationMode === 'n_count') {
-            for (let cs = 0; cs <= 1; cs++) {
-                for (let nan = 0; nan <= 6; nan++) {
-                    const out = Math.random() < bias ? 1 : 0;
-                    for (let m = 0; m < 64; m++) if (Symmetry.countSetBits(m) === nan) tempRuleset[(cs << 6) | m] = out;
-                }
-            }
-        } else if (generationMode === 'r_sym') {
-            if (!this.symmetryData || !this.symmetryData.canonicalRepresentatives) {
-                console.warn("_generateRandomRulesetHex: symmetryData not available for r_sym, falling back to random.");
-                for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
-            } else {
-                tempRuleset.fill(0);
-                for (const group of this.symmetryData.canonicalRepresentatives) {
-                    for (let cs = 0; cs <= 1; cs++) {
-                        const out = Math.random() < bias ? 1 : 0;
-                        for (const member of group.members) tempRuleset[(cs << 6) | member] = out;
-                    }
-                }
-            }
-        } else {
-            for (let i = 0; i < 128; i++) tempRuleset[i] = Math.random() < bias ? 1 : 0;
-        }
-        return rulesetToHex(tempRuleset);
-    }
+    _generateRandomRulesetHex = (bias, generationMode) =>
+        this.rulesetService.generateRandomRulesetHex(bias, generationMode);
 
     saveSelectedWorldState = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
@@ -1012,71 +909,14 @@ export class WorldManager {
     }
 
     generateShareUrl() {
-        const params = new URLSearchParams();
-        const worldSettings = this.getWorldSettingsForUI();
-
-        const allRulesets = worldSettings.map(ws => ws.rulesetHex);
-        const uniqueRulesets = [...new Set(allRulesets)];
-        if (uniqueRulesets.length === 1) {
-            params.set('r', uniqueRulesets[0]);
-        } else {
-            params.set('r_all', allRulesets.join(','));
-        }
-
-        // Handle initial states - check if all are simple density mode for backward compatibility
-        const initialStates = worldSettings.map(ws => ws.initialState);
-        const allDensityMode = initialStates.every(state => state && state.mode === 'density');
-        
-        if (allDensityMode) {
-            // Use compact density format for backward compatibility
-            const densities = initialStates.map(state => state.params.density);
-            const defaultDensities = Config.DEFAULT_INITIAL_DENSITIES.slice(0, Config.NUM_WORLDS);
-            
-            // Only include if different from default
-            if (JSON.stringify(densities) !== JSON.stringify(defaultDensities)) {
-                params.set('d', densities.map(d => d.toFixed(3)).join(','));
-            }
-        } else {
-            // Use full initial state format for complex configurations
-            try {
-                const statesJson = JSON.stringify(initialStates);
-                params.set('is', encodeURIComponent(statesJson));
-            } catch (e) {
-                console.error('Failed to encode initial states for URL:', e);
-                // Fallback to density-only format
-                const densities = initialStates.map(state => 
-                    state && state.mode === 'density' ? state.params.density : 0.5
-                );
-                params.set('d', densities.map(d => d.toFixed(3)).join(','));
-            }
-        }
-
-        let enabledMask = 0;
-        worldSettings.forEach((ws, i) => {
-            if (ws.enabled) {
-                enabledMask |= (1 << i);
-            }
+        return ShareCodec.encode({
+            worldSettings: this.getWorldSettingsForUI(),
+            selectedWorldIndex: this.getSelectedWorldIndex(),
+            camera: this.getCurrentCameraState(),
+            gridRows: Config.GRID_ROWS,
+            origin: window.location.origin,
+            pathname: window.location.pathname,
         });
-        if (enabledMask !== 0b111111111) {
-            params.set('e', enabledMask);
-        }
-
-        const selectedIndex = this.getSelectedWorldIndex();
-        if (selectedIndex !== Config.DEFAULT_SELECTED_WORLD_INDEX) {
-            params.set('w', selectedIndex);
-        }
-
-        // Grid size (only when it differs from the default preset).
-        if (Config.GRID_ROWS !== Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY]) {
-            params.set('g', Config.GRID_ROWS);
-        }
-
-        const camera = this.getCurrentCameraState();
-        if (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2) {
-            params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
-        }
-
-        return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     }
 
     _invertSelectedRuleset = () => {
@@ -1088,14 +928,8 @@ export class WorldManager {
             return;
         }
 
-        const rulesetArray = hexToRuleset(currentHex);
-        for (let i = 0; i < rulesetArray.length; i++) {
-            rulesetArray[i] = 1 - rulesetArray[i]; 
-        }
-        const invertedHex = rulesetToHex(rulesetArray);
-
-        
-        this.#applyRulesetToWorlds(invertedHex, 'selected', false); 
+        const invertedHex = RulesetService.invertHex(currentHex);
+        this.#applyRulesetToWorlds(invertedHex, 'selected', false);
     }
 
     areAllWorkersInitialized = () => {
