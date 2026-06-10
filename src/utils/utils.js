@@ -300,6 +300,51 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
 }
 
 /**
+ * Encodes a per-cell state array (each entry 0 or 1) as a base64 string, bit-packing
+ * 8 cells per byte first. This is ~12× more compact than a JSON number array (vs ~1.5×
+ * for one byte per cell) and is the save-file state format. Chunked so very large grids
+ * (e.g. the "huge" preset) don't overflow the call stack.
+ * Decode with {@link base64ToCells}, passing the original cell count.
+ * @param {Uint8Array|number[]} cells The per-cell state (truthy = on).
+ * @returns {string} A base64-encoded string of the bit-packed bytes.
+ */
+export function cellsToBase64(cells) {
+    const n = cells.length;
+    const packed = new Uint8Array(Math.ceil(n / 8));
+    for (let i = 0; i < n; i++) {
+        if (cells[i]) packed[i >> 3] |= (1 << (i & 7));
+    }
+    let binary = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < packed.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, packed.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+}
+
+/**
+ * Decodes a base64 string (produced by {@link cellsToBase64}) back into a Uint8Array of
+ * per-cell state bytes (each 0 or 1). Because the encoding bit-packs, the exact cell
+ * count must be supplied to drop trailing pad bits; if omitted, every bit of every byte
+ * is returned (the array length is rounded up to a multiple of 8).
+ * @param {string} b64 The base64-encoded bit-packed string.
+ * @param {number} [cellCount] The original number of cells.
+ * @returns {Uint8Array} The decoded per-cell state (empty array on invalid input).
+ */
+export function base64ToCells(b64, cellCount) {
+    if (typeof b64 !== 'string' || b64.length === 0) return new Uint8Array(0);
+    const binary = atob(b64);
+    const packed = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) packed[i] = binary.charCodeAt(i);
+    const n = (typeof cellCount === 'number' && cellCount >= 0) ? cellCount : packed.length * 8;
+    const cells = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+        cells[i] = (packed[i >> 3] >> (i & 7)) & 1;
+    }
+    return cells;
+}
+
+/**
  * Converts normalized texture coordinates (0-1) to discrete grid coordinates.
  * Searches in a small radius around a rough estimate for the closest valid hex.
  * @param {number} texX The normalized X coordinate in the texture (0 to 1).

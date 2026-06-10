@@ -7,6 +7,8 @@ import {
     indexToCoords,
     coordsToIndex,
     getHexLine,
+    cellsToBase64,
+    base64ToCells,
 } from '../src/utils/utils.js';
 
 describe('ruleset hex <-> array round-trip', () => {
@@ -119,5 +121,53 @@ describe('getHexLine', () => {
             expect(Number.isInteger(col)).toBe(true);
             expect(Number.isInteger(row)).toBe(true);
         }
+    });
+});
+
+describe('cellsToBase64 <-> base64ToCells (world-state save format)', () => {
+    it('round-trips a typical 0/1 cell array when the count is supplied', () => {
+        const cells = new Uint8Array([0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0]);
+        const b64 = cellsToBase64(cells);
+        expect(typeof b64).toBe('string');
+        const back = base64ToCells(b64, cells.length);
+        expect(back).toBeInstanceOf(Uint8Array);
+        expect(Array.from(back)).toEqual(Array.from(cells));
+    });
+
+    it('normalizes any truthy input to 1 and accepts a plain number array', () => {
+        const back = base64ToCells(cellsToBase64([1, 0, 1, 1]), 4);
+        expect(Array.from(back)).toEqual([1, 0, 1, 1]);
+    });
+
+    it('drops trailing pad bits using the supplied count, but exposes them without it', () => {
+        // 11 cells -> 2 packed bytes -> up to 16 bits; the 5 pad bits are zero.
+        const cells = new Uint8Array([1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1]);
+        const b64 = cellsToBase64(cells);
+        expect(base64ToCells(b64).length).toBe(16);          // rounded up to a byte boundary
+        expect(Array.from(base64ToCells(b64, 11))).toEqual(Array.from(cells));
+    });
+
+    it('handles the empty array', () => {
+        expect(cellsToBase64(new Uint8Array(0))).toBe('');
+        expect(base64ToCells('')).toEqual(new Uint8Array(0));
+        expect(base64ToCells(undefined)).toEqual(new Uint8Array(0));
+    });
+
+    it('round-trips a large grid without overflowing the call stack', () => {
+        const n = 90000; // larger than 8 * 0x8000 packed bytes; ~huge-preset scale
+        const cells = new Uint8Array(n);
+        for (let i = 0; i < n; i++) cells[i] = (i * 7 + 3) % 5 === 0 ? 1 : 0;
+        const back = base64ToCells(cellsToBase64(cells), n);
+        expect(back.length).toBe(n);
+        for (let i = 0; i < n; i++) expect(back[i]).toBe(cells[i]);
+    });
+
+    it('is several times smaller than a JSON number array', () => {
+        const cells = new Uint8Array(42624); // a real grid size (222 x 192)
+        for (let i = 0; i < cells.length; i++) cells[i] = i % 2;
+        const b64Len = cellsToBase64(cells).length;
+        const jsonLen = JSON.stringify(Array.from(cells)).length;
+        // Bit-packing -> ~0.167 base64 chars/cell vs ~2 chars/cell for "0,"/"1,".
+        expect(b64Len).toBeLessThan(jsonLen / 4);
     });
 });

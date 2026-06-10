@@ -5,7 +5,7 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells } from '../utils/utils.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -768,7 +768,7 @@ export class WorldManager {
         const proxy = this.worlds[this.selectedWorldIndex];
         if (!proxy) return;
 
-        const stateArray = proxy.latestStateArray ? Array.from(proxy.latestStateArray) : [];
+        const stateArray = proxy.latestStateArray || new Uint8Array(0);
         const rulesetHex = this.getCurrentRulesetHex();
         const stats = proxy.getLatestStats();
 
@@ -776,7 +776,10 @@ export class WorldManager {
             rows: Config.GRID_ROWS,
             cols: Config.GRID_COLS,
             rulesetHex: rulesetHex,
-            state: stateArray,
+            // v2 format: per-cell bytes base64-encoded (~4× smaller than a JSON number
+            // array). loadWorldState still reads the legacy `state: number[]` field.
+            format: 'b64',
+            stateB64: cellsToBase64(stateArray),
             worldTick: stats.tick
         };
         EventBus.dispatch(EVENTS.TRIGGER_DOWNLOAD, {
@@ -794,7 +797,20 @@ export class WorldManager {
         }
         const proxy = this.worlds[worldIndex];
         const newRulesetArray = hexToRuleset(loadedData.rulesetHex);
-        const newStateArray = Uint8Array.from(loadedData.state);
+        // Accept both the v2 base64 byte format and the legacy JSON number-array format.
+        let newStateArray;
+        if (typeof loadedData.stateB64 === 'string') {
+            newStateArray = base64ToCells(loadedData.stateB64, Config.NUM_CELLS);
+        } else if (Array.isArray(loadedData.state)) {
+            newStateArray = Uint8Array.from(loadedData.state);
+        } else {
+            alert("Save file is missing world state data.");
+            return;
+        }
+        if (newStateArray.length !== Config.NUM_CELLS) {
+            alert("State data length in file does not match current configuration.");
+            return;
+        }
 
         if (this.worldSettings[worldIndex]) {
             this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); 
