@@ -3,6 +3,8 @@ import { ControlsComponent } from './components/ControlsComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
+import { AnalysisComponent } from './components/AnalysisComponent.js';
+import { RuleRankComponent } from './components/RuleRankComponent.js';
 /**
  * Provides the tour definitions for the application's onboarding process.
  * This unified structure uses functional steps to adapt to both desktop and mobile UI contexts.
@@ -152,6 +154,90 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
     
+    const worldsetup = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="worlds"]' : '[data-tour-id="setup-panel-button"]',
+        title: 'Tutorial: World Setup',
+        content: "Each of the nine universes can be configured independently. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel to manage them.",
+        primaryAction: { text: 'Open Panel' },
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
+    }, {
+        element: '#world-setup-grid-size-mount',
+        title: 'Grid Size',
+        content: "Choose how large each universe is. Bigger grids reveal larger structures but simulate more slowly. <span class=\"onboarding-highlight-text\">Changing this restarts the simulation.</span>",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#world-setup-config-grid .world-config-cell:nth-child(5)',
+        title: 'Per-World Configuration',
+        content: "Every world has its own card: <span class=\"onboarding-highlight-text\">Edit...</span> sets its initial state (density or clusters), the switch <span class=\"onboarding-highlight-text\">enables/disables</span> it, and <span class=\"onboarding-highlight-text\">Use Main Ruleset</span> copies the selected world's rules here.",
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#world-setup-panel-actions',
+        title: 'Bulk Actions',
+        content: "These buttons act on all worlds at once: apply the selected world's initial state everywhere, restore defaults, or <span class=\"onboarding-highlight-text\">Apply &amp; Reset All Worlds</span> to start a fresh, controlled experiment.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
+
+    const analysis = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="analyze"]' : '[data-tour-id="analysis-panel-button"]',
+        title: 'Tutorial: Analysis Tools',
+        content: "Beyond watching patterns, you can measure them. Open the <span class=\"onboarding-highlight-text\">Analysis</span> panel to see live metrics for the selected world.",
+        primaryAction: { text: 'Open Panel' },
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === AnalysisComponent }
+    }, {
+        element: '.plugins-mount-area',
+        title: 'Live Metrics',
+        content: "The <span class=\"onboarding-highlight-text\">Activity Ratio</span> plot tracks the share of living cells over time, and the <span class=\"onboarding-highlight-text\">Entropy</span> plot measures how ordered or chaotic the world is. Stable lines often mean the automaton has settled; oscillations hint at engines and cycles. Enable <span class=\"onboarding-highlight-text\">entropy sampling</span> inside the plot to start measuring.",
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'analysis' }, mobile: { view: 'analyze' } }),
+        advanceOn: { type: 'click' }
+    }];
+
+    const rulerank = [{
+        element: '[data-tour-id="rank-panel-button"]',
+        title: 'Tutorial: Rule Usage Ranking',
+        content: "Which of the 128 rules are doing the real work? Open the <span class=\"onboarding-highlight-text\">Rule Rank</span> panel to find out.",
+        primaryAction: { text: 'Open Panel' },
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RuleRankComponent }
+    }, {
+        element: '#activation-rank',
+        title: 'Birth Rules',
+        content: "This column ranks the rules that most often make cells <span class=\"onboarding-highlight-text\">become active</span>. They are the engines of growth in your universe.",
+        primaryAction: { text: 'Next' },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#deactivation-rank',
+        title: 'Death Rules',
+        content: "This column ranks the rules that switch cells <span class=\"onboarding-highlight-text\">off</span>. The balance between both columns shapes whether a world grows, dies out, or stabilizes. Run the simulation to see the ranking update live.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
+
+    const history = [{
+        element: '#historyList',
+        title: 'Tutorial: Ruleset History',
+        content: "Every ruleset change of the selected world is recorded here. <span class=\"onboarding-highlight-text\">Click any entry</span> to revert the world to that ruleset.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => {
+            if (!appContext.uiManager.isMobile() && document.getElementById('historyPopout')?.classList.contains('hidden')) {
+                document.getElementById('historyButton')?.click();
+            }
+        },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#undoButton',
+        title: 'Undo & Redo',
+        content: "These buttons step backward and forward through the history. <br><br><b>Shortcuts:</b> <span class=\"onboarding-highlight-text\">Ctrl+Z</span> to undo, <span class=\"onboarding-highlight-text\">Ctrl+Shift+Z</span> to redo.",
+        primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
+
     const resetClear = [{
         element: '[data-tour-id="reset-clear-popout"]',
         title: 'Tutorial: Reset & Clear',
@@ -368,6 +454,10 @@ export const getTours = (appContext) => {
         controls,
         ruleset_actions,
         editor,
+        worldsetup,
+        analysis,
+        rulerank,
+        history,
         appliedEvolution,
         resetClear,
         saveLoad,

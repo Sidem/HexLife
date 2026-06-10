@@ -12,12 +12,13 @@ export class Panel extends BaseComponent {
     show() {
         if (this.panelElement && this.isHidden()) {
             this.panelElement.classList.remove('hidden');
-            
+
             EventBus.dispatch(EVENTS.VIEW_SHOWN, {
-                view: this, 
+                view: this,
                 contentComponentType: this.contentComponentType,
                 contentContainer: this.contentContainer
             });
+            this.options.onVisibilityChange?.(true);
         }
         if (this.options.persistence) {
             this._saveState();
@@ -25,8 +26,9 @@ export class Panel extends BaseComponent {
     }
 
     hide() {
-        if (this.panelElement) {
+        if (this.panelElement && !this.isHidden()) {
             this.panelElement.classList.add('hidden');
+            this.options.onVisibilityChange?.(false);
         }
         if (this.options.persistence) {
             this._saveState();

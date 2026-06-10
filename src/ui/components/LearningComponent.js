@@ -12,14 +12,20 @@ export class LearningComponent extends BaseComponent {
             return;
         }
         
+        // ids must match the tour names registered in tourSteps.js
         this.availableTours = [
-            { id: 'core', name: 'Core Orientation' },
-            { id: 'appliedEvolution', name: 'Mission: Applied Evolution' },
-            { id: 'controls', name: 'Tutorial: Simulation Controls' },
-            { id: 'ruleset_actions', name: 'Tutorial: Ruleset Actions' },
-            { id: 'editor', name: 'Tutorial: The Ruleset Editor' },
-            { id: 'reset-clear', name: 'Tutorial: Reset & Clear' },
-            { id: 'save-load', name: 'Tutorial: Save, Load & Share' },
+            { id: 'core', name: 'Core Orientation', section: 'Missions' },
+            { id: 'appliedEvolution', name: 'Applied Evolution', section: 'Missions' },
+            { id: 'personal_library', name: 'Chronicle Your Discoveries', section: 'Missions' },
+            { id: 'controls', name: 'Simulation Controls', section: 'Tutorials' },
+            { id: 'ruleset_actions', name: 'Ruleset Actions', section: 'Tutorials' },
+            { id: 'editor', name: 'The Ruleset Editor', section: 'Tutorials' },
+            { id: 'worldsetup', name: 'World Setup', section: 'Tutorials' },
+            { id: 'analysis', name: 'Analysis Tools', section: 'Tutorials' },
+            { id: 'rulerank', name: 'Rule Usage Ranking', section: 'Tutorials', desktopOnly: true },
+            { id: 'resetClear', name: 'Reset & Clear', section: 'Tutorials', desktopOnly: true },
+            { id: 'saveLoad', name: 'Save, Load & Share', section: 'Tutorials' },
+            { id: 'history', name: 'Ruleset History', section: 'Tutorials', desktopOnly: true },
         ];
         
         this.tourItemCache = {};
@@ -41,8 +47,17 @@ export class LearningComponent extends BaseComponent {
         `;
 
         this.tourListElement = this.element.querySelector('.learning-center-list');
-        
+
+        let currentSection = null;
         this.availableTours.forEach(tour => {
+            if (tour.section !== currentSection) {
+                currentSection = tour.section;
+                const header = document.createElement('li');
+                header.className = 'learning-section-header';
+                header.textContent = currentSection;
+                this.tourListElement.appendChild(header);
+            }
+
             const li = document.createElement('li');
             li.className = 'learning-center-item';
             li.innerHTML = `
@@ -50,8 +65,9 @@ export class LearningComponent extends BaseComponent {
                 <span class="tour-name">${tour.name}</span>
                 <button class="button tour-start-button" data-tour-name="${tour.id}">Start</button>
             `;
-            
+
             this.tourItemCache[tour.id] = {
+                item: li,
                 statusIcon: li.querySelector('.status-icon'),
                 startButton: li.querySelector('.tour-start-button')
             };
@@ -79,6 +95,7 @@ export class LearningComponent extends BaseComponent {
         if (!this.tourListElement || !this.appContext.uiManager) return;
 
         const completedTours = PersistenceService.loadOnboardingStates();
+        const isMobile = this.appContext.uiManager.isMobile();
 
         this.availableTours.forEach(tour => {
             const isCompleted = completedTours[tour.id];
@@ -86,6 +103,7 @@ export class LearningComponent extends BaseComponent {
             if (cache) {
                 cache.statusIcon.textContent = isCompleted ? '✅' : '🎓';
                 cache.startButton.textContent = isCompleted ? 'Replay' : 'Start';
+                cache.item.classList.toggle('hidden', Boolean(tour.desktopOnly && isMobile));
             }
         });
     }

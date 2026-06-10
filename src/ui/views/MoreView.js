@@ -46,7 +46,7 @@ export class MoreView extends BaseComponent {
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {
-            this.appContext.onboardingManager && this.appContext.onboardingManager.startTour('coreMobile', true);
+            this.appContext.onboardingManager && this.appContext.onboardingManager.startTour('core', true);
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="save-ruleset-mobile"]'), 'click', () => {

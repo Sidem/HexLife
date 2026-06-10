@@ -44,13 +44,17 @@ export class TopInfoBar {
             this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getSpeed());
         }
         this.popoutPanels.history = new PopoutPanel(this.uiElements.historyPopout, this.uiElements.historyButton, { position: 'bottom', alignment: 'end' });
-        
-        
+        // Register with the toolbar so these top-bar popouts also close on
+        // outside-click and Escape, like the toolbar's own popouts.
+        this.appContext.toolbar?.registerPopout(this.popoutPanels.history);
+
+
         if (!this.appContext.uiManager.isMobile() && this.uiElements.appMenuButton && this.uiElements.appMenuPopout) {
             this.popoutPanels.appMenu = new PopoutPanel(this.uiElements.appMenuPopout, this.uiElements.appMenuButton, {
                 position: 'bottom',
                 alignment: 'start'
             });
+            this.appContext.toolbar?.registerPopout(this.popoutPanels.appMenu);
         }
         
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());

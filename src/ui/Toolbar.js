@@ -93,7 +93,19 @@ export class Toolbar {
                 this.popoutPanels[config.name] = new PopoutPanel(popoutElement, buttonElement, options);
             }
         });
-        this.activePopouts = Object.values(this.popoutPanels);
+        // Append rather than reassign: other components (e.g. TopInfoBar) may
+        // have registered their popouts before init() runs.
+        this.activePopouts.push(...Object.values(this.popoutPanels));
+    }
+
+    /**
+     * Registers an externally-owned popout so it participates in shared
+     * close-on-outside-click and Escape handling.
+     */
+    registerPopout(popout) {
+        if (popout && !this.activePopouts.includes(popout)) {
+            this.activePopouts.push(popout);
+        }
     }
 
     _initPopoutControls() {

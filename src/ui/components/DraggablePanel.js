@@ -38,6 +38,11 @@ export class DraggablePanel extends Panel {
             this._setDraggable(mode === 'desktop');
         });
 
+        // Any interaction with the panel surfaces it above its siblings.
+        this.panelElement.addEventListener('pointerdown', () => {
+            this.options.onFocus?.(this);
+        }, true);
+
         
         this.closeButton = this.panelElement.querySelector('.close-panel-button');
         if (this.closeButton) {
@@ -80,8 +85,9 @@ export class DraggablePanel extends Panel {
             this.panelElement.style.top = s.y;
             this.panelElement.style.transform = 'none';
         } else {
-            this.panelElement.style.left = '100px';
-            this.panelElement.style.top = '100px';
+            const defaultPos = this.options.defaultPosition || { x: 100, y: 100 };
+            this.panelElement.style.left = `${defaultPos.x}px`;
+            this.panelElement.style.top = `${defaultPos.y}px`;
             this.panelElement.style.transform = 'none';
         }
     }
@@ -141,14 +147,15 @@ export class DraggablePanel extends Panel {
     }
 
     show() {
-        super.show(); 
-    
+        super.show();
+        this.options.onFocus?.(this);
+
         if (window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches) {
             this._setDraggable(false);
         } else {
             this._setDraggable(true);
         }
-    
+
         if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
             this.contentComponent.refresh();
         }

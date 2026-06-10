@@ -46,11 +46,8 @@ export class Application {
                     loadingIndicator.style.opacity = '0';
                     setTimeout(() => { 
                         loadingIndicator.style.display = 'none';
-                        if (this.appContext.uiManager.isMobile()) {
-                            this.appContext.onboardingManager.startTour('coreMobile');
-                        } else {
-                            this.appContext.onboardingManager.startTour('core');
-                        }
+                        // The unified 'core' tour adapts its steps to mobile/desktop itself.
+                        this.appContext.onboardingManager.startTour('core');
                     }, 500);
                 }, 250);
             }

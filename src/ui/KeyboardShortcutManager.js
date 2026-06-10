@@ -35,7 +35,7 @@ export class KeyboardShortcutManager {
             { key: 's', description: 'Toggle world setup panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }) },
             { key: 'a', description: 'Toggle analysis panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
             { key: 'n', description: 'Toggle ruleset actions panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }) },
-            { key: 'Escape', description: 'Close active popout or panel', category: 'Global', handler: () => EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS) },
+            { key: 'Escape', description: 'Close active popout or top-most panel', category: 'Global', handler: () => this._handleEscape() },
 
             // Simulation Controls
             { key: 'p', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
@@ -128,9 +128,9 @@ export class KeyboardShortcutManager {
      */
     _handleKeyDown(event) {
         if (this._isInputFocused(event)) {
-            
+
             if (event.key.toLowerCase() === 'escape') {
-                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+                 this._handleEscape();
             }
             return;
         }
@@ -147,6 +147,21 @@ export class KeyboardShortcutManager {
         if (shortcut) {
             event.preventDefault();
             shortcut.handler();
+        }
+    }
+
+    /**
+     * Escape closes transient UI in order of "closeness to the pointer":
+     * open popouts first, then only the top-most panel — not everything at once.
+     * @private
+     */
+    _handleEscape() {
+        if (this.toolbar && this.toolbar.closeAllPopouts()) {
+            return;
+        }
+        const topPanel = this.panelManager?.getTopMostVisiblePanel?.();
+        if (topPanel) {
+            topPanel.hide();
         }
     }
 

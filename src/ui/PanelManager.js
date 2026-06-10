@@ -15,35 +15,66 @@ export class PanelManager {
         this.worldManager = appContext.worldManager;
         this.panels = {};
         this.panelConfig = [
-            { name: 'ruleset', elementId: 'rulesetEditorPanel', presenter: DraggablePanel, contentType: RulesetEditorComponent, options: { handleSelector: 'h3' } },
-            { name: 'worldsetup', elementId: 'worldSetupPanel', presenter: DraggablePanel, contentType: WorldSetupComponent, options: { handleSelector: 'h3' } },
-            { name: 'analysis', elementId: 'analysisPanel', presenter: DraggablePanel, contentType: AnalysisComponent, options: { handleSelector: 'h3' } },
-            { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, options: { handleSelector: 'h3' } },
-            { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, options: { handleSelector: 'h3' } },
-            { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, options: { handleSelector: 'h3' } },
-            { name: 'chromalab', elementId: 'chromaLabPanel', presenter: DraggablePanel, contentType: ChromaLabComponent, options: { handleSelector: 'h3' } },
-            { name: 'shortcuts', elementId: 'shortcutsPanel', presenter: DraggablePanel, contentType: KeyboardShortcutsComponent, options: { handleSelector: 'h3' } }
+            { name: 'ruleset', elementId: 'rulesetEditorPanel', presenter: DraggablePanel, contentType: RulesetEditorComponent, triggerButtonId: 'editRuleButton', options: { handleSelector: 'h3' } },
+            { name: 'worldsetup', elementId: 'worldSetupPanel', presenter: DraggablePanel, contentType: WorldSetupComponent, triggerButtonId: 'setupPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'analysis', elementId: 'analysisPanel', presenter: DraggablePanel, contentType: AnalysisComponent, triggerButtonId: 'analysisPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, triggerButtonId: 'rankPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, triggerButtonId: 'helpButton', options: { handleSelector: 'h3' } },
+            { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, triggerButtonId: 'rulesetActionsButton', options: { handleSelector: 'h3' } },
+            { name: 'chromalab', elementId: 'chromaLabPanel', presenter: DraggablePanel, contentType: ChromaLabComponent, triggerButtonId: 'colorPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'shortcuts', elementId: 'shortcutsPanel', presenter: DraggablePanel, contentType: KeyboardShortcutsComponent, triggerButtonId: 'shortcutsButton', options: { handleSelector: 'h3' } }
         ];
     }
 
-    init() { 
-        this.panelConfig.forEach(config => {
+    init() {
+        this.panelConfig.forEach((config, index) => {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
                 const PresenterClass = config.presenter;
                 const contentContainer = panelElement.querySelector('.panel-content-area');
+                const triggerButton = config.triggerButtonId ? document.getElementById(config.triggerButtonId) : null;
                 const presenterInstance = new PresenterClass(panelElement, {
                     ...config.options,
                     persistence: { identifier: config.name },
-                    
+                    // Cascade first-time positions so freshly opened panels never
+                    // stack exactly on top of each other.
+                    defaultPosition: { x: 64 + index * 32, y: 52 + index * 28 },
+                    onFocus: (panel) => this.bringToFront(panel),
+                    onVisibilityChange: (visible) => triggerButton?.classList.toggle('active', visible),
                     contentComponentType: config.contentType,
                     contentContainer: contentContainer
                 });
 
                 this.panels[config.name] = presenterInstance;
+                // Panels restored open from a previous session bypass show().
+                triggerButton?.classList.toggle('active', !presenterInstance.isHidden());
             }
         });
         this._setupEventListeners();
+    }
+
+    /**
+     * Re-stacks panel z-indexes deterministically with the given panel on top.
+     * Keeps the whole range below popouts (z 1050) and the onboarding overlay.
+     */
+    bringToFront(panel) {
+        const zOf = (p) => parseInt(p.panelElement.style.zIndex, 10) || 1000;
+        const others = Object.values(this.panels)
+            .filter(p => p !== panel)
+            .sort((a, b) => zOf(a) - zOf(b));
+        let z = 1001;
+        others.forEach(p => { p.panelElement.style.zIndex = String(z++); });
+        if (panel?.panelElement) panel.panelElement.style.zIndex = String(z);
+    }
+
+    /**
+     * Returns the visible panel with the highest z-index, or null.
+     */
+    getTopMostVisiblePanel() {
+        const zOf = (p) => parseInt(p.panelElement.style.zIndex, 10) || 1000;
+        return Object.values(this.panels)
+            .filter(p => !p.isHidden())
+            .reduce((top, p) => (!top || zOf(p) > zOf(top) ? p : top), null);
     }
 
     _setupEventListeners() {
