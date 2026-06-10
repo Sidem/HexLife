@@ -30,6 +30,16 @@ let quadVAO;
 let hexLUTTexture = null;
 let disabledTextTexture = null;
 
+// --- Per-world FBO dirty tracking -------------------------------------------
+// A world's FBO only needs redrawing when its visual inputs change. The cell
+// buffers are tracked via WorldProxy.renderDirty; here we additionally track the
+// inputs the renderer itself owns: which world is selected (changes pan/zoom of
+// the affected FBOs), the selected world's camera, and per-world enabled state.
+let prevSelectedWorldIndex = -1;
+let prevCamera = { x: NaN, y: NaN, zoom: NaN };
+let prevEnabled = [];
+let worldEverDrawn = [];
+
 function updateColorLUTTexture(colorSettings, symmetryData, rulesetArray) {
     if (!gl || !hexLUTTexture) return;
     const lutData = generateColorLUT(colorSettings, symmetryData, rulesetArray);
@@ -124,6 +134,9 @@ export function initRenderer(canvasElement, appContext) {
     
     EventBus.subscribe(EVENTS.COLOR_SETTINGS_CHANGED, (settings) => {
         updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData());
+        // The LUT change alters every world's appearance but produces no STATE_UPDATE,
+        // so force an FBO redraw on the next frame.
+        appContext.worldManager.markAllWorldsRenderDirty();
     });
     
     requestAnimationFrame(() => resizeRenderer());
@@ -288,7 +301,41 @@ function renderWorldsToTextures(appContext) {
     const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
     const camera = appContext.worldManager.getCurrentCameraState();
-    
+
+    // Decide which world FBOs actually need redrawing this frame. The FBO textures
+    // retain their contents between frames, so any world we skip simply keeps the
+    // pixels from when it was last drawn — renderMainScene composites them as usual.
+    const selectionChanged = selectedWorldIndex !== prevSelectedWorldIndex;
+    const cameraChanged = !camera ||
+        camera.x !== prevCamera.x || camera.y !== prevCamera.y || camera.zoom !== prevCamera.zoom;
+    const needsDraw = new Array(Config.NUM_WORLDS);
+    let anyDraw = false;
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        const worldData = allWorldsStatus[i] ? allWorldsStatus[i].renderData : null;
+        const enabled = !!(worldData && worldData.enabled);
+        let draw = false;
+        if (!worldEverDrawn[i]) {
+            draw = true;                                  // first ever frame for this world
+        } else if (worldData && worldData.dirty) {
+            draw = true;                                  // state / hover / ghost changed
+        } else if (enabled !== prevEnabled[i]) {
+            draw = true;                                  // enabled <-> disabled toggled
+        } else if (selectionChanged && (i === selectedWorldIndex || i === prevSelectedWorldIndex)) {
+            draw = true;                                  // pan/zoom of this FBO changed
+        } else if (i === selectedWorldIndex && cameraChanged) {
+            draw = true;                                  // selected world's camera moved
+        }
+        needsDraw[i] = draw;
+        anyDraw = anyDraw || draw;
+    }
+
+    prevSelectedWorldIndex = selectedWorldIndex;
+    if (camera) prevCamera = { x: camera.x, y: camera.y, zoom: camera.zoom };
+
+    if (!anyDraw) {
+        return; // Nothing changed — leave every FBO as-is and skip all GPU work.
+    }
+
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
     gl.useProgram(hexShaderProgram);
     gl.bindVertexArray(hexVAO);
@@ -301,7 +348,7 @@ function renderWorldsToTextures(appContext) {
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         const worldStatus = allWorldsStatus[i];
         const worldData = worldStatus ? worldStatus.renderData : null;
-        if (worldData && worldData.enabled) {
+        if (worldData && worldData.enabled && needsDraw[i]) {
             const fboData = worldFBOs[i];
             gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
             gl.clearColor(...Config.BACKGROUND_COLOR);
@@ -330,6 +377,9 @@ function renderWorldsToTextures(appContext) {
                 WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
             }
             gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+            appContext.worldManager.clearWorldRenderDirty(i);
+            prevEnabled[i] = true;
+            worldEverDrawn[i] = true;
         }
     }
 
@@ -347,12 +397,15 @@ function renderWorldsToTextures(appContext) {
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const worldStatus = allWorldsStatus[i];
             const worldData = worldStatus ? worldStatus.renderData : null;
-            if (!worldData || !worldData.enabled) {
+            if ((!worldData || !worldData.enabled) && needsDraw[i]) {
                 const fboData = worldFBOs[i];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
                 gl.clearColor(...Config.DISABLED_WORLD_OVERLAY_COLOR);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                appContext.worldManager.clearWorldRenderDirty(i);
+                prevEnabled[i] = false;
+                worldEverDrawn[i] = true;
             }
         }
         

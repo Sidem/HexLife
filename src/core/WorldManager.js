@@ -743,6 +743,18 @@ export class WorldManager {
         return this.worlds.map(proxy => proxy.getFullStatus());
     }
 
+    // Called by the renderer once a world's FBO has been redrawn, so the next
+    // frame can skip the redraw until something visual changes again.
+    clearWorldRenderDirty = (worldIndex) => {
+        this.worlds[worldIndex]?.clearRenderDirty();
+    }
+
+    // Force every world's FBO to be redrawn on the next frame (e.g. after a color
+    // LUT change that alters appearance without producing a STATE_UPDATE).
+    markAllWorldsRenderDirty = () => {
+        this.worlds.forEach(proxy => proxy?.markRenderDirty());
+    }
+
 
     getSelectedWorldIndex = () => this.selectedWorldIndex;
 

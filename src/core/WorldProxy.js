@@ -9,6 +9,11 @@ export class WorldProxy {
         this.latestRuleIndexArray = null;
         this.latestHoverStateArray = null;
         this.latestGhostStateArray = null;
+        // Renderer dirty flag: true means this world's FBO needs to be redrawn.
+        // Set whenever the visual buffers change (state/hover via STATE_UPDATE, ghost
+        // via setGhostState/clearGhostState); cleared by the renderer after the FBO draw.
+        // Starts true so the first frame always draws.
+        this.renderDirty = true;
         this.latestStats = {
             tick: 0,
             activeCount: 0,
@@ -88,6 +93,7 @@ export class WorldProxy {
                 if (this.latestGhostStateArray) {
                     this.latestGhostStateArray.fill(0);
                 }
+                this.renderDirty = true;
                 this.onUpdate(this.worldIndex, 'state');
                 break;
             }
@@ -167,12 +173,14 @@ export class WorldProxy {
                 this.latestGhostStateArray[index] = 1;
             }
         }
+        this.renderDirty = true;
     }
 
     clearGhostState() {
         if (this.latestGhostStateArray) {
             this.latestGhostStateArray.fill(0);
         }
+        this.renderDirty = true;
     }
 
     sendCommand(commandType, commandData, transferList = []) {
@@ -233,7 +241,16 @@ export class WorldProxy {
             jsHoverStateArray: this.latestHoverStateArray,
             jsGhostStateArray: this.latestGhostStateArray,
             enabled: this.latestStats.isEnabled,
+            dirty: this.renderDirty,
         };
+    }
+
+    clearRenderDirty() {
+        this.renderDirty = false;
+    }
+
+    markRenderDirty() {
+        this.renderDirty = true;
     }
 
     getLatestStats() {
