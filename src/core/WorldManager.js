@@ -96,6 +96,11 @@ export class WorldManager {
             onInitialized: (worldIndex) => this._handleProxyInitialized(worldIndex)
         };
 
+        // One base seed for the whole initial-load batch so that, in deterministic mode, worlds
+        // sharing an initial-state config seed identically from first paint (no explicit Reset
+        // required). Matches the per-reset seeding done by every other reset path via _getResetSeed.
+        const initialBaseSeed = Date.now();
+
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const settings = this.worldSettings[i] || {
                 initialState: {
@@ -119,6 +124,7 @@ export class WorldManager {
                 speed: this.simulationController?.getSpeed() || 1,
                 initialEntropySamplingEnabled: this.isEntropySamplingEnabled,
                 initialEntropySampleRate: this.entropySampleRate,
+                seed: this._getResetSeed(initialBaseSeed, i),
             }, worldManagerCallbacks);
             this.worlds.push(proxy);
         }
@@ -764,12 +770,24 @@ export class WorldManager {
 
     getSymmetryData = () => this.symmetryData;
 
-    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => {
+    // Parse the current ruleset hex into its 128-entry array, memoizing on the hex string. This is
+    // called in tight loops (editor grids iterate every center-state × neighbor-count combination),
+    // and re-parsing the same hex each call was pure waste.
+    _getParsedCurrentRuleset = () => {
         const currentHex = this.getCurrentRulesetHex();
-        if (currentHex === "N/A" || currentHex === "Error") return 2;
+        if (currentHex === "N/A" || currentHex === "Error") return null;
+        if (this._parsedRulesetCache && this._parsedRulesetCache.hex === currentHex) {
+            return this._parsedRulesetCache.ruleset;
+        }
         const ruleset = hexToRuleset(currentHex);
+        if (!ruleset || ruleset.length !== 128) return null;
+        this._parsedRulesetCache = { hex: currentHex, ruleset };
+        return ruleset;
+    }
 
-        if (!ruleset || ruleset.length !== 128) return 2;
+    getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) => {
+        const ruleset = this._getParsedCurrentRuleset();
+        if (!ruleset) return 2;
         let firstOutput = -1;
         for (let mask = 0; mask < 64; mask++) {
             if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
@@ -786,11 +804,8 @@ export class WorldManager {
             console.error("getCanonicalRuleDetails: this.symmetryData is undefined.");
             return [];
         }
-        const currentHex = this.getCurrentRulesetHex();
-        if (currentHex === "N/A" || currentHex === "Error") return [];
-        const ruleset = hexToRuleset(currentHex);
-
-        if (!ruleset || ruleset.length !== 128) return [];
+        const ruleset = this._getParsedCurrentRuleset();
+        if (!ruleset) return [];
 
         return this.symmetryData.canonicalRepresentatives.flatMap(group => {
             let outputState0 = -1, outputState1 = -1;

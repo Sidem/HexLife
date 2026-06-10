@@ -64,6 +64,10 @@ export const DEFAULT_NEIGHBORHOOD_SIZE = 2;
 export const MAX_NEIGHBORHOOD_SIZE = 40;
 export const STATS_HISTORY_SIZE = 1000;
 export const CYCLE_DETECTION_HISTORY_SIZE = 40;
+// Hard cap on how many frames a candidate cycle may accumulate before detection is aborted.
+// Guards against spurious 32-bit checksum collisions that would otherwise grow `detectedCycle`
+// unbounded (one full state copy per tick) until the colliding checksum happens to recur.
+export const CYCLE_DETECTION_MAX_PERIOD = 300;
 export const RULESET_HISTORY_SIZE = 30;
 export const RENDER_TEXTURE_SIZE = 1280; 
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0]; 
@@ -76,6 +80,10 @@ export const DISABLED_WORLD_OVERLAY_COLOR = [0.25, 0.25, 0.25, 1.0];
 export const UI_UPDATE_THROTTLE_MS = 400;
 export const SIM_HOVER_THROTTLE_MS = 20;
 export const STATS_UPDATE_INTERVAL_MS = 100;
+// Cap per-tick grid snapshots to ~display rate. At high TPS the worker would otherwise post a full
+// copied state+rule buffer every changed tick (≈290 MB/s at 250 TPS × 9 worlds) while the display
+// only consumes 60 fps. Forced syncs (brush/reset/pause/enable) bypass this and send immediately.
+export const GRID_UPDATE_INTERVAL_MS = 1000 / 60;
 
 export const DEFAULT_INITIAL_DENSITIES = [
     0.0, 0.001, 0.01,
@@ -112,7 +120,9 @@ export const NEIGHBOR_DIRS_EVEN_R = [
  * Useful for debugging the flow of information in the application.
  */
 export const EVENT_BUS_LOGGING = {
-    enabled: true, // Set to true to enable console logging of events
+    // Gated on the dev build so production never ships event-bus console logging. Set to true
+    // manually while debugging; import.meta.env.DEV is false in `vite build`.
+    enabled: import.meta.env.DEV, // Set to true to enable console logging of events
     
     /**
      * An array of event prefixes to log. If empty, all events are logged (if enabled).

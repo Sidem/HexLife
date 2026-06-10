@@ -34,6 +34,7 @@ let stateHistoryChecksums = new Set();
 let stateChecksumQueue = [];
 
 let statsThrottler;
+let gridThrottler;
 let lastKnownStats = {};
 
 let isCyclePlaybackMode = false;
@@ -93,6 +94,26 @@ function resetCycleState() {
     stateHistoryChecksums.clear();
     stateChecksumQueue = [];
     lastSentChecksum = null;
+}
+
+// Abort an in-progress cycle-detection attempt without discarding the checksum history. Used when a
+// candidate "cycle" turns out to be a spurious 32-bit checksum collision (states differ) or grows
+// past CYCLE_DETECTION_MAX_PERIOD. The simulation keeps running normally and may legitimately
+// detect a real cycle later.
+function abortCycleDetection() {
+    isDetectingCycle = false;
+    detectedCycle = [];
+    cycleStartChecksum = null;
+}
+
+// Byte-for-byte equality of two Uint8Array views over the same logical length. Used to confirm a
+// recurring checksum reflects a genuinely identical state before committing to cycle playback.
+function statesEqual(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
 }
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
@@ -288,10 +309,16 @@ function runTick() {
 
 
     if (isDetectingCycle) {
-        if (newStateChecksum === cycleStartChecksum) {
+        if (newStateChecksum === cycleStartChecksum && statesEqual(jsStateArray, detectedCycle[0].state)) {
+            // Verified: the recurring checksum reflects a genuinely identical state, so the frames
+            // collected so far form one true period of the cycle. Commit to playback.
             isCyclePlaybackMode = true;
             isDetectingCycle = false;
             cyclePlaybackIndex = 0;
+        } else if (detectedCycle.length >= Config.CYCLE_DETECTION_MAX_PERIOD) {
+            // The candidate cycle grew past the cap without closing — almost certainly a spurious
+            // checksum collision. Abort so we stop copying a full state every tick.
+            abortCycleDetection();
         } else {
             detectedCycle.push({
                 state: jsStateArray.slice(),
@@ -359,12 +386,17 @@ function runTick() {
     
     if (simulationPerformedUpdate) {
         lastSentChecksum = newStateChecksum;
-        sendGridUpdate();
+        // Throttled to ~display rate. sendGridUpdate reads the current buffers at fire time, so a
+        // deferred send always carries the latest frame, never a stale one.
+        gridThrottler.schedule();
     }
 }
 
 
 function sendGridUpdate() {
+    // Any actual send (throttled or forced) clears a pending throttled send so forced syncs don't
+    // get followed by a redundant duplicate frame.
+    if (gridThrottler) gridThrottler.cancel();
     if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray) {
         console.warn(`Worker ${worldIndex}: Attempted to send grid update with invalid/missing buffers.`);
         return;
@@ -467,6 +499,7 @@ self.onmessage = async function(event) {
             workerEntropySampleRate = command.data.initialEntropySampleRate || 10;
 
             statsThrottler = new Throttler(sendStatsUpdate, Config.STATS_UPDATE_INTERVAL_MS);
+            gridThrottler = new Throttler(sendGridUpdate, Config.GRID_UPDATE_INTERVAL_MS);
 
             resetCycleState();
 

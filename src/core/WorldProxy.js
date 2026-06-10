@@ -64,6 +64,7 @@ export class WorldProxy {
                 speed: initialSettings.speed,
                 initialEntropySamplingEnabled: initialSettings.initialEntropySamplingEnabled,
                 initialEntropySampleRate: initialSettings.initialEntropySampleRate,
+                seed: initialSettings.seed,
             }
         }, [initialRulesetBuffer, initialHoverStateBuffer]);
     }

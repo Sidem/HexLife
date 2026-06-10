@@ -34,9 +34,16 @@ export const EventBus = {
         if (!subscriptions[eventType]) {
             subscriptions[eventType] = [];
         }
-        const index = subscriptions[eventType].push(callback) - 1;
-        return () => { 
-            subscriptions[eventType].splice(index, 1);
+        subscriptions[eventType].push(callback);
+        return () => {
+            const subs = subscriptions[eventType];
+            if (!subs) {
+                return;
+            }
+            const currentIndex = subs.indexOf(callback);
+            if (currentIndex !== -1) {
+                subs.splice(currentIndex, 1);
+            }
         };
     },
 
