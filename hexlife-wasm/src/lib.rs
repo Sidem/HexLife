@@ -214,3 +214,190 @@ impl World {
         entropy / 7.0
     }
 }
+
+// ---------------------------------------------------------------------------
+// Unit tests for the tick engine. These run natively via `cargo test` (the crate exposes an `rlib`
+// target for this); wasm-bindgen types compile fine off-wasm. The `tests` submodule can reach
+// `World`'s private fields because child modules see their ancestors' private items.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The project's default ruleset (also `INITIAL_RULESET_CODE` in src/core/config.js).
+    const DEFAULT_RULESET_HEX: &str = "12482080480080006880800180010117";
+
+    /// Parse a 32-char big-endian hex ruleset into the 128-byte rule table, MSB-first, exactly the
+    /// way JS `hexToRuleset` does (index 0 is the most-significant bit).
+    fn parse_hex_ruleset(hex: &str) -> Vec<u8> {
+        assert_eq!(hex.len(), 32, "ruleset hex must be 32 chars");
+        let mut ruleset = vec![0u8; 128];
+        for (ci, ch) in hex.chars().enumerate() {
+            let v = ch.to_digit(16).expect("valid hex digit") as u8;
+            for b in 0..4 {
+                ruleset[ci * 4 + b] = (v >> (3 - b)) & 1;
+            }
+        }
+        ruleset
+    }
+
+    /// Deterministic xorshift32 PRNG so tests are reproducible without external seeding.
+    fn xorshift32(seed: &mut u32) -> u32 {
+        let mut x = *seed;
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        *seed = x;
+        x
+    }
+
+    /// Build a world and fill its state with a deterministic ~50%-dense pattern.
+    fn seeded_world(cols: i32, rows: i32, seed: u32) -> World {
+        let mut w = World::new(cols, rows);
+        let mut s = seed;
+        for i in 0..w.num_cells {
+            w.state[i] = (xorshift32(&mut s) & 1) as u8;
+        }
+        w
+    }
+
+    #[test]
+    fn hex_ruleset_round_trips_against_known_bits() {
+        let rs = parse_hex_ruleset("80000000000000000000000000000001");
+        assert_eq!(rs[0], 1, "MSB maps to index 0");
+        assert_eq!(rs[127], 1, "LSB maps to index 127");
+        assert_eq!(rs.iter().filter(|&&b| b == 1).count(), 2);
+    }
+
+    #[test]
+    fn neighbor_table_is_in_range_and_symmetric() {
+        // Hexagonal adjacency on a torus is mutual: if j is one of i's six neighbors, i must be one
+        // of j's. A bug in the parity branch or wrap arithmetic of compute_neighbor_indices breaks
+        // this. (60 x 70 keeps both parities and a non-trivial torus.)
+        let w = World::new(60, 70);
+        let n = w.num_cells;
+        for i in 0..n {
+            let mut neigh = [0usize; 6];
+            for k in 0..6 {
+                let j = w.neighbor_indices[i * 6 + k] as usize;
+                assert!(j < n, "neighbor index out of range");
+                assert_ne!(j, i, "a cell must not be its own neighbor");
+                neigh[k] = j;
+            }
+            // No duplicate neighbors.
+            for a in 0..6 {
+                for b in (a + 1)..6 {
+                    assert_ne!(neigh[a], neigh[b], "duplicate neighbor for cell {i}");
+                }
+            }
+            // Symmetry: i appears in each neighbor's own table.
+            for &j in &neigh {
+                let mut found = false;
+                for k in 0..6 {
+                    if w.neighbor_indices[j * 6 + k] as usize == i {
+                        found = true;
+                        break;
+                    }
+                }
+                assert!(found, "adjacency {i}->{} not mutual", j);
+            }
+        }
+    }
+
+    #[test]
+    fn all_zero_ruleset_kills_everything() {
+        let mut w = seeded_world(40, 46, 0xC0FFEE);
+        // ruleset is already all zeros from World::new.
+        let active = w.run_tick();
+        assert_eq!(active, 0);
+        assert!(w.state.iter().all(|&c| c == 0));
+        assert_eq!(w.active_count(), 0);
+    }
+
+    #[test]
+    fn all_one_ruleset_fills_everything() {
+        let mut w = seeded_world(40, 46, 0x1234);
+        for r in w.ruleset.iter_mut() {
+            *r = 1;
+        }
+        let active = w.run_tick();
+        assert_eq!(active as usize, w.num_cells);
+        assert!(w.state.iter().all(|&c| c == 1));
+    }
+
+    #[test]
+    fn center_preserving_ruleset_is_a_still_life() {
+        // ruleset[idx] = center bit of idx. Every cell keeps its state regardless of neighbors, so
+        // the grid is frozen and the checksum is invariant across ticks.
+        let mut w = seeded_world(40, 46, 0xABCDEF);
+        for idx in 0..128 {
+            w.ruleset[idx] = ((idx >> 6) & 1) as u8;
+        }
+        let before: Vec<u8> = w.state.clone();
+        let sum0 = w.checksum_state();
+        for _ in 0..5 {
+            w.run_tick();
+        }
+        assert_eq!(w.state, before, "still life must not change");
+        assert_eq!(w.checksum_state(), sum0);
+    }
+
+    #[test]
+    fn center_inverting_ruleset_has_period_two() {
+        // ruleset[idx] = NOT(center bit). Every cell flips each tick, so after two ticks the grid
+        // returns to its starting configuration.
+        let mut w = seeded_world(40, 46, 0x55AA55);
+        for idx in 0..128 {
+            w.ruleset[idx] = 1 - (((idx >> 6) & 1) as u8);
+        }
+        let before: Vec<u8> = w.state.clone();
+        w.run_tick();
+        assert_ne!(w.state, before, "one tick should invert the grid");
+        w.run_tick();
+        assert_eq!(w.state, before, "two ticks should restore the grid");
+    }
+
+    #[test]
+    fn run_tick_is_deterministic_across_worlds() {
+        // Same dimensions + same seed + same ruleset => byte-identical evolution. This is the
+        // engine-side guarantee behind WorldManager's deterministic reset.
+        let ruleset = parse_hex_ruleset(DEFAULT_RULESET_HEX);
+        let mut a = seeded_world(50, 58, 0x99);
+        let mut b = seeded_world(50, 58, 0x99);
+        a.ruleset.copy_from_slice(&ruleset);
+        b.ruleset.copy_from_slice(&ruleset);
+        for _ in 0..25 {
+            a.run_tick();
+            b.run_tick();
+        }
+        assert_eq!(a.state, b.state);
+        assert_eq!(a.checksum_state(), b.checksum_state());
+    }
+
+    #[test]
+    fn default_ruleset_golden_checksum_regression() {
+        // Pins the hot path against accidental regressions: a fixed seed + the default ruleset must
+        // reproduce these exact checksums. If the tick logic changes, this fails loudly. (Values
+        // captured from the verified neighbor-table implementation.)
+        let ruleset = parse_hex_ruleset(DEFAULT_RULESET_HEX);
+        let mut w = seeded_world(48, 56, 0x2468ACE);
+        w.ruleset.copy_from_slice(&ruleset);
+
+        let initial = w.checksum_state();
+        w.run_tick();
+        let after_1 = w.checksum_state();
+        for _ in 0..49 {
+            w.run_tick();
+        }
+        let after_50 = w.checksum_state();
+
+        assert_eq!(initial, GOLDEN_INITIAL, "seed pattern changed");
+        assert_eq!(after_1, GOLDEN_AFTER_1, "single-tick evolution changed");
+        assert_eq!(after_50, GOLDEN_AFTER_50, "50-tick evolution changed");
+    }
+
+    // Golden checksums for default_ruleset_golden_checksum_regression (48x56 grid, seed 0x2468ACE).
+    const GOLDEN_INITIAL: i32 = 278795944;
+    const GOLDEN_AFTER_1: i32 = 2137887712;
+    const GOLDEN_AFTER_50: i32 = -205264731;
+}

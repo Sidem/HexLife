@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"] # Specifies a dynamic library for WASM
+# cdylib for the wasm-pack build; rlib so `cargo test` can link a native test harness for the
+# pure-logic unit tests in lib.rs (the tick engine compiles & runs fine off-wasm).
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2" # The core dependency for JS interop

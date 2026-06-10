@@ -59,4 +59,13 @@ export default [
         },
       },
   },
+
+  // The vitest config imports `vitest/config`, a package-exports subpath the node resolver can't
+  // follow. It resolves fine at runtime; silence the false positive here.
+  {
+    files: ['vitest.config.js'],
+    rules: {
+      'import/no-unresolved': 'off',
+    },
+  },
 ];
