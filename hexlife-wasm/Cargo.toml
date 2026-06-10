@@ -18,3 +18,23 @@ wasm-bindgen = "0.2" # The core dependency for JS interop
 opt-level = 3
 lto = true
 codegen-units = 1
+
+# wasm-opt invocation for `wasm-pack build`. Rust 1.82+ enables several non-MVP Wasm features by
+# default for wasm32-unknown-unknown (reference-types — which adds a second/externref table — plus
+# bulk-memory, multivalue, mutable-globals, nontrapping-fptoint, sign-ext). wasm-bindgen 0.2.123
+# REQUIRES reference-types (disabling it breaks the `clone_ref` intrinsic), so the optimized module
+# is non-MVP. Older `wasm-opt` builds (e.g. the one cached on the GitHub Actions runner) parse input
+# as MVP by default and abort with "Only 1 table definition allowed in MVP". Passing the explicit
+# --enable-* flags forces those features on at parse time so the build succeeds across every
+# binaryen version (local + the Pages deploy). `-O` keeps the prior optimization level. If you add a
+# default Wasm feature via the toolchain, add its --enable flag here too.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    '-O',
+    '--enable-reference-types',
+    '--enable-bulk-memory',
+    '--enable-multivalue',
+    '--enable-mutable-globals',
+    '--enable-nontrapping-float-to-int',
+    '--enable-sign-ext',
+]
