@@ -1,6 +1,23 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
+import { ICONS } from './icons.js';
+
+const TOOLBAR_BUTTON_ICONS = {
+    controlsButton: ICONS.sliders,
+    rulesetActionsButton: ICONS.sparkles,
+    resetClearButton: ICONS.rotateCcw,
+    editRuleButton: ICONS.pencil,
+    setupPanelButton: ICONS.globe,
+    analysisPanelButton: ICONS.chartLine,
+    rankPanelButton: ICONS.trophy,
+    saveStateButton: ICONS.save,
+    loadStateButton: ICONS.folderOpen,
+    shareButton: ICONS.share,
+    colorPanelButton: ICONS.palette,
+    shortcutsButton: ICONS.keyboard,
+    helpButton: ICONS.graduationCap,
+};
 
 export class Toolbar {
     constructor(appContext, libraryData) {
@@ -48,6 +65,10 @@ export class Toolbar {
             shortcutsButton: document.getElementById('shortcutsButton'),
             helpButton: document.getElementById('helpButton'),
         };
+        for (const [elementId, svg] of Object.entries(TOOLBAR_BUTTON_ICONS)) {
+            if (this.uiElements[elementId]) this.uiElements[elementId].innerHTML = svg;
+        }
+        this.updatePauseButtonVisual(this.appContext.simulationController?.getIsPaused() ?? true);
         this._initPopoutPanels();
         this._initPopoutControls();
         this._setupToolbarButtonListeners();
@@ -144,7 +165,7 @@ export class Toolbar {
 
     updatePauseButtonVisual(isPaused) {
         if (this.uiElements?.playPauseButton) {
-            this.uiElements.playPauseButton.textContent = isPaused ? "▶" : "❚❚";
+            this.uiElements.playPauseButton.innerHTML = isPaused ? ICONS.play : ICONS.pause;
             this.uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
         }
     }

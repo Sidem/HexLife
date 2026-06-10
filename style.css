@@ -46,3 +46,6 @@
 @import url('src/ui/views/MobileViews.css'); /* A general style for all mobile views */
 
 @import url('src/ui/views/MoreView.css');
+
+/* 7. Design Token Theme Layer — must be imported LAST so it wins the cascade */
+@import url('src/styles/theme.css');

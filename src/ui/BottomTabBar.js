@@ -1,5 +1,16 @@
 import { BaseComponent } from './components/BaseComponent.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { ICONS } from './icons.js';
+
+const TAB_ICONS = {
+    simulate: ICONS.hexagon,
+    rules: ICONS.sparkles,
+    editor: ICONS.pencil,
+    worlds: ICONS.globe,
+    analyze: ICONS.chartBars,
+    learning: ICONS.graduationCap,
+    more: ICONS.ellipsis,
+};
 
 
 export class BottomTabBar extends BaseComponent {
@@ -17,6 +28,8 @@ export class BottomTabBar extends BaseComponent {
         this.mountPoint.querySelectorAll('.tab-bar-button').forEach(button => {
             const view = button.dataset.view;
             this.buttons[view] = button;
+            const iconEl = button.querySelector('.icon');
+            if (iconEl && TAB_ICONS[view]) iconEl.innerHTML = TAB_ICONS[view];
         });
     }
 

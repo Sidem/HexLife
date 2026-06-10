@@ -142,20 +142,24 @@ function _calculateAndCacheLayout() {
     const isLandscape = canvasWidth >= canvasHeight;
     const aspectRatio = canvasWidth / canvasHeight;
     if (isLandscape && aspectRatio > 1.2) {
-        selectedViewWidth = canvasWidth * 0.6 - padding * 1.5;
+        // The minimap grid is square, so its column never needs to be wider
+        // than the available height; any excess goes to the selected view.
         selectedViewHeight = canvasHeight - padding * 2;
+        miniMapAreaWidth = Math.min(canvasWidth * 0.4 - padding * 1.5, selectedViewHeight);
+        selectedViewWidth = canvasWidth - miniMapAreaWidth - padding * 3;
         selectedViewX = padding;
         selectedViewY = padding;
-        miniMapAreaWidth = canvasWidth * 0.4 - padding * 1.5;
         miniMapAreaHeight = selectedViewHeight;
         miniMapAreaX = selectedViewX + selectedViewWidth + padding;
         miniMapAreaY = padding;
     } else {
-        selectedViewHeight = canvasHeight * 0.65 - padding * 1.5;
+        // Same idea for the bottom strip: cap its height at the width the
+        // square minimap grid can actually use.
         selectedViewWidth = canvasWidth - padding * 2;
+        miniMapAreaHeight = Math.min(canvasHeight * 0.35 - padding * 1.5, selectedViewWidth);
+        selectedViewHeight = canvasHeight - miniMapAreaHeight - padding * 3;
         selectedViewX = padding;
         selectedViewY = padding;
-        miniMapAreaHeight = canvasHeight * 0.35 - padding * 1.5;
         miniMapAreaWidth = selectedViewWidth;
         miniMapAreaX = padding;
         miniMapAreaY = selectedViewY + selectedViewHeight + padding;

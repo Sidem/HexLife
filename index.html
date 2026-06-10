@@ -43,6 +43,16 @@
 </head>
 
 <body>
+    <script>
+        // Testing shim: "?headless=1" keeps the render loop and visibility state alive
+        // in hidden/headless browsers (rAF is suspended when document.hidden is true).
+        if (new URLSearchParams(location.search).has('headless')) {
+            Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+            Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+            window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+            window.cancelAnimationFrame = (id) => clearTimeout(id);
+        }
+    </script>
     <div id="loading-indicator">
         <div class="loading-content">
             <div class="loader-grid">
@@ -132,19 +142,23 @@
         <div id="main-content-area" data-tour-id="main-content-area">
             <div id="vertical-toolbar" role="toolbar" aria-label="Main controls">
                 <button id="playPauseButton" class="toolbar-button" title="[P]lay/Pause Simulation" data-tour-id="play-pause-button">▶</button>
+                <div class="toolbar-separator" role="separator"></div>
                 <button id="controlsButton" class="toolbar-button" title="Simulation Controls" data-tour-id="controls-button">⚙️</button>
-                <button id="rulesetActionsButton" class="toolbar-button" title="Ruleset Actions (Generate, Mutate, Library)" data-tour-id="ruleset-actions-button">🧬</button>
                 <button id="resetClearButton" class="toolbar-button" title="Reset/Clear Worlds" data-tour-id="reset-clear-button">🔄</button>
-                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" data-tour-id="edit-rule-button">📝</button> 
-                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" data-tour-id="setup-panel-button">🌐</button> 
+                <div class="toolbar-separator" role="separator"></div>
+                <button id="rulesetActionsButton" class="toolbar-button" title="Ruleset Actions (Generate, Mutate, Library)" data-tour-id="ruleset-actions-button">🧬</button>
+                <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" data-tour-id="edit-rule-button">📝</button>
+                <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" data-tour-id="setup-panel-button">🌐</button>
+                <div class="toolbar-separator" role="separator"></div>
                 <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" data-tour-id="analysis-panel-button">📈</button>
                 <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" data-tour-id="rank-panel-button">🏆</button>
+                <div class="toolbar-separator" role="separator"></div>
                 <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">💾</button>
                 <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">📂</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
+                <div class="toolbar-separator" role="separator"></div>
                 <button id="colorPanelButton" class="toolbar-button" title="Chroma Lab - Color Customization">🎨</button>
                 <button id="shortcutsButton" class="toolbar-button" title="Keyboard Shortcuts">⌨️</button>
-
                 <button id="helpButton" class="toolbar-button" title="Help">🎓</button>
             </div>
             <canvas id="hexGridCanvas" aria-label="Hexagonal cellular automaton simulation display" data-tour-id="hex-grid-canvas">

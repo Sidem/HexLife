@@ -24,6 +24,7 @@ import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
 import { ToastManager } from './ToastManager.js';
+import { ICONS } from './icons.js';
 
 
 
@@ -201,9 +202,9 @@ export class UIManager {
 
         if (fabRightContainer) {
             fabRightContainer.innerHTML = `
-                <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush"><span class="icon">🛠️</span></button>
-                <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">🖐️</span></button>
-                <button id="mobilePlayPauseButton" class="mobile-fab primary-fab">▶</button>
+                <button id="mobileToolsFab" class="mobile-fab secondary-fab" title="Adjust Speed & Brush"><span class="icon">${ICONS.wrench}</span></button>
+                <button id="interaction-mode-toggle" class="mobile-fab secondary-fab" title="Toggle Pan/Draw Mode"><span class="icon">${ICONS.hand}</span></button>
+                <button id="mobilePlayPauseButton" class="mobile-fab primary-fab" title="Play/Pause">${ICONS.play}</button>
             `;
             new ToolsBottomSheet('fab-tools-bottom-sheet', fabRightContainer.querySelector('#mobileToolsFab'), appContext);
             fabRightContainer.querySelector('#mobilePlayPauseButton').addEventListener('click', () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE));
@@ -211,11 +212,11 @@ export class UIManager {
             
             EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => {
                 const mobilePlayPause = fabRightContainer.querySelector('#mobilePlayPauseButton');
-                if (mobilePlayPause) mobilePlayPause.textContent = isPaused ? "▶" : "❚❚";
+                if (mobilePlayPause) mobilePlayPause.innerHTML = isPaused ? ICONS.play : ICONS.pause;
             });
             EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
                 const toggleIcon = fabRightContainer.querySelector('#interaction-mode-toggle .icon');
-                if (toggleIcon) toggleIcon.textContent = mode === 'pan' ? '🖐️' : '✏️';
+                if (toggleIcon) toggleIcon.innerHTML = mode === 'pan' ? ICONS.hand : ICONS.pencil;
             });
         }
 
@@ -227,16 +228,16 @@ export class UIManager {
         if (!fabLeftContainer) return;
         fabLeftContainer.innerHTML = '';
         const fabActionMap = {
-            'generate': { icon: '✨', title: 'Generate', command: EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, payload: {} },
-            'mutate': { icon: '🦠', title: 'Mutate', command: EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, payload: {} },
-            'clone': { icon: '👯', title: 'Clone', command: EVENTS.COMMAND_CLONE_RULESET, payload: {} },
-            'clone-mutate': { icon: '🧬', title: 'Clone & Mutate', command: EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, payload: {} },
-            'clear-one': { icon: '🧹', title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
-            'clear-all': { icon: '🌍', title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
-            'reset-one': { icon: '🔄', title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
-            'reset-all': { icon: '♻️', title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
-            'reset-densities': { icon: '🎨', title: 'Default Densities', command: EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, payload: {} },
-            'apply-density-all': { icon: '🎯', title: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, payload: {} }
+            'generate': { icon: ICONS.sparkles, title: 'Generate', command: EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, payload: {} },
+            'mutate': { icon: ICONS.shuffle, title: 'Mutate', command: EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, payload: {} },
+            'clone': { icon: ICONS.copy, title: 'Clone', command: EVENTS.COMMAND_CLONE_RULESET, payload: {} },
+            'clone-mutate': { icon: ICONS.copyPlus, title: 'Clone & Mutate', command: EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, payload: {} },
+            'clear-one': { icon: ICONS.eraser, title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
+            'clear-all': { icon: ICONS.trash, title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
+            'reset-one': { icon: ICONS.rotateCcw, title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
+            'reset-all': { icon: ICONS.refreshCw, title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
+            'reset-densities': { icon: ICONS.droplet, title: 'Default Densities', command: EVENTS.COMMAND_RESET_DENSITIES_TO_DEFAULT, payload: {} },
+            'apply-density-all': { icon: ICONS.target, title: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_DENSITY_TO_ALL, payload: {} }
         };
 
         const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true, order: [] });

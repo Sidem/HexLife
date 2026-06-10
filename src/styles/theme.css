@@ -1,0 +1,556 @@
+/*
+  HexLife Explorer — Design Token Theme Layer
+  Imported LAST from style.css so it wins the cascade at equal specificity.
+
+  Goal: one cohesive dark theme with a single amber accent (matching the hex
+  brand mark and the selected-world highlight in the WebGL canvas), consistent
+  surfaces/radii/shadows, and readable focus states. Component CSS files keep
+  their layout rules; this file re-skins them.
+*/
+
+:root {
+    /* Surfaces (darkest → lightest) */
+    --bg-app: #161618;
+    --surface-1: #1d1d20;   /* bars: top bar, toolbar, tab bar */
+    --surface-2: #242428;   /* panels, popouts, sheets */
+    --surface-3: #2e2e34;   /* inputs, buttons, chips */
+    --surface-4: #3a3a42;   /* hover */
+    --surface-5: #45454e;   /* pressed / strong hover */
+
+    /* Borders */
+    --border-subtle: #2e2e33;
+    --border: #3c3c44;
+    --border-strong: #54545e;
+
+    /* Text */
+    --text-primary: #f2f2f4;
+    --text-secondary: #b9b9c2;
+    --text-muted: #87878f;
+
+    /* Accent — amber, matches the ⬡ brand and canvas selection outline */
+    --accent: #f0c674;
+    --accent-bright: #ffd98e;
+    --accent-dim: #d8b05b;
+    --on-accent: #1c1505;
+    --accent-soft: rgba(240, 198, 116, 0.14);
+    --accent-soft-hover: rgba(240, 198, 116, 0.22);
+    --accent-border: rgba(240, 198, 116, 0.5);
+
+    --danger: #e06c75;
+
+    /* Shape & depth */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --shadow-popout: 0 10px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Base ---------- */
+
+body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+}
+
+canvas#hexGridCanvas {
+    background-color: var(--bg-app);
+}
+
+/* Visible, consistent keyboard focus everywhere */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Wider, calmer scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--surface-5);
+    border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+}
+
+/* ---------- Buttons & form primitives ---------- */
+
+.button {
+    background-color: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 7px 14px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.button:hover {
+    background-color: var(--surface-4);
+    border-color: var(--border-strong);
+}
+
+.button:active {
+    background-color: var(--surface-5);
+}
+
+.checkbox-label {
+    background-color: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+}
+
+.checkbox-label:hover {
+    background-color: var(--surface-4);
+}
+
+.checkbox-input:checked + .checkbox-label {
+    background-color: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent);
+}
+
+/* Segmented switches (SwitchComponent + popout radio switches) */
+.switch-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-2);
+}
+
+.switch-label,
+.radio-switch-label {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border-right: 1px solid var(--border);
+}
+
+.switch-label:hover,
+.radio-switch-label:hover {
+    background-color: var(--surface-4);
+}
+
+.switch-input:checked + .switch-label,
+.radio-switch-input:checked + .radio-switch-label,
+.editor-apply-scope-controls .radio-group .radio-switch-input:checked + .radio-switch-label {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.switch-input:checked + .switch-label:hover {
+    background-color: var(--accent-soft-hover);
+}
+
+.three-way-switch {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background-color: var(--surface-2);
+}
+
+.type-checkbox .switch-label {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+/* Sliders: fill was a near-invisible #2b2d42; use the accent */
+.slider-component-container input[type="range"] {
+    color: var(--accent-dim);
+    --track-color: rgba(255, 255, 255, 0.12);
+}
+
+.slider-component-container label,
+.switch-component-label {
+    color: var(--text-secondary);
+}
+
+.slider-tooltip {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    color: var(--accent);
+}
+
+/* Text inputs */
+.popout-panel .hex-input,
+input[type="text"],
+input[type="number"],
+textarea,
+select {
+    background-color: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--accent-border);
+    outline: none;
+}
+
+/* ---------- Top info bar ---------- */
+
+#top-info-bar {
+    background-color: var(--surface-1);
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 12px;
+}
+
+#appLogo {
+    color: var(--accent);
+}
+
+#appMenuButton:hover {
+    background-color: var(--surface-3);
+}
+
+#rulesetDisplayContainer {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+#rulesetDisplayCode {
+    color: var(--accent);
+}
+
+/* Stats read as labelled, tabular values instead of a text soup */
+#statsDisplayContainer {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+#statsDisplayContainer span span {
+    color: var(--text-primary);
+}
+
+.ruleset-history-controls .button-icon,
+.save-ruleset-button {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+}
+
+.ruleset-history-controls .button-icon:hover:not(:disabled),
+.save-ruleset-button:hover:not([style*="cursor: not-allowed"]) {
+    background-color: var(--surface-3);
+    transform: none;
+}
+
+.ruleset-history-controls .button-icon:disabled {
+    background-color: transparent;
+    color: var(--surface-5);
+}
+
+.save-ruleset-button.not-saved {
+    background-color: transparent;
+}
+
+.save-ruleset-button.is-public,
+.save-ruleset-button.is-personal {
+    background-color: transparent;
+}
+
+/* ---------- Desktop vertical toolbar ---------- */
+
+#vertical-toolbar {
+    background-color: var(--surface-1);
+    border-right: 1px solid var(--border-subtle);
+    gap: 3px;
+    padding: 8px 0;
+}
+
+@media screen and (min-width: 769px) {
+    .toolbar-button {
+        width: 38px;
+        height: 38px;
+    }
+}
+
+.toolbar-button {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.toolbar-button svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.toolbar-button:hover {
+    background-color: var(--surface-3);
+    color: var(--text-primary);
+}
+
+.toolbar-button:active,
+.toolbar-button.active {
+    background-color: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+}
+
+#playPauseButton {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+#playPauseButton:hover {
+    background-color: var(--accent-bright);
+    color: var(--on-accent);
+}
+
+.toolbar-separator {
+    background-color: var(--border-subtle);
+    margin: 4px 0;
+    flex-shrink: 0;
+}
+
+/* ---------- Popouts ---------- */
+
+.popout-panel {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-popout);
+}
+
+.popout-panel h4 {
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.popout-panel .popout-separator {
+    background-color: var(--border-subtle);
+}
+
+.popout-panel .form-group label:not(.checkbox-label):not(.radio-switch-label) {
+    color: var(--text-secondary);
+}
+
+.history-item {
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-item:hover {
+    background-color: var(--surface-4);
+}
+
+.history-item.is-current {
+    color: var(--accent);
+    background-color: var(--accent-soft);
+}
+
+.popout-link-list li a:hover {
+    background-color: var(--surface-4);
+    color: var(--text-primary);
+}
+
+.actions-popover li:hover {
+    background-color: var(--surface-4);
+}
+
+/* Tabs inside popouts/panels */
+.tab-button {
+    color: var(--text-muted);
+}
+
+.tab-button:hover {
+    background-color: var(--surface-3);
+}
+
+.tab-button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.library-filter-tabs .sub-tab-button.active {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* ---------- Draggable panels (desktop) ---------- */
+
+@media screen and (min-width: 769px) {
+    .draggable-panel-base {
+        background-color: rgba(32, 32, 36, 0.96);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-panel);
+    }
+
+    .draggable-panel-base h3 {
+        border-bottom: 1px solid var(--border-subtle);
+        color: var(--text-primary);
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+}
+
+.close-panel-button {
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+}
+
+.close-panel-button:hover {
+    color: var(--text-primary);
+}
+
+.button-help-trigger:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* ---------- Mobile ---------- */
+
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+
+    /* The ruleset chip's min-width used to force #app-container (a flex item
+       of body) past the viewport width, clipping the stats row and tab bar. */
+    #app-container {
+        min-width: 0;
+        max-width: 100vw;
+    }
+
+    #rulesetDisplayContainer {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .ruleset-display-toggle {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    #rulesetDisplayName,
+    #rulesetDisplayCode {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* Stats row: fit 5 stats on a 375px screen without clipping */
+    #top-info-bar {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+
+    #statsDisplayContainer {
+        justify-content: space-between;
+        gap: 4px;
+        font-size: 0.9em;
+        overflow: hidden;
+    }
+
+    #statsDisplayContainer > span,
+    #statsDisplayContainer > span:first-child {
+        min-width: 0;
+        white-space: nowrap;
+    }
+
+    /* Bottom tab bar: 7 tabs must fit on narrow screens */
+    #bottom-tab-bar {
+        background-color: var(--surface-1);
+        border-top: 1px solid var(--border-subtle);
+    }
+
+    .tab-bar-button {
+        color: var(--text-muted);
+        font-size: 0.62em;
+        gap: 3px;
+        min-width: 0;
+        padding: 0 2px;
+        overflow: hidden;
+    }
+
+    .tab-bar-button .icon {
+        font-size: 1.6em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .tab-bar-button .icon svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .tab-bar-button .label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .tab-bar-button.active {
+        color: var(--accent);
+    }
+
+    /* FABs */
+    .mobile-fab {
+        background-color: rgba(40, 40, 46, 0.92);
+        border: 1px solid var(--border-strong);
+        color: var(--text-primary);
+        backdrop-filter: blur(8px);
+    }
+
+    .mobile-fab .icon svg {
+        width: 24px;
+        height: 24px;
+        display: block;
+    }
+
+    .secondary-fab {
+        background-color: rgba(40, 40, 46, 0.92);
+        border: 1px solid var(--border-strong);
+    }
+
+    .secondary-fab:hover {
+        background-color: var(--surface-4);
+    }
+
+    .primary-fab {
+        background-color: var(--accent);
+        border: none;
+        color: var(--on-accent);
+    }
+
+    .primary-fab svg {
+        width: 30px;
+        height: 30px;
+        display: block;
+    }
+
+    .primary-fab:hover {
+        background-color: var(--accent-bright);
+    }
+
+    .primary-fab:active {
+        background-color: var(--accent-dim);
+    }
+
+    .draggable-panel-base {
+        background-color: var(--bg-app);
+    }
+}
