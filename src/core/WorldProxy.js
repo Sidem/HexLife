@@ -7,7 +7,10 @@ export class WorldProxy {
 
         this.latestStateArray = null;
         this.latestRuleIndexArray = null;
-        this.latestHoverStateArray = null;
+        // Hover highlight now lives main-thread-only (no worker round-trip). Allocated eagerly and
+        // zeroed so the renderer always has a valid per-cell buffer to bind; mutated by
+        // setHoverState/clearHoverState. Mirrors latestGhostStateArray.
+        this.latestHoverStateArray = new Uint8Array(Config.NUM_CELLS);
         this.latestGhostStateArray = null;
         // Renderer dirty flag: true means this world's FBO needs to be redrawn.
         // Set whenever the visual buffers change (state/hover via STATE_UPDATE, ghost
@@ -52,10 +55,9 @@ export class WorldProxy {
             NUM_CELLS: initialSettings.config.NUM_CELLS,
         };
         
-        // The cell state buffer now lives inside Wasm linear memory (allocated by the worker), so
-        // only the ruleset and hover buffers need to be handed over at init.
+        // The cell state buffer now lives inside Wasm linear memory (allocated by the worker), and
+        // hover is main-thread-only, so only the ruleset buffer needs to be handed over at init.
         const initialRulesetBuffer = new Uint8Array(initialSettings.rulesetArray).buffer.slice(0);
-        const initialHoverStateBuffer = new Uint8Array(initialSettings.config.NUM_CELLS).buffer;
 
         this.worker.postMessage({
             type: 'INIT',
@@ -63,7 +65,6 @@ export class WorldProxy {
                 worldIndex: this.worldIndex,
                 config: initialConfig,
                 initialRulesetBuffer: initialRulesetBuffer,
-                initialHoverStateBuffer: initialHoverStateBuffer,
                 initialState: initialSettings.initialState, // Add this
                 initialIsEnabled: initialSettings.enabled,
                 speed: initialSettings.speed,
@@ -71,7 +72,7 @@ export class WorldProxy {
                 initialEntropySampleRate: initialSettings.initialEntropySampleRate,
                 seed: initialSettings.seed,
             }
-        }, [initialRulesetBuffer, initialHoverStateBuffer]);
+        }, [initialRulesetBuffer]);
     }
 
     _handleWorkerMessage(data) {
@@ -89,7 +90,6 @@ export class WorldProxy {
             case 'STATE_UPDATE': {
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
-                this.latestHoverStateArray = new Uint8Array(data.hoverStateBuffer);
                 if (this.latestGhostStateArray) {
                     this.latestGhostStateArray.fill(0);
                 }
@@ -227,11 +227,21 @@ export class WorldProxy {
     applySelectiveBrush(cellIndices, brushMode = 'invert') {
         this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices, brushMode });
     }
+    // Hover is purely visual, so it's computed and stored main-thread-only (like the ghost preview)
+    // instead of round-tripping the worker. Writes the per-cell highlight buffer directly and marks
+    // the FBO dirty so the renderer redraws on the next frame.
     setHoverState(hoverAffectedIndices) {
-        this.sendCommand('SET_HOVER_STATE', { hoverAffectedIndices });
+        this.latestHoverStateArray.fill(0);
+        for (const index of hoverAffectedIndices) {
+            if (index >= 0 && index < this.latestHoverStateArray.length) {
+                this.latestHoverStateArray[index] = 1;
+            }
+        }
+        this.renderDirty = true;
     }
     clearHoverState() {
-        this.sendCommand('CLEAR_HOVER_STATE', {});
+        this.latestHoverStateArray.fill(0);
+        this.renderDirty = true;
     }
 
     getLatestRenderData() {

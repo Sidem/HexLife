@@ -8,3 +8,11 @@ crate-type = ["cdylib"] # Specifies a dynamic library for WASM
 
 [dependencies]
 wasm-bindgen = "0.2" # The core dependency for JS interop
+
+# Optimize the release (and therefore wasm-pack) build for runtime speed. Matters most at the
+# `huge` grid preset (383k cells x 9 worlds). LTO + a single codegen unit let the optimizer inline
+# across the hot tick loop.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

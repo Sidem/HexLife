@@ -13,7 +13,6 @@ let jsStateArray = null;
 let jsNextStateArray = null;
 let jsRuleIndexArray = null;
 let jsNextRuleIndexArray = null;
-let jsHoverStateArray = null;
 let ruleset = null;
 let commandQueue = [];
 let isRunning = false;
@@ -149,22 +148,8 @@ function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
     return changed;
 }
 
-function setHoverStateLogic(hoverAffectedIndicesSet) {
-    if (!jsHoverStateArray) return false;
-    let changed = false;
-    for (let i = 0; i < workerConfig.NUM_CELLS; i++) {
-        const shouldHover = hoverAffectedIndicesSet.has(i);
-        if (jsHoverStateArray[i] !== (shouldHover ? 1 : 0)) {
-            jsHoverStateArray[i] = shouldHover ? 1 : 0;
-            changed = true;
-        }
-    }
-    return changed;
-}
-
 function processCommandQueue() {
     let needsGridUpdate = false;
-    let needsVisualUpdate = false;
     let rulesetChangedInQueue = false;
 
     for (const command of commandQueue) {
@@ -203,7 +188,6 @@ function processCommandQueue() {
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
-                if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 resetCycleState();
                 needsGridUpdate = true;
                 break;
@@ -221,19 +205,6 @@ function processCommandQueue() {
                 if (brushChanged) {
                     resetCycleState();
                     needsGridUpdate = true;
-                }
-                break;
-            }
-            case 'SET_HOVER_STATE': {
-                if (setHoverStateLogic(command.data.hoverAffectedIndices)) {
-                    needsVisualUpdate = true; 
-                }
-                break;
-            }
-            case 'CLEAR_HOVER_STATE': {
-                if (jsHoverStateArray && jsHoverStateArray.some(s => s === 1)) {
-                    jsHoverStateArray.fill(0);
-                    needsVisualUpdate = true; 
                 }
                 break;
             }
@@ -261,7 +232,6 @@ function processCommandQueue() {
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
-                if(jsHoverStateArray) jsHoverStateArray.fill(0);
                 isEnabled = true;
                 resetCycleState();
                 needsGridUpdate = true;
@@ -271,18 +241,18 @@ function processCommandQueue() {
         }
     }
     commandQueue = [];
-    
-    return { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue };
+
+    return { needsGridUpdate, rulesetChangedInQueue };
 }
 
 function runTick() {
-    const { needsGridUpdate, needsVisualUpdate, rulesetChangedInQueue } = processCommandQueue();
+    const { needsGridUpdate, rulesetChangedInQueue } = processCommandQueue();
     let simulationPerformedUpdate = false;
     if (!isEnabled || !isRunning) {
-        if (needsGridUpdate || needsVisualUpdate || rulesetChangedInQueue) {
+        if (needsGridUpdate || rulesetChangedInQueue) {
             forceSyncUpdate();
         }
-        return; 
+        return;
     }
     
     let activeCount;
@@ -397,21 +367,21 @@ function sendGridUpdate() {
     // Any actual send (throttled or forced) clears a pending throttled send so forced syncs don't
     // get followed by a redundant duplicate frame.
     if (gridThrottler) gridThrottler.cancel();
-    if (!jsStateArray || !jsRuleIndexArray || !jsHoverStateArray) {
+    if (!jsStateArray || !jsRuleIndexArray) {
         console.warn(`Worker ${worldIndex}: Attempted to send grid update with invalid/missing buffers.`);
         return;
     }
 
     // State and rule-index views are backed by Wasm linear memory, so copy out just their cells
-    // into fresh transferable buffers (never transfer/slice the whole Wasm heap).
+    // into fresh transferable buffers (never transfer/slice the whole Wasm heap). Hover is
+    // main-thread-only now, so it is no longer part of this payload.
     const statePayload = {
         type: 'STATE_UPDATE',
         worldIndex: worldIndex,
         stateBuffer: copyOutBuffer(jsStateArray),
         ruleIndexBuffer: copyOutBuffer(jsRuleIndexArray),
-        hoverStateBuffer: jsHoverStateArray.buffer.slice(0),
     };
-    const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer, statePayload.hoverStateBuffer];
+    const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer];
     self.postMessage(statePayload, transferListState);
 }
 
@@ -493,7 +463,6 @@ self.onmessage = async function(event) {
             // linear memory; build typed-array views over them rather than allocating in JS.
             refreshSimViews();
             ruleset.set(new Uint8Array(command.data.initialRulesetBuffer));
-            jsHoverStateArray = new Uint8Array(command.data.initialHoverStateBuffer);
             isEnabled = command.data.initialIsEnabled;
             workerIsEntropySamplingEnabled = command.data.initialEntropySamplingEnabled;
             workerEntropySampleRate = command.data.initialEntropySampleRate || 10;
@@ -518,7 +487,6 @@ self.onmessage = async function(event) {
                 jsStateArray.fill(0);
                 jsRuleIndexArray.fill(255); // Use 255 as a flag for "initial state"
             }
-            jsHoverStateArray.fill(0);
 
             const initialChecksum = stateChecksum();
             stateHistoryChecksums.add(initialChecksum);
@@ -651,8 +619,6 @@ self.onmessage = async function(event) {
             break;
         }
 
-        case 'SET_HOVER_STATE':
-        case 'CLEAR_HOVER_STATE':
         case 'SET_RULESET': {
             commandQueue.push(command);
             if (!isRunning || !isEnabled) {

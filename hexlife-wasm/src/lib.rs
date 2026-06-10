@@ -18,8 +18,6 @@ const NEIGHBOR_DIRS_EVEN_R: [[i32; 2]; 6] = [[-1, 0], [-1, -1], [0, -1], [1, -1]
 // rendering.
 #[wasm_bindgen]
 pub struct World {
-    grid_cols: i32,
-    grid_rows: i32,
     num_cells: usize,
     state: Vec<u8>,
     next_state: Vec<u8>,
@@ -28,6 +26,35 @@ pub struct World {
     ruleset: Vec<u8>,
     rule_usage_counters: Vec<u32>,
     last_active_count: u32,
+    // Flattened neighbor-index lookup: 6 entries per cell (`neighbor_indices[i*6 + n_order]` is the
+    // linear index of cell i's n_order-th neighbor, with toroidal wrapping already applied). The
+    // grid dimensions are fixed for the World's lifetime, so the neighborhood never changes — we
+    // compute it once here and the hot loops (`run_tick`, `block_entropy`) just index into it,
+    // replacing the per-cell parity branch + 12 modulo ops with plain array reads.
+    neighbor_indices: Vec<u32>,
+}
+
+/// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Called once
+/// from the constructor; see the `neighbor_indices` field for the layout.
+fn compute_neighbor_indices(grid_cols: i32, grid_rows: i32, num_cells: usize) -> Vec<u32> {
+    let cols = grid_cols;
+    let rows = grid_rows;
+    let mut table = vec![0u32; num_cells * 6];
+    for i in 0..num_cells {
+        let c_col = i as i32 % cols;
+        let c_row = i as i32 / cols;
+        let dirs = if c_col % 2 != 0 {
+            &NEIGHBOR_DIRS_ODD_R
+        } else {
+            &NEIGHBOR_DIRS_EVEN_R
+        };
+        for n_order in 0..6 {
+            let n_col = (c_col + dirs[n_order][0] + cols) % cols;
+            let n_row = (c_row + dirs[n_order][1] + rows) % rows;
+            table[i * 6 + n_order] = (n_row * cols + n_col) as u32;
+        }
+    }
+    table
 }
 
 #[wasm_bindgen]
@@ -41,8 +68,6 @@ impl World {
         // panic::set_hook(Box::new(console_error_panic_hook::hook));
         let num_cells = (grid_cols.max(0) * grid_rows.max(0)) as usize;
         World {
-            grid_cols,
-            grid_rows,
             num_cells,
             state: vec![0; num_cells],
             next_state: vec![0; num_cells],
@@ -51,6 +76,7 @@ impl World {
             ruleset: vec![0; 128],
             rule_usage_counters: vec![0; 128],
             last_active_count: 0,
+            neighbor_indices: compute_neighbor_indices(grid_cols, grid_rows, num_cells),
         }
     }
 
@@ -95,30 +121,18 @@ impl World {
     /// call the new generation lives in `state` (and JavaScript must mirror the swap of its views).
     /// Returns the number of active cells in the new generation.
     pub fn run_tick(&mut self) -> u32 {
-        let cols = self.grid_cols;
-        let rows = self.grid_rows;
         let mut active: u32 = 0;
 
         for i in 0..self.num_cells {
-            let c_col = i as i32 % cols;
-            let c_row = i as i32 / cols;
             let c_state = self.state[i];
 
             let mut neighbor_mask: u8 = 0;
 
-            // Determine which set of neighbor directions to use.
-            let dirs = if c_col % 2 != 0 {
-                &NEIGHBOR_DIRS_ODD_R
-            } else {
-                &NEIGHBOR_DIRS_EVEN_R
-            };
-
-            // Calculate the neighbor mask. The modulo arithmetic handles toroidal wrapping.
+            // Neighbor indices (with toroidal wrapping) are precomputed once at construction, so the
+            // mask is just six array reads — no parity branch or modulo arithmetic in the hot loop.
+            let nbase = i * 6;
             for n_order in 0..6 {
-                let n_col = (c_col + dirs[n_order][0] + cols) % cols;
-                let n_row = (c_row + dirs[n_order][1] + rows) % rows;
-                let neighbor_index = (n_row * cols + n_col) as usize;
-
+                let neighbor_index = self.neighbor_indices[nbase + n_order] as usize;
                 if self.state[neighbor_index] == 1 {
                     neighbor_mask |= 1 << n_order;
                 }
@@ -168,29 +182,18 @@ impl World {
         if self.num_cells == 0 {
             return 0.0;
         }
-        let cols = self.grid_cols;
-        let rows = self.grid_rows;
 
         // A block pattern is `(center_state << 6) | neighbor_mask`, i.e. exactly 128 possibilities.
         let mut counts = [0u32; 128];
 
         for i in 0..self.num_cells {
-            let c_col = i as i32 % cols;
-            let c_row = i as i32 / cols;
             let c_state = self.state[i];
 
             let mut neighbor_mask: u8 = 0;
-            let dirs = if c_col % 2 != 0 {
-                &NEIGHBOR_DIRS_ODD_R
-            } else {
-                &NEIGHBOR_DIRS_EVEN_R
-            };
-
+            // Reuse the precomputed neighbor table (see `run_tick`).
+            let nbase = i * 6;
             for n_order in 0..6 {
-                let n_col = (c_col + dirs[n_order][0] + cols) % cols;
-                let n_row = (c_row + dirs[n_order][1] + rows) % rows;
-                let neighbor_index = (n_row * cols + n_col) as usize;
-
+                let neighbor_index = self.neighbor_indices[nbase + n_order] as usize;
                 if self.state[neighbor_index] == 1 {
                     neighbor_mask |= 1 << n_order;
                 }
