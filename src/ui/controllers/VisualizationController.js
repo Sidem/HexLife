@@ -7,12 +7,14 @@ export class VisualizationController {
         EventBus.subscribe(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, this.#handleSetVisualizationType);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, this.#handleSetShowCycleIndicator);
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_STATUS_BADGES, this.#handleSetShowStatusBadges);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, this.#handleSetShowCommandToasts);
     }
 
     getVizType = () => PersistenceService.loadUISetting('rulesetVizType', 'binary');
     getShowMinimapOverlay = () => PersistenceService.loadUISetting('showMinimapOverlay', true);
     getShowCycleIndicator = () => PersistenceService.loadUISetting('showCycleIndicator', true);
+    getShowStatusBadges = () => PersistenceService.loadUISetting('showStatusBadges', true);
     getShowCommandToasts = () => PersistenceService.loadUISetting('showCommandToasts', true);
 
     getVisualizationOptions() {
@@ -35,6 +37,11 @@ export class VisualizationController {
 
     #handleSetShowCycleIndicator = (shouldShow) => {
         PersistenceService.saveUISetting('showCycleIndicator', !!shouldShow);
+        EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
+    }
+
+    #handleSetShowStatusBadges = (shouldShow) => {
+        PersistenceService.saveUISetting('showStatusBadges', !!shouldShow);
         EventBus.dispatch(EVENTS.RULESET_VISUALIZATION_CHANGED);
     }
 

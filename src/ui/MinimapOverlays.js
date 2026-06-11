@@ -12,6 +12,7 @@ export class MinimapOverlays extends BaseComponent {
         this.layoutCache = {};
         this.overlayElements = [];
         this.cycleIndicatorElements = [];
+        this.statusBadgeElements = [];
         this.init();
     }
 
@@ -31,6 +32,14 @@ export class MinimapOverlays extends BaseComponent {
             indicator.dataset.worldId = i;
             this.mountPoint.appendChild(indicator);
             this.cycleIndicatorElements.push(indicator);
+
+            // At-a-glance terminal-state badge (extinct / saturated / cycling). Surfaces metrics
+            // already computed per world so the 3×3 minimap is scannable without selecting each tile.
+            const badge = document.createElement('div');
+            badge.className = 'world-status-badge hidden';
+            badge.dataset.worldId = i;
+            this.mountPoint.appendChild(badge);
+            this.statusBadgeElements.push(badge);
         }
 
         this._subscribeToEvent(EVENTS.LAYOUT_UPDATED, this.handleLayoutUpdate);
@@ -49,6 +58,7 @@ export class MinimapOverlays extends BaseComponent {
         const isMobile = mode === 'mobile';
         this.overlayElements.forEach(overlay => overlay.classList.toggle('mini', isMobile));
         this.cycleIndicatorElements.forEach(indicator => indicator.classList.toggle('mini', isMobile));
+        this.statusBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
     }
 
     updateOverlays() {
@@ -60,6 +70,7 @@ export class MinimapOverlays extends BaseComponent {
         const vizState = {
             showCycleIndicator: this.visualizationController.getShowCycleIndicator(),
             showMinimapOverlay: this.visualizationController.getShowMinimapOverlay(),
+            showStatusBadges: this.visualizationController.getShowStatusBadges(),
             vizType: this.visualizationController.getVizType(),
         };
 
@@ -93,7 +104,29 @@ export class MinimapOverlays extends BaseComponent {
                 indicatorEl.classList.add('hidden');
             }
 
-            
+
+            const badgeEl = this.statusBadgeElements[i];
+            const showBadges = vizState?.showStatusBadges ?? false;
+            const status = (badgeEl && showBadges && worldStatus?.renderData.enabled)
+                ? MinimapOverlays._computeStatus(worldStatus.stats)
+                : null;
+            if (status) {
+                badgeEl.className = `world-status-badge ${status.type}`;
+                badgeEl.classList.toggle('mini', this.overlayElements[i]?.classList.contains('mini'));
+                badgeEl.style.left = `${miniX + miniMapSpacing}px`;
+                badgeEl.style.top = `${miniY + miniMapH - 18 - miniMapSpacing}px`;
+                badgeEl.title = status.title;
+                const badgeSig = `${status.type}-${status.label}`;
+                if (badgeEl.dataset.badgeSig !== badgeSig) {
+                    badgeEl.textContent = status.label;
+                    badgeEl.dataset.badgeSig = badgeSig;
+                }
+            } else if (badgeEl) {
+                badgeEl.classList.add('hidden');
+                badgeEl.dataset.badgeSig = '';
+            }
+
+
             const overlayEl = this.overlayElements[i];
             const showOverlay = vizState?.showMinimapOverlay ?? false;
             if (overlayEl && worldStatus?.renderData.enabled && showOverlay) {
@@ -117,4 +150,22 @@ export class MinimapOverlays extends BaseComponent {
             }
         }
     }
-} 
+
+    // Classify a world's terminal state from already-computed stats. Extinct/saturated take
+    // precedence over cycling (a period-1 cycle at ratio 0/1 is really just dead/full). Returns
+    // null for an actively-evolving world so no badge is shown.
+    static _computeStatus(stats) {
+        if (!stats) return null;
+        if (stats.ratio <= 0) {
+            return { type: 'extinct', label: '✕', title: 'Extinct — all cells dead' };
+        }
+        if (stats.ratio >= 1) {
+            return { type: 'saturated', label: '■', title: 'Saturated — all cells alive' };
+        }
+        if (stats.isInCycle) {
+            const period = stats.cycleLength || 0;
+            return { type: 'cycling', label: `↻${period}`, title: `Stable cycle — period ${period}` };
+        }
+        return null;
+    }
+}

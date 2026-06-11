@@ -198,6 +198,8 @@ export const EVENTS = {
     COMMAND_SET_SHOW_MINIMAP_OVERLAY: 'command:setShowMinimapOverlay',
     /** @param {boolean} shouldShow - Whether to show the cycle indicators. */
     COMMAND_SET_SHOW_CYCLE_INDICATOR: 'command:setShowCycleIndicator',
+    /** @param {boolean} shouldShow - Whether to show the per-minimap status badges (extinct/saturated/cycling). */
+    COMMAND_SET_SHOW_STATUS_BADGES: 'command:setShowStatusBadges',
     /** @event A user-initiated command to execute the generate ruleset action with the controller's current settings. */
     COMMAND_EXECUTE_GENERATE_RULESET: 'command:executeGenerateRuleset',
     /** @event A user-initiated command to execute the mutate ruleset action with the controller's current settings. */

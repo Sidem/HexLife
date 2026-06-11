@@ -69,3 +69,55 @@
     width: 25px;
     height: 25px;
 }
+
+/* Per-minimap status badges (extinct / saturated / cycling) */
+.world-status-badge {
+    position: absolute;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 51; /* Above the ruleset overlay, same as the cycle indicator */
+}
+
+.world-status-badge.hidden {
+    display: none;
+    opacity: 0;
+}
+
+.world-status-badge.extinct {
+    background-color: rgba(60, 60, 70, 0.85);
+    color: #c8c8d0;
+}
+
+.world-status-badge.saturated {
+    background-color: rgba(230, 170, 30, 0.9);
+    color: #1a1a1a;
+    border-color: rgba(255, 230, 150, 0.8);
+}
+
+.world-status-badge.cycling {
+    background-color: rgba(20, 130, 160, 0.9);
+    color: #e8fbff;
+    border-color: rgba(140, 220, 240, 0.8);
+}
+
+.world-status-badge.mini {
+    height: 15px;
+    min-width: 15px;
+    padding: 0 3px;
+    font-size: 9px;
+    border-radius: 7.5px;
+}
