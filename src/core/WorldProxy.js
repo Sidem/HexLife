@@ -88,8 +88,28 @@ export class WorldProxy {
                 break;
             }
             case 'STATE_UPDATE': {
+                // Hand the buffers we're about to replace back to the worker (transferred) so it
+                // can refill them on the next grid send instead of allocating two fresh NUM_CELLS
+                // ArrayBuffers each time. The renderer and save path read latestStateArray /
+                // latestRuleIndexArray only synchronously (within an rAF / a save call), never
+                // across an event-loop turn, so once they're reassigned below the old backing
+                // buffers are unreferenced and safe to detach. A detached buffer reports
+                // byteLength 0, so the guard also skips anything already transferred away.
+                const reclaimable = [];
+                if (this.latestStateArray && this.latestStateArray.buffer.byteLength > 0) {
+                    reclaimable.push(this.latestStateArray.buffer);
+                }
+                if (this.latestRuleIndexArray && this.latestRuleIndexArray.buffer.byteLength > 0) {
+                    reclaimable.push(this.latestRuleIndexArray.buffer);
+                }
                 this.latestStateArray = new Uint8Array(data.stateBuffer);
                 this.latestRuleIndexArray = new Uint8Array(data.ruleIndexBuffer);
+                if (reclaimable.length > 0) {
+                    this.worker.postMessage(
+                        { type: 'RECLAIM_BUFFERS', data: { buffers: reclaimable } },
+                        reclaimable
+                    );
+                }
                 if (this.latestGhostStateArray) {
                     this.latestGhostStateArray.fill(0);
                 }

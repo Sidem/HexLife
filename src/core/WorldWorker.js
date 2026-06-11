@@ -91,6 +91,33 @@ function copyOutBuffer(view) {
     return view.slice().buffer;
 }
 
+// Transfer-back pool for the two STATE_UPDATE cell buffers. After the main thread consumes a grid
+// send it posts the now-replaced ArrayBuffers back (RECLAIM_BUFFERS, transferred); copyCellsOut
+// refills one instead of allocating a fresh NUM_CELLS buffer per send (~display rate × 9 worlds).
+// In steady state two pairs of buffers ping-pong between worker and main thread with zero
+// per-frame allocation. Bounded so a lagging/stalled main thread can't grow it without limit.
+let cellBufferPool = [];
+const MAX_POOLED_BUFFERS = 4; // 2 in flight + slack
+
+// Pop a pooled cell buffer of the current NUM_CELLS size, discarding any stale-sized leftovers
+// (e.g. survivors of a grid-dimension change); allocate fresh only when the pool can't supply one.
+function acquireCellBuffer() {
+    const n = workerConfig.NUM_CELLS;
+    while (cellBufferPool.length > 0) {
+        const buf = cellBufferPool.pop();
+        if (buf.byteLength === n) return buf;
+    }
+    return new ArrayBuffer(n);
+}
+
+// Cell-buffer equivalent of copyOutBuffer that draws from the transfer-back pool. Used only for the
+// state / rule-index payloads (both NUM_CELLS bytes), which dominate the per-send allocation churn.
+function copyCellsOut(view) {
+    const buf = acquireCellBuffer();
+    new Uint8Array(buf).set(view);
+    return buf;
+}
+
 function resetCycleState() {
     isCyclePlaybackMode = false;
     isDetectingCycle = false;
@@ -414,8 +441,8 @@ function sendGridUpdate() {
     const statePayload = {
         type: 'STATE_UPDATE',
         worldIndex: worldIndex,
-        stateBuffer: copyOutBuffer(jsStateArray),
-        ruleIndexBuffer: copyOutBuffer(jsRuleIndexArray),
+        stateBuffer: copyCellsOut(jsStateArray),
+        ruleIndexBuffer: copyCellsOut(jsRuleIndexArray),
     };
     const transferListState = [statePayload.stateBuffer, statePayload.ruleIndexBuffer];
     self.postMessage(statePayload, transferListState);
@@ -671,6 +698,21 @@ self.onmessage = async function(event) {
             commandQueue.push(command);
             if (!isRunning || !isEnabled) {
                 runTick();
+            }
+            break;
+        }
+        case 'RECLAIM_BUFFERS': {
+            // Main thread returning consumed STATE_UPDATE buffers for reuse. Pool only
+            // current-size buffers and only up to the cap (defends against a stale size after a
+            // grid change, and against unbounded growth if sends ever outpace reclaims).
+            const buffers = command.data && command.data.buffers;
+            if (buffers) {
+                for (const buf of buffers) {
+                    if (buf && buf.byteLength === workerConfig.NUM_CELLS &&
+                        cellBufferPool.length < MAX_POOLED_BUFFERS) {
+                        cellBufferPool.push(buf);
+                    }
+                }
             }
             break;
         }
