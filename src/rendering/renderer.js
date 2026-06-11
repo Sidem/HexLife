@@ -152,9 +152,9 @@ function _calculateAndCacheLayout() {
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
-    const isLandscape = canvasWidth >= canvasHeight;
     const aspectRatio = canvasWidth / canvasHeight;
-    if (isLandscape && aspectRatio > 1.2) {
+    if (aspectRatio >= Config.LAYOUT_LANDSCAPE_MIN_ASPECT) {
+        // Wide: minimap column on the right, selected view absorbs the rest.
         // The minimap grid is square, so its column never needs to be wider
         // than the available height; any excess goes to the selected view.
         selectedViewHeight = canvasHeight - padding * 2;
@@ -165,9 +165,9 @@ function _calculateAndCacheLayout() {
         miniMapAreaHeight = selectedViewHeight;
         miniMapAreaX = selectedViewX + selectedViewWidth + padding;
         miniMapAreaY = padding;
-    } else {
-        // Same idea for the bottom strip: cap its height at the width the
-        // square minimap grid can actually use.
+    } else if (aspectRatio <= Config.LAYOUT_PORTRAIT_MAX_ASPECT) {
+        // Tall & narrow: minimap strip across the bottom. The strip is roughly
+        // as wide as it is tall here, so the square grid nearly fills it.
         selectedViewWidth = canvasWidth - padding * 2;
         miniMapAreaHeight = Math.min(canvasHeight * 0.35 - padding * 1.5, selectedViewWidth);
         selectedViewHeight = canvasHeight - miniMapAreaHeight - padding * 3;
@@ -176,6 +176,20 @@ function _calculateAndCacheLayout() {
         miniMapAreaWidth = selectedViewWidth;
         miniMapAreaX = padding;
         miniMapAreaY = selectedViewY + selectedViewHeight + padding;
+    } else {
+        // Near-square: a full-width/height strip would leave the square grid floating in a
+        // large empty band, so the selected view fills the whole canvas and the minimap is
+        // docked as a square overlay in the bottom-right corner. Input hit-testing checks the
+        // minimap before the selected view, so the overlapped corner still selects mini worlds.
+        selectedViewX = padding;
+        selectedViewY = padding;
+        selectedViewWidth = canvasWidth - padding * 2;
+        selectedViewHeight = canvasHeight - padding * 2;
+        const overlaySide = Math.min(canvasWidth, canvasHeight) * Config.MINIMAP_OVERLAY_SIZE_FACTOR;
+        miniMapAreaWidth = overlaySide;
+        miniMapAreaHeight = overlaySide;
+        miniMapAreaX = canvasWidth - padding - overlaySide;
+        miniMapAreaY = canvasHeight - padding - overlaySide;
     }
 
     const miniMapGridRatio = Config.WORLD_LAYOUT_COLS / Config.WORLD_LAYOUT_ROWS;

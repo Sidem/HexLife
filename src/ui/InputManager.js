@@ -129,13 +129,9 @@ export class InputManager {
         const rect = this.gl.canvas.getBoundingClientRect();
         const pointerX = event.clientX - rect.left;
         const pointerY = event.clientY - rect.top;
-        const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
-        if (pointerX >= selectedViewX && pointerX < selectedViewX + selectedViewWidth &&
-            pointerY >= selectedViewY && pointerY < selectedViewY + selectedViewHeight) {
-            const texCoordX = (pointerX - selectedViewX) / selectedViewWidth;
-            const texCoordY = (pointerY - selectedViewY) / selectedViewHeight;
-            return { ...textureCoordsToGridCoords(texCoordX, texCoordY, camera), viewType: 'selected', worldIndexAtCursor: this.worldManager.getSelectedWorldIndex() };
-        }
+        // Minimaps are hit-tested first: in the near-square layout the minimap is docked as an
+        // overlay on top of the selected view, so its corner must win. In the side-by-side and
+        // stacked layouts the regions are disjoint, so checking order is irrelevant there.
         const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = this.layoutCache.miniMap;
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const r_map = Math.floor(i / Config.WORLD_LAYOUT_COLS);
@@ -145,6 +141,13 @@ export class InputManager {
             if (pointerX >= miniX && pointerX < miniX + miniMapW && pointerY >= miniY && pointerY < miniY + miniMapH) {
                 return { worldIndexAtCursor: i, col: null, row: null, viewType: 'mini' };
             }
+        }
+        const { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight } = this.layoutCache.selectedView;
+        if (pointerX >= selectedViewX && pointerX < selectedViewX + selectedViewWidth &&
+            pointerY >= selectedViewY && pointerY < selectedViewY + selectedViewHeight) {
+            const texCoordX = (pointerX - selectedViewX) / selectedViewWidth;
+            const texCoordY = (pointerY - selectedViewY) / selectedViewHeight;
+            return { ...textureCoordsToGridCoords(texCoordX, texCoordY, camera), viewType: 'selected', worldIndexAtCursor: this.worldManager.getSelectedWorldIndex() };
         }
         return { worldIndexAtCursor: null, col: null, row: null, viewType: null };
     }

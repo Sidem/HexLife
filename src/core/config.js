@@ -77,7 +77,17 @@ export const CYCLE_DETECTION_HISTORY_SIZE = 400;
 // collected/played back). Raise both together to detect longer cycles.
 export const CYCLE_DETECTION_MAX_PERIOD = 400;
 export const RULESET_HISTORY_SIZE = 30;
-export const RENDER_TEXTURE_SIZE = 1280; 
+export const RENDER_TEXTURE_SIZE = 1280;
+// --- Selected-view / minimap layout regimes (renderer._calculateAndCacheLayout) ---
+// aspectRatio = canvasWidth / canvasHeight. Wide windows get a side-by-side split (minimap
+// column on the right); tall, narrow windows get a stacked split (minimap strip across the
+// bottom). In the near-square band between these two thresholds, a full-width/height strip
+// would leave the square 3x3 grid floating in a large empty band, so the selected view instead
+// fills the whole canvas and the minimap is docked as a corner overlay.
+export const LAYOUT_LANDSCAPE_MIN_ASPECT = 1.25; // >= this -> side-by-side columns
+export const LAYOUT_PORTRAIT_MAX_ASPECT = 0.8;   // <= this -> stacked rows (tall, narrow band)
+// Minimap overlay square side as a fraction of the smaller canvas dimension (near-square only).
+export const MINIMAP_OVERLAY_SIZE_FACTOR = 0.32;
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0]; 
 export const HOVER_BORDER_COLOR = [0.6, 0.6, 0.6, 1.0]; 
 export const HOVER_FILLED_DARKEN_FACTOR = 0.66; 
