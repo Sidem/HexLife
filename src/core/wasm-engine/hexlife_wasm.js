@@ -38,6 +38,14 @@ export class World {
         return ret;
     }
     /**
+     * Number of cells that flipped state in the last `run_tick` (turnover/activity proxy).
+     * @returns {number}
+     */
+    last_changed_count() {
+        const ret = wasm.world_last_changed_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Public constructor that can be called from JavaScript. All buffers are allocated once,
      * here, and never reallocated for the lifetime of the `World` — so the pointers handed to
      * JavaScript (and the views built over them) stay valid as long as Wasm memory is not grown.
@@ -69,6 +77,15 @@ export class World {
      */
     num_cells() {
         const ret = wasm.world_num_cells(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Hamming distance between the main lane and the probe lane (number of differing cells). Zero
+     * when no probe is active.
+     * @returns {number}
+     */
+    probe_hamming() {
+        const ret = wasm.world_probe_hamming(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -112,11 +129,27 @@ export class World {
         return ret >>> 0;
     }
     /**
+     * Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
+     * one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
+     * reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range
+     * `flip_index` is ignored (the probe then starts as an exact copy — Hamming 0).
+     * @param {number} flip_index
+     */
+    start_probe(flip_index) {
+        wasm.world_start_probe(this.__wbg_ptr, flip_index);
+    }
+    /**
      * @returns {number}
      */
     state_ptr() {
         const ret = wasm.world_state_ptr(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Stop the probe and free its buffers (a non-probing World pays no per-tick or memory cost).
+     */
+    stop_probe() {
+        wasm.world_stop_probe(this.__wbg_ptr);
     }
 }
 if (Symbol.dispose) World.prototype[Symbol.dispose] = World.prototype.free;

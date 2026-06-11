@@ -29,12 +29,27 @@ pub struct World {
     ruleset: Vec<u8>,
     rule_usage_counters: Vec<u32>,
     last_active_count: u32,
+    // Number of cells whose state flipped in the last `run_tick` (`next != current`). A cheap
+    // activity/turnover proxy for the auto-explore evaluation burst — one extra compare per cell,
+    // behavior-neutral.
+    last_changed_count: u32,
     // Flattened neighbor-index lookup: 6 entries per cell (`neighbor_indices[i*6 + n_order]` is the
     // linear index of cell i's n_order-th neighbor, with toroidal wrapping already applied). The
     // grid dimensions are fixed for the World's lifetime, so the neighborhood never changes — we
     // compute it once here and the hot loops (`run_tick`, `block_entropy`) just index into it,
     // replacing the per-cell parity branch + 12 modulo ops with plain array reads.
     neighbor_indices: Vec<u32>,
+    // --- Damage-spreading probe (auto-explore branching-parameter measure) ---
+    // A second simulation lane: a copy of `state` with one cell flipped, advanced in lockstep with
+    // the main lane (same ruleset, same neighbor table). The Hamming distance between the two lanes
+    // over time estimates the branching parameter σ (does a single-cell perturbation grow, hold, or
+    // die?). Buffers are lazily allocated on `start_probe` and freed on `stop_probe` so a non-probing
+    // World pays nothing. While `probe_active`, every `run_tick` also advances the probe lane (≈2×
+    // tick cost — evaluation-only). The probe lane never touches the usage counters or `next_state`,
+    // so probe-off ticks stay byte-identical to today.
+    probe_active: bool,
+    probe_state: Vec<u8>,
+    probe_next_state: Vec<u8>,
 }
 
 /// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Called once
@@ -79,7 +94,11 @@ impl World {
             ruleset: vec![0; 128],
             rule_usage_counters: vec![0; 128],
             last_active_count: 0,
+            last_changed_count: 0,
             neighbor_indices: compute_neighbor_indices(grid_cols, grid_rows, num_cells),
+            probe_active: false,
+            probe_state: Vec::new(),
+            probe_next_state: Vec::new(),
         }
     }
 
@@ -125,6 +144,7 @@ impl World {
     /// Returns the number of active cells in the new generation.
     pub fn run_tick(&mut self) -> u32 {
         let mut active: u32 = 0;
+        let mut changed: u32 = 0;
 
         for i in 0..self.num_cells {
             let c_state = self.state[i];
@@ -151,6 +171,9 @@ impl World {
             if next_state_value == 1 {
                 active += 1;
             }
+            if next_state_value != c_state {
+                changed += 1;
+            }
         }
 
         // Promote the freshly computed generation to "current". This is a cheap pointer swap; the
@@ -160,12 +183,63 @@ impl World {
         std::mem::swap(&mut self.rule_indices, &mut self.next_rule_indices);
 
         self.last_active_count = active;
+        self.last_changed_count = changed;
+
+        // While a damage probe is running, advance its lane in lockstep so the Hamming distance
+        // tracks the same generation count as the main lane. Probe-off ⇒ this is skipped entirely.
+        if self.probe_active {
+            self.run_probe_tick();
+        }
+
         active
     }
 
     /// Number of active cells in the current generation (as of the last `run_tick`).
     pub fn active_count(&self) -> u32 {
         self.last_active_count
+    }
+
+    /// Number of cells that flipped state in the last `run_tick` (turnover/activity proxy).
+    pub fn last_changed_count(&self) -> u32 {
+        self.last_changed_count
+    }
+
+    /// Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
+    /// one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
+    /// reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range
+    /// `flip_index` is ignored (the probe then starts as an exact copy — Hamming 0).
+    pub fn start_probe(&mut self, flip_index: usize) {
+        if self.probe_state.len() != self.num_cells {
+            self.probe_state = vec![0; self.num_cells];
+            self.probe_next_state = vec![0; self.num_cells];
+        }
+        self.probe_state.copy_from_slice(&self.state);
+        if flip_index < self.num_cells {
+            self.probe_state[flip_index] ^= 1;
+        }
+        self.probe_active = true;
+    }
+
+    /// Hamming distance between the main lane and the probe lane (number of differing cells). Zero
+    /// when no probe is active.
+    pub fn probe_hamming(&self) -> u32 {
+        if !self.probe_active {
+            return 0;
+        }
+        let mut distance: u32 = 0;
+        for i in 0..self.num_cells {
+            if self.state[i] != self.probe_state[i] {
+                distance += 1;
+            }
+        }
+        distance
+    }
+
+    /// Stop the probe and free its buffers (a non-probing World pays no per-tick or memory cost).
+    pub fn stop_probe(&mut self) {
+        self.probe_active = false;
+        self.probe_state = Vec::new();
+        self.probe_next_state = Vec::new();
     }
 
     /// Rolling hash of the current state buffer, used for cycle detection.
@@ -215,6 +289,31 @@ impl World {
             }
         }
         entropy / 7.0
+    }
+}
+
+// Private helpers (kept out of the `#[wasm_bindgen]` block so they aren't exported to JS).
+impl World {
+    /// Advance the probe lane by one generation using the same ruleset + neighbor table as the main
+    /// lane. Mirrors `run_tick`'s core but writes only `probe_next_state` and touches neither the
+    /// usage counters nor the main-lane buffers — so a running probe never perturbs the simulation.
+    fn run_probe_tick(&mut self) {
+        for i in 0..self.num_cells {
+            let c_state = self.probe_state[i];
+
+            let mut neighbor_mask: u8 = 0;
+            let nbase = i * 6;
+            for n_order in 0..6 {
+                let neighbor_index = self.neighbor_indices[nbase + n_order] as usize;
+                if self.probe_state[neighbor_index] == 1 {
+                    neighbor_mask |= 1 << n_order;
+                }
+            }
+
+            let rule_idx = ((c_state << 6) | neighbor_mask) as usize;
+            self.probe_next_state[i] = self.ruleset[rule_idx];
+        }
+        std::mem::swap(&mut self.probe_state, &mut self.probe_next_state);
     }
 }
 
@@ -412,6 +511,98 @@ mod tests {
         assert_eq!(initial, GOLDEN_INITIAL, "seed pattern changed");
         assert_eq!(after_1, GOLDEN_AFTER_1, "single-tick evolution changed");
         assert_eq!(after_50, GOLDEN_AFTER_50, "50-tick evolution changed");
+    }
+
+    #[test]
+    fn changed_count_matches_state_diff() {
+        // The all-zero ruleset sends every active cell to 0 and leaves dead cells dead, so the
+        // changed-count after one tick must equal the number of cells that were active beforehand.
+        let mut w = seeded_world(40, 46, 0xBADF00D);
+        let initially_active = w.state.iter().filter(|&&c| c == 1).count() as u32;
+        w.run_tick();
+        assert_eq!(w.last_changed_count(), initially_active);
+
+        // A still life (center-preserving) changes nothing.
+        let mut s = seeded_world(40, 46, 0x13579);
+        for idx in 0..128 {
+            s.ruleset[idx] = ((idx >> 6) & 1) as u8;
+        }
+        s.run_tick();
+        assert_eq!(s.last_changed_count(), 0);
+
+        // A center-inverting ruleset flips every cell each tick.
+        let mut inv = seeded_world(40, 46, 0x2468);
+        for idx in 0..128 {
+            inv.ruleset[idx] = 1 - (((idx >> 6) & 1) as u8);
+        }
+        inv.run_tick();
+        assert_eq!(inv.last_changed_count() as usize, inv.num_cells);
+    }
+
+    #[test]
+    fn probe_damage_holds_for_still_life() {
+        // Center-preserving ruleset: every cell is frozen, so a single-cell perturbation neither
+        // spreads nor heals — Hamming distance stays pinned at 1.
+        let mut w = seeded_world(40, 46, 0xC0DE);
+        for idx in 0..128 {
+            w.ruleset[idx] = ((idx >> 6) & 1) as u8;
+        }
+        w.start_probe(123);
+        assert_eq!(w.probe_hamming(), 1, "probe starts one cell apart");
+        for _ in 0..10 {
+            w.run_tick();
+            assert_eq!(w.probe_hamming(), 1, "damage neither spreads nor heals");
+        }
+        w.stop_probe();
+        assert_eq!(w.probe_hamming(), 0, "no distance reported once probe is off");
+    }
+
+    #[test]
+    fn probe_damage_holds_for_center_inverting() {
+        // Center-inverting ruleset: both lanes flip in lockstep every tick, so the one perturbed
+        // cell stays perturbed — Hamming distance remains 1 across ticks.
+        let mut w = seeded_world(40, 46, 0xFEED);
+        for idx in 0..128 {
+            w.ruleset[idx] = 1 - (((idx >> 6) & 1) as u8);
+        }
+        w.start_probe(200);
+        assert_eq!(w.probe_hamming(), 1);
+        for _ in 0..10 {
+            w.run_tick();
+            assert_eq!(w.probe_hamming(), 1, "lockstep flip preserves the single difference");
+        }
+    }
+
+    #[test]
+    fn probe_damage_dies_for_saturating_ruleset() {
+        // All-ones ruleset drives both lanes to a fully-active grid after a single tick, so any
+        // initial perturbation is erased — Hamming distance collapses to 0.
+        let mut w = seeded_world(40, 46, 0xABBA);
+        for r in w.ruleset.iter_mut() {
+            *r = 1;
+        }
+        w.start_probe(50);
+        assert_eq!(w.probe_hamming(), 1);
+        w.run_tick();
+        assert_eq!(w.probe_hamming(), 0, "saturation heals the perturbation");
+    }
+
+    #[test]
+    fn probe_does_not_perturb_main_lane() {
+        // A running probe must leave the main lane byte-identical to an un-probed run: same seed +
+        // ruleset, one world probing and one not, must evolve to identical state/checksum.
+        let ruleset = parse_hex_ruleset(DEFAULT_RULESET_HEX);
+        let mut probed = seeded_world(48, 56, 0x2468ACE);
+        let mut plain = seeded_world(48, 56, 0x2468ACE);
+        probed.ruleset.copy_from_slice(&ruleset);
+        plain.ruleset.copy_from_slice(&ruleset);
+        probed.start_probe(777);
+        for _ in 0..30 {
+            probed.run_tick();
+            plain.run_tick();
+        }
+        assert_eq!(probed.state, plain.state, "probe must not alter the main lane");
+        assert_eq!(probed.checksum_state(), plain.checksum_state());
     }
 
     // Golden checksums for default_ruleset_golden_checksum_regression (48x56 grid, seed 0x2468ACE).
