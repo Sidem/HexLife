@@ -18,6 +18,7 @@ const KEYS = {
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
     USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
     USER_PATTERNS: `${LS_KEY_PREFIX}userPatterns`,
+    EXPLORE_GALLERY: `${LS_KEY_PREFIX}exploreGallery`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`
@@ -236,6 +237,15 @@ export function loadUserPatterns() {
 
 export function saveUserPatterns(userPatterns) {
     _setItem(KEYS.USER_PATTERNS, userPatterns);
+}
+
+// Auto-explore session gallery (Phase 4): the MAP-Elites-lite archive's entry list, best-first.
+export function loadExploreGallery() {
+    return _getItem(KEYS.EXPLORE_GALLERY) || [];
+}
+
+export function saveExploreGallery(entries) {
+    _setItem(KEYS.EXPLORE_GALLERY, entries);
 }
 
 export function loadColorSettings() {

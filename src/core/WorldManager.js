@@ -4,6 +4,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
+import { AutoExploreService } from './AutoExploreService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells } from '../utils/utils.js';
 
@@ -26,6 +27,9 @@ export class WorldManager {
         this.initialDefaultRulesetHex = "";
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
+        // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
+        // it only references the proxies/ruleset service lazily once started.
+        this.autoExploreService = new AutoExploreService(this);
         this._setupEventListeners();
     }
 
@@ -205,6 +209,13 @@ export class WorldManager {
         this.#setupEditorCommandHandlers();
         this.#setupWorldStateCommandHandlers();
         this.#setupInputAndInteractionHandlers();
+        this.#setupAutoExploreHandlers();
+    }
+
+    #setupAutoExploreHandlers() {
+        EventBus.subscribe(EVENTS.COMMAND_START_AUTO_EXPLORE, (options) => this.autoExploreService.start(options || {}));
+        EventBus.subscribe(EVENTS.COMMAND_STOP_AUTO_EXPLORE, (data) => this.autoExploreService.stop(data || {}));
+        EventBus.subscribe(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY, () => this.autoExploreService.clearGallery());
     }
 
     #setupSimulationControlHandlers() {
@@ -688,7 +699,99 @@ export class WorldManager {
             }
         });
         this.simulationController._syncPauseState(this.isGloballyPaused);
+        // Respect global pause during exploration: the pause button pauses/resumes the search loop.
+        // (Guarded so the restore path — which runs after the service is already idle — can't recurse.)
+        if (this.autoExploreService?.isRunning()) {
+            if (this.isGloballyPaused) this.autoExploreService.pause();
+            else this.autoExploreService.resume();
+        }
     }
+
+    // --- Auto-explore support (Phase 4) -------------------------------------
+    // The AutoExploreService owns the search loop but mutates worlds through these helpers so the
+    // proxy/persistence dance stays in WorldManager. They deliberately avoid spamming localStorage
+    // and ruleset history during the search; the snapshot/restore pair brackets a whole session.
+
+    /** Snapshot the pre-explore worlds (rulesets, initial states, enabled flags) + pause state. */
+    _captureAutoExploreSnapshot = () => ({
+        isGloballyPaused: this.isGloballyPaused,
+        worlds: this.worldSettings.map(ws => ({
+            rulesetHex: ws.rulesetHex,
+            initialState: structuredClone(ws.initialState),
+            enabled: ws.enabled,
+        })),
+    });
+
+    /** Enable (or disable) every world for a full-grid search, without starting normal ticking. */
+    _setAllWorldsEnabledForExplore = (enabled) => {
+        this.worlds.forEach((proxy, idx) => {
+            if (this.worldSettings[idx]) this.worldSettings[idx].enabled = enabled;
+            proxy.setEnabled(enabled);
+        });
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+    };
+
+    /**
+     * Apply a candidate ruleset to a world during exploration. Lightweight: uploads to the worker and
+     * keeps `worldSettings.rulesetHex` in sync (so the worker's STATS echo doesn't re-trigger a
+     * persist), but pushes no history and writes no localStorage — the session is bracketed by
+     * snapshot/restore. Dispatches RULESET_CHANGED for the selected world so the UI tracks the champion.
+     */
+    _applyExploreRuleset = (worldIndex, hex) => {
+        const proxy = this.worlds[worldIndex];
+        const settings = this.worldSettings[worldIndex];
+        if (!proxy || !settings || hex === "Error") return;
+        proxy.setRuleset(hexToRuleset(hex).buffer.slice(0));
+        settings.rulesetHex = hex;
+        if (worldIndex === this.selectedWorldIndex) EventBus.dispatch(EVENTS.RULESET_CHANGED, hex);
+    };
+
+    /**
+     * Restore the worlds captured by {@link _captureAutoExploreSnapshot}. Re-applies each world's
+     * ruleset (without history), initial state and enabled flag, resets the grids, and restores the
+     * pre-explore pause state.
+     * @param {object} snapshot
+     * @param {{adoptChampionHex?: string|null}} [opts] - When `adoptChampionHex` is set, the selected
+     *   world keeps that ruleset (user adopted the find) instead of its pre-explore one.
+     */
+    _restoreAutoExploreSnapshot = (snapshot, opts = {}) => {
+        if (!snapshot) return;
+        const adoptHex = opts.adoptChampionHex || null;
+        const baseSeed = Date.now();
+        snapshot.worlds.forEach((snap, idx) => {
+            const settings = this.worldSettings[idx];
+            const proxy = this.worlds[idx];
+            if (!settings || !proxy) return;
+            const restoreHex = (adoptHex && idx === this.selectedWorldIndex) ? adoptHex : snap.rulesetHex;
+            settings.initialState = structuredClone(snap.initialState);
+            settings.enabled = snap.enabled;
+            proxy.setEnabled(snap.enabled);
+            this._commitRuleset(idx, restoreHex, {
+                addToHistory: false,
+                reset: true,
+                seed: this._getResetSeed(baseSeed, idx),
+            });
+        });
+        // Restore the pre-explore pause state (starts/stops enabled worlds as appropriate).
+        this.setGlobalPause(snapshot.isGloballyPaused);
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+        // NB: do NOT call dispatchSelectedWorldUpdates here — it reconciles worldSettings from the
+        // proxy's *cached* stats, which still hold the champion hex (the worker hasn't echoed the
+        // just-pushed restored ruleset yet) and would clobber the restore. Dispatch the restored
+        // truth directly instead; the worker's RESET_WORLD stats echo then re-syncs the proxy cache.
+        const selIdx = this.selectedWorldIndex;
+        const selHex = this.worldSettings[selIdx]?.rulesetHex;
+        if (selHex) {
+            EventBus.dispatch(EVENTS.RULESET_CHANGED, selHex);
+            PersistenceService.saveRuleset(selHex);
+            const selStats = this.worlds[selIdx]?.getLatestStats();
+            if (selStats) {
+                EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, { ...selStats, rulesetHex: selHex, worldIndex: selIdx });
+            }
+        }
+    };
 
     setGlobalSpeed = (speed) => {
         const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));

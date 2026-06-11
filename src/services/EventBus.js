@@ -319,4 +319,16 @@ export const EVENTS = {
     COLOR_SETTINGS_CHANGED: 'ui:colorSettingsChanged',
     /** @param {boolean} shouldShow - Whether to show the command toasts. */
     COMMAND_SET_SHOW_COMMAND_TOASTS: 'command:setShowCommandToasts',
+
+    // --- Auto-explore (Phase 4) ---
+    /** @param {Partial<import('../core/AutoExploreService.js').EXPLORE_CONFIG>} [options] - Optional overrides (mutationRate, mutationMode, evalTicks, IC-suite knobs). Starts the auto-explore generation loop seeded from the selected world's ruleset. */
+    COMMAND_START_AUTO_EXPLORE: 'command:startAutoExplore',
+    /** @param {{adopt?: boolean}} [data] - Stop the auto-explore loop and restore pre-explore worlds. When `adopt` is true, keep the current champion ruleset in the selected world instead of restoring it. */
+    COMMAND_STOP_AUTO_EXPLORE: 'command:stopAutoExplore',
+    /** @event Emitted with no payload to clear the persisted auto-explore session gallery. */
+    COMMAND_CLEAR_AUTO_EXPLORE_GALLERY: 'command:clearAutoExploreGallery',
+    /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null}} data - Auto-explore loop progress (per generation + lifecycle transitions). */
+    EXPLORE_PROGRESS: 'explore:progress',
+    /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */
+    EXPLORE_FIND_ADDED: 'explore:findAdded',
 };
