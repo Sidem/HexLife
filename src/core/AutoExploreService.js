@@ -59,6 +59,10 @@ export const EXPLORE_CONFIG = {
     mutationRate: 0.06,
     /** Default mutation mode. */
     mutationMode: 'r_sym',
+    /** Crossover children (champion × runner-up) bred per generation once a runner-up exists. */
+    crossoverChildren: 3,
+    /** Crossover recombination mode (RulesetService.crossoverHexes). */
+    crossoverMode: 'r_sym',
     /** Minimum candidate score to bank a find into the gallery archive. */
     findThreshold: 0.45,
     /** Max gallery entries to persist (best-first; archive itself is unbounded in memory). */
@@ -76,6 +80,8 @@ export class AutoExploreService {
         this.state = EXPLORE_STATE.IDLE;
         this.generation = 0;
         this.championHex = null;
+        /** Runner-up of the latest generation — the second parent for crossover breeding. */
+        this.runnerUpHex = null;
         this.options = { ...EXPLORE_CONFIG };
         this.archive = new BehaviorArchive();
         /** Snapshot of pre-explore per-world settings + pause state, for restore on stop. */
@@ -105,6 +111,7 @@ export class AutoExploreService {
         if (this.isRunning()) return;
         this.options = { ...EXPLORE_CONFIG, ...options };
         this.generation = 0;
+        this.runnerUpHex = null;
         this._runToken++;
 
         const seedHex = this.wm.getCurrentRulesetHex();
@@ -208,10 +215,8 @@ export class AutoExploreService {
         );
         if (token !== this._runToken) return;
 
-        // Score, archive, and select.
-        let bestSelectionScore = -Infinity;
-        let bestHex = this.championHex;
-        let bestScored = null;
+        // Score every candidate, archive the interesting finds, then rank by novelty-weighted score.
+        const ranked = [];
         const finds = [];
 
         for (const ev of evaluations) {
@@ -219,12 +224,7 @@ export class AutoExploreService {
             const scored = scoreCandidate(ev.perIC);
             const winMetrics = ev.perIC[scored.winningIC] || {};
             const selectionScore = scored.score * this.archive.noveltyMultiplier(winMetrics, scored.score);
-
-            if (selectionScore > bestSelectionScore) {
-                bestSelectionScore = selectionScore;
-                bestHex = ev.hex;
-                bestScored = { ev, scored, winMetrics };
-            }
+            ranked.push({ ev, scored, winMetrics, selectionScore });
 
             if (scored.score >= this.options.findThreshold) {
                 const entry = this._makeEntry(ev, scored, winMetrics);
@@ -238,6 +238,12 @@ export class AutoExploreService {
             for (const f of finds) EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: f, gallerySize: this.archive.size });
         }
 
+        // Best = next champion; second-best = runner-up parent for next generation's crossover.
+        ranked.sort((a, b) => b.selectionScore - a.selectionScore);
+        const bestScored = ranked.length > 0 ? ranked[0] : null;
+        const bestHex = bestScored ? bestScored.ev.hex : this.championHex;
+        this.runnerUpHex = ranked.length > 1 ? ranked[1].ev.hex : null;
+
         if (bestHex) this.championHex = bestHex;
 
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('generation', {
@@ -248,8 +254,10 @@ export class AutoExploreService {
     }
 
     /**
-     * Build the per-world candidate ruleset list: the champion sits in the selected world, every
-     * other world gets an independent mutant of the champion.
+     * Build the per-world candidate ruleset list: the champion sits in the selected world; the other
+     * worlds get a mix of champion×runner-up crossover children (when a runner-up exists — i.e. from
+     * generation 1 on) and independent mutants of the champion. Crossover recombines two good
+     * families, mutation explores around the champion — together they balance exploit and explore.
      * @param {string} championHex
      * @param {number} numWorlds
      * @param {number} selectedIdx
@@ -257,18 +265,28 @@ export class AutoExploreService {
      */
     _buildPopulation(championHex, numWorlds, selectedIdx) {
         const rs = this.wm.rulesetService;
-        const { mutationRate, mutationMode } = this.options;
+        const { mutationRate, mutationMode, crossoverMode, crossoverChildren } = this.options;
         const referenceRuleset = hexToRuleset(championHex);
         const population = new Array(numWorlds);
-        for (let i = 0; i < numWorlds; i++) {
-            if (i === selectedIdx) {
-                population[i] = championHex;
+
+        const otherIndices = [];
+        for (let i = 0; i < numWorlds; i++) if (i !== selectedIdx) otherIndices.push(i);
+        // Breed crossover children only when we have a distinct runner-up to cross with.
+        const canBreed = this.runnerUpHex && this.runnerUpHex !== championHex;
+        const numChildren = canBreed ? Math.min(crossoverChildren, otherIndices.length) : 0;
+
+        population[selectedIdx] = championHex;
+        otherIndices.forEach((idx, k) => {
+            let hex;
+            if (k < numChildren) {
+                // A low post-crossover mutation rate injects fresh variation into each child.
+                hex = rs.crossoverHexes(championHex, this.runnerUpHex, crossoverMode, Math.random, mutationRate);
             } else {
-                let hex = rs.generateMutatedHex(championHex, mutationRate, mutationMode, referenceRuleset);
-                if (!hex || hex === 'Error') hex = championHex;
-                population[i] = hex;
+                hex = rs.generateMutatedHex(championHex, mutationRate, mutationMode, referenceRuleset);
             }
-        }
+            if (!hex || hex === 'Error') hex = championHex;
+            population[idx] = hex;
+        });
         return population;
     }
 

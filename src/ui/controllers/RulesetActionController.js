@@ -32,6 +32,17 @@ export class RulesetActionController {
                 ensureMutation: this.getEnsureMutation()
             });
         });
+
+        EventBus.subscribe(EVENTS.COMMAND_EXECUTE_BREED_WORLDS, () => {
+            // Crossover supports uniform / r_sym; map the shared mutate mode onto those.
+            const crossoverMode = this.getMutateMode() === 'r_sym' ? 'r_sym' : 'uniform';
+            EventBus.dispatch(EVENTS.COMMAND_BREED_WORLDS, {
+                parentAIndex: null, // null => the selected world (resolved in WorldManager)
+                parentBIndex: this.getBreedPartner(),
+                mode: crossoverMode,
+                postMutationRate: this.getMutateRate() / 100.0
+            });
+        });
     }
 
     getGenMode = () => PersistenceService.loadUISetting('rulesetGenerationMode', 'r_sym');
@@ -43,6 +54,7 @@ export class RulesetActionController {
     getMutateMode = () => PersistenceService.loadUISetting('mutateMode', 'single');
     getMutateScope = () => PersistenceService.loadUISetting('mutateScope', 'selected');
     getEnsureMutation = () => PersistenceService.loadUISetting('ensureMutation', true);
+    getBreedPartner = () => PersistenceService.loadUISetting('breedPartner', 1);
 
     getGenerationConfig() {
         return [
@@ -122,4 +134,5 @@ export class RulesetActionController {
     setMutateMode = (mode) => PersistenceService.saveUISetting('mutateMode', mode);
     setMutateScope = (scope) => PersistenceService.saveUISetting('mutateScope', scope);
     setEnsureMutation = (shouldEnsure) => PersistenceService.saveUISetting('ensureMutation', shouldEnsure);
+    setBreedPartner = (idx) => PersistenceService.saveUISetting('breedPartner', idx);
 } 

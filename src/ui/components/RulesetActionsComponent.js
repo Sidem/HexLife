@@ -128,6 +128,13 @@ export class RulesetActionsComponent extends BaseComponent {
                 <button class="button" data-action="clone">Clone</button>
                 <button class="button" data-action="clone-mutate">Clone & Mutate</button>
             </div>
+            <div class="form-group breed-controls">
+                <label for="ruleset-actions-breed-partner">Breed selected with:</label>
+                <select id="ruleset-actions-breed-partner" title="Second parent world to cross the selected world with">
+                    ${Array.from({ length: 9 }, (_, i) => `<option value="${i}">World ${i + 1}</option>`).join('')}
+                </select>
+                <button class="button" data-action="breed" title="Crossover the selected world with the chosen world; children fill the remaining worlds">Breed</button>
+            </div>
         `;
         
         new SliderComponent(pane.querySelector(`#ruleset-actions-mutate-rate-mount`), {
@@ -160,6 +167,12 @@ export class RulesetActionsComponent extends BaseComponent {
             initialValue: this.appContext.rulesetActionController.getEnsureMutation(),
             items: [{ value: 'ensure', text: 'Ensure at least one mutation' }],
             onChange: this.appContext.rulesetActionController.setEnsureMutation
+        });
+
+        const breedPartnerSelect = pane.querySelector('#ruleset-actions-breed-partner');
+        breedPartnerSelect.value = String(this.appContext.rulesetActionController.getBreedPartner());
+        breedPartnerSelect.addEventListener('change', e => {
+            this.appContext.rulesetActionController.setBreedPartner(parseInt(e.target.value, 10));
         });
     }
 
@@ -310,6 +323,11 @@ export class RulesetActionsComponent extends BaseComponent {
         mutatePane.querySelector('[data-action="clone-mutate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
              EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned & Mutated Ruleset' });
+             EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+        });
+        mutatePane.querySelector('[data-action="breed"]').addEventListener('click', () => {
+             EventBus.dispatch(EVENTS.COMMAND_EXECUTE_BREED_WORLDS);
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Bred Rulesets' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
 

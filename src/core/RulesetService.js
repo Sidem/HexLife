@@ -119,6 +119,56 @@ export class RulesetService {
     }
 
     /**
+     * Breed two parent ruleset hexes into a child (Phase 5 of the auto-explore roadmap).
+     * - `uniform`: per-bit coin flip — each of the 128 outputs is taken from A or B independently.
+     * - `r_sym`:   per `(centerState × canonical orbit)` group, pick one parent wholesale and copy
+     *              its outputs across every orbit member, so coherent rule families travel together
+     *              (exactly like r_sym mutation/generation). Falls back to `uniform` if symmetryData
+     *              is unavailable.
+     * An optional low post-crossover mutation rate flips each entry independently (single-bit), to
+     * inject fresh variation the way breeding pipelines usually do. With `postMutationRate=0` every
+     * child bit is taken verbatim from A or B (and breeding identical parents is the identity).
+     * Pure — the injectable `rng` keeps it deterministically testable like the rest of the algebra.
+     * @param {string} hexA
+     * @param {string} hexB
+     * @param {'uniform'|'r_sym'} [mode='r_sym']
+     * @param {() => number} [rng=Math.random]
+     * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
+     * @returns {string} 32-char hex
+     */
+    crossoverHexes(hexA, hexB, mode = 'r_sym', rng = Math.random, postMutationRate = 0) {
+        const a = hexToRuleset(hexA);
+        const b = hexToRuleset(hexB);
+        const child = new Uint8Array(128);
+
+        const canonicalGroups = this.symmetryData && this.symmetryData.canonicalRepresentatives;
+        if (mode === 'r_sym' && canonicalGroups && canonicalGroups.length > 0) {
+            for (const group of canonicalGroups) {
+                for (let cs = 0; cs <= 1; cs++) {
+                    const parent = rng() < 0.5 ? a : b;
+                    for (const member of group.members) {
+                        const idx = (cs << 6) | member;
+                        child[idx] = parent[idx];
+                    }
+                }
+            }
+        } else {
+            // uniform (and the r_sym fallback): per-bit coin flip.
+            for (let i = 0; i < 128; i++) {
+                child[i] = (rng() < 0.5 ? a : b)[i];
+            }
+        }
+
+        if (postMutationRate > 0) {
+            for (let i = 0; i < 128; i++) {
+                if (rng() < postMutationRate) child[i] = 1 - child[i];
+            }
+        }
+
+        return rulesetToHex(child);
+    }
+
+    /**
      * The effective output shared by every mask with `numActiveNeighbors` set bits
      * (for a given centerState), or 2 ("mixed") if the outputs disagree or the
      * ruleset is missing/invalid.

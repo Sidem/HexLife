@@ -262,6 +262,11 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLONE_RULESET, () => {
             this._cloneRuleset();
         });
+        EventBus.subscribe(EVENTS.COMMAND_BREED_WORLDS, (data) => {
+            // A null/undefined parentAIndex means "the selected world" (the UI's implicit parent A).
+            const parentA = (data.parentAIndex == null) ? this.selectedWorldIndex : data.parentAIndex;
+            this._breedWorlds(parentA, data.parentBIndex, data.mode, data.postMutationRate);
+        });
         EventBus.subscribe(EVENTS.COMMAND_INVERT_RULESET, this._invertSelectedRuleset);
         EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_REDO_RULESET, (data) => this.redoRulesetChange(data.worldIndex));
@@ -618,6 +623,55 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
         EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
     }
+
+    /** The current ruleset hex of a world by index (live worker stats first, then saved settings). */
+    _getRulesetHexForWorld = (idx) => {
+        const stats = this.worlds[idx]?.getLatestStats();
+        if (stats?.rulesetHex && stats.rulesetHex !== "Error") return stats.rulesetHex;
+        return this.worldSettings[idx]?.rulesetHex || null;
+    };
+
+    /**
+     * Breed two parent worlds: parents A and B keep their rulesets; every other world receives a
+     * fresh `crossoverHexes(A, B)` child (Phase 5 manual surface — mirrors clone-and-mutate but with
+     * two parents). The child worlds are reset+restarted so the recombination is visible immediately.
+     * @param {number} parentAIdx
+     * @param {number} parentBIdx
+     * @param {'uniform'|'r_sym'} [mode='r_sym']
+     * @param {number} [postMutationRate=0]
+     */
+    _breedWorlds = (parentAIdx, parentBIdx, mode = 'r_sym', postMutationRate = 0) => {
+        const hexA = this._getRulesetHexForWorld(parentAIdx);
+        const hexB = this._getRulesetHexForWorld(parentBIdx);
+        if (!hexA || !hexB || hexA === "N/A" || hexB === "N/A") {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Cannot breed: a parent world has an invalid ruleset.", type: 'error' });
+            return;
+        }
+        if (parentAIdx === parentBIdx) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Pick two different worlds to breed.", type: 'error' });
+            return;
+        }
+
+        const baseSeed = Date.now();
+        this.worlds.forEach((proxy, idx) => {
+            if (idx === parentAIdx || idx === parentBIdx) return; // parents keep their rulesets
+            const childHex = this.rulesetService.crossoverHexes(hexA, hexB, mode, Math.random, postMutationRate);
+            if (!childHex || childHex === "Error") return;
+            this._commitRuleset(idx, childHex, {
+                uploadToWorker: true,
+                reset: true,
+                seed: this._getResetSeed(baseSeed, idx),
+            });
+            if (!this.isGloballyPaused) proxy.startSimulation();
+        });
+
+        if (this.selectedWorldIndex !== parentAIdx && this.selectedWorldIndex !== parentBIdx) {
+            this.dispatchSelectedWorldUpdates();
+        }
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+    };
 
     _cloneRuleset = () => {
         const selectedProxy = this.worlds[this.selectedWorldIndex];
