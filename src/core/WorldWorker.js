@@ -116,10 +116,13 @@ function abortCycleDetection() {
 // memory bounded — up to CYCLE_DETECTION_MAX_PERIOD frames are held while detecting, so on the
 // "huge" preset the unpacked form would cost hundreds of MB/world. The rule-index array (0-127
 // per cell) isn't binary, so it's kept as a byte copy for faithful playback colouring.
-function captureCycleFrame() {
+// activeCount is stored alongside (the caller already has it for this state) so playback reads it
+// directly instead of recomputing an O(NUM_CELLS) reduce every replayed tick.
+function captureCycleFrame(activeCount) {
     return {
         state: packCells(jsStateArray),
-        rules: jsRuleIndexArray.slice()
+        rules: jsRuleIndexArray.slice(),
+        activeCount
     };
 }
 
@@ -315,7 +318,8 @@ function runTick() {
         unpackCellsInto(nextFrame.state, jsStateArray, workerConfig.NUM_CELLS);
         jsRuleIndexArray.set(nextFrame.rules);
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
-        activeCount = jsStateArray.reduce((s, c) => s + c, 0);
+        // Stored at capture (see captureCycleFrame) — avoids an O(NUM_CELLS) reduce per tick.
+        activeCount = nextFrame.activeCount;
     } else {
         worldTickCounter++;
         // run_tick advances the simulation inside Wasm and swaps the current/next buffers
@@ -341,12 +345,12 @@ function runTick() {
             // checksum collision. Abort so we stop copying a full state every tick.
             abortCycleDetection();
         } else {
-            detectedCycle.push(captureCycleFrame());
+            detectedCycle.push(captureCycleFrame(activeCount));
         }
     } else if (!isCyclePlaybackMode && checksumWindowCounts.has(newStateChecksum)) {
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
-        detectedCycle = [captureCycleFrame()];
+        detectedCycle = [captureCycleFrame(activeCount)];
     }
 
     if (!isCyclePlaybackMode) {
