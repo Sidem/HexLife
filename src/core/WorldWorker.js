@@ -34,7 +34,9 @@ const MAX_HISTORY_SIZE = Config.STATS_HISTORY_SIZE || 100;
 let workerIsEntropySamplingEnabled = false;
 let workerEntropySampleRate = 10;
 let lastSentChecksum = null;
-let stateHistoryChecksums = new Set();
+// Sliding window of recent state checksums for cycle detection. checksumWindowCounts is a
+// Map<checksum, count> (not a Set) so evicting the oldest entry is O(1) — see recordChecksum.
+let checksumWindowCounts = new Map();
 let stateChecksumQueue = [];
 
 let statsThrottler;
@@ -95,7 +97,7 @@ function resetCycleState() {
     detectedCycle = [];
     cyclePlaybackIndex = 0;
     cycleStartChecksum = null;
-    stateHistoryChecksums.clear();
+    checksumWindowCounts.clear();
     stateChecksumQueue = [];
     lastSentChecksum = null;
 }
@@ -119,6 +121,20 @@ function captureCycleFrame() {
         state: packCells(jsStateArray),
         rules: jsRuleIndexArray.slice()
     };
+}
+
+// Record a state checksum into the sliding detection window. Eviction of the oldest entry is
+// O(1): decrement its count in checksumWindowCounts and forget the checksum only when no copies
+// remain in the window — replacing an earlier per-tick O(window) `queue.includes(oldest)` rescan.
+function recordChecksum(checksum) {
+    stateChecksumQueue.push(checksum);
+    checksumWindowCounts.set(checksum, (checksumWindowCounts.get(checksum) || 0) + 1);
+    if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
+        const oldest = stateChecksumQueue.shift();
+        const remaining = (checksumWindowCounts.get(oldest) || 0) - 1;
+        if (remaining > 0) checksumWindowCounts.set(oldest, remaining);
+        else checksumWindowCounts.delete(oldest);
+    }
 }
 
 // Byte-for-byte equality of two Uint8Array views over the same logical length. Used to confirm a
@@ -327,21 +343,14 @@ function runTick() {
         } else {
             detectedCycle.push(captureCycleFrame());
         }
-    } else if (!isCyclePlaybackMode && stateHistoryChecksums.has(newStateChecksum)) {
+    } else if (!isCyclePlaybackMode && checksumWindowCounts.has(newStateChecksum)) {
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
         detectedCycle = [captureCycleFrame()];
     }
 
     if (!isCyclePlaybackMode) {
-        stateHistoryChecksums.add(newStateChecksum);
-        stateChecksumQueue.push(newStateChecksum);
-        if (stateChecksumQueue.length > Config.CYCLE_DETECTION_HISTORY_SIZE) {
-            const oldestChecksum = stateChecksumQueue.shift();
-            if (!stateChecksumQueue.includes(oldestChecksum)) {
-                stateHistoryChecksums.delete(oldestChecksum);
-            }
-        }
+        recordChecksum(newStateChecksum);
     }
 
     if (newStateChecksum !== lastSentChecksum) {
@@ -547,8 +556,7 @@ self.onmessage = async function(event) {
             }
 
             const initialChecksum = stateChecksum();
-            stateHistoryChecksums.add(initialChecksum);
-            stateChecksumQueue.push(initialChecksum);
+            recordChecksum(initialChecksum);
             lastSentChecksum = initialChecksum;
 
             const initialActiveCount = isEnabled && jsStateArray ? jsStateArray.reduce((s, c) => s + c, 0) : 0;
