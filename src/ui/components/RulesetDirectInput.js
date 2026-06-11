@@ -63,7 +63,7 @@ export class RulesetDirectInput extends BaseComponent {
     _handleSetHex = () => {
         const hex = this.inputElement.value.trim().toUpperCase();
         if (!hex || !/^[0-9A-F]{32}$/.test(hex)) {
-            alert("Invalid Hex: Must be 32 hex chars.");
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Invalid Hex: Must be 32 hex chars.", type: 'error' });
             this.inputElement.select();
             return;
         }
@@ -80,13 +80,13 @@ export class RulesetDirectInput extends BaseComponent {
     _handleCopyHex = () => {
         const hex = this.appContext.worldManager.getCurrentRulesetHex();
         if (!hex || hex === "N/A" || hex === "Error") {
-            alert("No ruleset for selected world to copy.");
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "No ruleset for selected world to copy.", type: 'error' });
             return;
         }
         navigator.clipboard.writeText(hex).then(() => {
             const oldTxt = this.copyButton.textContent;
             this.copyButton.textContent = "Copied!";
             setTimeout(() => { this.copyButton.textContent = oldTxt; }, 1500);
-        }).catch(_err => alert('Failed to copy ruleset hex.'));
+        }).catch(_err => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Failed to copy ruleset hex.', type: 'error' }));
     }
 } 

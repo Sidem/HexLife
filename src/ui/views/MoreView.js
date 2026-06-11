@@ -61,7 +61,7 @@ export class MoreView extends BaseComponent {
                     EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex });
                 }
             } else {
-                alert("This is a public ruleset from the library and cannot be edited.");
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "This is a public ruleset from the library and cannot be edited.", type: 'info' });
             }
         });
 

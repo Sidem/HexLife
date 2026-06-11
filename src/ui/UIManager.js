@@ -295,9 +295,9 @@ export class UIManager {
                 try {
                     const loadedData = JSON.parse(re.target.result);
                     EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex(), loadedData });
-                } catch (err) { alert(`Error processing file: ${err.message}`); }
+                } catch (err) { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Error processing file: ${err.message}`, type: 'error' }); }
             };
-            reader.onerror = () => { alert(`Error reading file.`); };
+            reader.onerror = () => { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Error reading file.', type: 'error' }); };
             reader.readAsText(data.file);
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
@@ -438,7 +438,7 @@ export class UIManager {
     _onShareSetup() {
         const url = this.appContext.worldManager.generateShareUrl();
         if (!url) {
-            alert('Could not generate a share link for the current setup.');
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not generate a share link for the current setup.', type: 'error' });
             return;
         }
         if (this.isMobile() && navigator.share) {
@@ -460,10 +460,10 @@ export class UIManager {
                 shareLinkInput.select();
             } else {
                 navigator.clipboard.writeText(url).then(() => {
-                    alert('Share link copied to clipboard!');
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Share link copied to clipboard!', type: 'success' });
                 }).catch(err => {
                     console.error('Failed to copy share link:', err);
-                    alert('Could not copy link.');
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not copy link.', type: 'error' });
                 });
             }
         }

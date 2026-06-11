@@ -154,10 +154,10 @@ export class Toolbar {
                     const data = JSON.parse(re.target.result);
                     if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
                     EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), loadedData: data });
-                } catch (err) { alert(`Error processing file: ${err.message}`); }
+                } catch (err) { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Error processing file: ${err.message}`, type: 'error' }); }
                 finally { e.target.value = null; }
             };
-            reader.onerror = () => { alert(`Error reading file.`); e.target.value = null; };
+            reader.onerror = () => { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Error reading file.', type: 'error' }); e.target.value = null; };
             reader.readAsText(file);
         });
 
@@ -171,7 +171,7 @@ export class Toolbar {
             navigator.clipboard.writeText(this.uiElements.shareLinkInput.value).then(() => {
                 this.uiElements.copyShareLinkButton.textContent = "Copied!";
                 setTimeout(() => this.uiElements.copyShareLinkButton.textContent = "Copy to Clipboard", 1500);
-            }).catch(_err => alert('Failed to copy link.'));
+            }).catch(_err => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Failed to copy link.', type: 'error' }));
         }
     }
 

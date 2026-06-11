@@ -142,7 +142,7 @@ export class ToolsBottomSheet extends BottomSheet {
                 label.textContent = e.target.checked ? 'Enabled' : 'Disabled';
                 const toggles = fabPane.querySelectorAll('.fab-action-toggle:checked');
                 if (toggles.length > 3) {
-                    alert('You can only enable up to 3 custom actions.');
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'You can only enable up to 3 custom actions.', type: 'info' });
                     e.target.checked = false;
                     label.textContent = 'Disabled';
                     return;

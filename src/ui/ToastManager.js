@@ -10,8 +10,12 @@ export class ToastManager extends BaseComponent {
     }
 
     showToast({ message, type = 'info', duration = 3000 }) {
-        const showToasts = PersistenceService.loadUISetting('showCommandToasts', true);
-        if (!showToasts) return;
+        // Error toasts are not optional command feedback — they always show, regardless
+        // of the "Show Command Toasts" setting. Other types respect the user preference.
+        if (type !== 'error') {
+            const showToasts = PersistenceService.loadUISetting('showCommandToasts', true);
+            if (!showToasts) return;
+        }
 
         const toastElement = document.createElement('div');
         toastElement.className = `toast-notification ${type}`;

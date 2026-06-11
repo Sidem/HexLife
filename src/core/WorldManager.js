@@ -554,7 +554,7 @@ export class WorldManager {
 
         if (sourceRulesetHex === "Error" || sourceRulesetHex === "N/A") {
              console.error("Cannot clone/mutate: selected world's ruleset is invalid.");
-             alert("Selected world has an invalid ruleset and cannot be cloned.");
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Selected world has an invalid ruleset and cannot be cloned.", type: 'error' });
              return;
         }
 
@@ -618,7 +618,7 @@ export class WorldManager {
         const sourceRulesetHex = this.getCurrentRulesetHex();
         if (sourceRulesetHex === "Error" || sourceRulesetHex === "N/A") {
              console.error("Cannot clone: selected world's ruleset is invalid.");
-             alert("Selected world has an invalid ruleset and cannot be cloned.");
+             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Selected world has an invalid ruleset and cannot be cloned.", type: 'error' });
              return;
         }
 
@@ -795,7 +795,7 @@ export class WorldManager {
     loadWorldState = (worldIndex, loadedData) => {
         if (worldIndex < 0 || worldIndex >= this.worlds.length) return;
         if (loadedData.rows !== Config.GRID_ROWS || loadedData.cols !== Config.GRID_COLS) {
-            alert("Grid dimensions in file do not match current configuration.");
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Grid dimensions in file do not match current configuration.", type: 'error' });
             return;
         }
         const proxy = this.worlds[worldIndex];
@@ -807,11 +807,11 @@ export class WorldManager {
         } else if (Array.isArray(loadedData.state)) {
             newStateArray = Uint8Array.from(loadedData.state);
         } else {
-            alert("Save file is missing world state data.");
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Save file is missing world state data.", type: 'error' });
             return;
         }
         if (newStateArray.length !== Config.NUM_CELLS) {
-            alert("State data length in file does not match current configuration.");
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "State data length in file does not match current configuration.", type: 'error' });
             return;
         }
 

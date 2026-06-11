@@ -249,7 +249,7 @@ export class RulesetEditorComponent extends BaseComponent {
                 return;
             }
             if (!/^[0-9A-F]{32}$/.test(hexString)) {
-                alert("Invalid Hex Code in Editor: Must be 32 hex chars.\nReverting.");
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Invalid Hex Code in Editor: Must be 32 hex chars. Reverting.", type: 'error' });
                 this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
             } else if (hexString !== currentSelectedWorldHex) {
                 EventBus.dispatch(EVENTS.COMMAND_EDITOR_SET_RULESET_HEX, {
