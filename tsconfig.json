@@ -1,0 +1,21 @@
+{
+  // Type-checking is opt-in, file-by-file. This config does NOT compile anything
+  // (Vite handles the build); it only runs `tsc --noEmit` to enforce JSDoc
+  // `@typedef`s. `checkJs` is OFF, so only files that begin with `// @ts-check`
+  // are error-checked — other JS is parsed for type info but not reported on.
+  // To bring another file under the checker: add `// @ts-check` to its top and
+  // fix the reported errors. No `include` edit needed.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": []
+  },
+  "include": ["src/**/*.js"]
+}

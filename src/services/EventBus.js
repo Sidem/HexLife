@@ -1,5 +1,11 @@
+// @ts-check
 import { EVENT_BUS_LOGGING } from '../core/config.js';
 
+/**
+ * @typedef {(data: any) => void} EventCallback
+ */
+
+/** @type {Record<string, EventCallback[]>} */
 const subscriptions = {};
 
 /**
@@ -30,6 +36,11 @@ function logEvent(eventType, data) {
 }
 
 export const EventBus = {
+    /**
+     * @param {string} eventType
+     * @param {EventCallback} callback
+     * @returns {() => void} Unsubscribe function.
+     */
     subscribe(eventType, callback) {
         if (!subscriptions[eventType]) {
             subscriptions[eventType] = [];
@@ -47,6 +58,10 @@ export const EventBus = {
         };
     },
 
+    /**
+     * @param {string} eventType
+     * @param {*} [data] - The event payload (see `EVENTS` for per-event shapes).
+     */
     dispatch(eventType, data) {
         logEvent(eventType, data);
         if (subscriptions[eventType]) {
@@ -65,6 +80,46 @@ export const EventBus = {
 };
 
 /**
+ * Recurring payload shapes, defined once so per-event docs reference a single
+ * source of truth instead of re-spelling the same object inline. Reference them
+ * from event `@param` tags (e.g. `@param {RulesetScopeData} data`). These are
+ * available to any file that opts into `// @ts-check`.
+ *
+ * @typedef {'all'|'selected'} Scope - Which worlds an operation targets.
+ * @typedef {'all'|'selected'|'none'} ResetScope - Conditional-reset scope.
+ * @typedef {0|1} CellState - A single cell's state (off/on).
+ *
+ * @typedef {Object} RulesetScopeData
+ * @property {Scope} scope
+ *
+ * @typedef {Object} WorldIndexData
+ * @property {number} worldIndex
+ *
+ * @typedef {Object} WorldStats - Per-world statistics payload (WORLD_STATS_UPDATED).
+ * @property {number} worldIndex
+ * @property {number} tick
+ * @property {number} activeCount
+ * @property {number} ratio
+ * @property {number} [binaryEntropy]
+ * @property {number} [blockEntropy]
+ * @property {boolean} isEnabled
+ * @property {number} tps
+ * @property {string} rulesetHex
+ * @property {Uint32Array} ruleUsage
+ * @property {boolean} isInCycle
+ * @property {number} cycleLength
+ *
+ * @typedef {Object} WorldSetting - One world's settings entry (WORLD_SETTINGS_CHANGED).
+ * @property {{mode: string, params: object}} initialState
+ * @property {boolean} enabled
+ * @property {string} rulesetHex
+ *
+ * @typedef {Object} EntropySamplingParams
+ * @property {boolean} enabled
+ * @property {number} rate
+ */
+
+/**
  * @description Centralized event definitions for the application.
  * Each event is documented with its expected payload structure.
  */
@@ -80,14 +135,14 @@ export const EVENTS = {
     BRUSH_SIZE_CHANGED: 'simulation:brushSizeChanged',
     /** @param {number} newIndex - The index of the newly selected world. */
     SELECTED_WORLD_CHANGED: 'simulation:selectedWorldChanged', 
-    /** @param {{worldIndex: number, tick: number, activeCount: number, ratio: number, binaryEntropy?: number, blockEntropy?: number, isEnabled: boolean, tps: number, rulesetHex: string, ruleUsage: Uint32Array, isInCycle: boolean, cycleLength: number}} stats - The updated statistics object for a world. */
-    WORLD_STATS_UPDATED: 'simulation:worldStatsUpdated',                              
+    /** @param {WorldStats} stats - The updated statistics object for a world. */
+    WORLD_STATS_UPDATED: 'simulation:worldStatsUpdated',
     /** @event Emitted with no payload when all worlds are reset simultaneously. */
-    ALL_WORLDS_RESET: 'simulation:allWorldsReset', 
-    /** @param {Array<{initialState: {mode: string, params: object}, enabled: boolean, rulesetHex: string}>} settings - The complete array of settings for all worlds. */
-    WORLD_SETTINGS_CHANGED: 'simulation:worldSettingsChanged', 
-    /** @param {{enabled: boolean, rate: number}} params - The new entropy sampling parameters. */
-    ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged', 
+    ALL_WORLDS_RESET: 'simulation:allWorldsReset',
+    /** @param {WorldSetting[]} settings - The complete array of settings for all worlds. */
+    WORLD_SETTINGS_CHANGED: 'simulation:worldSettingsChanged',
+    /** @param {EntropySamplingParams} params - The new entropy sampling parameters. */
+    ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged',
     /** @param {{fps: number, tps: number, targetTps: number}} metrics - The latest performance metrics. */
     PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated', 
     /** @param {{worldIndex: number}} data - The index of the world whose history changed. */
