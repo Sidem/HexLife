@@ -130,11 +130,23 @@
     color: #f0f0f0;
     display: inline-block;
     text-align: right;
+    /* Equal-width digits so a value's box never reflows as it ticks */
+    font-variant-numeric: tabular-nums;
 }
 
 #statsDisplayContainer > span:first-child {
     min-width: 60px;
 }
+
+/* Reserve a fixed width for each numeric value. Without this, the stats
+   column's width changes as rapidly-updating values (FPS/TPS/tick) gain or
+   lose digits, which shifts the centered #rulesetDisplayContainer. */
+#stat-tick { min-width: 6ch; }
+#stat-ratio { min-width: 3ch; }
+#stat-brush-size { min-width: 2ch; }
+#stat-fps { min-width: 3ch; }
+#stat-actual-tps,
+#stat-target-tps { min-width: 4ch; }
 
 /* App Menu Popout */
 #appMenuPopout {
