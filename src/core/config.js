@@ -63,11 +63,19 @@ export const MAX_SIM_SPEED = 250;
 export const DEFAULT_NEIGHBORHOOD_SIZE = 2; 
 export const MAX_NEIGHBORHOOD_SIZE = 40;
 export const STATS_HISTORY_SIZE = 1000;
-export const CYCLE_DETECTION_HISTORY_SIZE = 40;
-// Hard cap on how many frames a candidate cycle may accumulate before detection is aborted.
-// Guards against spurious 32-bit checksum collisions that would otherwise grow `detectedCycle`
-// unbounded (one full state copy per tick) until the colliding checksum happens to recur.
-export const CYCLE_DETECTION_MAX_PERIOD = 300;
+// Sliding window of recent state checksums kept per world. Cycle detection can only *trigger* when a
+// state's checksum still matches one in this window, so this is the effective ceiling on detectable
+// cycle period: a cycle of period P is only caught if P <= CYCLE_DETECTION_HISTORY_SIZE. The window
+// stores plain 32-bit checksums (not states), so its cost is tiny and independent of grid size.
+export const CYCLE_DETECTION_HISTORY_SIZE = 400;
+// Hard cap on how many frames a candidate cycle may accumulate before detection is aborted. Kept
+// equal to CYCLE_DETECTION_HISTORY_SIZE: a genuine cycle closes within HISTORY_SIZE frames, so any
+// candidate that grows past this is necessarily a spurious 32-bit checksum collision (which would
+// otherwise grow `detectedCycle` unbounded — one full state copy per tick — until it happens to
+// recur). NB: unlike the history window, this buffer holds full state+rules copies, so its worst-case
+// memory scales with NUM_CELLS (~2*NUM_CELLS bytes/frame, only while a long cycle is actually being
+// collected/played back). Raise both together to detect longer cycles.
+export const CYCLE_DETECTION_MAX_PERIOD = 400;
 export const RULESET_HISTORY_SIZE = 30;
 export const RENDER_TEXTURE_SIZE = 1280; 
 export const FILL_COLOR = [1.0, 1.0, 0.0, 1.0]; 
