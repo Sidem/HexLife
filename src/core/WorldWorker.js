@@ -117,6 +117,24 @@ function statesEqual(a, b) {
 
 function calculateBinaryEntropy(p1) { if (p1 <= 0 || p1 >= 1) return 0; const p0 = 1 - p1; return -(p1 * Math.log2(p1) + p0 * Math.log2(p0)); }
 
+// Assemble the lastKnownStats snapshot from current world state. activeCount is passed in (every
+// caller already has it); ratio derives from it. binaryEntropy/blockEntropy are passed explicitly
+// because callers differ on whether/how they sample entropy (live tick carries forward the last
+// sample; force/enable/reset paths compute or leave them undefined).
+function buildStats(activeCount, binaryEntropy, blockEntropy) {
+    return {
+        tick: worldTickCounter,
+        activeCount,
+        ratio: workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0,
+        binaryEntropy,
+        blockEntropy,
+        rulesetHex: rulesetToHex(ruleset),
+        isEnabled,
+        isInCycle: isCyclePlaybackMode,
+        cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
+    };
+}
+
 // Hex block entropy is computed in Wasm over the state buffer it already owns (see World::block_entropy).
 function calculateHexBlockEntropy() {
     return wasm_world ? wasm_world.block_entropy() : 0;
@@ -338,17 +356,11 @@ function runTick() {
     if (ratioHistory.length > MAX_HISTORY_SIZE) ratioHistory.shift();
     
     
-    lastKnownStats = {
-        tick: worldTickCounter,
-        activeCount: activeCount,
-        ratio: ratio,
-        binaryEntropy: currentBinaryEntropy ?? lastKnownStats.binaryEntropy,
-        blockEntropy: currentBlockEntropy ?? lastKnownStats.blockEntropy,
-        rulesetHex: rulesetToHex(ruleset),
-        isEnabled: isEnabled,
-        isInCycle: isCyclePlaybackMode,
-        cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
-    };
+    lastKnownStats = buildStats(
+        activeCount,
+        currentBinaryEntropy ?? lastKnownStats.binaryEntropy,
+        currentBlockEntropy ?? lastKnownStats.blockEntropy
+    );
 
     
     statsThrottler.schedule();
@@ -418,19 +430,8 @@ function forceSyncUpdate() {
     }
 
     
-    lastKnownStats = {
-        tick: worldTickCounter,
-        activeCount: active,
-        ratio: ratio,
-        binaryEntropy: binaryEntropy,
-        blockEntropy: blockEntropy,
-        rulesetHex: rulesetToHex(ruleset),
-        isEnabled: isEnabled,
-        isInCycle: isCyclePlaybackMode,
-        cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
-    };
-    
-    
+    lastKnownStats = buildStats(active, binaryEntropy, blockEntropy);
+
     sendStatsUpdate(true);
 }
 
@@ -507,17 +508,7 @@ self.onmessage = async function(event) {
             }
 
             
-            lastKnownStats = {
-                tick: worldTickCounter,
-                activeCount: initialActiveCount,
-                ratio: initialRatio,
-                binaryEntropy: initialBinaryEntropy,
-                blockEntropy: initialBlockEntropy,
-                rulesetHex: rulesetToHex(ruleset),
-                isEnabled: isEnabled,
-                isInCycle: false,
-                cycleLength: 0
-            };
+            lastKnownStats = buildStats(initialActiveCount, initialBinaryEntropy, initialBlockEntropy);
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
             sendGridUpdate();
@@ -561,17 +552,11 @@ self.onmessage = async function(event) {
                 const ratioAfterEnable = workerConfig.NUM_CELLS > 0 ? activeAfterEnable / workerConfig.NUM_CELLS : 0; 
                 
                 
-                lastKnownStats = {
-                    tick: worldTickCounter,
-                    activeCount: activeAfterEnable,
-                    ratio: ratioAfterEnable,
-                    binaryEntropy: workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratioAfterEnable) : undefined,
-                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined,
-                    rulesetHex: rulesetToHex(ruleset),
-                    isEnabled: isEnabled,
-                    isInCycle: isCyclePlaybackMode,
-                    cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
-                };
+                lastKnownStats = buildStats(
+                    activeAfterEnable,
+                    workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratioAfterEnable) : undefined,
+                    workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined
+                );
 
                 sendGridUpdate();
                 sendStatsUpdate(true); 
@@ -601,17 +586,11 @@ self.onmessage = async function(event) {
                 const ratio = workerConfig.NUM_CELLS > 0 ? active / workerConfig.NUM_CELLS : 0;
                 
                 
-                lastKnownStats = {
-                    tick: worldTickCounter,
-                    activeCount: active,
-                    ratio: ratio,
-                    binaryEntropy: workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratio) : undefined,
-                    blockEntropy: workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined,
-                    rulesetHex: rulesetToHex(ruleset),
-                    isEnabled: isEnabled,
-                    isInCycle: isCyclePlaybackMode,
-                    cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
-                };
+                lastKnownStats = buildStats(
+                    active,
+                    workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratio) : undefined,
+                    workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : undefined
+                );
 
                 sendGridUpdate();
                 sendStatsUpdate(true); 
