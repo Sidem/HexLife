@@ -45,9 +45,32 @@ let lastKnownStats = {};
 
 let isCyclePlaybackMode = false;
 let isDetectingCycle = false;
-let detectedCycle = []; 
+let detectedCycle = [];
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
+
+// --- Auto-explore evaluation burst (Phase 2) ---------------------------------
+// A RUN_EVALUATION command runs the current (ruleset × state) for a fixed number of ticks in a
+// tight chunked loop, collecting the cheap interestingness proxies the engine now exposes
+// (changed-cell turnover, damage-spreading σ, block entropy, rule-usage delta, kill flags, cycle
+// outcome) and replies once with EVALUATION_RESULT. The burst runs OUTSIDE the normal setInterval
+// tick loop: it pauses normal ticking, self-schedules via setTimeout(0) between chunks so STOP /
+// other commands stay responsive, and sends throttled grid updates so the search stays watchable.
+let isEvaluating = false;
+let evalState = null;
+let evalTimerId = null;
+// Per-chunk wall-clock budget — same responsiveness discipline as TICK_BATCH_TIME_BUDGET_MS.
+const EVAL_CHUNK_BUDGET_MS = 8;
+// Throttle grid sends during a burst to ~10 fps (watching the grid churn is the show; we don't go
+// dark, but we don't flood the main thread with one send per tick either).
+const EVAL_GRID_SEND_INTERVAL_MS = 100;
+// A burst's final ratio at or above this counts as "saturated" (a kill signal in Phase 3).
+const EVAL_SATURATION_RATIO = 0.99;
+// Commands that change the cell state or ruleset being evaluated; receiving one mid-burst aborts the
+// evaluation. Lifecycle-only commands (START/STOP/SPEED, entropy params) are deliberately excluded.
+const EVAL_DISRUPTIVE_COMMANDS = new Set([
+    'RESET_WORLD', 'LOAD_STATE', 'SET_RULESET', 'APPLY_BRUSH', 'APPLY_SELECTIVE_BRUSH', 'SET_ENABLED',
+]);
 
 const strategies = {
     density: new DensityStrategy(),
@@ -543,8 +566,283 @@ function updateSimulationInterval() {
     }
 }
 
+// Advance one evaluation tick: step the sim, mirror the buffer swap, and run the same cycle
+// detection the live loop uses (so a burst that falls into a cycle can be classified as terminal).
+// Deliberately does NOT touch the normal stats histories — eval metrics are accumulated separately
+// in evalState, leaving ratioHistory/entropyHistory untouched for the live UI.
+function evalTick() {
+    worldTickCounter++;
+    const activeCount = wasm_world.run_tick();
+    [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+    [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
+
+    const newChecksum = stateChecksum();
+
+    // Mirror of runTick's cycle detection (kept in lockstep on purpose).
+    if (isDetectingCycle) {
+        if (newChecksum === cycleStartChecksum && statesEqual(packCells(jsStateArray), detectedCycle[0].state)) {
+            isCyclePlaybackMode = true;
+            isDetectingCycle = false;
+            cyclePlaybackIndex = 0;
+        } else if (detectedCycle.length >= Config.CYCLE_DETECTION_MAX_PERIOD) {
+            abortCycleDetection();
+        } else {
+            detectedCycle.push(captureCycleFrame(activeCount));
+        }
+    } else if (!isCyclePlaybackMode && checksumWindowCounts.has(newChecksum)) {
+        isDetectingCycle = true;
+        cycleStartChecksum = newChecksum;
+        detectedCycle = [captureCycleFrame(activeCount)];
+    }
+    if (!isCyclePlaybackMode) {
+        recordChecksum(newChecksum);
+    }
+
+    return activeCount;
+}
+
+// Estimate the branching parameter σ from a damage-spreading Hamming series. σ is the mean
+// per-generation growth factor of a single-cell perturbation: σ<1 sub-critical (damage heals),
+// σ≈1 critical (edge of chaos — what auto-explore hunts for), σ>1 super-critical (chaos). We fit a
+// line to ln(hamming) vs generation over the early, UNSATURATED regime (damage still small relative
+// to the grid) and take σ=exp(slope). The implicit starting point (gen 0, hamming 1 → ln 0) anchors
+// the fit. Returns 0 when the perturbation dies on the first generation, or null when no probe ran.
+function estimateSigma(hammingSeries, numCells) {
+    if (!hammingSeries || hammingSeries.length === 0) return null;
+    const saturationCap = 0.25 * numCells;
+    const xs = [0];
+    const ys = [0]; // (generation 0, ln(initial hamming = 1) = 0)
+    for (let i = 0; i < hammingSeries.length; i++) {
+        const h = hammingSeries[i];
+        if (h <= 0) break;            // damage healed — stop (the rest are zeros)
+        if (h > saturationCap) break; // damage saturated — later points no longer reflect growth
+        xs.push(i + 1);
+        ys.push(Math.log(h));
+    }
+    if (xs.length < 2) {
+        // Only the anchor survived: the perturbation died on (or before) the first sampled
+        // generation, or instantly saturated. Healed ⇒ sub-critical (0); saturated ⇒ super-critical.
+        return hammingSeries[0] > saturationCap ? Infinity : 0;
+    }
+    const n = xs.length;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (let i = 0; i < n; i++) {
+        sx += xs[i]; sy += ys[i]; sxx += xs[i] * xs[i]; sxy += xs[i] * ys[i];
+    }
+    const denom = n * sxx - sx * sx;
+    if (denom === 0) return null;
+    const slope = (n * sxy - sx * sy) / denom;
+    return Math.exp(slope);
+}
+
+// Tear down an in-flight evaluation (used when a state-mutating command arrives mid-burst, or
+// before starting a fresh burst). Still posts an EVALUATION_RESULT — flagged `cancelled` — so the
+// caller's pending promise resolves rather than hanging forever. Restores normal ticking if the sim
+// was running.
+function cancelEvaluation(reason) {
+    if (!isEvaluating) return;
+    if (evalTimerId !== null) { clearTimeout(evalTimerId); evalTimerId = null; }
+    if (wasm_world) wasm_world.stop_probe();
+    isEvaluating = false;
+    evalState = null;
+    self.postMessage({ type: 'EVALUATION_RESULT', worldIndex, cancelled: true, cancelledBy: reason || null });
+    updateSimulationInterval();
+}
+
+// Begin a burst. Snapshots the rule-usage counters (so we can report the per-burst delta), arms the
+// damage probe if requested, pauses the normal tick interval, and kicks off the chunk loop.
+function startEvaluation(opts) {
+    if (!wasm_world) return;
+    if (isEvaluating) cancelEvaluation();
+
+    const ticks = Math.max(1, opts.ticks || 300);
+    const sampleEvery = Math.max(1, opts.sampleEvery || 10);
+    const probeOpts = opts.probe || {};
+    const probeEnabled = !!probeOpts.enabled;
+    const probeTicks = Math.max(0, probeOpts.probeTicks || 0);
+    // Default the flip to the grid centre when the caller doesn't pin one.
+    const flipIndex = Number.isInteger(probeOpts.flipIndex)
+        ? probeOpts.flipIndex
+        : Math.floor(workerConfig.NUM_CELLS / 2);
+
+    // Pause normal ticking for the duration of the burst.
+    if (tickIntervalId) { clearInterval(tickIntervalId); tickIntervalId = null; }
+
+    // Fresh cycle-detection window for this burst (a cycle reached during eval is terminal).
+    resetCycleState();
+    recordChecksum(stateChecksum());
+
+    if (probeEnabled && probeTicks > 0) {
+        wasm_world.start_probe(flipIndex);
+        // start_probe lazily allocates the two probe buffers, which can GROW Wasm linear memory and
+        // thereby detach every typed-array view over it (state/ruleset/usage counters). Rebuild the
+        // views so the burst reads live memory rather than a detached buffer.
+        refreshSimViews();
+    }
+
+    evalState = {
+        ticks,
+        sampleEvery,
+        probe: { enabled: probeEnabled && probeTicks > 0, flipIndex, probeTicks },
+        ticksDone: 0,
+        // changed-cell turnover: online accumulators (mean / variance / Fano / CV at the end).
+        changedSum: 0,
+        changedSumSq: 0,
+        changedN: 0,
+        // block-entropy samples (level + variance computed at the end).
+        blockEntropySamples: [],
+        // damage-spreading Hamming series over the probe window.
+        probeHamming: [],
+        // rule-usage counters at burst start; the delta over the burst is end - start.
+        startRuleUsage: ruleUsageCounters ? ruleUsageCounters.slice() : new Uint32Array(128),
+        lastActiveCount: wasm_world.active_count(),
+        cycleDetected: false,
+        cyclePeriod: 0,
+        lastGridSendTime: 0,
+    };
+    isEvaluating = true;
+    evalTimerId = setTimeout(runEvaluationChunk, 0);
+}
+
+// Run one time-budgeted chunk of the burst, then either finish or self-reschedule.
+function runEvaluationChunk() {
+    evalTimerId = null;
+    if (!isEvaluating || !evalState) return;
+    const chunkStart = performance.now();
+
+    while (evalState.ticksDone < evalState.ticks) {
+        const t = evalState.ticksDone; // 0-based index of the tick about to run
+        const activeCount = evalTick();
+        evalState.ticksDone++;
+        evalState.lastActiveCount = activeCount;
+
+        const changed = wasm_world.last_changed_count();
+        evalState.changedSum += changed;
+        evalState.changedSumSq += changed * changed;
+        evalState.changedN++;
+
+        // Damage probe: sample Hamming within the window, then free the probe lane once it closes.
+        if (evalState.probe.enabled && t < evalState.probe.probeTicks) {
+            evalState.probeHamming.push(wasm_world.probe_hamming());
+            if (t + 1 >= evalState.probe.probeTicks) {
+                wasm_world.stop_probe();
+            }
+        }
+
+        // Block-entropy sampling.
+        if (t % evalState.sampleEvery === 0) {
+            evalState.blockEntropySamples.push(calculateHexBlockEntropy());
+        }
+
+        // Falling into a cycle is a definitive classification — stop burning ticks.
+        if (isCyclePlaybackMode) {
+            evalState.cycleDetected = true;
+            evalState.cyclePeriod = detectedCycle.length;
+            break;
+        }
+
+        if (performance.now() - chunkStart >= EVAL_CHUNK_BUDGET_MS) break;
+    }
+
+    // Throttled grid send so the search stays watchable.
+    const now = performance.now();
+    if (now - evalState.lastGridSendTime >= EVAL_GRID_SEND_INTERVAL_MS) {
+        evalState.lastGridSendTime = now;
+        sendGridUpdate();
+    }
+
+    if (evalState.ticksDone >= evalState.ticks || evalState.cycleDetected) {
+        finishEvaluation();
+    } else {
+        evalTimerId = setTimeout(runEvaluationChunk, 0);
+    }
+}
+
+// Reduce the burst's accumulators to a summary and post EVALUATION_RESULT, then restore normal
+// ticking. All scoring/weighting lives downstream (Phase 3) — this reply carries only raw metrics.
+function finishEvaluation() {
+    const s = evalState;
+    if (!s) return;
+    if (wasm_world) wasm_world.stop_probe();
+
+    const numCells = workerConfig.NUM_CELLS || 1;
+    const finalActiveCount = s.lastActiveCount;
+    const finalRatio = finalActiveCount / numCells;
+
+    // Changed-cell turnover stats.
+    const changedMean = s.changedN > 0 ? s.changedSum / s.changedN : 0;
+    const changedVar = s.changedN > 0
+        ? Math.max(0, s.changedSumSq / s.changedN - changedMean * changedMean)
+        : 0;
+    const changedStd = Math.sqrt(changedVar);
+    const changedFano = changedMean > 0 ? changedVar / changedMean : 0; // variance/mean (susceptibility proxy)
+    const changedCV = changedMean > 0 ? changedStd / changedMean : 0;   // coefficient of variation
+
+    // Block-entropy level + variance.
+    let beMean = 0, beVar = 0;
+    const beSamples = s.blockEntropySamples;
+    if (beSamples.length > 0) {
+        for (const v of beSamples) beMean += v;
+        beMean /= beSamples.length;
+        for (const v of beSamples) beVar += (v - beMean) * (v - beMean);
+        beVar /= beSamples.length;
+    }
+
+    const sigma = s.probe.enabled ? estimateSigma(s.probeHamming, numCells) : null;
+
+    // Per-rule usage delta over the burst (end - start); a Shannon-diversity input for Phase 3.
+    const ruleUsageDelta = new Uint32Array(128);
+    if (ruleUsageCounters) {
+        for (let i = 0; i < 128; i++) {
+            ruleUsageDelta[i] = (ruleUsageCounters[i] - s.startRuleUsage[i]) >>> 0;
+        }
+    }
+    const ruleUsageDeltaBuffer = ruleUsageDelta.buffer;
+
+    const result = {
+        type: 'EVALUATION_RESULT',
+        worldIndex,
+        ticksRun: s.ticksDone,
+        finalRatio,
+        finalActiveCount,
+        changed: {
+            mean: changedMean,
+            variance: changedVar,
+            fano: changedFano,
+            cv: changedCV,
+        },
+        blockEntropy: {
+            mean: beMean,
+            variance: beVar,
+            samples: beSamples,
+        },
+        sigma,
+        probeHamming: s.probeHamming,
+        ruleUsageDelta: ruleUsageDeltaBuffer,
+        extinct: finalActiveCount === 0,
+        saturated: finalRatio >= EVAL_SATURATION_RATIO,
+        cycle: { detected: s.cycleDetected, period: s.cyclePeriod },
+    };
+
+    isEvaluating = false;
+    evalState = null;
+    self.postMessage(result, [ruleUsageDeltaBuffer]);
+
+    // Resume normal ticking if the sim was running before the burst.
+    updateSimulationInterval();
+}
+
 self.onmessage = async function(event) {
     const command = event.data;
+
+    // A command that mutates the world's cell state or ruleset mid-burst invalidates the evaluation,
+    // so abort it (the proxy promise still resolves via the cancelled result). Benign lifecycle
+    // commands (START/STOP/SPEED/entropy params) don't touch the evaluated state and are allowed to
+    // run alongside the burst — their effect is reapplied when the burst restores normal ticking.
+    // RUN_EVALUATION restarts cleanly via startEvaluation; RECLAIM_BUFFERS is harmless.
+    if (isEvaluating && EVAL_DISRUPTIVE_COMMANDS.has(command.type)) {
+        cancelEvaluation(command.type);
+    }
 
     switch (command.type) {
         case 'INIT': {
@@ -699,6 +997,11 @@ self.onmessage = async function(event) {
             if (!isRunning || !isEnabled) {
                 runTick();
             }
+            break;
+        }
+        case 'RUN_EVALUATION': {
+            // { ticks, sampleEvery, probe: { enabled, flipIndex, probeTicks } } → one EVALUATION_RESULT.
+            startEvaluation(command.data || {});
             break;
         }
         case 'RECLAIM_BUFFERS': {

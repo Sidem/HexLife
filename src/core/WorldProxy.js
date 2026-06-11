@@ -180,6 +180,24 @@ export class WorldProxy {
                 this.onUpdate(this.worldIndex, 'stats');
                 break;
             }
+            case 'EVALUATION_RESULT': {
+                // Auto-explore burst summary (Phase 2). Decode the transferred rule-usage delta into a
+                // typed array and resolve any pending runEvaluation() promise. onEvaluationResult lets
+                // WorldManager (Phase 4) observe results without polling.
+                const ruleUsageDelta = data.ruleUsageDelta
+                    ? new Uint32Array(data.ruleUsageDelta)
+                    : new Uint32Array(128);
+                const result = { ...data, ruleUsageDelta };
+                if (this._pendingEvaluation) {
+                    const resolve = this._pendingEvaluation;
+                    this._pendingEvaluation = null;
+                    resolve(result);
+                }
+                if (this.onEvaluationResult) {
+                    this.onEvaluationResult(this.worldIndex, result);
+                }
+                break;
+            }
         }
     }
 
@@ -240,6 +258,16 @@ export class WorldProxy {
         this.latestStats.ruleUsage.fill(0);
 
         this.sendCommand('RESET_WORLD', { initialState, seed });
+    }
+    // Run an auto-explore evaluation burst on this world's current (ruleset × state). Resolves with
+    // the EVALUATION_RESULT summary. opts: { ticks, sampleEvery, probe: { enabled, flipIndex,
+    // probeTicks } }. A burst already in flight is superseded — its promise resolves with the new
+    // result rather than hanging (the worker only ever emits one result per active burst).
+    runEvaluation(opts = {}) {
+        return new Promise((resolve) => {
+            this._pendingEvaluation = resolve;
+            this.sendCommand('RUN_EVALUATION', opts);
+        });
     }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
