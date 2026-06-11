@@ -82,6 +82,14 @@
     cursor: pointer;
 }
 
+/* A derived (auto-generated) name is a mnemonic, not a name the user picked —
+   render it lighter so it reads as a softer, suggested identity. */
+.ruleset-display-toggle.is-derived #rulesetDisplayName {
+    font-weight: 500;
+    font-style: italic;
+    color: #c8c8d0;
+}
+
 #rulesetDisplayCode {
     font-family: monospace;
     font-size: 0.9rem;
@@ -199,8 +207,30 @@ screen and (pointer: coarse) and (hover: none) {
     border: 1px solid #555;
 }
 
-.history-item-hex {
+.history-item-label {
     flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.history-item-name {
+    font-weight: 600;
+    font-size: 0.95em;
+    color: #e8e8ee;
+}
+
+.history-item-name.is-derived {
+    font-weight: 500;
+    font-style: italic;
+    color: #c0c4d0;
+}
+
+.history-item-hex {
+    font-family: monospace;
+    font-size: 0.8em;
+    color: #9a9aa4;
 }
 
 .ruleset-history-controls {

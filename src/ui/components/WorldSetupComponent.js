@@ -108,6 +108,7 @@ export class WorldSetupComponent extends BaseComponent {
             cell.innerHTML = `
                 <div class="world-label">World ${i}</div>
                 <div class="ruleset-viz-container"></div>
+                <div class="world-ruleset-name" title="This world's ruleset name"></div>
                 <div class="setting-control state-control">
                     <span class="state-mode-label">Mode: <b class="state-mode-value">Density</b></span>
                     <button class="button" data-action="edit-state" data-world-index="${i}">Edit...</button>
@@ -135,6 +136,7 @@ export class WorldSetupComponent extends BaseComponent {
             });
             this.worldControlCache[i] = {
                 vizContainer,
+                rulesetName: cell.querySelector('.world-ruleset-name'),
                 stateModeValue: cell.querySelector('.state-mode-value'),
                 enableSwitch,
                 enableSwitchLabel: enableSwitchMount.querySelector('label')
@@ -210,8 +212,10 @@ export class WorldSetupComponent extends BaseComponent {
 
             
             const formattedFullHex = formatHexCode(settings.rulesetHex);
-            cache.vizContainer.title = formattedFullHex;
-            
+            const { name: displayName } = this.appContext.libraryController.getDisplayName(settings.rulesetHex);
+            cache.vizContainer.title = `${displayName}\n${formattedFullHex}`;
+            if (cache.rulesetName) cache.rulesetName.textContent = displayName;
+
             const svg = rulesetVisualizer.createRulesetSVG(settings.rulesetHex);
             svg.classList.add('ruleset-viz-svg');
             cache.vizContainer.innerHTML = ''; 

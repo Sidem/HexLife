@@ -1,5 +1,6 @@
 import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { rulesetName } from '../../utils/utils.js';
 
 export class SaveRulesetModal extends BaseComponent {
     constructor(mountPoint, appContext) {
@@ -65,6 +66,12 @@ export class SaveRulesetModal extends BaseComponent {
     show = (data) => {
         this.rulesetData = { ...data };
         this.ui.hexDisplay.textContent = this.rulesetData.hex;
+        // Suggest the auto-derived mnemonic as a placeholder so the user has a
+        // sensible default to accept or override (the hex stays the real identity).
+        const suggested = rulesetName(this.rulesetData.hex);
+        this.ui.nameInput.placeholder = suggested && suggested !== this.rulesetData.hex
+            ? suggested
+            : "e.g., 'Crawling Crystals'";
         this.ui.nameInput.value = this.rulesetData.name || '';
         this.ui.descInput.value = this.rulesetData.description || '';
         this.ui.title.textContent = this.rulesetData.id ? 'Edit Ruleset' : 'Save Ruleset';

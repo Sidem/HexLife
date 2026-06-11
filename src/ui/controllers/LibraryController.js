@@ -1,5 +1,6 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { rulesetName } from '../../utils/utils.js';
 
 export class LibraryController {
     constructor() {
@@ -77,6 +78,20 @@ export class LibraryController {
         this.userLibrary = this.userLibrary.filter(r => r.id !== rulesetId);
         PersistenceService.saveUserRulesets(this.userLibrary);
         EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
+    }
+
+    /**
+     * Resolves a human-friendly display name for a ruleset: the personal or public
+     * library name if one exists, otherwise the deterministic derived mnemonic.
+     * @param {string} hex The ruleset hex.
+     * @returns {{name: string, isDerived: boolean}} The resolved name and whether it
+     *          was auto-derived (vs a name the user/library assigned).
+     */
+    getDisplayName(hex) {
+        const saved = this.userLibrary.find(r => r.hex === hex)?.name
+            || this.libraryData?.rulesets.find(r => r.hex === hex)?.name;
+        if (saved) return { name: saved, isDerived: false };
+        return { name: rulesetName(hex), isDerived: true };
     }
 
     /**

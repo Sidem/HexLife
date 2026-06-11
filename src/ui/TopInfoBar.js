@@ -169,18 +169,20 @@ export class TopInfoBar {
         }
 
         
-        const personalRule = this.appContext.libraryController.getUserLibrary().find(r => r.hex === hex);
-        const publicRule = this.appContext.libraryController.getLibraryData().rulesets.find(r => r.hex === hex);
-        
-        const ruleName = personalRule?.name || publicRule?.name;
+        // Every ruleset gets a human-friendly identity: the library name if it has one,
+        // otherwise a derived two-word mnemonic. Derived names are styled differently
+        // (see .is-derived) so users can tell them apart from a name they chose.
+        const isValidHex = hex && hex !== 'N/A' && hex !== 'Error';
 
         this.uiElements.rulesetDisplayCode.textContent = formatHexCode(hex);
-        if (ruleName) {
-            this.uiElements.rulesetDisplayName.textContent = ruleName;
+        if (isValidHex) {
+            const { name, isDerived } = this.appContext.libraryController.getDisplayName(hex);
+            this.uiElements.rulesetDisplayName.textContent = name;
             this.uiElements.rulesetDisplay.classList.add('has-name');
+            this.uiElements.rulesetDisplay.classList.toggle('is-derived', isDerived);
         } else {
             this.uiElements.rulesetDisplayName.textContent = '';
-            this.uiElements.rulesetDisplay.classList.remove('has-name');
+            this.uiElements.rulesetDisplay.classList.remove('has-name', 'is-derived');
         }
     }
 

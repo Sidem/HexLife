@@ -80,9 +80,13 @@ export class RulesetDisplayFactory {
     createHistoryListItem(hex, isCurrent = false) {
         const item = document.createElement('div');
         item.className = 'history-item' + (isCurrent ? ' is-current' : '');
+        const { name, isDerived } = this.appContext.libraryController.getDisplayName(hex);
         item.innerHTML = `
             <div class="viz-placeholder"></div>
-            <div class="history-item-hex">${formatHexCode(hex)}</div>
+            <div class="history-item-label">
+                <div class="history-item-name${isDerived ? ' is-derived' : ''}">${name}</div>
+                <div class="history-item-hex">${formatHexCode(hex)}</div>
+            </div>
         `;
         if (isCurrent) {
             item.innerHTML += `<span class="tag">Current</span>`;

@@ -158,6 +158,58 @@ export function formatHexCode(hexCode) {
     return formatted;
 }
 
+// Two-word digest vocabulary for deriving a human-friendly ruleset identity from a
+// hex code (see rulesetName). The hex string stays the canonical identity; this is a
+// stable, pronounceable mnemonic so a ruleset isn't only ever 32 hex chars. 64×64 =
+// 4096 combinations — enough to tell rulesets apart at a glance for a UI label.
+// Keep both arrays append-only: reordering or removing an entry would rename every
+// existing ruleset (names are derived positionally), breaking the "deterministic" promise.
+const RULESET_NAME_ADJECTIVES = [
+    'Amber', 'Arctic', 'Ashen', 'Astral', 'Azure', 'Blazing', 'Bold', 'Bramble',
+    'Bright', 'Cinder', 'Cobalt', 'Coral', 'Cosmic', 'Crimson', 'Crystal', 'Dappled',
+    'Dawn', 'Dusk', 'Eager', 'Ember', 'Feral', 'Frosted', 'Gilded', 'Glacial',
+    'Gleaming', 'Hidden', 'Hollow', 'Humble', 'Ivory', 'Jade', 'Lunar', 'Mellow',
+    'Misty', 'Molten', 'Mossy', 'Noble', 'Nimble', 'Onyx', 'Pale', 'Prismatic',
+    'Quiet', 'Radiant', 'Restless', 'Rugged', 'Rustic', 'Sable', 'Scarlet', 'Shaded',
+    'Silent', 'Silver', 'Solar', 'Stormy', 'Sunlit', 'Tangled', 'Tidal', 'Twilight',
+    'Velvet', 'Verdant', 'Vivid', 'Wandering', 'Wild', 'Winter', 'Woven', 'Zephyr',
+];
+const RULESET_NAME_NOUNS = [
+    'Aurora', 'Basin', 'Beacon', 'Bloom', 'Bramble', 'Canyon', 'Cascade', 'Cipher',
+    'Cluster', 'Comet', 'Coral', 'Crest', 'Current', 'Delta', 'Drift', 'Echo',
+    'Ember', 'Eddy', 'Fern', 'Flare', 'Fractal', 'Glade', 'Glyph', 'Grove',
+    'Harbor', 'Haven', 'Hollow', 'Lantern', 'Lattice', 'Loom', 'Marsh', 'Meadow',
+    'Mesa', 'Mirage', 'Nebula', 'Nexus', 'Oasis', 'Orbit', 'Petal', 'Pinnacle',
+    'Prism', 'Quartz', 'Quasar', 'Ravine', 'Reef', 'Ridge', 'Ripple', 'Spiral',
+    'Spire', 'Sprout', 'Strand', 'Summit', 'Tangle', 'Tempest', 'Thicket', 'Tide',
+    'Tundra', 'Vale', 'Vapor', 'Vertex', 'Vortex', 'Warren', 'Willow', 'Zenith',
+];
+
+/**
+ * Derives a stable, human-friendly two-word name from a ruleset hex code, e.g.
+ * "Cobalt Lattice". Deterministic: the same hex always yields the same name, with no
+ * dependence on Math.random or external state, so it is safe to call from the UI and
+ * to unit-test. The hex remains the canonical identity — this is a mnemonic label only.
+ * @param {string} hexCode The 32-char hex ruleset string (case-insensitive).
+ * @returns {string} A two-word name, or the original input if it isn't a valid hex code.
+ */
+export function rulesetName(hexCode) {
+    if (!hexCode || typeof hexCode !== 'string' || !/^[0-9a-fA-F]{32}$/.test(hexCode)) {
+        return hexCode;
+    }
+    const norm = hexCode.toUpperCase();
+    // FNV-1a 32-bit hash over the normalized hex; deterministic and well-distributed.
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < norm.length; i++) {
+        hash ^= norm.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    hash >>>= 0; // coerce to unsigned 32-bit
+    const adjIndex = hash % RULESET_NAME_ADJECTIVES.length;
+    const nounIndex = Math.floor(hash / RULESET_NAME_ADJECTIVES.length) % RULESET_NAME_NOUNS.length;
+    return `${RULESET_NAME_ADJECTIVES[adjIndex]} ${RULESET_NAME_NOUNS[nounIndex]}`;
+}
+
 /**
  * Calculate appropriate hex size for rendering neatly into the texture.
  * Used by both renderer (for layout) and main (for interaction mapping).

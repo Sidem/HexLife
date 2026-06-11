@@ -46,8 +46,19 @@
     flex-grow: 1; /* Allow grid to take available space */
 }
 
-.world-config-cell > :nth-child(3) {
+.world-config-cell .state-control {
     grid-column: span 2;
+}
+
+.world-ruleset-name {
+    grid-column: span 2;
+    font-size: 0.8em;
+    font-style: italic;
+    color: #9fa8c0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .world-config-cell {

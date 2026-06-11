@@ -9,6 +9,7 @@ import {
     getHexLine,
     cellsToBase64,
     base64ToCells,
+    rulesetName,
 } from '../src/utils/utils.js';
 
 describe('ruleset hex <-> array round-trip', () => {
@@ -169,5 +170,60 @@ describe('cellsToBase64 <-> base64ToCells (world-state save format)', () => {
         const jsonLen = JSON.stringify(Array.from(cells)).length;
         // Bit-packing -> ~0.167 base64 chars/cell vs ~2 chars/cell for "0,"/"1,".
         expect(b64Len).toBeLessThan(jsonLen / 4);
+    });
+});
+
+describe('rulesetName (human-friendly ruleset identity)', () => {
+    const VALID = Config.INITIAL_RULESET_CODE;
+
+    it('produces a stable two-word name for a valid hex', () => {
+        const name = rulesetName(VALID);
+        expect(typeof name).toBe('string');
+        const words = name.split(' ');
+        expect(words.length).toBe(2);
+        expect(words[0].length).toBeGreaterThan(0);
+        expect(words[1].length).toBeGreaterThan(0);
+    });
+
+    it('is deterministic — same hex always yields the same name', () => {
+        expect(rulesetName(VALID)).toBe(rulesetName(VALID));
+        expect(rulesetName('0'.repeat(32))).toBe(rulesetName('0'.repeat(32)));
+    });
+
+    it('is case-insensitive (canonical identity ignores hex casing)', () => {
+        expect(rulesetName(VALID.toLowerCase())).toBe(rulesetName(VALID.toUpperCase()));
+    });
+
+    it('gives different rulesets different names (no trivial collapse)', () => {
+        const names = new Set([
+            rulesetName('0'.repeat(32)),
+            rulesetName('F'.repeat(32)),
+            rulesetName(VALID),
+            rulesetName('12482080480080006880800180010117'),
+            rulesetName('EDB7DF7FB7FF7FF97F7FFE7FEFFEEEE8'),
+        ]);
+        // At least 4 of the 5 distinct hexes map to distinct names.
+        expect(names.size).toBeGreaterThanOrEqual(4);
+    });
+
+    it('returns the input unchanged for invalid hex', () => {
+        expect(rulesetName('not-a-hex')).toBe('not-a-hex');
+        expect(rulesetName('ABC')).toBe('ABC');
+        expect(rulesetName('')).toBe('');
+        expect(rulesetName(null)).toBe(null);
+        expect(rulesetName(undefined)).toBe(undefined);
+    });
+
+    it('distributes reasonably across many random rulesets', () => {
+        // Sanity check that the hash spreads names out rather than clustering.
+        const seen = new Set();
+        for (let i = 0; i < 200; i++) {
+            // deterministic pseudo-hex from i (no Math.random in tests)
+            const hex = (BigInt(i) * 0x9e3779b97f4a7c15n & ((1n << 128n) - 1n))
+                .toString(16).toUpperCase().padStart(32, '0');
+            seen.add(rulesetName(hex));
+        }
+        // Expect a healthy spread of distinct names from 200 inputs.
+        expect(seen.size).toBeGreaterThan(100);
     });
 });
