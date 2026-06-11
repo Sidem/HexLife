@@ -21,7 +21,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Quality gate: lint + JS tests + Rust tests must pass before anything ships.
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: JS tests
+        run: npm run test:run
+
+      - name: Rust tests
+        run: cargo test --manifest-path hexlife-wasm/Cargo.toml
+
   build-and-deploy:
+    needs: quality-gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -36,7 +61,7 @@ jobs:
         uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: 'latest'
-      
+
       - name: Install dependencies
         run: npm install
 
