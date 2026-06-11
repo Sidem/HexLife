@@ -312,7 +312,10 @@ function setupFBOs() {
 }
 
 function renderWorldsToTextures(appContext) {
-    const allWorldsStatus = appContext.worldManager.getWorldsFullStatus();
+    // Hot path: pull only render data (typed-array views + flags). Avoid
+    // getWorldsFullStatus(), which additionally spreads `{...latestStats}` for all
+    // 9 worlds every rAF — the renderer never reads stats here.
+    const allWorldsRenderData = appContext.worldManager.getWorldsRenderData();
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
     const camera = appContext.worldManager.getCurrentCameraState();
 
@@ -325,7 +328,7 @@ function renderWorldsToTextures(appContext) {
     const needsDraw = new Array(Config.NUM_WORLDS);
     let anyDraw = false;
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const worldData = allWorldsStatus[i] ? allWorldsStatus[i].renderData : null;
+        const worldData = allWorldsRenderData[i] || null;
         const enabled = !!(worldData && worldData.enabled);
         let draw = false;
         if (!worldEverDrawn[i]) {
@@ -360,8 +363,7 @@ function renderWorldsToTextures(appContext) {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const worldStatus = allWorldsStatus[i];
-        const worldData = worldStatus ? worldStatus.renderData : null;
+        const worldData = allWorldsRenderData[i] || null;
         if (worldData && worldData.enabled && needsDraw[i]) {
             const fboData = worldFBOs[i];
             gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
@@ -409,8 +411,7 @@ function renderWorldsToTextures(appContext) {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const worldStatus = allWorldsStatus[i];
-            const worldData = worldStatus ? worldStatus.renderData : null;
+            const worldData = allWorldsRenderData[i] || null;
             if ((!worldData || !worldData.enabled) && needsDraw[i]) {
                 const fboData = worldFBOs[i];
                 gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
