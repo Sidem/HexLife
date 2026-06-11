@@ -352,6 +352,38 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
 }
 
 /**
+ * Bit-packs a per-cell binary state array (each entry truthy = on) into a Uint8Array,
+ * 8 cells per byte (bit `i & 7` of byte `i >> 3`). This is the canonical packing used by
+ * both the save-file format ({@link cellsToBase64}) and the worker's cycle-frame buffers.
+ * @param {Uint8Array|number[]} cells The per-cell state (truthy = on).
+ * @returns {Uint8Array} Bit-packed bytes (`ceil(cells.length / 8)` long).
+ */
+export function packCells(cells) {
+    const n = cells.length;
+    const packed = new Uint8Array(Math.ceil(n / 8));
+    for (let i = 0; i < n; i++) {
+        if (cells[i]) packed[i >> 3] |= (1 << (i & 7));
+    }
+    return packed;
+}
+
+/**
+ * Unpacks bit-packed bytes (from {@link packCells}) into an existing per-cell target array,
+ * writing 0/1 into the first `n` entries. Reuses the caller's buffer to avoid per-call
+ * allocation on hot paths (e.g. cycle playback).
+ * @param {Uint8Array} packed The bit-packed bytes.
+ * @param {Uint8Array|number[]} target The destination per-cell array (length ≥ n).
+ * @param {number} n The number of cells to unpack.
+ * @returns {Uint8Array|number[]} The same `target`, for convenience.
+ */
+export function unpackCellsInto(packed, target, n) {
+    for (let i = 0; i < n; i++) {
+        target[i] = (packed[i >> 3] >> (i & 7)) & 1;
+    }
+    return target;
+}
+
+/**
  * Encodes a per-cell state array (each entry 0 or 1) as a base64 string, bit-packing
  * 8 cells per byte first. This is ~12× more compact than a JSON number array (vs ~1.5×
  * for one byte per cell) and is the save-file state format. Chunked so very large grids
@@ -361,11 +393,7 @@ export function mutateRandomBitsInHex(hexString, mutationRate = 1) {
  * @returns {string} A base64-encoded string of the bit-packed bytes.
  */
 export function cellsToBase64(cells) {
-    const n = cells.length;
-    const packed = new Uint8Array(Math.ceil(n / 8));
-    for (let i = 0; i < n; i++) {
-        if (cells[i]) packed[i >> 3] |= (1 << (i & 7));
-    }
+    const packed = packCells(cells);
     let binary = '';
     const CHUNK = 0x8000;
     for (let i = 0; i < packed.length; i += CHUNK) {
@@ -389,11 +417,7 @@ export function base64ToCells(b64, cellCount) {
     const packed = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) packed[i] = binary.charCodeAt(i);
     const n = (typeof cellCount === 'number' && cellCount >= 0) ? cellCount : packed.length * 8;
-    const cells = new Uint8Array(n);
-    for (let i = 0; i < n; i++) {
-        cells[i] = (packed[i >> 3] >> (i & 7)) & 1;
-    }
-    return cells;
+    return unpackCellsInto(packed, new Uint8Array(n), n);
 }
 
 /**

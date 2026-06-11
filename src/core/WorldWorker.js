@@ -1,6 +1,6 @@
 import * as Config from './config.js';
 import init, { World } from './wasm-engine/hexlife_wasm.js';
-import { rulesetToHex, findHexagonsInNeighborhood } from '../utils/utils.js';
+import { rulesetToHex, findHexagonsInNeighborhood, packCells, unpackCellsInto } from '../utils/utils.js';
 import { Throttler } from '../utils/throttler.js';
 import { DensityStrategy } from './initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from './initialStateStrategies/ClusterStrategy.js';
@@ -108,6 +108,17 @@ function abortCycleDetection() {
     isDetectingCycle = false;
     detectedCycle = [];
     cycleStartChecksum = null;
+}
+
+// Capture one cycle frame. The binary state is bit-packed (8 cells/byte) to keep collected-frame
+// memory bounded — up to CYCLE_DETECTION_MAX_PERIOD frames are held while detecting, so on the
+// "huge" preset the unpacked form would cost hundreds of MB/world. The rule-index array (0-127
+// per cell) isn't binary, so it's kept as a byte copy for faithful playback colouring.
+function captureCycleFrame() {
+    return {
+        state: packCells(jsStateArray),
+        rules: jsRuleIndexArray.slice()
+    };
 }
 
 // Byte-for-byte equality of two Uint8Array views over the same logical length. Used to confirm a
@@ -283,8 +294,9 @@ function runTick() {
         worldTickCounter++;
         const nextFrame = detectedCycle[cyclePlaybackIndex];
         // Playback writes directly into the current state buffer (no run_tick, no buffer swap),
-        // so the Wasm-owned `state` and the worker's views stay in sync.
-        jsStateArray.set(nextFrame.state);
+        // so the Wasm-owned `state` and the worker's views stay in sync. The frame's state is
+        // bit-packed (8 cells/byte); unpack it back into the live view.
+        unpackCellsInto(nextFrame.state, jsStateArray, workerConfig.NUM_CELLS);
         jsRuleIndexArray.set(nextFrame.rules);
         cyclePlaybackIndex = (cyclePlaybackIndex + 1) % detectedCycle.length;
         activeCount = jsStateArray.reduce((s, c) => s + c, 0);
@@ -302,7 +314,7 @@ function runTick() {
 
 
     if (isDetectingCycle) {
-        if (newStateChecksum === cycleStartChecksum && statesEqual(jsStateArray, detectedCycle[0].state)) {
+        if (newStateChecksum === cycleStartChecksum && statesEqual(packCells(jsStateArray), detectedCycle[0].state)) {
             // Verified: the recurring checksum reflects a genuinely identical state, so the frames
             // collected so far form one true period of the cycle. Commit to playback.
             isCyclePlaybackMode = true;
@@ -313,18 +325,12 @@ function runTick() {
             // checksum collision. Abort so we stop copying a full state every tick.
             abortCycleDetection();
         } else {
-            detectedCycle.push({
-                state: jsStateArray.slice(),
-                rules: jsRuleIndexArray.slice()
-            });
+            detectedCycle.push(captureCycleFrame());
         }
     } else if (!isCyclePlaybackMode && stateHistoryChecksums.has(newStateChecksum)) {
         isDetectingCycle = true;
         cycleStartChecksum = newStateChecksum;
-        detectedCycle = [{
-            state: jsStateArray.slice(),
-            rules: jsRuleIndexArray.slice()
-        }];
+        detectedCycle = [captureCycleFrame()];
     }
 
     if (!isCyclePlaybackMode) {
