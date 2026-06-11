@@ -328,9 +328,8 @@ export class WorldManager {
             const baseSeed = Date.now();
             indicesToReset.forEach(idx => {
                 if (data.copyPrimaryRuleset && idx !== this.selectedWorldIndex) {
-                    const newRulesetBuffer = hexToRuleset(primaryRulesetHex).buffer.slice(0);
-                    this.worlds[idx].setRuleset(newRulesetBuffer);
-                    this.worldSettings[idx].rulesetHex = primaryRulesetHex;
+                    // Copy-on-reset doesn't push history (it isn't a user ruleset edit).
+                    this._commitRuleset(idx, primaryRulesetHex, { addToHistory: false });
                 }
                 if (this.worldSettings[idx]) {
                     this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
@@ -452,6 +451,36 @@ export class WorldManager {
         return this.deterministic ? baseSeed : baseSeed + worldIndex;
     }
 
+    /**
+     * Apply a ruleset to a single world, centralizing the push-history → hexToRuleset →
+     * buffer.slice(0) → setRuleset → update-worldSettings dance repeated across every
+     * ruleset-mutation path. Callers still own scope resolution, persistence, and event
+     * dispatch (so a batch can persist/dispatch once after the loop).
+     * @param {number} worldIndex
+     * @param {string} hex - 32-char ruleset hex (a falsy world/settings entry is a no-op).
+     * @param {object} [opts]
+     * @param {boolean} [opts.addToHistory=true] - Push hex onto the world's ruleset history.
+     *   Set false for undo/redo/revert, which reshape history themselves.
+     * @param {boolean} [opts.uploadToWorker=true] - Send the parsed rule buffer to the worker.
+     *   Set false when the worker already has this ruleset (clone source) or receives it via
+     *   another command (LOAD_STATE). Skipped when hex is "Error".
+     * @param {boolean} [opts.reset=false] - Reset the world's grid after applying.
+     * @param {number} [opts.seed] - Reset seed (used when reset is true).
+     */
+    _commitRuleset = (worldIndex, hex, opts = {}) => {
+        const { addToHistory = true, uploadToWorker = true, reset = false, seed } = opts;
+        const proxy = this.worlds[worldIndex];
+        const settings = this.worldSettings[worldIndex];
+        if (!proxy || !settings) return;
+
+        if (addToHistory) this._addRulesetToHistory(worldIndex, hex);
+        if (uploadToWorker && hex !== "Error") {
+            proxy.setRuleset(hexToRuleset(hex).buffer.slice(0));
+        }
+        settings.rulesetHex = hex;
+        if (reset) proxy.resetWorld(settings.initialState, seed);
+    }
+
     #applyRulesetToWorlds = (rulesetHex, scope, shouldReset) => {
         const newRulesetArray = hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
@@ -463,17 +492,10 @@ export class WorldManager {
         const baseSeed = Date.now();
 
         indicesToAffect.forEach(idx => {
-
-            this._addRulesetToHistory(idx, rulesetHex);
-
-            const newRulesetBuffer = newRulesetArray.buffer.slice(0);
-            this.worlds[idx].setRuleset(newRulesetBuffer);
-            this.worldSettings[idx].rulesetHex = rulesetHex;
-
-
-            if (shouldReset && this.worldSettings[idx]) {
-                this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
-            }
+            this._commitRuleset(idx, rulesetHex, {
+                reset: shouldReset,
+                seed: this._getResetSeed(baseSeed, idx),
+            });
         });
 
         if (indicesToAffect.includes(this.selectedWorldIndex)) {
@@ -507,11 +529,7 @@ export class WorldManager {
             const newHex = this._generateMutatedHex(currentHex, mutationRate, mutationMode);
 
             if (newHex !== currentHex && newHex !== "Error") {
-                this._addRulesetToHistory(idx, newHex);
-                const newRulesetArray = hexToRuleset(newHex);
-                const newRulesetBuffer = newRulesetArray.buffer.slice(0);
-                this.worlds[idx].setRuleset(newRulesetBuffer);
-                this.worldSettings[idx].rulesetHex = newHex;
+                this._commitRuleset(idx, newHex);
             }
         });
 
@@ -545,7 +563,8 @@ export class WorldManager {
 
         this.worlds.forEach((proxy, idx) => {
             let newHex = sourceRulesetHex;
-            if (idx !== this.selectedWorldIndex) {
+            const isSelected = idx === this.selectedWorldIndex;
+            if (!isSelected) {
                 let attempts = 0;
                 const maxAttempts = 10; // prevent infinite loop
                 do {
@@ -567,24 +586,19 @@ export class WorldManager {
                     } while (generatedHexes.has(forcedHex) && forceAttempts < 128);
                     newHex = forcedHex;
                 }
-                
-                if (newHex !== "Error") {
-                    generatedHexes.add(newHex);
-                    const newRulesetBuffer = hexToRuleset(newHex).buffer.slice(0);
-                    proxy.setRuleset(newRulesetBuffer);
-                }
+
+                if (newHex !== "Error") generatedHexes.add(newHex);
             }
-            
-            
-            this._addRulesetToHistory(idx, newHex);
-            this.worldSettings[idx].rulesetHex = newHex;
 
-            if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
+            // The selected world already runs the source ruleset, so skip its worker upload.
+            this._commitRuleset(idx, newHex, {
+                uploadToWorker: !isSelected,
+                reset: true,
+                seed: this._getResetSeed(baseSeed, idx),
+            });
 
-                if (!this.isGloballyPaused) {
-                    proxy.startSimulation();
-                }
+            if (!this.isGloballyPaused) {
+                proxy.startSimulation();
             }
         });
 
@@ -610,20 +624,15 @@ export class WorldManager {
 
         const baseSeed = Date.now();
         this.worlds.forEach((proxy, idx) => {
-            if (idx !== this.selectedWorldIndex) {
-                const newRulesetBuffer = hexToRuleset(sourceRulesetHex).buffer.slice(0);
-                proxy.setRuleset(newRulesetBuffer);
-            }
+            // The selected world already runs the source ruleset, so skip its worker upload.
+            this._commitRuleset(idx, sourceRulesetHex, {
+                uploadToWorker: idx !== this.selectedWorldIndex,
+                reset: true,
+                seed: this._getResetSeed(baseSeed, idx),
+            });
 
-            this._addRulesetToHistory(idx, sourceRulesetHex);
-            this.worldSettings[idx].rulesetHex = sourceRulesetHex;
-
-            if (this.worldSettings[idx]) {
-                proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
-                
-                if (!this.isGloballyPaused) {
-                    proxy.startSimulation();
-                }
+            if (!this.isGloballyPaused) {
+                proxy.startSimulation();
             }
         });
 
@@ -649,18 +658,12 @@ export class WorldManager {
             const newHex = modifierFunc(currentHex);
 
             if (newHex !== currentHex && newHex !== "Error") {
-                this._addRulesetToHistory(idx, newHex);
-                const newRulesetArray = hexToRuleset(newHex);
-                const newRulesetBuffer = newRulesetArray.buffer.slice(0);
-                this.worlds[idx].setRuleset(newRulesetBuffer);
-                this.worldSettings[idx].rulesetHex = newHex;
-
-                if (conditionalResetScope !== 'none') {
-                    const resetTargetIndices = this._getAffectedWorldIndices(conditionalResetScope);
-                    if (resetTargetIndices.includes(idx) && this.worldSettings[idx]) {
-                        this.worlds[idx].resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
-                    }
-                }
+                const shouldReset = conditionalResetScope !== 'none' &&
+                    this._getAffectedWorldIndices(conditionalResetScope).includes(idx);
+                this._commitRuleset(idx, newHex, {
+                    reset: shouldReset,
+                    seed: this._getResetSeed(baseSeed, idx),
+                });
             }
         });
 
@@ -813,8 +816,8 @@ export class WorldManager {
         }
 
         if (this.worldSettings[worldIndex]) {
-            this._addRulesetToHistory(worldIndex, loadedData.rulesetHex); 
-            this.worldSettings[worldIndex].rulesetHex = loadedData.rulesetHex;
+            // The ruleset reaches the worker via the LOAD_STATE command below, not setRuleset.
+            this._commitRuleset(worldIndex, loadedData.rulesetHex, { uploadToWorker: false });
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialState = {
                 mode: 'density',
@@ -855,10 +858,7 @@ export class WorldManager {
         settings.rulesetFuture.unshift(...itemsToMove.reverse());
 
         const targetRuleset = settings.rulesetHistory[historyIndex];
-        settings.rulesetHex = targetRuleset;
-
-        const newRulesetBuffer = hexToRuleset(targetRuleset).buffer.slice(0);
-        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+        this._commitRuleset(worldIndex, targetRuleset, { addToHistory: false });
 
         if (worldIndex === this.selectedWorldIndex) {
             EventBus.dispatch(EVENTS.RULESET_CHANGED, targetRuleset);
@@ -879,10 +879,7 @@ export class WorldManager {
         settings.rulesetFuture.unshift(currentRuleset); 
 
         const previousRuleset = settings.rulesetHistory[targetIndex];
-        settings.rulesetHex = previousRuleset;
-        
-        const newRulesetBuffer = hexToRuleset(previousRuleset).buffer.slice(0);
-        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+        this._commitRuleset(worldIndex, previousRuleset, { addToHistory: false });
 
         if (worldIndex === this.selectedWorldIndex) {
             EventBus.dispatch(EVENTS.RULESET_CHANGED, previousRuleset);
@@ -896,12 +893,10 @@ export class WorldManager {
         const settings = this.worldSettings[worldIndex];
         if (!settings || settings.rulesetFuture.length === 0) return;
 
-        const nextRuleset = settings.rulesetFuture.shift(); 
+        const nextRuleset = settings.rulesetFuture.shift();
         settings.rulesetHistory.push(nextRuleset);
-        settings.rulesetHex = nextRuleset;
-
-        const newRulesetBuffer = hexToRuleset(nextRuleset).buffer.slice(0);
-        this.worlds[worldIndex].setRuleset(newRulesetBuffer);
+        // History already advanced above; just upload + sync the cached hex.
+        this._commitRuleset(worldIndex, nextRuleset, { addToHistory: false });
 
         if (worldIndex === this.selectedWorldIndex) {
             EventBus.dispatch(EVENTS.RULESET_CHANGED, nextRuleset);
