@@ -20,6 +20,11 @@ let isEnabled = true;
 let tickIntervalId = null;
 let currentSpeedTarget = Config.DEFAULT_SPEED;
 let targetTickDurationMs = 1000 / Config.DEFAULT_SPEED;
+// Tick-batching accumulator (see runTickBatch): carries fractional owed ticks
+// between timer fires so real TPS tracks currentSpeedTarget despite the browser's
+// ~4ms setInterval clamp.
+let tickAccumulator = 0;
+let lastBatchTime = 0;
 let worldTickCounter = 0;
 let ruleUsageCounters = null;
 let ratioHistory = [];
@@ -435,6 +440,48 @@ function forceSyncUpdate() {
     sendStatsUpdate(true);
 }
 
+// Per-fire wall-clock budget. Browsers clamp setInterval to ~4ms, so a single
+// runTick per fire caps real TPS well below high targets and drifts. runTickBatch
+// instead runs as many ticks as elapsed real time owes, bounded by this budget so
+// the worker stays responsive to incoming commands; debt it can't service is
+// dropped (capped accumulator) rather than spiralling.
+const TICK_BATCH_TIME_BUDGET_MS = 8;
+
+function runTickBatch() {
+    const now = performance.now();
+    let elapsed = now - lastBatchTime;
+    lastBatchTime = now;
+    if (elapsed < 0) elapsed = 0; // guard against a non-monotonic clock reading
+
+    // While paused/disabled, a single runTick still drains the command queue
+    // (and force-syncs if a ruleset/grid edit arrived) without advancing the sim.
+    if (!isRunning || !isEnabled) {
+        runTick();
+        return;
+    }
+
+    tickAccumulator += (elapsed * currentSpeedTarget) / 1000;
+    // Cap owed ticks to ~one second of catch-up so a long stall (GC, backgrounded
+    // tab) doesn't unleash a huge burst on the next fire.
+    const maxDebt = Math.max(currentSpeedTarget, 1);
+    if (tickAccumulator > maxDebt) tickAccumulator = maxDebt;
+
+    while (tickAccumulator >= 1) {
+        runTick();
+        tickAccumulator -= 1;
+        // Cycle playback / a stop command mid-batch flips these; bail so we don't
+        // keep ticking a sim that just halted.
+        if (!isRunning || !isEnabled) {
+            tickAccumulator = 0;
+            break;
+        }
+        if (performance.now() - now >= TICK_BATCH_TIME_BUDGET_MS) {
+            tickAccumulator = 0; // drop unservable debt; resync next fire
+            break;
+        }
+    }
+}
+
 function updateSimulationInterval() {
     if (tickIntervalId) {
         clearInterval(tickIntervalId);
@@ -442,7 +489,11 @@ function updateSimulationInterval() {
     }
     if (isRunning && isEnabled) {
         targetTickDurationMs = Math.max(1, 1000 / currentSpeedTarget);
-        tickIntervalId = setInterval(runTick, targetTickDurationMs);
+        // Reset the accumulator clock so a speed change or (re)start doesn't book
+        // ticks for the idle gap before this interval existed.
+        lastBatchTime = performance.now();
+        tickAccumulator = 0;
+        tickIntervalId = setInterval(runTickBatch, targetTickDurationMs);
     }
 }
 
