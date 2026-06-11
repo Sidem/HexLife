@@ -31,7 +31,6 @@ export class ControlsComponent extends BaseComponent {
                 <h5>Visualization</h5>
                 <div id="controls-ruleset-viz-mount"></div>
                 <div id="controls-show-minimap-overlay-mount"></div>
-                <div id="controls-show-cycle-indicator-mount"></div>
                 <div id="controls-show-status-badges-mount"></div>
                 <div id="controls-show-command-toasts-mount"></div>
             </div>
@@ -94,14 +93,6 @@ export class ControlsComponent extends BaseComponent {
             initialValue: vizController.getShowMinimapOverlay(),
             items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
-        });
-
-        new SwitchComponent(this.element.querySelector(`#controls-show-cycle-indicator-mount`), {
-            type: 'checkbox',
-            name: `controls-show-cycle-indicator`, 
-            initialValue: vizController.getShowCycleIndicator(),
-            items: [{ value: 'show', text: 'Show Cycle Indicators' }],
-            onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_CYCLE_INDICATOR, shouldShow)
         });
 
         new SwitchComponent(this.element.querySelector(`#controls-show-status-badges-mount`), {

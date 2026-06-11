@@ -11,7 +11,6 @@ export class MinimapOverlays extends BaseComponent {
         this.visualizationController = appContext.visualizationController;
         this.layoutCache = {};
         this.overlayElements = [];
-        this.cycleIndicatorElements = [];
         this.statusBadgeElements = [];
         this.init();
     }
@@ -26,12 +25,6 @@ export class MinimapOverlays extends BaseComponent {
             overlay.style.display = 'none';
             this.mountPoint.appendChild(overlay);
             this.overlayElements.push(overlay);
-
-            const indicator = document.createElement('div');
-            indicator.className = 'cycle-indicator hidden';
-            indicator.dataset.worldId = i;
-            this.mountPoint.appendChild(indicator);
-            this.cycleIndicatorElements.push(indicator);
 
             // At-a-glance terminal-state badge (extinct / saturated / cycling). Surfaces metrics
             // already computed per world so the 3×3 minimap is scannable without selecting each tile.
@@ -57,7 +50,6 @@ export class MinimapOverlays extends BaseComponent {
     handleUIModeChange({ mode }) {
         const isMobile = mode === 'mobile';
         this.overlayElements.forEach(overlay => overlay.classList.toggle('mini', isMobile));
-        this.cycleIndicatorElements.forEach(indicator => indicator.classList.toggle('mini', isMobile));
         this.statusBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
     }
 
@@ -68,7 +60,6 @@ export class MinimapOverlays extends BaseComponent {
         const selectedWorldIndex = this.worldManager.getSelectedWorldIndex();
         const selectedWorldRuleset = allWorldsStatus[selectedWorldIndex]?.stats.rulesetHex;
         const vizState = {
-            showCycleIndicator: this.visualizationController.getShowCycleIndicator(),
             showMinimapOverlay: this.visualizationController.getShowMinimapOverlay(),
             showStatusBadges: this.visualizationController.getShowStatusBadges(),
             vizType: this.visualizationController.getVizType(),
@@ -81,28 +72,6 @@ export class MinimapOverlays extends BaseComponent {
             const col = i % Config.WORLD_LAYOUT_COLS;
             const miniX = col * (miniMapW + miniMapSpacing);
             const miniY = row * (miniMapH + miniMapSpacing);
-
-            
-            const indicatorEl = this.cycleIndicatorElements[i];
-            const showIndicators = vizState?.showCycleIndicator ?? false;
-            if (indicatorEl && worldStatus?.stats.isInCycle && showIndicators) {
-                indicatorEl.classList.remove('hidden');
-                indicatorEl.style.left = `${miniX + miniMapW - 20 - miniMapSpacing}px`;
-                indicatorEl.style.top = `${miniY}px`;
-                const cycleLength = worldStatus.stats.cycleLength;
-                if (indicatorEl.dataset.cycleLength !== String(cycleLength)) {
-                    indicatorEl.dataset.cycleLength = String(cycleLength);
-                    indicatorEl.innerHTML = `
-                        <svg viewBox="0 0 24 24" width="100%" height="100%">
-                            <path d="M12 2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8V2z" fill="#fff"/>
-                            <path d="M22 12a10 10 0 0 0-10-10v2a8 8 0 0 1 8 8h2z" fill="#fff" transform="rotate(180 12 12)"/>
-                            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${cycleLength}</text>
-                        </svg>
-                    `;
-                }
-            } else if (indicatorEl) {
-                indicatorEl.classList.add('hidden');
-            }
 
 
             const badgeEl = this.statusBadgeElements[i];

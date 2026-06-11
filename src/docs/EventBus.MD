@@ -76,7 +76,6 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_SET_PAUSE_WHILE_DRAWING` | `shouldPause: boolean` | Command to set the pause-while-drawing preference. |
 | `COMMAND_SET_VISUALIZATION_TYPE` | `type: string` | Command to set the visualization type ('binary', 'color'). |
 | `COMMAND_SET_SHOW_MINIMAP_OVERLAY` | `shouldShow: boolean` | Command to show/hide minimap overlays. |
-| `COMMAND_SET_SHOW_CYCLE_INDICATOR` | `shouldShow: boolean` | Command to show/hide cycle indicators. |
 | `COMMAND_SET_SHOW_STATUS_BADGES` | `shouldShow: boolean` | Command to show/hide per-minimap status badges (extinct/saturated/cycling). |
 | `COMMAND_TOGGLE_PANEL` | `{ panelName, show? }` | Command to show, hide, or toggle a draggable panel. |
 | `COMMAND_TOGGLE_POPOUT` | `{ popoutName, show? }` | Command to show, hide, or toggle a popout panel. |
