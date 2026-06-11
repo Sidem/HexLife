@@ -40,6 +40,19 @@ let prevCamera = { x: NaN, y: NaN, zoom: NaN };
 let prevEnabled = [];
 let worldEverDrawn = [];
 
+// --- Main-scene compositing dirty tracking ----------------------------------
+// renderMainScene composites the FBO textures (selected view + 3×3 minimap) to
+// the canvas. That output only changes when an FBO was redrawn this frame or the
+// layout changed (resize → quad positions move). WebGL keeps the last presented
+// frame on screen when the drawing buffer is left untouched, so when nothing
+// changed we skip the whole composite and the canvas keeps showing it. A paused,
+// idle sim therefore issues no GPU work at all. `composeDirty` is set by the
+// layout recompute; per-frame FBO redraws are signalled via renderWorldsToTextures.
+let composeDirty = true;
+// Precomputed clip-space quad vertices, rebuilt only when the layout changes.
+// Avoids allocating a Float32Array + per-quad math every frame in drawQuad.
+let quadVertsCache = null;
+
 function updateColorLUTTexture(colorSettings, symmetryData, rulesetArray) {
     if (!gl || !hexLUTTexture) return;
     const lutData = generateColorLUT(colorSettings, symmetryData, rulesetArray);
@@ -214,8 +227,50 @@ function _calculateAndCacheLayout() {
         selectedView: { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight },
         miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
     };
+
+    // Precompute clip-space quad vertices for everything renderMainScene draws.
+    // These depend only on layout (and canvas size), so building them here keeps
+    // the per-frame composite allocation-free.
+    const miniMaps = new Array(Config.NUM_WORLDS);
+    const selectionOutlines = new Array(Config.NUM_WORLDS);
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
+        const col = i % Config.WORLD_LAYOUT_COLS;
+        const miniX = gridContainerX + col * (miniMapW + miniMapSpacing);
+        const miniY = gridContainerY + row * (miniMapH + miniMapSpacing);
+        miniMaps[i] = _computeQuadVerts(miniX, miniY, miniMapW, miniMapH);
+        const outlineThickness = Math.max(2, Math.min(miniMapW, miniMapH) * 0.02);
+        selectionOutlines[i] = _computeQuadVerts(
+            miniX - outlineThickness, miniY - outlineThickness,
+            miniMapW + 2 * outlineThickness, miniMapH + 2 * outlineThickness
+        );
+    }
+    quadVertsCache = {
+        selectedView: _computeQuadVerts(selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight),
+        miniMaps,
+        selectionOutlines,
+    };
+    composeDirty = true; // layout moved — the canvas composite must be redrawn
+
     EventBus.dispatch(EVENTS.LAYOUT_CALCULATED, { ...layoutCache });
     EventBus.dispatch(EVENTS.LAYOUT_UPDATED, { ...layoutCache });
+}
+
+// Convert a pixel-space rect to the clip-space TRIANGLE_STRIP vertices drawQuad
+// uploads. Returns a fresh Float32Array; only called on layout change.
+function _computeQuadVerts(pixelX, pixelY, pixelW, pixelH) {
+    const canvasWidth = gl.canvas.width;
+    const canvasHeight = gl.canvas.height;
+    const clipX = (pixelX / canvasWidth) * 2 - 1;
+    const clipY = (pixelY / canvasHeight) * -2 + 1;
+    const clipW = (pixelW / canvasWidth) * 2;
+    const clipH = (pixelH / canvasHeight) * 2;
+    return new Float32Array([
+        clipX, clipY - clipH,
+        clipX + clipW, clipY - clipH,
+        clipX, clipY,
+        clipX + clipW, clipY
+    ]);
 }
 
 export function getLayoutCache() {
@@ -350,7 +405,7 @@ function renderWorldsToTextures(appContext) {
     if (camera) prevCamera = { x: camera.x, y: camera.y, zoom: camera.zoom };
 
     if (!anyDraw) {
-        return; // Nothing changed — leave every FBO as-is and skip all GPU work.
+        return false; // Nothing changed — leave every FBO as-is and skip all GPU work.
     }
 
     gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
@@ -432,11 +487,17 @@ function renderWorldsToTextures(appContext) {
     
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+    return true; // at least one FBO was redrawn — the canvas composite is stale
 }
 
-function renderMainScene(appContext) {
+function renderMainScene(appContext, fbosDrawn) {
+    if (!quadShaderProgram || !quadVAO || !quadVertsCache) return;
+    // Skip the whole composite when neither an FBO nor the layout changed: the
+    // canvas keeps the last presented frame, so an idle/paused sim does no GPU work.
+    if (!fbosDrawn && !composeDirty) return;
+    composeDirty = false;
+
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
-    if (!quadShaderProgram || !quadVAO) return;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -444,56 +505,36 @@ function renderMainScene(appContext) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(quadShaderProgram);
     gl.bindVertexArray(quadVAO);
-    const { selectedView, miniMap } = layoutCache;
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(selectedView.x, selectedView.y, selectedView.width, selectedView.height);
+        drawQuad(quadVertsCache.selectedView);
     }
 
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
-        const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
-        const col = i % Config.WORLD_LAYOUT_COLS;
-        const miniX = miniMap.gridContainerX + col * (miniMap.miniMapW + miniMap.miniMapSpacing);
-        const miniY = miniMap.gridContainerY + row * (miniMap.miniMapH + miniMap.miniMapSpacing);
-
         if (i === selectedWorldIndex) {
-            const outlineThickness = Math.max(2, Math.min(miniMap.miniMapW, miniMap.miniMapH) * 0.02);
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
             gl.uniform4fv(quadUniformLocations.u_color, Config.SELECTION_OUTLINE_COLOR);
-            drawQuad(miniX - outlineThickness, miniY - outlineThickness, miniMap.miniMapW + 2 * outlineThickness, miniMap.miniMapH + 2 * outlineThickness);
+            drawQuad(quadVertsCache.selectionOutlines[i]);
         }
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, worldFBOs[i].texture);
         gl.uniform1i(quadUniformLocations.texture, 0);
         gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(miniX, miniY, miniMap.miniMapW, miniMap.miniMapH);
+        drawQuad(quadVertsCache.miniMaps[i]);
     }
 
     gl.bindVertexArray(null);
 }
 
-function drawQuad(pixelX, pixelY, pixelW, pixelH) {
-    const canvasWidth = gl.canvas.width;
-    const canvasHeight = gl.canvas.height;
-    const clipX = (pixelX / canvasWidth) * 2 - 1;
-    const clipY = (pixelY / canvasHeight) * -2 + 1;
-    const clipW = (pixelW / canvasWidth) * 2;
-    const clipH = (pixelH / canvasHeight) * 2;
-    const positions = new Float32Array([
-        clipX, clipY - clipH,
-        clipX + clipW, clipY - clipH,
-        clipX, clipY,
-        clipX + clipW, clipY
-    ]);
-
+// Upload precomputed clip-space vertices (from quadVertsCache) and draw the quad.
+function drawQuad(verts) {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
-
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, verts);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
@@ -501,8 +542,8 @@ export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
         return;
     }
-    renderWorldsToTextures(appContext);
-    renderMainScene(appContext);
+    const fbosDrawn = renderWorldsToTextures(appContext);
+    renderMainScene(appContext, fbosDrawn);
 }
 
 export function resizeRenderer() {
