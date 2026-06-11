@@ -17,6 +17,7 @@ const KEYS = {
     SHORTCUTS_PANEL_STATE: `${LS_KEY_PREFIX}shortcutsPanelState`,
     UI_SETTINGS: `${LS_KEY_PREFIX}uiSettings`,
     USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
+    USER_PATTERNS: `${LS_KEY_PREFIX}userPatterns`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`
@@ -227,6 +228,14 @@ export function loadUserRulesets() {
 
 export function saveUserRulesets(userRulesets) {
     _setItem(KEYS.USER_RULESETS, userRulesets);
+}
+
+export function loadUserPatterns() {
+    return _getItem(KEYS.USER_PATTERNS) || [];
+}
+
+export function saveUserPatterns(userPatterns) {
+    _setItem(KEYS.USER_PATTERNS, userPatterns);
 }
 
 export function loadColorSettings() {

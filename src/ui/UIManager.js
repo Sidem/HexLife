@@ -18,6 +18,7 @@ import * as Config from '../core/config.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { SaveRulesetModal } from './components/SaveRulesetModal.js';
+import { SavePatternModal } from './components/SavePatternModal.js';
 import { ActionsPopover } from './components/ActionsPopover.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
@@ -42,6 +43,7 @@ export class UIManager {
         this.sharedComponents = {}; 
         this.initialStateConfigModal = null; // Add this
         this.saveRulesetModal = null;
+        this.savePatternModal = null;
         this.actionsPopover = null;
         this.confirmationDialog = null;
         this.rulesetDisplayFactory = null;
@@ -107,6 +109,7 @@ export class UIManager {
         
         
         this.saveRulesetModal = new SaveRulesetModal(document.getElementById('modal-container'), appContext);
+        this.savePatternModal = new SavePatternModal(document.getElementById('modal-container'), appContext);
         
         
         this.confirmationDialog = new ConfirmationDialog(document.getElementById('dialog-container'));
@@ -309,6 +312,9 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, (data) => {
             this.saveRulesetModal.show(data);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, (data) => {
+            this.savePatternModal.show(data);
         });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_CONFIRMATION, (data) => {
             this.confirmationDialog.show(data);

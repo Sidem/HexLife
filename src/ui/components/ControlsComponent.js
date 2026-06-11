@@ -2,6 +2,7 @@ import { BaseComponent } from './BaseComponent.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { ICONS } from '../icons.js';
 
 export class ControlsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -33,6 +34,13 @@ export class ControlsComponent extends BaseComponent {
                 <div id="controls-show-minimap-overlay-mount"></div>
                 <div id="controls-show-status-badges-mount"></div>
                 <div id="controls-show-command-toasts-mount"></div>
+            </div>
+            <div class="tool-group">
+                <h5>Patterns</h5>
+                <button class="button" id="controls-capture-pattern-button">
+                    <span class="inline-icon">${ICONS.crop}</span> Capture Pattern
+                </button>
+                <div id="controls-patterns-list" class="patterns-list"></div>
             </div>
         `;
 
@@ -110,9 +118,68 @@ export class ControlsComponent extends BaseComponent {
             items: [{ value: 'show', text: 'Show Action Toasts' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, shouldShow)
         });
+
+        this._setupPatterns();
+    }
+
+    _setupPatterns() {
+        const captureBtn = this.element.querySelector('#controls-capture-pattern-button');
+        this.patternsList = this.element.querySelector('#controls-patterns-list');
+
+        this._addDOMListener(captureBtn, 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+            EventBus.dispatch(EVENTS.COMMAND_START_PATTERN_CAPTURE);
+        });
+
+        this._addDOMListener(this.patternsList, 'click', (e) => {
+            const item = e.target.closest('[data-pattern-id]');
+            if (!item) return;
+            const id = item.dataset.patternId;
+            const libraryController = this.appContext.libraryController;
+            if (e.target.closest('[data-action="place-pattern"]')) {
+                libraryController.placeUserPattern(id);
+                EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+            } else if (e.target.closest('[data-action="delete-pattern"]')) {
+                const pattern = libraryController.getUserPatterns().find(p => p.id === id);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+                    title: 'Delete Pattern',
+                    message: `Are you sure you want to permanently delete "${pattern?.name ?? 'this pattern'}"?`,
+                    confirmLabel: 'Delete',
+                    onConfirm: () => {
+                        libraryController.deleteUserPattern(id);
+                        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Deleted "${pattern?.name ?? 'pattern'}".`, type: 'info' });
+                    }
+                });
+            }
+        });
+
+        this._renderPatternsList();
+        this._subscribeToEvent(EVENTS.USER_PATTERNS_CHANGED, this._renderPatternsList);
+    }
+
+    _renderPatternsList() {
+        if (!this.patternsList) return;
+        const patterns = this.appContext.libraryController.getUserPatterns();
+        if (patterns.length === 0) {
+            this.patternsList.innerHTML = `<p class="empty-state-text">No saved patterns yet. Click "Capture Pattern", then drag a box over active cells.</p>`;
+            return;
+        }
+        this.patternsList.innerHTML = patterns.map(p => `
+            <div class="pattern-list-item" data-pattern-id="${p.id}">
+                <span class="pattern-list-name" title="${this._escape(p.name)}">${this._escape(p.name)}</span>
+                <div class="pattern-list-actions">
+                    <button class="button-icon" data-action="place-pattern" title="Place this pattern">${ICONS.target}</button>
+                    <button class="button-icon" data-action="delete-pattern" title="Delete this pattern">${ICONS.trash}</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    _escape(str) {
+        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
     getElement() {
         return this.element;
     }
-} 
+}

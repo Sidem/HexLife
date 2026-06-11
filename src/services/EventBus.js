@@ -239,6 +239,8 @@ export const EVENTS = {
     COMMAND_UPDATE_GHOST_PREVIEW: 'command:updateGhostPreview',
     /** @event Emitted with no payload to clear any active ghost preview. */
     COMMAND_CLEAR_GHOST_PREVIEW: 'command:clearGhostPreview',
+    /** @event Emitted with no payload to enter select-region mode for capturing a pattern from the selected world. */
+    COMMAND_START_PATTERN_CAPTURE: 'command:startPatternCapture',
     /** @event Emitted with no payload to toggle between pan and draw interaction modes. */
     COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
     /** @event Emitted with no payload to trigger the share functionality. */
@@ -305,6 +307,12 @@ export const EVENTS = {
     USER_RULESET_SAVED: 'ui:userRulesetSaved',
     /** @event Fired when the user library is modified (add, delete, update). */
     USER_LIBRARY_CHANGED: 'ui:userLibraryChanged',
+    /** @param {{cells: Array<[number, number]>, name?: string}} data - Command to show the save-pattern modal with captured relative cell coordinates. */
+    COMMAND_SHOW_SAVE_PATTERN_MODAL: 'command:showSavePatternModal',
+    /** @event Fired when the user's saved patterns are modified (add, delete). */
+    USER_PATTERNS_CHANGED: 'ui:userPatternsChanged',
+    /** @param {{pattern: object}} data - Fired when a user pattern is successfully saved. */
+    USER_PATTERN_SAVED: 'ui:userPatternSaved',
     /** @param {{title: string, message: string, onConfirm: function}} data - Command to show a confirmation dialog. */
     COMMAND_SHOW_CONFIRMATION: 'command:showConfirmation',
     /** @param {object} settings - The complete color settings object from the ColorController. */

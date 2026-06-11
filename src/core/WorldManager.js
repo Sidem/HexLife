@@ -719,6 +719,11 @@ export class WorldManager {
 
     getSelectedWorldIndex = () => this.selectedWorldIndex;
 
+    // Returns the selected world's live per-cell binary state buffer (Uint8Array of
+    // NUM_CELLS, 0/1), or null if not yet available. Used by pattern capture to read
+    // which cells are active within a selected region — same view the renderer reads.
+    getSelectedWorldStateArray = () => this.worlds[this.selectedWorldIndex]?.latestStateArray || null;
+
     getCurrentRulesetHex = () => {
         const proxy = this.worlds[this.selectedWorldIndex];
         if (proxy && proxy.isInitialized) {

@@ -1,0 +1,26 @@
+.pattern-preview {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80px;
+    max-height: 160px;
+    padding: 10px;
+    background-color: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+.pattern-preview-svg {
+    max-height: 140px;
+}
+
+.pattern-preview-svg rect {
+    fill: #3cb44b;
+}
+
+.pattern-cell-count {
+    margin: 6px 0 0 0 !important;
+    text-align: center;
+    font-size: 0.85em !important;
+    color: #aaa !important;
+}

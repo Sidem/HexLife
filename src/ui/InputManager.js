@@ -6,6 +6,7 @@ import { textureCoordsToGridCoords, calculateHexSizeForTexture } from '../utils/
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
 import { DrawStrategy } from './inputStrategies/DrawStrategy.js';
 import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js';
+import { SelectRegionStrategy } from './inputStrategies/SelectRegionStrategy.js';
 import { HoverHandler } from './inputStrategies/HoverHandler.js';
 
 /**
@@ -24,6 +25,7 @@ export class InputManager {
             pan: new PanStrategy(this),
             draw: new DrawStrategy(this),
             place: new PlacePatternStrategy(this),
+            select: new SelectRegionStrategy(this),
         };
         this.hoverHandler = new HoverHandler(this);
 
@@ -97,6 +99,7 @@ export class InputManager {
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
+        EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, () => this.setStrategy('select'));
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
     }
 

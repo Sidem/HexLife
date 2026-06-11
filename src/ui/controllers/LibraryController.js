@@ -6,11 +6,13 @@ export class LibraryController {
     constructor() {
         this.libraryData = null;
         this.userLibrary = [];
+        this.userPatterns = [];
     }
 
     init(libraryData) {
         this.libraryData = libraryData;
         this.userLibrary = PersistenceService.loadUserRulesets();
+        this.userPatterns = PersistenceService.loadUserPatterns();
     }
 
     getUserLibrary() {
@@ -33,6 +35,58 @@ export class LibraryController {
         if (!this.libraryData) return;
         const patternData = this.libraryData.patterns.find(p => p.name === patternName);
         if (patternData) {
+            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: patternData.cells });
+        }
+    }
+
+    /**
+     * Returns a copy of the user's personal pattern library.
+     * @returns {Array<{id: string, name: string, cells: Array<[number, number]>, createdAt: string}>}
+     */
+    getUserPatterns() {
+        return [...this.userPatterns];
+    }
+
+    /**
+     * Adds (or updates, if `id` matches) a pattern in the user's personal pattern library.
+     * @param {{name: string, cells: Array<[number, number]>, id?: string}} patternData
+     */
+    saveUserPattern(patternData) {
+        const existingIndex = patternData.id ? this.userPatterns.findIndex(p => p.id === patternData.id) : -1;
+
+        if (existingIndex > -1) {
+            this.userPatterns[existingIndex] = { ...this.userPatterns[existingIndex], ...patternData };
+        } else {
+            const newPattern = {
+                id: String(Date.now()),
+                createdAt: new Date().toISOString(),
+                ...patternData
+            };
+            this.userPatterns.unshift(newPattern);
+        }
+
+        PersistenceService.saveUserPatterns(this.userPatterns);
+        EventBus.dispatch(EVENTS.USER_PATTERNS_CHANGED);
+        EventBus.dispatch(EVENTS.USER_PATTERN_SAVED, { pattern: patternData });
+    }
+
+    /**
+     * Deletes a pattern from the user's personal pattern library.
+     * @param {string} patternId The ID of the pattern to delete.
+     */
+    deleteUserPattern(patternId) {
+        this.userPatterns = this.userPatterns.filter(p => p.id !== patternId);
+        PersistenceService.saveUserPatterns(this.userPatterns);
+        EventBus.dispatch(EVENTS.USER_PATTERNS_CHANGED);
+    }
+
+    /**
+     * Enters placing mode for one of the user's saved patterns.
+     * @param {string} patternId The ID of the pattern to place.
+     */
+    placeUserPattern(patternId) {
+        const patternData = this.userPatterns.find(p => p.id === patternId);
+        if (patternData && Array.isArray(patternData.cells) && patternData.cells.length > 0) {
             EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: patternData.cells });
         }
     }

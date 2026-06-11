@@ -30,6 +30,10 @@
         cursor: crosshair;
     }
 
+    canvas#hexGridCanvas.selecting-region-cursor {
+        cursor: crosshair;
+    }
+
     /* MOBILE LAYOUT OVERRIDE - To be expanded in mobile-first refactoring */
     @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)),
     (max-width: 480px) {
