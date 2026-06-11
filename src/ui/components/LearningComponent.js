@@ -18,6 +18,8 @@ export class LearningComponent extends BaseComponent {
             { id: 'core', name: 'Core Orientation', section: 'Missions' },
             { id: 'appliedEvolution', name: 'Applied Evolution', section: 'Missions' },
             { id: 'personal_library', name: 'Chronicle Your Discoveries', section: 'Missions' },
+            { id: 'evolutionLoop', name: 'The Evolution Loop', section: 'Experiments' },
+            { id: 'sparkOfLife', name: 'The Spark of Life', section: 'Experiments' },
             { id: 'controls', name: 'Simulation Controls', section: 'Tutorials' },
             { id: 'ruleset_actions', name: 'Ruleset Actions', section: 'Tutorials' },
             { id: 'editor', name: 'The Ruleset Editor', section: 'Tutorials' },

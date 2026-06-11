@@ -40,6 +40,18 @@ export const getTours = (appContext) => {
     };
 
     /**
+     * Like focusOrientation, but for the hands-on "Experiments" — clear the chrome,
+     * centre the big viewer on one universe, and let time run so mutations and seeds
+     * are immediately visible. Experiments teach a loop by *doing*, so the sim must
+     * be live rather than frozen. Safe on replays — it just re-centres and resumes.
+     */
+    const startExperiment = () => {
+        resetUIState();
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, Math.floor(appContext.worldManager.worlds.length / 2));
+        EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+    };
+
+    /**
      * Helper to show the correct view for a tour step.
      * @param {{desktop: {type: 'panel'|'popout', name: string}, mobile: {view: string}}} config
      */
@@ -493,8 +505,99 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
+    /**
+     * Guided experiment — the flagship "core loop" of HexLife taught by doing, not
+     * by pointing at chrome. Five short steps: intro → Mutate → Observe & Select →
+     * Repeat → finish. Every working step is anchored on the minimap (where the change
+     * is visible) and advances on the *action's* event (COMMAND_CLONE_AND_MUTATE fires
+     * for both the M shortcut and the mobile Clone & Mutate button; SELECTED_WORLD_CHANGED
+     * for any minimap pick), so it is input-agnostic across desktop and mobile.
+     */
+    const evolutionLoop = [{
+        element: 'body',
+        title: 'Experiment: The Evolution Loop',
+        content: "Every discovery in HexLife comes from one simple loop: <span class=\"onboarding-highlight-text\">Mutate &rarr; Observe &rarr; Select &rarr; Repeat</span>. Let's run it together &mdash; by the end you'll be steering a universe by hand.",
+        primaryAction: { text: 'Start the Loop' },
+        onBeforeShow: startExperiment,
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Step 1: Mutate',
+        content: "Press <span class=\"onboarding-highlight-text\">M</span> to run <b>Clone &amp; Mutate</b>: the selected world's ruleset is copied into all nine worlds, then each copy is nudged by a small random mutation. <br><br>On mobile, tap the <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> quick-action button. Watch the minimap &mdash; all nine worlds change at once.",
+        onBeforeShow: () => { showView({ mobile: { view: 'simulate' } }); },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+    }, {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Step 2: Observe & Select',
+        content: "Each of the nine worlds now runs a slightly different ruleset. Scan them and <span class=\"onboarding-highlight-text\">click the world that looks most alive</span> to you &mdash; the busiest, the most structured, the strangest. That choice is your selection pressure.",
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+    }, {
+        element: '#minimap-guide',
+        highlightType: 'canvas',
+        title: 'Step 3: Repeat',
+        content: "Now press <span class=\"onboarding-highlight-text\">M</span> again. Your chosen world becomes the new parent, and nine fresh mutations of <i>it</i> fill the grid. Do this a few times and you're breeding rulesets &mdash; each generation drifts toward whatever you keep picking.",
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+    }, {
+        element: 'body',
+        title: "That's the Whole Loop",
+        content: "<span class=\"onboarding-highlight-text\">M &rarr; pick &rarr; M &rarr; pick&hellip;</span> Keep going as long as it stays interesting. When you find a ruleset you love, save it with the <span class=\"inline-icon\">" + ICONS.star + "</span> button so it's never lost. Happy hunting, Researcher.",
+        primaryAction: { text: 'Finish Experiment' },
+        advanceOn: { type: 'click' }
+    }];
+
+    /**
+     * Guided experiment — the *other* half of the core loop: state, not rules. The
+     * user clears a world to a blank canvas (done for them in onBeforeShow), seeds it
+     * by hand, then starts time and watches the same ruleset bring their spark to life.
+     * Mirrors the draw-mode handling of the `core` tour (desktop is already in draw
+     * mode; mobile gets a switch-to-draw nudge) and advances on the brush/pause events
+     * so it is input-agnostic.
+     */
+    const sparkOfLife = [{
+        element: 'body',
+        title: 'Experiment: The Spark of Life',
+        content: "Where does a pattern come from? You. In this experiment you'll seed an empty world by hand, then let the rules take over. We've cleared the central world to give you a blank canvas.",
+        primaryAction: { text: 'Begin' },
+        onBeforeShow: () => {
+            resetUIState();
+            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, Math.floor(appContext.worldManager.worlds.length / 2));
+            EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+            EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
+        },
+        advanceOn: { type: 'click' }
+    }, {
+        element: 'body',
+        title: 'Switch to Draw Mode',
+        condition: (appContext) => appContext.uiManager.isMobile(),
+        content: "On mobile you paint cells in draw mode. <span class=\"onboarding-highlight-text\">Tap the hand icon (&#128075;)</span> to switch to draw mode, then continue. <br><br>On desktop you're already in draw mode.",
+        primaryAction: { text: 'Continue' },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#selected-world-guide',
+        highlightType: 'canvas',
+        title: 'Step 1: Seed a Spark',
+        content: "<span class=\"onboarding-highlight-text\">Click and drag (or touch and drag)</span> on the main view to paint living cells onto the blank grid. A small cluster is plenty &mdash; the rules do the rest.",
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+    }, {
+        element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
+        title: 'Step 2: Start Time',
+        content: "Now press <span class=\"onboarding-highlight-text\">P</span> (or the Play button) to start the universal clock and watch your spark evolve under the current ruleset.",
+        condition: (appContext) => appContext.simulationController.getIsPaused(),
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
+    }, {
+        element: 'body',
+        title: 'State + Rules = Behavior',
+        content: "That's the foundation: the cells you drew are the <span class=\"onboarding-highlight-text\">state</span>, and the ruleset decides how that state changes each tick. Try clearing again (<span class=\"onboarding-highlight-text\">C</span>) and seeding a different shape &mdash; the same rules can treat it completely differently.",
+        primaryAction: { text: 'Finish Experiment' },
+        advanceOn: { type: 'click' }
+    }];
+
     return {
         core,
+        evolutionLoop,
+        sparkOfLife,
         controls,
         ruleset_actions,
         editor,
