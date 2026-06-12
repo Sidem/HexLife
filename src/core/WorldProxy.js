@@ -260,9 +260,11 @@ export class WorldProxy {
         this.sendCommand('RESET_WORLD', { initialState, seed });
     }
     // Run an auto-explore evaluation burst on this world's current (ruleset × state). Resolves with
-    // the EVALUATION_RESULT summary. opts: { ticks, sampleEvery, probe: { enabled, flipIndex,
-    // probeTicks } }. A burst already in flight is superseded — its promise resolves with the new
-    // result rather than hanging (the worker only ever emits one result per active burst).
+    // the EVALUATION_RESULT summary. opts: { ticks, sampleEvery, warmupTicks, probe: { enabled,
+    // flipIndex, probeTicks } }. `warmupTicks` (default 0) discards an early transient before metric
+    // accumulation. The result adds `blockEntropy.spatialVariance` and `spatialOrder: {mean, last}`.
+    // A burst already in flight is superseded — its promise resolves with the new result rather than
+    // hanging (the worker only ever emits one result per active burst).
     runEvaluation(opts = {}) {
         return new Promise((resolve) => {
             this._pendingEvaluation = resolve;

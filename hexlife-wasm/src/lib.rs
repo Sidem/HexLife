@@ -290,6 +290,94 @@ impl World {
         }
         entropy / 7.0
     }
+
+    /// Spatial-order join-count statistic over the current state buffer (auto-explore spatial term).
+    ///
+    /// One pass over the flattened `neighbor_indices` table counts the heterogeneous
+    /// (active↔inactive) unique neighbor pairs `J` — each undirected edge is counted once by only
+    /// considering `neighbor_idx > cell_idx`, so the total unique-edge count is `3N` on the wrapped
+    /// hex grid (6 neighbors per cell ÷ 2). With density `p = active/N`, the random-mixing
+    /// expectation is `E[J] = 3N · 2p(1−p)`. Returns `1 − J/E[J]` clamped to [−1, 1]:
+    /// positive ⇒ clustered/domain structure, negative ⇒ anti-clustered (checkerboard-like),
+    /// ≈0 ⇒ well-mixed noise. Returns 0 when `E[J] == 0` (p ∈ {0, 1}: an empty or full grid).
+    /// No allocation — safe to call on the live state without detaching JS views.
+    pub fn spatial_order(&self) -> f64 {
+        if self.num_cells == 0 {
+            return 0.0;
+        }
+        let mut active: u32 = 0;
+        let mut hetero: u32 = 0;
+        for i in 0..self.num_cells {
+            let s_i = self.state[i];
+            if s_i == 1 {
+                active += 1;
+            }
+            let nbase = i * 6;
+            for n_order in 0..6 {
+                let j = self.neighbor_indices[nbase + n_order] as usize;
+                // Count each undirected edge once (only the larger-indexed endpoint).
+                if j > i && self.state[j] != s_i {
+                    hetero += 1;
+                }
+            }
+        }
+        let n = self.num_cells as f64;
+        let p = active as f64 / n;
+        let expected = 3.0 * n * 2.0 * p * (1.0 - p);
+        if expected == 0.0 {
+            return 0.0;
+        }
+        (1.0 - (hetero as f64) / expected).clamp(-1.0, 1.0)
+    }
+
+    /// Block-pattern entropy of the current state as `[mean, variance]` (auto-explore spatial-
+    /// heterogeneity term). `mean` equals {@link World::block_entropy} — the normalized Shannon
+    /// entropy of the 7-cell block-pattern distribution, expressible as the average per-cell
+    /// surprisal `−log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
+    /// near zero when local structure is spatially uniform (every region looks the same) and large
+    /// when the field mixes very-common patterns (ordered regions) with very-rare ones (disordered
+    /// regions). Computed in one pass over the cells to build the 128-bucket histogram, then a
+    /// cheap 128-bucket finalize (`Var = E[s²] − E[s]²`).
+    ///
+    /// NB: returning a `Vec<f64>` allocates in Wasm linear memory; callers holding typed-array
+    /// views over the heap must `refreshSimViews()` afterwards (see the worker notes).
+    pub fn block_entropy_stats(&self) -> Vec<f64> {
+        if self.num_cells == 0 {
+            return vec![0.0, 0.0];
+        }
+
+        let mut counts = [0u32; 128];
+        for i in 0..self.num_cells {
+            let c_state = self.state[i];
+            let mut neighbor_mask: u8 = 0;
+            let nbase = i * 6;
+            for n_order in 0..6 {
+                let neighbor_index = self.neighbor_indices[nbase + n_order] as usize;
+                if self.state[neighbor_index] == 1 {
+                    neighbor_mask |= 1 << n_order;
+                }
+            }
+            let block_pattern = ((c_state << 6) | neighbor_mask) as usize;
+            counts[block_pattern] += 1;
+        }
+
+        let total = self.num_cells as f64;
+        // The mean surprisal equals the Shannon entropy; the variance is E[s²] − mean². Each cell of
+        // pattern k shares the same surprisal s_k = −log2(p_k)/7 (normalized by 7 bits to match
+        // block_entropy's [0,1] scale), so we can finalize over the 128 buckets weighted by p_k.
+        let mut mean = 0.0;
+        let mut mean_sq = 0.0;
+        for &count in counts.iter() {
+            if count > 0 {
+                let p = count as f64 / total;
+                let surprisal = -p.log2() / 7.0;
+                mean += p * surprisal;
+                mean_sq += p * surprisal * surprisal;
+            }
+        }
+        let variance = (mean_sq - mean * mean).max(0.0);
+        vec![mean, variance]
+    }
 }
 
 // Private helpers (kept out of the `#[wasm_bindgen]` block so they aren't exported to JS).
@@ -603,6 +691,127 @@ mod tests {
         }
         assert_eq!(probed.state, plain.state, "probe must not alter the main lane");
         assert_eq!(probed.checksum_state(), plain.checksum_state());
+    }
+
+    #[test]
+    fn spatial_order_matches_manual_join_count() {
+        // Validate the getter against an independent recomputation of the join-count statistic on
+        // a seeded arbitrary state (the "manual count" sanity check).
+        let w = seeded_world(40, 46, 0x5EED);
+        let n = w.num_cells;
+        let mut active = 0u32;
+        let mut hetero = 0u32;
+        for i in 0..n {
+            if w.state[i] == 1 {
+                active += 1;
+            }
+            for k in 0..6 {
+                let j = w.neighbor_indices[i * 6 + k] as usize;
+                if j > i && w.state[j] != w.state[i] {
+                    hetero += 1;
+                }
+            }
+        }
+        let p = active as f64 / n as f64;
+        let expected = 3.0 * n as f64 * 2.0 * p * (1.0 - p);
+        let want = (1.0 - hetero as f64 / expected).clamp(-1.0, 1.0);
+        assert!(
+            (w.spatial_order() - want).abs() < 1e-9,
+            "spatial_order {} != manual {}",
+            w.spatial_order(),
+            want
+        );
+    }
+
+    #[test]
+    fn spatial_order_near_zero_for_random_fill() {
+        // A ~50% random fill is well-mixed: J ≈ E[J], so the statistic sits near 0.
+        let w = seeded_world(60, 70, 0x1234);
+        let v = w.spatial_order();
+        assert!(v.abs() < 0.1, "random fill should be ~0, got {v}");
+    }
+
+    #[test]
+    fn spatial_order_positive_for_solid_block() {
+        // Left half solid, right half empty: heterogeneous edges only along the two column
+        // boundaries, far below the random expectation, so the statistic is strongly positive.
+        let mut w = World::new(40, 46);
+        for i in 0..w.num_cells {
+            w.state[i] = if (i % 40) < 20 { 1 } else { 0 };
+        }
+        let v = w.spatial_order();
+        assert!(v > 0.5, "clustered block should be >0.5, got {v}");
+    }
+
+    #[test]
+    fn spatial_order_negative_for_striped() {
+        // Row-parity stripes are anti-clustered on the triangular adjacency (4 of 6 neighbors flip
+        // parity), giving J > E[J] and a negative statistic. 46 rows wrap cleanly (even).
+        let mut w = World::new(40, 46);
+        for i in 0..w.num_cells {
+            w.state[i] = ((i / 40) % 2) as u8;
+        }
+        let v = w.spatial_order();
+        assert!(v < 0.0, "anti-clustered stripes should be <0, got {v}");
+    }
+
+    #[test]
+    fn spatial_order_zero_for_uniform_grids() {
+        // p ∈ {0, 1} ⇒ E[J] == 0 ⇒ defined as 0.
+        let empty = World::new(40, 46);
+        assert_eq!(empty.spatial_order(), 0.0);
+        let mut full = World::new(40, 46);
+        for c in full.state.iter_mut() {
+            *c = 1;
+        }
+        assert_eq!(full.spatial_order(), 0.0);
+    }
+
+    #[test]
+    fn block_entropy_stats_mean_matches_block_entropy() {
+        let w = seeded_world(48, 56, 0x2468ACE);
+        let stats = w.block_entropy_stats();
+        assert_eq!(stats.len(), 2);
+        assert!(
+            (stats[0] - w.block_entropy()).abs() < 1e-12,
+            "mean {} must equal block_entropy {}",
+            stats[0],
+            w.block_entropy()
+        );
+    }
+
+    #[test]
+    fn block_entropy_stats_variance_zero_for_uniform() {
+        // All-zero and all-one grids each have a single block pattern: surprisal 0 everywhere.
+        let empty = World::new(40, 46);
+        let es = empty.block_entropy_stats();
+        assert_eq!(es[0], 0.0);
+        assert_eq!(es[1], 0.0);
+
+        let mut full = World::new(40, 46);
+        for c in full.state.iter_mut() {
+            *c = 1;
+        }
+        let fs = full.block_entropy_stats();
+        assert_eq!(fs[0], 0.0);
+        assert_eq!(fs[1], 0.0);
+    }
+
+    #[test]
+    fn block_entropy_stats_variance_positive_for_mixed() {
+        // Half uniform (all zero), half random: one very-common pattern plus many rare ones, so the
+        // per-cell surprisal varies across the field and the variance is strictly positive.
+        let mut w = World::new(60, 70);
+        let mut s = 0xC0FFEEu32;
+        for i in 0..w.num_cells {
+            w.state[i] = if (i % 60) < 30 {
+                0
+            } else {
+                (xorshift32(&mut s) & 1) as u8
+            };
+        }
+        let stats = w.block_entropy_stats();
+        assert!(stats[1] > 0.0, "mixed field should have positive variance, got {}", stats[1]);
     }
 
     // Golden checksums for default_ruleset_golden_checksum_regression (48x56 grid, seed 0x2468ACE).

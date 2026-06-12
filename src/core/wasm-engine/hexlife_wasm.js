@@ -30,6 +30,26 @@ export class World {
         return ret;
     }
     /**
+     * Block-pattern entropy of the current state as `[mean, variance]` (auto-explore spatial-
+     * heterogeneity term). `mean` equals {@link World::block_entropy} — the normalized Shannon
+     * entropy of the 7-cell block-pattern distribution, expressible as the average per-cell
+     * surprisal `−log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
+     * near zero when local structure is spatially uniform (every region looks the same) and large
+     * when the field mixes very-common patterns (ordered regions) with very-rare ones (disordered
+     * regions). Computed in one pass over the cells to build the 128-bucket histogram, then a
+     * cheap 128-bucket finalize (`Var = E[s²] − E[s]²`).
+     *
+     * NB: returning a `Vec<f64>` allocates in Wasm linear memory; callers holding typed-array
+     * views over the heap must `refreshSimViews()` afterwards (see the worker notes).
+     * @returns {Float64Array}
+     */
+    block_entropy_stats() {
+        const ret = wasm.world_block_entropy_stats(this.__wbg_ptr);
+        var v1 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+        return v1;
+    }
+    /**
      * Rolling hash of the current state buffer, used for cycle detection.
      * @returns {number}
      */
@@ -129,6 +149,23 @@ export class World {
         return ret >>> 0;
     }
     /**
+     * Spatial-order join-count statistic over the current state buffer (auto-explore spatial term).
+     *
+     * One pass over the flattened `neighbor_indices` table counts the heterogeneous
+     * (active↔inactive) unique neighbor pairs `J` — each undirected edge is counted once by only
+     * considering `neighbor_idx > cell_idx`, so the total unique-edge count is `3N` on the wrapped
+     * hex grid (6 neighbors per cell ÷ 2). With density `p = active/N`, the random-mixing
+     * expectation is `E[J] = 3N · 2p(1−p)`. Returns `1 − J/E[J]` clamped to [−1, 1]:
+     * positive ⇒ clustered/domain structure, negative ⇒ anti-clustered (checkerboard-like),
+     * ≈0 ⇒ well-mixed noise. Returns 0 when `E[J] == 0` (p ∈ {0, 1}: an empty or full grid).
+     * No allocation — safe to call on the live state without detaching JS views.
+     * @returns {number}
+     */
+    spatial_order() {
+        const ret = wasm.world_spatial_order(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
      * one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
      * reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range
@@ -179,6 +216,19 @@ const WorldFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_world_free(ptr, 1));
 
+function getArrayF64FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
+let cachedFloat64ArrayMemory0 = null;
+function getFloat64ArrayMemory0() {
+    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
+        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachedFloat64ArrayMemory0;
+}
+
 function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);
 }
@@ -210,6 +260,7 @@ function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedFloat64ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

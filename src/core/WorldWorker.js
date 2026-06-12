@@ -225,6 +225,18 @@ function calculateHexBlockEntropy() {
     return wasm_world ? wasm_world.block_entropy() : 0;
 }
 
+// Eval-only spatial sample: block-entropy [mean, variance] + join-count spatial order, read from the
+// current state buffer. `block_entropy_stats()` returns a `Vec<f64>` and therefore ALLOCATES in Wasm
+// linear memory — that can grow the heap and detach every typed-array view (state/ruleset/usage), so
+// refresh the views immediately after it and before any further JS-side buffer access. `spatial_order`
+// and `block_entropy` are alloc-free; the mean from stats equals `block_entropy()` by construction.
+function sampleEvalSpatialMetrics() {
+    const be = wasm_world.block_entropy_stats(); // [mean, variance]
+    refreshSimViews(); // block_entropy_stats allocated → views may be detached
+    const spatialOrder = wasm_world.spatial_order();
+    return { beMean: be[0], beVariance: be[1], spatialOrder };
+}
+
 function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
     if (!jsStateArray || !cellIndices || cellIndices.size === 0) return false;
     let changed = false;
@@ -657,6 +669,12 @@ function startEvaluation(opts) {
 
     const ticks = Math.max(1, opts.ticks || 300);
     const sampleEvery = Math.max(1, opts.sampleEvery || 10);
+    // Warmup ticks let an early transient settle before metrics start accumulating (addresses the
+    // long-horizon-blindness finding F2). The burst still runs from tick 0 — cycle detection and the
+    // extinct/saturated flags stay live the whole time — but the changed-count / entropy / spatial
+    // accumulators (and the rule-usage baseline) only engage once `t >= warmupTicks`. Clamped to
+    // leave at least one measured tick.
+    const warmupTicks = Math.min(Math.max(0, opts.warmupTicks || 0), ticks - 1);
     const probeOpts = opts.probe || {};
     const probeEnabled = !!probeOpts.enabled;
     const probeTicks = Math.max(0, probeOpts.probeTicks || 0);
@@ -683,18 +701,26 @@ function startEvaluation(opts) {
     evalState = {
         ticks,
         sampleEvery,
+        warmupTicks,
         probe: { enabled: probeEnabled && probeTicks > 0, flipIndex, probeTicks },
         ticksDone: 0,
         // changed-cell turnover: online accumulators (mean / variance / Fano / CV at the end).
         changedSum: 0,
         changedSumSq: 0,
         changedN: 0,
-        // block-entropy samples (level + variance computed at the end).
+        // block-entropy samples (level + temporal variance computed at the end).
         blockEntropySamples: [],
+        // per-frame across-block surprisal variance (spatial heterogeneity); averaged at the end.
+        spatialVarianceSamples: [],
+        // per-frame join-count spatial-order statistic; mean + last reported at the end.
+        spatialOrderSamples: [],
         // damage-spreading Hamming series over the probe window.
         probeHamming: [],
-        // rule-usage counters at burst start; the delta over the burst is end - start.
+        // rule-usage counters baseline. Snapshotted lazily at END of warmup (counters are monotonic
+        // → burst delta = end − this baseline). Initialized to the start-of-burst snapshot as a
+        // fallback for a burst that ends during warmup (its delta is moot — such bursts are cyclic).
         startRuleUsage: ruleUsageCounters ? ruleUsageCounters.slice() : new Uint32Array(128),
+        ruleUsageSnapped: false,
         lastActiveCount: wasm_world.active_count(),
         cycleDetected: false,
         cyclePeriod: 0,
@@ -712,16 +738,32 @@ function runEvaluationChunk() {
 
     while (evalState.ticksDone < evalState.ticks) {
         const t = evalState.ticksDone; // 0-based index of the tick about to run
+
+        // Snapshot the rule-usage baseline at the END of warmup, BEFORE the first measured tick
+        // runs (counters are monotonic; the burst delta = end − this baseline). warmupTicks=0 ⇒ this
+        // fires before tick 0, matching the pre-warmup behaviour.
+        if (!evalState.ruleUsageSnapped && t >= evalState.warmupTicks) {
+            evalState.startRuleUsage = ruleUsageCounters ? ruleUsageCounters.slice() : new Uint32Array(128);
+            evalState.ruleUsageSnapped = true;
+        }
+
         const activeCount = evalTick();
         evalState.ticksDone++;
         evalState.lastActiveCount = activeCount;
 
-        const changed = wasm_world.last_changed_count();
-        evalState.changedSum += changed;
-        evalState.changedSumSq += changed * changed;
-        evalState.changedN++;
+        // Metric accumulators only engage past the warmup window (cycle detection / kill flags above
+        // stayed live the whole burst).
+        const inWindow = t >= evalState.warmupTicks;
+
+        if (inWindow) {
+            const changed = wasm_world.last_changed_count();
+            evalState.changedSum += changed;
+            evalState.changedSumSq += changed * changed;
+            evalState.changedN++;
+        }
 
         // Damage probe: sample Hamming within the window, then free the probe lane once it closes.
+        // The probe runs from tick 0 (σ fits the early unsaturated regime), independent of warmup.
         if (evalState.probe.enabled && t < evalState.probe.probeTicks) {
             evalState.probeHamming.push(wasm_world.probe_hamming());
             if (t + 1 >= evalState.probe.probeTicks) {
@@ -729,9 +771,12 @@ function runEvaluationChunk() {
             }
         }
 
-        // Block-entropy sampling.
-        if (t % evalState.sampleEvery === 0) {
-            evalState.blockEntropySamples.push(calculateHexBlockEntropy());
+        // Block-entropy + spatial sampling (engine spatial metrics), measurement window only.
+        if (inWindow && (t % evalState.sampleEvery === 0)) {
+            const m = sampleEvalSpatialMetrics();
+            evalState.blockEntropySamples.push(m.beMean);
+            evalState.spatialVarianceSamples.push(m.beVariance);
+            evalState.spatialOrderSamples.push(m.spatialOrder);
         }
 
         // Falling into a cycle is a definitive classification — stop burning ticks.
@@ -778,7 +823,7 @@ function finishEvaluation() {
     const changedFano = changedMean > 0 ? changedVar / changedMean : 0; // variance/mean (susceptibility proxy)
     const changedCV = changedMean > 0 ? changedStd / changedMean : 0;   // coefficient of variation
 
-    // Block-entropy level + variance.
+    // Block-entropy level + temporal variance (across samples).
     let beMean = 0, beVar = 0;
     const beSamples = s.blockEntropySamples;
     if (beSamples.length > 0) {
@@ -786,6 +831,23 @@ function finishEvaluation() {
         beMean /= beSamples.length;
         for (const v of beSamples) beVar += (v - beMean) * (v - beMean);
         beVar /= beSamples.length;
+    }
+
+    // Spatial heterogeneity: mean over samples of the per-frame across-block surprisal variance.
+    let spatialVariance = 0;
+    const svSamples = s.spatialVarianceSamples;
+    if (svSamples.length > 0) {
+        for (const v of svSamples) spatialVariance += v;
+        spatialVariance /= svSamples.length;
+    }
+
+    // Spatial order (join-count): mean over samples + last sampled value.
+    let spatialOrderMean = 0, spatialOrderLast = 0;
+    const soSamples = s.spatialOrderSamples;
+    if (soSamples.length > 0) {
+        for (const v of soSamples) spatialOrderMean += v;
+        spatialOrderMean /= soSamples.length;
+        spatialOrderLast = soSamples[soSamples.length - 1];
     }
 
     const sigma = s.probe.enabled ? estimateSigma(s.probeHamming, numCells) : null;
@@ -814,8 +876,10 @@ function finishEvaluation() {
         blockEntropy: {
             mean: beMean,
             variance: beVar,
+            spatialVariance,
             samples: beSamples,
         },
+        spatialOrder: { mean: spatialOrderMean, last: spatialOrderLast },
         sigma,
         probeHamming: s.probeHamming,
         ruleUsageDelta: ruleUsageDeltaBuffer,

@@ -549,5 +549,45 @@ export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
 export function resizeRenderer() {
     if (!gl || !canvas) return;
     Utils.resizeCanvasToDisplaySize(canvas, gl);
-    _calculateAndCacheLayout(); 
+    _calculateAndCacheLayout();
+}
+
+/**
+ * Capture a world's render-texture FBO as a PNG Blob (full {@link Config.RENDER_TEXTURE_SIZE}²
+ * resolution, independent of the on-screen canvas size or layout). Reading the FBO directly avoids
+ * needing `preserveDrawingBuffer` on the main context and grabs just the one world (not the 3×3
+ * composite). Used by the media-export feature for snapshots of the selected world.
+ * @param {number} worldIndex
+ * @returns {Promise<Blob|null>|null} resolves to the PNG blob, or null if capture is unavailable.
+ */
+export function captureWorldPNG(worldIndex) {
+    if (!gl || worldIndex < 0 || worldIndex >= worldFBOs.length) return null;
+    const fboData = worldFBOs[worldIndex];
+    if (!fboData) return null;
+
+    const size = Config.RENDER_TEXTURE_SIZE;
+    const pixels = new Uint8Array(size * size * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
+    gl.readPixels(0, 0, size, size, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    // WebGL's FBO origin is bottom-left; flip rows into top-left image orientation.
+    const out = document.createElement('canvas');
+    out.width = size;
+    out.height = size;
+    const ctx = out.getContext('2d');
+    const imageData = ctx.createImageData(size, size);
+    const rowBytes = size * 4;
+    for (let y = 0; y < size; y++) {
+        const srcStart = (size - 1 - y) * rowBytes;
+        imageData.data.set(pixels.subarray(srcStart, srcStart + rowBytes), y * rowBytes);
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    return new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+}
+
+/** The live main canvas element (used by the media-export feature for WebM capture). */
+export function getCanvasElement() {
+    return canvas;
 }
