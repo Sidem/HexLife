@@ -5,6 +5,7 @@ import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
+import { ExploreComponent } from './components/ExploreComponent.js';
 import { KeyboardShortcutsComponent } from './components/KeyboardShortcutsComponent.js';
 import { DraggablePanel } from './components/DraggablePanel.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
@@ -22,6 +23,7 @@ export class PanelManager {
             { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, triggerButtonId: 'helpButton', options: { handleSelector: 'h3' } },
             { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, triggerButtonId: 'rulesetActionsButton', options: { handleSelector: 'h3' } },
             { name: 'chromalab', elementId: 'chromaLabPanel', presenter: DraggablePanel, contentType: ChromaLabComponent, triggerButtonId: 'colorPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'explore', elementId: 'explorePanel', presenter: DraggablePanel, contentType: ExploreComponent, triggerButtonId: 'exploreButton', options: { handleSelector: 'h3' } },
             { name: 'shortcuts', elementId: 'shortcutsPanel', presenter: DraggablePanel, contentType: KeyboardShortcutsComponent, triggerButtonId: 'shortcutsButton', options: { handleSelector: 'h3' } }
         ];
     }

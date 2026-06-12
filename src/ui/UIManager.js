@@ -12,6 +12,7 @@ import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
+import { ExploreComponent } from './components/ExploreComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
@@ -57,6 +58,7 @@ export class UIManager {
         worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
+        explore: { constructor: ExploreComponent, title: 'Auto-Explore' },
         learning: { constructor: LearningComponent, title: 'Learning Hub (Alpha)' },
     };
 
@@ -87,6 +89,7 @@ export class UIManager {
             ruleRank: new RuleRankComponent(appContext),
             learning: new LearningComponent(appContext),
             chromaLab: new ChromaLabComponent(appContext),
+            explore: new ExploreComponent(appContext),
             shortcuts: new KeyboardShortcutsComponent(appContext)
         };
 

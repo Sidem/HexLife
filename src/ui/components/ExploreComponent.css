@@ -1,0 +1,240 @@
+.explore-component-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 280px;
+}
+
+.explore-component-content .tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.explore-component-content .tool-group h5 {
+    margin: 0;
+    font-size: 1em;
+    color: var(--accent, #f0c674);
+    border-bottom: 1px solid var(--border-subtle, #444);
+    padding-bottom: 4px;
+}
+
+.explore-blurb {
+    margin: 0;
+    font-size: 0.8em;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+/* --- Status line --- */
+.explore-status {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 0.85em;
+}
+
+.explore-status-state {
+    font-weight: 600;
+    color: var(--text-secondary, #b9b9c2);
+}
+
+.explore-status-state.state-running {
+    color: var(--accent, #f0c674);
+}
+
+.explore-status-state.state-paused {
+    color: #d8b05b;
+}
+
+.explore-status-detail {
+    color: var(--text-muted, #87878f);
+    font-variant-numeric: tabular-nums;
+}
+
+.explore-run-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.explore-run-buttons .button {
+    flex: 1;
+    min-width: 72px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.explore-run-buttons .action-button {
+    background-color: var(--accent-soft, rgba(240, 198, 116, 0.14));
+    border-color: var(--accent-border, rgba(240, 198, 116, 0.5));
+    color: var(--accent, #f0c674);
+}
+
+.explore-run-buttons .button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* --- Settings (dim while running) --- */
+.explore-settings.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.explore-field-label {
+    font-size: 0.85em;
+    color: var(--text-secondary, #b9b9c2);
+}
+
+.explore-ic-checkboxes {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.explore-ic-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85em;
+    text-transform: capitalize;
+    color: var(--text-secondary, #b9b9c2);
+    cursor: pointer;
+}
+
+/* --- Gallery / leaderboard --- */
+.explore-gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle, #444);
+    padding-bottom: 4px;
+}
+
+.explore-gallery-header h5 {
+    margin: 0;
+    border: none;
+    padding: 0;
+    font-size: 1em;
+    color: var(--accent, #f0c674);
+}
+
+.explore-gallery-count {
+    color: var(--text-muted, #87878f);
+    font-weight: 400;
+    font-size: 0.85em;
+}
+
+.explore-gallery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.explore-gallery-list .empty-state-text {
+    margin: 4px 0 0 0;
+    font-size: 0.8em;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+.explore-find {
+    background-color: var(--surface-3, #2a2a2a);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.explore-find-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.explore-find-score {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent, #f0c674);
+    min-width: 2.4em;
+}
+
+.explore-find-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9em;
+}
+
+.explore-find-ic {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #87878f);
+    background-color: var(--surface-1, #1d1d20);
+    border-radius: 4px;
+    padding: 2px 5px;
+    flex-shrink: 0;
+}
+
+/* Debug surface: per-component score bars */
+.explore-find-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.explore-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72em;
+    color: var(--text-muted, #87878f);
+}
+
+.explore-bar-label {
+    min-width: 4.5em;
+    text-align: right;
+}
+
+.explore-bar-track {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--surface-1, #1d1d20);
+    overflow: hidden;
+}
+
+.explore-bar-fill {
+    display: block;
+    height: 100%;
+    background-color: var(--accent-dim, #d8b05b);
+    border-radius: 3px;
+}
+
+.explore-bar-val {
+    min-width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.explore-find-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.explore-find-actions .button-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+}

@@ -25,6 +25,7 @@ export class MoreView extends BaseComponent {
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
         <button class="button" data-action="share">Share Setup</button>
         <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.star} Save Ruleset</button>
+        <button class="button" data-action="explore" title="Auto-Explore" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.compass} Auto-Explore</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
     </div>
@@ -44,6 +45,10 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="share"]'), 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="explore"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'explore' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {

@@ -27,6 +27,7 @@
 @import url('src/ui/components/LearningComponent.css');
 @import url('src/ui/components/RulesetActionsComponent.css');
 @import url('src/ui/components/ChromaLabComponent.css');
+@import url('src/ui/components/ExploreComponent.css');
 @import url('src/ui/components/SaveRulesetModal.css');
 @import url('src/ui/components/SavePatternModal.css');
 @import url('src/ui/components/InitialStateConfigModal.css');

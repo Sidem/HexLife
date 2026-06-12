@@ -59,6 +59,8 @@ export const EXPLORE_CONFIG = {
     mutationRate: 0.06,
     /** Default mutation mode. */
     mutationMode: 'r_sym',
+    /** Labels of the IC-suite conditions to evaluate over (null/empty = the full suite). */
+    icLabels: null,
     /** Crossover children (champion × runner-up) bred per generation once a runner-up exists. */
     crossoverChildren: 3,
     /** Crossover recombination mode (RulesetService.crossoverHexes). */
@@ -102,6 +104,29 @@ export class AutoExploreService {
         return this.archive.getEntries();
     }
 
+    /** Snapshot of the current loop status, for a UI mounting mid-run (no event needed). */
+    getStatus() {
+        return {
+            state: this.state,
+            generation: this.generation,
+            championHex: this.championHex,
+            gallerySize: this.archive.size,
+            options: { ...this.options },
+        };
+    }
+
+    /**
+     * Resolve which IC-suite conditions to evaluate over. Unknown/empty selections fall back to the
+     * full suite so a misconfigured toggle never produces a zero-IC (un-scoreable) run.
+     * @param {string[]|null|undefined} labels
+     * @returns {typeof IC_SUITE}
+     */
+    _resolveICSuite(labels) {
+        if (!labels || labels.length === 0) return IC_SUITE;
+        const filtered = IC_SUITE.filter((ic) => labels.includes(ic.label));
+        return filtered.length > 0 ? filtered : IC_SUITE;
+    }
+
     /**
      * Begin exploration. Snapshots the current worlds, seeds the champion from the selected world's
      * ruleset, enables all worlds for a full 3×3 search, and kicks off the async generation loop.
@@ -120,6 +145,7 @@ export class AutoExploreService {
             return;
         }
         this.championHex = seedHex;
+        this._activeICSuite = this._resolveICSuite(this.options.icLabels);
 
         this._snapshot = this.wm._captureAutoExploreSnapshot();
         // A full-grid search needs every world running, regardless of prior enabled flags.
@@ -218,20 +244,29 @@ export class AutoExploreService {
         // Score every candidate, archive the interesting finds, then rank by novelty-weighted score.
         const ranked = [];
         const finds = [];
+        // Per-world score/kill snapshot for the minimap badges (indexed by world). evaluations[idx]
+        // corresponds to world idx (population.map preserved order), so we can index directly.
+        const perWorldScores = new Array(population.length).fill(null);
 
-        for (const ev of evaluations) {
-            if (!ev || ev.perIC.length === 0) continue;
+        evaluations.forEach((ev, idx) => {
+            if (!ev || ev.perIC.length === 0) return;
             const scored = scoreCandidate(ev.perIC);
             const winMetrics = ev.perIC[scored.winningIC] || {};
             const selectionScore = scored.score * this.archive.noveltyMultiplier(winMetrics, scored.score);
             ranked.push({ ev, scored, winMetrics, selectionScore });
+            const winIC = scored.perIC[scored.winningIC];
+            perWorldScores[idx] = {
+                score: scored.score,
+                killed: winIC ? winIC.killed : false,
+                killReason: winIC ? winIC.killReason : null,
+            };
 
             if (scored.score >= this.options.findThreshold) {
                 const entry = this._makeEntry(ev, scored, winMetrics);
                 const res = this.archive.tryInsert(entry);
                 if (res.added || res.improved) finds.push(entry);
             }
-        }
+        });
 
         if (finds.length > 0) {
             this._persistGallery();
@@ -250,6 +285,8 @@ export class AutoExploreService {
             bestScore: bestScored ? bestScored.scored.score : 0,
             bestHex,
             bestComponents: bestScored ? bestScored.scored.perComponent : null,
+            perWorldScores,
+            selectedWorldIndex: selectedIdx,
         }));
     }
 
@@ -300,10 +337,11 @@ export class AutoExploreService {
     async _evaluateCandidate(worldIndex, hex, token) {
         const proxy = this.wm.worlds[worldIndex];
         if (!proxy) return null;
+        const suite = this._activeICSuite || IC_SUITE;
         const perIC = [];
-        for (let i = 0; i < IC_SUITE.length; i++) {
+        for (let i = 0; i < suite.length; i++) {
             if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
-            const ic = IC_SUITE[i];
+            const ic = suite[i];
             const seed = this._seedFor(worldIndex, i);
             proxy.resetWorld(ic.initialState, seed);
             const result = await proxy.runEvaluation({

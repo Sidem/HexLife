@@ -143,6 +143,7 @@
                 <button id="editRuleButton" class="toolbar-button" title="[E]dit Ruleset Panel" data-tour-id="edit-rule-button">📝</button>
                 <button id="setupPanelButton" class="toolbar-button" title="[S]etup Worlds Panel" data-tour-id="setup-panel-button">🌐</button>
                 <div class="toolbar-separator" role="separator"></div>
+                <button id="exploreButton" class="toolbar-button" title="Auto-Explore (find interesting rulesets)" data-tour-id="explore-button">🧭</button>
                 <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" data-tour-id="analysis-panel-button">📈</button>
                 <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" data-tour-id="rank-panel-button">🏆</button>
                 <div class="toolbar-separator" role="separator"></div>
@@ -244,6 +245,13 @@
             </div>
         </div>
         
+        <div id="explorePanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="explorePanelTitle" data-tour-id="explore-panel">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="explorePanelTitle">Auto-Explore</h3>
+            <div class="panel-content-area">
+            </div>
+        </div>
+
         <div id="chromaLabPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="chromaLabTitle">
             <button class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="chromaLabTitle">Chroma Lab</h3>

@@ -331,7 +331,9 @@ export const EVENTS = {
     COMMAND_STOP_AUTO_EXPLORE: 'command:stopAutoExplore',
     /** @event Emitted with no payload to clear the persisted auto-explore session gallery. */
     COMMAND_CLEAR_AUTO_EXPLORE_GALLERY: 'command:clearAutoExploreGallery',
-    /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null}} data - Auto-explore loop progress (per generation + lifecycle transitions). */
+    /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry}} data - Apply a gallery find to the selected world: set its ruleset and reset with the find's winning IC + seed (reproduces the discovered behavior). Stops the explore loop first if running. */
+    COMMAND_APPLY_EXPLORE_FIND: 'command:applyExploreFind',
+    /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null, perWorldScores?: Array<{score:number, killed:boolean, killReason:string|null}|null>, selectedWorldIndex?: number}} data - Auto-explore loop progress (per generation + lifecycle transitions). */
     EXPLORE_PROGRESS: 'explore:progress',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */
     EXPLORE_FIND_ADDED: 'explore:findAdded',

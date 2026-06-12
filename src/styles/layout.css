@@ -100,3 +100,60 @@
     font-size: 9px;
     border-radius: 7.5px;
 }
+
+/* Per-world interestingness score, shown top-left of each minimap during an auto-explore run. */
+.world-explore-score {
+    position: absolute;
+    min-width: 22px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.65);
+    pointer-events: none;
+    z-index: 52;
+}
+
+.world-explore-score.hidden {
+    display: none;
+}
+
+.world-explore-score.high {
+    background-color: rgba(110, 190, 90, 0.92);
+    color: #0e1a0c;
+    border-color: rgba(180, 240, 160, 0.85);
+}
+
+.world-explore-score.mid {
+    background-color: rgba(230, 190, 70, 0.92);
+    color: #1a1505;
+    border-color: rgba(255, 225, 140, 0.85);
+}
+
+.world-explore-score.low {
+    background-color: rgba(70, 70, 80, 0.85);
+    color: #d2d2da;
+}
+
+.world-explore-score.killed {
+    background-color: rgba(150, 60, 65, 0.9);
+    color: #ffe3e3;
+    border-color: rgba(230, 150, 150, 0.8);
+}
+
+.world-explore-score.mini {
+    height: 13px;
+    min-width: 18px;
+    padding: 0 2px;
+    font-size: 8px;
+    border-radius: 6.5px;
+}

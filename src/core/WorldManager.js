@@ -6,7 +6,7 @@ import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService } from './AutoExploreService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -216,7 +216,38 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_START_AUTO_EXPLORE, (options) => this.autoExploreService.start(options || {}));
         EventBus.subscribe(EVENTS.COMMAND_STOP_AUTO_EXPLORE, (data) => this.autoExploreService.stop(data || {}));
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY, () => this.autoExploreService.clearGallery());
+        EventBus.subscribe(EVENTS.COMMAND_APPLY_EXPLORE_FIND, (data) => this.applyExploreFind(data?.find));
     }
+
+    /**
+     * Apply a gallery find to the selected world so the user can study the discovered behavior:
+     * set the world's ruleset (pushed to history — this is a deliberate adopt, unlike the search's
+     * throwaway candidates) and reset with the find's winning initial condition + deterministic seed,
+     * exactly reproducing the IC the score was won on. Stops any in-flight explore loop first.
+     * @param {import('./analysis/BehaviorArchive.js').ArchiveEntry} find
+     */
+    applyExploreFind = (find) => {
+        if (!find || !find.hex || find.hex === 'Error') return;
+        if (this.autoExploreService?.isRunning()) this.autoExploreService.stop();
+
+        const idx = this.selectedWorldIndex;
+        const settings = this.worldSettings[idx];
+        const proxy = this.worlds[idx];
+        if (!settings || !proxy) return;
+
+        if (find.initialState) settings.initialState = structuredClone(find.initialState);
+        this._commitRuleset(idx, find.hex, {
+            addToHistory: true,
+            reset: true,
+            seed: find.seed,
+        });
+        PersistenceService.saveRuleset(find.hex);
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.RULESET_CHANGED, find.hex);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Applied "${find.mnemonic || rulesetName(find.hex)}" (${find.icLabel || 'IC'}).`, type: 'success' });
+    };
 
     #setupSimulationControlHandlers() {
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, this.setGlobalPause);

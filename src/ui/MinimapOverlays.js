@@ -12,6 +12,10 @@ export class MinimapOverlays extends BaseComponent {
         this.layoutCache = {};
         this.overlayElements = [];
         this.statusBadgeElements = [];
+        this.scoreBadgeElements = [];
+        /** Per-world auto-explore scores (set while a search runs; null otherwise). */
+        this._exploreScores = null;
+        this._exploring = false;
         this.init();
     }
 
@@ -33,6 +37,14 @@ export class MinimapOverlays extends BaseComponent {
             badge.dataset.worldId = i;
             this.mountPoint.appendChild(badge);
             this.statusBadgeElements.push(badge);
+
+            // Per-world interestingness score, shown only during an auto-explore run (top-left so it
+            // never collides with the bottom-anchored status badge or the ruleset overlay).
+            const scoreBadge = document.createElement('div');
+            scoreBadge.className = 'world-explore-score hidden';
+            scoreBadge.dataset.worldId = i;
+            this.mountPoint.appendChild(scoreBadge);
+            this.scoreBadgeElements.push(scoreBadge);
         }
 
         this._subscribeToEvent(EVENTS.LAYOUT_UPDATED, this.handleLayoutUpdate);
@@ -40,6 +52,7 @@ export class MinimapOverlays extends BaseComponent {
         this._subscribeToEvent(EVENTS.RULESET_VISUALIZATION_CHANGED, this.updateOverlays);
         this._subscribeToEvent(EVENTS.ALL_WORLDS_RESET, this.updateOverlays);
         this._subscribeToEvent(EVENTS.UI_MODE_CHANGED, this.handleUIModeChange);
+        this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this.handleExploreProgress);
     }
 
     handleLayoutUpdate(layout) {
@@ -51,6 +64,19 @@ export class MinimapOverlays extends BaseComponent {
         const isMobile = mode === 'mobile';
         this.overlayElements.forEach(overlay => overlay.classList.toggle('mini', isMobile));
         this.statusBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
+        this.scoreBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
+    }
+
+    // Track the live per-world auto-explore scores so the next overlay pass can paint the badges.
+    handleExploreProgress(payload) {
+        const running = payload?.state === 'running' || payload?.state === 'paused';
+        this._exploring = running;
+        if (running && Array.isArray(payload.perWorldScores)) {
+            this._exploreScores = payload.perWorldScores;
+        } else if (!running) {
+            this._exploreScores = null;
+        }
+        this.updateOverlays();
     }
 
     updateOverlays() {
@@ -93,6 +119,28 @@ export class MinimapOverlays extends BaseComponent {
             } else if (badgeEl) {
                 badgeEl.classList.add('hidden');
                 badgeEl.dataset.badgeSig = '';
+            }
+
+
+            const scoreEl = this.scoreBadgeElements[i];
+            const scoreInfo = (this._exploring && this._exploreScores) ? this._exploreScores[i] : null;
+            if (scoreEl && scoreInfo) {
+                const mini = this.overlayElements[i]?.classList.contains('mini') ? ' mini' : '';
+                if (scoreInfo.killed) {
+                    scoreEl.className = `world-explore-score killed${mini}`;
+                    scoreEl.textContent = '✕';
+                    scoreEl.title = `Killed: ${scoreInfo.killReason || 'degenerate'}`;
+                } else {
+                    const s = scoreInfo.score || 0;
+                    const tier = s >= 0.6 ? 'high' : (s >= 0.4 ? 'mid' : 'low');
+                    scoreEl.className = `world-explore-score ${tier}${mini}`;
+                    scoreEl.textContent = s.toFixed(2);
+                    scoreEl.title = `Interestingness ${s.toFixed(3)}`;
+                }
+                scoreEl.style.left = `${miniX + miniMapSpacing}px`;
+                scoreEl.style.top = `${miniY + miniMapSpacing}px`;
+            } else if (scoreEl) {
+                scoreEl.className = 'world-explore-score hidden';
             }
 
 
