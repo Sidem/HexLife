@@ -14,6 +14,7 @@ import {
     axialToOffset,
     translatePatternCells,
     patternToHexSVG,
+    hammingDistanceHex,
 } from '../src/utils/utils.js';
 
 describe('ruleset hex <-> array round-trip', () => {
@@ -48,6 +49,30 @@ describe('ruleset hex <-> array round-trip', () => {
     it('rulesetToHex rejects wrong-length input', () => {
         expect(rulesetToHex(new Uint8Array(127))).toBe('Error');
         expect(rulesetToHex(null)).toBe('Error');
+    });
+
+    describe('hammingDistanceHex', () => {
+        const ZERO = '0'.repeat(32);
+        it('is 0 for identical hexes', () => {
+            expect(hammingDistanceHex(ZERO, ZERO)).toBe(0);
+            expect(hammingDistanceHex('12482080480080006880800180010117', '12482080480080006880800180010117')).toBe(0);
+        });
+        it('counts a single differing bit as 1', () => {
+            expect(hammingDistanceHex(ZERO, '0'.repeat(31) + '1')).toBe(1); // last nibble 0000 -> 0001
+        });
+        it('is 128 for a full bit-inversion', () => {
+            expect(hammingDistanceHex(ZERO, 'F'.repeat(32))).toBe(128);
+        });
+        it('counts bits within a nibble (case-insensitive)', () => {
+            expect(hammingDistanceHex(ZERO, '0'.repeat(31) + 'f')).toBe(4); // 0000 -> 1111
+            expect(hammingDistanceHex(ZERO, '0'.repeat(30) + '3F')).toBe(6); // 2 + 4 bits
+        });
+        it('returns Infinity for invalid / mismatched-length / non-string input', () => {
+            expect(hammingDistanceHex(ZERO, 'tooshort')).toBe(Infinity);
+            expect(hammingDistanceHex(ZERO, 'G'.repeat(32))).toBe(Infinity); // non-hex char
+            expect(hammingDistanceHex(ZERO, null)).toBe(Infinity);
+            expect(hammingDistanceHex(42, ZERO)).toBe(Infinity);
+        });
     });
 
     it('hexToRuleset returns a zeroed array for malformed hex', () => {

@@ -265,7 +265,8 @@ export class AutoExploreService {
             // The score that drives selection + the gallery: the confirmed final score when a
             // confirmation ran (so the period-84 screen-trap can't become champion), else the screen.
             const baseScore = confirmed ? confirmed.finalScore : screenScore;
-            const selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore);
+            // Pass the candidate hex so the incumbent champion isn't penalized against itself (F3).
+            const selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex);
             ranked.push({ r, scored, winMetrics, selectionScore, baseScore });
 
             const winIC = scored.perIC[scored.winningIC];

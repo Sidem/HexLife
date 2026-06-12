@@ -1,5 +1,7 @@
 // @ts-check
 
+import { hammingDistanceHex } from '../../utils/utils.js';
+
 /**
  * Phase 4 of the auto-explore roadmap: a MAP-Elites-lite behavior archive that doubles as the
  * session gallery. Candidates are placed into a coarse grid of behavior *cells* keyed by a
@@ -65,6 +67,13 @@ export const ARCHIVE_CONFIG = {
      * is never penalized). < 1 penalizes re-finding; 1 would disable novelty pressure.
      */
     occupiedNoveltyMultiplier: 0.6,
+    /**
+     * Family-dedupe radius (F5): two rulesets within this bit-Hamming distance are considered the
+     * same family. On insert, a candidate within this distance of an existing entry must out-score
+     * it to be kept (and then it *replaces* that sibling); otherwise it's rejected. Stops near-
+     * identical hex siblings filling adjacent behavior cells.
+     */
+    familyMinHamming: 6,
 };
 
 /**
@@ -127,19 +136,51 @@ export class BehaviorArchive {
     }
 
     /**
-     * Attempt to insert an entry. Keeps the best per cell.
-     * @param {ArchiveEntry} entry - Must carry `score` and (winning-IC) `metrics`.
-     * @returns {{added: boolean, improved: boolean, cellKey: string, displaced: ArchiveEntry|null}}
+     * Find the best-scoring existing entry within `familyMinHamming` bits of `hex` (its "family"),
+     * or null. O(entries) scan — fine at ≤200 entries.
+     * @param {string} hex
+     * @returns {{key: string, entry: ArchiveEntry}|null}
+     */
+    _bestFamilyMember(hex) {
+        const radius = this.config.familyMinHamming;
+        if (!(radius > 0) || typeof hex !== 'string') return null;
+        let best = null;
+        for (const [key, entry] of this.cells) {
+            if (hammingDistanceHex(hex, entry.hex) < radius && (!best || entry.score > best.entry.score)) {
+                best = { key, entry };
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Attempt to insert an entry. Keeps the best per cell, and (F5) at most one entry per *family*
+     * of near-identical hex siblings.
+     * @param {ArchiveEntry} entry - Must carry `score`, `hex`, and (winning-IC) `metrics`.
+     * @returns {{added: boolean, improved: boolean, cellKey: string, displaced: ArchiveEntry|null, rejectedBy?: string}}
      *   `added` true when a new cell was filled; `improved` true when an occupied cell's incumbent
-     *   was beaten and replaced; both false when the entry was rejected (occupied, not better).
+     *   was beaten and replaced; both false when the entry was rejected (occupied/family, not better).
+     *   `rejectedBy: 'family'` marks a family-dedupe rejection.
      */
     tryInsert(entry) {
         const { cellKey } = descriptorFor(entry.metrics || {}, this.config);
         const stored = { ...entry, cellKey };
+
+        // Family dedupe runs BEFORE the cell logic: a near-identical sibling must out-score the best
+        // existing family member to be kept; if it does, that sibling's cell is vacated first so the
+        // family never occupies two cells at once.
+        const family = this._bestFamilyMember(entry.hex);
+        if (family) {
+            if (entry.score <= family.entry.score) {
+                return { added: false, improved: false, cellKey, displaced: null, rejectedBy: 'family' };
+            }
+            this.cells.delete(family.key);
+        }
+
         const existing = this.cells.get(cellKey);
         if (!existing) {
             this.cells.set(cellKey, stored);
-            return { added: true, improved: false, cellKey, displaced: null };
+            return { added: true, improved: false, cellKey, displaced: family ? family.entry : null };
         }
         if (entry.score > existing.score) {
             this.cells.set(cellKey, stored);
@@ -150,26 +191,34 @@ export class BehaviorArchive {
 
     /**
      * Whether the behavior cell for these metrics is already occupied by an equal-or-better entry.
+     * Self-exemption (F3): if the incumbent IS this candidate (same `hex`), it does not count as
+     * occupying the cell — a champion is never penalized against its own archived entry (else the
+     * incumbent eats the novelty penalty its noisy re-score can't beat, causing champion churn).
      * @param {BehaviorMetrics} metrics
      * @param {number} score
+     * @param {string} [hex] - The candidate's hex; an incumbent with this same hex is exempt.
      * @returns {boolean}
      */
-    isOccupiedBetter(metrics, score) {
+    isOccupiedBetter(metrics, score, hex) {
         const { cellKey } = descriptorFor(metrics, this.config);
         const existing = this.cells.get(cellKey);
-        return !!existing && existing.score >= score;
+        if (!existing || existing.score < score) return false;
+        if (hex != null && existing.hex === hex) return false; // the incumbent is this candidate itself
+        return true;
     }
 
     /**
      * Novelty multiplier for champion selection: 1 for a candidate that would fill or improve its
-     * cell, {@link ARCHIVE_CONFIG.occupiedNoveltyMultiplier} for one already covered by a better
-     * incumbent. Multiply a candidate's raw score by this to get its selection score.
+     * cell (or is the cell's own incumbent), {@link ARCHIVE_CONFIG.occupiedNoveltyMultiplier} for
+     * one already covered by a *different* better incumbent. Multiply a candidate's raw score by
+     * this to get its selection score.
      * @param {BehaviorMetrics} metrics
      * @param {number} score
+     * @param {string} [hex] - The candidate's hex (for self-exemption, F3).
      * @returns {number}
      */
-    noveltyMultiplier(metrics, score) {
-        return this.isOccupiedBetter(metrics, score) ? this.config.occupiedNoveltyMultiplier : 1;
+    noveltyMultiplier(metrics, score, hex) {
+        return this.isOccupiedBetter(metrics, score, hex) ? this.config.occupiedNoveltyMultiplier : 1;
     }
 
     /** @returns {number} Number of occupied behavior cells. */

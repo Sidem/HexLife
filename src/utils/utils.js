@@ -424,6 +424,30 @@ export function hexToRuleset(hexString) {
     return ruleset;
 }
 
+/** Per-nibble popcount table (0..15 → number of set bits), for hammingDistanceHex. */
+const NIBBLE_POPCOUNT = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+
+/**
+ * Bit-level Hamming distance between two 32-char ruleset hex strings (0..128). Each of the 32 hex
+ * nibbles is XOR'd and its set bits counted via {@link NIBBLE_POPCOUNT}. Used by the behavior
+ * archive's family dedupe to reject near-identical hex siblings. Invalid input or a length mismatch
+ * returns `Infinity` (so callers treat it as "not in the same family").
+ * @param {string} hexA
+ * @param {string} hexB
+ * @returns {number} Bit distance in [0,128], or Infinity if either input is not a 32-char hex string.
+ */
+export function hammingDistanceHex(hexA, hexB) {
+    if (typeof hexA !== 'string' || typeof hexB !== 'string') return Infinity;
+    if (hexA.length !== 32 || hexB.length !== 32) return Infinity;
+    if (!/^[0-9a-fA-F]{32}$/.test(hexA) || !/^[0-9a-fA-F]{32}$/.test(hexB)) return Infinity;
+    let dist = 0;
+    for (let i = 0; i < 32; i++) {
+        const xor = parseInt(hexA[i], 16) ^ parseInt(hexB[i], 16);
+        dist += NIBBLE_POPCOUNT[xor];
+    }
+    return dist;
+}
+
 /**
  * Mutates a 32-character hex ruleset string by flipping a specified number of random rule bits.
  * @param {string} hexString The 32-character hex string.

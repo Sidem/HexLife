@@ -4,6 +4,7 @@ import {
     descriptorFor,
     BehaviorArchive,
 } from '../src/core/analysis/BehaviorArchive.js';
+import { hammingDistanceHex } from '../src/utils/utils.js';
 
 // Helper: build a BehaviorMetrics-shaped object.
 function metrics(finalRatio, blockEntropyMean, sigma) {
@@ -108,6 +109,64 @@ describe('BehaviorArchive novelty pressure', () => {
         a.tryInsert(entry('weak', 0.4, m));
         // A stronger candidate in the same cell should still be considered novel (it'll improve the cell).
         expect(a.noveltyMultiplier(m, 0.9)).toBe(1);
+    });
+});
+
+describe('BehaviorArchive novelty self-exemption (F3)', () => {
+    const H1 = '00000000000000000000000000000000';
+    const H2 = 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
+    it('does NOT penalize a candidate against its own archived entry (same hex)', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0);
+        a.tryInsert(entry(H1, 0.7, m));
+        // Same hex, noisier lower re-score: the incumbent IS this candidate → no penalty.
+        expect(a.noveltyMultiplier(m, 0.5, H1)).toBe(1);
+    });
+    it('still penalizes a DIFFERENT hex landing in the same occupied-better cell', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0);
+        a.tryInsert(entry(H1, 0.7, m));
+        expect(a.noveltyMultiplier(m, 0.5, H2)).toBe(ARCHIVE_CONFIG.occupiedNoveltyMultiplier);
+    });
+    it('without a hex argument keeps the legacy (always-penalize) behavior', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0);
+        a.tryInsert(entry(H1, 0.7, m));
+        expect(a.noveltyMultiplier(m, 0.5)).toBe(ARCHIVE_CONFIG.occupiedNoveltyMultiplier);
+    });
+});
+
+describe('BehaviorArchive family dedupe (F5)', () => {
+    const BASE = '0000000000000000000000000000000F'; // last nibble 1111
+    const SIB = '00000000000000000000000000000007'; // 0111 → 1 bit from BASE (< familyMinHamming 6)
+    const FAR = '00000000000000000000000000000030'; // BASE^FAR over last two nibbles = 0x3,0xF → 6 bits
+
+    it('rejects a near-identical sibling that does not out-score the family incumbent', () => {
+        const a = new BehaviorArchive();
+        a.tryInsert(entry(BASE, 0.7, metrics(0.3, 0.4, 1.0)));
+        const res = a.tryInsert(entry(SIB, 0.5, metrics(0.8, 0.6, 0.3))); // different cell, same family
+        expect(res.rejectedBy).toBe('family');
+        expect(res.added).toBe(false);
+        expect(a.size).toBe(1);
+        expect(a.getEntries()[0].hex).toBe(BASE);
+    });
+
+    it('a better sibling REPLACES the incumbent: old cell vacated, new entry in its own cell', () => {
+        const a = new BehaviorArchive();
+        a.tryInsert(entry(BASE, 0.5, metrics(0.3, 0.4, 1.0))); // cell A
+        const res = a.tryInsert(entry(SIB, 0.8, metrics(0.8, 0.6, 0.3))); // family, higher, cell B
+        expect(res.added).toBe(true);
+        expect(a.size).toBe(1); // family stays a single entry
+        expect(a.getEntries()[0].hex).toBe(SIB);
+    });
+
+    it('does NOT dedupe a candidate exactly at the family threshold distance', () => {
+        const a = new BehaviorArchive();
+        expect(hammingDistanceHex(BASE, FAR)).toBe(ARCHIVE_CONFIG.familyMinHamming); // == 6, not < 6
+        a.tryInsert(entry(BASE, 0.5, metrics(0.1, 0.2, 1.0)));
+        const res = a.tryInsert(entry(FAR, 0.5, metrics(0.8, 0.6, 0.3))); // distinct cell, not a family
+        expect(res.added).toBe(true);
+        expect(a.size).toBe(2);
     });
 });
 
