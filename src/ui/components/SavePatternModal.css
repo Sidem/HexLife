@@ -14,8 +14,10 @@
     max-height: 140px;
 }
 
-.pattern-preview-svg rect {
+.pattern-preview-svg polygon {
     fill: #3cb44b;
+    stroke: #1e1e1e;
+    stroke-width: 0.5;
 }
 
 .pattern-cell-count {

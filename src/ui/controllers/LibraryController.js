@@ -7,12 +7,56 @@ export class LibraryController {
         this.libraryData = null;
         this.userLibrary = [];
         this.userPatterns = [];
+        // In-memory pattern clipboard for the Ctrl+C / Ctrl+V copy-paste workflow.
+        // {cells: Array<[number, number]>, originParity: number} | null
+        this.patternClipboard = null;
     }
 
     init(libraryData) {
         this.libraryData = libraryData;
         this.userLibrary = PersistenceService.loadUserRulesets();
         this.userPatterns = PersistenceService.loadUserPatterns();
+
+        EventBus.subscribe(EVENTS.COMMAND_COPY_PATTERN, () => {
+            EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+            EventBus.dispatch(EVENTS.COMMAND_START_PATTERN_CAPTURE, { mode: 'copy' });
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SET_PATTERN_CLIPBOARD, (data) => this.setPatternClipboard(data));
+        EventBus.subscribe(EVENTS.COMMAND_PASTE_PATTERN, () => this.pasteClipboardPattern());
+    }
+
+    /**
+     * Stores a captured pattern on the clipboard and notifies the user.
+     * @param {{cells: Array<[number, number]>, originParity?: number}} data
+     */
+    setPatternClipboard(data) {
+        if (!data || !Array.isArray(data.cells) || data.cells.length === 0) return;
+        this.patternClipboard = { cells: data.cells, originParity: data.originParity ?? 0 };
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: `Copied ${data.cells.length} cells — Ctrl+V to paste.`,
+            type: 'success'
+        });
+    }
+
+    /** @returns {{cells: Array<[number, number]>, originParity: number}|null} */
+    getPatternClipboard() {
+        return this.patternClipboard;
+    }
+
+    /** Enters placing mode with the clipboard pattern, if any. */
+    pasteClipboardPattern() {
+        if (!this.patternClipboard) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: 'Nothing copied yet — Ctrl+C, then drag a box over active cells.',
+                type: 'info'
+            });
+            return;
+        }
+        EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+        EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, {
+            cells: this.patternClipboard.cells,
+            originParity: this.patternClipboard.originParity
+        });
     }
 
     getUserLibrary() {
@@ -35,7 +79,10 @@ export class LibraryController {
         if (!this.libraryData) return;
         const patternData = this.libraryData.patterns.find(p => p.name === patternName);
         if (patternData) {
-            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: patternData.cells });
+            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, {
+                cells: patternData.cells,
+                originParity: patternData.originParity ?? 0
+            });
         }
     }
 
@@ -87,7 +134,12 @@ export class LibraryController {
     placeUserPattern(patternId) {
         const patternData = this.userPatterns.find(p => p.id === patternId);
         if (patternData && Array.isArray(patternData.cells) && patternData.cells.length > 0) {
-            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, { cells: patternData.cells });
+            // Make this the active clipboard pattern so Ctrl+V repeats the placement.
+            this.patternClipboard = { cells: patternData.cells, originParity: patternData.originParity ?? 0 };
+            EventBus.dispatch(EVENTS.COMMAND_ENTER_PLACING_MODE, {
+                cells: patternData.cells,
+                originParity: patternData.originParity ?? 0
+            });
         }
     }
 

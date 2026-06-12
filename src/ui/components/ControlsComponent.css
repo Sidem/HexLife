@@ -19,12 +19,42 @@
     padding: 0 4px;
 }
 
+.pattern-buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.pattern-buttons .button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
 #controls-capture-pattern-button {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     margin-top: 6px;
+}
+
+.pattern-hotkey-hint {
+    margin: 6px 0 0 0;
+    font-size: 0.75em;
+    color: #999;
+    text-align: center;
+}
+
+.pattern-hotkey-hint kbd {
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.9em;
+    color: #ddd;
 }
 
 .patterns-list {
@@ -52,6 +82,28 @@
     background-color: #2a2a2a;
     border: 1px solid #444;
     border-radius: 4px;
+}
+
+.pattern-list-thumb {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 2px;
+}
+
+.pattern-thumb-svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.pattern-thumb-svg polygon {
+    fill: #3cb44b;
 }
 
 .pattern-list-name {

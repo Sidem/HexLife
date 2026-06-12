@@ -92,6 +92,14 @@ export class KeyboardShortcutManager {
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared selected world' });
             }},
 
+            // Patterns
+            { key: 'c', ctrlKey: true, skipWhenTextSelected: true, description: 'Copy a region of cells as a pattern', category: 'Patterns', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_COPY_PATTERN);
+            }},
+            { key: 'v', ctrlKey: true, description: 'Paste the copied pattern', category: 'Patterns', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_PASTE_PATTERN);
+            }},
+
             // History
             { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() });
@@ -136,15 +144,19 @@ export class KeyboardShortcutManager {
         }
 
         const pressedKey = event.key.toLowerCase();
-        
+
         const shortcut = this.shortcuts.find(s => {
             const keyMatch = s.key.toLowerCase() === pressedKey;
             const shiftMatch = (s.shiftKey || false) === event.shiftKey;
-            const ctrlMatch = (s.ctrlKey || false) === (event.ctrlKey || event.metaKey); 
+            const ctrlMatch = (s.ctrlKey || false) === (event.ctrlKey || event.metaKey);
             return keyMatch && shiftMatch && ctrlMatch;
         });
 
         if (shortcut) {
+            // Don't hijack Ctrl+C when the user is copying selected page text.
+            if (shortcut.skipWhenTextSelected && this._hasTextSelection()) {
+                return;
+            }
             event.preventDefault();
             shortcut.handler();
         }
@@ -184,6 +196,15 @@ export class KeyboardShortcutManager {
         );
 
         return isFocusable(activeEl) || isFocusable(targetEl);
+    }
+
+    /**
+     * @returns {boolean} True when the user has a non-empty text selection on the page.
+     * @private
+     */
+    _hasTextSelection() {
+        const sel = typeof window !== 'undefined' && window.getSelection ? window.getSelection() : null;
+        return !!sel && sel.toString().length > 0;
     }
     
 

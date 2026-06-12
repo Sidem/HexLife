@@ -3,6 +3,7 @@ import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { ICONS } from '../icons.js';
+import { patternToHexSVG } from '../../utils/utils.js';
 
 export class ControlsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -37,9 +38,18 @@ export class ControlsComponent extends BaseComponent {
             </div>
             <div class="tool-group">
                 <h5>Patterns</h5>
-                <button class="button" id="controls-capture-pattern-button">
-                    <span class="inline-icon">${ICONS.crop}</span> Capture Pattern
+                <div class="pattern-buttons">
+                    <button class="button" id="controls-copy-pattern-button" title="Copy a region of cells to the clipboard (Ctrl+C)">
+                        <span class="inline-icon">${ICONS.copy ?? ICONS.crop}</span> Copy Region
+                    </button>
+                    <button class="button" id="controls-paste-pattern-button" title="Paste the copied pattern (Ctrl+V)">
+                        <span class="inline-icon">${ICONS.target}</span> Paste
+                    </button>
+                </div>
+                <button class="button" id="controls-capture-pattern-button" title="Capture a region and save it to your library">
+                    <span class="inline-icon">${ICONS.crop}</span> Capture &amp; Save…
                 </button>
+                <p class="pattern-hotkey-hint"><kbd>Ctrl</kbd>+<kbd>C</kbd> copy region · <kbd>Ctrl</kbd>+<kbd>V</kbd> paste</p>
                 <div id="controls-patterns-list" class="patterns-list"></div>
             </div>
         `;
@@ -124,11 +134,21 @@ export class ControlsComponent extends BaseComponent {
 
     _setupPatterns() {
         const captureBtn = this.element.querySelector('#controls-capture-pattern-button');
+        const copyBtn = this.element.querySelector('#controls-copy-pattern-button');
+        const pasteBtn = this.element.querySelector('#controls-paste-pattern-button');
         this.patternsList = this.element.querySelector('#controls-patterns-list');
 
         this._addDOMListener(captureBtn, 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-            EventBus.dispatch(EVENTS.COMMAND_START_PATTERN_CAPTURE);
+            EventBus.dispatch(EVENTS.COMMAND_START_PATTERN_CAPTURE, { mode: 'save' });
+        });
+
+        this._addDOMListener(copyBtn, 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_COPY_PATTERN);
+        });
+
+        this._addDOMListener(pasteBtn, 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_PASTE_PATTERN);
         });
 
         this._addDOMListener(this.patternsList, 'click', (e) => {
@@ -166,6 +186,7 @@ export class ControlsComponent extends BaseComponent {
         }
         this.patternsList.innerHTML = patterns.map(p => `
             <div class="pattern-list-item" data-pattern-id="${p.id}">
+                <span class="pattern-list-thumb">${this._renderThumb(p)}</span>
                 <span class="pattern-list-name" title="${this._escape(p.name)}">${this._escape(p.name)}</span>
                 <div class="pattern-list-actions">
                     <button class="button-icon" data-action="place-pattern" title="Place this pattern">${ICONS.target}</button>
@@ -173,6 +194,13 @@ export class ControlsComponent extends BaseComponent {
                 </div>
             </div>
         `).join('');
+    }
+
+    /** Renders a small hexagon thumbnail for a saved pattern. */
+    _renderThumb(pattern) {
+        const cells = Array.isArray(pattern.cells) ? pattern.cells : [];
+        if (cells.length === 0) return '';
+        return patternToHexSVG(cells, { originParity: pattern.originParity ?? 0, size: 4, className: 'pattern-thumb-svg' });
     }
 
     _escape(str) {

@@ -1,5 +1,6 @@
 import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { patternToHexSVG } from '../../utils/utils.js';
 
 export class SavePatternModal extends BaseComponent {
     constructor(mountPoint, appContext) {
@@ -78,28 +79,17 @@ export class SavePatternModal extends BaseComponent {
             ...this.patternData,
             name
         });
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Pattern '${name}' saved!`, type: 'success' });
+        // Make the just-saved pattern the active clipboard entry so Ctrl+V pastes it.
+        this.appContext.libraryController.patternClipboard = {
+            cells: Array.isArray(this.patternData.cells) ? this.patternData.cells : [],
+            originParity: this.patternData.originParity ?? 0
+        };
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Pattern '${name}' saved! Ctrl+V to place it.`, type: 'success' });
         this.hide();
     }
 
-    /** Renders captured relative cells as a small SVG dot-grid preview. */
+    /** Renders captured relative cells as a small flat-top hexagon preview. */
     _renderPreview(cells) {
-        if (cells.length === 0) return '';
-        let maxX = 0;
-        let maxY = 0;
-        for (const [x, y] of cells) {
-            if (x > maxX) maxX = x;
-            if (y > maxY) maxY = y;
-        }
-        const cols = maxX + 1;
-        const rows = maxY + 1;
-        const cell = 8;
-        const gap = 1;
-        const width = cols * (cell + gap) + gap;
-        const height = rows * (cell + gap) + gap;
-        const rects = cells.map(([x, y]) =>
-            `<rect x="${gap + x * (cell + gap)}" y="${gap + y * (cell + gap)}" width="${cell}" height="${cell}" rx="1.5" />`
-        ).join('');
-        return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" class="pattern-preview-svg">${rects}</svg>`;
+        return patternToHexSVG(cells, { originParity: this.patternData.originParity ?? 0, size: 8 });
     }
 }

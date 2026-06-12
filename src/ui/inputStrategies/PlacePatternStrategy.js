@@ -1,6 +1,7 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
+import { translatePatternCells } from '../../utils/utils.js';
 
 /**
  * @class PlacePatternStrategy
@@ -10,20 +11,23 @@ export class PlacePatternStrategy extends BaseInputStrategy {
     constructor(manager) {
         super(manager);
         this.patternToPlace = null;
+        this.originParity = 0;
     }
 
     enter(options) {
         if (!options || !options.cells) {
             console.error("PlacePatternStrategy: No cell data provided.");
-            this.manager.setStrategy('pan'); 
+            this.manager.setStrategy('pan');
             return;
         }
         this.patternToPlace = options.cells;
+        this.originParity = options.originParity ?? 0;
         this.manager.canvas.classList.add('placing-pattern-cursor');
     }
 
     exit() {
         this.patternToPlace = null;
+        this.originParity = 0;
         this.manager.canvas.classList.remove('placing-pattern-cursor');
         EventBus.dispatch(EVENTS.COMMAND_CLEAR_GHOST_PREVIEW);
     }
@@ -61,12 +65,10 @@ export class PlacePatternStrategy extends BaseInputStrategy {
         if (!this.patternToPlace) return new Set();
 
         const indices = new Set();
-        for (const [dx, dy] of this.patternToPlace) {
-            const newCol = anchorCol + dx;
-            const newRow = anchorRow + dy;
+        const placed = translatePatternCells(this.patternToPlace, anchorCol, anchorRow, this.originParity);
+        for (const [newCol, newRow] of placed) {
             if (newCol >= 0 && newCol < Config.GRID_COLS && newRow >= 0 && newRow < Config.GRID_ROWS) {
-                const index = newRow * Config.GRID_COLS + newCol;
-                indices.add(index);
+                indices.add(newRow * Config.GRID_COLS + newCol);
             }
         }
         return indices;

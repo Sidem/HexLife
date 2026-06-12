@@ -10,6 +10,10 @@ import {
     cellsToBase64,
     base64ToCells,
     rulesetName,
+    offsetToAxial,
+    axialToOffset,
+    translatePatternCells,
+    patternToHexSVG,
 } from '../src/utils/utils.js';
 
 describe('ruleset hex <-> array round-trip', () => {
@@ -225,5 +229,91 @@ describe('rulesetName (human-friendly ruleset identity)', () => {
         }
         // Expect a healthy spread of distinct names from 200 inputs.
         expect(seen.size).toBeGreaterThan(100);
+    });
+});
+
+describe('hex offset ⇄ axial coordinate conversion', () => {
+    it('round-trips offset → axial → offset across the grid (incl. negatives)', () => {
+        for (let col = -5; col <= 10; col++) {
+            for (let row = -5; row <= 10; row++) {
+                const { q, r } = offsetToAxial(col, row);
+                const back = axialToOffset(q, r);
+                expect(back).toEqual({ col, row });
+            }
+        }
+    });
+
+    it('matches the staggered layout: odd columns sit half a row lower', () => {
+        // Pixel row position from axial coords is (r + q/2); the stagger lives in q/2.
+        const pixelRow = (col, row) => {
+            const { q, r } = offsetToAxial(col, row);
+            return r + q / 2;
+        };
+        // An odd column at the same offset-row is half a row below its even neighbour.
+        expect(pixelRow(3, 3) - pixelRow(2, 3)).toBeCloseTo(0.5);
+        expect(pixelRow(2, 3)).toBeCloseTo(3);
+    });
+});
+
+describe('translatePatternCells (phase-preserving paste)', () => {
+    // Canonical SE neighbour deltas straight from the engine's neighbor tables.
+    const SE_EVEN = [1, 0];  // NEIGHBOR_DIRS_EVEN_R slot 4
+    const SE_ODD = [1, 1];   // NEIGHBOR_DIRS_ODD_R slot 4
+
+    it('maps the origin cell onto the anchor', () => {
+        expect(translatePatternCells([[0, 0]], 7, 4, 0)).toEqual([[7, 4]]);
+        expect(translatePatternCells([[0, 0]], 8, 5, 1)).toEqual([[8, 5]]);
+    });
+
+    it('preserves the SE relationship regardless of anchor column parity', () => {
+        // Captured pattern: origin (even) + its SE neighbour, stored as offsets.
+        const pattern = [[0, 0], [1, 0]];
+
+        // Paste onto an EVEN anchor → second cell is the even-column SE neighbour.
+        const onEven = translatePatternCells(pattern, 4, 4, 0);
+        expect(onEven[0]).toEqual([4, 4]);
+        expect(onEven[1]).toEqual([4 + SE_EVEN[0], 4 + SE_EVEN[1]]);
+
+        // Paste onto an ODD anchor → second cell is the odd-column SE neighbour.
+        // Naive anchor+delta would wrongly produce the NE neighbour here.
+        const onOdd = translatePatternCells(pattern, 5, 5, 0);
+        expect(onOdd[0]).toEqual([5, 5]);
+        expect(onOdd[1]).toEqual([5 + SE_ODD[0], 5 + SE_ODD[1]]);
+    });
+
+    it('keeps the axial delta between cells invariant across all anchors', () => {
+        const pattern = [[0, 0], [2, 1], [1, 2]];
+        const captured = pattern.map(([dx, dy]) => offsetToAxial(dx, dy));
+        const baseDelta = captured.map(c => ({ dq: c.q - captured[0].q, dr: c.r - captured[0].r }));
+
+        for (const [ac, ar] of [[3, 3], [4, 3], [10, 8], [11, 9]]) {
+            const placed = translatePatternCells(pattern, ac, ar, 0);
+            const placedAxial = placed.map(([c, r]) => offsetToAxial(c, r));
+            for (let i = 0; i < placed.length; i++) {
+                expect(placedAxial[i].q - placedAxial[0].q).toBe(baseDelta[i].dq);
+                expect(placedAxial[i].r - placedAxial[0].r).toBe(baseDelta[i].dr);
+            }
+        }
+    });
+
+    it('respects a captured odd origin parity', () => {
+        // Same offsets, but captured against an ODD origin column → different shape.
+        const pattern = [[0, 0], [1, 0]];
+        const fromEven = translatePatternCells(pattern, 6, 6, 0);
+        const fromOdd = translatePatternCells(pattern, 6, 6, 1);
+        expect(fromEven[1]).not.toEqual(fromOdd[1]);
+    });
+});
+
+describe('patternToHexSVG', () => {
+    it('returns empty string for no cells', () => {
+        expect(patternToHexSVG([])).toBe('');
+        expect(patternToHexSVG(null)).toBe('');
+    });
+
+    it('emits one polygon per cell', () => {
+        const svg = patternToHexSVG([[0, 0], [1, 0], [0, 1]]);
+        expect(svg.startsWith('<svg')).toBe(true);
+        expect((svg.match(/<polygon/g) || []).length).toBe(3);
     });
 });

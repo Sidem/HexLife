@@ -13,14 +13,18 @@ export class SelectRegionStrategy extends BaseInputStrategy {
         super(manager);
         this.isSelecting = false;
         this.startCoords = null; // { col, row }
+        this.mode = 'save'; // 'save' → open save modal; 'copy' → set the clipboard
     }
 
-    enter() {
+    enter(options) {
         this.isSelecting = false;
         this.startCoords = null;
+        this.mode = (options && options.mode) || 'save';
         this.manager.canvas.classList.add('selecting-region-cursor');
         EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-            message: 'Drag a box over the active cells to capture them as a pattern. Esc to cancel.',
+            message: this.mode === 'copy'
+                ? 'Drag a box over active cells to copy them. Ctrl+V to paste. Esc to cancel.'
+                : 'Drag a box over the active cells to capture them as a pattern. Esc to cancel.',
             type: 'info'
         });
     }
@@ -108,7 +112,7 @@ export class SelectRegionStrategy extends BaseInputStrategy {
             }
         }
 
-        const cells = this._captureActiveCells(start.col, start.row, endCol, endRow);
+        const { cells, originParity } = this._captureActiveCells(start.col, start.row, endCol, endRow);
         if (cells.length === 0) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
                 message: 'No active cells in selection — nothing to capture.',
@@ -118,7 +122,11 @@ export class SelectRegionStrategy extends BaseInputStrategy {
             return;
         }
 
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, { cells });
+        if (this.mode === 'copy') {
+            EventBus.dispatch(EVENTS.COMMAND_SET_PATTERN_CLIPBOARD, { cells, originParity });
+        } else {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, { cells, originParity });
+        }
         this.manager.setStrategy(this.manager.previousStrategyName || 'pan');
     }
 
@@ -140,12 +148,14 @@ export class SelectRegionStrategy extends BaseInputStrategy {
 
     /**
      * Reads the selected world's state buffer and returns the active cells within
-     * the rectangle, normalized to relative coordinates anchored at (0, 0).
-     * @returns {Array<[number, number]>}
+     * the rectangle, normalized to relative coordinates anchored at the bounding
+     * box's top-left. `originParity` records the parity of the origin column so the
+     * pattern's column-stagger phase can be reproduced on paste.
+     * @returns {{cells: Array<[number, number]>, originParity: number}}
      */
     _captureActiveCells(c1, r1, c2, r2) {
         const stateArray = this.manager.worldManager.getSelectedWorldStateArray();
-        if (!stateArray) return [];
+        if (!stateArray) return { cells: [], originParity: 0 };
         const { minCol, maxCol, minRow, maxRow } = this._bounds(c1, r1, c2, r2);
 
         const active = [];
@@ -160,7 +170,11 @@ export class SelectRegionStrategy extends BaseInputStrategy {
                 }
             }
         }
-        return active.map(([col, row]) => [col - originCol, row - originRow]);
+        if (active.length === 0) return { cells: [], originParity: 0 };
+        return {
+            cells: active.map(([col, row]) => [col - originCol, row - originRow]),
+            originParity: originCol & 1,
+        };
     }
 
     _bounds(c1, r1, c2, r2) {

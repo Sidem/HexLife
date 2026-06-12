@@ -99,7 +99,7 @@ export class InputManager {
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
-        EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, () => this.setStrategy('select'));
+        EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => this.setStrategy('select', data));
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
     }
 

@@ -237,14 +237,20 @@ export const EVENTS = {
     COMMAND_RESET_INITIAL_STATES_TO_DEFAULT: 'command:resetInitialStatesToDefault',
     /** @param {{panelName: string, shouldShow: boolean}} data - Command to show or hide a specific popout panel. */
     COMMAND_SHOW_POPOUT: 'command:showPopout',
-    /** @param {{cells: Array<[number, number]>}} data - The pattern data (relative cell coordinates) for placing mode. */
+    /** @param {{cells: Array<[number, number]>, originParity?: number}} data - The pattern data (relative cell coordinates) for placing mode; `originParity` preserves the hex column-stagger phase. */
     COMMAND_ENTER_PLACING_MODE: 'command:enterPlacingMode',
     /** @param {{indices: Set<number>}} data - The set of cell indices to show as a ghost preview. */
     COMMAND_UPDATE_GHOST_PREVIEW: 'command:updateGhostPreview',
     /** @event Emitted with no payload to clear any active ghost preview. */
     COMMAND_CLEAR_GHOST_PREVIEW: 'command:clearGhostPreview',
-    /** @event Emitted with no payload to enter select-region mode for capturing a pattern from the selected world. */
+    /** @param {{mode?: 'save'|'copy'}} [data] - Enter select-region mode to capture a pattern from the selected world. `mode` 'save' (default) opens the save modal; 'copy' sets the pattern clipboard. */
     COMMAND_START_PATTERN_CAPTURE: 'command:startPatternCapture',
+    /** @event Emitted with no payload to start a copy-region capture (clipboard). */
+    COMMAND_COPY_PATTERN: 'command:copyPattern',
+    /** @event Emitted with no payload to paste the pattern clipboard into placing mode. */
+    COMMAND_PASTE_PATTERN: 'command:pastePattern',
+    /** @param {{cells: Array<[number, number]>, originParity?: number}} data - Stores a captured pattern on the in-memory clipboard for pasting. */
+    COMMAND_SET_PATTERN_CLIPBOARD: 'command:setPatternClipboard',
     /** @event Emitted with no payload to toggle between pan and draw interaction modes. */
     COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
     /** @event Emitted with no payload to trigger the share functionality. */
@@ -311,7 +317,7 @@ export const EVENTS = {
     USER_RULESET_SAVED: 'ui:userRulesetSaved',
     /** @event Fired when the user library is modified (add, delete, update). */
     USER_LIBRARY_CHANGED: 'ui:userLibraryChanged',
-    /** @param {{cells: Array<[number, number]>, name?: string}} data - Command to show the save-pattern modal with captured relative cell coordinates. */
+    /** @param {{cells: Array<[number, number]>, originParity?: number, name?: string}} data - Command to show the save-pattern modal with captured relative cell coordinates. */
     COMMAND_SHOW_SAVE_PATTERN_MODAL: 'command:showSavePatternModal',
     /** @event Fired when the user's saved patterns are modified (add, delete). */
     USER_PATTERNS_CHANGED: 'ui:userPatternsChanged',

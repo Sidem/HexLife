@@ -75,6 +75,119 @@ export function gridToPixelCoords(col, row, hexSize, startX = 0, startY = 0) {
     return { x, y };
 }
 
+// ── Hex offset ⇄ axial coordinates ────────────────────────────────────────────
+// The grid is a flat-top, odd-q offset layout: odd columns are shifted DOWN by
+// half a row (see `gridToPixelCoords`). Offset coordinates are NOT translation-
+// invariant on a staggered hex grid — moving a pattern by an odd number of columns
+// flips its vertical phase. Axial coordinates ARE translation-invariant, so we
+// convert through them whenever a pattern must be moved across the grid.
+
+/**
+ * Converts odd-q offset coordinates to axial coordinates.
+ * @param {number} col
+ * @param {number} row
+ * @returns {{q: number, r: number}}
+ */
+export function offsetToAxial(col, row) {
+    const q = col;
+    const r = row - ((col - (col & 1)) >> 1);
+    return { q, r };
+}
+
+/**
+ * Converts axial coordinates back to odd-q offset coordinates.
+ * @param {number} q
+ * @param {number} r
+ * @returns {{col: number, row: number}}
+ */
+export function axialToOffset(q, r) {
+    const col = q;
+    const row = r + ((q - (q & 1)) >> 1);
+    return { col, row };
+}
+
+/**
+ * Translates a captured pattern to absolute grid coordinates anchored at
+ * (anchorCol, anchorRow) while preserving the hex grid's column-stagger phase.
+ *
+ * A pattern's relative `[dx, dy]` cells were authored against an origin column of
+ * parity `originParity`. Naive `anchor + delta` translation breaks the pattern
+ * whenever the anchor column's parity differs from the origin's, because odd and
+ * even columns sit at different vertical phases. Converting through axial space and
+ * back reproduces the exact captured shape at any anchor.
+ *
+ * @param {Array<[number, number]>} cells Relative offset cells `[dx, dy]`.
+ * @param {number} anchorCol Destination anchor column.
+ * @param {number} anchorRow Destination anchor row.
+ * @param {number} [originParity=0] Parity (0=even, 1=odd) of the capture origin column.
+ * @returns {Array<[number, number]>} Absolute `[col, row]` pairs (unclamped).
+ */
+export function translatePatternCells(cells, anchorCol, anchorRow, originParity = 0) {
+    const originCol = originParity & 1; // a reference column of the captured parity
+    const origin = offsetToAxial(originCol, 0);
+    const anchor = offsetToAxial(anchorCol, anchorRow);
+    const dq = anchor.q - origin.q;
+    const dr = anchor.r - origin.r;
+    const out = [];
+    for (const [dx, dy] of cells) {
+        const a = offsetToAxial(originCol + dx, dy);
+        const { col, row } = axialToOffset(a.q + dq, a.r + dr);
+        out.push([col, row]);
+    }
+    return out;
+}
+
+/**
+ * Renders a captured pattern as a standalone SVG of flat-top hexagons laid out on
+ * the staggered grid (odd columns dropped half a row), so previews match how the
+ * pattern actually tiles. Pure — returns markup, touches no DOM.
+ *
+ * @param {Array<[number, number]>} cells Relative offset cells `[dx, dy]`.
+ * @param {object} [options]
+ * @param {number} [options.originParity=0] Parity of the capture origin column.
+ * @param {number} [options.size=6] Hex radius (centre→vertex) in SVG units.
+ * @param {string} [options.className='pattern-preview-svg'] Root `<svg>` class.
+ * @returns {string} SVG markup (empty string when there are no cells).
+ */
+export function patternToHexSVG(cells, options = {}) {
+    if (!Array.isArray(cells) || cells.length === 0) return '';
+    const { originParity = 0, size = 6, className = 'pattern-preview-svg' } = options;
+    const sqrt3 = Math.sqrt(3);
+    const horiz = 1.5 * size;       // column spacing
+    const vert = sqrt3 * size;      // row spacing
+
+    // Six flat-top vertices relative to a centre.
+    const corners = [];
+    for (let i = 0; i < 6; i++) {
+        const ang = (Math.PI / 180) * (60 * i);
+        corners.push([Math.cos(ang) * size, Math.sin(ang) * size]);
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const polys = cells.map(([dx, dy]) => {
+        const parity = (originParity + dx) & 1;
+        const cx = dx * horiz;
+        const cy = dy * vert + (parity ? vert / 2 : 0);
+        const pts = corners.map(([ox, oy]) => {
+            const x = cx + ox;
+            const y = cy + oy;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+        }).join(' ');
+        return `<polygon points="${pts}" />`;
+    }).join('');
+
+    const pad = size * 0.4;
+    const vbX = (minX - pad).toFixed(2);
+    const vbY = (minY - pad).toFixed(2);
+    const vbW = (maxX - minX + pad * 2).toFixed(2);
+    const vbH = (maxY - minY + pad * 2).toFixed(2);
+    return `<svg viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" class="${className}">${polys}</svg>`;
+}
+
 /**
  * Checks if a point (pixel coordinates) is inside a flat-top hexagon.
  * @param {number} pointX Pixel X of the point.

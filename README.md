@@ -4,9 +4,18 @@
 
 HexLife Explorer is an interactive, high-performance web-based cellular automaton simulator that operates on a hexagonal grid. It allows users to discover and explore complex emergent behaviors by defining custom rulesets. The simulation leverages WebGL2 for efficient rendering and employs Web Workers to run multiple, concurrent "worlds," each with its own unique state and rules. The core simulation logic is written in Rust and compiled to WebAssembly (Wasm) for maximum performance.
 
+## Highlights
+
+  * 🧭 **Auto-Explore** — an automated evolutionary search that hunts for "interesting" rulesets across a suite of initial conditions, scores them on spatial structure / entropy / criticality, and banks the best finds in a persistent, visual gallery.
+  * 🔬 **Nine concurrent worlds** running independent Rust/Wasm simulations in parallel Web Workers, composed with one instanced WebGL2 draw call per world.
+  * ✂️ **Hex-aware pattern capture & copy/paste** — marquee-select live cells and stamp them back anywhere; placement preserves the grid's column-stagger phase so patterns never distort (`Ctrl`+`C` / `Ctrl`+`V`).
+  * 🧪 **Guided experiments & onboarding tours** in the Learning Hub teach the core loops hands-on.
+  * 🔗 **Shareable everything** — rulesets are 32-char hex strings with human-friendly mnemonic names; full setups encode into a single share link.
+  * ⚡ **Engineered for performance** — bit-packed state buffers, transfer-back buffer pools, dirty-flag-gated rendering, and a zero-GPU-work idle path.
+
 ## Core Concepts
 
-  * **Hexagonal Grid:** The simulation takes place on a "flat-top, odd-r" hexagonal grid where each cell has six direct neighbors. The grid wraps toroidally, connecting opposite edges.
+  * **Hexagonal Grid:** The simulation takes place on a flat-top hexagonal grid where each cell has six direct neighbors and **consecutive columns are staggered by half a hex** (odd columns dropped half a row). The grid wraps toroidally, connecting opposite edges. Because offset coordinates are not translation-invariant on a staggered grid, pattern placement converts through axial coordinates to preserve a captured shape's phase.
   * **Cellular Automata:** Each cell exists in one of two states: active (alive) or inactive (dead). A cell's state in the next generation (tick) is determined by its current state and the states of its six neighbors, according to a 128-bit ruleset.
   * **Rulesets:** The automaton's behavior is defined by a ruleset of 128 rules. Each rule corresponds to a unique local configuration (the center cell's state and its 6 neighbors, 2^7 = 128 possibilities). The ruleset is represented as a 32-character hexadecimal string that can be easily shared and modified.
 
@@ -57,8 +66,21 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
       * **Save/Load (💾/📂):** Save the complete state of the selected world (cell states, ruleset, and tick count) to a JSON file. Load a previously saved state to continue a simulation.
       * **Share Link (🔗):** Generate a unique URL that encodes the current setup (rulesets, densities, selected world, camera position) to share with others.
   * **Reset/Clear (🔄):** Reset worlds to their initial random density or clear them completely to an active or inactive state.
+  * **Patterns (✂️):** Capture a region of live cells and reuse it elsewhere.
+      * **Copy region (`Ctrl`+`C`):** Drag a marquee over active cells to copy them to an in-memory clipboard.
+      * **Paste (`Ctrl`+`V`):** Stamp the copied pattern under the cursor. Placement is **hex-phase-aware** — the captured shape is reproduced exactly at any anchor, regardless of column parity, by translating through axial coordinates.
+      * **Capture & Save:** Name a captured region and store it in your personal pattern library (persisted to `localStorage`). Saved patterns show a true-to-grid hexagon thumbnail and can be re-placed at any time.
 
-### 4\. Advanced Draggable Panels
+### 4\. Auto-Explore (🧭)
+
+An automated, evolutionary search for interesting rulesets.
+
+  * **Two-stage evaluation:** every candidate is first screened with short Wasm evaluation bursts across a suite of initial conditions (chaos / sparse / seed), then promising finds are confirmed with a longer burst to filter out transients and label long-period cyclers.
+  * **Interestingness score:** a pure, tunable objective combining σ≈1 criticality, mid-band block entropy, spatial-structure and heterogeneity terms, rule-usage diversity, and activity fluctuation — with hard kills for extinct / saturated / frozen / short-cycle behaviors.
+  * **Generation loop:** champion + mutated and crossover-bred offspring evolve over generations with deterministic per-(generation, world, IC) seeding, while a MAP-Elites-style **behavior archive** keeps a diverse gallery of the best finds.
+  * **Gallery:** banked finds persist across sessions and can be applied, saved, shared, or bred further. Per-world score badges surface the search live on the minimaps.
+
+### 5\. Advanced Draggable Panels
 
   * **Ruleset Editor (📝):** A powerful interface for viewing and modifying rulesets with multiple modes.
       * **Modes:** View and edit rules individually (**Detailed**), grouped by neighbor count (**Neighbor Count**), or grouped by rotational symmetry (**Rotational Symmetry**), which is the default.
@@ -69,7 +91,7 @@ HexLife Explorer is built on a modern, decoupled architecture designed for perfo
       * **Entropy Plot:** Visualizes the history of **Binary Entropy** (based on activity ratio) or **Block Entropy** (based on 7-cell hexagonal patterns). Includes controls to enable/disable entropy sampling and adjust the sampling rate.
   * **Rule Rank Panel (🏆):** Provides a real-time ranking of which rules are being used most frequently. It features a dual-column layout to separately rank rules that cause cells to become **active** versus those that cause them to become **inactive**, offering deep insight into the automaton's dynamics.
 
-### 5\. Keyboard Shortcuts
+### 6\. Keyboard Shortcuts
 
 A rich set of keyboard shortcuts enhances usability for power users.
 
@@ -99,6 +121,10 @@ A rich set of keyboard shortcuts enhances usability for power users.
 | `Shift`+`C` | **Clear** the selected world only | |
 | `D` | **Reset Densities** to default & Reset All | |
 | `Shift`+`D` | **Apply Selected Density to All** & Reset All | |
+| | | |
+| **Patterns** | | |
+| `Ctrl`+`C` | **Copy** a region of cells as a pattern | Drag a marquee to capture. Ignored while page text is selected. |
+| `Ctrl`+`V` | **Paste** the copied pattern | Phase-preserving placement under the cursor. |
 | | | |
 | **History** | | |
 | `Ctrl`+`Z` | **Undo** ruleset change | For the selected world. |
