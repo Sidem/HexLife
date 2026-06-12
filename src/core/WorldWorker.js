@@ -888,6 +888,11 @@ function finishEvaluation() {
         cycle: { detected: s.cycleDetected, period: s.cyclePeriod },
     };
 
+    // Flush the burst's FINAL frame to the main thread before the result resolves, so the renderer
+    // can draw the world's end-of-eval state (the auto-explore thumbnail capture point, v2.6). The
+    // mid-burst grid sends are throttled, so without this the very last frame may never be rendered.
+    sendGridUpdate();
+
     isEvaluating = false;
     evalState = null;
     self.postMessage(result, [ruleUsageDeltaBuffer]);

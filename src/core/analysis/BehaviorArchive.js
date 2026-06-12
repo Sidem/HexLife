@@ -35,7 +35,10 @@ import { hammingDistanceHex } from '../../utils/utils.js';
  * @typedef {object} ArchiveEntry
  * @property {string} hex                 32-char ruleset hex.
  * @property {string} [mnemonic]          Human-friendly ruleset name (rulesetName(hex)).
- * @property {number} score               Aggregated interestingness ([0,1]).
+ * @property {number} score               Aggregated interestingness ([0,1]) — the confirmed score in v2.
+ * @property {number} [screenScore]       The cheap screening score before confirmation (v2.4).
+ * @property {number|null} [cyclic]       Detected cycle period if this is a (penalized) cycler (v2.4).
+ * @property {string|null} [thumb]        Data-URL thumbnail of the find's final frame (v2.6).
  * @property {object} [perComponent]      Winning-IC component breakdown (criticality/entropyBand/…).
  * @property {number} [winningIC]         Index of the winning IC in the suite.
  * @property {string} [icLabel]           Label of the winning IC (e.g. 'chaos'|'sparse'|'seed').

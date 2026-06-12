@@ -246,7 +246,24 @@ export function loadExploreGallery() {
 }
 
 export function saveExploreGallery(entries) {
-    _setItem(KEYS.EXPLORE_GALLERY, entries);
+    try {
+        localStorage.setItem(KEYS.EXPLORE_GALLERY, JSON.stringify(entries));
+    } catch (e) {
+        // Thumbnails (v2.6) are the only large field; if the write overflows the quota, retry once
+        // with every `thumb` stripped so the gallery data itself is never lost to a full store.
+        if (e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) {
+            console.warn('saveExploreGallery: quota exceeded, retrying without thumbnails.');
+            try {
+                const stripped = (entries || []).map(({ thumb: _thumb, ...rest }) => rest);
+                localStorage.setItem(KEYS.EXPLORE_GALLERY, JSON.stringify(stripped));
+                return;
+            } catch (e2) {
+                console.error('saveExploreGallery: still failing after stripping thumbnails:', e2);
+                return;
+            }
+        }
+        console.error('Error saving explore gallery to localStorage:', e);
+    }
 }
 
 export function loadColorSettings() {

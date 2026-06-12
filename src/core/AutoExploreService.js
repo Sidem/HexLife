@@ -85,9 +85,16 @@ const EXPLORE_STATE = Object.freeze({ IDLE: 'idle', RUNNING: 'running', PAUSED: 
 export class AutoExploreService {
     /**
      * @param {object} worldManager - The owning WorldManager (proxies + ruleset service + helpers).
+     * @param {object} [opts]
+     * @param {((worldIndex: number) => Promise<string|null>)|null} [opts.thumbnailProvider]
+     *   Async capture of a world's current render as a small data-URL thumbnail (DI so the service
+     *   stays renderer-free, principle 5). null in unit tests / when no renderer is available.
      */
-    constructor(worldManager) {
+    constructor(worldManager, { thumbnailProvider = null } = {}) {
         this.wm = worldManager;
+        this.thumbnailProvider = thumbnailProvider;
+        /** Per-find thumbnail capture deadline (ms) so the search never stalls on a slow capture. */
+        this.thumbnailTimeoutMs = 300;
         this.state = EXPLORE_STATE.IDLE;
         this.generation = 0;
         this.championHex = null;
@@ -280,7 +287,7 @@ export class AutoExploreService {
             // Bank only candidates that survived a confirmation burst (rejected-at-confirm are dropped).
             // A cycle-penalized find is still banked — it's a legitimate, honestly-tagged category.
             if (confirmed && !confirmed.rejected) {
-                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore);
+                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb);
                 const res = this.archive.tryInsert(entry);
                 if (res.added || res.improved) finds.push(entry);
             }
@@ -347,7 +354,32 @@ export class AutoExploreService {
                 confirmCyclePenalty: this.options.confirmCyclePenalty,
             });
         }
-        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed };
+
+        // Capture a thumbnail of the just-confirmed world NOW — it still holds the confirmation
+        // burst's final frame, and the next generation hasn't reset it yet (v2.6, F6). Time-boxed so
+        // a slow capture never stalls the search.
+        let thumb = null;
+        if (confirmed && !confirmed.rejected && this.thumbnailProvider) {
+            thumb = await this._captureThumbnail(worldIndex);
+            if (token !== this._runToken) return null;
+        }
+        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed, thumb };
+    }
+
+    /**
+     * Race the injected thumbnail provider against a short timeout so the loop never blocks on capture.
+     * @param {number} worldIndex
+     * @returns {Promise<string|null>}
+     */
+    async _captureThumbnail(worldIndex) {
+        try {
+            return await Promise.race([
+                Promise.resolve(this.thumbnailProvider(worldIndex)),
+                new Promise((resolve) => setTimeout(() => resolve(null), this.thumbnailTimeoutMs)),
+            ]);
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -430,15 +462,17 @@ export class AutoExploreService {
      * @param {object} winMetrics
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
+     * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
      * @returns {import('./analysis/BehaviorArchive.js').ArchiveEntry}
      */
-    _makeEntry(ev, scored, winMetrics, confirmed, screenScore) {
+    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null) {
         return {
             hex: ev.hex,
             mnemonic: rulesetName(ev.hex),
             score: confirmed.finalScore,
             screenScore,
             cyclic: confirmed.cyclic,
+            thumb: thumb || null,
             perComponent: scored.perComponent,
             winningIC: scored.winningIC,
             icLabel: winMetrics.icLabel,

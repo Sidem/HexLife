@@ -561,6 +561,40 @@ export function resizeRenderer() {
  * @returns {Promise<Blob|null>|null} resolves to the PNG blob, or null if capture is unavailable.
  */
 export function captureWorldPNG(worldIndex) {
+    const out = _captureWorldToCanvas(worldIndex);
+    if (!out) return null;
+    return new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+}
+
+/**
+ * Capture a world's render-texture FBO and downscale it to a small square thumbnail data URL.
+ * Used by the auto-explore gallery (visual previews of finds, roadmap F6). Returns a JPEG data URL
+ * (~2–4 KB at 96px/0.5), or null if capture is unavailable. Synchronous — no Blob/decoder round-trip.
+ * @param {number} worldIndex
+ * @param {number} [size=96] Output square edge in px.
+ * @param {number} [quality=0.5] JPEG quality in [0,1].
+ * @returns {string|null}
+ */
+export function captureWorldThumbnail(worldIndex, size = 96, quality = 0.5) {
+    const full = _captureWorldToCanvas(worldIndex);
+    if (!full) return null;
+    const thumb = document.createElement('canvas');
+    thumb.width = size;
+    thumb.height = size;
+    const ctx = thumb.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(full, 0, 0, size, size);
+    return thumb.toDataURL('image/jpeg', quality);
+}
+
+/**
+ * Read a world's FBO into a full-resolution top-left-oriented 2D canvas (the shared capture path for
+ * PNG export and thumbnails). Reading the FBO directly avoids needing `preserveDrawingBuffer` on the
+ * main context and grabs just the one world (not the 3×3 composite).
+ * @param {number} worldIndex
+ * @returns {HTMLCanvasElement|null}
+ */
+function _captureWorldToCanvas(worldIndex) {
     if (!gl || worldIndex < 0 || worldIndex >= worldFBOs.length) return null;
     const fboData = worldFBOs[worldIndex];
     if (!fboData) return null;
@@ -576,6 +610,7 @@ export function captureWorldPNG(worldIndex) {
     out.width = size;
     out.height = size;
     const ctx = out.getContext('2d');
+    if (!ctx) return null;
     const imageData = ctx.createImageData(size, size);
     const rowBytes = size * 4;
     for (let y = 0; y < size; y++) {
@@ -583,8 +618,7 @@ export function captureWorldPNG(worldIndex) {
         imageData.data.set(pixels.subarray(srcStart, srcStart + rowBytes), y * rowBytes);
     }
     ctx.putImageData(imageData, 0, 0);
-
-    return new Promise((resolve) => out.toBlob(resolve, 'image/png'));
+    return out;
 }
 
 /** The live main canvas element (used by the media-export feature for WebM capture). */
