@@ -1,7 +1,7 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { hexToRuleset, rulesetName } from '../utils/utils.js';
-import { scoreCandidate } from './analysis/InterestingnessScore.js';
+import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from './analysis/InterestingnessScore.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 
 /**
@@ -49,8 +49,17 @@ export const IC_SUITE = [
 
 /** Tunable knobs for the explore loop (the score weights live in InterestingnessScore.SCORE_CONFIG). */
 export const EXPLORE_CONFIG = {
-    /** Ticks per evaluation burst. */
+    /** Ticks per (cheap) screening evaluation burst. */
     evalTicks: 160,
+    /** Ticks discarded at the start of a burst before metrics accumulate (kills transient pollution, F2). */
+    warmupTicks: 20,
+    /** Ticks for the (expensive) confirmation burst run only on would-be finds (long-horizon, F2). */
+    confirmTicks: 600,
+    /** A cycle of period ≤ this at confirmation is tagged + penalized (must catch the period-84 trap;
+     *  must stay ≤ the worker's CYCLE_DETECTION_MAX_PERIOD = 400). */
+    confirmCycleMaxPeriod: 120,
+    /** Score multiplier applied to a confirmed cycler (honest labeling, not silent rejection). */
+    confirmCyclePenalty: 0.25,
     /** Block-entropy sample cadence within a burst. */
     sampleEvery: 10,
     /** Damage-probe window length (ticks) for the σ estimate. */
@@ -236,33 +245,41 @@ export class AutoExploreService {
         // Apply each candidate's ruleset to its world up front (so the user sees the population).
         population.forEach((hex, idx) => this.wm._applyExploreRuleset(idx, hex));
 
-        const evaluations = await Promise.all(
-            population.map((hex, idx) => this._evaluateCandidate(idx, hex, token))
+        // Each world screens its candidate over the IC suite and, if promising, runs ONE long
+        // confirmation burst on the SAME world — all concurrent, NO cross-world barrier (each world
+        // owns its worker, so world A's confirmation never waits on world B's screen).
+        const results = await Promise.all(
+            population.map((hex, idx) => this._screenAndConfirm(idx, hex, token))
         );
         if (token !== this._runToken) return;
 
-        // Score every candidate, archive the interesting finds, then rank by novelty-weighted score.
+        // Bank confirmed finds, then rank by novelty-weighted *confirmed* score.
         const ranked = [];
         const finds = [];
-        // Per-world score/kill snapshot for the minimap badges (indexed by world). evaluations[idx]
-        // corresponds to world idx (population.map preserved order), so we can index directly.
+        // Per-world score/kill snapshot for the minimap badges (results[idx] ↔ world idx).
         const perWorldScores = new Array(population.length).fill(null);
 
-        evaluations.forEach((ev, idx) => {
-            if (!ev || ev.perIC.length === 0) return;
-            const scored = scoreCandidate(ev.perIC);
-            const winMetrics = ev.perIC[scored.winningIC] || {};
-            const selectionScore = scored.score * this.archive.noveltyMultiplier(winMetrics, scored.score);
-            ranked.push({ ev, scored, winMetrics, selectionScore });
+        results.forEach((r, idx) => {
+            if (!r || r.scored.perIC.length === 0) return;
+            const { scored, screenScore, winMetrics, confirmed } = r;
+            // The score that drives selection + the gallery: the confirmed final score when a
+            // confirmation ran (so the period-84 screen-trap can't become champion), else the screen.
+            const baseScore = confirmed ? confirmed.finalScore : screenScore;
+            const selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore);
+            ranked.push({ r, scored, winMetrics, selectionScore, baseScore });
+
             const winIC = scored.perIC[scored.winningIC];
             perWorldScores[idx] = {
-                score: scored.score,
+                score: baseScore,
                 killed: winIC ? winIC.killed : false,
                 killReason: winIC ? winIC.killReason : null,
+                cyclic: confirmed ? confirmed.cyclic : null,
             };
 
-            if (scored.score >= this.options.findThreshold) {
-                const entry = this._makeEntry(ev, scored, winMetrics);
+            // Bank only candidates that survived a confirmation burst (rejected-at-confirm are dropped).
+            // A cycle-penalized find is still banked — it's a legitimate, honestly-tagged category.
+            if (confirmed && !confirmed.rejected) {
+                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore);
                 const res = this.archive.tryInsert(entry);
                 if (res.added || res.improved) finds.push(entry);
             }
@@ -276,18 +293,60 @@ export class AutoExploreService {
         // Best = next champion; second-best = runner-up parent for next generation's crossover.
         ranked.sort((a, b) => b.selectionScore - a.selectionScore);
         const bestScored = ranked.length > 0 ? ranked[0] : null;
-        const bestHex = bestScored ? bestScored.ev.hex : this.championHex;
-        this.runnerUpHex = ranked.length > 1 ? ranked[1].ev.hex : null;
+        const bestHex = bestScored ? bestScored.r.hex : this.championHex;
+        this.runnerUpHex = ranked.length > 1 ? ranked[1].r.hex : null;
 
         if (bestHex) this.championHex = bestHex;
 
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('generation', {
-            bestScore: bestScored ? bestScored.scored.score : 0,
+            bestScore: bestScored ? bestScored.baseScore : 0,
             bestHex,
             bestComponents: bestScored ? bestScored.scored.perComponent : null,
             perWorldScores,
             selectedWorldIndex: selectedIdx,
         }));
+    }
+
+    /**
+     * Per-world two-stage evaluation (v2.4): cheap screen over the IC suite, then — only if the
+     * candidate clears `findThreshold` — ONE expensive confirmation burst on the SAME world, winning
+     * IC, the SAME stored seed. The confirmation sees long-horizon outcomes (a quiet death, a late
+     * cycle) the 160-tick screen can't (F2). Pure scoring/confirmation logic lives in
+     * InterestingnessScore; this method just sequences the worker bursts. Returns null if aborted.
+     * @param {number} worldIndex
+     * @param {string} hex
+     * @param {number} token
+     * @returns {Promise<{hex: string, perIC: object[], scored: object, screenScore: number,
+     *   winMetrics: object, confirmed: {finalScore: number, cyclic: number|null, rejected: boolean}|null}|null>}
+     */
+    async _screenAndConfirm(worldIndex, hex, token) {
+        const ev = await this._evaluateCandidate(worldIndex, hex, token);
+        if (!ev || ev.perIC.length === 0 || token !== this._runToken) return null;
+
+        const scored = scoreCandidate(ev.perIC);
+        const screenScore = scored.score;
+        const winMetrics = ev.perIC[scored.winningIC] || {};
+
+        let confirmed = null;
+        if (screenScore >= this.options.findThreshold && winMetrics.initialState) {
+            if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
+            const proxy = this.wm.worlds[worldIndex];
+            proxy.resetWorld(winMetrics.initialState, winMetrics.seed);
+            const confirmMetrics = await proxy.runEvaluation({
+                ticks: this.options.confirmTicks,
+                sampleEvery: this.options.sampleEvery,
+                warmupTicks: this.options.warmupTicks,
+                probe: { enabled: true, probeTicks: this.options.probeTicks },
+            });
+            if (!confirmMetrics || confirmMetrics.cancelled || token !== this._runToken) return null;
+            const confirmIC = scoreSingleIC({ ...confirmMetrics, icLabel: winMetrics.icLabel });
+            confirmed = applyConfirmation(screenScore, confirmIC, confirmMetrics, {
+                ...SCORE_CONFIG,
+                confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod,
+                confirmCyclePenalty: this.options.confirmCyclePenalty,
+            });
+        }
+        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed };
     }
 
     /**
@@ -347,6 +406,7 @@ export class AutoExploreService {
             const result = await proxy.runEvaluation({
                 ticks: this.options.evalTicks,
                 sampleEvery: this.options.sampleEvery,
+                warmupTicks: this.options.warmupTicks,
                 probe: { enabled: true, probeTicks: this.options.probeTicks },
             });
             if (!result || result.cancelled) return null;
@@ -361,17 +421,23 @@ export class AutoExploreService {
     }
 
     /**
-     * Build a gallery entry from a scored candidate (winning IC reproduces the interesting behavior).
-     * @param {{hex: string, perIC: object[]}} ev
+     * Build a gallery entry from a scored + confirmed candidate (winning IC reproduces the behavior).
+     * The banked `score` is the *confirmed* final score; `screenScore` and `cyclic` are kept for the
+     * gallery (honest labeling — a `↻N` chip, design principle 3).
+     * @param {{hex: string}} ev
      * @param {object} scored
      * @param {object} winMetrics
+     * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
+     * @param {number} screenScore
      * @returns {import('./analysis/BehaviorArchive.js').ArchiveEntry}
      */
-    _makeEntry(ev, scored, winMetrics) {
+    _makeEntry(ev, scored, winMetrics, confirmed, screenScore) {
         return {
             hex: ev.hex,
             mnemonic: rulesetName(ev.hex),
-            score: scored.score,
+            score: confirmed.finalScore,
+            screenScore,
+            cyclic: confirmed.cyclic,
             perComponent: scored.perComponent,
             winningIC: scored.winningIC,
             icLabel: winMetrics.icLabel,

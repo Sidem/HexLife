@@ -185,6 +185,17 @@
     flex-shrink: 0;
 }
 
+/* Cyclic chip: a confirmed long-period cycler (honest labeling, v2.4) */
+.explore-find-cyclic {
+    font-size: 0.72em;
+    font-weight: 600;
+    color: var(--warning-text, #d8a23a);
+    background-color: var(--warning-surface, rgba(216, 162, 58, 0.15));
+    border-radius: 4px;
+    padding: 2px 5px;
+    flex-shrink: 0;
+}
+
 /* Debug surface: per-component score bars */
 .explore-find-bars {
     display: flex;

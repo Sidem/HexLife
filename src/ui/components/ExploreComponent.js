@@ -27,10 +27,12 @@ const SETTING_KEYS = {
 };
 
 const COMPONENT_META = [
-    { key: 'criticality', label: 'σ' },
+    { key: 'criticality', label: 'σ', usedFlag: 'criticalityUsed' },
     { key: 'entropyBand', label: 'Entropy' },
     { key: 'fluctuation', label: 'Flux' },
     { key: 'ruleDiversity', label: 'Diversity' },
+    { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed' },
+    { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed' },
 ];
 
 const MAX_GALLERY_RENDER = 40;
@@ -260,12 +262,17 @@ export class ExploreComponent extends BaseComponent {
         const name = this._escape(entry.mnemonic || entry.hex);
         const ic = this._escape(entry.icLabel || '');
         const bars = this._renderComponentBars(entry.perComponent);
+        // Honest labeling (v2.4, principle 3): a confirmed long cycle is a legitimate category — tag it.
+        const cyclicChip = entry.cyclic
+            ? `<span class="explore-find-cyclic" title="Settles into a period-${entry.cyclic} cycle">↻${entry.cyclic}</span>`
+            : '';
         return `
             <div class="explore-find" data-index="${index}">
                 <div class="explore-find-head">
                     <span class="explore-find-score" title="Interestingness score">${score}</span>
                     <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
                     <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
+                    ${cyclicChip}
                 </div>
                 ${bars}
                 <div class="explore-find-actions">
@@ -280,8 +287,10 @@ export class ExploreComponent extends BaseComponent {
     // Debug surface: per-component score breakdown. Each bar is the component's [0,1] contribution.
     _renderComponentBars(perComponent) {
         if (!perComponent) return '';
-        const rows = COMPONENT_META.map(({ key, label }) => {
-            const used = key !== 'criticality' || perComponent.criticalityUsed;
+        const rows = COMPONENT_META.map(({ key, label, usedFlag }) => {
+            // A gated term shows "n/a" unless its flag is truthy (σ with no probe; spatial terms on
+            // v1/old entries that predate them — flag absent ⇒ n/a). Ungated terms always render.
+            const used = !usedFlag || !!perComponent[usedFlag];
             const val = used ? Math.max(0, Math.min(1, perComponent[key] || 0)) : 0;
             const pct = Math.round(val * 100);
             const valText = used ? val.toFixed(2) : 'n/a';
