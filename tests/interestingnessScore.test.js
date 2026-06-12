@@ -4,7 +4,9 @@ import {
     scoreSingleIC,
     scoreCandidate,
     ruleUsageDiversity,
+    applyConfirmation,
 } from '../src/core/analysis/InterestingnessScore.js';
+import fixtures from './fixtures/exploreEvalFixtures.json';
 
 // --- Synthetic candidates ----------------------------------------------------
 // Each helper returns an EvalMetrics-shaped object (the subset the score reads).
@@ -286,6 +288,140 @@ describe('scoreCandidate — IC-suite aggregation', () => {
         const r = scoreCandidate([noisyCritical(), pureNoise(), frozen()]);
         expect(r.score).toBeGreaterThanOrEqual(0);
         expect(r.score).toBeLessThanOrEqual(1);
+    });
+});
+
+// --- v2.3: spatial structure terms -------------------------------------------
+
+/** Homogeneous churn: high activity but spatially random (no structure, no heterogeneity). */
+function uniformChurn() {
+    return {
+        finalRatio: 0.9,
+        finalActiveCount: Math.round(0.9 * NUM_CELLS),
+        numCells: NUM_CELLS,
+        changed: { mean: 4000, variance: 64000000, fano: 16000, cv: 2.0 },
+        blockEntropy: { mean: 0.4, variance: 0.01, spatialVariance: 0.001 },
+        spatialOrder: { mean: 0.0, last: 0.0 },
+        sigma: 1.0,
+        ruleUsageDelta: uniformDelta(120),
+        extinct: false,
+        saturated: false,
+        cycle: { detected: false, period: 0 },
+        icLabel: 'sparse',
+    };
+}
+
+/** Structured critical: lower activity but clearly spatially organized + heterogeneous. */
+function structuredCritical() {
+    return {
+        finalRatio: 0.3,
+        finalActiveCount: Math.round(0.3 * NUM_CELLS),
+        numCells: NUM_CELLS,
+        changed: { mean: 1500, variance: 2250000, fano: 1500, cv: 1.0 },
+        blockEntropy: { mean: 0.4, variance: 0.01, spatialVariance: 0.05 },
+        spatialOrder: { mean: 0.5, last: 0.5 },
+        sigma: 1.0,
+        ruleUsageDelta: uniformDelta(80),
+        extinct: false,
+        saturated: false,
+        cycle: { detected: false, period: 0 },
+        icLabel: 'chaos',
+    };
+}
+
+describe('scoreSingleIC — spatial structure (v2)', () => {
+    it('a spatially-structured critical burst outranks homogeneous churn', () => {
+        const structured = scoreSingleIC(structuredCritical()).score;
+        const churn = scoreSingleIC(uniformChurn()).score;
+        expect(structured).toBeGreaterThan(churn);
+    });
+
+    it('exposes spatial components + a spatialUsed flag when the metrics are present', () => {
+        const c = scoreSingleIC(structuredCritical()).components;
+        expect(c.spatialUsed).toBe(true);
+        expect(c.spatialStructure).toBeGreaterThan(0.5); // 0.5 / (0.5 + 0.12)
+        expect(c.spatialHeterogeneity).toBeGreaterThan(0.5);
+    });
+
+    it('deviation in EITHER direction from random mixing counts as structure', () => {
+        const pos = scoreSingleIC({ ...structuredCritical(), spatialOrder: { mean: 0.4, last: 0.4 } }).components.spatialStructure;
+        const neg = scoreSingleIC({ ...structuredCritical(), spatialOrder: { mean: -0.4, last: -0.4 } }).components.spatialStructure;
+        expect(pos).toBeCloseTo(neg, 10);
+        expect(pos).toBeGreaterThan(0);
+    });
+
+    it('marks spatial terms unused and renormalizes when the v2.1 metrics are absent (v1 entries)', () => {
+        const m = structuredCritical();
+        delete m.spatialOrder;
+        m.blockEntropy = { mean: 0.4, variance: 0.01 }; // no spatialVariance
+        const r = scoreSingleIC(m);
+        expect(r.components.spatialUsed).toBe(false);
+        expect(r.components.spatialStructure).toBe(0);
+        expect(r.components.spatialHeterogeneity).toBe(0);
+        // Dropping the spatial weights must not zero the score — it scores on the remaining terms.
+        expect(r.score).toBeGreaterThan(0);
+    });
+});
+
+describe('Score v2 — real fixtures (the central F1/F4 regression)', () => {
+    const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
+    const churnSparse = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' }).score;
+
+    it('gliders-chaos out-ranks churn-sparse by ≥0.10', () => {
+        expect(glidersChaos - churnSparse).toBeGreaterThanOrEqual(0.10);
+    });
+
+    it('both fixtures score in a discriminating mid-range (ceiling check, F4)', () => {
+        expect(glidersChaos).toBeGreaterThan(churnSparse);
+        expect(glidersChaos).toBeLessThan(1);
+        expect(churnSparse).toBeGreaterThan(0);
+    });
+
+    it('the gliders sparse-healed / saturated-seed ICs are killed, chaos carries the candidate', () => {
+        expect(scoreSingleIC(fixtures.gliders_seed_160).killReason).toBe('saturated');
+        // sparse IC: σ=0 (no spread) but alive with structure — not necessarily killed, just weaker.
+        const cand = scoreCandidate([
+            fixtures.gliders_chaos_160, fixtures.gliders_sparse_160, fixtures.gliders_seed_160,
+        ]);
+        expect(cand.winningIC).toBe(0); // chaos IC is the best
+    });
+});
+
+describe('applyConfirmation (v2.4 helper)', () => {
+    const passMetrics = { cycle: { detected: false, period: 0 } };
+    const passIC = { score: 0.7, killed: false, killReason: null };
+
+    it('passes a clean confirmation straight through', () => {
+        const r = applyConfirmation(0.65, passIC, passMetrics);
+        expect(r.rejected).toBe(false);
+        expect(r.cyclic).toBe(null);
+        expect(r.finalScore).toBeCloseTo(0.7, 10);
+    });
+
+    it('rejects a find that was hard-killed at confirmation', () => {
+        const killedIC = { score: 0, killed: true, killReason: 'saturated' };
+        const r = applyConfirmation(0.65, killedIC, { cycle: { detected: false, period: 0 } });
+        expect(r.rejected).toBe(true);
+        expect(r.finalScore).toBe(0);
+        expect(r.cyclic).toBe(null);
+    });
+
+    it('penalizes + tags a long cycle (period ≤ confirmCycleMaxPeriod) instead of rejecting it', () => {
+        const r = applyConfirmation(0.8, { score: 0.8, killed: false, killReason: null }, { cycle: { detected: true, period: 84 } });
+        expect(r.rejected).toBe(false);
+        expect(r.cyclic).toBe(84);
+        expect(r.finalScore).toBeCloseTo(0.8 * SCORE_CONFIG.confirmCyclePenalty, 10);
+    });
+
+    it('does not tag a cycle longer than confirmCycleMaxPeriod', () => {
+        const period = SCORE_CONFIG.confirmCycleMaxPeriod + 10;
+        const r = applyConfirmation(0.8, { score: 0.8, killed: false, killReason: null }, { cycle: { detected: true, period } });
+        expect(r.cyclic).toBe(null);
+        expect(r.finalScore).toBeCloseTo(0.8, 10);
+    });
+
+    it('rejects a null/missing confirmation IC score (defensive)', () => {
+        expect(applyConfirmation(0.5, null, passMetrics).rejected).toBe(true);
     });
 });
 

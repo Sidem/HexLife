@@ -28,8 +28,17 @@
 /**
  * @typedef {object} BlockEntropyStats
  * @property {number} mean     Mean normalized hex block entropy ([0,1]) over the burst.
- * @property {number} variance Variance of the block-entropy samples.
+ * @property {number} variance Variance of the block-entropy samples (temporal).
+ * @property {number} [spatialVariance] Mean over samples of the across-block surprisal variance
+ *   (v2.1 spatial heterogeneity; absent on v1 metrics / old persisted entries).
  * @property {number} [samples] Optional raw sample count / array (unused by the score).
+ */
+
+/**
+ * @typedef {object} SpatialOrderStats
+ * @property {number} mean  Mean join-count spatial-order statistic over the burst (v2.1).
+ *   ~0 = random mixing; deviation in either direction = spatial structure.
+ * @property {number} last  Last sampled spatial-order value.
  */
 
 /**
@@ -40,6 +49,7 @@
  * @property {number} [numCells]         Total cells (optional; derived from ratio if absent).
  * @property {ChangedStats} [changed]
  * @property {BlockEntropyStats} [blockEntropy]
+ * @property {SpatialOrderStats} [spatialOrder] v2.1 spatial-order stats (absent on v1 metrics).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe).
  * @property {Uint32Array|number[]} [ruleUsageDelta] 128-entry rule-usage delta over the burst.
  * @property {boolean} [extinct]
@@ -54,7 +64,10 @@
  * @property {number} entropyBand   Mid-band block-entropy term ([0,1]).
  * @property {number} fluctuation   Activity-fluctuation (CV) term ([0,1]).
  * @property {number} ruleDiversity Shannon diversity of rule usage ([0,1]).
+ * @property {number} spatialStructure     Spatial-order deviation term ([0,1]) — 0 if unused (v2).
+ * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
+ * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
  */
 
 /**
@@ -86,12 +99,23 @@ export const SCORE_CONFIG = {
     /** finalRatio at or above this is a saturated state (double-guards the worker's own flag). */
     saturatedRatio: 0.99,
 
-    // --- Component weights (relative; renormalized internally, criticality dropped if σ absent) ---
+    // --- Component weights (relative; renormalized internally — criticality dropped if σ absent,
+    // the two spatial terms dropped if the v2.1 spatial metrics are absent) ---
+    //
+    // v2 rebalance (F1/F2/F4): the σ≈1 / mid-band-entropy / high-CV proxies CANNOT tell
+    // homogeneous "churn" from a structured glider soup — both saturate those terms (measured in
+    // tests/fixtures/exploreEvalFixtures.json: churn-sparse and gliders-chaos tie on criticality,
+    // and churn actually *wins* entropyBand, fluctuation and ruleDiversity). The ONLY metric that
+    // separates them is the spatial-order term, so it carries the most weight; fluctuation drops
+    // (CV rewards a cycle's oscillation amplitude — F2). These weights are tuned so the gliders-chaos
+    // fixture out-ranks the churn-sparse fixture by ≥0.10 (the central v2 regression).
     weights: {
-        criticality: 0.35,
-        entropyBand: 0.25,
-        fluctuation: 0.20,
-        ruleDiversity: 0.20,
+        criticality: 0.20,
+        entropyBand: 0.10,
+        fluctuation: 0.05,
+        ruleDiversity: 0.10,
+        spatialStructure: 0.40,
+        spatialHeterogeneity: 0.15,
     },
 
     // --- Criticality term: gaussian in ln(σ), peaked at σ=1 → exp(-(ln σ)² / 2τ²) ---
@@ -108,6 +132,22 @@ export const SCORE_CONFIG = {
     // --- Rule-diversity term: Shannon entropy of the 128-bin usage delta, normalized to [0,1] ---
     /** Exponent applied to the normalized diversity (gamma); 1 = linear. */
     ruleDiversityGamma: 1,
+
+    // --- Spatial terms (v2.1 metrics; half-saturation rewards in [0,1]) ---
+    /** |spatialOrder.mean| at which the structure term reaches 0.5. Deviation in EITHER direction
+     *  from random mixing (≈0) counts as structure. Tuned from the fixtures (gliders ≈0.23 vs churn ≈0.02). */
+    spatialOrderHalfSat: 0.12,
+    /** blockEntropy.spatialVariance at which the heterogeneity term reaches 0.5 (the [0,1]-entropy
+     *  variance scale is small). */
+    spatialVarHalfSat: 0.02,
+
+    // --- Confirmation pass (v2.4 two-stage eval; consumed by applyConfirmation). The operational
+    // copies live in AutoExploreService.EXPLORE_CONFIG and are passed through; these are the defaults
+    // that keep the pure helper self-contained and unit-testable. ---
+    /** A cycle of period ≤ this at confirmation is a (legitimate but degenerate) cycler → penalize+tag. */
+    confirmCycleMaxPeriod: 120,
+    /** Score multiplier applied to a confirmed cycler (honest labeling, not silent rejection). */
+    confirmCyclePenalty: 0.25,
 
     // --- IC-suite aggregation: soft-max over per-IC scores (mostly best) + small mean (robustness) ---
     /** Soft-max temperature; lower → closer to the single best IC. */
@@ -184,7 +224,10 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 entropyBand: 0,
                 fluctuation: 0,
                 ruleDiversity: 0,
+                spatialStructure: 0,
+                spatialHeterogeneity: 0,
                 criticalityUsed: false,
+                spatialUsed: false,
             },
             killed: true,
             killReason,
@@ -210,8 +253,21 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     // --- Rule diversity (Shannon entropy of the usage delta). ---
     const ruleDiversity = Math.pow(ruleUsageDiversity(metrics.ruleUsageDelta), cfg.ruleDiversityGamma);
 
-    // Weighted combine; drop the criticality weight (and renormalize) when σ is unavailable
-    // so a no-probe burst is judged on the remaining terms rather than penalized.
+    // --- Spatial structure (join-count deviation from random mixing, EITHER direction). v2.1. ---
+    const soMean = metrics.spatialOrder != null ? metrics.spatialOrder.mean : undefined;
+    const hasSpatialOrder = soMean != null && Number.isFinite(soMean);
+    const soMag = hasSpatialOrder ? Math.abs(soMean) : 0;
+    const spatialStructure = hasSpatialOrder ? soMag / (soMag + cfg.spatialOrderHalfSat) : 0;
+
+    // --- Spatial heterogeneity (across-block surprisal variance). v2.1. ---
+    const sv = metrics.blockEntropy ? metrics.blockEntropy.spatialVariance : undefined;
+    const hasSpatialVar = sv != null && Number.isFinite(sv);
+    const spatialHeterogeneity = hasSpatialVar ? sv / (sv + cfg.spatialVarHalfSat) : 0;
+    const spatialUsed = hasSpatialOrder || hasSpatialVar;
+
+    // Weighted combine; drop a weight (and renormalize) when its input is unavailable so a burst is
+    // judged on the terms it has rather than penalized: criticality when σ is null, and the two
+    // spatial terms when the v2.1 metrics are absent (v1 metrics / old persisted entries).
     const w = cfg.weights;
     let num = entropyBand * w.entropyBand + fluctuation * w.fluctuation + ruleDiversity * w.ruleDiversity;
     let den = w.entropyBand + w.fluctuation + w.ruleDiversity;
@@ -219,11 +275,22 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += criticality * w.criticality;
         den += w.criticality;
     }
+    if (hasSpatialOrder) {
+        num += spatialStructure * w.spatialStructure;
+        den += w.spatialStructure;
+    }
+    if (hasSpatialVar) {
+        num += spatialHeterogeneity * w.spatialHeterogeneity;
+        den += w.spatialHeterogeneity;
+    }
     const score = den > 0 ? num / den : 0;
 
     return {
         score,
-        components: { criticality, entropyBand, fluctuation, ruleDiversity, criticalityUsed },
+        components: {
+            criticality, entropyBand, fluctuation, ruleDiversity,
+            spatialStructure, spatialHeterogeneity, criticalityUsed, spatialUsed,
+        },
         killed: false,
         killReason: null,
         icLabel,
@@ -251,7 +318,8 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
             score: 0,
             perIC: [],
             perComponent: {
-                criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0, criticalityUsed: false,
+                criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
+                spatialStructure: 0, spatialHeterogeneity: 0, criticalityUsed: false, spatialUsed: false,
             },
             winningIC: -1,
         };
@@ -287,4 +355,51 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
         perComponent: perIC[winningIC].components,
         winningIC,
     };
+}
+
+/**
+ * @typedef {object} ConfirmationResult
+ * @property {number} finalScore  The score to bank for this find (confirmation-based).
+ * @property {number|null} cyclic  Detected cycle period if the find is a (penalized) cycler, else null.
+ * @property {boolean} rejected   True if the confirmation burst killed the find (don't bank it).
+ */
+
+/**
+ * Phase v2.4: reconcile a cheap *screening* score with an expensive *confirmation* burst on the same
+ * world / IC / seed. The confirmation burst runs far longer (EXPLORE_CONFIG.confirmTicks) so it can
+ * see long-horizon outcomes the 160-tick screen can't (F2): a find that quietly dies, saturates,
+ * freezes, or settles into a long cycle by tick ~600.
+ *
+ * Honest labeling over silent rejection (design principle 3): a hard kill at confirmation rejects the
+ * find outright, but a *long* cycle (period in (shortCycleMaxPeriod, confirmCycleMaxPeriod]) is a
+ * legitimate category — it is tagged `cyclic` and its score is multiplied by `confirmCyclePenalty`
+ * rather than discarded.
+ *
+ * Pure and side-effect-free (unit-testable without workers).
+ *
+ * @param {number} screenScore               The cheap screening score (kept for context/telemetry).
+ * @param {ICScore} confirmICScore           scoreSingleIC() applied to the confirmation metrics.
+ * @param {EvalMetrics} confirmMetrics        The raw confirmation-burst metrics (for the cycle period).
+ * @param {typeof SCORE_CONFIG} [config]
+ * @returns {ConfirmationResult}
+ */
+export function applyConfirmation(screenScore, confirmICScore, confirmMetrics, config = SCORE_CONFIG) {
+    const cfg = config;
+    // A hard kill at confirmation (extinct / saturated / frozen / short-cycle) ⇒ the find did not
+    // survive a long burst; reject it (never banked).
+    if (!confirmICScore || confirmICScore.killed) {
+        return { finalScore: 0, cyclic: null, rejected: true };
+    }
+
+    const cycle = confirmMetrics ? confirmMetrics.cycle : null;
+    if (cycle && cycle.detected && cycle.period <= cfg.confirmCycleMaxPeriod) {
+        // A real, longer cycle (the short ones are already hard-killed above): legitimate but degenerate.
+        return {
+            finalScore: confirmICScore.score * cfg.confirmCyclePenalty,
+            cyclic: cycle.period,
+            rejected: false,
+        };
+    }
+
+    return { finalScore: confirmICScore.score, cyclic: null, rejected: false };
 }
