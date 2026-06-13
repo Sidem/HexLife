@@ -337,10 +337,16 @@ export const EVENTS = {
     COMMAND_START_AUTO_EXPLORE: 'command:startAutoExplore',
     /** @param {{adopt?: boolean}} [data] - Stop the auto-explore loop and restore pre-explore worlds. When `adopt` is true, keep the current champion ruleset in the selected world instead of restoring it. */
     COMMAND_STOP_AUTO_EXPLORE: 'command:stopAutoExplore',
+    /** @event Emitted with no payload to pause the auto-explore loop at the next generation boundary (no restore). */
+    COMMAND_PAUSE_AUTO_EXPLORE: 'command:pauseAutoExplore',
+    /** @event Emitted with no payload to resume a paused auto-explore loop. */
+    COMMAND_RESUME_AUTO_EXPLORE: 'command:resumeAutoExplore',
     /** @event Emitted with no payload to clear the persisted auto-explore session gallery. */
     COMMAND_CLEAR_AUTO_EXPLORE_GALLERY: 'command:clearAutoExploreGallery',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry}} data - Apply a gallery find to the selected world: set its ruleset and reset with the find's winning IC + seed (reproduces the discovered behavior). Stops the explore loop first if running. */
     COMMAND_APPLY_EXPLORE_FIND: 'command:applyExploreFind',
+    /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry}} data - Re-evaluate a gallery find on the selected world over a confirmation-length burst and update its stored score. Only valid when no run is active. */
+    COMMAND_RETEST_EXPLORE_FIND: 'command:retestExploreFind',
     /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null, perWorldScores?: Array<{score:number, killed:boolean, killReason:string|null}|null>, selectedWorldIndex?: number}} data - Auto-explore loop progress (per generation + lifecycle transitions). */
     EXPLORE_PROGRESS: 'explore:progress',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */

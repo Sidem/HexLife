@@ -23,4 +23,9 @@ describe('EXPLORE_CONFIG ↔ worker cycle detection', () => {
         expect(EXPLORE_CONFIG.warmupTicks).toBeGreaterThanOrEqual(0);
         expect(EXPLORE_CONFIG.warmupTicks).toBeLessThan(EXPLORE_CONFIG.evalTicks);
     });
+
+    // v2.7: the generation budget defaults to unlimited so existing behaviour is unchanged.
+    it('maxGenerations defaults to 0 (unlimited)', () => {
+        expect(EXPLORE_CONFIG.maxGenerations).toBe(0);
+    });
 });

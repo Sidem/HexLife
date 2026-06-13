@@ -94,6 +94,29 @@ describe('BehaviorArchive insertion', () => {
     });
 });
 
+describe('BehaviorArchive updateEntry (v2.7 re-test)', () => {
+    it('patches an existing entry in place and re-sorts by the new score', () => {
+        const a = new BehaviorArchive();
+        a.tryInsert(entry('aa', 0.8, metrics(0.1, 0.2, 1.0)));
+        a.tryInsert(entry('bb', 0.5, metrics(0.8, 0.6, 0.3)));
+        expect(a.getEntries()[0].hex).toBe('aa');
+
+        const ok = a.updateEntry('aa', { score: 0.2, cyclic: 84 });
+        expect(ok).toBe(true);
+        // re-sorted: bb (0.5) now outranks the re-scored aa (0.2)
+        expect(a.getEntries().map(e => e.hex)).toEqual(['bb', 'aa']);
+        const aa = a.getEntries().find(e => e.hex === 'aa');
+        expect(aa.score).toBe(0.2);
+        expect(aa.cyclic).toBe(84);
+    });
+
+    it('returns false when no entry matches the hex', () => {
+        const a = new BehaviorArchive();
+        a.tryInsert(entry('aa', 0.8, metrics(0.1, 0.2, 1.0)));
+        expect(a.updateEntry('zz', { score: 0.1 })).toBe(false);
+    });
+});
+
 describe('BehaviorArchive novelty pressure', () => {
     it('returns 1 for an empty cell and the penalty for an occupied-better cell', () => {
         const a = new BehaviorArchive();

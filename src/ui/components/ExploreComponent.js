@@ -24,6 +24,7 @@ const SETTING_KEYS = {
     mode: 'exploreMutationMode',
     ticks: 'exploreEvalTicks',
     icLabels: 'exploreICLabels',
+    maxGenerations: 'exploreMaxGenerations',
 };
 
 const COMPONENT_META = [
@@ -66,6 +67,7 @@ export class ExploreComponent extends BaseComponent {
         const mode = PersistenceService.loadUISetting(SETTING_KEYS.mode, EXPLORE_CONFIG.mutationMode);
         const ticks = PersistenceService.loadUISetting(SETTING_KEYS.ticks, EXPLORE_CONFIG.evalTicks);
         const icLabels = PersistenceService.loadUISetting(SETTING_KEYS.icLabels, IC_SUITE.map(ic => ic.label));
+        const maxGenerations = PersistenceService.loadUISetting(SETTING_KEYS.maxGenerations, EXPLORE_CONFIG.maxGenerations);
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
@@ -78,6 +80,7 @@ export class ExploreComponent extends BaseComponent {
                 </div>
                 <div class="form-group-buttons explore-run-buttons">
                     <button class="button action-button" data-action="start"><span class="inline-icon">${ICONS.compass}</span> Start</button>
+                    <button class="button" data-action="pause" disabled title="Pause/resume the search at the next generation boundary">Pause</button>
                     <button class="button" data-action="stop" disabled>Stop</button>
                     <button class="button" data-action="adopt" disabled title="Stop and keep the current champion ruleset in the selected world">Stop &amp; Keep</button>
                 </div>
@@ -98,6 +101,10 @@ export class ExploreComponent extends BaseComponent {
                         `).join('')}
                     </div>
                 </div>
+                <div class="form-group explore-budget-field">
+                    <label class="explore-field-label" for="explore-max-generations">Generation Budget <span class="explore-field-hint">(0 = unlimited)</span></label>
+                    <input type="number" id="explore-max-generations" class="explore-budget-input" min="0" max="10000" step="1" value="${maxGenerations}">
+                </div>
             </div>
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
@@ -113,9 +120,11 @@ export class ExploreComponent extends BaseComponent {
         this.galleryList = this.element.querySelector('#explore-gallery-list');
         this.runButtons = {
             start: this.element.querySelector('[data-action="start"]'),
+            pause: this.element.querySelector('[data-action="pause"]'),
             stop: this.element.querySelector('[data-action="stop"]'),
             adopt: this.element.querySelector('[data-action="adopt"]'),
         };
+        this.budgetInput = this.element.querySelector('#explore-max-generations');
 
         this.sliders.rate = new SliderComponent(this.element.querySelector('#explore-mutation-rate-mount'), {
             id: 'explore-mutation-rate',
@@ -151,8 +160,17 @@ export class ExploreComponent extends BaseComponent {
 
     attachEventListeners() {
         this._addDOMListener(this.runButtons.start, 'click', () => this._startExploration());
+        this._addDOMListener(this.runButtons.pause, 'click', () => this._togglePause());
         this._addDOMListener(this.runButtons.stop, 'click', () => EventBus.dispatch(EVENTS.COMMAND_STOP_AUTO_EXPLORE, {}));
         this._addDOMListener(this.runButtons.adopt, 'click', () => EventBus.dispatch(EVENTS.COMMAND_STOP_AUTO_EXPLORE, { adopt: true }));
+
+        if (this.budgetInput) {
+            this._addDOMListener(this.budgetInput, 'change', () => {
+                const v = Math.max(0, Math.floor(Number(this.budgetInput.value) || 0));
+                this.budgetInput.value = v;
+                PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, v);
+            });
+        }
 
         this._addDOMListener(this.element.querySelector('[data-action="clear-gallery"]'), 'click', () => {
             if (this.service.getGalleryEntries().length === 0) return;
@@ -191,8 +209,15 @@ export class ExploreComponent extends BaseComponent {
             mutationRate: this.sliders.rate.getValue() / 100,
             mutationMode: this.element.querySelector('input[name="explore-mutation-mode"]:checked')?.value || EXPLORE_CONFIG.mutationMode,
             evalTicks: this.sliders.ticks.getValue(),
+            maxGenerations: Math.max(0, Math.floor(Number(this.budgetInput?.value) || 0)),
             icLabels,
         });
+    }
+
+    _togglePause() {
+        const state = this.service.getStatus().state;
+        if (state === 'running') EventBus.dispatch(EVENTS.COMMAND_PAUSE_AUTO_EXPLORE, {});
+        else if (state === 'paused') EventBus.dispatch(EVENTS.COMMAND_RESUME_AUTO_EXPLORE, {});
     }
 
     _onProgress(payload) {
@@ -217,6 +242,11 @@ export class ExploreComponent extends BaseComponent {
         if (this.runButtons.start) this.runButtons.start.disabled = isRunning;
         if (this.runButtons.stop) this.runButtons.stop.disabled = !isRunning;
         if (this.runButtons.adopt) this.runButtons.adopt.disabled = !isRunning;
+        if (this.runButtons.pause) {
+            this.runButtons.pause.disabled = !isRunning;
+            this.runButtons.pause.textContent = state === 'paused' ? 'Resume' : 'Pause';
+        }
+        if (this.budgetInput) this.budgetInput.disabled = isRunning;
 
         const stateEl = this.statusEl?.querySelector('[data-field="state"]');
         const detailEl = this.statusEl?.querySelector('[data-field="detail"]');
@@ -284,6 +314,7 @@ export class ExploreComponent extends BaseComponent {
                         ${bars}
                         <div class="explore-find-actions">
                             <button class="button-icon" data-action="apply" title="Apply to selected world (ruleset + winning IC)">${ICONS.target}</button>
+                            <button class="button-icon" data-action="retest" title="Re-test this find on the selected world (re-scores it)">${ICONS.refreshCw}</button>
                             <button class="button-icon" data-action="save" title="Save ruleset to your library">${ICONS.star}</button>
                             <button class="button-icon" data-action="share" title="Copy share link">${ICONS.share}</button>
                         </div>
@@ -326,6 +357,12 @@ export class ExploreComponent extends BaseComponent {
         if (action === 'apply') {
             EventBus.dispatch(EVENTS.COMMAND_APPLY_EXPLORE_FIND, { find: entry });
             EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
+        } else if (action === 'retest') {
+            if (this.service.isRunning()) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the run before re-testing a find.', type: 'error' });
+                return;
+            }
+            EventBus.dispatch(EVENTS.COMMAND_RETEST_EXPLORE_FIND, { find: entry });
         } else if (action === 'save') {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex: entry.hex, name: entry.mnemonic });
         } else if (action === 'share') {

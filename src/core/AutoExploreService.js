@@ -78,6 +78,8 @@ export const EXPLORE_CONFIG = {
     findThreshold: 0.45,
     /** Max gallery entries to persist (best-first; archive itself is unbounded in memory). */
     maxGalleryEntries: 200,
+    /** Generation budget: stop the loop after this many generations (0 = unlimited). */
+    maxGenerations: 0,
 };
 
 const EXPLORE_STATE = Object.freeze({ IDLE: 'idle', RUNNING: 'running', PAUSED: 'paused' });
@@ -153,6 +155,8 @@ export class AutoExploreService {
         this.options = { ...EXPLORE_CONFIG, ...options };
         this.generation = 0;
         this.runnerUpHex = null;
+        /** Best base score observed this run (for the generation-budget completion toast, v2.7). */
+        this._bestScoreSeen = 0;
         this._runToken++;
 
         const seedHex = this.wm.getCurrentRulesetHex();
@@ -221,6 +225,61 @@ export class AutoExploreService {
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('stopped'));
     }
 
+    /**
+     * Re-evaluate a gallery find on the selected world over a confirmation-length burst and update
+     * its stored score / components / cyclic tag in place (loop UX, v2.7). Only valid when no run is
+     * active — it borrows the selected world's worker, which the search owns while running.
+     * `startEvaluation` pauses normal ticking for the burst and restores it afterwards. Toasts the
+     * score delta and re-emits EXPLORE_FIND_ADDED so the gallery re-renders + re-sorts.
+     * @param {import('./analysis/BehaviorArchive.js').ArchiveEntry} find
+     * @returns {Promise<void>}
+     */
+    async retestFind(find) {
+        if (this.isRunning()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the run before re-testing a find.', type: 'error' });
+            return;
+        }
+        if (!find || !find.hex || find.hex === 'Error' || !find.initialState) return;
+
+        const idx = this.wm.selectedWorldIndex;
+        const proxy = this.wm.worlds[idx];
+        if (!proxy) return;
+
+        const oldScore = typeof find.score === 'number' ? find.score : 0;
+
+        this.wm._applyExploreRuleset(idx, find.hex);
+        proxy.resetWorld(find.initialState, find.seed);
+        const metrics = await proxy.runEvaluation({
+            ticks: this.options.confirmTicks ?? EXPLORE_CONFIG.confirmTicks,
+            sampleEvery: this.options.sampleEvery ?? EXPLORE_CONFIG.sampleEvery,
+            warmupTicks: this.options.warmupTicks ?? EXPLORE_CONFIG.warmupTicks,
+            probe: { enabled: true, probeTicks: this.options.probeTicks ?? EXPLORE_CONFIG.probeTicks },
+        });
+        if (!metrics || metrics.cancelled) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Re-test was interrupted.', type: 'error' });
+            return;
+        }
+
+        const confirmIC = scoreSingleIC({ ...metrics, icLabel: find.icLabel });
+        const confirmed = applyConfirmation(find.screenScore ?? oldScore, confirmIC, metrics, {
+            ...SCORE_CONFIG,
+            confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod ?? EXPLORE_CONFIG.confirmCycleMaxPeriod,
+            confirmCyclePenalty: this.options.confirmCyclePenalty ?? EXPLORE_CONFIG.confirmCyclePenalty,
+        });
+
+        this.archive.updateEntry(find.hex, {
+            score: confirmed.finalScore,
+            cyclic: confirmed.cyclic,
+            perComponent: confirmIC.components,
+        });
+        this._persistGallery();
+        EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find, gallerySize: this.archive.size, retested: true });
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: `${oldScore.toFixed(2)} → ${confirmed.finalScore.toFixed(2)} (${find.mnemonic || rulesetName(find.hex)})`,
+            type: 'success',
+        });
+    }
+
     // --- Generation loop ----------------------------------------------------
 
     /**
@@ -236,6 +295,17 @@ export class AutoExploreService {
             await this._runGeneration(token);
             if (token !== this._runToken) return; // stopped/restarted mid-generation
             this.generation++;
+
+            // Generation budget (v2.7): stop once the configured number of generations have run.
+            if (this.options.maxGenerations > 0 && this.generation >= this.options.maxGenerations) {
+                const name = this.championHex ? rulesetName(this.championHex) : '';
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: `Explored ${this.generation} generations — best ${this._bestScoreSeen.toFixed(2)} ${name}`.trim(),
+                    type: 'success',
+                });
+                this.stop();
+                return;
+            }
         }
     }
 
@@ -305,6 +375,7 @@ export class AutoExploreService {
         this.runnerUpHex = ranked.length > 1 ? ranked[1].r.hex : null;
 
         if (bestHex) this.championHex = bestHex;
+        if (bestScored && bestScored.baseScore > this._bestScoreSeen) this._bestScoreSeen = bestScored.baseScore;
 
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('generation', {
             bestScore: bestScored ? bestScored.baseScore : 0,

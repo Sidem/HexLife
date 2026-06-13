@@ -220,8 +220,11 @@ export class WorldManager {
     #setupAutoExploreHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_START_AUTO_EXPLORE, (options) => this.autoExploreService.start(options || {}));
         EventBus.subscribe(EVENTS.COMMAND_STOP_AUTO_EXPLORE, (data) => this.autoExploreService.stop(data || {}));
+        EventBus.subscribe(EVENTS.COMMAND_PAUSE_AUTO_EXPLORE, () => this.autoExploreService.pause());
+        EventBus.subscribe(EVENTS.COMMAND_RESUME_AUTO_EXPLORE, () => this.autoExploreService.resume());
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY, () => this.autoExploreService.clearGallery());
         EventBus.subscribe(EVENTS.COMMAND_APPLY_EXPLORE_FIND, (data) => this.applyExploreFind(data?.find));
+        EventBus.subscribe(EVENTS.COMMAND_RETEST_EXPLORE_FIND, (data) => this.autoExploreService.retestFind(data?.find));
     }
 
     /**

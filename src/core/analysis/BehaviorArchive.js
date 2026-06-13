@@ -237,6 +237,24 @@ export class BehaviorArchive {
         return [...this.cells.values()].sort((a, b) => b.score - a.score);
     }
 
+    /**
+     * Patch an existing entry (matched by hex) in place — used by the re-test action (v2.7) to
+     * refresh a find's score/components/cyclic tag after a fresh confirmation burst. The behavior
+     * cell is left unchanged (getEntries re-sorts by the new score).
+     * @param {string} hex
+     * @param {Partial<ArchiveEntry>} patch
+     * @returns {boolean} true if an entry was found and patched.
+     */
+    updateEntry(hex, patch) {
+        for (const entry of this.cells.values()) {
+            if (entry.hex === hex) {
+                Object.assign(entry, patch);
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Drop every entry. */
     clear() {
         this.cells.clear();

@@ -89,6 +89,35 @@
     color: var(--text-secondary, #b9b9c2);
 }
 
+.explore-field-hint {
+    font-size: 0.85em;
+    color: var(--text-muted, #87878f);
+    font-weight: 400;
+}
+
+.explore-budget-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.explore-budget-input {
+    width: 5.5em;
+    padding: 3px 6px;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary, #e6e6ea);
+    font-variant-numeric: tabular-nums;
+}
+
+/* While a search is active, re-testing a find would fight the loop for the worker — dim + block it. */
+.explore-component-content.is-running .explore-find-actions [data-action="retest"] {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 .explore-ic-checkboxes {
     display: flex;
     gap: 8px;
