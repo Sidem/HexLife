@@ -28,6 +28,8 @@ import { hammingDistanceHex } from '../../utils/utils.js';
  * @property {{mean: number, variance?: number}} [blockEntropy] Mean normalized block entropy in
  *   [0,1] (the entropy bin); optional temporal variance (v2.8 Wuensche term, persisted for re-score
  *   stability but not part of the descriptor).
+ * @property {{meanSpeed: number}} [transport] Centroid-drift speed (v2.9 transport term, persisted
+ *   for re-score stability but not part of the descriptor).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe ran).
  */
 

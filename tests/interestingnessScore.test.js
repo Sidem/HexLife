@@ -399,6 +399,40 @@ describe('scoreSingleIC — temporal entropy variance (v2.8)', () => {
     });
 });
 
+// --- v2.9: transport / mobility (active-cell centroid drift) -----------------
+
+describe('scoreSingleIC — transport / mobility (v2.9)', () => {
+    it('a mobile (high-transport) burst out-scores an otherwise-identical pinned one', () => {
+        const base = structuredCritical();
+        const moving = scoreSingleIC({ ...base, transport: { meanSpeed: 0.5 } });
+        const pinned = scoreSingleIC({ ...base, transport: { meanSpeed: 0.0 } });
+        expect(moving.components.transport).toBeGreaterThan(pinned.components.transport);
+        expect(moving.score).toBeGreaterThan(pinned.score);
+    });
+
+    it('exposes the transport component + a transportUsed flag when transport.meanSpeed is present', () => {
+        // At meanSpeed == halfSat the half-saturation reward is exactly 0.5.
+        const c = scoreSingleIC({ ...structuredCritical(), transport: { meanSpeed: SCORE_CONFIG.transportHalfSat } }).components;
+        expect(c.transportUsed).toBe(true);
+        expect(c.transport).toBeCloseTo(0.5, 6);
+    });
+
+    it('half-saturation: a larger drift speed yields a larger but bounded ([0,1]) term', () => {
+        const slow = scoreSingleIC({ ...structuredCritical(), transport: { meanSpeed: 0.05 } }).components.transport;
+        const fast = scoreSingleIC({ ...structuredCritical(), transport: { meanSpeed: 2.0 } }).components.transport;
+        expect(fast).toBeGreaterThan(slow);
+        expect(fast).toBeLessThanOrEqual(1);
+    });
+
+    it('marks the term unused and renormalizes when transport.meanSpeed is absent (v1 entries)', () => {
+        const r = scoreSingleIC(structuredCritical()); // no transport field at all
+        expect(r.components.transportUsed).toBe(false);
+        expect(r.components.transport).toBe(0);
+        // Dropping the transport weight must not zero the score — it scores on the remaining terms.
+        expect(r.score).toBeGreaterThan(0);
+    });
+});
+
 describe('Score v2 — real fixtures (the central F1/F4 regression)', () => {
     const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
     const churnSparse = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' }).score;

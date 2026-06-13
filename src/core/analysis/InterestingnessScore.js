@@ -42,6 +42,13 @@
  */
 
 /**
+ * @typedef {object} TransportStats
+ * @property {number} meanSpeed  Mean per-tick active-cell centroid drift speed (cells/tick) over the
+ *   burst (v2.9 transport/mobility term). Coherent translation (gliders/spaceships) → high; a dense
+ *   churn whose centroid stays pinned → ~0. Absent on v1/legacy metrics.
+ */
+
+/**
  * Subset of an EVALUATION_RESULT that the score consumes. Extra fields are ignored.
  * @typedef {object} EvalMetrics
  * @property {number} [finalRatio]       Final active-cell ratio in [0,1].
@@ -50,6 +57,7 @@
  * @property {ChangedStats} [changed]
  * @property {BlockEntropyStats} [blockEntropy]
  * @property {SpatialOrderStats} [spatialOrder] v2.1 spatial-order stats (absent on v1 metrics).
+ * @property {TransportStats} [transport] v2.9 centroid-drift transport stats (absent on v1 metrics).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe).
  * @property {Uint32Array|number[]} [ruleUsageDelta] 128-entry rule-usage delta over the burst.
  * @property {boolean} [extinct]
@@ -67,9 +75,11 @@
  * @property {number} spatialStructure     Spatial-order deviation term ([0,1]) — 0 if unused (v2).
  * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
  * @property {number} temporalEntropyVariance Temporal block-entropy-variance term ([0,1]) — 0 if unused (v2.8).
+ * @property {number} transport     Centroid-drift transport/mobility term ([0,1]) — 0 if unused (v2.9).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
  * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
  * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
+ * @property {boolean} transportUsed   Whether transport.meanSpeed was present and the transport term counted (v2.9).
  */
 
 /**
@@ -125,14 +135,24 @@ export const SCORE_CONFIG = {
     // only safe because the v2.4 confirmation burst hard-penalizes cyclers DOWNSTREAM
     // (confirmCycleMaxPeriod). Keep that ordering — never reintroduce temporal variance upstream of the
     // confirmation filter.
+    //
+    // v2.9 (direct transport): added `transport` — the mean per-tick active-cell centroid drift speed
+    // (Kumar/ASAL-style mobility signal). Gliders/spaceships are the archetypal "interesting"
+    // structures and were previously detected only indirectly (via spatialStructure); a translating
+    // structure drifts the centroid steadily while a dense churn keeps it pinned, so this is a DIRECT
+    // motion signal that reinforces spatialStructure rather than fighting it. The other seven weights
+    // were scaled down proportionally to make room (spatialStructure stays dominant; their relative
+    // proportions — and therefore the gliders-vs-churn fixture gap — are preserved). Like the spatial
+    // and temporal terms it is dropped-and-renormalized for v1/legacy entries that predate it.
     weights: {
-        criticality: 0.18,
-        entropyBand: 0.08,
+        criticality: 0.16,
+        entropyBand: 0.07,
         fluctuation: 0.04,
-        ruleDiversity: 0.08,
-        spatialStructure: 0.35,
-        spatialHeterogeneity: 0.12,
-        temporalEntropyVariance: 0.15,
+        ruleDiversity: 0.07,
+        spatialStructure: 0.31,
+        spatialHeterogeneity: 0.11,
+        temporalEntropyVariance: 0.13,
+        transport: 0.11,
     },
 
     // --- Criticality term: gaussian in ln(σ), peaked at σ=1 → exp(-(ln σ)² / 2τ²) ---
@@ -163,6 +183,12 @@ export const SCORE_CONFIG = {
      *  which the term reaches 0.5. The temporal-variance scale is an order of magnitude below the
      *  spatial one (a complex rule swings entropy by ~0.007 across samples vs ~0.16 across blocks). */
     temporalVarHalfSat: 0.005,
+
+    // --- Transport / mobility term (v2.9 centroid drift; half-saturation reward) ---
+    /** transport.meanSpeed (mean per-tick active-cell centroid drift, in cells/tick) at which the
+     *  term reaches 0.5. A glider/spaceship soup drifts the centroid on the order of tenths of a cell
+     *  per tick; a dense churn keeps it near zero, so a low half-sat keeps the term discriminating. */
+    transportHalfSat: 0.1,
 
     // --- Confirmation pass (v2.4 two-stage eval; consumed by applyConfirmation). The operational
     // copies live in AutoExploreService.EXPLORE_CONFIG and are passed through; these are the defaults
@@ -250,9 +276,11 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 spatialStructure: 0,
                 spatialHeterogeneity: 0,
                 temporalEntropyVariance: 0,
+                transport: 0,
                 criticalityUsed: false,
                 spatialUsed: false,
                 temporalVarUsed: false,
+                transportUsed: false,
             },
             killed: true,
             killReason,
@@ -299,10 +327,18 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const hasTemporalVar = tv != null && Number.isFinite(tv);
     const temporalEntropyVariance = hasTemporalVar ? tv / (tv + cfg.temporalVarHalfSat) : 0;
 
+    // --- Transport / mobility (active-cell centroid drift speed). v2.9. ---
+    // The mean per-tick drift of the active-cell centroid: a DIRECT signal for coherently translating
+    // structures (gliders/spaceships), which a dense homogeneous churn — whose centroid stays pinned —
+    // lacks. Half-saturation reward. Absent on v1/legacy metrics → dropped + renormalized below.
+    const tp = metrics.transport ? metrics.transport.meanSpeed : undefined;
+    const hasTransport = tp != null && Number.isFinite(tp);
+    const transport = hasTransport ? tp / (tp + cfg.transportHalfSat) : 0;
+
     // Weighted combine; drop a weight (and renormalize) when its input is unavailable so a burst is
     // judged on the terms it has rather than penalized: criticality when σ is null, the two spatial
-    // terms when the v2.1 metrics are absent, and the temporal-variance term when blockEntropy.variance
-    // is absent (v1 metrics / old persisted entries).
+    // terms when the v2.1 metrics are absent, the temporal-variance term when blockEntropy.variance
+    // is absent, and the transport term when transport.meanSpeed is absent (v1 metrics / old entries).
     const w = cfg.weights;
     let num = entropyBand * w.entropyBand + fluctuation * w.fluctuation + ruleDiversity * w.ruleDiversity;
     let den = w.entropyBand + w.fluctuation + w.ruleDiversity;
@@ -322,14 +358,18 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += temporalEntropyVariance * w.temporalEntropyVariance;
         den += w.temporalEntropyVariance;
     }
+    if (hasTransport) {
+        num += transport * w.transport;
+        den += w.transport;
+    }
     const score = den > 0 ? num / den : 0;
 
     return {
         score,
         components: {
             criticality, entropyBand, fluctuation, ruleDiversity,
-            spatialStructure, spatialHeterogeneity, temporalEntropyVariance,
-            criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar,
+            spatialStructure, spatialHeterogeneity, temporalEntropyVariance, transport,
+            criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
         },
         killed: false,
         killReason: null,
@@ -359,8 +399,8 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
             perIC: [],
             perComponent: {
                 criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
-                spatialStructure: 0, spatialHeterogeneity: 0, temporalEntropyVariance: 0,
-                criticalityUsed: false, spatialUsed: false, temporalVarUsed: false,
+                spatialStructure: 0, spatialHeterogeneity: 0, temporalEntropyVariance: 0, transport: 0,
+                criticalityUsed: false, spatialUsed: false, temporalVarUsed: false, transportUsed: false,
             },
             winningIC: -1,
         };

@@ -582,6 +582,9 @@ export class AutoExploreService {
                     mean: winMetrics.blockEntropy ? winMetrics.blockEntropy.mean : 0,
                     variance: winMetrics.blockEntropy ? winMetrics.blockEntropy.variance : 0,
                 },
+                // Persist the centroid-drift speed (v2.9 transport term) so a re-scored/reloaded entry
+                // keeps its transport term instead of dropping-and-renormalizing. Legacy entries omit it.
+                transport: { meanSpeed: winMetrics.transport ? winMetrics.transport.meanSpeed : 0 },
                 sigma: winMetrics.sigma,
             },
         };

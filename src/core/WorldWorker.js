@@ -321,16 +321,62 @@ function calculateHexBlockEntropy() {
     return wasm_world ? wasm_world.block_entropy() : 0;
 }
 
-// Eval-only spatial sample: block-entropy [mean, variance] + join-count spatial order, read from the
-// current state buffer. `block_entropy_stats()` returns a `Vec<f64>` and therefore ALLOCATES in Wasm
-// linear memory — that can grow the heap and detach every typed-array view (state/ruleset/usage), so
-// refresh the views immediately after it and before any further JS-side buffer access. `spatial_order`
-// and `block_entropy` are alloc-free; the mean from stats equals `block_entropy()` by construction.
+// Eval-only spatial sample: block-entropy [mean, variance] + join-count spatial order + the active-
+// cell centroid (per-axis circular-mean angle), read from the current state buffer.
+// `block_entropy_stats()` returns a `Vec<f64>` and therefore ALLOCATES in Wasm linear memory — that
+// can grow the heap and detach every typed-array view (state/ruleset/usage), so refresh the views
+// immediately after it and before any further JS-side buffer access. `spatial_order`,
+// `block_entropy` and `compute_active_centroid`/`centroid_*_angle` are all alloc-free; the mean from
+// stats equals `block_entropy()` by construction. The centroid angles feed the transport metric.
 function sampleEvalSpatialMetrics() {
     const be = wasm_world.block_entropy_stats(); // [mean, variance]
     refreshSimViews(); // block_entropy_stats allocated → views may be detached
     const spatialOrder = wasm_world.spatial_order();
-    return { beMean: be[0], beVariance: be[1], spatialOrder };
+    // Alloc-free: one pass stashes both axis angles + their concentrations; accessors read them back.
+    wasm_world.compute_active_centroid();
+    return {
+        beMean: be[0], beVariance: be[1], spatialOrder,
+        centroidColAngle: wasm_world.centroid_col_angle(),
+        centroidRowAngle: wasm_world.centroid_row_angle(),
+        centroidColR: wasm_world.centroid_col_concentration(),
+        centroidRowR: wasm_world.centroid_row_concentration(),
+    };
+}
+
+// Signed shortest angular delta b−a on a circle, in (−π, π]. atan2(sin Δ, cos Δ) collapses the wrap
+// ambiguity to the shortest path — the only correct displacement between two toroidal centroid angles.
+function shortestAngleDelta(a, b) {
+    const d = b - a;
+    return Math.atan2(Math.sin(d), Math.cos(d));
+}
+
+// Transport / mobility accumulation: turn the centroid displacement between this sample and the
+// previous one into a per-tick drift speed (cells/tick) and fold it into the running mean. The
+// shortest-path-on-torus delta per axis is converted from radians back to cells (× dim / 2π), GATED
+// by that axis's concentration (mean resultant length R), combined as a Euclidean magnitude, and
+// normalized by the sample spacing so the speed is independent of `sampleEvery`.
+//
+// The concentration gate is essential: a spread-out / near-saturated field has a near-zero resultant
+// vector, so its centroid ANGLE is meaningless noise that jitters as cells flip — without the gate a
+// dense churn reads a large spurious "speed". Weighting each axis by min(R_prev, R_cur) makes only a
+// coherent, localized mass (a glider/spaceship, R≈1) contribute; a dense churn (R≈0) contributes ~0.
+function accumulateTransport(s) {
+    const prev = evalState.prevCentroid;
+    if (prev) {
+        const cols = workerConfig.GRID_COLS || 1;
+        const rows = workerConfig.GRID_ROWS || 1;
+        const dCol = shortestAngleDelta(prev.colAngle, s.centroidColAngle) * cols / (2 * Math.PI);
+        const dRow = shortestAngleDelta(prev.rowAngle, s.centroidRowAngle) * rows / (2 * Math.PI);
+        const wCol = Math.min(prev.colR, s.centroidColR);
+        const wRow = Math.min(prev.rowR, s.centroidRowR);
+        const perTick = Math.hypot(dCol * wCol, dRow * wRow) / evalState.sampleEvery;
+        evalState.transportSum += perTick;
+        evalState.transportN++;
+    }
+    evalState.prevCentroid = {
+        colAngle: s.centroidColAngle, rowAngle: s.centroidRowAngle,
+        colR: s.centroidColR, rowR: s.centroidRowR,
+    };
 }
 
 function applySelectiveBrushLogic(cellIndices, brushMode = 'invert') {
@@ -828,6 +874,11 @@ function startEvaluation(opts) {
         spatialVarianceSamples: [],
         // per-frame join-count spatial-order statistic; mean + last reported at the end.
         spatialOrderSamples: [],
+        // transport / mobility: running mean of the per-tick active-cell centroid drift speed, plus
+        // the previous sample's centroid angles to difference against (see accumulateTransport).
+        transportSum: 0,
+        transportN: 0,
+        prevCentroid: null,
         // damage-spreading Hamming series over the probe window.
         probeHamming: [],
         // rule-usage counters baseline. Snapshotted lazily at END of warmup (counters are monotonic
@@ -891,6 +942,8 @@ function runEvaluationChunk() {
             evalState.blockEntropySamples.push(m.beMean);
             evalState.spatialVarianceSamples.push(m.beVariance);
             evalState.spatialOrderSamples.push(m.spatialOrder);
+            // Fold the inter-sample centroid drift (concentration-gated) into the mean transport speed.
+            accumulateTransport(m);
         }
 
         // Falling into a cycle is a definitive classification — stop burning ticks.
@@ -964,6 +1017,10 @@ function finishEvaluation() {
         spatialOrderLast = soSamples[soSamples.length - 1];
     }
 
+    // Transport (mobility): mean per-tick active-cell centroid drift speed over the burst's samples.
+    // Needs ≥2 samples to difference; a sub-warmup or instantly-terminal burst leaves it at 0.
+    const transportMeanSpeed = s.transportN > 0 ? s.transportSum / s.transportN : 0;
+
     const sigma = s.probe.enabled ? estimateSigma(s.probeHamming, numCells) : null;
 
     // Per-rule usage delta over the burst (end - start); a Shannon-diversity input for Phase 3.
@@ -994,6 +1051,7 @@ function finishEvaluation() {
             samples: beSamples,
         },
         spatialOrder: { mean: spatialOrderMean, last: spatialOrderLast },
+        transport: { meanSpeed: transportMeanSpeed },
         sigma,
         probeHamming: s.probeHamming,
         ruleUsageDelta: ruleUsageDeltaBuffer,

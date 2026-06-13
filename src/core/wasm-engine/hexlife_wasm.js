@@ -50,12 +50,58 @@ export class World {
         return v1;
     }
     /**
+     * Column-axis active-cell centroid angle from the last `compute_active_centroid` (radians).
+     * @returns {number}
+     */
+    centroid_col_angle() {
+        const ret = wasm.world_centroid_col_angle(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Column-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+     * @returns {number}
+     */
+    centroid_col_concentration() {
+        const ret = wasm.world_centroid_col_concentration(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Row-axis active-cell centroid angle from the last `compute_active_centroid` (radians).
+     * @returns {number}
+     */
+    centroid_row_angle() {
+        const ret = wasm.world_centroid_row_angle(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Row-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+     * @returns {number}
+     */
+    centroid_row_concentration() {
+        const ret = wasm.world_centroid_row_concentration(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Rolling hash of the current state buffer, used for cycle detection.
      * @returns {number}
      */
     checksum_state() {
         const ret = wasm.world_checksum_state(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Recompute the active-cell centroid as a per-axis circular mean and stash it in
+     * `centroid_col_angle` / `centroid_row_angle` (radians, in (-π, π]). The circular mean is the
+     * ONLY correct centroid on a torus: each axis coordinate maps to an angle θ = 2π·coord/dim,
+     * we accumulate Σsin/Σcos, and take atan2 of the resultant vector. A simple arithmetic mean
+     * would jump discontinuously across the wrap seam and mis-measure a structure straddling it.
+     *
+     * One pass, NO allocation (scalar accumulators + four scalar field writes), so it never grows
+     * Wasm linear memory and JS typed-array views stay valid — no `refreshSimViews()` needed after.
+     * With no active cells the resultant is the zero vector and all four outputs default to 0.
+     */
+    compute_active_centroid() {
+        wasm.world_compute_active_centroid(this.__wbg_ptr);
     }
     /**
      * Number of cells that flipped state in the last `run_tick` (turnover/activity proxy).

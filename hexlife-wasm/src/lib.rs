@@ -22,6 +22,10 @@ const NEIGHBOR_DIRS_EVEN_R: [[i32; 2]; 6] = [[-1, 0], [-1, -1], [0, -1], [1, -1]
 #[wasm_bindgen]
 pub struct World {
     num_cells: usize,
+    // Grid dimensions, retained so per-cell `(col, row)` can be recovered from the linear index
+    // (the neighbor table bakes the dims in but doesn't keep them). Used by the active-cell centroid.
+    grid_cols: usize,
+    grid_rows: usize,
     state: Vec<u8>,
     next_state: Vec<u8>,
     rule_indices: Vec<u8>,
@@ -50,6 +54,23 @@ pub struct World {
     probe_active: bool,
     probe_state: Vec<u8>,
     probe_next_state: Vec<u8>,
+    // --- Active-cell centroid (auto-explore transport / mobility measure) ---
+    // The centroid of the active cells expressed as a per-axis CIRCULAR mean angle (radians, in
+    // (-π, π]). On a torus the only correct centroid is the circular mean: map each axis coordinate
+    // to an angle θ = 2π·coord/dim, accumulate Σsin/Σcos, and take atan2 of the resultant. A plain
+    // arithmetic mean would be wrong across the wrap seam. `compute_active_centroid` fills these in
+    // one alloc-free pass; the worker samples them and turns the inter-sample displacement into a
+    // mean drift speed (`metrics.transport.meanSpeed`). Both default to 0 (no active cells ⇒ 0).
+    centroid_col_angle: f64,
+    centroid_row_angle: f64,
+    // Per-axis CONCENTRATION = mean resultant length R = |Σ(sin,cos)|/N_active, in [0,1]. R≈1 when the
+    // active cells cluster in a narrow arc (a compact structure — the centroid angle is meaningful);
+    // R≈0 when they spread around the whole torus (a dense/uniform field — the near-zero resultant's
+    // angle is pure NOISE that jitters as cells flip). The worker GATES each axis's centroid
+    // displacement by this so spread-out churn can't masquerade as motion; only a coherent, localized
+    // mass contributes to the transport speed.
+    centroid_col_concentration: f64,
+    centroid_row_concentration: f64,
 }
 
 /// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Called once
@@ -87,6 +108,8 @@ impl World {
         let num_cells = (grid_cols.max(0) * grid_rows.max(0)) as usize;
         World {
             num_cells,
+            grid_cols: grid_cols.max(0) as usize,
+            grid_rows: grid_rows.max(0) as usize,
             state: vec![0; num_cells],
             next_state: vec![0; num_cells],
             rule_indices: vec![0; num_cells],
@@ -99,6 +122,10 @@ impl World {
             probe_active: false,
             probe_state: Vec::new(),
             probe_next_state: Vec::new(),
+            centroid_col_angle: 0.0,
+            centroid_row_angle: 0.0,
+            centroid_col_concentration: 0.0,
+            centroid_row_concentration: 0.0,
         }
     }
 
@@ -377,6 +404,73 @@ impl World {
         }
         let variance = (mean_sq - mean * mean).max(0.0);
         vec![mean, variance]
+    }
+
+    /// Recompute the active-cell centroid as a per-axis circular mean and stash it in
+    /// `centroid_col_angle` / `centroid_row_angle` (radians, in (-π, π]). The circular mean is the
+    /// ONLY correct centroid on a torus: each axis coordinate maps to an angle θ = 2π·coord/dim,
+    /// we accumulate Σsin/Σcos, and take atan2 of the resultant vector. A simple arithmetic mean
+    /// would jump discontinuously across the wrap seam and mis-measure a structure straddling it.
+    ///
+    /// One pass, NO allocation (scalar accumulators + four scalar field writes), so it never grows
+    /// Wasm linear memory and JS typed-array views stay valid — no `refreshSimViews()` needed after.
+    /// With no active cells the resultant is the zero vector and all four outputs default to 0.
+    pub fn compute_active_centroid(&mut self) {
+        self.centroid_col_angle = 0.0;
+        self.centroid_row_angle = 0.0;
+        self.centroid_col_concentration = 0.0;
+        self.centroid_row_concentration = 0.0;
+        if self.num_cells == 0 || self.grid_cols == 0 || self.grid_rows == 0 {
+            return;
+        }
+        use std::f64::consts::PI;
+        let col_step = 2.0 * PI / self.grid_cols as f64;
+        let row_step = 2.0 * PI / self.grid_rows as f64;
+        let cols = self.grid_cols;
+        let (mut sin_c, mut cos_c, mut sin_r, mut cos_r) = (0.0, 0.0, 0.0, 0.0);
+        let mut active = 0u32;
+        for i in 0..self.num_cells {
+            if self.state[i] == 1 {
+                let col = (i % cols) as f64;
+                let row = (i / cols) as f64;
+                let ac = col * col_step;
+                let ar = row * row_step;
+                sin_c += ac.sin();
+                cos_c += ac.cos();
+                sin_r += ar.sin();
+                cos_r += ar.cos();
+                active += 1;
+            }
+        }
+        if active > 0 {
+            let n = active as f64;
+            self.centroid_col_angle = sin_c.atan2(cos_c);
+            self.centroid_row_angle = sin_r.atan2(cos_r);
+            // Mean resultant length per axis: |Σ(sin,cos)| / N_active, clamped to [0,1] (it already is
+            // by construction; the min guards float drift). 1 = tightly clustered, 0 = spread/uniform.
+            self.centroid_col_concentration = ((sin_c * sin_c + cos_c * cos_c).sqrt() / n).min(1.0);
+            self.centroid_row_concentration = ((sin_r * sin_r + cos_r * cos_r).sqrt() / n).min(1.0);
+        }
+    }
+
+    /// Column-axis active-cell centroid angle from the last `compute_active_centroid` (radians).
+    pub fn centroid_col_angle(&self) -> f64 {
+        self.centroid_col_angle
+    }
+
+    /// Row-axis active-cell centroid angle from the last `compute_active_centroid` (radians).
+    pub fn centroid_row_angle(&self) -> f64 {
+        self.centroid_row_angle
+    }
+
+    /// Column-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+    pub fn centroid_col_concentration(&self) -> f64 {
+        self.centroid_col_concentration
+    }
+
+    /// Row-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+    pub fn centroid_row_concentration(&self) -> f64 {
+        self.centroid_row_concentration
     }
 }
 
@@ -812,6 +906,93 @@ mod tests {
         }
         let stats = w.block_entropy_stats();
         assert!(stats[1] > 0.0, "mixed field should have positive variance, got {}", stats[1]);
+    }
+
+    #[test]
+    fn active_centroid_circular_mean_of_known_points() {
+        use std::f64::consts::PI;
+        // Empty grid ⇒ angles AND concentrations default to 0.
+        let mut empty = World::new(40, 46);
+        empty.compute_active_centroid();
+        assert_eq!(empty.centroid_col_angle(), 0.0);
+        assert_eq!(empty.centroid_row_angle(), 0.0);
+        assert_eq!(empty.centroid_col_concentration(), 0.0);
+        assert_eq!(empty.centroid_row_concentration(), 0.0);
+
+        // A single active cell sits exactly at its own circular-mean angle (θ = 2π·coord/dim) and is
+        // maximally concentrated (a single point ⇒ R = 1 on both axes).
+        let cols = 40usize;
+        let mut one = World::new(cols as i32, 46);
+        let (col, row) = (10usize, 0usize);
+        one.state[row * cols + col] = 1;
+        one.compute_active_centroid();
+        assert!((one.centroid_col_angle() - 2.0 * PI * col as f64 / cols as f64).abs() < 1e-9);
+        assert!((one.centroid_row_angle() - 0.0).abs() < 1e-9);
+        assert!((one.centroid_col_concentration() - 1.0).abs() < 1e-12);
+        assert!((one.centroid_row_concentration() - 1.0).abs() < 1e-12);
+
+        // A FULL grid spreads active cells evenly around the torus on both axes, so the resultant
+        // vector collapses to ~0 and the concentration ⇒ ~0. This is the churn-gating guarantee: a
+        // dense/uniform field's centroid angle is meaningless noise and must not register as motion.
+        let mut full = World::new(cols as i32, 46);
+        for c in full.state.iter_mut() {
+            *c = 1;
+        }
+        full.compute_active_centroid();
+        assert!(full.centroid_col_concentration() < 1e-9, "full grid col R must be ~0");
+        assert!(full.centroid_row_concentration() < 1e-9, "full grid row R must be ~0");
+    }
+
+    #[test]
+    fn active_centroid_tracks_translation_and_holds_for_still_life() {
+        use std::f64::consts::PI;
+        // Signed shortest angle between two circular-mean angles, and the torus displacement (in
+        // cells) it implies — mirrors the worker's transport accumulation exactly.
+        fn shortest(a: f64, b: f64) -> f64 {
+            let d = b - a;
+            d.sin().atan2(d.cos())
+        }
+        fn displacement(cols: f64, rows: f64, c0: f64, r0: f64, c1: f64, r1: f64) -> f64 {
+            let dcol = shortest(c0, c1) * cols / (2.0 * PI);
+            let drow = shortest(r0, r1) * rows / (2.0 * PI);
+            (dcol * dcol + drow * drow).sqrt()
+        }
+
+        let cols = 40i32;
+        let rows = 46i32;
+
+        // A "copy neighbor-d" ruleset (next = bit d of the neighbor mask) translates a lone active
+        // cell by one fixed neighbor step each tick — the cell stays single, it just moves.
+        let mut mover = World::new(cols, rows);
+        let d = 3usize;
+        for idx in 0..128 {
+            mover.ruleset[idx] = ((idx >> d) & 1) as u8;
+        }
+        let center = (rows / 2 * cols + cols / 2) as usize;
+        mover.state[center] = 1;
+        mover.compute_active_centroid();
+        let (c0, r0) = (mover.centroid_col_angle(), mover.centroid_row_angle());
+        mover.run_tick();
+        assert_eq!(mover.active_count(), 1, "the mover stays a single cell (it just translated)");
+        mover.compute_active_centroid();
+        let (c1, r1) = (mover.centroid_col_angle(), mover.centroid_row_angle());
+        let dist = displacement(cols as f64, rows as f64, c0, r0, c1, r1);
+        assert!(dist > 0.5, "a translating mover yields non-zero centroid speed, got {dist}");
+
+        // A still life (center-preserving ruleset) leaves every cell — and so the centroid — put.
+        let mut still = seeded_world(cols, rows, 0xACE5);
+        for idx in 0..128 {
+            still.ruleset[idx] = ((idx >> 6) & 1) as u8;
+        }
+        still.compute_active_centroid();
+        let (sc0, sr0) = (still.centroid_col_angle(), still.centroid_row_angle());
+        for _ in 0..5 {
+            still.run_tick();
+        }
+        still.compute_active_centroid();
+        let (sc1, sr1) = (still.centroid_col_angle(), still.centroid_row_angle());
+        let sdist = displacement(cols as f64, rows as f64, sc0, sr0, sc1, sr1);
+        assert!(sdist < 1e-9, "a still life yields ~0 centroid speed, got {sdist}");
     }
 
     // Golden checksums for default_ruleset_golden_checksum_regression (48x56 grid, seed 0x2468ACE).

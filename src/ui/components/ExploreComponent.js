@@ -35,6 +35,7 @@ const COMPONENT_META = [
     { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed' },
     { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed' },
     { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed' },
+    { key: 'transport', label: 'Transport', usedFlag: 'transportUsed' },
 ];
 
 const MAX_GALLERY_RENDER = 40;
