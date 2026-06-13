@@ -3,8 +3,8 @@ import { EVENTS } from '../../../services/EventBus.js';
 import * as PersistenceService from '../../../services/PersistenceService.js';
 
 /**
- * On-demand "interestingness" metrics for the selected world. The six component values
- * (σ / Entropy / Flux / Diversity / Structure / Heterog.) are the same ones Auto-Explore scores a
+ * On-demand "interestingness" metrics for the selected world. The seven component values
+ * (σ / Entropy / Flux / Diversity / Structure / Heterog. / Temporal) are the same ones Auto-Explore scores a
  * candidate on, but they're only produced by an evaluation burst — so rather than computing them live
  * on the hot tick path, this plugin runs ONE burst on demand (the Measure button) via
  * WorldManager.measureSelectedWorld (non-destructive: it snapshots and restores the world) and renders
@@ -19,6 +19,7 @@ const COMPONENT_META = [
     { key: 'ruleDiversity', label: 'Diversity', hint: 'Shannon spread of which of the 128 rules actually fire.' },
     { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed', hint: 'Join-count spatial order — domains/gliders vs salt-and-pepper.' },
     { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed', hint: 'Order and disorder coexisting in different regions.' },
+    { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed', hint: 'Entropy swinging over time (Wuensche) — complex rules, not steady order or chaos.' },
 ];
 
 const SETTING_PROBE = 'analysisMeasureProbe';
@@ -40,7 +41,7 @@ export class InterestingnessMetricsPlugin extends IAnalysisPlugin {
 
         this.mountPoint.innerHTML = `
             <div class="interestingness-metrics-plugin">
-                <p class="im-blurb">Measure the selected world's dynamics — the same six terms Auto-Explore ranks rulesets on. Runs one short evaluation burst; the world is restored afterwards.</p>
+                <p class="im-blurb">Measure the selected world's dynamics — the same seven terms Auto-Explore ranks rulesets on. Runs one short evaluation burst; the world is restored afterwards.</p>
                 <div class="im-controls">
                     <label class="im-ticks-field">Ticks:
                         <input type="number" id="im-ticks" min="40" max="5000" step="20" value="${ticks}">

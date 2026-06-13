@@ -34,6 +34,7 @@ const COMPONENT_META = [
     { key: 'ruleDiversity', label: 'Diversity' },
     { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed' },
     { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed' },
+    { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed' },
 ];
 
 const MAX_GALLERY_RENDER = 40;

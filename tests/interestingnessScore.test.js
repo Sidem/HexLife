@@ -363,6 +363,42 @@ describe('scoreSingleIC — spatial structure (v2)', () => {
     });
 });
 
+// --- v2.8: temporal entropy variance (Wuensche complex-rule discriminator) ---
+
+describe('scoreSingleIC — temporal entropy variance (v2.8)', () => {
+    it('a high-temporal-variance burst out-scores an otherwise-identical flat one', () => {
+        const base = structuredCritical();
+        const swinging = scoreSingleIC({ ...base, blockEntropy: { ...base.blockEntropy, variance: 0.02 } });
+        const flat = scoreSingleIC({ ...base, blockEntropy: { ...base.blockEntropy, variance: 0.0 } });
+        expect(swinging.components.temporalEntropyVariance)
+            .toBeGreaterThan(flat.components.temporalEntropyVariance);
+        expect(swinging.score).toBeGreaterThan(flat.score);
+    });
+
+    it('exposes the temporal component + a temporalVarUsed flag when blockEntropy.variance is present', () => {
+        const c = scoreSingleIC(structuredCritical()).components;
+        expect(c.temporalVarUsed).toBe(true);
+        expect(c.temporalEntropyVariance).toBeGreaterThan(0.5); // 0.01 / (0.01 + 0.005)
+    });
+
+    it('marks the term unused and renormalizes when blockEntropy.variance is absent (v1 entries)', () => {
+        const m = structuredCritical();
+        // Legacy metrics: no temporal variance (keep spatialVariance so other terms still count).
+        m.blockEntropy = { mean: m.blockEntropy.mean, spatialVariance: m.blockEntropy.spatialVariance };
+        const r = scoreSingleIC(m);
+        expect(r.components.temporalVarUsed).toBe(false);
+        expect(r.components.temporalEntropyVariance).toBe(0);
+        // Dropping the temporal weight must not zero the score — it scores on the remaining terms.
+        expect(r.score).toBeGreaterThan(0);
+    });
+
+    it('separates the real fixtures: gliders-chaos swings entropy far more than churn-sparse', () => {
+        const g = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).components.temporalEntropyVariance;
+        const c = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' }).components.temporalEntropyVariance;
+        expect(g).toBeGreaterThan(c);
+    });
+});
+
 describe('Score v2 — real fixtures (the central F1/F4 regression)', () => {
     const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
     const churnSparse = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' }).score;

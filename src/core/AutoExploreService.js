@@ -575,7 +575,13 @@ export class AutoExploreService {
             generation: this.generation,
             metrics: {
                 finalRatio: winMetrics.finalRatio,
-                blockEntropy: { mean: winMetrics.blockEntropy ? winMetrics.blockEntropy.mean : 0 },
+                // Persist both mean (descriptor / entropy bin) and the temporal variance (v2.8 Wuensche
+                // term) so a re-scored or reloaded entry keeps its temporal-variance term instead of
+                // falling back to drop-and-renormalize. Legacy entries lack variance → renormalize.
+                blockEntropy: {
+                    mean: winMetrics.blockEntropy ? winMetrics.blockEntropy.mean : 0,
+                    variance: winMetrics.blockEntropy ? winMetrics.blockEntropy.variance : 0,
+                },
                 sigma: winMetrics.sigma,
             },
         };

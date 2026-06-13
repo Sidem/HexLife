@@ -25,7 +25,9 @@ import { hammingDistanceHex } from '../../utils/utils.js';
  * The behavior-descriptor subset the archive reads from a candidate's WINNING-IC metrics.
  * @typedef {object} BehaviorMetrics
  * @property {number} [finalRatio]       Final active-cell ratio in [0,1].
- * @property {{mean: number}} [blockEntropy] Mean normalized block entropy in [0,1].
+ * @property {{mean: number, variance?: number}} [blockEntropy] Mean normalized block entropy in
+ *   [0,1] (the entropy bin); optional temporal variance (v2.8 Wuensche term, persisted for re-score
+ *   stability but not part of the descriptor).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe ran).
  */
 

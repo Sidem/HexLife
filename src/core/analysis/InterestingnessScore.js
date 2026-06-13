@@ -66,8 +66,10 @@
  * @property {number} ruleDiversity Shannon diversity of rule usage ([0,1]).
  * @property {number} spatialStructure     Spatial-order deviation term ([0,1]) — 0 if unused (v2).
  * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
+ * @property {number} temporalEntropyVariance Temporal block-entropy-variance term ([0,1]) — 0 if unused (v2.8).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
  * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
+ * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
  */
 
 /**
@@ -100,7 +102,8 @@ export const SCORE_CONFIG = {
     saturatedRatio: 0.99,
 
     // --- Component weights (relative; renormalized internally — criticality dropped if σ absent,
-    // the two spatial terms dropped if the v2.1 spatial metrics are absent) ---
+    // the two spatial terms dropped if the v2.1 spatial metrics are absent, temporalEntropyVariance
+    // dropped if blockEntropy.variance is absent) ---
     //
     // v2 rebalance (F1/F2/F4): the σ≈1 / mid-band-entropy / high-CV proxies CANNOT tell
     // homogeneous "churn" from a structured glider soup — both saturate those terms (measured in
@@ -109,13 +112,27 @@ export const SCORE_CONFIG = {
     // separates them is the spatial-order term, so it carries the most weight; fluctuation drops
     // (CV rewards a cycle's oscillation amplitude — F2). These weights are tuned so the gliders-chaos
     // fixture out-ranks the churn-sparse fixture by ≥0.10 (the central v2 regression).
+    //
+    // v2.8 (Wuensche discriminator): added `temporalEntropyVariance` — the variance of block entropy
+    // OVER TIME. Wuensche (1999, "Classifying Cellular Automata Automatically") shows this is the
+    // single strongest signal separating complex/glider rules from ordered and chaotic ones: ordered
+    // rules settle to a low stable entropy, chaotic rules sit at a high stable entropy, and only
+    // *complex* rules show large entropy *swings*. On the fixtures gliders-chaos has ~12× the temporal
+    // variance of churn-sparse, so it reinforces spatialStructure (the v2 separator) rather than
+    // fighting it. All weights were re-tuned together to make room; spatialStructure REMAINS the
+    // dominant term (the v2 finding). NB: temporal-variance terms were historically down-weighted
+    // because long cyclers inflate them (the `fluctuation` weight = 0.05 rationale, F2). This term is
+    // only safe because the v2.4 confirmation burst hard-penalizes cyclers DOWNSTREAM
+    // (confirmCycleMaxPeriod). Keep that ordering — never reintroduce temporal variance upstream of the
+    // confirmation filter.
     weights: {
-        criticality: 0.20,
-        entropyBand: 0.10,
-        fluctuation: 0.05,
-        ruleDiversity: 0.10,
-        spatialStructure: 0.40,
-        spatialHeterogeneity: 0.15,
+        criticality: 0.18,
+        entropyBand: 0.08,
+        fluctuation: 0.04,
+        ruleDiversity: 0.08,
+        spatialStructure: 0.35,
+        spatialHeterogeneity: 0.12,
+        temporalEntropyVariance: 0.15,
     },
 
     // --- Criticality term: gaussian in ln(σ), peaked at σ=1 → exp(-(ln σ)² / 2τ²) ---
@@ -140,6 +157,12 @@ export const SCORE_CONFIG = {
     /** blockEntropy.spatialVariance at which the heterogeneity term reaches 0.5 (the [0,1]-entropy
      *  variance scale is small). */
     spatialVarHalfSat: 0.02,
+
+    // --- Temporal entropy-variance term (v2.8 Wuensche discriminator; half-saturation reward) ---
+    /** blockEntropy.variance (temporal — variance of the per-sample block entropy OVER the burst) at
+     *  which the term reaches 0.5. The temporal-variance scale is an order of magnitude below the
+     *  spatial one (a complex rule swings entropy by ~0.007 across samples vs ~0.16 across blocks). */
+    temporalVarHalfSat: 0.005,
 
     // --- Confirmation pass (v2.4 two-stage eval; consumed by applyConfirmation). The operational
     // copies live in AutoExploreService.EXPLORE_CONFIG and are passed through; these are the defaults
@@ -226,8 +249,10 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 ruleDiversity: 0,
                 spatialStructure: 0,
                 spatialHeterogeneity: 0,
+                temporalEntropyVariance: 0,
                 criticalityUsed: false,
                 spatialUsed: false,
+                temporalVarUsed: false,
             },
             killed: true,
             killReason,
@@ -265,9 +290,19 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const spatialHeterogeneity = hasSpatialVar ? sv / (sv + cfg.spatialVarHalfSat) : 0;
     const spatialUsed = hasSpatialOrder || hasSpatialVar;
 
+    // --- Temporal entropy variance (Wuensche complex-rule discriminator). v2.8. ---
+    // The variance of block entropy OVER TIME across the burst's samples — large for complex rules
+    // that swing between order and disorder, small for both ordered (low stable) and chaotic (high
+    // stable) rules. Safe ONLY because the v2.4 confirmation burst hard-penalizes cyclers downstream
+    // (cyclers also inflate this); never move it upstream of that filter. Absent on v1/legacy metrics.
+    const tv = metrics.blockEntropy ? metrics.blockEntropy.variance : undefined;
+    const hasTemporalVar = tv != null && Number.isFinite(tv);
+    const temporalEntropyVariance = hasTemporalVar ? tv / (tv + cfg.temporalVarHalfSat) : 0;
+
     // Weighted combine; drop a weight (and renormalize) when its input is unavailable so a burst is
-    // judged on the terms it has rather than penalized: criticality when σ is null, and the two
-    // spatial terms when the v2.1 metrics are absent (v1 metrics / old persisted entries).
+    // judged on the terms it has rather than penalized: criticality when σ is null, the two spatial
+    // terms when the v2.1 metrics are absent, and the temporal-variance term when blockEntropy.variance
+    // is absent (v1 metrics / old persisted entries).
     const w = cfg.weights;
     let num = entropyBand * w.entropyBand + fluctuation * w.fluctuation + ruleDiversity * w.ruleDiversity;
     let den = w.entropyBand + w.fluctuation + w.ruleDiversity;
@@ -283,13 +318,18 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += spatialHeterogeneity * w.spatialHeterogeneity;
         den += w.spatialHeterogeneity;
     }
+    if (hasTemporalVar) {
+        num += temporalEntropyVariance * w.temporalEntropyVariance;
+        den += w.temporalEntropyVariance;
+    }
     const score = den > 0 ? num / den : 0;
 
     return {
         score,
         components: {
             criticality, entropyBand, fluctuation, ruleDiversity,
-            spatialStructure, spatialHeterogeneity, criticalityUsed, spatialUsed,
+            spatialStructure, spatialHeterogeneity, temporalEntropyVariance,
+            criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar,
         },
         killed: false,
         killReason: null,
@@ -319,7 +359,8 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
             perIC: [],
             perComponent: {
                 criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
-                spatialStructure: 0, spatialHeterogeneity: 0, criticalityUsed: false, spatialUsed: false,
+                spatialStructure: 0, spatialHeterogeneity: 0, temporalEntropyVariance: 0,
+                criticalityUsed: false, spatialUsed: false, temporalVarUsed: false,
             },
             winningIC: -1,
         };
