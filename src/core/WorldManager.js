@@ -4,7 +4,8 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
-import { AutoExploreService } from './AutoExploreService.js';
+import { AutoExploreService, EXPLORE_CONFIG } from './AutoExploreService.js';
+import { scoreSingleIC } from './analysis/InterestingnessScore.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import * as Renderer from '../rendering/renderer.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
@@ -1104,6 +1105,64 @@ export class WorldManager {
             content: JSON.stringify(data, null, 2),
             mimeType: 'application/json'
         });
+    }
+
+    /**
+     * Run a one-off "interestingness" measurement on the selected world WITHOUT disturbing it, for the
+     * Analysis panel's on-demand metrics. Snapshots the exact current cells + tick, runs one evaluation
+     * burst (the SAME machinery Auto-Explore uses — `RUN_EVALUATION`), scores it with `scoreSingleIC`,
+     * then restores the snapshot so the burst doesn't fast-forward the user's world. Compute-intensive
+     * (especially the σ damage probe), hence on-demand rather than live.
+     * @param {{ticks?: number, probe?: boolean}} [opts] - `ticks` burst length; `probe` enables the σ probe.
+     * @returns {Promise<{score:number, components:object, killed:boolean, killReason:(string|null), tick:number}|null>}
+     */
+    measureSelectedWorld = async ({ ticks = EXPLORE_CONFIG.evalTicks, probe = true } = {}) => {
+        if (this.autoExploreService?.isRunning()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop Auto-Explore before measuring a world.', type: 'error' });
+            return null;
+        }
+        const idx = this.selectedWorldIndex;
+        const proxy = this.worlds[idx];
+        if (!proxy) return null;
+
+        const hex = this.getCurrentRulesetHex();
+        if (!hex || hex === 'Error' || hex === 'N/A') {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Selected world has no valid ruleset to measure.', type: 'error' });
+            return null;
+        }
+
+        // Snapshot the exact pre-measure state (cells + tick) for a non-destructive restore.
+        const savedCells = proxy.latestStateArray ? new Uint8Array(proxy.latestStateArray) : null;
+        if (!savedCells || savedCells.length !== Config.NUM_CELLS) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready to measure yet.', type: 'error' });
+            return null;
+        }
+        const savedTick = proxy.getLatestStats().tick || 0;
+        const rulesetArray = this.getCurrentRulesetArray();
+
+        try {
+            const metrics = await proxy.runEvaluation({
+                ticks,
+                sampleEvery: EXPLORE_CONFIG.sampleEvery,
+                warmupTicks: EXPLORE_CONFIG.warmupTicks,
+                probe: { enabled: !!probe, probeTicks: EXPLORE_CONFIG.probeTicks },
+            });
+            const scored = scoreSingleIC({ ...metrics, icLabel: 'measure' });
+            return {
+                score: scored.score,
+                components: scored.components,
+                killed: scored.killed,
+                killReason: scored.killReason,
+                tick: savedTick,
+            };
+        } finally {
+            // Restore the exact pre-measure cells/tick (LOAD_STATE rewrites the worker buffers).
+            proxy.sendCommand('LOAD_STATE', {
+                newStateBuffer: savedCells.buffer.slice(0),
+                newRulesetBuffer: rulesetArray.buffer.slice(0),
+                worldTick: savedTick,
+            }, [savedCells.buffer.slice(0), rulesetArray.buffer.slice(0)]);
+        }
     }
 
     loadWorldState = (worldIndex, loadedData) => {

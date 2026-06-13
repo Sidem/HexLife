@@ -179,4 +179,92 @@
 .analysis-component-content.mobile-context {
     /* Mobile-specific layout styles for the component */
     padding: 0;
-} 
+}
+
+/* --- Interestingness Metrics plugin (on-demand Measure) --- */
+.interestingness-metrics-plugin {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.interestingness-metrics-plugin .im-blurb {
+    margin: 0;
+    font-size: 0.78em;
+    color: #aaa;
+    line-height: 1.4;
+}
+
+.interestingness-metrics-plugin .im-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.interestingness-metrics-plugin .im-ticks-field,
+.interestingness-metrics-plugin .im-probe-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82em;
+    color: #ccc;
+}
+
+.interestingness-metrics-plugin .im-ticks-field input {
+    width: 5em;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid #444;
+    border-radius: 3px;
+    color: #eee;
+    padding: 2px 4px;
+}
+
+.interestingness-metrics-plugin .im-measure-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--accent-dim, #d8b05b);
+    border-radius: 4px;
+    background-color: rgba(216, 176, 91, 0.12);
+    color: var(--accent, #f0c674);
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.interestingness-metrics-plugin .im-measure-btn:hover:not(:disabled) {
+    background-color: rgba(216, 176, 91, 0.25);
+}
+
+.interestingness-metrics-plugin .im-measure-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.interestingness-metrics-plugin .im-status {
+    font-size: 0.85em;
+    color: #ddd;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.interestingness-metrics-plugin .im-kill {
+    color: #e07a7a;
+    font-weight: bold;
+}
+
+.interestingness-metrics-plugin .im-score-bar {
+    display: inline-block;
+    flex: 1;
+    max-width: 120px;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--surface-1, #1d1d20);
+    overflow: hidden;
+}
+
+.interestingness-metrics-plugin .im-score-fill {
+    display: block;
+    height: 100%;
+    background-color: var(--accent, #f0c674);
+    border-radius: 3px;
+}

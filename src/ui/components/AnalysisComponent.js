@@ -5,6 +5,7 @@ import { Throttler } from '../../utils/throttler.js';
 
 import { RatioHistoryPlugin } from './analysis_plugins/RatioHistoryPlugin.js';
 import { EntropyPlotPlugin } from './analysis_plugins/EntropyPlotPlugin.js';
+import { InterestingnessMetricsPlugin } from './analysis_plugins/InterestingnessMetricsPlugin.js';
 
 export class AnalysisComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -44,6 +45,7 @@ export class AnalysisComponent extends BaseComponent {
     _registerPlugins() {
         this.plugins.push(new RatioHistoryPlugin());
         this.plugins.push(new EntropyPlotPlugin());
+        this.plugins.push(new InterestingnessMetricsPlugin());
         console.log(`AnalysisComponent: Registered ${this.plugins.length} plugins.`);
     }
 
@@ -64,7 +66,10 @@ export class AnalysisComponent extends BaseComponent {
                 const stats = this.worldManager.getSelectedWorldStats();
                 return (stats && stats.hexBlockEntropyHistory) ? [...stats.hexBlockEntropyHistory] : [];
             },
-            getEntropySamplingState: () => this.worldManager.getEntropySamplingState()
+            getEntropySamplingState: () => this.worldManager.getEntropySamplingState(),
+            // On-demand interestingness measurement of the selected world (reuses the Auto-Explore
+            // evaluation pipeline; non-destructive). Resolves to a scored breakdown or null.
+            measureSelectedWorld: (opts) => this.worldManager.measureSelectedWorld(opts)
         };
 
         this.plugins.forEach(plugin => {

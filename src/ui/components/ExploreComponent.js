@@ -151,7 +151,7 @@ export class ExploreComponent extends BaseComponent {
         this.sliders.ticks = new SliderComponent(this.element.querySelector('#explore-eval-ticks-mount'), {
             id: 'explore-eval-ticks',
             label: 'Ticks / Evaluation:',
-            min: 40, max: 400, step: 20,
+            min: 40, max: 5000, step: 20,
             value: ticks,
             showValue: true,
             onChange: (v) => PersistenceService.saveUISetting(SETTING_KEYS.ticks, v),

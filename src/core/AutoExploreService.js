@@ -27,21 +27,40 @@ import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 
 /**
  * The IC suite every candidate is evaluated over (roadmap design principle 1: the unit of behavior
- * is `ruleset × initial condition`). Three deterministically-seeded conditions spanning the regimes
- * where different rule families show structure: dense chaos, sparse noise, and a single seed cluster.
+ * is `ruleset × initial condition`). Deterministically-seeded conditions spanning the regimes where
+ * different rule families show structure: dense chaos, sparse noise, a single compact seed cluster,
+ * and several interacting clusters.
+ *
+ * NB the cluster strategy is registered under the worker key `'clusters'` (plural) — `mode: 'cluster'`
+ * silently fell back to density-1.0 (a saturated grid, instantly killed), so the cluster ICs MUST use
+ * `'clusters'`. See WorldWorker `strategies` / ClusterStrategy.
  */
 export const IC_SUITE = [
     { label: 'chaos', initialState: { mode: 'density', params: { density: 0.5 } } },
     { label: 'sparse', initialState: { mode: 'density', params: { density: 0.05 } } },
     {
+        // A single compact seed cluster dropped into an empty grid ("does a small blob organize?").
         label: 'seed',
         initialState: {
-            mode: 'cluster',
+            mode: 'clusters',
             params: {
                 count: 1, density: 1.0, densityVariation: 0,
-                diameter: 14, diameterVariation: 0,
+                diameter: 6, diameterVariation: 0,
                 eccentricity: 0, orientation: 0, orientationVariation: 0,
-                gaussianStdDev: 1.5,
+                gaussianStdDev: 2.0,
+            },
+        },
+    },
+    {
+        // Several interacting clusters ("do separate blobs collide, merge, or seed travelling structure?").
+        label: 'clusters',
+        initialState: {
+            mode: 'clusters',
+            params: {
+                count: 5, density: 1.0, densityVariation: 0.1,
+                diameter: 8, diameterVariation: 3,
+                eccentricity: 0.2, orientation: 0, orientationVariation: 1,
+                gaussianStdDev: 2.0,
             },
         },
     },
@@ -153,6 +172,10 @@ export class AutoExploreService {
     start(options = {}) {
         if (this.isRunning()) return;
         this.options = { ...EXPLORE_CONFIG, ...options };
+        // The confirmation burst must run at least as long as the (now up-to-5000-tick) screening burst,
+        // otherwise a long screen would be "confirmed" by a shorter look — defeating screen-cheap/confirm-
+        // expensive. Scale it up to match without ever shortening the configured confirm length.
+        this.options.confirmTicks = Math.max(this.options.confirmTicks, this.options.evalTicks);
         this.generation = 0;
         this.runnerUpHex = null;
         /** Best base score observed this run (for the generation-budget completion toast, v2.7). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EXPLORE_CONFIG } from '../src/core/AutoExploreService.js';
+import { EXPLORE_CONFIG, IC_SUITE } from '../src/core/AutoExploreService.js';
 import { CYCLE_DETECTION_MAX_PERIOD } from '../src/core/config.js';
 
 // v2.4: the confirmation pass tags/penalizes cycles up to confirmCycleMaxPeriod. The worker can only
@@ -27,5 +27,27 @@ describe('EXPLORE_CONFIG ↔ worker cycle detection', () => {
     // v2.7: the generation budget defaults to unlimited so existing behaviour is unchanged.
     it('maxGenerations defaults to 0 (unlimited)', () => {
         expect(EXPLORE_CONFIG.maxGenerations).toBe(0);
+    });
+});
+
+// The worker registers the cluster strategy under the key 'clusters' (plural). A cluster IC declared
+// with mode 'cluster' silently falls back to density-1.0 (a saturated, instantly-killed grid), so the
+// cluster ICs MUST use 'clusters' to actually place clusters. Lock that in.
+describe('IC_SUITE initial conditions', () => {
+    it('every IC uses a worker-recognised mode (density or clusters)', () => {
+        for (const ic of IC_SUITE) {
+            expect(['density', 'clusters']).toContain(ic.initialState.mode);
+        }
+    });
+
+    it('includes the chaos / sparse / seed / clusters conditions', () => {
+        const labels = IC_SUITE.map((ic) => ic.label);
+        expect(labels).toEqual(expect.arrayContaining(['chaos', 'sparse', 'seed', 'clusters']));
+    });
+
+    it('cluster-based ICs declare a positive cluster count', () => {
+        for (const ic of IC_SUITE.filter((c) => c.initialState.mode === 'clusters')) {
+            expect(ic.initialState.params.count).toBeGreaterThan(0);
+        }
     });
 });
