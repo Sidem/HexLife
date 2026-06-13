@@ -214,7 +214,9 @@ export const EVENTS = {
     /** @event Emitted with no payload to save the currently selected world's state to a file. */
     COMMAND_SAVE_SELECTED_WORLD_STATE: 'command:saveSelectedWorldState', 
     /** @param {{worldIndex: number, loadedData: object}} data - The world to load the state into and the data to load. */
-    COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState', 
+    COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState',
+    /** @event Emitted with no payload to export the currently selected world's render as a PNG download. */
+    COMMAND_EXPORT_WORLD_PNG: 'command:exportWorldPng',
     /** @param {{worldIndex: number, col: number, row: number, brushSize: number}} data - Brush application details. */
     COMMAND_APPLY_BRUSH: 'command:applyBrush', 
     /** @param {{worldIndex: number, cellIndices: Set<number>}} data - A set of specific cell indices to toggle. */

@@ -64,6 +64,7 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_CLEAR_WORLDS` | `{ scope: 'all'\|'selected' }` | Command to clear all cells in the specified scope. |
 | `COMMAND_SAVE_SELECTED_WORLD_STATE` | `(none)` | Command to trigger a file download of the selected world's state. |
 | `COMMAND_LOAD_WORLD_STATE` | `{ worldIndex, loadedData }` | Command to load a world state from a JSON object. |
+| `COMMAND_EXPORT_WORLD_PNG` | `(none)` | Command to export the selected world's render as a PNG download. |
 | `COMMAND_APPLY_SELECTIVE_BRUSH` | `{ worldIndex, cellIndices }` | Command to toggle the state of a specific set of cells. |
 | `COMMAND_SET_WORLD_ENABLED` | `{ worldIndex, isEnabled: boolean }` | Command to set the new enabled state for a specific world. |
 | `COMMAND_SET_ENTROPY_SAMPLING` | `{ enabled: boolean, rate: number }` | Command to set new parameters for entropy sampling. |

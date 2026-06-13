@@ -1,5 +1,6 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as Renderer from '../rendering/renderer.js';
+import { rulesetName } from '../utils/utils.js';
 
 export class Application {
     constructor(appContext) {
@@ -21,7 +22,40 @@ export class Application {
         requestAnimationFrame(this.renderLoop.bind(this));
         window.addEventListener('resize', this.#handleResize);
         document.addEventListener('visibilitychange', this.#handleVisibilityChange);
+        EventBus.subscribe(EVENTS.COMMAND_EXPORT_WORLD_PNG, this.#handleExportWorldPNG);
         console.log("Application loop started.");
+    }
+
+    /**
+     * Export the selected world's render as a PNG download (media-export flagship, v2.6). Reads the
+     * world's FBO at full resolution via the renderer; names the file by ruleset mnemonic + tick.
+     */
+    #handleExportWorldPNG = async () => {
+        const wm = this.appContext.worldManager;
+        const idx = wm.selectedWorldIndex;
+        try {
+            const blobPromise = Renderer.captureWorldPNG(idx);
+            const blob = blobPromise && await blobPromise;
+            if (!blob) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not export PNG.', type: 'error' });
+                return;
+            }
+            const hex = wm.getCurrentRulesetHex();
+            const tick = wm.getSelectedWorldStats().tick || 0;
+            const name = `hexlife-${rulesetName(hex)}-t${tick}.png`.replace(/\s+/g, '-');
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Saved PNG snapshot.', type: 'success' });
+        } catch (err) {
+            console.error('PNG export failed:', err);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not export PNG.', type: 'error' });
+        }
     }
 
     /**

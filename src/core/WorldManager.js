@@ -6,6 +6,7 @@ import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService } from './AutoExploreService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
+import * as Renderer from '../rendering/renderer.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
 
 export class WorldManager {
@@ -28,8 +29,12 @@ export class WorldManager {
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
         // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
-        // it only references the proxies/ruleset service lazily once started.
-        this.autoExploreService = new AutoExploreService(this);
+        // it only references the proxies/ruleset service lazily once started. The thumbnail provider
+        // (v2.6, F6) waits a couple of rAFs for the renderer to draw the world's final eval frame,
+        // then grabs a small JPEG data URL — DI so the service stays renderer-free.
+        this.autoExploreService = new AutoExploreService(this, {
+            thumbnailProvider: (worldIndex) => this._captureExploreThumbnail(worldIndex),
+        });
         this._setupEventListeners();
     }
 
@@ -830,6 +835,30 @@ export class WorldManager {
         settings.rulesetHex = hex;
         if (worldIndex === this.selectedWorldIndex) EventBus.dispatch(EVENTS.RULESET_CHANGED, hex);
     };
+
+    /**
+     * Capture a small JPEG thumbnail of a world's current render for the explore gallery (v2.6, F6).
+     * Waits up to two animation frames so the renderer has a chance to draw the world's final eval
+     * frame (the worker posts a grid update before EVALUATION_RESULT) before reading its FBO. Resolves
+     * to null on any failure so the search loop never throws on capture (it also time-boxes the call).
+     * @param {number} worldIndex
+     * @returns {Promise<string|null>}
+     */
+    _captureExploreThumbnail = (worldIndex) => new Promise((resolve) => {
+        try {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    try {
+                        resolve(Renderer.captureWorldThumbnail(worldIndex));
+                    } catch {
+                        resolve(null);
+                    }
+                });
+            });
+        } catch {
+            resolve(null);
+        }
+    });
 
     /**
      * Restore the worlds captured by {@link _captureAutoExploreSnapshot}. Re-applies each world's

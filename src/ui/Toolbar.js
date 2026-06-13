@@ -14,6 +14,7 @@ const TOOLBAR_BUTTON_ICONS = {
     rankPanelButton: ICONS.trophy,
     saveStateButton: ICONS.save,
     loadStateButton: ICONS.folderOpen,
+    exportPngButton: ICONS.camera,
     shareButton: ICONS.share,
     colorPanelButton: ICONS.palette,
     shortcutsButton: ICONS.keyboard,
@@ -57,6 +58,7 @@ export class Toolbar {
             copyShareLinkButton: document.getElementById('copyShareLinkButton'),
             saveStateButton: document.getElementById('saveStateButton'),
             loadStateButton: document.getElementById('loadStateButton'),
+            exportPngButton: document.getElementById('exportPngButton'),
             fileInput: document.getElementById('fileInput'),
             editRuleButton: document.getElementById('editRuleButton'),
             setupPanelButton: document.getElementById('setupPanelButton'),
@@ -133,6 +135,7 @@ export class Toolbar {
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
+            exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG),
             loadStateButton: () => {
                 this.uiElements.fileInput.accept = ".txt,.json";
                 this.uiElements.fileInput.click();

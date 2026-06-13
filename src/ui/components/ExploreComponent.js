@@ -266,19 +266,28 @@ export class ExploreComponent extends BaseComponent {
         const cyclicChip = entry.cyclic
             ? `<span class="explore-find-cyclic" title="Settles into a period-${entry.cyclic} cycle">↻${entry.cyclic}</span>`
             : '';
+        // Visual preview (v2.6, F6). v1/old entries have no `thumb` (principle 4) — show a placeholder.
+        const thumb = entry.thumb
+            ? `<img class="explore-find-thumb" src="${this._escape(entry.thumb)}" alt="" loading="lazy" />`
+            : `<div class="explore-find-thumb explore-find-thumb--empty" title="No preview">⬡</div>`;
         return `
             <div class="explore-find" data-index="${index}">
-                <div class="explore-find-head">
-                    <span class="explore-find-score" title="Interestingness score">${score}</span>
-                    <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
-                    <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
-                    ${cyclicChip}
-                </div>
-                ${bars}
-                <div class="explore-find-actions">
-                    <button class="button-icon" data-action="apply" title="Apply to selected world (ruleset + winning IC)">${ICONS.target}</button>
-                    <button class="button-icon" data-action="save" title="Save ruleset to your library">${ICONS.star}</button>
-                    <button class="button-icon" data-action="share" title="Copy share link">${ICONS.share}</button>
+                <div class="explore-find-row">
+                    ${thumb}
+                    <div class="explore-find-body">
+                        <div class="explore-find-head">
+                            <span class="explore-find-score" title="Interestingness score">${score}</span>
+                            <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
+                            <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
+                            ${cyclicChip}
+                        </div>
+                        ${bars}
+                        <div class="explore-find-actions">
+                            <button class="button-icon" data-action="apply" title="Apply to selected world (ruleset + winning IC)">${ICONS.target}</button>
+                            <button class="button-icon" data-action="save" title="Save ruleset to your library">${ICONS.star}</button>
+                            <button class="button-icon" data-action="share" title="Copy share link">${ICONS.share}</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;

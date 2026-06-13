@@ -23,6 +23,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="save">Save World State</button>
         <label for="mobileFileInput" class="button file-input-label">Load World State</label>
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
+        <button class="button" data-action="export-png" title="Export PNG snapshot of selected world" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.camera} Export PNG</button>
         <button class="button" data-action="share">Share Setup</button>
         <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.star} Save Ruleset</button>
         <button class="button" data-action="explore" title="Auto-Explore" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.compass} Auto-Explore</button>
@@ -41,6 +42,10 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="save"]'), 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="export-png"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG);
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="share"]'), 'click', () => {

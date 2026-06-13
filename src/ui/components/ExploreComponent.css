@@ -153,6 +153,39 @@
     gap: 6px;
 }
 
+.explore-find-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.explore-find-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.explore-find-thumb {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid var(--border, #444);
+    background-color: var(--surface-1, #1d1d20);
+    object-fit: cover;
+    image-rendering: pixelated;
+}
+
+.explore-find-thumb--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted, #87878f);
+    font-size: 1.4em;
+}
+
 .explore-find-head {
     display: flex;
     align-items: center;
