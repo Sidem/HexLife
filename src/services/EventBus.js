@@ -144,7 +144,9 @@ export const EVENTS = {
     /** @param {EntropySamplingParams} params - The new entropy sampling parameters. */
     ENTROPY_SAMPLING_CHANGED: 'simulation:entropySamplingChanged',
     /** @param {{fps: number, tps: number, targetTps: number}} metrics - The latest performance metrics. */
-    PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated', 
+    PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated',
+    /** @param {{recording: boolean}} data - Whether WebM canvas recording is currently active (drives the record button visual). */
+    WORLD_RECORDING_STATE_CHANGED: 'simulation:worldRecordingStateChanged',
     /** @param {{worldIndex: number}} data - The index of the world whose history changed. */
     HISTORY_CHANGED: 'simulation:historyChanged',
 
@@ -217,6 +219,8 @@ export const EVENTS = {
     COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState',
     /** @event Emitted with no payload to export the currently selected world's render as a PNG download. */
     COMMAND_EXPORT_WORLD_PNG: 'command:exportWorldPng',
+    /** @event Emitted with no payload to toggle WebM video recording of the live canvas (start ⇄ stop+download). */
+    COMMAND_TOGGLE_WORLD_RECORDING: 'command:toggleWorldRecording',
     /** @param {{worldIndex: number, col: number, row: number, brushSize: number}} data - Brush application details. */
     COMMAND_APPLY_BRUSH: 'command:applyBrush', 
     /** @param {{worldIndex: number, cellIndices: Set<number>}} data - A set of specific cell indices to toggle. */

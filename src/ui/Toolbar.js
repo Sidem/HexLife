@@ -15,6 +15,7 @@ const TOOLBAR_BUTTON_ICONS = {
     saveStateButton: ICONS.save,
     loadStateButton: ICONS.folderOpen,
     exportPngButton: ICONS.camera,
+    recordWebmButton: ICONS.video,
     shareButton: ICONS.share,
     colorPanelButton: ICONS.palette,
     shortcutsButton: ICONS.keyboard,
@@ -59,6 +60,7 @@ export class Toolbar {
             saveStateButton: document.getElementById('saveStateButton'),
             loadStateButton: document.getElementById('loadStateButton'),
             exportPngButton: document.getElementById('exportPngButton'),
+            recordWebmButton: document.getElementById('recordWebmButton'),
             fileInput: document.getElementById('fileInput'),
             editRuleButton: document.getElementById('editRuleButton'),
             setupPanelButton: document.getElementById('setupPanelButton'),
@@ -136,6 +138,7 @@ export class Toolbar {
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
             exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG),
+            recordWebmButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING),
             loadStateButton: () => {
                 this.uiElements.fileInput.accept = ".txt,.json";
                 this.uiElements.fileInput.click();
@@ -168,7 +171,15 @@ export class Toolbar {
         });
 
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => this.updatePauseButtonVisual(isPaused));
-        
+        EventBus.subscribe(EVENTS.WORLD_RECORDING_STATE_CHANGED, ({ recording }) => this.updateRecordButtonVisual(recording));
+    }
+
+    updateRecordButtonVisual(isRecording) {
+        const button = this.uiElements?.recordWebmButton;
+        if (!button) return;
+        button.innerHTML = isRecording ? ICONS.stopCircle : ICONS.video;
+        button.title = isRecording ? 'Stop recording & save WebM' : 'Record WebM video of the canvas';
+        button.classList.toggle('is-recording', !!isRecording);
     }
 
     _copyShareLink() {

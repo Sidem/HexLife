@@ -40,6 +40,17 @@
         border-color: #005a9e;
     }
 
+    .toolbar-button.is-recording {
+        color: #ff4d4d;
+        border-color: #ff4d4d;
+        animation: toolbar-recording-pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes toolbar-recording-pulse {
+        0%, 100% { background-color: rgba(255, 77, 77, 0.12); }
+        50% { background-color: rgba(255, 77, 77, 0.32); }
+    }
+
     .toolbar-separator {
         height: 1px;
         width: 80%;

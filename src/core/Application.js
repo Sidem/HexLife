@@ -1,6 +1,7 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as Renderer from '../rendering/renderer.js';
 import { rulesetName } from '../utils/utils.js';
+import { WebmRecorder } from '../services/WebmRecorder.js';
 
 export class Application {
     constructor(appContext) {
@@ -10,6 +11,7 @@ export class Application {
         this.frameCount = 0;
         this.lastFpsUpdateTime = 0;
         this.pausedByVisibilityChange = false;
+        this.webmRecorder = new WebmRecorder();
     }
 
     /**
@@ -23,7 +25,62 @@ export class Application {
         window.addEventListener('resize', this.#handleResize);
         document.addEventListener('visibilitychange', this.#handleVisibilityChange);
         EventBus.subscribe(EVENTS.COMMAND_EXPORT_WORLD_PNG, this.#handleExportWorldPNG);
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING, this.#handleToggleRecording);
         console.log("Application loop started.");
+    }
+
+    /**
+     * Toggle WebM video recording of the live canvas (media-export flagship). First click starts
+     * `MediaRecorder` over `canvas.captureStream()`; second click stops and downloads the clip, named
+     * by ruleset mnemonic + tick. Recording the live canvas captures whatever is on screen (selected
+     * view + minimap), so the user gets exactly what they see while the simulation runs.
+     */
+    #handleToggleRecording = async () => {
+        if (this.webmRecorder.isRecording) {
+            try {
+                const blob = await this.webmRecorder.stop();
+                EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: false });
+                if (!blob || blob.size === 0) {
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Recording was empty.', type: 'error' });
+                    return;
+                }
+                const wm = this.appContext.worldManager;
+                const hex = wm.getCurrentRulesetHex();
+                const tick = wm.getSelectedWorldStats().tick || 0;
+                const name = `hexlife-${rulesetName(hex)}-t${tick}.webm`.replace(/\s+/g, '-');
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Saved WebM recording.', type: 'success' });
+            } catch (err) {
+                console.error('WebM recording stop failed:', err);
+                EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: false });
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not save recording.', type: 'error' });
+            }
+            return;
+        }
+
+        if (!WebmRecorder.isSupported()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Recording is not supported in this browser.', type: 'error' });
+            return;
+        }
+        try {
+            this.webmRecorder.start(Renderer.getCanvasElement());
+            EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: true });
+            const hint = this.appContext.simulationController?.getIsPaused()
+                ? 'Recording… (play the simulation to capture motion; click again to stop)'
+                : 'Recording… (click again to stop & save)';
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: hint, type: 'info' });
+        } catch (err) {
+            console.error('WebM recording start failed:', err);
+            EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: false });
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not start recording.', type: 'error' });
+        }
     }
 
     /**
