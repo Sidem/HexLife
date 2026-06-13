@@ -41,6 +41,14 @@ export class KeyboardShortcutManager {
             { key: 'p', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             } },
+            // State-history scrub-back: step one tick when paused (← back into recorded history,
+            // → forward; forward past the live tip advances the sim a single tick).
+            { key: 'ArrowLeft', description: 'Step back one tick (when paused)', category: 'Global Controls', handler: () => {
+                if (this.appContext.simulationController?.getIsPaused()) EventBus.dispatch(EVENTS.COMMAND_STATE_STEP, { delta: 1 });
+            } },
+            { key: 'ArrowRight', description: 'Step forward one tick (when paused)', category: 'Global Controls', handler: () => {
+                if (this.appContext.simulationController?.getIsPaused()) EventBus.dispatch(EVENTS.COMMAND_STATE_STEP, { delta: -1 });
+            } },
             
             // Ruleset Actions
             { key: 'i', description: "Invert the selected world's ruleset", category: 'Actions & Panels', handler: () => {

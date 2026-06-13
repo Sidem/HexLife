@@ -31,7 +31,9 @@ export class WorldProxy {
             hexBlockEntropyHistory: [],
             ruleUsage: new Uint32Array(128),
             isInCycle: false,
-            cycleLength: 0
+            cycleLength: 0,
+            historyLength: 0,
+            isScrubbing: false
         };
         this.isInitialized = false;
         this.onUpdate = worldManagerCallbacks.onUpdate;
@@ -172,7 +174,9 @@ export class WorldProxy {
                     tps: smoothedTPS, 
                     rulesetHex: data.rulesetHex || this.latestStats.rulesetHex,
                     isInCycle: data.isInCycle,
-                    cycleLength: data.cycleLength
+                    cycleLength: data.cycleLength,
+                    historyLength: data.historyLength ?? this.latestStats.historyLength,
+                    isScrubbing: data.isScrubbing ?? false
                 };
 
                 this.lastTickCountForServerUpdate = data.tick; 
@@ -271,6 +275,16 @@ export class WorldProxy {
             this.sendCommand('RUN_EVALUATION', opts);
         });
     }
+    // --- State-history scrub-back (selected world only) ---------------------
+    // Enable/disable recording of recent state frames. The main thread captures only on the selected
+    // world so the ring's memory is bounded to one world.
+    setHistoryCapture(enabled) { this.sendCommand('SET_HISTORY_CAPTURE', { enabled }); }
+    // Park on the frame `offset` ticks back from the live tip (0 = present). Caller pauses first.
+    scrubHistory(offset) { this.sendCommand('STATE_HISTORY_SCRUB', { offset }); }
+    // Leave scrub mode, discarding the recorded future beyond the scrub point.
+    resumeHistory() { this.sendCommand('STATE_HISTORY_RESUME', {}); }
+    // Advance the live sim exactly one tick while paused (forward step past the recorded tip).
+    stepHistoryLive() { this.sendCommand('STATE_HISTORY_STEP_LIVE', {}); }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
     }

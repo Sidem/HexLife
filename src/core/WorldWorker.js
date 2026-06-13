@@ -2,6 +2,7 @@ import * as Config from './config.js';
 import init, { World } from './wasm-engine/hexlife_wasm.js';
 import { rulesetToHex, findHexagonsInNeighborhood, packCells, unpackCellsInto } from '../utils/utils.js';
 import { Throttler } from '../utils/throttler.js';
+import { StateHistoryRing } from './StateHistoryRing.js';
 import { DensityStrategy } from './initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from './initialStateStrategies/ClusterStrategy.js';
 
@@ -42,6 +43,17 @@ let stateChecksumQueue = [];
 let statsThrottler;
 let gridThrottler;
 let lastKnownStats = {};
+
+// --- State-history scrub-back ----------------------------------------------
+// Ring of recent advancing-tick frames (bit-packed state + rule indices), captured only while
+// historyCaptureEnabled (the main thread enables this on the SELECTED world only, so the memory cost
+// is a single world's ring — see Config.STATE_HISTORY_RING_SIZE). When the user pauses and scrubs
+// back, `scrubToOffset` writes a past frame into the live buffers (destructive, like cycle playback);
+// `resumeScrub` truncates the "future" beyond the scrub point so the sim continues cleanly from there.
+let stateHistory = new StateHistoryRing(Config.STATE_HISTORY_RING_SIZE);
+let historyCaptureEnabled = false;
+let isScrubbing = false;
+let scrubOffset = 0; // tip-relative position the user is currently viewing (0 = live present)
 
 let isCyclePlaybackMode = false;
 let isDetectingCycle = false;
@@ -176,6 +188,86 @@ function captureCycleFrame(activeCount) {
     };
 }
 
+// --- State-history scrub-back helpers ---------------------------------------
+// Capture the current live state as a scrub-back frame. Same bit-packed shape as a cycle frame
+// (packed binary state + rule-index byte copy + the active count the caller already has), so the ring
+// reuses the cycle-frame memory profile. Only called while historyCaptureEnabled (selected world).
+function captureHistoryFrame(activeCount) {
+    stateHistory.push({
+        state: packCells(jsStateArray),
+        rules: jsRuleIndexArray.slice(),
+        tick: worldTickCounter,
+        activeCount,
+    });
+}
+
+// Forget the recorded history and leave scrub mode. Called on any state-discontinuity command
+// (reset/load/ruleset change/disable) so a scrub never resurrects a frame from a different timeline.
+function resetStateHistory() {
+    stateHistory.clear();
+    isScrubbing = false;
+    scrubOffset = 0;
+}
+
+// Write the frame `offset` ticks back from the tip into the live buffers and report it. The state
+// buffer is Wasm-owned, so unpacking into the view sets the actual simulation state (exactly how
+// cycle playback works) — resuming play continues forward from here. Resets cycle detection because
+// we jumped discontinuously, but keeps the ring intact so the user can scrub back and forth.
+function scrubToOffset(offset) {
+    if (stateHistory.length === 0) return;
+    scrubOffset = stateHistory.clampOffset(offset);
+    const frame = stateHistory.at(scrubOffset);
+    if (!frame) return;
+    isScrubbing = true;
+    unpackCellsInto(frame.state, jsStateArray, workerConfig.NUM_CELLS);
+    jsRuleIndexArray.set(frame.rules);
+    worldTickCounter = frame.tick;
+    resetCycleState();
+    lastSentChecksum = stateChecksum();
+    lastKnownStats = buildStats(frame.activeCount, lastKnownStats.binaryEntropy, lastKnownStats.blockEntropy);
+    sendGridUpdate();
+    sendStatsUpdate(true);
+}
+
+// Leave scrub mode, discarding the recorded "future" beyond the scrub point so the ring stays
+// consistent with the live state the simulation will continue from. The live buffers already hold the
+// scrub frame (scrubToOffset wrote it), so normal ticking just resumes from there.
+function resumeScrub() {
+    if (!isScrubbing) return;
+    stateHistory.truncateToOffset(scrubOffset);
+    isScrubbing = false;
+    scrubOffset = 0;
+    recordChecksum(stateChecksum()); // reseed the cycle-detection window from the resumed frame
+    // Rebuild the cached stats so a follow-up sendStatsUpdate reflects the now-shorter history and the
+    // cleared scrub flag (truncation/clear don't otherwise touch lastKnownStats).
+    lastKnownStats = buildStats(lastKnownStats.activeCount, lastKnownStats.binaryEntropy, lastKnownStats.blockEntropy);
+}
+
+// Advance the live simulation exactly one tick while paused (forward step past the recorded tip). Any
+// active scrub is resumed first (truncating the future) so we always step forward from what's shown.
+// Cycle detection is intentionally skipped for a manual step — it only matters during continuous play.
+function stepLive() {
+    if (!jsStateArray || !wasm_world) return;
+    if (isScrubbing) resumeScrub();
+    if (isCyclePlaybackMode) return;
+    worldTickCounter++;
+    const activeCount = wasm_world.run_tick();
+    [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+    [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
+    const newChecksum = stateChecksum();
+    recordChecksum(newChecksum);
+    if (historyCaptureEnabled) captureHistoryFrame(activeCount);
+    const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
+    lastSentChecksum = newChecksum;
+    lastKnownStats = buildStats(
+        activeCount,
+        workerIsEntropySamplingEnabled ? calculateBinaryEntropy(ratio) : lastKnownStats.binaryEntropy,
+        workerIsEntropySamplingEnabled ? calculateHexBlockEntropy() : lastKnownStats.blockEntropy
+    );
+    sendGridUpdate();
+    sendStatsUpdate(true);
+}
+
 // Record a state checksum into the sliding detection window. Eviction of the oldest entry is
 // O(1): decrement its count in checksumWindowCounts and forget the checksum only when no copies
 // remain in the window — replacing an earlier per-tick O(window) `queue.includes(oldest)` rescan.
@@ -217,6 +309,10 @@ function buildStats(activeCount, binaryEntropy, blockEntropy) {
         isEnabled,
         isInCycle: isCyclePlaybackMode,
         cycleLength: isCyclePlaybackMode ? detectedCycle.length : 0,
+        // State-history scrub-back: how many frames are available to step back through, and whether
+        // the world is currently parked on a past frame. Drives the transport bar's slider range.
+        historyLength: stateHistory.length,
+        isScrubbing,
     };
 }
 
@@ -274,6 +370,7 @@ function processCommandQueue() {
                 rulesetChangedInQueue = true;
                 needsGridUpdate = true;
                 resetCycleState();
+                resetStateHistory(); // new ruleset ⇒ a fresh timeline; old scrub frames are stale
                 break;
             }
             case 'RESET_WORLD': {
@@ -304,6 +401,7 @@ function processCommandQueue() {
                 if(jsNextStateArray) jsNextStateArray.fill(0);
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 resetCycleState();
+                resetStateHistory(); // reset ⇒ new initial state; discard the old timeline
                 needsGridUpdate = true;
                 break;
             }
@@ -319,6 +417,13 @@ function processCommandQueue() {
                 }
                 if (brushChanged) {
                     resetCycleState();
+                    // A manual edit is a discontinuity, but (unlike reset/load) the user is mid-draw,
+                    // so keep the recorded history and append the edited state as the new tip so the
+                    // ring stays continuous (and a stroke can be scrubbed away rather than wiped).
+                    if (historyCaptureEnabled) {
+                        if (isScrubbing) resumeScrub();
+                        captureHistoryFrame(wasm_world ? wasm_world.active_count() : 0);
+                    }
                     needsGridUpdate = true;
                 }
                 break;
@@ -329,6 +434,7 @@ function processCommandQueue() {
                     jsStateArray.fill(0);
                     if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                     resetCycleState();
+                    resetStateHistory();
                     needsGridUpdate = true;
                 } else if (isEnabled && jsStateArray) {
                     lastSentChecksum = null;
@@ -349,6 +455,7 @@ function processCommandQueue() {
                 if(jsNextRuleIndexArray) jsNextRuleIndexArray.fill(0);
                 isEnabled = true;
                 resetCycleState();
+                resetStateHistory(); // loaded a different state ⇒ discard the old timeline
                 needsGridUpdate = true;
                 rulesetChangedInQueue = true;
                 break;
@@ -363,7 +470,9 @@ function processCommandQueue() {
 function runTick() {
     const { needsGridUpdate, rulesetChangedInQueue } = processCommandQueue();
     let simulationPerformedUpdate = false;
-    if (!isEnabled || !isRunning) {
+    // While parked on a past frame (scrub-back) the sim must not advance — only drain the queue (a
+    // reset/load/brush there clears history and leaves scrub mode) and force-sync any induced edit.
+    if (!isEnabled || !isRunning || isScrubbing) {
         if (needsGridUpdate || rulesetChangedInQueue) {
             forceSyncUpdate();
         }
@@ -391,6 +500,11 @@ function runTick() {
         [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
         [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
     }
+
+    // Scrub-back capture (selected world only). Captured for both live and cycle-playback ticks so a
+    // world that was already cycling when selected still gets a scrub-able history (the ring just
+    // fills with the loop frames). Eval bursts use evalTick, a separate path that never captures.
+    if (historyCaptureEnabled) captureHistoryFrame(activeCount);
 
     const newStateChecksum = stateChecksum();
 
@@ -534,9 +648,9 @@ function runTickBatch() {
     lastBatchTime = now;
     if (elapsed < 0) elapsed = 0; // guard against a non-monotonic clock reading
 
-    // While paused/disabled, a single runTick still drains the command queue
+    // While paused/disabled/scrubbing, a single runTick still drains the command queue
     // (and force-syncs if a ruleset/grid edit arrived) without advancing the sim.
-    if (!isRunning || !isEnabled) {
+    if (!isRunning || !isEnabled || isScrubbing) {
         runTick();
         return;
     }
@@ -980,6 +1094,9 @@ self.onmessage = async function(event) {
         }
 
         case 'START_SIMULATION': {
+            // Resuming play from a scrubbed-back frame: leave scrub mode (truncating the discarded
+            // future) so ticking continues forward from exactly what the user is viewing.
+            if (isScrubbing) resumeScrub();
             isRunning = true;
             updateSimulationInterval();
             break;
@@ -1002,7 +1119,7 @@ self.onmessage = async function(event) {
                 jsStateArray.fill(0);
                 if(jsRuleIndexArray) jsRuleIndexArray.fill(0);
                 resetCycleState();
-                
+                resetStateHistory();
                 sendUpdateForSetEnabled = true;
             } else if (isEnabled && !prevEnabled && jsStateArray) {
                  lastSentChecksum = null; 
@@ -1071,6 +1188,35 @@ self.onmessage = async function(event) {
         case 'RUN_EVALUATION': {
             // { ticks, sampleEvery, probe: { enabled, flipIndex, probeTicks } } → one EVALUATION_RESULT.
             startEvaluation(command.data || {});
+            break;
+        }
+        case 'SET_HISTORY_CAPTURE': {
+            // The main thread enables scrub-back capture on the SELECTED world only (one world's ring
+            // → bounded memory). Disabling discards the ring and leaves scrub mode.
+            const enable = !!(command.data && command.data.enabled);
+            if (enable === historyCaptureEnabled) break;
+            historyCaptureEnabled = enable;
+            if (!enable) resetStateHistory();
+            break;
+        }
+        case 'STATE_HISTORY_SCRUB': {
+            // Park on a past frame (offset = ticks back from the tip). Caller pauses first. Ignored
+            // mid-eval (an explore burst owns the buffers) — scrub UI is gated to the paused state.
+            if (!isEvaluating) scrubToOffset((command.data && command.data.offset) || 0);
+            break;
+        }
+        case 'STATE_HISTORY_RESUME': {
+            // Leave scrub mode without advancing (truncates the discarded future).
+            if (!isEvaluating) {
+                resumeScrub();
+                sendGridUpdate();
+                sendStatsUpdate(true);
+            }
+            break;
+        }
+        case 'STATE_HISTORY_STEP_LIVE': {
+            // Advance exactly one tick while paused (forward step past the recorded tip).
+            if (!isEvaluating) stepLive();
             break;
         }
         case 'RECLAIM_BUFFERS': {

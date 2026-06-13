@@ -18,6 +18,10 @@ export class WorldManager {
         this.brushController = null;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
+        // State-history scrub-back: the user's current view position on the selected world's recorded
+        // history (offset ticks back from the live tip; 0 = present) and whether they're parked there.
+        this.scrubOffset = 0;
+        this.isScrubbing = false;
         this.deterministic = PersistenceService.loadUISetting('deterministic', true); // Add this
         this._hoverAffectedIndicesSet = new Set();
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
@@ -166,6 +170,8 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORKER_INITIALIZED, { worldIndex });
         if (worldIndex === this.selectedWorldIndex) {
             this.dispatchSelectedWorldUpdates();
+            // Record scrub-back history on the selected world only (bounded memory).
+            this.worlds[worldIndex]?.setHistoryCapture(true);
         }
         if (!this.isGloballyPaused && this.worlds[worldIndex]?.getLatestStats().isEnabled) {
             this.worlds[worldIndex].startSimulation();
@@ -261,10 +267,25 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, this.setGlobalPause);
         EventBus.subscribe(EVENTS.COMMAND_SET_SPEED, (speed) => this.setGlobalSpeed(speed));
         EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (newIndex) => {
+            const prevIndex = this.selectedWorldIndex;
+            if (newIndex !== prevIndex) {
+                // Hand scrub-back capture from the old selected world to the new one (one world records
+                // at a time → bounded memory). Leaving the old world's scrub state intact would strand
+                // it parked on a past frame, so resume it before clearing its capture.
+                if (this.isScrubbing) this.worlds[prevIndex]?.resumeHistory();
+                this.worlds[prevIndex]?.setHistoryCapture(false);
+                this.worlds[newIndex]?.setHistoryCapture(true);
+                this.isScrubbing = false;
+                this.scrubOffset = 0;
+            }
             this.selectedWorldIndex = newIndex;
             this.dispatchSelectedWorldUpdates();
             EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, newIndex);
+            this._dispatchScrubState();
         });
+        EventBus.subscribe(EVENTS.COMMAND_SCRUB_HISTORY, (data) => this.scrubSelectedHistory(data?.offset ?? 0));
+        EventBus.subscribe(EVENTS.COMMAND_STATE_STEP, (data) => this.stepSelectedHistory(data?.delta ?? 0));
+        EventBus.subscribe(EVENTS.COMMAND_EXIT_SCRUB, () => this.exitScrub());
         EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
             this.isEntropySamplingEnabled = data.enabled;
             this.entropySampleRate = data.rate;
@@ -781,7 +802,75 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
+    // --- State-history scrub-back -------------------------------------------
+    // Emit the selected world's current scrub availability/position so the transport bar can render.
+    _dispatchScrubState = () => {
+        const proxy = this.worlds[this.selectedWorldIndex];
+        const length = proxy?.getLatestStats().historyLength ?? 0;
+        EventBus.dispatch(EVENTS.STATE_HISTORY_CHANGED, {
+            worldIndex: this.selectedWorldIndex,
+            length,
+            offset: this.scrubOffset,
+            isScrubbing: this.isScrubbing,
+        });
+    }
+
+    // Park the selected world on `offset` ticks back from its live tip. Pauses globally first (you
+    // can't sensibly scrub a running grid), then drives the worker's destructive playback.
+    scrubSelectedHistory = (offset) => {
+        const idx = this.selectedWorldIndex;
+        const proxy = this.worlds[idx];
+        if (!proxy) return;
+        const length = proxy.getLatestStats().historyLength ?? 0;
+        if (length === 0) return;
+        if (!this.isGloballyPaused) this.setGlobalPause(true);
+        this.scrubOffset = Math.max(0, Math.min(length - 1, Math.round(offset) || 0));
+        this.isScrubbing = true;
+        proxy.scrubHistory(this.scrubOffset);
+        this._dispatchScrubState();
+    }
+
+    // Step the scrub position by `delta` ticks (positive = back, negative = forward). Forward past the
+    // live tip advances the simulation one tick instead (a genuine single-step-forward while paused).
+    stepSelectedHistory = (delta) => {
+        const idx = this.selectedWorldIndex;
+        const proxy = this.worlds[idx];
+        if (!proxy) return;
+        if (!this.isGloballyPaused) this.setGlobalPause(true);
+        const length = proxy.getLatestStats().historyLength ?? 0;
+        const target = this.scrubOffset + (Math.round(delta) || 0);
+        if (target < 0) {
+            // Forward past the tip: advance the live sim. Drops scrub mode (the worker truncates).
+            this.isScrubbing = false;
+            this.scrubOffset = 0;
+            proxy.stepHistoryLive();
+        } else {
+            if (length === 0) return;
+            this.scrubOffset = Math.min(target, length - 1);
+            this.isScrubbing = true;
+            proxy.scrubHistory(this.scrubOffset);
+        }
+        this._dispatchScrubState();
+    }
+
+    // Leave scrub mode and return the selected world to its live tip (without resuming play).
+    exitScrub = () => {
+        if (!this.isScrubbing) return;
+        this.worlds[this.selectedWorldIndex]?.resumeHistory();
+        this.isScrubbing = false;
+        this.scrubOffset = 0;
+        this._dispatchScrubState();
+    }
+
     setGlobalPause = (isPaused) => {
+        // Resuming play from a scrubbed-back frame: leave scrub mode so ticking continues forward from
+        // the viewed frame (the worker also self-heals on START_SIMULATION, but clear our state here).
+        if (!isPaused && this.isScrubbing) {
+            this.worlds[this.selectedWorldIndex]?.resumeHistory();
+            this.isScrubbing = false;
+            this.scrubOffset = 0;
+            this._dispatchScrubState();
+        }
         this.isGloballyPaused = isPaused;
         this.worlds.forEach(proxy => {
             if (this.isGloballyPaused || !proxy.getLatestStats().isEnabled) {

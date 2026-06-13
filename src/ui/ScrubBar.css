@@ -1,0 +1,107 @@
+/* State-history scrub-back transport bar — floats over the canvas (bottom-centre of
+   #main-content-area) when the simulation is paused and the selected world has recorded history. */
+.scrub-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: min(560px, calc(100% - 24px));
+    padding: 6px 10px;
+    background-color: rgba(29, 29, 32, 0.92);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-popout);
+    backdrop-filter: blur(10px);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+}
+
+.scrub-bar.hidden {
+    display: none;
+}
+
+.scrub-bar.is-scrubbing {
+    border-color: var(--accent-border);
+}
+
+.scrub-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    min-width: 30px;
+    padding: 0 6px;
+    background-color: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.scrub-btn:hover {
+    background-color: var(--surface-4);
+    color: var(--text-primary);
+}
+
+.scrub-btn:active {
+    background-color: var(--surface-5);
+}
+
+.scrub-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.scrub-btn.scrub-live {
+    font-size: 0.78em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.scrub-bar.is-scrubbing .scrub-live {
+    background-color: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent);
+}
+
+.scrub-slider {
+    flex: 1 1 160px;
+    min-width: 90px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.scrub-label {
+    flex-shrink: 0;
+    min-width: 78px;
+    text-align: right;
+    font-size: 0.8em;
+    color: var(--text-primary);
+}
+
+/* On narrow screens, drop the ±10 skip buttons and tuck the bar above the FABs. */
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+    .scrub-bar {
+        bottom: 84px;
+        gap: 4px;
+        padding: 5px 8px;
+    }
+
+    .scrub-bar [data-action="back10"],
+    .scrub-bar [data-action="fwd10"] {
+        display: none;
+    }
+
+    .scrub-label {
+        min-width: 64px;
+    }
+}

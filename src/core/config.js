@@ -77,6 +77,13 @@ export const CYCLE_DETECTION_HISTORY_SIZE = 400;
 // collected/played back). Raise both together to detect longer cycles.
 export const CYCLE_DETECTION_MAX_PERIOD = 400;
 export const RULESET_HISTORY_SIZE = 30;
+// State-history scrub-back ring: how many recent state frames the SELECTED world's worker retains so
+// the user can pause and step backward ("what just happened?"). Only the selected world captures (the
+// main thread toggles capture on selection change), so memory is one world's ring: each frame holds a
+// bit-packed binary state (NUM_CELLS/8 bytes) plus a rule-index byte array (NUM_CELLS bytes), the same
+// frame shape the cycle-detection buffer uses. ~240 ticks of scrub-back covers the "few hundred ticks"
+// the feature targets while keeping the worst-case (huge grid) ring well under the cycle buffer's cap.
+export const STATE_HISTORY_RING_SIZE = 240;
 export const RENDER_TEXTURE_SIZE = 1280;
 // --- Selected-view / minimap layout regimes (renderer._calculateAndCacheLayout) ---
 // aspectRatio = canvasWidth / canvasHeight. Wide windows get a side-by-side split (minimap

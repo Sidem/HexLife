@@ -108,6 +108,8 @@ export const EventBus = {
  * @property {Uint32Array} ruleUsage
  * @property {boolean} isInCycle
  * @property {number} cycleLength
+ * @property {number} [historyLength] - Scrub-back frames available on this world (selected world only).
+ * @property {boolean} [isScrubbing] - Whether the world is parked on a past frame.
  *
  * @typedef {Object} WorldSetting - One world's settings entry (WORLD_SETTINGS_CHANGED).
  * @property {{mode: string, params: object}} initialState
@@ -149,6 +151,8 @@ export const EVENTS = {
     WORLD_RECORDING_STATE_CHANGED: 'simulation:worldRecordingStateChanged',
     /** @param {{worldIndex: number}} data - The index of the world whose history changed. */
     HISTORY_CHANGED: 'simulation:historyChanged',
+    /** @param {{worldIndex: number, length: number, offset: number, isScrubbing: boolean}} data - State-history scrub-back position/availability for the selected world (drives the transport bar). */
+    STATE_HISTORY_CHANGED: 'simulation:stateHistoryChanged',
 
     
     /** @param {{filename: string, content: string, mimeType: string}} data - The file details for download. */
@@ -168,7 +172,13 @@ export const EVENTS = {
     /** @param {boolean} isPaused - The desired explicit pause state. */
     COMMAND_SET_PAUSE_STATE: 'command:setPauseState',
     /** @param {number} speed - The desired simulation speed. */
-    COMMAND_SET_SPEED: 'command:setSpeed', 
+    COMMAND_SET_SPEED: 'command:setSpeed',
+    /** @param {{offset: number}} data - Scrub the selected world's state history to `offset` ticks back from the live tip (0 = present). Pauses first. */
+    COMMAND_SCRUB_HISTORY: 'command:scrubHistory',
+    /** @param {{delta: number}} data - Step the selected world's scrub position by `delta` ticks (positive = back, negative = forward; forward past the tip advances the live sim one tick). */
+    COMMAND_STATE_STEP: 'command:stateStep',
+    /** @event Emitted with no payload to leave scrub mode and return the selected world to its live tip. */
+    COMMAND_EXIT_SCRUB: 'command:exitScrub',
     /** @param {number} size - The desired brush size. */
     COMMAND_SET_BRUSH_SIZE: 'command:setBrushSize',
     /** @param {number} increment - The amount to increment the brush size by (e.g., 1 or -1). */

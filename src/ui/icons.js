@@ -14,6 +14,10 @@ function icon(content, { filled = false } = {}) {
 export const ICONS = {
     play: icon('<path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2z"/>', { filled: true }),
     pause: icon('<rect x="5.5" y="4" width="4.5" height="16" rx="1"/><rect x="14" y="4" width="4.5" height="16" rx="1"/>', { filled: true }),
+    chevronLeft: icon('<path d="m15 18-6-6 6-6"/>'),
+    chevronRight: icon('<path d="m9 18 6-6-6-6"/>'),
+    skipBack: icon('<path d="M18 4.8a1 1 0 0 1 1.5.86v12.68a1 1 0 0 1-1.5.86l-9-5.66a1 1 0 0 1 0-1.72z"/><rect x="4" y="4" width="3" height="16" rx="1"/>', { filled: true }),
+    skipForward: icon('<path d="M6 4.8a1 1 0 0 0-1.5.86v12.68a1 1 0 0 0 1.5.86l9-5.66a1 1 0 0 0 0-1.72z"/><rect x="17" y="4" width="3" height="16" rx="1"/>', { filled: true }),
     sliders: icon('<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>'),
     sparkles: icon('<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/>'),
     rotateCcw: icon('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'),

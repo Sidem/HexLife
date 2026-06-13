@@ -15,6 +15,7 @@
 /* 3. Core UI Element Areas */
 @import url('src/ui/TopInfoBar.css');
 @import url('src/ui/Toolbar.css');
+@import url('src/ui/ScrubBar.css');
 @import url('src/ui/Onboarding.css');
 
 /* 4. Reusable UI Components */

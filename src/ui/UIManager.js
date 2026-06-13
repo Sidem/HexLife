@@ -24,6 +24,7 @@ import { ActionsPopover } from './components/ActionsPopover.js';
 import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
+import { ScrubBar } from './ScrubBar.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
 import { ToastManager } from './ToastManager.js';
 import { ICONS } from './icons.js';
@@ -105,7 +106,8 @@ export class UIManager {
 
         
         const minimapOverlays = new MinimapOverlays(appContext);
-        this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays);
+        const scrubBar = new ScrubBar(appContext);
+        this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays, scrubBar);
 
         
         this.initMobileUI();

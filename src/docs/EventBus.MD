@@ -29,6 +29,7 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `ENTROPY_SAMPLING_CHANGED`| `{ enabled, rate }` | Dispatched when entropy sampling is enabled/disabled or the rate changes. |
 | `PERFORMANCE_METRICS_UPDATED`| `{ fps, tps, targetTps }` | Dispatched periodically with rendering and simulation performance data. |
 | `HISTORY_CHANGED` | `{ worldIndex: number }` | Dispatched when a world's ruleset history (undo/redo stack) is modified. |
+| `STATE_HISTORY_CHANGED` | `{ worldIndex, length, offset, isScrubbing }` | State-history scrub-back position/availability for the selected world; drives the transport bar. |
 | `COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL`| `(none)` | Command to apply the selected world's initial state to all other worlds. |
 | `COMMAND_RESET_INITIAL_STATES_TO_DEFAULT`| `(none)` | Command to reset all world initial states to their default values. |
 | `COMMAND_SET_WORLD_INITIAL_STATE` | `{ worldIndex: number, initialState: object }` | Command to set the initial state config for a specific world. |
@@ -46,6 +47,9 @@ This document formalizes the data structures (payloads) for all events dispatche
 | `COMMAND_TOGGLE_PAUSE` | `(none)` | Command to toggle the global pause state. |
 | `COMMAND_SET_PAUSE_STATE` | `isPaused: boolean` | Command to explicitly set the global pause state. |
 | `COMMAND_SET_SPEED` | `speed: number` | Command to set the global simulation speed. |
+| `COMMAND_SCRUB_HISTORY` | `{ offset: number }` | Scrub the selected world's state history to `offset` ticks back from the live tip (0 = present). Pauses first. |
+| `COMMAND_STATE_STEP` | `{ delta: number }` | Step the selected world's scrub position by `delta` ticks (positive = back, negative = forward; forward past the tip advances the live sim one tick). |
+| `COMMAND_EXIT_SCRUB` | `(none)` | Leave scrub mode and return the selected world to its live tip. |
 | `COMMAND_GENERATE_RANDOM_RULESET` | `{ bias, generationMode, ... }`| Command to generate a new, random ruleset. |
 | `COMMAND_EXECUTE_GENERATE_RULESET` | `(none)` | User-initiated command to execute the generate ruleset action with the controller's current settings. |
 | `COMMAND_SET_RULESET` | `{ hexString, resetScope... }` | Command to apply a specific ruleset from a hex string. |
