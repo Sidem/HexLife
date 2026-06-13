@@ -87,6 +87,44 @@ An automated, evolutionary search for interesting rulesets — point it at the g
   * **Visual gallery:** banked finds persist across sessions, each shown with a **rendered thumbnail** plus per-component score bars, and can be applied, saved, shared, or bred further. Per-world score badges surface the search live on the minimaps, and killed candidates show their kill reason on hover.
   * **Loop controls:** **Pause / Resume** the hunt without losing progress, set an optional **generation budget** to stop automatically (with a "best find" summary toast), and **re-test (🔄)** any gallery entry to re-confirm its score on demand.
 
+#### Initial-condition suite
+
+Each candidate is judged not on one starting grid but on a small **suite of initial conditions (ICs)**, because the same ruleset can be lifeless from one seed and teeming from another. All three are deterministically seeded, so a find is exactly reproducible:
+
+| IC | Mode | What it probes |
+| :--- | :--- | :--- |
+| **Chaos** | Uniform random, density **0.5** | Behavior emerging from a fully-mixed, high-energy soup. |
+| **Sparse** | Uniform random, density **0.05** | Whether structure can *grow* from near-emptiness (favors gliders/replicators). |
+| **Seed** | A single **cluster** | Whether a compact blob organizes, spreads, or collapses. |
+
+The **Seed** IC *is* a cluster: a single Gaussian-falloff blob (~14 cells across) dropped in an otherwise empty grid — so clustered initial states are already part of the suite. (The other two are uniform-noise fields by design, to cover the opposite end of the spectrum.) You can restrict a run to any subset of the three via the panel's IC toggles. The per-IC scores are then combined into one headline number with a **soft-max** (temperature 0.15, so the combine leans toward the world's *best* IC) plus a small (0.2) plain-mean robustness bonus — a ruleset that shines under one IC isn't dragged down by being dull under another, but consistency across ICs is still rewarded.
+
+#### Evaluation length (tick budgets)
+
+There is **no 400-tick cap on how long a candidate runs** — the "400" in the codebase is the longest *cycle period* the detector can recognize (`CYCLE_DETECTION_MAX_PERIOD`), not an evaluation length. The two stages run for:
+
+  * **Screening burst — 160 ticks** (after a 20-tick warm-up that's discarded so start-up transients don't pollute the metrics). Cheap, run on all nine candidates every generation.
+  * **Confirmation burst — 600 ticks**, run only on candidates that clear the find threshold. This already runs well past 400 ticks; its job is to expose long-horizon fates the short screen can't see — a quiet death, a late saturation, or settling into a long cycle. A cycle of period ≤ 120 found here tags the find `↻N` and penalizes (but keeps) it.
+
+#### How a candidate is scored — the six component values
+
+The gallery's per-component bars expose the raw ingredients of the interestingness score. Each is normalized to **[0, 1]**, then combined with the weights shown (criticality is dropped and the rest renormalized if no damage-probe ran; the two spatial terms are dropped for legacy gallery entries that predate them):
+
+| Value | Weight | How it's measured | What a high value means |
+| :--- | :---: | :--- | :--- |
+| **σ** (criticality) | 0.20 | A **damage-spreading probe**: the grid is cloned, one cell is flipped, and both copies run side-by-side while the Hamming distance between them is tracked over a 64-tick window. σ = `exp(slope)` of a log-linear fit to that distance — the average per-tick growth factor of a one-cell perturbation. The term is a Gaussian peaked at **σ = 1** (in log space, τ = 0.6). | The automaton sits at the **edge of chaos**: σ < 1 = perturbations heal (frozen/ordered), σ > 1 = they explode (full chaos), σ ≈ 1 = information propagates without dying or blowing up — where the most interesting computation lives. |
+| **Entropy** (entropy band) | 0.10 | Mean **block entropy**: for every cell, take its 7-cell neighborhood (center + 6 neighbors → one of 2⁷ = 128 patterns), build the histogram of those patterns across the grid, and take its Shannon entropy normalized to [0, 1]. Scored as a Gaussian peaked at a **mid-band target of 0.4** (τ = 0.18). | The grid is **structured but not noise**. Entropy near 0 = uniform/repetitive (dull); near 1 = maximal randomness (TV static); the mid-band is where recognizable, varied local patterns coexist. |
+| **Flux** (fluctuation) | 0.05 | The **coefficient of variation** (std ÷ mean) of the *changed-cell count* — how many cells flip state each tick — across the burst. Scored by half-saturation: `cv / (cv + 0.3)`. | Activity comes in **bursts rather than a steady hum** — large fluctuations in how much is changing are a hallmark of susceptibility near a critical point (avalanches, sweeping fronts) rather than uniform churn. |
+| **Diversity** (rule diversity) | 0.10 | Every tick, each cell's next state is decided by exactly one of the 128 rules; the engine tallies how often each rule fires (a 128-bin histogram). This is the **Shannon entropy of that histogram**, normalized by log₂(128). | The dynamics draw on a **rich rule vocabulary**. Near 0 = one or two rules do all the work (monotonous); near 1 = many distinct local situations arise and are handled differently (complex behavior). |
+| **Structure** (spatial structure) | 0.40 | A **join-count statistic** (`spatial_order`): it compares how often neighboring cells share the same state against what pure random mixing would produce. ~0 = well-mixed; **positive = clustering** (like-with-like domains); **negative = anti-correlation** (checkerboard/stripes). The score rewards *deviation in either direction*, half-saturating at 0.12. | The grid has **genuine spatial organization** — domains, fronts, gliders, lattices — rather than salt-and-pepper noise. This is the **most heavily weighted term**: it's the one signal that reliably separates a structured glider soup from homogeneous high-activity "churn" (which maxes out σ/entropy/flux but is visually boring). |
+| **Heterog.** (spatial heterogeneity) | 0.15 | The **across-cell variance** of each cell's block-entropy surprisal (−log₂p ÷ 7), averaged over the burst (`block_entropy_stats` returns mean *and* this variance). Half-saturates at 0.02. | **Order and disorder coexist in different regions** at the same time — calm zones beside busy ones, rather than the whole grid behaving identically. Spatially uniform behavior (everywhere-ordered or everywhere-chaotic) scores low; a patchwork scores high. |
+
+Before any of this is computed, four **hard kills** zero the score outright: **extinct** (died out), **saturated** (≥99% active), **frozen** (≤0.5 cells changing per tick on average), and **short-cycle** (a detected period ≤ 4 — blinkers and fixed points). These weed out the degenerate regimes cheaply so the six graded terms only ever rank the survivors.
+
+#### Generation budget
+
+A **generation** is one full round of the evolutionary loop: the nine worlds each evaluate a candidate (the reigning champion plus mutated and crossover-bred offspring), the best is banked, and a new champion + runner-up are chosen to breed the next round. By default the loop runs **unlimited** until you stop it. Setting a **generation budget** (the panel's numeric input) caps it: the search tracks the best score seen and, once it has completed that many generations, **stops automatically and toasts a summary** (e.g. *"Explored 50 generations — best 0.86 Frosted-Willow"*). Use it to bound a hands-off run or to get a reproducible, fixed-effort sweep.
+
 ### 5\. State History Scrub-Back (⏪)
 
 Pause the simulation and rewind the selected world to see exactly how it got to where it is.
