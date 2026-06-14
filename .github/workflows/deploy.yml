@@ -63,7 +63,10 @@ jobs:
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
         with:
-          version: 'latest'
+          # Pin an explicit version: 'latest' makes the action query the GitHub
+          # releases API, which intermittently returns an HTML error page (rate
+          # limit) and breaks its JSON parse. A concrete version skips that lookup.
+          version: 'v0.13.1'
 
       - name: Install dependencies
         run: npm install
