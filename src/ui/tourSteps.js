@@ -2,6 +2,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { ICONS } from './icons.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
+import { RulesetLibraryComponent } from './components/RulesetLibraryComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
@@ -172,18 +173,42 @@ export const getTours = (appContext) => {
         element: '[data-pane="mutate"]',
         title: 'Mutate',
         content: "Introduce small, random changes to an existing ruleset to evolve it. The <span class=\"onboarding-highlight-text\">Clone & Mutate</span> action is a powerful way to run parallel experiments.",
-        primaryAction: { text: 'Next' },
-        onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
-        advanceOn: { type: 'click' }
-    }, {
-        element: '[data-pane="library"]',
-        title: 'Library',
-        content: "Load pre-discovered rulesets or place well-known patterns (like a 'Glider') onto the grid.",
         primaryAction: { text: 'Finish' },
         onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }];
-    
+
+    const ruleset_library = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
+        title: 'Tutorial: Ruleset Library',
+        content: "Load pre-discovered rulesets from the curated <span class=\"onboarding-highlight-text\">Library</span>, your own saved rules, or paste a ruleset's hex code <span class=\"onboarding-highlight-text\">Directly</span>.",
+        primaryAction: { text: 'Open Library' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'library' }, mobile: { view: 'library' } }),
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
+    }, {
+        element: '.ruleset-library-scope',
+        title: 'Apply to:',
+        content: "Choose whether loading a ruleset applies it to the <span class=\"onboarding-highlight-text\">Selected</span> world only or to <span class=\"onboarding-highlight-text\">All</span> nine. This same choice governs the Direct hex input too.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'library' }, mobile: { view: 'library' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '[data-pane="library"]',
+        title: 'Library',
+        content: "Browse <span class=\"onboarding-highlight-text\">Public</span> rulesets or switch to <span class=\"onboarding-highlight-text\">My Rulesets</span> for the ones you've saved, then press Load.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '[data-pane="direct"]',
+        title: 'Direct',
+        content: "Already have a 32-character hex code? Paste it here to set the ruleset instantly.",
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
+        advanceOn: { type: 'click' }
+    }];
+
     const editor = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="editor"]' : '[data-tour-id="edit-rule-button"]',
         title: 'Tutorial: The Ruleset Editor',
@@ -351,24 +376,24 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'click' }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
         title: 'Step 1: Get a Baseline',
-        content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel to access the library.",
-        //primaryAction: { text: 'Open Ruleset Actions' },
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
+        content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span> to load a known ruleset. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        //primaryAction: { text: 'Open Ruleset Library' },
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
         element: '[data-pane="library"]',
         title: 'Step 2: Open the Library',
         content: "Now, select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
         primaryAction: { text: 'Done' },
-        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
+        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
-        element: '#ruleset-actions-library-public-content .library-item:nth-child(10) .button',
+        element: '#ruleset-library-public-content .library-item:nth-child(10) .button',
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         //primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (_step) => { document.querySelector('#ruleset-actions-library-public-content .library-item:nth-child(10) .button')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+        onBeforeShow: (_step) => { document.querySelector('#ruleset-library-public-content .library-item:nth-child(10) .button')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
@@ -482,18 +507,18 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Save It!' },
         advanceOn: { type: 'event', eventName: EVENTS.USER_RULESET_SAVED }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
         title: 'Step 3: Visit Your Library',
-        content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel.",
-        primaryAction: { text: 'Open Panel' },
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
+        content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span>. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        primaryAction: { text: 'Open Library' },
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
         element: '[data-library-filter="personal"]',
         title: 'Step 4: View Your Rulesets',
         content: "The library contains both public and personal rules. <span class=\"onboarding-highlight-text\">Click on 'My Rulesets'</span> to see your saved creations.",
         primaryAction: { text: 'Click My Rulesets' },
         onBeforeShow: (_step) => {
-            showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} });
+            showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} });
             setTimeout(() => { document.querySelector('[data-pane="library"]')?.click(); }, 150);
         },
         advanceOn: { type: 'click' }
@@ -600,6 +625,7 @@ export const getTours = (appContext) => {
         sparkOfLife,
         controls,
         ruleset_actions,
+        ruleset_library,
         editor,
         worldsetup,
         analysis,

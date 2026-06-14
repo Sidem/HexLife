@@ -10,6 +10,8 @@ import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
+import { RulesetLibraryComponent } from './components/RulesetLibraryComponent.js';
+import { PatternsComponent } from './components/PatternsComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 import { ExploreComponent } from './components/ExploreComponent.js';
@@ -56,6 +58,8 @@ export class UIManager {
 
     #mobileViewConfig = {
         rules: { constructor: RulesetActionsComponent, title: 'Rulesets' },
+        library: { constructor: RulesetLibraryComponent, title: 'Ruleset Library' },
+        patterns: { constructor: PatternsComponent, title: 'Patterns' },
         worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
@@ -83,7 +87,9 @@ export class UIManager {
 
         this.sharedComponents = {
             controls: new ControlsComponent(appContext),
-            rulesetActions: new RulesetActionsComponent(appContext, { libraryData }),
+            patterns: new PatternsComponent(appContext),
+            rulesetActions: new RulesetActionsComponent(appContext),
+            rulesetLibrary: new RulesetLibraryComponent(appContext, { libraryData }),
             rulesetEditor: new RulesetEditorComponent(appContext),
             worldSetup: new WorldSetupComponent(appContext),
             analysis: new AnalysisComponent(appContext),

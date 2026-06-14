@@ -1,11 +1,14 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
+import { PatternsComponent } from './components/PatternsComponent.js';
 import { ICONS } from './icons.js';
 
 const TOOLBAR_BUTTON_ICONS = {
     controlsButton: ICONS.sliders,
+    patternsButton: ICONS.shapes,
     rulesetActionsButton: ICONS.sparkles,
+    libraryButton: ICONS.library,
     resetClearButton: ICONS.rotateCcw,
     editRuleButton: ICONS.pencil,
     setupPanelButton: ICONS.globe,
@@ -36,6 +39,7 @@ export class Toolbar {
         this.toolbarElement = document.getElementById('vertical-toolbar');
         this.popoutConfig = [
             { name: 'controls', buttonId: 'controlsButton', popoutId: 'controlsPopout', options: { position: 'right', alignment: 'start' } },
+            { name: 'patterns', buttonId: 'patternsButton', popoutId: 'patternsPopout', options: { position: 'right', alignment: 'start' } },
             { name: 'resetClear', buttonId: 'resetClearButton', popoutId: 'resetClearPopout', options: { position: 'right', alignment: 'start', offset: 5 } },
             { name: 'share', buttonId: 'shareButton', popoutId: 'sharePopout', options: { position: 'right', alignment: 'start' } }
         ];
@@ -45,10 +49,13 @@ export class Toolbar {
         this.uiElements = {
             playPauseButton: document.getElementById('playPauseButton'),
             controlsButton: document.getElementById('controlsButton'),
+            patternsButton: document.getElementById('patternsButton'),
             rulesetActionsButton: document.getElementById('rulesetActionsButton'),
+            libraryButton: document.getElementById('libraryButton'),
             resetClearButton: document.getElementById('resetClearButton'),
             shareButton: document.getElementById('shareButton'),
             controlsPopout: document.getElementById('controlsPopout'),
+            patternsPopout: document.getElementById('patternsPopout'),
             resetClearPopout: document.getElementById('resetClearPopout'),
             sharePopout: document.getElementById('sharePopout'),
             resetCurrentButtonPopout: document.getElementById('resetCurrentButtonPopout'),
@@ -94,8 +101,14 @@ export class Toolbar {
                         options.contentContainer = controlsMount;
                         options.contentComponentType = ControlsComponent;
                     }
+                } else if (config.name === 'patterns') {
+                    const patternsMount = popoutElement.querySelector('#desktopPatternsMount');
+                    if (patternsMount) {
+                        options.contentContainer = patternsMount;
+                        options.contentComponentType = PatternsComponent;
+                    }
                 }
-                
+
                 this.popoutPanels[config.name] = new PopoutPanel(popoutElement, buttonElement, options);
             }
         });
@@ -125,7 +138,9 @@ export class Toolbar {
         const buttonToActionMap = {
             playPauseButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE),
             controlsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'controls' }),
+            patternsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'patterns' }),
             rulesetActionsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }),
+            libraryButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'library' }),
             resetClearButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'resetClear' }),
             editRuleButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset' }),
             analysisPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }),

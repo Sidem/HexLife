@@ -70,8 +70,8 @@ export class RulesetDirectInput extends BaseComponent {
         
         EventBus.dispatch(EVENTS.COMMAND_SET_RULESET, {
             hexString: hex,
-            scope: 'all',
-            resetOnNewRule: true
+            scope: this.appContext.rulesetActionController.getGenScope(),
+            resetOnNewRule: this.appContext.rulesetActionController.getGenAutoReset()
         });
         this.inputElement.value = '';
         EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS); 

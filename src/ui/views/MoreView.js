@@ -27,6 +27,8 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="record-webm" title="Record WebM video of the canvas" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.video} <span data-record-label>Record Video</span></button>
         <button class="button" data-action="share">Share Setup</button>
         <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.star} Save Ruleset</button>
+        <button class="button" data-action="library" title="Ruleset Library" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.library} Ruleset Library</button>
+        <button class="button" data-action="patterns" title="Patterns" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.shapes} Patterns</button>
         <button class="button" data-action="explore" title="Auto-Explore" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.compass} Auto-Explore</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
@@ -63,6 +65,14 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="share"]'), 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="library"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'library' });
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="patterns"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'patterns' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="explore"]'), 'click', () => {

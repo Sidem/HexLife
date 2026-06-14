@@ -2,15 +2,12 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
-import { RulesetDirectInput } from './RulesetDirectInput.js';
-import { ICONS } from '../icons.js';
 
 export class RulesetActionsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
-        super(null, options); 
+        super(null, options);
         this.appContext = appContext;
-        
-        this.libraryData = options.libraryData;
+
         this.sliders = {};
         this.switches = {};
         this.element = document.createElement('div');
@@ -30,42 +27,30 @@ export class RulesetActionsComponent extends BaseComponent {
             <div class="ruleset-actions-header">
                 <button id="ruleset-actions-generate-tab" class="ruleset-actions-segment active" data-pane="generate">Generate</button>
                 <button id="ruleset-actions-mutate-tab" class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
-                <button id="ruleset-actions-library-tab" class="ruleset-actions-segment" data-pane="library">Library</button>
-                <button id="ruleset-actions-direct-tab" class="ruleset-actions-segment" data-pane="direct">Direct</button>
             </div>
             <div class="ruleset-actions-content">
                 <div id="ruleset-actions-generate-pane" class="ruleset-pane"></div>
                 <div id="ruleset-actions-mutate-pane" class="ruleset-pane hidden"></div>
-                <div id="ruleset-actions-library-pane" class="ruleset-pane hidden"></div>
-                <div id="ruleset-actions-direct-pane" class="ruleset-pane hidden"></div>
             </div>
         `;
 
         this.panes = {
             generate: this.element.querySelector(`#ruleset-actions-generate-pane`),
             mutate: this.element.querySelector(`#ruleset-actions-mutate-pane`),
-            library: this.element.querySelector(`#ruleset-actions-library-pane`),
-            direct: this.element.querySelector(`#ruleset-actions-direct-pane`),
         };
 
         this.segments = {
             generate: this.element.querySelector('[data-pane="generate"]'),
             mutate: this.element.querySelector('[data-pane="mutate"]'),
-            library: this.element.querySelector('[data-pane="library"]'),
-            direct: this.element.querySelector('[data-pane="direct"]'),
         };
-        this.actionsPopover = this.appContext.uiManager.actionsPopover; 
-        this.factory = this.appContext.rulesetDisplayFactory;
 
         this._renderGeneratePane();
         this._renderMutatePane();
-        this._renderLibraryPane();
-        this._renderDirectPane();
     }
 
     _renderGeneratePane() {
         const pane = this.panes.generate;
-        
+
         pane.innerHTML = `
             <div class="form-group" id="ruleset-actions-gen-mode-mount"></div>
             <div class="form-group bias-controls">
@@ -79,34 +64,34 @@ export class RulesetActionsComponent extends BaseComponent {
         `;
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-mode-mount`), {
-            label: 'Generation Mode:', 
-            type: 'radio', 
-            name: `ruleset-actions-gen-mode`, 
+            label: 'Generation Mode:',
+            type: 'radio',
+            name: `ruleset-actions-gen-mode`,
             initialValue: this.appContext.rulesetActionController.getGenMode(),
             items: this.appContext.rulesetActionController.getGenerationConfig(),
             onChange: this.appContext.rulesetActionController.setGenMode
         });
-        
+
         this.sliders.bias = new SliderComponent(pane.querySelector(`#ruleset-actions-bias-slider-mount`), {
             ...this.appContext.rulesetActionController.getBiasSliderConfig(),
-            id: `ruleset-actions-bias-slider`, 
+            id: `ruleset-actions-bias-slider`,
             value: this.appContext.rulesetActionController.getBias(),
             disabled: !this.appContext.rulesetActionController.getUseCustomBias()
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-scope-mount`), {
             ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
-            name: `ruleset-actions-gen-scope`, 
+            name: `ruleset-actions-gen-scope`,
             initialValue: this.appContext.rulesetActionController.getGenScope(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-reset-mount`), {
             ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
-            name: `ruleset-actions-gen-reset`, 
+            name: `ruleset-actions-gen-reset`,
             initialValue: this.appContext.rulesetActionController.getGenAutoReset(),
         });
 
-        
+
         const biasCheckbox = pane.querySelector(`#ruleset-actions-use-custom-bias`);
         biasCheckbox.checked = this.appContext.rulesetActionController.getUseCustomBias();
         biasCheckbox.addEventListener('change', e => {
@@ -117,7 +102,7 @@ export class RulesetActionsComponent extends BaseComponent {
 
     _renderMutatePane() {
         const pane = this.panes.mutate;
-        
+
         pane.innerHTML = `
             <div class="form-group" id="ruleset-actions-mutate-rate-mount"></div>
             <div class="form-group" id="ruleset-actions-mutate-mode-mount"></div>
@@ -136,17 +121,17 @@ export class RulesetActionsComponent extends BaseComponent {
                 <button class="button" data-action="breed" title="Crossover the selected world with the chosen world; children fill the remaining worlds">Breed</button>
             </div>
         `;
-        
+
         new SliderComponent(pane.querySelector(`#ruleset-actions-mutate-rate-mount`), {
             ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
-            id: `ruleset-actions-mutate-rate`, 
+            id: `ruleset-actions-mutate-rate`,
             value: this.appContext.rulesetActionController.getMutateRate(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-mode-mount`), {
-            label: 'Mutation Mode:', 
-            type: 'radio', 
-            name: `ruleset-actions-mutate-mode`, 
+            label: 'Mutation Mode:',
+            type: 'radio',
+            name: `ruleset-actions-mutate-mode`,
             initialValue: this.appContext.rulesetActionController.getMutateMode(),
             items: this.appContext.rulesetActionController.getMutationModeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateMode
@@ -155,7 +140,7 @@ export class RulesetActionsComponent extends BaseComponent {
         new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-scope-mount`), {
             label: 'Apply to:',
             type: 'radio',
-            name: `ruleset-actions-mutate-scope`, 
+            name: `ruleset-actions-mutate-scope`,
             initialValue: this.appContext.rulesetActionController.getMutateScope(),
             items: this.appContext.rulesetActionController.getMutationScopeConfig(),
             onChange: this.appContext.rulesetActionController.setMutateScope
@@ -176,130 +161,10 @@ export class RulesetActionsComponent extends BaseComponent {
         });
     }
 
-    _renderLibraryPane() {
-        const pane = this.panes.library;
-        pane.innerHTML = `
-            <div class="library-filter-tabs">
-                <button class="sub-tab-button active" data-library-filter="public">Public</button>
-                <button class="sub-tab-button" data-library-filter="personal">My Rulesets</button>
-            </div>
-            <div id="ruleset-actions-library-public-content" class="library-list"></div>
-            <div id="ruleset-actions-library-personal-content" class="library-list hidden"></div>
-        `;
-        
-        this._renderPublicLibrary();
-        this._renderPersonalLibrary();
-    }
-
-    _renderPublicLibrary() {
-        const rulesetsList = this.element.querySelector('#ruleset-actions-library-public-content');
-        rulesetsList.innerHTML = ''; 
-        if (!this.libraryData || !this.libraryData.rulesets) return;
-
-        this.libraryData.rulesets.forEach(rule => {
-            const item = this.factory.createLibraryListItem(rule, false);
-            rulesetsList.appendChild(item);
-        });
-    }
-
-    _renderPersonalLibrary() {
-        const personalList = this.element.querySelector('#ruleset-actions-library-personal-content');
-        personalList.innerHTML = ''; 
-        const userRulesets = this.appContext.libraryController.getUserLibrary();
-
-        if (userRulesets.length === 0) {
-            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the <span class="inline-icon">${ICONS.star}</span> icon to save the current ruleset!</p>`;
-            return;
-        }
-
-        userRulesets.forEach(rule => {
-            const item = this.factory.createLibraryListItem(rule, true);
-            personalList.appendChild(item);
-        });
-    }
-
-    _renderDirectPane() {
-        const mountPoint = this.panes.direct;
-        mountPoint.innerHTML = '';
-        new RulesetDirectInput(mountPoint, this.appContext, { context: `ruleset-actions-direct` });
-    }
-
     attachEventListeners() {
         this.element.querySelector('.ruleset-actions-header').addEventListener('click', e => {
             if (e.target.matches('.ruleset-actions-segment')) {
                 this.setActivePane(e.target.dataset.pane);
-            }
-        });
-
-        const libraryPane = this.element.querySelector(`#ruleset-actions-library-pane`);
-        libraryPane.addEventListener('click', e => {
-            const target = e.target;
-            const action = target.dataset.action;
-            const rulesetActionController = this.appContext.rulesetActionController;
-
-            
-            if (target.matches('[data-library-filter]')) {
-                const filter = target.dataset.libraryFilter;
-                libraryPane.querySelectorAll('.sub-tab-button').forEach(b => b.classList.remove('active'));
-                target.classList.add('active');
-                
-                const publicPane = libraryPane.querySelector('#ruleset-actions-library-public-content');
-                const personalPane = libraryPane.querySelector('#ruleset-actions-library-personal-content');
-                
-                publicPane.classList.toggle('hidden', filter !== 'public');
-                personalPane.classList.toggle('hidden', filter !== 'personal');
-                return;
-            }
-
-            if (action === 'load-rule' || action === 'load-personal') {
-                this.appContext.libraryController.loadRuleset(
-                    target.parentNode.dataset.hex,
-                    rulesetActionController.getGenScope(),
-                    rulesetActionController.getGenAutoReset()
-                );
-                //EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
-            }
-            
-            
-            if (target.closest('[data-action="manage-personal"]')) {
-                const manageButton = target.closest('[data-action="manage-personal"]');
-                const actionsContainer = manageButton.parentElement;
-                const id = actionsContainer.dataset.id;
-                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
-                if (!rule) return;
-
-                const popoverActions = [
-                    {
-                        label: 'Rename',
-                        callback: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule)
-                    },
-                    {
-                        label: 'Share',
-                        callback: () => {
-                            const url = new URL(window.location.href);
-                            url.search = `?r=${rule.hex}`;
-                            navigator.clipboard.writeText(url.toString()).then(() => {
-                                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Share link copied!', type: 'success' });
-                            });
-                        }
-                    },
-                    {
-                        label: 'Delete',
-                        callback: () => {
-                            EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
-                                title: 'Delete Ruleset',
-                                message: `Are you sure you want to permanently delete "${rule.name}"?`,
-                                confirmLabel: 'Delete',
-                                onConfirm: () => {
-                                    this.appContext.libraryController.deleteUserRuleset(rule.id);
-                                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Deleted "${rule.name}".`, type: 'info' });
-                                }
-                            });
-                        }
-                    }
-                ];
-                
-                this.actionsPopover.show(popoverActions, manageButton);
             }
         });
 
@@ -308,7 +173,7 @@ export class RulesetActionsComponent extends BaseComponent {
              EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated New Ruleset' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
-        
+
         const mutatePane = this.element.querySelector(`#ruleset-actions-mutate-pane`);
         mutatePane.querySelector('[data-action="mutate"]').addEventListener('click', () => {
              EventBus.dispatch(EVENTS.COMMAND_EXECUTE_MUTATE_RULESET);
@@ -330,9 +195,6 @@ export class RulesetActionsComponent extends BaseComponent {
              EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Bred Rulesets' });
              EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         });
-
-        
-        this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._renderPersonalLibrary);
     }
 
     setActivePane(paneName) {
@@ -344,5 +206,5 @@ export class RulesetActionsComponent extends BaseComponent {
         this.segments[paneName].classList.add('active');
     }
 
-    
-} 
+
+}
