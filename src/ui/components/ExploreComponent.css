@@ -112,6 +112,33 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Perceptual-objective (CLIP embedding) toggle + status line (v3.0). */
+.explore-embedding-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.explore-embedding-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9em;
+    color: var(--text-secondary, #b9b9c2);
+    cursor: pointer;
+}
+
+.explore-embedding-status {
+    font-size: 0.8em;
+    color: var(--text-muted, #87878f);
+    min-height: 1em;
+    line-height: 1.3;
+}
+
+.explore-embedding-status[data-status="loading"] { color: var(--accent, #5a9bd4); }
+.explore-embedding-status[data-status="ready"] { color: var(--success, #4caf50); }
+.explore-embedding-status[data-status="error"] { color: var(--text-muted, #87878f); }
+
 /* While a search is active, re-testing a find would fight the loop for the worker — dim + block it. */
 .explore-component-content.is-running .explore-find-actions [data-action="retest"] {
     opacity: 0.4;

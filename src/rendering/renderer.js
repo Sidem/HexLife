@@ -588,6 +588,27 @@ export function captureWorldThumbnail(worldIndex, size = 96, quality = 0.5) {
 }
 
 /**
+ * Capture a world's render-texture FBO and downscale it to a small square `ImageData` (RGBA pixels).
+ * Used by the optional perceptual auto-explore objective (v3.0) to feed rendered frames to the
+ * foundation-model embedding worker. Returns raw `ImageData` (not a data URL) so the bytes can be
+ * transferred to the worker without a JPEG encode/decode round-trip. Null if capture is unavailable.
+ * @param {number} worldIndex
+ * @param {number} [size=224] Output square edge in px (CLIP's native input size).
+ * @returns {ImageData|null}
+ */
+export function captureWorldImageData(worldIndex, size = 224) {
+    const full = _captureWorldToCanvas(worldIndex);
+    if (!full) return null;
+    const small = document.createElement('canvas');
+    small.width = size;
+    small.height = size;
+    const ctx = small.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(full, 0, 0, size, size);
+    return ctx.getImageData(0, 0, size, size);
+}
+
+/**
  * Read a world's FBO into a full-resolution top-left-oriented 2D canvas (the shared capture path for
  * PNG export and thumbnails). Reading the FBO directly avoids needing `preserveDrawingBuffer` on the
  * main context and grabs just the one world (not the 3×3 composite).

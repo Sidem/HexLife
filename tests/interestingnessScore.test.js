@@ -433,6 +433,55 @@ describe('scoreSingleIC — transport / mobility (v2.9)', () => {
     });
 });
 
+// --- v3.0: open-endedness / perceptual novelty (foundation-model trajectory novelty) -----------
+
+describe('scoreSingleIC — open-endedness / perceptual novelty (v3.0)', () => {
+    it('a higher-novelty trajectory out-scores an otherwise-identical low-novelty one', () => {
+        const base = structuredCritical();
+        const novel = scoreSingleIC({ ...base, embedding: { openEndedness: 0.4 } });
+        const still = scoreSingleIC({ ...base, embedding: { openEndedness: 0.01 } });
+        expect(novel.components.openEndedness).toBeGreaterThan(still.components.openEndedness);
+        expect(novel.score).toBeGreaterThan(still.score);
+    });
+
+    it('exposes the openEndedness component + flag at the half-saturation point', () => {
+        const c = scoreSingleIC({ ...structuredCritical(), embedding: { openEndedness: SCORE_CONFIG.openEndednessHalfSat } }).components;
+        expect(c.openEndednessUsed).toBe(true);
+        expect(c.openEndedness).toBeCloseTo(0.5, 6);
+    });
+
+    it('half-saturation: a larger novelty yields a larger but bounded ([0,1]) term', () => {
+        const lo = scoreSingleIC({ ...structuredCritical(), embedding: { openEndedness: 0.02 } }).components.openEndedness;
+        const hi = scoreSingleIC({ ...structuredCritical(), embedding: { openEndedness: 1.5 } }).components.openEndedness;
+        expect(hi).toBeGreaterThan(lo);
+        expect(hi).toBeLessThanOrEqual(1);
+    });
+
+    it('marks the term unused and renormalizes when no embedding is present (the default, off)', () => {
+        const r = scoreSingleIC(structuredCritical()); // no embedding field at all
+        expect(r.components.openEndednessUsed).toBe(false);
+        expect(r.components.openEndedness).toBe(0);
+        expect(r.score).toBeGreaterThan(0);
+    });
+
+    it('OFF-PATH IDENTITY: adding the (absent) term does not change a model-free score', () => {
+        // The embedding-off score must be byte-identical to the statistical pipeline. Since the
+        // openEndedness weight is ADDED without touching the other eight, scoring metrics with no
+        // `embedding` field renormalizes over exactly the same eight terms ⇒ same number.
+        const m = structuredCritical();
+        const withUndefined = scoreSingleIC({ ...m, embedding: undefined }).score;
+        const without = scoreSingleIC(m).score;
+        expect(withUndefined).toBe(without);
+    });
+
+    it('a hard kill still zeroes the score regardless of a high novelty', () => {
+        const r = scoreSingleIC({ ...dying(), embedding: { openEndedness: 1.0 } });
+        expect(r.killed).toBe(true);
+        expect(r.score).toBe(0);
+        expect(r.components.openEndedness).toBe(0);
+    });
+});
+
 describe('Score v2 — real fixtures (the central F1/F4 regression)', () => {
     const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
     const churnSparse = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' }).score;

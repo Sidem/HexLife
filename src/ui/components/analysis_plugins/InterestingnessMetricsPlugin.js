@@ -21,6 +21,7 @@ const COMPONENT_META = [
     { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed', hint: 'Order and disorder coexisting in different regions.' },
     { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed', hint: 'Entropy swinging over time (Wuensche) — complex rules, not steady order or chaos.' },
     { key: 'transport', label: 'Transport', usedFlag: 'transportUsed', hint: 'Active-cell centroid drift — coherent motion (gliders/spaceships) vs a pinned churn.' },
+    { key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed', hint: 'Perceptual (CLIP) trajectory novelty — only measured by Auto-Explore when the embedding objective is on; n/a here.' },
 ];
 
 const SETTING_PROBE = 'analysisMeasureProbe';

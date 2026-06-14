@@ -20,6 +20,7 @@ const KEYS = {
     USER_RULESETS: `${LS_KEY_PREFIX}userRulesets`,
     USER_PATTERNS: `${LS_KEY_PREFIX}userPatterns`,
     EXPLORE_GALLERY: `${LS_KEY_PREFIX}exploreGallery`,
+    EMBEDDING_GALLERY: `${LS_KEY_PREFIX}embeddingGallery`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`
@@ -264,6 +265,17 @@ export function saveExploreGallery(entries) {
         }
         console.error('Error saving explore gallery to localStorage:', e);
     }
+}
+
+// Perceptual auto-explore illumination archive (v3.0): compact embedding-cell entries (hex + score +
+// random-projection cell key — NO raw vectors, so it stays small). Keyed separately from the main
+// gallery; only written/read when the embedding objective is in use.
+export function loadEmbeddingGallery() {
+    return _getItem(KEYS.EMBEDDING_GALLERY) || [];
+}
+
+export function saveEmbeddingGallery(entries) {
+    _setItem(KEYS.EMBEDDING_GALLERY, entries);
 }
 
 export function loadColorSettings() {

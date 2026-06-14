@@ -365,4 +365,8 @@ export const EVENTS = {
     EXPLORE_PROGRESS: 'explore:progress',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */
     EXPLORE_FIND_ADDED: 'explore:findAdded',
+    /** @param {{enabled: boolean}} data - Toggle the optional foundation-model (CLIP) perceptual auto-explore objective (v3.0). When enabled, the embedding model lazily loads in its own worker; the statistical objective is unchanged when disabled (default). */
+    COMMAND_SET_EMBEDDING_ENABLED: 'command:setEmbeddingEnabled',
+    /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean}} data - The perceptual-objective embedding provider changed status (toggled, model loading, ready, or degraded after a failure). */
+    EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
 };

@@ -3,6 +3,8 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import { hexToRuleset, rulesetName } from '../utils/utils.js';
 import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from './analysis/InterestingnessScore.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
+import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
+import { trajectoryNovelty, meanVector } from './analysis/EmbeddingNovelty.js';
 
 /**
  * Phase 4 of the auto-explore roadmap: the generation loop that ties Phases 1–3 together into the
@@ -99,6 +101,11 @@ export const EXPLORE_CONFIG = {
     maxGalleryEntries: 200,
     /** Generation budget: stop the loop after this many generations (0 = unlimited). */
     maxGenerations: 0,
+    // --- Perceptual objective (v3.0, ASAL; only active when the embedding model is enabled + loaded) ---
+    /** Frames captured per confirmed find to form the embedding trajectory (the open-endedness signal). */
+    embeddingFrames: 6,
+    /** Ticks advanced between captured trajectory frames (spacing of the perceptual time series). */
+    embeddingFrameTicks: 50,
 };
 
 const EXPLORE_STATE = Object.freeze({ IDLE: 'idle', RUNNING: 'running', PAUSED: 'paused' });
@@ -110,12 +117,22 @@ export class AutoExploreService {
      * @param {((worldIndex: number) => Promise<string|null>)|null} [opts.thumbnailProvider]
      *   Async capture of a world's current render as a small data-URL thumbnail (DI so the service
      *   stays renderer-free, principle 5). null in unit tests / when no renderer is available.
+     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, getStatus?: () => string}|null} [opts.embeddingProvider]
+     *   Optional foundation-model embedding provider for the perceptual objective (v3.0). null/absent ⇒
+     *   the statistical objective is used unchanged (the default).
+     * @param {((worldIndex: number) => Promise<any|null>)|null} [opts.frameProvider]
+     *   Async capture of a world's current render as raw ImageData (fed to the embedder). null ⇒ no
+     *   perceptual trajectory is captured (the term is simply absent and the score renormalizes).
      */
-    constructor(worldManager, { thumbnailProvider = null } = {}) {
+    constructor(worldManager, { thumbnailProvider = null, embeddingProvider = null, frameProvider = null } = {}) {
         this.wm = worldManager;
         this.thumbnailProvider = thumbnailProvider;
-        /** Per-find thumbnail capture deadline (ms) so the search never stalls on a slow capture. */
+        this.embeddingProvider = embeddingProvider;
+        this.frameProvider = frameProvider;
+        /** Per-find thumbnail/frame capture deadline (ms) so the search never stalls on a slow capture. */
         this.thumbnailTimeoutMs = 300;
+        /** Whether the perceptual objective is active for the current run (set in start()). */
+        this.embeddingEnabled = false;
         this.state = EXPLORE_STATE.IDLE;
         this.generation = 0;
         this.championHex = null;
@@ -123,6 +140,10 @@ export class AutoExploreService {
         this.runnerUpHex = null;
         this.options = { ...EXPLORE_CONFIG };
         this.archive = new BehaviorArchive();
+        /** Perceptual illumination archive (v3.0): a second MAP-Elites-lite archive keyed by the
+         *  foundation-model embedding, running alongside `archive`. Populated only when embeddings are
+         *  on; supplies an additional perceptual-novelty pressure on champion selection. */
+        this.embeddingArchive = new EmbeddingArchive();
         /** Snapshot of pre-explore per-world settings + pause state, for restore on stop. */
         this._snapshot = null;
         /** Resolver used to suspend the loop while paused. */
@@ -131,6 +152,7 @@ export class AutoExploreService {
         this._runToken = 0;
 
         this._loadGallery();
+        this._loadEmbeddingGallery();
     }
 
     isRunning() {
@@ -148,6 +170,9 @@ export class AutoExploreService {
             generation: this.generation,
             championHex: this.championHex,
             gallerySize: this.archive.size,
+            embeddingEnabled: !!(this.embeddingProvider && this.embeddingProvider.isEnabled()),
+            embeddingStatus: this.embeddingProvider && this.embeddingProvider.getStatus ? this.embeddingProvider.getStatus() : 'disabled',
+            embeddingCells: this.embeddingArchive.size,
             options: { ...this.options },
         };
     }
@@ -189,6 +214,16 @@ export class AutoExploreService {
         }
         this.championHex = seedHex;
         this._activeICSuite = this._resolveICSuite(this.options.icLabels);
+
+        // Perceptual objective (v3.0): active only when a provider is wired AND the user enabled it.
+        // Warm the model up front (non-blocking); if it can't load, degrade to the statistical objective
+        // for this run. The frameProvider is required to capture the trajectory the embedder consumes.
+        this.embeddingEnabled = !!(this.embeddingProvider && this.embeddingProvider.isEnabled() && this.frameProvider);
+        if (this.embeddingEnabled) {
+            this.embeddingProvider.ensureReady().then((ok) => {
+                if (!ok) this.embeddingEnabled = false; // model unavailable ⇒ silent statistical fallback
+            }).catch(() => { this.embeddingEnabled = false; });
+        }
 
         this._snapshot = this.wm._captureAutoExploreSnapshot();
         // A full-grid search needs every world running, regardless of prior enabled flags.
@@ -356,17 +391,24 @@ export class AutoExploreService {
         // Bank confirmed finds, then rank by novelty-weighted *confirmed* score.
         const ranked = [];
         const finds = [];
+        let embeddingChanged = false;
         // Per-world score/kill snapshot for the minimap badges (results[idx] ↔ world idx).
         const perWorldScores = new Array(population.length).fill(null);
 
         results.forEach((r, idx) => {
             if (!r || r.scored.perIC.length === 0) return;
-            const { scored, screenScore, winMetrics, confirmed } = r;
+            const { scored, screenScore, winMetrics, confirmed, embedding } = r;
             // The score that drives selection + the gallery: the confirmed final score when a
             // confirmation ran (so the period-84 screen-trap can't become champion), else the screen.
             const baseScore = confirmed ? confirmed.finalScore : screenScore;
+            const embVector = embedding ? embedding.vector : null;
             // Pass the candidate hex so the incumbent champion isn't penalized against itself (F3).
-            const selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex);
+            let selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex);
+            // Perceptual illumination (v3.0): when an embedding is available, also push the search away
+            // from perceptually-explored cells — the second (embedding-keyed) novelty pressure.
+            if (this.embeddingEnabled && embVector) {
+                selectionScore *= this.embeddingArchive.noveltyMultiplier(embVector, baseScore, r.hex);
+            }
             ranked.push({ r, scored, winMetrics, selectionScore, baseScore });
 
             const winIC = scored.perIC[scored.winningIC];
@@ -380,9 +422,21 @@ export class AutoExploreService {
             // Bank only candidates that survived a confirmation burst (rejected-at-confirm are dropped).
             // A cycle-penalized find is still banked — it's a legitimate, honestly-tagged category.
             if (confirmed && !confirmed.rejected) {
-                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb);
+                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb, embedding);
                 const res = this.archive.tryInsert(entry);
                 if (res.added || res.improved) finds.push(entry);
+                // Mirror into the perceptual illumination archive (keyed by the find's embedding).
+                if (embVector) {
+                    this.embeddingArchive.tryInsert({
+                        hex: entry.hex,
+                        mnemonic: entry.mnemonic,
+                        score: entry.score,
+                        openEndedness: embedding.openEndedness,
+                        generation: this.generation,
+                        vector: embVector,
+                    });
+                    embeddingChanged = true;
+                }
             }
         });
 
@@ -390,6 +444,7 @@ export class AutoExploreService {
             this._persistGallery();
             for (const f of finds) EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: f, gallerySize: this.archive.size });
         }
+        if (embeddingChanged) this._persistEmbeddingGallery();
 
         // Best = next champion; second-best = runner-up parent for next generation's crossover.
         ranked.sort((a, b) => b.selectionScore - a.selectionScore);
@@ -430,6 +485,7 @@ export class AutoExploreService {
         const winMetrics = ev.perIC[scored.winningIC] || {};
 
         let confirmed = null;
+        let embedding = null;
         if (screenScore >= this.options.findThreshold && winMetrics.initialState) {
             if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
             const proxy = this.wm.worlds[worldIndex];
@@ -441,6 +497,22 @@ export class AutoExploreService {
                 probe: { enabled: true, probeTicks: this.options.probeTicks },
             });
             if (!confirmMetrics || confirmMetrics.cancelled || token !== this._runToken) return null;
+
+            // Perceptual objective (v3.0): capture a short embedding trajectory of the just-confirmed
+            // behavior and fold its open-endedness (trajectory novelty) into the confirmation metrics
+            // so the CONFIRMED score carries the perceptual term. Cheap statistical screening stays
+            // model-free; only confirmed finds pay the embedding cost. ANY failure (no model, capture
+            // miss, < 2 usable frames) leaves confirmMetrics untouched ⇒ the score renormalizes over
+            // the statistical terms (graceful degradation). Runs only after the confirmation burst, so
+            // deterministic per-(gen,world,IC) seeding upstream is unaffected.
+            if (this.embeddingEnabled) {
+                embedding = await this._captureEmbedding(worldIndex, token);
+                if (token !== this._runToken) return null;
+                if (embedding && Number.isFinite(embedding.openEndedness)) {
+                    confirmMetrics.embedding = { openEndedness: embedding.openEndedness };
+                }
+            }
+
             const confirmIC = scoreSingleIC({ ...confirmMetrics, icLabel: winMetrics.icLabel });
             confirmed = applyConfirmation(screenScore, confirmIC, confirmMetrics, {
                 ...SCORE_CONFIG,
@@ -450,14 +522,83 @@ export class AutoExploreService {
         }
 
         // Capture a thumbnail of the just-confirmed world NOW — it still holds the confirmation
-        // burst's final frame, and the next generation hasn't reset it yet (v2.6, F6). Time-boxed so
-        // a slow capture never stalls the search.
+        // burst's final frame (or the embedding trajectory's last frame), and the next generation
+        // hasn't reset it yet (v2.6, F6). Time-boxed so a slow capture never stalls the search.
         let thumb = null;
         if (confirmed && !confirmed.rejected && this.thumbnailProvider) {
             thumb = await this._captureThumbnail(worldIndex);
             if (token !== this._runToken) return null;
         }
-        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed, thumb };
+        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed, thumb, embedding };
+    }
+
+    /**
+     * Capture a short trajectory of rendered frames of the just-confirmed world and reduce it to a
+     * perceptual open-endedness signal (v3.0, ASAL). Starts from the confirmation burst's final state,
+     * then advances the world in small sub-bursts, capturing one frame between each, and embeds every
+     * frame with the (off-thread) foundation model. Returns `{ openEndedness, vector }` — the trajectory
+     * novelty and the mean embedding (the perceptual archive key) — or null on any failure / abort /
+     * fewer than two usable embeddings (the caller then degrades gracefully).
+     * @param {number} worldIndex
+     * @param {number} token
+     * @returns {Promise<{openEndedness: number, vector: Float32Array}|null>}
+     */
+    async _captureEmbedding(worldIndex, token) {
+        if (!this.embeddingEnabled || !this.frameProvider || !this.embeddingProvider) return null;
+        const proxy = this.wm.worlds[worldIndex];
+        if (!proxy) return null;
+
+        const n = Math.max(2, this.options.embeddingFrames || EXPLORE_CONFIG.embeddingFrames);
+        const frameTicks = Math.max(1, this.options.embeddingFrameTicks || EXPLORE_CONFIG.embeddingFrameTicks);
+
+        const frames = [];
+        const first = await this._captureFrame(worldIndex);
+        if (token !== this._runToken) return null;
+        if (first) frames.push(first);
+        for (let i = 1; i < n; i++) {
+            if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
+            const r = await proxy.runEvaluation({
+                ticks: frameTicks,
+                sampleEvery: this.options.sampleEvery,
+                warmupTicks: 0,
+                probe: { enabled: false },
+            });
+            if (!r || r.cancelled || token !== this._runToken) break;
+            const f = await this._captureFrame(worldIndex);
+            if (token !== this._runToken) return null;
+            if (f) frames.push(f);
+        }
+        if (frames.length < 2) return null;
+
+        const embeds = [];
+        for (const f of frames) {
+            if (token !== this._runToken) return null;
+            const e = await this.embeddingProvider.embed(f);
+            if (e && e.length) embeds.push(e);
+        }
+        if (embeds.length < 2) return null;
+
+        const vector = meanVector(embeds);
+        if (!vector) return null;
+        return { openEndedness: trajectoryNovelty(embeds), vector };
+    }
+
+    /**
+     * Race the injected frame provider (raw ImageData capture) against the capture deadline so the loop
+     * never blocks on a slow render read.
+     * @param {number} worldIndex
+     * @returns {Promise<any|null>}
+     */
+    async _captureFrame(worldIndex) {
+        if (!this.frameProvider) return null;
+        try {
+            return await Promise.race([
+                Promise.resolve(this.frameProvider(worldIndex)),
+                new Promise((resolve) => setTimeout(() => resolve(null), this.thumbnailTimeoutMs)),
+            ]);
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -557,9 +698,24 @@ export class AutoExploreService {
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
      * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
+     * @param {{openEndedness: number, vector: Float32Array}|null} [embedding] Perceptual trajectory
+     *   result (v3.0); when present, its open-endedness term is overlaid onto the (screen-derived)
+     *   component breakdown so the gallery bar reflects the perceptual signal the confirmation measured.
      * @returns {import('./analysis/BehaviorArchive.js').ArchiveEntry}
      */
-    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null) {
+    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, embedding = null) {
+        // Screening is model-free, so its perComponent has no perceptual term. The open-endedness is
+        // measured during confirmation; overlay it (the half-saturation reward + flag) so the gallery's
+        // "Novelty" bar shows it. The other eight terms keep their screen values (screening measures them).
+        let perComponent = scored.perComponent;
+        if (embedding && Number.isFinite(embedding.openEndedness)) {
+            const oe = embedding.openEndedness;
+            perComponent = {
+                ...scored.perComponent,
+                openEndedness: oe / (oe + SCORE_CONFIG.openEndednessHalfSat),
+                openEndednessUsed: true,
+            };
+        }
         return {
             hex: ev.hex,
             mnemonic: rulesetName(ev.hex),
@@ -567,7 +723,8 @@ export class AutoExploreService {
             screenScore,
             cyclic: confirmed.cyclic,
             thumb: thumb || null,
-            perComponent: scored.perComponent,
+            openEndedness: embedding && Number.isFinite(embedding.openEndedness) ? embedding.openEndedness : undefined,
+            perComponent,
             winningIC: scored.winningIC,
             icLabel: winMetrics.icLabel,
             initialState: winMetrics.initialState,
@@ -617,9 +774,26 @@ export class AutoExploreService {
         PersistenceService.saveExploreGallery(entries);
     }
 
+    // --- Perceptual illumination archive persistence (v3.0; compact, no raw vectors) --------------
+
+    _loadEmbeddingGallery() {
+        try {
+            this.embeddingArchive.loadEntries(PersistenceService.loadEmbeddingGallery());
+        } catch (e) {
+            console.warn('AutoExploreService: failed to load embedding gallery', e);
+        }
+    }
+
+    _persistEmbeddingGallery() {
+        const entries = this.embeddingArchive.getEntries().slice(0, this.options.maxGalleryEntries);
+        PersistenceService.saveEmbeddingGallery(entries);
+    }
+
     clearGallery() {
         this.archive.clear();
+        this.embeddingArchive.clear();
         PersistenceService.saveExploreGallery([]);
+        PersistenceService.saveEmbeddingGallery([]);
         EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: null, gallerySize: 0, cleared: true });
     }
 }

@@ -5,6 +5,7 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService, EXPLORE_CONFIG } from './AutoExploreService.js';
+import { EmbeddingService } from '../services/EmbeddingService.js';
 import { scoreSingleIC } from './analysis/InterestingnessScore.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import * as Renderer from '../rendering/renderer.js';
@@ -33,12 +34,25 @@ export class WorldManager {
         this.initialDefaultRulesetHex = "";
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
+        // Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
+        // ASAL). Default off (persisted setting); lazily loads a CLIP image encoder in its own worker
+        // only when enabled, and degrades to the statistical objective on any failure.
+        this.embeddingService = new EmbeddingService({
+            enabled: PersistenceService.loadUISetting('embeddingEnabled', false),
+        });
+        // If the user previously opted in, warm the (browser-cached) model now so the panel shows a
+        // truthful ready/error status instead of a stuck "will load on demand"; fire-and-forget and
+        // self-degrading. Default-off users never spawn the worker.
+        if (this.embeddingService.isEnabled()) this.embeddingService.ensureReady();
         // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
         // it only references the proxies/ruleset service lazily once started. The thumbnail provider
         // (v2.6, F6) waits a couple of rAFs for the renderer to draw the world's final eval frame,
-        // then grabs a small JPEG data URL — DI so the service stays renderer-free.
+        // then grabs a small JPEG data URL — DI so the service stays renderer-free. The frame provider
+        // (v3.0) likewise grabs raw ImageData for the embedder; both are renderer-free DI.
         this.autoExploreService = new AutoExploreService(this, {
             thumbnailProvider: (worldIndex) => this._captureExploreThumbnail(worldIndex),
+            embeddingProvider: this.embeddingService,
+            frameProvider: (worldIndex) => this._captureExploreFrame(worldIndex),
         });
         this._setupEventListeners();
     }
@@ -232,6 +246,12 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY, () => this.autoExploreService.clearGallery());
         EventBus.subscribe(EVENTS.COMMAND_APPLY_EXPLORE_FIND, (data) => this.applyExploreFind(data?.find));
         EventBus.subscribe(EVENTS.COMMAND_RETEST_EXPLORE_FIND, (data) => this.autoExploreService.retestFind(data?.find));
+        // Perceptual objective toggle (v3.0): persist the choice and load/unload the embedding model.
+        EventBus.subscribe(EVENTS.COMMAND_SET_EMBEDDING_ENABLED, (data) => {
+            const enabled = !!(data && data.enabled);
+            PersistenceService.saveUISetting('embeddingEnabled', enabled);
+            this.embeddingService.setEnabled(enabled);
+        });
     }
 
     /**
@@ -943,6 +963,29 @@ export class WorldManager {
                 requestAnimationFrame(() => {
                     try {
                         resolve(Renderer.captureWorldThumbnail(worldIndex));
+                    } catch {
+                        resolve(null);
+                    }
+                });
+            });
+        } catch {
+            resolve(null);
+        }
+    });
+
+    /**
+     * Capture a world's current render as raw ImageData for the perceptual objective's embedding worker
+     * (v3.0). Same two-rAF wait as the thumbnail capture (let the renderer draw the world's latest eval
+     * frame before reading its FBO); resolves null on any failure so the search never throws on capture.
+     * @param {number} worldIndex
+     * @returns {Promise<ImageData|null>}
+     */
+    _captureExploreFrame = (worldIndex) => new Promise((resolve) => {
+        try {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    try {
+                        resolve(Renderer.captureWorldImageData(worldIndex));
                     } catch {
                         resolve(null);
                     }

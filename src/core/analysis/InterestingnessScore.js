@@ -49,6 +49,15 @@
  */
 
 /**
+ * @typedef {object} EmbeddingStats
+ * @property {number} openEndedness  Raw trajectory novelty (mean consecutive cosine distance) of a
+ *   find's frame embeddings in a foundation-model (CLIP) space (v3.0 ASAL perceptual term). Present
+ *   ONLY when the optional, default-off embedding objective is enabled AND a model produced ≥2 usable
+ *   frame embeddings; absent otherwise (statistical objective ⇒ term dropped + renormalized, so the
+ *   score is unchanged from the embedding-off pipeline).
+ */
+
+/**
  * Subset of an EVALUATION_RESULT that the score consumes. Extra fields are ignored.
  * @typedef {object} EvalMetrics
  * @property {number} [finalRatio]       Final active-cell ratio in [0,1].
@@ -58,6 +67,8 @@
  * @property {BlockEntropyStats} [blockEntropy]
  * @property {SpatialOrderStats} [spatialOrder] v2.1 spatial-order stats (absent on v1 metrics).
  * @property {TransportStats} [transport] v2.9 centroid-drift transport stats (absent on v1 metrics).
+ * @property {EmbeddingStats} [embedding] v3.0 foundation-model perceptual stats (absent unless the
+ *   optional embedding objective is enabled and a model produced a usable frame trajectory).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe).
  * @property {Uint32Array|number[]} [ruleUsageDelta] 128-entry rule-usage delta over the burst.
  * @property {boolean} [extinct]
@@ -76,10 +87,12 @@
  * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
  * @property {number} temporalEntropyVariance Temporal block-entropy-variance term ([0,1]) — 0 if unused (v2.8).
  * @property {number} transport     Centroid-drift transport/mobility term ([0,1]) — 0 if unused (v2.9).
+ * @property {number} openEndedness Foundation-model trajectory-novelty term ([0,1]) — 0 if unused (v3.0).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
  * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
  * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
  * @property {boolean} transportUsed   Whether transport.meanSpeed was present and the transport term counted (v2.9).
+ * @property {boolean} openEndednessUsed Whether an embedding trajectory was present and the perceptual term counted (v3.0).
  */
 
 /**
@@ -144,6 +157,16 @@ export const SCORE_CONFIG = {
     // were scaled down proportionally to make room (spatialStructure stays dominant; their relative
     // proportions — and therefore the gliders-vs-churn fixture gap — are preserved). Like the spatial
     // and temporal terms it is dropped-and-renormalized for v1/legacy entries that predate it.
+    //
+    // v3.0 (perceptual interestingness, ASAL): added `openEndedness` — the temporal novelty of a
+    // find's frames in a foundation-model (CLIP) embedding space (Kumar et al. 2024). It is an
+    // OPTIONAL, default-off term: present only when the embedding objective is enabled AND a model
+    // produced a usable frame trajectory, dropped-and-renormalized otherwise. CRITICALLY, its weight
+    // is ADDED WITHOUT changing the other eight values, so when embeddings are off the term is absent
+    // and the renormalized score is byte-identical to the statistical pipeline (the eight terms keep
+    // their exact relative proportions — fixtures lacking it still rank gliders > churn unchanged).
+    // It complements the statistical terms with a human-perception-aligned signal rather than
+    // replacing them; it sits downstream of the v2.4 confirmation filter like every other graded term.
     weights: {
         criticality: 0.16,
         entropyBand: 0.07,
@@ -153,6 +176,7 @@ export const SCORE_CONFIG = {
         spatialHeterogeneity: 0.11,
         temporalEntropyVariance: 0.13,
         transport: 0.11,
+        openEndedness: 0.12,
     },
 
     // --- Criticality term: gaussian in ln(σ), peaked at σ=1 → exp(-(ln σ)² / 2τ²) ---
@@ -189,6 +213,14 @@ export const SCORE_CONFIG = {
      *  term reaches 0.5. A glider/spaceship soup drifts the centroid on the order of tenths of a cell
      *  per tick; a dense churn keeps it near zero, so a low half-sat keeps the term discriminating. */
     transportHalfSat: 0.1,
+
+    // --- Open-endedness term (v3.0 ASAL perceptual novelty; half-saturation reward) ---
+    /** embedding.openEndedness (mean consecutive cosine distance of a find's frame embeddings, in
+     *  [0,2]) at which the term reaches 0.5. A still/settled pattern barely moves in CLIP space
+     *  (≈0); an evolving/travelling one steps into visually-new territory each frame. A low half-sat
+     *  keeps the term discriminating, since consecutive frames of even an active CA stay fairly
+     *  similar in a vision-model embedding. */
+    openEndednessHalfSat: 0.08,
 
     // --- Confirmation pass (v2.4 two-stage eval; consumed by applyConfirmation). The operational
     // copies live in AutoExploreService.EXPLORE_CONFIG and are passed through; these are the defaults
@@ -277,10 +309,12 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 spatialHeterogeneity: 0,
                 temporalEntropyVariance: 0,
                 transport: 0,
+                openEndedness: 0,
                 criticalityUsed: false,
                 spatialUsed: false,
                 temporalVarUsed: false,
                 transportUsed: false,
+                openEndednessUsed: false,
             },
             killed: true,
             killReason,
@@ -335,6 +369,15 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const hasTransport = tp != null && Number.isFinite(tp);
     const transport = hasTransport ? tp / (tp + cfg.transportHalfSat) : 0;
 
+    // --- Open-endedness / perceptual novelty (foundation-model trajectory novelty). v3.0 (ASAL). ---
+    // The mean cosine distance between consecutive frame embeddings in a CLIP-style space: a DIRECT,
+    // human-perception-aligned signal for "the look keeps evolving". Present only when the optional
+    // embedding objective is enabled and a model produced a usable trajectory; absent otherwise →
+    // dropped + renormalized below, so the embedding-off score is unchanged. Half-saturation reward.
+    const oe = metrics.embedding ? metrics.embedding.openEndedness : undefined;
+    const hasOpenEndedness = oe != null && Number.isFinite(oe);
+    const openEndedness = hasOpenEndedness ? oe / (oe + cfg.openEndednessHalfSat) : 0;
+
     // Weighted combine; drop a weight (and renormalize) when its input is unavailable so a burst is
     // judged on the terms it has rather than penalized: criticality when σ is null, the two spatial
     // terms when the v2.1 metrics are absent, the temporal-variance term when blockEntropy.variance
@@ -362,14 +405,19 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += transport * w.transport;
         den += w.transport;
     }
+    if (hasOpenEndedness) {
+        num += openEndedness * w.openEndedness;
+        den += w.openEndedness;
+    }
     const score = den > 0 ? num / den : 0;
 
     return {
         score,
         components: {
             criticality, entropyBand, fluctuation, ruleDiversity,
-            spatialStructure, spatialHeterogeneity, temporalEntropyVariance, transport,
+            spatialStructure, spatialHeterogeneity, temporalEntropyVariance, transport, openEndedness,
             criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
+            openEndednessUsed: hasOpenEndedness,
         },
         killed: false,
         killReason: null,
@@ -400,7 +448,9 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
             perComponent: {
                 criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
                 spatialStructure: 0, spatialHeterogeneity: 0, temporalEntropyVariance: 0, transport: 0,
+                openEndedness: 0,
                 criticalityUsed: false, spatialUsed: false, temporalVarUsed: false, transportUsed: false,
+                openEndednessUsed: false,
             },
             winningIC: -1,
         };

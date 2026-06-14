@@ -36,7 +36,16 @@ const COMPONENT_META = [
     { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed' },
     { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed' },
     { key: 'transport', label: 'Transport', usedFlag: 'transportUsed' },
+    { key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed' },
 ];
+
+/** Human-readable status line for the perceptual-objective toggle, keyed by EMBEDDING_STATUS. */
+const EMBEDDING_STATUS_TEXT = {
+    disabled: '',
+    loading: 'Loading vision model… (downloads ~tens of MB once, then cached)',
+    ready: 'Vision model ready — finds are also scored on perceptual novelty.',
+    error: 'Vision model unavailable — using the statistical objective.',
+};
 
 const MAX_GALLERY_RENDER = 40;
 
@@ -70,6 +79,9 @@ export class ExploreComponent extends BaseComponent {
         const ticks = PersistenceService.loadUISetting(SETTING_KEYS.ticks, EXPLORE_CONFIG.evalTicks);
         const icLabels = PersistenceService.loadUISetting(SETTING_KEYS.icLabels, IC_SUITE.map(ic => ic.label));
         const maxGenerations = PersistenceService.loadUISetting(SETTING_KEYS.maxGenerations, EXPLORE_CONFIG.maxGenerations);
+        const status = this.service.getStatus();
+        const embeddingEnabled = !!status.embeddingEnabled;
+        const embeddingStatus = status.embeddingStatus || 'disabled';
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
@@ -107,6 +119,13 @@ export class ExploreComponent extends BaseComponent {
                     <label class="explore-field-label" for="explore-max-generations">Generation Budget <span class="explore-field-hint">(0 = unlimited)</span></label>
                     <input type="number" id="explore-max-generations" class="explore-budget-input" min="0" max="10000" step="1" value="${maxGenerations}">
                 </div>
+                <div class="form-group explore-embedding-field">
+                    <label class="explore-embedding-toggle" title="Score finds on perceptual novelty using a vision model (CLIP) embedding of their frames — ASAL-style. Optional: the model loads on demand (tens of MB, cached) and the search falls back to the statistical objective if it can't load.">
+                        <input type="checkbox" id="explore-embedding-enabled" ${embeddingEnabled ? 'checked' : ''}>
+                        <span>Perceptual novelty (CLIP) <span class="explore-field-hint">experimental</span></span>
+                    </label>
+                    <div class="explore-embedding-status" id="explore-embedding-status" data-status="${embeddingStatus}">${this._escape(EMBEDDING_STATUS_TEXT[embeddingStatus] || '')}</div>
+                </div>
             </div>
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
@@ -127,6 +146,8 @@ export class ExploreComponent extends BaseComponent {
             adopt: this.element.querySelector('[data-action="adopt"]'),
         };
         this.budgetInput = this.element.querySelector('#explore-max-generations');
+        this.embeddingToggle = this.element.querySelector('#explore-embedding-enabled');
+        this.embeddingStatusEl = this.element.querySelector('#explore-embedding-status');
 
         this.sliders.rate = new SliderComponent(this.element.querySelector('#explore-mutation-rate-mount'), {
             id: 'explore-mutation-rate',
@@ -189,10 +210,27 @@ export class ExploreComponent extends BaseComponent {
             PersistenceService.saveUISetting(SETTING_KEYS.icLabels, this._readICLabels());
         });
 
+        if (this.embeddingToggle) {
+            this._addDOMListener(this.embeddingToggle, 'change', () => {
+                EventBus.dispatch(EVENTS.COMMAND_SET_EMBEDDING_ENABLED, { enabled: this.embeddingToggle.checked });
+            });
+        }
+
         this._addDOMListener(this.galleryList, 'click', (e) => this._onGalleryClick(e));
 
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
         this._subscribeToEvent(EVENTS.EXPLORE_FIND_ADDED, this._onFindAdded);
+        this._subscribeToEvent(EVENTS.EMBEDDING_STATUS_CHANGED, this._onEmbeddingStatus);
+    }
+
+    _onEmbeddingStatus(payload) {
+        if (!payload) return;
+        if (this.embeddingToggle) this.embeddingToggle.checked = !!payload.enabled;
+        if (this.embeddingStatusEl) {
+            const status = payload.status || 'disabled';
+            this.embeddingStatusEl.dataset.status = status;
+            this.embeddingStatusEl.textContent = EMBEDDING_STATUS_TEXT[status] || '';
+        }
     }
 
     _readICLabels() {
