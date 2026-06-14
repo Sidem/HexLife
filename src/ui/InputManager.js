@@ -96,7 +96,10 @@ export class InputManager {
             e.preventDefault();
             this.currentStrategy.handleTouchEnd(e);
         }, { passive: false });
-        document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e));
+        // Capture phase so the active strategy can intercept and consume a key (via
+        // stopPropagation) before the global KeyboardShortcutManager's bubble-phase handler —
+        // e.g. 'r' rotates while placing a pattern instead of resetting all worlds.
+        document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e), true);
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
         EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => this.setStrategy('select', data));

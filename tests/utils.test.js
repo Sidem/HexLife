@@ -13,6 +13,7 @@ import {
     offsetToAxial,
     axialToOffset,
     translatePatternCells,
+    rotatePatternCells,
     patternToHexSVG,
     hammingDistanceHex,
 } from '../src/utils/utils.js';
@@ -327,6 +328,63 @@ describe('translatePatternCells (phase-preserving paste)', () => {
         const fromEven = translatePatternCells(pattern, 6, 6, 0);
         const fromOdd = translatePatternCells(pattern, 6, 6, 1);
         expect(fromEven[1]).not.toEqual(fromOdd[1]);
+    });
+});
+
+describe('rotatePatternCells (60° hex rotation about the origin)', () => {
+    // cube hex-distance from the origin: invariant under rotation.
+    const ring = (col, row) => {
+        const { q, r } = offsetToAxial(col, row);
+        return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
+    };
+    const sortPairs = (cells) => [...cells].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+    it('returns empty for empty / invalid input', () => {
+        expect(rotatePatternCells([], 0, 1)).toEqual([]);
+        expect(rotatePatternCells(null, 0, 1)).toEqual([]);
+    });
+
+    it('pins the origin cell in place', () => {
+        expect(rotatePatternCells([[0, 0]], 0, 1)).toEqual([[0, 0]]);
+        expect(rotatePatternCells([[0, 0]], 1, 3)).toEqual([[0, 0]]);
+    });
+
+    it('six 60° steps return to the original (and preserve cell count)', () => {
+        const pattern = [[0, 0], [1, 0], [2, 1], [1, 2], [-1, -1]];
+        let cur = pattern;
+        for (let i = 0; i < 6; i++) cur = rotatePatternCells(cur, 0, 1);
+        expect(cur.length).toBe(pattern.length);
+        expect(sortPairs(cur)).toEqual(sortPairs(pattern));
+    });
+
+    it('clockwise then counter-clockwise is the identity', () => {
+        const pattern = [[0, 0], [2, 1], [1, 2]];
+        const there = rotatePatternCells(pattern, 0, 1);
+        expect(sortPairs(rotatePatternCells(there, 0, -1))).toEqual(sortPairs(pattern));
+    });
+
+    it('wraps the step count modulo 6 (negative == 5 forward)', () => {
+        const pattern = [[0, 0], [1, 0], [0, 1]];
+        expect(sortPairs(rotatePatternCells(pattern, 0, -1)))
+            .toEqual(sortPairs(rotatePatternCells(pattern, 0, 5)));
+        expect(sortPairs(rotatePatternCells(pattern, 0, 6))).toEqual(sortPairs(pattern));
+    });
+
+    it('preserves each cell\'s ring distance from the origin (rigid rotation)', () => {
+        const pattern = [[1, 0], [2, 1], [1, 2], [-1, -1], [0, 2]];
+        const before = pattern.map(([c, r]) => ring(c, r));
+        const after = rotatePatternCells(pattern, 0, 1).map(([c, r]) => ring(c, r));
+        expect(after).toEqual(before);
+    });
+
+    it('rotates the six unit neighbours into a permutation of themselves', () => {
+        // The six immediate neighbours of an even-column origin form one orbit under 60°.
+        const neighbours = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [0, 1]];
+        const rotated = rotatePatternCells(neighbours, 0, 1);
+        expect(rotated.length).toBe(6);
+        expect(sortPairs(rotated)).toEqual(sortPairs(neighbours));
+        // It is a genuine rotation, not the identity.
+        expect(rotated).not.toEqual(neighbours);
     });
 });
 

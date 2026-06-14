@@ -138,6 +138,44 @@ export function translatePatternCells(cells, anchorCol, anchorRow, originParity 
 }
 
 /**
+ * Rotates a captured pattern in 60° increments about its origin cell, preserving the
+ * hex grid's column-stagger phase. Operates in cube coordinates (where 60° rotation is
+ * the exact permutation `(x, y, z) → (-z, -x, -y)`), so the result is a lossless
+ * relabelling of the same hexagons — applying six steps is the identity.
+ *
+ * The pivot is the pattern's origin (column of parity `originParity`, row 0) — the same
+ * cell `translatePatternCells` anchors under the cursor — so a rotated pattern still pins
+ * that cell to the anchor. The returned cells keep the original `originParity` reference.
+ *
+ * @param {Array<[number, number]>} cells Relative offset cells `[dx, dy]`.
+ * @param {number} [originParity=0] Parity (0=even, 1=odd) of the capture origin column.
+ * @param {number} [steps=1] Number of 60° steps; positive = clockwise on screen,
+ *        negative = counter-clockwise. Any integer is wrapped into [0, 6).
+ * @returns {Array<[number, number]>} Rotated relative `[dx, dy]` cells.
+ */
+export function rotatePatternCells(cells, originParity = 0, steps = 1) {
+    if (!Array.isArray(cells) || cells.length === 0) return [];
+    const originCol = originParity & 1;
+    const origin = offsetToAxial(originCol, 0);
+    const n = ((steps % 6) + 6) % 6;
+    const out = [];
+    for (const [dx, dy] of cells) {
+        const a = offsetToAxial(originCol + dx, dy);
+        // Cube coordinates of this cell relative to the origin (x + y + z = 0).
+        let x = a.q - origin.q;
+        let z = a.r - origin.r;
+        let y = -x - z;
+        for (let i = 0; i < n; i++) {
+            const nx = -z, ny = -x, nz = -y; // 60° clockwise step
+            x = nx; y = ny; z = nz;
+        }
+        const { col, row } = axialToOffset(origin.q + x, origin.r + z);
+        out.push([col - originCol, row]);
+    }
+    return out;
+}
+
+/**
  * Renders a captured pattern as a standalone SVG of flat-top hexagons laid out on
  * the staggered grid (odd columns dropped half a row), so previews match how the
  * pattern actually tiles. Pure — returns markup, touches no DOM.
