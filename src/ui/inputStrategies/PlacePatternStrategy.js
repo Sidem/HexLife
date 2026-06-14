@@ -40,7 +40,12 @@ export class PlacePatternStrategy extends BaseInputStrategy {
             return;
         }
         const indicesToSet = this.getTranslatedPatternIndices(col, row);
-        EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndexAtCursor, cellIndices: indicesToSet });
+        // Stamp the pattern: its cells are meant to be set alive, so use 'draw' rather than the
+        // default 'invert'. Inverting XORs the pattern against whatever is already there, which on a
+        // busy/running world erases overlapping live cells and leaves a garbled remnant that dies the
+        // next tick (the "pattern disappears while running" bug). 'draw' matches the ghost preview and
+        // works identically whether the sim is paused or running, sparse or dense.
+        EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, { worldIndex: worldIndexAtCursor, cellIndices: indicesToSet, brushMode: 'draw' });
         this.manager.setStrategy(this.manager.previousStrategyName || 'pan');
     }
 
