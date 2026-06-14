@@ -7,6 +7,9 @@ import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
+import { PatternsComponent } from './components/PatternsComponent.js';
+import { ExploreComponent } from './components/ExploreComponent.js';
+import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 /**
  * Provides the tour definitions for the application's onboarding process.
  * This unified structure uses functional steps to adapt to both desktop and mobile UI contexts.
@@ -297,6 +300,92 @@ export const getTours = (appContext) => {
         title: 'Death Rules',
         content: "This column ranks the rules that switch cells <span class=\"onboarding-highlight-text\">off</span>. The balance between both columns shapes whether a world grows, dies out, or stabilizes. Run the simulation to see the ranking update live.",
         primaryAction: { text: 'Finish' },
+        advanceOn: { type: 'click' }
+    }];
+
+    const patterns = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="patterns-button"]',
+        title: 'Tutorial: Patterns',
+        content: "Copy and paste regions of cells, or capture a shape into your personal <span class=\"onboarding-highlight-text\">pattern library</span> and stamp it onto any world. <br><br>On mobile, find Patterns under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        primaryAction: { text: 'Open Patterns' },
+        condition: () => !isViewOpen({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === PatternsComponent }
+    }, {
+        element: '#patterns-copy-button',
+        title: 'Copy & Paste a Region',
+        content: "Click <span class=\"onboarding-highlight-text\">Copy Region</span>, then drag a box over active cells to grab them. <span class=\"onboarding-highlight-text\">Paste</span> drops the copy back onto the grid where you click. <br><br><b>Shortcuts:</b> <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy a region, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#patterns-capture-button',
+        title: 'Capture & Save',
+        content: "Click <span class=\"onboarding-highlight-text\">Capture &amp; Save…</span> and drag a box over some cells to store that shape in your library. Saved patterns persist across sessions.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#patterns-list',
+        title: 'Stamp Your Patterns',
+        content: "Saved patterns live here. Hit the <span class=\"onboarding-highlight-text\">place</span> icon to stamp one onto the grid &mdash; you can keep stamping repeatedly, and press <kbd>R</kbd> to rotate the stamp by 60°. The trash icon deletes a pattern.",
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
+        advanceOn: { type: 'click' }
+    }];
+
+    const explore = [{
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="explore-button"]',
+        title: 'Tutorial: Auto-Explore',
+        content: "Let the Explorer hunt for you. Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span> near the edge of chaos, scoring and breeding the best automatically. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        primaryAction: { text: 'Open Auto-Explore' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ExploreComponent }
+    }, {
+        element: '.explore-run-buttons',
+        title: 'Run the Search',
+        content: "<span class=\"onboarding-highlight-text\">Start</span> begins the search; <span class=\"onboarding-highlight-text\">Pause</span>, <span class=\"onboarding-highlight-text\">Stop</span>, and <span class=\"onboarding-highlight-text\">Stop &amp; Keep</span> (which adopts the current champion into your selected world) end it. The status line above tracks the generation and best score.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#explore-settings',
+        title: 'Tune the Search',
+        content: "Control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '.explore-gallery-group',
+        title: 'The Gallery',
+        content: "Every interesting find collects here, best-first, with a per-component score breakdown. Use the per-find actions to <span class=\"onboarding-highlight-text\">apply</span> it to the selected world, re-test, <span class=\"onboarding-highlight-text\">save</span> it to your library, or <span class=\"onboarding-highlight-text\">share</span> a link.",
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        advanceOn: { type: 'click' }
+    }];
+
+    const chromaLab = [{
+        element: '#colorPanelButton',
+        title: 'Tutorial: Chroma Lab',
+        content: "Color is HexLife's primary information channel &mdash; it encodes which rule fired in each cell. The <span class=\"onboarding-highlight-text\">Chroma Lab</span> lets you recolor the simulation to taste.",
+        primaryAction: { text: 'Open Chroma Lab' },
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'chromalab' } }),
+        onBeforeShow: resetUIState,
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ChromaLabComponent }
+    }, {
+        element: '#chroma-mode-select',
+        title: 'Coloring Modes',
+        content: "Switch between <span class=\"onboarding-highlight-text\">Preset Palettes</span>, coloring by <span class=\"onboarding-highlight-text\">Neighbor Count</span>, or by <span class=\"onboarding-highlight-text\">Symmetry Groups</span> &mdash; each tells a different visual story about how your ruleset behaves.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'chromalab' } }),
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#chroma-preset-section',
+        title: 'Preset Palettes',
+        content: "Pick a ready-made palette here. Keep <span class=\"onboarding-highlight-text\">Ensure flicker-proof presets</span> on to avoid harsh frame-to-frame flicker on busy rulesets. Your choice is saved automatically.",
+        primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'chromalab' } }),
         advanceOn: { type: 'click' }
     }];
 
@@ -624,12 +713,15 @@ export const getTours = (appContext) => {
         evolutionLoop,
         sparkOfLife,
         controls,
+        patterns,
         ruleset_actions,
         ruleset_library,
         editor,
         worldsetup,
+        explore,
         analysis,
         rulerank,
+        chromaLab,
         history,
         appliedEvolution,
         resetClear,
