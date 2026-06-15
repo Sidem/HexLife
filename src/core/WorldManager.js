@@ -100,6 +100,7 @@ export class WorldManager {
                 this.worldSettings.push({
                     initialState: initialState,
                     enabled: enabled,
+                    locked: false,
                     rulesetHex: rulesetHex,
                     rulesetHistory: [rulesetHex],
                     rulesetFuture: []
@@ -118,6 +119,7 @@ export class WorldManager {
                 if (!setting.rulesetFuture) {
                     setting.rulesetFuture = [];
                 }
+                setting.locked = !!setting.locked;
             });
             this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
         }
@@ -139,6 +141,7 @@ export class WorldManager {
                     params: { density: Config.DEFAULT_INITIAL_DENSITIES[i] ?? 0.5 }
                 },
                 enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
+                locked: false,
                 rulesetHex: this.initialDefaultRulesetHex,
                 rulesetHistory: [this.initialDefaultRulesetHex],
                 rulesetFuture: []
@@ -329,7 +332,7 @@ export class WorldManager {
     #setupRulesetCommandHandlers() {
         EventBus.subscribe(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, (data) => {
             const newRulesetHex = this._generateRandomRulesetHex(data.bias, data.generationMode);
-            this.#applyRulesetToWorlds(newRulesetHex, data.applyScope, data.shouldReset);
+            this.#applyRulesetToWorlds(newRulesetHex, data.applyScope, data.shouldReset, true);
         });
         EventBus.subscribe(EVENTS.COMMAND_SET_RULESET, (data) => {
             this.#applyRulesetToWorlds(data.hexString, data.scope, data.resetOnNewRule);
@@ -458,6 +461,8 @@ export class WorldManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
         EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_LOCK, () => this.toggleSelectedWorldLock());
+        EventBus.subscribe(EVENTS.COMMAND_COPY_WORLD_STATE, (data) => this.copyWorldState(this.selectedWorldIndex, data.targetWorldIndex));
         EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, (data) => {
             if (this.worldSettings[data.worldIndex]) {
                 this.worldSettings[data.worldIndex].initialState = data.initialState;
@@ -525,6 +530,10 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
+    /** True when a world's ruleset is locked against evolutionary/automatic rewrites (Generate,
+     *  Mutate, Clone, Clone & Mutate, Breed). Deliberate sets/edits ignore this. */
+    _isLocked = (idx) => !!this.worldSettings[idx]?.locked;
+
     _getAffectedWorldIndices = (scope) => {
         if (scope === 'none') return [];
         if (scope === 'all') return this.worlds.map((_, i) => i);
@@ -578,14 +587,15 @@ export class WorldManager {
         if (reset) proxy.resetWorld(settings.initialState, seed);
     }
 
-    #applyRulesetToWorlds = (rulesetHex, scope, shouldReset) => {
+    #applyRulesetToWorlds = (rulesetHex, scope, shouldReset, respectLocks = false) => {
         const newRulesetArray = hexToRuleset(rulesetHex);
         if (rulesetHex === "Error" || newRulesetArray.length !== 128) {
             console.error("Cannot apply invalid ruleset hex:", rulesetHex);
             return;
         }
 
-        const indicesToAffect = this._getAffectedWorldIndices(scope);
+        let indicesToAffect = this._getAffectedWorldIndices(scope);
+        if (respectLocks) indicesToAffect = indicesToAffect.filter(idx => !this._isLocked(idx));
         const baseSeed = Date.now();
 
         indicesToAffect.forEach(idx => {
@@ -613,11 +623,12 @@ export class WorldManager {
         const indices = this._getAffectedWorldIndices(scope);
 
         indices.forEach(idx => {
+            if (this._isLocked(idx)) return;
             const proxyStats = this.worlds[idx]?.getLatestStats();
             let currentHex = (proxyStats?.rulesetHex && proxyStats.rulesetHex !== "Error")
                 ? proxyStats.rulesetHex
                 : this.worldSettings[idx]?.rulesetHex;
-            
+
             if (!currentHex) {
                 console.warn(`_mutateRulesetForScope: No current hex for world ${idx}, skipping mutation.`);
                 return;
@@ -661,6 +672,8 @@ export class WorldManager {
         this.worlds.forEach((proxy, idx) => {
             let newHex = sourceRulesetHex;
             const isSelected = idx === this.selectedWorldIndex;
+            // A locked world keeps its ruleset (and grid) untouched by clone & mutate.
+            if (!isSelected && this._isLocked(idx)) return;
             if (!isSelected) {
                 let attempts = 0;
                 const maxAttempts = 10; // prevent infinite loop
@@ -736,6 +749,7 @@ export class WorldManager {
         const baseSeed = Date.now();
         this.worlds.forEach((proxy, idx) => {
             if (idx === parentAIdx || idx === parentBIdx) return; // parents keep their rulesets
+            if (this._isLocked(idx)) return; // a locked world keeps its ruleset untouched by breeding
             const childHex = this.rulesetService.crossoverHexes(hexA, hexB, mode, Math.random, postMutationRate);
             if (!childHex || childHex === "Error") return;
             this._commitRuleset(idx, childHex, {
@@ -770,6 +784,8 @@ export class WorldManager {
 
         const baseSeed = Date.now();
         this.worlds.forEach((proxy, idx) => {
+            // A locked world keeps its ruleset (and grid) untouched by clone.
+            if (idx !== this.selectedWorldIndex && this._isLocked(idx)) return;
             // The selected world already runs the source ruleset, so skip its worker upload.
             this._commitRuleset(idx, sourceRulesetHex, {
                 uploadToWorker: idx !== this.selectedWorldIndex,
@@ -1096,6 +1112,7 @@ export class WorldManager {
     getWorldSettingsForUI = () => this.worldSettings.map(ws => ({
         initialState: ws.initialState,
         enabled: ws.enabled,
+        locked: !!ws.locked,
         rulesetHex: ws.rulesetHex
     }));
 
@@ -1207,6 +1224,63 @@ export class WorldManager {
             }, [savedCells.buffer.slice(0), rulesetArray.buffer.slice(0)]);
         }
     }
+
+    /**
+     * Toggle the selected world's ruleset lock. A locked world keeps its ruleset through the
+     * evolutionary/automatic paths (Generate, Mutate, Clone, Clone & Mutate, Breed); deliberate
+     * sets/edits still apply. Returns the new locked state (for the caller's toast).
+     * @returns {boolean}
+     */
+    toggleSelectedWorldLock = () => {
+        const idx = this.selectedWorldIndex;
+        const settings = this.worldSettings[idx];
+        if (!settings) return false;
+        settings.locked = !settings.locked;
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        return settings.locked;
+    };
+
+    /**
+     * Copy a world's current cell state (NOT its ruleset) onto another world; the target keeps
+     * its own ruleset. The copied state is stamped at tick 0 (a fresh paste, not a continuation).
+     * @param {number} sourceIndex
+     * @param {number} targetIndex
+     */
+    copyWorldState = (sourceIndex, targetIndex) => {
+        if (sourceIndex === targetIndex) return;
+        const source = this.worlds[sourceIndex];
+        const target = this.worlds[targetIndex];
+        if (!source || !target) return;
+
+        const stateArray = source.latestStateArray;
+        if (!stateArray || stateArray.length !== Config.NUM_CELLS) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Source world state is not ready yet.', type: 'error' });
+            return;
+        }
+
+        const targetRulesetHex = this._getRulesetHexForWorld(targetIndex);
+        const targetRulesetArray = hexToRuleset(targetRulesetHex);
+        const stateCopy = new Uint8Array(stateArray);
+
+        target.sendCommand('LOAD_STATE', {
+            newStateBuffer: stateCopy.buffer.slice(0),
+            newRulesetBuffer: targetRulesetArray.buffer.slice(0),
+            worldTick: 0,
+        }, [stateCopy.buffer.slice(0), targetRulesetArray.buffer.slice(0)]);
+
+        target.setEnabled(true);
+        if (this.worldSettings[targetIndex]) this.worldSettings[targetIndex].enabled = true;
+        if (!this.isGloballyPaused) {
+            target.startSimulation();
+            target.setSpeed(this.simulationController.getSpeed());
+        }
+
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        if (targetIndex === this.selectedWorldIndex) this.dispatchSelectedWorldUpdates();
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Copied world ${sourceIndex + 1} state → world ${targetIndex + 1}` });
+    };
 
     loadWorldState = (worldIndex, loadedData) => {
         if (worldIndex < 0 || worldIndex >= this.worlds.length) return;

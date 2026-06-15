@@ -49,6 +49,12 @@ export class KeyboardShortcutManager {
             { key: 'ArrowRight', description: 'Step forward one tick (when paused)', category: 'Global Controls', handler: () => {
                 if (this.appContext.simulationController?.getIsPaused()) EventBus.dispatch(EVENTS.COMMAND_STATE_STEP, { delta: -1 });
             } },
+            { key: 'l', description: "Lock / unlock the selected world's ruleset", category: 'Global Controls', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_LOCK);
+                const idx = this.appContext.worldManager.getSelectedWorldIndex();
+                const locked = this.appContext.worldManager.getWorldSettingsForUI()[idx]?.locked;
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `${locked ? 'Locked' : 'Unlocked'} world ${idx + 1}` });
+            } },
             
             // Ruleset Actions
             { key: 'i', description: "Invert the selected world's ruleset", category: 'Actions & Panels', handler: () => {
@@ -108,6 +114,24 @@ export class KeyboardShortcutManager {
                 EventBus.dispatch(EVENTS.COMMAND_PASTE_PATTERN);
             }},
 
+            // Copy the selected world's state (not its ruleset) to another world. Bound to the numpad
+            // (Ctrl + top-row digits is hijacked by the browser for tab switching). Same 3x3 grid
+            // mapping as world selection: Num7 = top-left, Num1 = bottom-left.
+            ...Array.from({ length: 9 }, (_, i) => ({
+                code: `Numpad${i + 1}`,
+                ctrlKey: true,
+                displayKey: `Ctrl + Num ${i + 1}`,
+                description: `Copy selected world's state to world ${[6, 7, 8, 3, 4, 5, 0, 1, 2][i] + 1}`,
+                category: 'Patterns',
+                handler: () => this._handleCopyStateTo(i + 1),
+            })),
+
+            // Contextual placing-mode keys (handled by PlacePatternStrategy) — documented here only.
+            { key: 'r', displayOnly: true, description: 'Rotate pattern 60° clockwise', category: 'Patterns (while placing)' },
+            { key: 'r', shiftKey: true, displayOnly: true, description: 'Rotate pattern 60° counter-clockwise', category: 'Patterns (while placing)' },
+            { key: 'f', displayOnly: true, description: 'Mirror pattern horizontally', category: 'Patterns (while placing)' },
+            { key: 'f', shiftKey: true, displayOnly: true, description: 'Mirror pattern vertically', category: 'Patterns (while placing)' },
+
             // History
             { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() });
@@ -154,7 +178,11 @@ export class KeyboardShortcutManager {
         const pressedKey = event.key.toLowerCase();
 
         const shortcut = this.shortcuts.find(s => {
-            const keyMatch = s.key.toLowerCase() === pressedKey;
+            // Display-only entries document contextual shortcuts (handled elsewhere) and are never dispatched here.
+            if (s.displayOnly) return false;
+            // `code`-based entries match the physical key (e.g. Numpad digits, which are layout-independent
+            // and dodge the browser's Ctrl+digit tab-switch on the top number row).
+            const keyMatch = s.code ? (s.code === event.code) : (s.key.toLowerCase() === pressedKey);
             const shiftMatch = (s.shiftKey || false) === event.shiftKey;
             const ctrlMatch = (s.ctrlKey || false) === (event.ctrlKey || event.metaKey);
             return keyMatch && shiftMatch && ctrlMatch;
@@ -224,9 +252,21 @@ export class KeyboardShortcutManager {
      * @private
      */
     _handleNumericSelect(numKey) {
-        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2]; 
+        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2];
         const worldIndex = keyToWorldIndex[numKey - 1];
         EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndex);
+    }
+
+    /**
+     * Copies the selected world's state onto the world at the numpad position (same 3x3 grid
+     * mapping as {@link _handleNumericSelect}).
+     * @param {number} numKey The numpad digit pressed (1-9).
+     * @private
+     */
+    _handleCopyStateTo(numKey) {
+        const keyToWorldIndex = [6, 7, 8, 3, 4, 5, 0, 1, 2];
+        const targetWorldIndex = keyToWorldIndex[numKey - 1];
+        EventBus.dispatch(EVENTS.COMMAND_COPY_WORLD_STATE, { targetWorldIndex });
     }
 
 

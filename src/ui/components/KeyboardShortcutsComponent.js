@@ -21,12 +21,11 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         for (const category in groupedShortcuts) {
             html += `<div class="shortcut-category"><h4>${category}</h4><ul>`;
             groupedShortcuts[category].forEach(shortcut => {
+                const keysHtml = shortcut.displayKey
+                    ? shortcut.displayKey.split(' + ').map(k => `<kbd>${k}</kbd>`).join(' + ')
+                    : `${shortcut.ctrlKey ? '<kbd>Ctrl</kbd> + ' : ''}${shortcut.shiftKey ? '<kbd>Shift</kbd> + ' : ''}<kbd>${shortcut.key.toUpperCase()}</kbd>`;
                 html += `<li>
-                    <div class="keys">
-                        ${shortcut.ctrlKey ? '<kbd>Ctrl</kbd> + ' : ''}
-                        ${shortcut.shiftKey ? '<kbd>Shift</kbd> + ' : ''}
-                        <kbd>${shortcut.key.toUpperCase()}</kbd>
-                    </div>
+                    <div class="keys">${keysHtml}</div>
                     <div class="description">${shortcut.description}</div>
                 </li>`;
             });

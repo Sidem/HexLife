@@ -13,6 +13,7 @@ export class MinimapOverlays extends BaseComponent {
         this.overlayElements = [];
         this.statusBadgeElements = [];
         this.scoreBadgeElements = [];
+        this.lockBadgeElements = [];
         /** Per-world auto-explore scores (set while a search runs; null otherwise). */
         this._exploreScores = null;
         this._exploring = false;
@@ -45,6 +46,16 @@ export class MinimapOverlays extends BaseComponent {
             scoreBadge.dataset.worldId = i;
             this.mountPoint.appendChild(scoreBadge);
             this.scoreBadgeElements.push(scoreBadge);
+
+            // Ruleset-lock indicator (top-right). Shown when the world's ruleset is locked against
+            // the evolutionary/automatic paths (Generate/Mutate/Clone/Breed).
+            const lockBadge = document.createElement('div');
+            lockBadge.className = 'world-lock-badge hidden';
+            lockBadge.dataset.worldId = i;
+            lockBadge.textContent = '🔒';
+            lockBadge.title = "Ruleset locked — protected from Generate/Mutate/Clone/Breed";
+            this.mountPoint.appendChild(lockBadge);
+            this.lockBadgeElements.push(lockBadge);
         }
 
         this._subscribeToEvent(EVENTS.LAYOUT_UPDATED, this.handleLayoutUpdate);
@@ -53,6 +64,7 @@ export class MinimapOverlays extends BaseComponent {
         this._subscribeToEvent(EVENTS.ALL_WORLDS_RESET, this.updateOverlays);
         this._subscribeToEvent(EVENTS.UI_MODE_CHANGED, this.handleUIModeChange);
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this.handleExploreProgress);
+        this._subscribeToEvent(EVENTS.WORLD_SETTINGS_CHANGED, this.updateOverlays);
     }
 
     handleLayoutUpdate(layout) {
@@ -65,6 +77,7 @@ export class MinimapOverlays extends BaseComponent {
         this.overlayElements.forEach(overlay => overlay.classList.toggle('mini', isMobile));
         this.statusBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
         this.scoreBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
+        this.lockBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
     }
 
     // Track the live per-world auto-explore scores so the next overlay pass can paint the badges.
@@ -83,6 +96,7 @@ export class MinimapOverlays extends BaseComponent {
         if (!this.layoutCache.miniMap || !this.worldManager) return;
 
         const allWorldsStatus = this.worldManager.getWorldsFullStatus();
+        const worldSettings = this.worldManager.getWorldSettingsForUI();
         const selectedWorldIndex = this.worldManager.getSelectedWorldIndex();
         const selectedWorldRuleset = allWorldsStatus[selectedWorldIndex]?.stats.rulesetHex;
         const vizState = {
@@ -141,6 +155,20 @@ export class MinimapOverlays extends BaseComponent {
                 scoreEl.style.top = `${miniY + miniMapSpacing}px`;
             } else if (scoreEl) {
                 scoreEl.className = 'world-explore-score hidden';
+            }
+
+
+            const lockEl = this.lockBadgeElements[i];
+            if (lockEl) {
+                if (worldSettings[i]?.locked) {
+                    lockEl.classList.remove('hidden');
+                    lockEl.classList.toggle('mini', this.overlayElements[i]?.classList.contains('mini'));
+                    const w = lockEl.classList.contains('mini') ? 15 : 18;
+                    lockEl.style.left = `${miniX + miniMapW - w - miniMapSpacing}px`;
+                    lockEl.style.top = `${miniY + miniMapSpacing}px`;
+                } else {
+                    lockEl.classList.add('hidden');
+                }
             }
 
 

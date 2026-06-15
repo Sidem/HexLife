@@ -14,6 +14,7 @@ import {
     axialToOffset,
     translatePatternCells,
     rotatePatternCells,
+    mirrorPatternCells,
     patternToHexSVG,
     hammingDistanceHex,
 } from '../src/utils/utils.js';
@@ -385,6 +386,61 @@ describe('rotatePatternCells (60° hex rotation about the origin)', () => {
         expect(sortPairs(rotated)).toEqual(sortPairs(neighbours));
         // It is a genuine rotation, not the identity.
         expect(rotated).not.toEqual(neighbours);
+    });
+});
+
+describe('mirrorPatternCells (hex reflection about the origin)', () => {
+    const ring = (col, row) => {
+        const { q, r } = offsetToAxial(col, row);
+        return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
+    };
+    const sortPairs = (cells) => [...cells].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+    it('returns empty for empty / invalid input', () => {
+        expect(mirrorPatternCells([], 0, false)).toEqual([]);
+        expect(mirrorPatternCells(null, 0, true)).toEqual([]);
+    });
+
+    it('pins the origin cell in place (both axes, both parities)', () => {
+        expect(mirrorPatternCells([[0, 0]], 0, false)).toEqual([[0, 0]]);
+        expect(mirrorPatternCells([[0, 0]], 0, true)).toEqual([[0, 0]]);
+        expect(mirrorPatternCells([[0, 0]], 1, false)).toEqual([[0, 0]]);
+        expect(mirrorPatternCells([[0, 0]], 1, true)).toEqual([[0, 0]]);
+    });
+
+    it('mirroring twice on the same axis is the identity (involution)', () => {
+        const pattern = [[0, 0], [1, 0], [2, 1], [1, 2], [-1, -1], [0, 2]];
+        for (const vertical of [false, true]) {
+            const once = mirrorPatternCells(pattern, 0, vertical);
+            const twice = mirrorPatternCells(once, 0, vertical);
+            expect(sortPairs(twice)).toEqual(sortPairs(pattern));
+        }
+    });
+
+    it('preserves cell count and ring distance (rigid reflection)', () => {
+        const pattern = [[1, 0], [2, 1], [1, 2], [-1, -1], [0, 2]];
+        const before = sortPairs(pattern.map(([c, r]) => [ring(c, r), 0]));
+        for (const vertical of [false, true]) {
+            const m = mirrorPatternCells(pattern, 0, vertical);
+            expect(m.length).toBe(pattern.length);
+            expect(sortPairs(m.map(([c, r]) => [ring(c, r), 0]))).toEqual(before);
+        }
+    });
+
+    it('horizontal flip negates the screen-x of a pure-column cell', () => {
+        // A cell one column to the right maps to one column left, same row.
+        expect(mirrorPatternCells([[1, 0]], 0, false)).toEqual([[-1, 0]]);
+    });
+
+    it('vertical flip negates the screen-y of a pure-row cell', () => {
+        // A cell one row down maps to one row up, same column.
+        expect(mirrorPatternCells([[0, 1]], 0, true)).toEqual([[0, -1]]);
+    });
+
+    it('is a genuine reflection (not the identity) for a chiral pattern', () => {
+        const chiral = [[0, 0], [1, 0], [2, 1]];
+        expect(mirrorPatternCells(chiral, 0, false)).not.toEqual(chiral);
+        expect(mirrorPatternCells(chiral, 0, true)).not.toEqual(chiral);
     });
 });
 

@@ -176,6 +176,39 @@ export function rotatePatternCells(cells, originParity = 0, steps = 1) {
 }
 
 /**
+ * Mirrors a captured pattern about its origin cell, preserving the hex grid's column-stagger
+ * phase. Like {@link rotatePatternCells} this operates in cube coordinates (where the flat-top
+ * lattice's mirror lines are exact integer permutations), so the result is a lossless relabelling
+ * of the same hexagons — mirroring twice on the same axis is the identity.
+ *
+ * For flat-top hexagons the vertical axis through the centre (top & bottom edges) gives the
+ * horizontal flip, and the horizontal axis (left & right vertices) gives the vertical flip:
+ *   - horizontal (left↔right): negate screen-x, keep screen-y → `(x,z) → (-x, x+z)`
+ *   - vertical   (up↔down):    keep screen-x, negate screen-y → `(x,z) → (x, -x-z)`
+ *
+ * @param {Array<[number, number]>} cells Relative offset cells `[dx, dy]`.
+ * @param {number} [originParity=0] Parity (0=even, 1=odd) of the capture origin column.
+ * @param {boolean} [vertical=false] `false` = horizontal flip (left↔right); `true` = vertical (up↔down).
+ * @returns {Array<[number, number]>} Mirrored relative `[dx, dy]` cells.
+ */
+export function mirrorPatternCells(cells, originParity = 0, vertical = false) {
+    if (!Array.isArray(cells) || cells.length === 0) return [];
+    const originCol = originParity & 1;
+    const origin = offsetToAxial(originCol, 0);
+    const out = [];
+    for (const [dx, dy] of cells) {
+        const a = offsetToAxial(originCol + dx, dy);
+        const x = a.q - origin.q;
+        const z = a.r - origin.r;
+        const nx = vertical ? x : -x;
+        const nz = vertical ? (-x - z) : (x + z);
+        const { col, row } = axialToOffset(origin.q + nx, origin.r + nz);
+        out.push([col - originCol, row]);
+    }
+    return out;
+}
+
+/**
  * Renders a captured pattern as a standalone SVG of flat-top hexagons laid out on
  * the staggered grid (odd columns dropped half a row), so previews match how the
  * pattern actually tiles. Pure — returns markup, touches no DOM.

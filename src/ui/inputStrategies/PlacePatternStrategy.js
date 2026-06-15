@@ -1,7 +1,7 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
-import { translatePatternCells, rotatePatternCells } from '../../utils/utils.js';
+import { translatePatternCells, rotatePatternCells, mirrorPatternCells } from '../../utils/utils.js';
 
 /**
  * @class PlacePatternStrategy
@@ -34,7 +34,7 @@ export class PlacePatternStrategy extends BaseInputStrategy {
         this.manager.canvas.classList.add('placing-pattern-cursor');
         this._createHint();
         EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-            message: 'Click to place · R to rotate (Shift+R reverses) · Esc to exit',
+            message: 'Click to place · R rotate · F flip (Shift+F vertical) · Esc to exit',
             type: 'info'
         });
     }
@@ -102,6 +102,13 @@ export class PlacePatternStrategy extends BaseInputStrategy {
             event.preventDefault();
             event.stopPropagation();
             this.rotate(event.shiftKey ? -1 : 1);
+            return;
+        }
+        if (event.key === 'f' || event.key === 'F') {
+            // Same capture-phase consumption as rotate, so no global 'f' shortcut can fire.
+            event.preventDefault();
+            event.stopPropagation();
+            this.mirror(event.shiftKey);
         }
     }
 
@@ -113,6 +120,22 @@ export class PlacePatternStrategy extends BaseInputStrategy {
     rotate(steps) {
         if (!this.patternToPlace) return;
         this.patternToPlace = rotatePatternCells(this.patternToPlace, this.originParity, steps);
+        this._refreshGhost();
+    }
+
+    /**
+     * Mirrors the live pattern (kept across placements) and refreshes the ghost preview at the
+     * last known cursor cell.
+     * @param {boolean} vertical `false` = horizontal flip (left↔right); `true` = vertical (up↔down).
+     */
+    mirror(vertical) {
+        if (!this.patternToPlace) return;
+        this.patternToPlace = mirrorPatternCells(this.patternToPlace, this.originParity, vertical);
+        this._refreshGhost();
+    }
+
+    /** Re-renders the ghost preview at the last known cursor cell, if any. */
+    _refreshGhost() {
         if (this.lastCol !== null && this.lastRow !== null) {
             const indicesToSet = this.getTranslatedPatternIndices(this.lastCol, this.lastRow);
             EventBus.dispatch(EVENTS.COMMAND_UPDATE_GHOST_PREVIEW, { indices: indicesToSet });

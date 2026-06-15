@@ -242,7 +242,11 @@ export const EVENTS = {
     /** @param {{worldIndex: number, initialState: object}} data - The new initial state config for a specific world. */
     COMMAND_SET_WORLD_INITIAL_STATE: 'command:setWorldInitialState',
     /** @param {{worldIndex: number, isEnabled: boolean}} data - The new enabled state for a specific world. */
-    COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled', 
+    COMMAND_SET_WORLD_ENABLED: 'command:setWorldEnabled',
+    /** @event Emitted with no payload to toggle the selected world's ruleset lock (protects it from Generate/Mutate/Clone/Breed). */
+    COMMAND_TOGGLE_WORLD_LOCK: 'command:toggleWorldLock',
+    /** @param {{targetWorldIndex: number}} data - Copy the selected world's cell state (not ruleset) onto the target world. */
+    COMMAND_COPY_WORLD_STATE: 'command:copyWorldState',
     /** @param {{enabled: boolean, rate: number}} data - New parameters for entropy sampling. */
     COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
     /** @param {number} newIndex - The index of the world to select. */
