@@ -289,6 +289,15 @@
     line-height: 1.5;
 }
 
+/* Desktop: keep the actions panel a sensible reading width instead of letting its widest content
+   (the long Breed hint) stretch it toward the 90vw clamp. */
+@media screen and (min-width: 769px) {
+    #rulesetActionsPanel {
+        width: 440px;
+        min-width: 320px;
+    }
+}
+
 /* Mobile specific adjustments */
 @media (max-width: 768px) {
     
