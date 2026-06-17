@@ -210,9 +210,27 @@ describe('RulesetService.crossoverHexes', () => {
         }
     });
 
+    it('n_count: each neighbor-count bucket is taken wholesale from a single parent', () => {
+        const out = service.crossoverHexes(hexA, hexB, 'n_count', seq([0, 0.9]));
+        const a = hexToRuleset(hexA), b = hexToRuleset(hexB), child = hexToRuleset(out);
+        for (let cs = 0; cs <= 1; cs++) {
+            for (let nan = 0; nan <= 6; nan++) {
+                // Find the parent this bucket took (from its first mask), then assert the rest match it.
+                let fromA = null;
+                for (let mask = 0; mask < 64; mask++) {
+                    if (countSetBits(mask) !== nan) continue;
+                    const idx = (cs << 6) | mask;
+                    if (fromA === null) fromA = child[idx] === a[idx];
+                    expect(child[idx]).toBe(fromA ? a[idx] : b[idx]);
+                }
+            }
+        }
+    });
+
     it('breeding identical parents is the identity (no post-mutation)', () => {
         expect(service.crossoverHexes(hexA, hexA, 'uniform', seq([0, 0.9]))).toBe(hexA);
         expect(service.crossoverHexes(hexA, hexA, 'r_sym', seq([0, 0.9]))).toBe(hexA);
+        expect(service.crossoverHexes(hexA, hexA, 'n_count', seq([0, 0.9]))).toBe(hexA);
     });
 
     it('is deterministic under an injected rng', () => {
@@ -232,6 +250,56 @@ describe('RulesetService.crossoverHexes', () => {
         const bare = new RulesetService(null);
         const out = bare.crossoverHexes(hexA, hexB, 'r_sym', () => 0);
         expect(out).toBe(hexA); // uniform with rng always < 0.5 => parent A
+    });
+});
+
+describe('RulesetService.crossoverPoolHexes (genepool)', () => {
+    const hexA = '12482080480080006880800180010117';
+    const hexB = RulesetService.invertHex(hexA);
+    const hexC = '0FF00FF00FF00FF00FF00FF00FF00FF0';
+
+    it('two-parent pool is byte-identical to crossoverHexes (same rng sequence)', () => {
+        for (const mode of ['uniform', 'r_sym', 'n_count']) {
+            const draws = [0.1, 0.8, 0.3, 0.9, 0.2, 0.6, 0.05, 0.95, 0.4, 0.55, 0.7, 0.15, 0.85, 0.25];
+            const pool = service.crossoverPoolHexes([hexA, hexB], mode, seq(draws), 0);
+            const bin = service.crossoverHexes(hexA, hexB, mode, seq(draws), 0);
+            expect(pool).toBe(bin);
+        }
+    });
+
+    it('single-parent pool + post-mutation == clone-and-mutate (identity then flips)', () => {
+        // No mutation: pure clone of the only parent, regardless of mode.
+        expect(service.crossoverPoolHexes([hexA], 'r_sym', () => 0.4, 0)).toBe(hexA);
+        expect(service.crossoverPoolHexes([hexA], 'n_count', () => 0.4, 0)).toBe(hexA);
+        // Full mutation flips every bit (clone then invert).
+        expect(service.crossoverPoolHexes([hexA], 'uniform', () => 0, 1)).toBe(RulesetService.invertHex(hexA));
+    });
+
+    it('every child bit comes from some parent in the pool (uniform, 3 parents)', () => {
+        const out = service.crossoverPoolHexes([hexA, hexB, hexC], 'uniform', seq([0.1, 0.5, 0.9]), 0);
+        const a = hexToRuleset(hexA), b = hexToRuleset(hexB), c = hexToRuleset(hexC), child = hexToRuleset(out);
+        for (let i = 0; i < 128; i++) {
+            expect(child[i] === a[i] || child[i] === b[i] || child[i] === c[i]).toBe(true);
+        }
+    });
+
+    it('n_count, 3 parents: each bucket is taken wholesale from one pool member', () => {
+        const out = service.crossoverPoolHexes([hexA, hexB, hexC], 'n_count', seq([0, 0.4, 0.9]), 0);
+        const pool = [hexToRuleset(hexA), hexToRuleset(hexB), hexToRuleset(hexC)];
+        const child = hexToRuleset(out);
+        for (let cs = 0; cs <= 1; cs++) {
+            for (let nan = 0; nan <= 6; nan++) {
+                const masks = [];
+                for (let mask = 0; mask < 64; mask++) if (countSetBits(mask) === nan) masks.push((cs << 6) | mask);
+                // Some single pool member must match the child across the whole bucket.
+                const ok = pool.some(p => masks.every(idx => child[idx] === p[idx]));
+                expect(ok).toBe(true);
+            }
+        }
+    });
+
+    it('empty pool yields a zeroed ruleset', () => {
+        expect(service.crossoverPoolHexes([], 'uniform', () => 0)).toBe('0'.repeat(32));
     });
 });
 

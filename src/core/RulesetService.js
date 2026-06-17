@@ -125,37 +125,77 @@ export class RulesetService {
      *              its outputs across every orbit member, so coherent rule families travel together
      *              (exactly like r_sym mutation/generation). Falls back to `uniform` if symmetryData
      *              is unavailable.
+     * - `n_count`: per `(centerState × neighbor-count bucket)`, pick one parent wholesale and copy
+     *              its outputs across every mask with that active-neighbor count, so totalistic
+     *              behaviour is inherited as a unit (mirrors n_count mutation/generation).
      * An optional low post-crossover mutation rate flips each entry independently (single-bit), to
      * inject fresh variation the way breeding pipelines usually do. With `postMutationRate=0` every
      * child bit is taken verbatim from A or B (and breeding identical parents is the identity).
      * Pure — the injectable `rng` keeps it deterministically testable like the rest of the algebra.
      * @param {string} hexA
      * @param {string} hexB
-     * @param {'uniform'|'r_sym'} [mode='r_sym']
+     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
      * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
      * @returns {string} 32-char hex
      */
     crossoverHexes(hexA, hexB, mode = 'r_sym', rng = Math.random, postMutationRate = 0) {
-        const a = hexToRuleset(hexA);
-        const b = hexToRuleset(hexB);
+        return this.crossoverPoolHexes([hexA, hexB], mode, rng, postMutationRate);
+    }
+
+    /**
+     * Recombine a *pool* of parent ruleset hexes into a single child (the genepool generalization of
+     * `crossoverHexes`). For each inheritance unit a parent is drawn uniformly at random from the pool
+     * and its outputs copied across that whole unit:
+     * - `uniform`: per-bit.
+     * - `r_sym`:   per `(centerState × canonical orbit)` group. Falls back to `uniform` if symmetryData
+     *              is unavailable.
+     * - `n_count`: per `(centerState × neighbor-count bucket)`.
+     * With a single parent every unit is taken from it (so a 1-parent pool + `postMutationRate` is
+     * exactly clone-and-mutate). With two parents the rng-draw order and parent choice are identical to
+     * the binary `crossoverHexes` (`floor(rng()*2)` matches `rng() < 0.5`), so existing callers/tests
+     * are byte-identical. The injectable `rng` keeps it deterministic.
+     * @param {string[]} hexes - One or more 32-char ruleset hexes.
+     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
+     * @param {() => number} [rng=Math.random]
+     * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
+     * @returns {string} 32-char hex ('Error'/empty pool yields a zeroed ruleset).
+     */
+    crossoverPoolHexes(hexes, mode = 'r_sym', rng = Math.random, postMutationRate = 0) {
+        const parents = (hexes || []).map(hexToRuleset);
         const child = new Uint8Array(128);
+        if (parents.length === 0) return rulesetToHex(child);
+
+        // Draw a parent uniformly from the pool; clamp guards an injected rng that returns exactly 1.
+        const pickParent = () => parents[Math.min(parents.length - 1, Math.floor(rng() * parents.length))];
 
         const canonicalGroups = this.symmetryData && this.symmetryData.canonicalRepresentatives;
         if (mode === 'r_sym' && canonicalGroups && canonicalGroups.length > 0) {
             for (const group of canonicalGroups) {
                 for (let cs = 0; cs <= 1; cs++) {
-                    const parent = rng() < 0.5 ? a : b;
+                    const parent = pickParent();
                     for (const member of group.members) {
                         const idx = (cs << 6) | member;
                         child[idx] = parent[idx];
                     }
                 }
             }
+        } else if (mode === 'n_count') {
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let nan = 0; nan <= 6; nan++) {
+                    const parent = pickParent();
+                    for (let mask = 0; mask < 64; mask++) {
+                        if (Symmetry.countSetBits(mask) === nan) {
+                            const idx = (cs << 6) | mask;
+                            child[idx] = parent[idx];
+                        }
+                    }
+                }
+            }
         } else {
-            // uniform (and the r_sym fallback): per-bit coin flip.
+            // uniform (and the r_sym fallback): per-bit draw from the pool.
             for (let i = 0; i < 128; i++) {
-                child[i] = (rng() < 0.5 ? a : b)[i];
+                child[i] = pickParent()[i];
             }
         }
 

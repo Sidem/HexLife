@@ -55,6 +55,15 @@ export class KeyboardShortcutManager {
                 const locked = this.appContext.worldManager.getWorldSettingsForUI()[idx]?.locked;
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `${locked ? 'Locked' : 'Unlocked'} world ${idx + 1}` });
             } },
+            { key: 'b', description: "Flag / unflag the selected world as a breeding parent", category: 'Global Controls', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_PARENT);
+                const idx = this.appContext.worldManager.getSelectedWorldIndex();
+                const isParent = this.appContext.worldManager.getWorldSettingsForUI()[idx]?.isParent;
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `World ${idx + 1} ${isParent ? 'added to' : 'removed from'} breeding pool` });
+            } },
+            { key: 'b', shiftKey: true, description: 'Breed offspring from the parent genepool', category: 'Actions & Panels', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_EXECUTE_BREED_WORLDS);
+            } },
             
             // Ruleset Actions
             { key: 'i', description: "Invert the selected world's ruleset", category: 'Actions & Panels', handler: () => {

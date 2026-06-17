@@ -101,6 +101,7 @@ export class WorldManager {
                     initialState: initialState,
                     enabled: enabled,
                     locked: false,
+                    isParent: false,
                     rulesetHex: rulesetHex,
                     rulesetHistory: [rulesetHex],
                     rulesetFuture: []
@@ -120,6 +121,7 @@ export class WorldManager {
                     setting.rulesetFuture = [];
                 }
                 setting.locked = !!setting.locked;
+                setting.isParent = !!setting.isParent;
             });
             this.initialDefaultRulesetHex = PersistenceService.loadRuleset() || Config.INITIAL_RULESET_CODE;
         }
@@ -142,6 +144,7 @@ export class WorldManager {
                 },
                 enabled: Config.DEFAULT_WORLD_ENABLED_STATES[i] ?? true,
                 locked: false,
+                isParent: false,
                 rulesetHex: this.initialDefaultRulesetHex,
                 rulesetHistory: [this.initialDefaultRulesetHex],
                 rulesetFuture: []
@@ -347,9 +350,7 @@ export class WorldManager {
             this._cloneRuleset();
         });
         EventBus.subscribe(EVENTS.COMMAND_BREED_WORLDS, (data) => {
-            // A null/undefined parentAIndex means "the selected world" (the UI's implicit parent A).
-            const parentA = (data.parentAIndex == null) ? this.selectedWorldIndex : data.parentAIndex;
-            this._breedWorlds(parentA, data.parentBIndex, data.mode, data.postMutationRate);
+            this._breedFromGenepool(data?.mode, data?.postMutationRate);
         });
         EventBus.subscribe(EVENTS.COMMAND_INVERT_RULESET, this._invertSelectedRuleset);
         EventBus.subscribe(EVENTS.COMMAND_UNDO_RULESET, (data) => this.undoRulesetChange(data.worldIndex));
@@ -462,6 +463,7 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
         EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_LOCK, () => this.toggleSelectedWorldLock());
+        EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_PARENT, (data) => this.toggleWorldParent(data?.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_COPY_WORLD_STATE, (data) => this.copyWorldState(this.selectedWorldIndex, data.targetWorldIndex));
         EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, (data) => {
             if (this.worldSettings[data.worldIndex]) {
@@ -533,6 +535,16 @@ export class WorldManager {
     /** True when a world's ruleset is locked against evolutionary/automatic rewrites (Generate,
      *  Mutate, Clone, Clone & Mutate, Breed). Deliberate sets/edits ignore this. */
     _isLocked = (idx) => !!this.worldSettings[idx]?.locked;
+
+    /** True when a world is flagged as a breeding parent (a member of the genepool). */
+    _isParent = (idx) => !!this.worldSettings[idx]?.isParent;
+
+    /** Enabled worlds currently flagged as breeding parents (the genepool). */
+    _getParentIndices = () =>
+        this.worldSettings.reduce((acc, ws, idx) => {
+            if (ws?.isParent && ws?.enabled) acc.push(idx);
+            return acc;
+        }, []);
 
     _getAffectedWorldIndices = (scope) => {
         if (scope === 'none') return [];
@@ -726,46 +738,79 @@ export class WorldManager {
     };
 
     /**
-     * Breed two parent worlds: parents A and B keep their rulesets; every other world receives a
-     * fresh `crossoverHexes(A, B)` child (Phase 5 manual surface — mirrors clone-and-mutate but with
-     * two parents). The child worlds are reset+restarted so the recombination is visible immediately.
-     * @param {number} parentAIdx
-     * @param {number} parentBIdx
-     * @param {'uniform'|'r_sym'} [mode='r_sym']
+     * Breed from the genepool: every enabled world flagged as a parent (`isParent`) is a source; each
+     * remaining enabled, non-parent, non-locked world receives a fresh `crossoverPoolHexes(...)` child
+     * recombined from the pool. Parents keep their rulesets. Offspring are reset+restarted so the
+     * recombination is visible immediately.
+     * - 0 parents → no-op (with guidance toast).
+     * - 1 parent  → each offspring is that parent's ruleset + post-mutation (i.e. clone-and-mutate).
+     * - ≥2        → multi-parent recombination (2 parents is identical to the old A×B breed).
+     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
      * @param {number} [postMutationRate=0]
      */
-    _breedWorlds = (parentAIdx, parentBIdx, mode = 'r_sym', postMutationRate = 0) => {
-        const hexA = this._getRulesetHexForWorld(parentAIdx);
-        const hexB = this._getRulesetHexForWorld(parentBIdx);
-        if (!hexA || !hexB || hexA === "N/A" || hexB === "N/A") {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Cannot breed: a parent world has an invalid ruleset.", type: 'error' });
+    _breedFromGenepool = (mode = 'r_sym', postMutationRate = 0) => {
+        const parentIndices = this._getParentIndices();
+        if (parentIndices.length === 0) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Flag at least one world as a parent first (press B).", type: 'error' });
             return;
         }
-        if (parentAIdx === parentBIdx) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Pick two different worlds to breed.", type: 'error' });
+
+        const parentHexes = parentIndices
+            .map(idx => this._getRulesetHexForWorld(idx))
+            .filter(hex => hex && hex !== "N/A" && hex !== "Error");
+        if (parentHexes.length === 0) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Cannot breed: parent worlds have invalid rulesets.", type: 'error' });
+            return;
+        }
+
+        // Offspring slots: enabled, not a parent, not locked.
+        const offspringIndices = [];
+        this.worldSettings.forEach((ws, idx) => {
+            if (ws?.enabled && !this._isParent(idx) && !this._isLocked(idx)) offspringIndices.push(idx);
+        });
+        if (offspringIndices.length === 0) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "No offspring worlds — leave an enabled, unlocked, non-parent world to breed into.", type: 'error' });
             return;
         }
 
         const baseSeed = Date.now();
-        this.worlds.forEach((proxy, idx) => {
-            if (idx === parentAIdx || idx === parentBIdx) return; // parents keep their rulesets
-            if (this._isLocked(idx)) return; // a locked world keeps its ruleset untouched by breeding
-            const childHex = this.rulesetService.crossoverHexes(hexA, hexB, mode, Math.random, postMutationRate);
+        offspringIndices.forEach(idx => {
+            const childHex = this.rulesetService.crossoverPoolHexes(parentHexes, mode, Math.random, postMutationRate);
             if (!childHex || childHex === "Error") return;
             this._commitRuleset(idx, childHex, {
                 uploadToWorker: true,
                 reset: true,
                 seed: this._getResetSeed(baseSeed, idx),
             });
-            if (!this.isGloballyPaused) proxy.startSimulation();
+            if (!this.isGloballyPaused) this.worlds[idx]?.startSimulation();
         });
 
-        if (this.selectedWorldIndex !== parentAIdx && this.selectedWorldIndex !== parentBIdx) {
+        // The selected world may be an offspring whose ruleset just changed; reconcile its UI unless
+        // it is a parent (untouched).
+        if (!this._isParent(this.selectedWorldIndex)) {
             this.dispatchSelectedWorldUpdates();
         }
         PersistenceService.saveWorldSettings(this.worldSettings);
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
         EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: `Bred ${offspringIndices.length} offspring from ${parentHexes.length} parent${parentHexes.length === 1 ? '' : 's'}`
+        });
+    };
+
+    /**
+     * Toggle a world's breeding-parent flag (defaults to the selected world). A parent is a source
+     * for the genepool breed and is never overwritten by it. Returns the new flag (for a toast).
+     * @param {number} [worldIndex] - Defaults to the selected world.
+     * @returns {boolean}
+     */
+    toggleWorldParent = (worldIndex = this.selectedWorldIndex) => {
+        const settings = this.worldSettings[worldIndex];
+        if (!settings) return false;
+        settings.isParent = !settings.isParent;
+        PersistenceService.saveWorldSettings(this.worldSettings);
+        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+        return settings.isParent;
     };
 
     _cloneRuleset = () => {
@@ -1113,6 +1158,7 @@ export class WorldManager {
         initialState: ws.initialState,
         enabled: ws.enabled,
         locked: !!ws.locked,
+        isParent: !!ws.isParent,
         rulesetHex: ws.rulesetHex
     }));
 

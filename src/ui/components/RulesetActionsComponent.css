@@ -120,6 +120,65 @@
     background-color: #f4d03f;
 }
 
+/* Breed Pane Styles */
+.ruleset-pane .breed-hint {
+    margin: 0 0 4px;
+    color: #aaa;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+
+.ruleset-pane .breed-hint kbd {
+    background-color: #2c2c2c;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-family: monospace;
+    color: #f0f0f0;
+}
+
+/* 3×3 grid mirroring the world layout; each cell toggles a world's parent flag. */
+.ruleset-pane .breed-parent-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 40px);
+    gap: 5px;
+}
+
+.ruleset-pane .breed-parent-cell {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #555;
+    background-color: #2c2c2c;
+    color: #ccc;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.ruleset-pane .breed-parent-cell:hover:not(:disabled):not(.active) {
+    background-color: #3a3a3a;
+}
+
+.ruleset-pane .breed-parent-cell.active {
+    background-color: #5ad17a;
+    border-color: #8df0a8;
+    color: #0e1a0c;
+}
+
+.ruleset-pane .breed-parent-cell:disabled,
+.ruleset-pane .breed-parent-cell.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.ruleset-pane .breed-parent-readout {
+    color: #aaa;
+    font-size: 0.85em;
+    font-style: italic;
+}
+
 /* Library Pane Styles */
 .library-filter-tabs {
     display: flex;

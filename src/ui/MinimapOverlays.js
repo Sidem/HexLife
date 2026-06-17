@@ -14,6 +14,8 @@ export class MinimapOverlays extends BaseComponent {
         this.statusBadgeElements = [];
         this.scoreBadgeElements = [];
         this.lockBadgeElements = [];
+        this.parentRingElements = [];
+        this.parentBadgeElements = [];
         /** Per-world auto-explore scores (set while a search runs; null otherwise). */
         this._exploreScores = null;
         this._exploring = false;
@@ -56,6 +58,22 @@ export class MinimapOverlays extends BaseComponent {
             lockBadge.title = "Ruleset locked — protected from Generate/Mutate/Clone/Breed";
             this.mountPoint.appendChild(lockBadge);
             this.lockBadgeElements.push(lockBadge);
+
+            // Breed-parent indicator: a full-minimap ring + a 🧬 label on every world flagged as a
+            // genepool parent (driven by worldSettings.isParent, like the lock badge).
+            const parentRing = document.createElement('div');
+            parentRing.className = 'world-parent-ring hidden';
+            parentRing.dataset.worldId = i;
+            this.mountPoint.appendChild(parentRing);
+            this.parentRingElements.push(parentRing);
+
+            const parentBadge = document.createElement('div');
+            parentBadge.className = 'world-parent-badge hidden';
+            parentBadge.dataset.worldId = i;
+            parentBadge.textContent = '🧬';
+            parentBadge.title = 'Breeding parent — a source for genepool breeding';
+            this.mountPoint.appendChild(parentBadge);
+            this.parentBadgeElements.push(parentBadge);
         }
 
         this._subscribeToEvent(EVENTS.LAYOUT_UPDATED, this.handleLayoutUpdate);
@@ -78,6 +96,7 @@ export class MinimapOverlays extends BaseComponent {
         this.statusBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
         this.scoreBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
         this.lockBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
+        this.parentBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
     }
 
     // Track the live per-world auto-explore scores so the next overlay pass can paint the badges.
@@ -169,6 +188,28 @@ export class MinimapOverlays extends BaseComponent {
                 } else {
                     lockEl.classList.add('hidden');
                 }
+            }
+
+
+            const ringEl = this.parentRingElements[i];
+            const parentBadgeEl = this.parentBadgeElements[i];
+            const isParent = !!worldSettings[i]?.isParent && worldStatus?.renderData.enabled;
+            if (ringEl && parentBadgeEl && isParent) {
+                ringEl.className = 'world-parent-ring';
+                ringEl.style.left = `${miniX}px`;
+                ringEl.style.top = `${miniY}px`;
+                ringEl.style.width = `${miniMapW}px`;
+                ringEl.style.height = `${miniMapH}px`;
+
+                parentBadgeEl.className = 'world-parent-badge';
+                parentBadgeEl.classList.toggle('mini', this.overlayElements[i]?.classList.contains('mini'));
+                // Sit just left of the top-right lock badge so the two never overlap.
+                const w = parentBadgeEl.classList.contains('mini') ? 15 : 18;
+                parentBadgeEl.style.left = `${miniX + miniMapW - 2 * w - 2 * miniMapSpacing}px`;
+                parentBadgeEl.style.top = `${miniY + miniMapSpacing}px`;
+            } else {
+                if (ringEl) ringEl.className = 'world-parent-ring hidden';
+                if (parentBadgeEl) parentBadgeEl.className = 'world-parent-badge hidden';
             }
 
 

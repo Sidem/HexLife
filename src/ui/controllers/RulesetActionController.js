@@ -34,13 +34,9 @@ export class RulesetActionController {
         });
 
         EventBus.subscribe(EVENTS.COMMAND_EXECUTE_BREED_WORLDS, () => {
-            // Crossover supports uniform / r_sym; map the shared mutate mode onto those.
-            const crossoverMode = this.getMutateMode() === 'r_sym' ? 'r_sym' : 'uniform';
             EventBus.dispatch(EVENTS.COMMAND_BREED_WORLDS, {
-                parentAIndex: null, // null => the selected world (resolved in WorldManager)
-                parentBIndex: this.getBreedPartner(),
-                mode: crossoverMode,
-                postMutationRate: this.getMutateRate() / 100.0
+                mode: this.getBreedMode(),
+                postMutationRate: this.getBreedMutationRate() / 100.0
             });
         });
     }
@@ -54,7 +50,8 @@ export class RulesetActionController {
     getMutateMode = () => PersistenceService.loadUISetting('mutateMode', 'single');
     getMutateScope = () => PersistenceService.loadUISetting('mutateScope', 'selected');
     getEnsureMutation = () => PersistenceService.loadUISetting('ensureMutation', true);
-    getBreedPartner = () => PersistenceService.loadUISetting('breedPartner', 1);
+    getBreedMode = () => PersistenceService.loadUISetting('breedMode', 'r_sym');
+    getBreedMutationRate = () => PersistenceService.loadUISetting('breedMutationRate', 1);
 
     getGenerationConfig() {
         return [
@@ -77,6 +74,26 @@ export class RulesetActionController {
             { value: 'selected', text: 'Selected' },
             { value: 'all', text: 'All' }
         ];
+    }
+
+    getBreedModeConfig() {
+        return [
+            { value: 'uniform', text: 'Uniform' },
+            { value: 'r_sym', text: 'Symmetry' },
+            { value: 'n_count', text: 'N-Count' }
+        ];
+    }
+
+    getBreedMutationRateSliderConfig() {
+        return {
+            label: 'Offspring Mutation:',
+            min: 0,
+            max: 50,
+            step: 1,
+            unit: '%',
+            showValue: true,
+            onChange: this.setBreedMutationRate
+        };
     }
 
     getMutationRateSliderConfig() {
@@ -134,5 +151,6 @@ export class RulesetActionController {
     setMutateMode = (mode) => PersistenceService.saveUISetting('mutateMode', mode);
     setMutateScope = (scope) => PersistenceService.saveUISetting('mutateScope', scope);
     setEnsureMutation = (shouldEnsure) => PersistenceService.saveUISetting('ensureMutation', shouldEnsure);
-    setBreedPartner = (idx) => PersistenceService.saveUISetting('breedPartner', idx);
+    setBreedMode = (mode) => PersistenceService.saveUISetting('breedMode', mode);
+    setBreedMutationRate = (rate) => PersistenceService.saveUISetting('breedMutationRate', rate);
 } 

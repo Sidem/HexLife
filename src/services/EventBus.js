@@ -195,10 +195,12 @@ export const EVENTS = {
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
     /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
     COMMAND_CLONE_RULESET: 'command:cloneRuleset',
-    /** @param {{parentAIndex: number, parentBIndex: number, mode: 'uniform'|'r_sym', postMutationRate: number}} data - Breed two parent worlds' rulesets (crossover) into the remaining worlds. */
+    /** @param {{mode: 'uniform'|'r_sym'|'n_count', postMutationRate: number}} data - Breed from the genepool: recombine all worlds flagged `isParent` into every non-parent world. */
     COMMAND_BREED_WORLDS: 'command:breedWorlds',
-    /** @event A user-initiated command to execute the breed action with the controller's current settings (selected world × chosen partner). */
+    /** @event A user-initiated command to execute the genepool breed with the controller's current inheritance mode + offspring-mutation rate. */
     COMMAND_EXECUTE_BREED_WORLDS: 'command:executeBreedWorlds',
+    /** @param {{worldIndex?: number}} data - Toggle a world's breeding-parent flag (defaults to the selected world). */
+    COMMAND_TOGGLE_WORLD_PARENT: 'command:toggleWorldParent',
     /** @event Emitted with no payload to invert the ruleset of the selected world. */
     COMMAND_INVERT_RULESET: 'command:invertRuleset',
     /** @param {{worldIndex: number}} data - The world index for which to undo a ruleset change. */
