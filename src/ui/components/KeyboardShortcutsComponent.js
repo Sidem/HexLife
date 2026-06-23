@@ -32,7 +32,7 @@ export class KeyboardShortcutsComponent extends BaseComponent {
             [['Q', 'q'], ['W', 'w'], ['E', 'e'], ['R', 'r'], ['T', 't'], ['Y', 'y'], ['U', 'u'], ['I', 'i'], ['O', 'o'], ['P', 'p']],
             [['A', 'a'], ['S', 's'], ['D', 'd'], ['F', 'f'], ['G', 'g'], ['H', 'h'], ['J', 'j'], ['K', 'k'], ['L', 'l']],
             [['Shift', 'shift', 1.7], ['Z', 'z'], ['X', 'x'], ['C', 'c'], ['V', 'v'], ['B', 'b'], ['N', 'n'], ['M', 'm']],
-            [['Ctrl', 'ctrl', 1.7], ['Esc', 'esc', 1.4], ['◄', '←', 1.2], ['►', '→', 1.2]],
+            [['Ctrl', 'ctrl', 1.7], ['Esc', 'esc', 1.4], ['Space', 'space', 3], ['◄', '←', 1.2], ['▲', '↑', 1.2], ['▼', '↓', 1.2], ['►', '→', 1.2]],
         ];
     }
 
@@ -69,6 +69,9 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         const k = (s.key || '').toLowerCase();
         if (k === 'arrowleft') return '←';
         if (k === 'arrowright') return '→';
+        if (k === 'arrowup') return '↑';
+        if (k === 'arrowdown') return '↓';
+        if (k === ' ') return 'space';
         if (k === 'escape') return 'esc';
         return k;
     }
@@ -276,7 +279,7 @@ export class KeyboardShortcutsComponent extends BaseComponent {
     }
 
     _showDetail(id) {
-        const cap = id === 'shift' ? 'Shift' : id === 'ctrl' ? 'Ctrl' : id === 'esc' ? 'Esc' : id.toUpperCase();
+        const cap = id === 'shift' ? 'Shift' : id === 'ctrl' ? 'Ctrl' : id === 'esc' ? 'Esc' : id === 'space' ? 'Space' : id.toUpperCase();
         if (id === 'shift' || id === 'ctrl') {
             this._detailEl.innerHTML = `<div class="kb-detail-hint"><kbd>${cap}</kbd> is a modifier — switch the layer above to see its combos.</div>`;
             return;

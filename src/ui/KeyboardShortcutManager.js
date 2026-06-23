@@ -1,4 +1,5 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import * as Config from '../core/config.js';
 
 /**
  * A data-driven keyboard shortcut manager for the HexLife Explorer.
@@ -12,7 +13,14 @@ export class KeyboardShortcutManager {
         this.panelManager = panelManager;
         this.toolbar = toolbar;
         this.shortcuts = [];
+        // Tracks held `repeatOnHold` keys (keyed by event.code) so we can drive a smooth,
+        // OS-independent auto-repeat instead of relying on the native key-repeat rate.
+        this._repeatTimers = new Map();
     }
+
+    /** Delay (ms) before a held key starts repeating, then the interval between repeats. */
+    static get REPEAT_DELAY_MS() { return 280; }
+    static get REPEAT_INTERVAL_MS() { return 60; }
 
     /**
      * Initializes the manager by registering all shortcuts and attaching the global event listener.
@@ -20,6 +28,9 @@ export class KeyboardShortcutManager {
     init() {
         this._registerShortcuts();
         document.addEventListener('keydown', this._handleKeyDown.bind(this));
+        document.addEventListener('keyup', this._handleKeyUp.bind(this));
+        // Stop any in-flight repeat if focus leaves the window (keyup may never arrive).
+        window.addEventListener('blur', () => this._clearAllRepeats());
     }
 
     /**
@@ -41,6 +52,12 @@ export class KeyboardShortcutManager {
             { key: 'p', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             } },
+            { key: ' ', displayKey: 'Space', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
+            } },
+            // Speed nudge (±1 tps). Hold to ramp continuously.
+            { key: 'ArrowUp', repeatOnHold: true, description: 'Increase speed by 1 tps (hold to ramp)', category: 'Global Controls', handler: () => this._nudgeSpeed(1) },
+            { key: 'ArrowDown', repeatOnHold: true, description: 'Decrease speed by 1 tps (hold to ramp)', category: 'Global Controls', handler: () => this._nudgeSpeed(-1) },
             // State-history scrub-back: step one tick when paused (← back into recorded history,
             // → forward; forward past the live tip advances the sim a single tick).
             { key: 'ArrowLeft', description: 'Step back one tick (when paused)', category: 'Global Controls', handler: () => {
@@ -203,8 +220,70 @@ export class KeyboardShortcutManager {
                 return;
             }
             event.preventDefault();
+
+            if (shortcut.repeatOnHold) {
+                // Drive our own steady auto-repeat instead of the OS one: ignore the native
+                // repeat events, fire once now, then ramp after a short delay.
+                if (event.repeat || this._repeatTimers.has(event.code)) return;
+                shortcut.handler();
+                this._startRepeat(event.code, shortcut.handler);
+                return;
+            }
+
             shortcut.handler();
         }
+    }
+
+    /**
+     * Begins the hold-to-repeat cycle for a key: an initial delay, then a steady interval.
+     * @param {string} code The physical `event.code` of the held key (used for the keyup match).
+     * @param {Function} handler The shortcut handler to invoke on each repeat.
+     * @private
+     */
+    _startRepeat(code, handler) {
+        const KSM = KeyboardShortcutManager;
+        const delayId = setTimeout(() => {
+            const intervalId = setInterval(handler, KSM.REPEAT_INTERVAL_MS);
+            this._repeatTimers.set(code, { intervalId });
+        }, KSM.REPEAT_DELAY_MS);
+        this._repeatTimers.set(code, { delayId });
+    }
+
+    /**
+     * Stops the repeat cycle for a released key.
+     * @param {KeyboardEvent} event The native keyup event.
+     * @private
+     */
+    _handleKeyUp(event) {
+        this._clearRepeat(event.code);
+    }
+
+    /** Clears any pending delay / interval timer for a single key. @private */
+    _clearRepeat(code) {
+        const t = this._repeatTimers.get(code);
+        if (!t) return;
+        if (t.delayId) clearTimeout(t.delayId);
+        if (t.intervalId) clearInterval(t.intervalId);
+        this._repeatTimers.delete(code);
+    }
+
+    /** Clears every active repeat timer (e.g. on window blur). @private */
+    _clearAllRepeats() {
+        this._repeatTimers.forEach(t => {
+            if (t.delayId) clearTimeout(t.delayId);
+            if (t.intervalId) clearInterval(t.intervalId);
+        });
+        this._repeatTimers.clear();
+    }
+
+    /**
+     * Adjusts the global simulation speed by `delta` ticks-per-second, clamped by the controller.
+     * @param {number} delta Signed tps change (+1 / -1).
+     * @private
+     */
+    _nudgeSpeed(delta) {
+        const current = this.appContext.simulationController?.getSpeed() ?? Config.DEFAULT_SPEED;
+        EventBus.dispatch(EVENTS.COMMAND_SET_SPEED, current + delta);
     }
 
     /**
