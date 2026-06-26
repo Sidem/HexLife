@@ -82,6 +82,7 @@ const EVAL_SATURATION_RATIO = 0.99;
 // evaluation. Lifecycle-only commands (START/STOP/SPEED, entropy params) are deliberately excluded.
 const EVAL_DISRUPTIVE_COMMANDS = new Set([
     'RESET_WORLD', 'LOAD_STATE', 'SET_RULESET', 'APPLY_BRUSH', 'APPLY_SELECTIVE_BRUSH', 'SET_ENABLED',
+    'SHIFT_STATE',
 ]);
 
 const strategies = {
@@ -151,6 +152,33 @@ function copyCellsOut(view) {
     const buf = acquireCellBuffer();
     new Uint8Array(buf).set(view);
     return buf;
+}
+
+// Toroidally translate the live cell state (and its rule-index colouring) by (dCol, dRow) whole
+// cells, wrapping at the grid edges. Used to re-centre a pattern that has drifted across the wrap
+// seam. The grid is odd-q (flat-top, odd columns shifted half a row): a vertical shift is a clean
+// torus symmetry, but a horizontal shift by an ODD number of columns flips every cell's stagger
+// phase and shears the neighbourhood — callers pass an even dCol so the dynamics stay identical.
+// Returns true if the buffers actually moved.
+function shiftStateBuffer(dCol, dRow) {
+    if (!jsStateArray) return false;
+    const cols = workerConfig.GRID_COLS;
+    const rows = workerConfig.GRID_ROWS;
+    const sc = (((dCol % cols) + cols) % cols);
+    const sr = (((dRow % rows) + rows) % rows);
+    if (sc === 0 && sr === 0) return false;
+    const srcState = jsStateArray.slice();
+    const srcRules = jsRuleIndexArray ? jsRuleIndexArray.slice() : null;
+    for (let row = 0; row < rows; row++) {
+        const destRowBase = ((row + sr) % rows) * cols;
+        const srcRowBase = row * cols;
+        for (let col = 0; col < cols; col++) {
+            const dest = destRowBase + ((col + sc) % cols);
+            jsStateArray[dest] = srcState[srcRowBase + col];
+            if (srcRules) jsRuleIndexArray[dest] = srcRules[srcRowBase + col];
+        }
+    }
+    return true;
 }
 
 function resetCycleState() {
@@ -466,6 +494,20 @@ function processCommandQueue() {
                     // A manual edit is a discontinuity, but (unlike reset/load) the user is mid-draw,
                     // so keep the recorded history and append the edited state as the new tip so the
                     // ring stays continuous (and a stroke can be scrubbed away rather than wiped).
+                    if (historyCaptureEnabled) {
+                        if (isScrubbing) resumeScrub();
+                        captureHistoryFrame(wasm_world ? wasm_world.active_count() : 0);
+                    }
+                    needsGridUpdate = true;
+                }
+                break;
+            }
+            case 'SHIFT_STATE': {
+                const shifted = shiftStateBuffer(command.data.dCol | 0, command.data.dRow | 0);
+                if (shifted) {
+                    resetCycleState();
+                    // Like a manual brush edit: keep the recorded timeline and append the shifted
+                    // state as the new tip so the move can be scrubbed away rather than wiping history.
                     if (historyCaptureEnabled) {
                         if (isScrubbing) resumeScrub();
                         captureHistoryFrame(wasm_world ? wasm_world.active_count() : 0);
@@ -1215,6 +1257,7 @@ self.onmessage = async function(event) {
         case 'RESET_WORLD':
         case 'APPLY_BRUSH':
         case 'APPLY_SELECTIVE_BRUSH':
+        case 'SHIFT_STATE':
         case 'LOAD_STATE': {
             commandQueue.push(command);
             const { needsGridUpdate: inducedUpdateOnGrid } = processCommandQueue();

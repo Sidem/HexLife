@@ -4,6 +4,7 @@ import { getLayoutCache } from '../rendering/renderer.js';
 import { textureCoordsToGridCoords, calculateHexSizeForTexture } from '../utils/utils.js';
 
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
+import { ShiftWorldStrategy } from './inputStrategies/ShiftWorldStrategy.js';
 import { DrawStrategy } from './inputStrategies/DrawStrategy.js';
 import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js';
 import { SelectRegionStrategy } from './inputStrategies/SelectRegionStrategy.js';
@@ -23,10 +24,16 @@ export class InputManager {
         this.layoutCache = getLayoutCache(); 
         this.strategies = {
             pan: new PanStrategy(this),
+            shiftWorld: new ShiftWorldStrategy(this),
             draw: new DrawStrategy(this),
             place: new PlacePatternStrategy(this),
             select: new SelectRegionStrategy(this),
         };
+        // While the "shift world" hotkey is held we temporarily swap into shiftWorld mode and
+        // restore the prior mode on release. Tracks that this is a held-key override (not a normal
+        // mode change) so an unrelated INTERACTION_MODE_CHANGED can't strand us in shiftWorld.
+        this._shiftWorldKeyHeld = false;
+        this._strategyBeforeShiftWorld = null;
         this.hoverHandler = new HoverHandler(this);
 
         this.currentStrategyName = 'pan'; 
@@ -100,6 +107,11 @@ export class InputManager {
         // stopPropagation) before the global KeyboardShortcutManager's bubble-phase handler —
         // e.g. 'r' rotates while placing a pattern instead of resetting all worlds.
         document.addEventListener('keydown', (e) => this.currentStrategy.handleKeyDown(e), true);
+        // Hold-to-shift-world hotkey: while held, dragging the selected view translates the world's
+        // cells (wrapping at the seam) instead of doing the active mode's action.
+        window.addEventListener('keydown', (e) => this._handleShiftWorldKeyDown(e));
+        window.addEventListener('keyup', (e) => this._handleShiftWorldKeyUp(e));
+        window.addEventListener('blur', () => this._releaseShiftWorldKey());
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
         EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => this.setStrategy('select', data));
@@ -125,6 +137,41 @@ export class InputManager {
     }
     
     
+
+    /** The key that, while held, enables world-shift (cell-translate) dragging. */
+    static get SHIFT_WORLD_KEY() { return 'h'; }
+
+    _isTextInputFocused() {
+        const el = document.activeElement;
+        return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+            el.tagName === 'SELECT' || el.isContentEditable);
+    }
+
+    _handleShiftWorldKeyDown(event) {
+        if (event.key !== InputManager.SHIFT_WORLD_KEY) return;
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        if (this._shiftWorldKeyHeld || this._isTextInputFocused()) return;
+        // Only override the default navigation mode, so placing/selecting a pattern is left intact.
+        if (this.currentStrategyName !== 'pan') return;
+        event.preventDefault();
+        this._shiftWorldKeyHeld = true;
+        this._strategyBeforeShiftWorld = this.currentStrategyName;
+        this.setStrategy('shiftWorld');
+    }
+
+    _handleShiftWorldKeyUp(event) {
+        if (event.key !== InputManager.SHIFT_WORLD_KEY) return;
+        this._releaseShiftWorldKey();
+    }
+
+    _releaseShiftWorldKey() {
+        if (!this._shiftWorldKeyHeld) return;
+        this._shiftWorldKeyHeld = false;
+        const restore = this._strategyBeforeShiftWorld || 'pan';
+        this._strategyBeforeShiftWorld = null;
+        // Only restore if we're still the active override (a mode change mid-hold takes precedence).
+        if (this.currentStrategyName === 'shiftWorld') this.setStrategy(restore);
+    }
 
     getCoordsFromPointerEvent(event) {
         if (!this.gl || !this.gl.canvas || !this.worldManager || !this.layoutCache.selectedView) {

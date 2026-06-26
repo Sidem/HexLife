@@ -66,6 +66,7 @@ export class KeyboardShortcutManager {
             { key: 'ArrowRight', description: 'Step forward one tick (when paused)', category: 'Global Controls', handler: () => {
                 if (this.appContext.simulationController?.getIsPaused()) EventBus.dispatch(EVENTS.COMMAND_STATE_STEP, { delta: -1 });
             } },
+            { key: 'h', displayOnly: true, description: 'Hold + drag to shift the world (wrap-around re-centre)', category: 'Global Controls' },
             { key: 'l', description: "Lock / unlock the selected world's ruleset", category: 'Global Controls', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_LOCK);
                 const idx = this.appContext.worldManager.getSelectedWorldIndex();

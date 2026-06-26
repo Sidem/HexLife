@@ -495,6 +495,10 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, (data) => {
             this.worlds[data.worldIndex]?.applySelectiveBrush(data.cellIndices, data.brushMode);
         });
+        EventBus.subscribe(EVENTS.COMMAND_SHIFT_WORLD, (data) => {
+            const idx = (data && typeof data.worldIndex === 'number') ? data.worldIndex : this.selectedWorldIndex;
+            this.worlds[idx]?.shiftState(data.dCol | 0, data.dRow | 0);
+        });
         EventBus.subscribe(EVENTS.COMMAND_SET_HOVER_STATE, (data) => {
             findHexagonsInNeighborhood(data.col, data.row, this.brushController.getBrushSize(), this._hoverAffectedIndicesSet);
             this.worlds[data.worldIndex]?.setHoverState(this._hoverAffectedIndicesSet);

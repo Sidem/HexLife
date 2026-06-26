@@ -291,6 +291,12 @@ export class WorldProxy {
     applySelectiveBrush(cellIndices, brushMode = 'invert') {
         this.sendCommand('APPLY_SELECTIVE_BRUSH', { cellIndices, brushMode });
     }
+    // Toroidally shift the cell state (and rule-index colouring) by whole cells, wrapping at the
+    // edges. Used to re-centre a pattern that has drifted across the wrap seam. dCol should be even
+    // so the odd-q column-stagger phase is preserved (an odd column shift would shear the pattern).
+    shiftState(dCol, dRow) {
+        this.sendCommand('SHIFT_STATE', { dCol, dRow });
+    }
     // Hover is purely visual, so it's computed and stored main-thread-only (like the ghost preview)
     // instead of round-tripping the worker. Writes the per-cell highlight buffer directly and marks
     // the FBO dirty so the renderer redraws on the next frame.

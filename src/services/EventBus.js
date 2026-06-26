@@ -237,6 +237,8 @@ export const EVENTS = {
     COMMAND_APPLY_BRUSH: 'command:applyBrush', 
     /** @param {{worldIndex: number, cellIndices: Set<number>}} data - A set of specific cell indices to toggle. */
     COMMAND_APPLY_SELECTIVE_BRUSH: 'command:applySelectiveBrush',
+    /** @param {{worldIndex: number, dCol: number, dRow: number}} data - Toroidally shift a world's cell state by whole cells (wraps at the edges). dCol must be even to preserve the odd-q hex phase. */
+    COMMAND_SHIFT_WORLD: 'command:shiftWorld',
     /** @param {{worldIndex: number, col: number, row: number}} data - The grid coordinates for the hover state. */
     COMMAND_SET_HOVER_STATE: 'command:setHoverState', 
     /** @param {{worldIndex: number}} data - The world index for which to clear the hover state. */
