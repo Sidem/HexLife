@@ -63,6 +63,7 @@ export class Toolbar {
             clearCurrentButtonPopout: document.getElementById('clearCurrentButtonPopout'),
             clearAllButtonPopout: document.getElementById('clearAllButtonPopout'),
             shareLinkInput: document.getElementById('shareLinkInput'),
+            shareIncludeStateCheckbox: document.getElementById('shareIncludeStateCheckbox'),
             copyShareLinkButton: document.getElementById('copyShareLinkButton'),
             saveStateButton: document.getElementById('saveStateButton'),
             loadStateButton: document.getElementById('loadStateButton'),
@@ -183,6 +184,11 @@ export class Toolbar {
             };
             reader.onerror = () => { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Error reading file.', type: 'error' }); e.target.value = null; };
             reader.readAsText(file);
+        });
+
+        // Toggling "include full world state" regenerates the link in place.
+        this.uiElements.shareIncludeStateCheckbox?.addEventListener('change', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);
         });
 
         EventBus.subscribe(EVENTS.SIMULATION_PAUSED, (isPaused) => this.updatePauseButtonVisual(isPaused));

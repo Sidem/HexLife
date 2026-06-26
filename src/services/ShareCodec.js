@@ -19,9 +19,12 @@ export class ShareCodec {
      * @param {number} snapshot.gridRows - Current grid row count.
      * @param {string} snapshot.origin - e.g. window.location.origin
      * @param {string} snapshot.pathname - e.g. window.location.pathname
+     * @param {boolean} [snapshot.includeWorldState=true] - When false, encode only the
+     *   ruleset(s) and omit the per-world state (initial states, enabled mask, selection,
+     *   grid size, camera) so the link stays short. Defaults to true (full setup).
      * @returns {string} Full shareable URL.
      */
-    static encode({ worldSettings, selectedWorldIndex, camera, gridRows, origin, pathname }) {
+    static encode({ worldSettings, selectedWorldIndex, camera, gridRows, origin, pathname, includeWorldState = true }) {
         const params = new URLSearchParams();
 
         const allRulesets = worldSettings.map(ws => ws.rulesetHex);
@@ -30,6 +33,11 @@ export class ShareCodec {
             params.set('r', uniqueRulesets[0]);
         } else {
             params.set('r_all', allRulesets.join(','));
+        }
+
+        // Ruleset-only links stop here — everything below describes the world state.
+        if (!includeWorldState) {
+            return `${origin}${pathname}?${params.toString()}`;
         }
 
         // Handle initial states - check if all are simple density mode for backward compatibility

@@ -453,7 +453,8 @@ export class UIManager {
     }
 
     _onShareSetup() {
-        const url = this.appContext.worldManager.generateShareUrl();
+        const includeWorldState = !!document.getElementById('shareIncludeStateCheckbox')?.checked;
+        const url = this.appContext.worldManager.generateShareUrl({ includeWorldState });
         if (!url) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not generate a share link for the current setup.', type: 'error' });
             return;

@@ -1459,7 +1459,7 @@ export class WorldManager {
         return { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate };
     }
 
-    generateShareUrl() {
+    generateShareUrl({ includeWorldState = false } = {}) {
         return ShareCodec.encode({
             worldSettings: this.getWorldSettingsForUI(),
             selectedWorldIndex: this.getSelectedWorldIndex(),
@@ -1467,6 +1467,7 @@ export class WorldManager {
             gridRows: Config.GRID_ROWS,
             origin: window.location.origin,
             pathname: window.location.pathname,
+            includeWorldState,
         });
     }
 

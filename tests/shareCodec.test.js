@@ -92,6 +92,49 @@ describe('ShareCodec encode -> parse round-trip', () => {
         expect(params.get('r')).toBe(HEX);
     });
 
+    it('encodes ruleset-only when includeWorldState is false (short link)', () => {
+        const densities = Array.from({ length: Config.NUM_WORLDS }, (_, i) => (i + 1) / 20);
+        const url = ShareCodec.encode({
+            worldSettings: densityWorlds(densities, { disabled: [1] }),
+            selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX === 0 ? 2 : 0,
+            camera: { x: 100.5, y: 200.5, zoom: 1.75 },
+            gridRows: Config.GRID_ROWS,
+            origin,
+            pathname,
+            includeWorldState: false,
+        });
+        const params = new URL(url).searchParams;
+        // Only the ruleset survives.
+        expect(params.get('r')).toBe(HEX);
+        expect(params.has('d')).toBe(false);
+        expect(params.has('is')).toBe(false);
+        expect(params.has('e')).toBe(false);
+        expect(params.has('w')).toBe(false);
+        expect(params.has('cam')).toBe(false);
+
+        const out = parseUrl(url);
+        expect(out.rulesetHex).toBe(HEX);
+        expect(out.densities).toBeUndefined();
+        expect(out.enabledMask).toBeUndefined();
+    });
+
+    it('still emits r_all for per-world rulesets in ruleset-only mode', () => {
+        const worldSettings = densityWorlds(Array(Config.NUM_WORLDS).fill(0.5));
+        worldSettings[0].rulesetHex = 'F'.repeat(32);
+        const url = ShareCodec.encode({
+            worldSettings,
+            selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
+            camera: { x: center, y: center, zoom: 1.0 },
+            gridRows: Config.GRID_ROWS,
+            origin,
+            pathname,
+            includeWorldState: false,
+        });
+        const out = parseUrl(url);
+        expect(out.rulesets).toHaveLength(Config.NUM_WORLDS);
+        expect(out.rulesets[0]).toBe('F'.repeat(32));
+    });
+
     it('round-trips full initial-state JSON (`is`) for non-density modes', () => {
         const worldSettings = Array.from({ length: Config.NUM_WORLDS }, (_, i) => ({
             rulesetHex: HEX,
