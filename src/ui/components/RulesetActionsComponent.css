@@ -6,38 +6,47 @@
     height: 100%;
 }
 
+/* Segmented mode tabs (Generate / Mutate / Breed) */
 .ruleset-actions-header {
     display: flex;
-    justify-content: stretch;
-    background-color: #2a2a2a;
+    gap: 4px;
+    padding: 4px;
+    background-color: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
     flex-shrink: 0;
 }
 
 .ruleset-actions-segment {
     flex-grow: 1;
-    padding: 12px 5px;
+    padding: 8px 5px;
     font-size: 0.9em;
     text-align: center;
-    background-color: #3a3a3a;
-    color: #ccc;
+    background-color: transparent;
+    color: var(--text-secondary);
     border: none;
-    border-right: 1px solid #555;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.ruleset-actions-segment:last-child {
-    border-right: none;
+    transition: background-color 0.15s, color 0.15s;
 }
 
 .ruleset-actions-segment.active {
-    background-color: #f0c674;
-    color: #1e1e1e;
-    font-weight: bold;
+    background-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
 }
 
 .ruleset-actions-segment:hover:not(.active) {
-    background-color: #4a4a4a;
+    background-color: var(--surface-3);
+    color: var(--text-primary);
+}
+
+.ruleset-actions-blurb {
+    margin: 10px 2px 4px;
+    font-size: 0.82em;
+    line-height: 1.4;
+    color: var(--text-muted);
+    flex-shrink: 0;
 }
 
 .ruleset-actions-content {
@@ -48,93 +57,113 @@
 .ruleset-pane {
     display: flex;
     flex-direction: column;
+    gap: 14px;
+    padding-top: 4px;
 }
 
 .ruleset-pane.hidden {
     display: none;
 }
 
-.ruleset-pane .form-group {
+/* A labelled control row: caption above the control */
+.ruleset-field {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 
-.ruleset-pane .form-group label:not(.switch-label):not(.checkbox-label) {
-    font-weight: bold;
-    color: #ccc;
+.ruleset-field.hidden {
+    display: none;
 }
 
-.ruleset-pane .bias-controls {
+.ruleset-field-label {
+    font-size: 0.82em;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+/* Bias slider nested under the "Custom density bias" toggle */
+.ruleset-pane .ruleset-subfield {
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+    margin-top: -4px;
+}
+
+/* Segmented switches fill the panel width */
+.ruleset-pane .switch-component-container .switch-group {
     display: flex;
-    flex-direction: row;
-    gap: 3px;
+    width: 100%;
 }
 
-.ruleset-pane .checkbox-input {
-    margin-right: 8px;
-}
-
-.ruleset-pane .checkbox-label {
-    display: flex;
-    align-items: center;
-    color: #ccc;
-    font-weight: bold;
+.ruleset-pane .switch-label {
+    padding: 7px 6px;
 }
 
 .ruleset-pane .hex-input {
     padding: 6px 8px;
-    border: 1px solid #555;
-    background-color: #2c2c2c;
-    color: white;
-    border-radius: 3px;
+    border: 1px solid var(--border);
+    background-color: var(--surface-1);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
     font-size: 0.9em;
     font-family: monospace;
     width: 100%;
     box-sizing: border-box;
 }
 
-.ruleset-pane .action-button,
-.ruleset-pane .form-group-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.ruleset-pane .action-button,
-.ruleset-pane .form-group-buttons .button {
-    flex: 1;
-    padding: 15px;
-    font-size: 1.1em;
-    font-weight: bold;
-    background-color: #f0c674;
-    color: #1e1e1e;
+/* Primary call-to-action button per pane */
+.ruleset-pane .ruleset-primary-action {
+    width: 100%;
+    padding: 13px;
+    font-size: 1.02em;
+    font-weight: 600;
+    background-color: var(--accent);
+    color: var(--on-accent);
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.15s;
 }
 
-.ruleset-pane .action-button:hover,
-.ruleset-pane .form-group-buttons .button:hover {
-    background-color: #f4d03f;
+.ruleset-pane .ruleset-primary-action:hover {
+    background-color: var(--accent-bright);
+}
+
+/* Secondary actions sit below the primary one, visually subordinate */
+.ruleset-pane .ruleset-secondary-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: -6px;
+}
+
+.ruleset-pane .ruleset-secondary-actions .button {
+    flex: 1;
+}
+
+.ruleset-pane .ruleset-secondary-full {
+    width: 100%;
+    margin-top: -6px;
 }
 
 /* Breed Pane Styles */
-.ruleset-pane .breed-hint {
-    margin: 0 0 4px;
-    color: #aaa;
-    font-size: 0.85em;
-    line-height: 1.4;
+.ruleset-pane .ruleset-hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.82em;
+    line-height: 1.45;
 }
 
-.ruleset-pane .breed-hint kbd {
-    background-color: #2c2c2c;
-    border: 1px solid #555;
+.ruleset-pane .ruleset-hint strong {
+    color: var(--text-secondary);
+}
+
+.ruleset-pane .ruleset-hint kbd {
+    background-color: var(--surface-1);
+    border: 1px solid var(--border);
     border-radius: 3px;
     padding: 0 4px;
     font-family: monospace;
-    color: #f0f0f0;
+    color: var(--text-primary);
 }
 
 /* 3×3 grid mirroring the world layout; each cell toggles a world's parent flag. */
@@ -147,24 +176,24 @@
 .ruleset-pane .breed-parent-cell {
     width: 40px;
     height: 40px;
-    border: 1px solid #555;
-    background-color: #2c2c2c;
-    color: #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    background-color: var(--surface-1);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
     font-size: 0.85em;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
     transition: background-color 0.15s, border-color 0.15s;
 }
 
 .ruleset-pane .breed-parent-cell:hover:not(:disabled):not(.active) {
-    background-color: #3a3a3a;
+    background-color: var(--surface-3);
 }
 
 .ruleset-pane .breed-parent-cell.active {
-    background-color: #5ad17a;
-    border-color: #8df0a8;
-    color: #0e1a0c;
+    background-color: var(--accent);
+    border-color: var(--accent-bright);
+    color: var(--on-accent);
 }
 
 .ruleset-pane .breed-parent-cell:disabled,
@@ -174,9 +203,8 @@
 }
 
 .ruleset-pane .breed-parent-readout {
-    color: #aaa;
-    font-size: 0.85em;
-    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.82em;
 }
 
 /* Library Pane Styles */

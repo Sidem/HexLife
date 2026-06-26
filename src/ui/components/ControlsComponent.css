@@ -1,22 +1,64 @@
 .controls-component-content {
     display: flex;
     flex-direction: column;
+    gap: 18px;
 }
 
-.controls-component-content .tool-group {
+.controls-component-content .control-section {
     display: flex;
     flex-direction: column;
+    gap: 10px;
 }
 
-.controls-component-content .tool-group h5 {
+.controls-component-content .control-section-title {
     margin: 0;
-    font-size: 1em;
-    color: #f0c674;
-    border-bottom: 1px solid #444;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-muted);
+}
+
+.controls-component-content .control-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.controls-component-content .control-field-label {
+    font-size: 0.82em;
+    color: var(--text-secondary);
+}
+
+.controls-component-content .control-toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0 -8px;
 }
 
 .controls-component-content .slider-component-container {
-    padding: 0 4px;
+    padding: 0 2px;
+}
+
+/* Brush-action / cell-coloring segmented switches fill the panel width */
+.controls-component-content .switch-component-container .switch-group {
+    display: flex;
+    width: 100%;
+}
+
+.controls-component-content .switch-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 6px;
+}
+
+.controls-component-content .switch-label svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
 }
 
 .pattern-buttons {

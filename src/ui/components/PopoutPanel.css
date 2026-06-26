@@ -102,6 +102,84 @@
         background-color: #5a5a5a;
     }
 
+    /* Reset / Clear Popout */
+    #resetClearPopout {
+        min-width: 260px;
+    }
+
+    #resetClearPopout .reset-clear-card {
+        background-color: var(--surface-1);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+        margin-bottom: 8px;
+    }
+
+    #resetClearPopout .reset-clear-card:last-child {
+        margin-bottom: 0;
+    }
+
+    #resetClearPopout .reset-clear-card-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        margin-bottom: 9px;
+    }
+
+    #resetClearPopout .reset-clear-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        background-color: var(--accent-soft);
+        color: var(--accent);
+    }
+
+    #resetClearPopout .reset-clear-card-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    #resetClearPopout .reset-clear-card-title {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    #resetClearPopout .reset-clear-card-desc {
+        font-size: 0.78em;
+        line-height: 1.35;
+        color: var(--text-muted);
+    }
+
+    #resetClearPopout .reset-clear-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    #resetClearPopout .reset-clear-scope {
+        flex: 1;
+        text-align: center;
+        padding: 8px 6px;
+        font-size: 0.85em;
+    }
+
+    /* "All 9 worlds" is unrecoverable across the whole grid — flag it. */
+    #resetClearPopout .reset-clear-scope.is-scope-all {
+        border-color: rgba(224, 108, 117, 0.4);
+        color: var(--danger);
+    }
+
+    #resetClearPopout .reset-clear-scope.is-scope-all:hover {
+        background-color: rgba(224, 108, 117, 0.14);
+        border-color: rgba(224, 108, 117, 0.6);
+    }
+
     /* History Popout Specific */
     #historyPopout .history-list-container {
         max-height: 300px;

@@ -2,6 +2,13 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
+import { ToggleSwitch } from './ToggleSwitch.js';
+
+const PANE_BLURBS = {
+    generate: 'Roll a brand-new ruleset from scratch.',
+    mutate: 'Tweak the current ruleset by flipping rule bits — or clone it first.',
+    breed: 'Recombine rulesets from parent worlds into the others.'
+};
 
 export class RulesetActionsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -24,17 +31,20 @@ export class RulesetActionsComponent extends BaseComponent {
 
     render() {
         this.element.innerHTML = `
-            <div class="ruleset-actions-header">
-                <button id="ruleset-actions-generate-tab" class="ruleset-actions-segment active" data-pane="generate">Generate</button>
-                <button id="ruleset-actions-mutate-tab" class="ruleset-actions-segment" data-pane="mutate">Mutate</button>
-                <button id="ruleset-actions-breed-tab" class="ruleset-actions-segment" data-pane="breed">Breed</button>
+            <div class="ruleset-actions-header" role="tablist">
+                <button id="ruleset-actions-generate-tab" class="ruleset-actions-segment active" data-pane="generate" role="tab">Generate</button>
+                <button id="ruleset-actions-mutate-tab" class="ruleset-actions-segment" data-pane="mutate" role="tab">Mutate</button>
+                <button id="ruleset-actions-breed-tab" class="ruleset-actions-segment" data-pane="breed" role="tab">Breed</button>
             </div>
+            <p class="ruleset-actions-blurb" id="ruleset-actions-blurb"></p>
             <div class="ruleset-actions-content">
                 <div id="ruleset-actions-generate-pane" class="ruleset-pane"></div>
                 <div id="ruleset-actions-mutate-pane" class="ruleset-pane hidden"></div>
                 <div id="ruleset-actions-breed-pane" class="ruleset-pane hidden"></div>
             </div>
         `;
+
+        this.blurb = this.element.querySelector('#ruleset-actions-blurb');
 
         this.panes = {
             generate: this.element.querySelector(`#ruleset-actions-generate-pane`),
@@ -55,101 +65,131 @@ export class RulesetActionsComponent extends BaseComponent {
 
     _renderGeneratePane() {
         const pane = this.panes.generate;
+        const controller = this.appContext.rulesetActionController;
 
         pane.innerHTML = `
-            <div class="form-group" id="ruleset-actions-gen-mode-mount"></div>
-            <div class="form-group bias-controls">
-                <input type="checkbox" id="ruleset-actions-use-custom-bias" class="checkbox-input" checked>
-                <label for="ruleset-actions-use-custom-bias" class="checkbox-label">Custom Bias:</label>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Generation method</span>
+                <div id="ruleset-actions-gen-mode-mount"></div>
+            </div>
+            <div id="ruleset-actions-use-custom-bias-mount"></div>
+            <div class="ruleset-field ruleset-subfield" id="ruleset-actions-bias-field">
+                <span class="ruleset-field-label">Density bias</span>
                 <div id="ruleset-actions-bias-slider-mount"></div>
             </div>
-            <div class="form-group" id="ruleset-actions-gen-scope-mount"></div>
-            <div class="form-group" id="ruleset-actions-gen-reset-mount"></div>
-            <button class="button action-button" data-action="generate">Generate New Ruleset</button>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Apply to</span>
+                <div id="ruleset-actions-gen-scope-mount"></div>
+            </div>
+            <div id="ruleset-actions-gen-reset-mount"></div>
+            <button class="button ruleset-primary-action" data-action="generate">Generate New Ruleset</button>
         `;
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-mode-mount`), {
-            label: 'Generation Mode:',
+            label: '',
             type: 'radio',
             name: `ruleset-actions-gen-mode`,
-            initialValue: this.appContext.rulesetActionController.getGenMode(),
-            items: this.appContext.rulesetActionController.getGenerationConfig(),
-            onChange: this.appContext.rulesetActionController.setGenMode
+            initialValue: controller.getGenMode(),
+            items: controller.getGenerationConfig(),
+            onChange: controller.setGenMode
         });
 
         this.sliders.bias = new SliderComponent(pane.querySelector(`#ruleset-actions-bias-slider-mount`), {
-            ...this.appContext.rulesetActionController.getBiasSliderConfig(),
+            ...controller.getBiasSliderConfig(),
+            label: '',
             id: `ruleset-actions-bias-slider`,
-            value: this.appContext.rulesetActionController.getBias(),
-            disabled: !this.appContext.rulesetActionController.getUseCustomBias()
+            value: controller.getBias(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-scope-mount`), {
-            ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
+            ...controller.getGenScopeSwitchConfig(),
+            label: '',
             name: `ruleset-actions-gen-scope`,
-            initialValue: this.appContext.rulesetActionController.getGenScope(),
+            initialValue: controller.getGenScope(),
         });
 
-        new SwitchComponent(pane.querySelector(`#ruleset-actions-gen-reset-mount`), {
-            ...this.appContext.rulesetActionController.getGenAutoResetSwitchConfig(),
-            name: `ruleset-actions-gen-reset`,
-            initialValue: this.appContext.rulesetActionController.getGenAutoReset(),
+        const biasField = pane.querySelector('#ruleset-actions-bias-field');
+        const syncBias = (useCustom) => {
+            biasField.classList.toggle('hidden', !useCustom);
+        };
+
+        new ToggleSwitch(pane.querySelector(`#ruleset-actions-use-custom-bias-mount`), {
+            id: 'ruleset-actions-use-custom-bias',
+            label: 'Custom density bias',
+            description: 'Set the share of live cells in new rulesets (off = random).',
+            initialValue: controller.getUseCustomBias(),
+            onChange: (checked) => {
+                controller.setUseCustomBias(checked);
+                syncBias(checked);
+            }
         });
+        syncBias(controller.getUseCustomBias());
 
-
-        const biasCheckbox = pane.querySelector(`#ruleset-actions-use-custom-bias`);
-        biasCheckbox.checked = this.appContext.rulesetActionController.getUseCustomBias();
-        biasCheckbox.addEventListener('change', e => {
-            this.appContext.rulesetActionController.setUseCustomBias(e.target.checked);
-            this.sliders.bias?.setDisabled(!e.target.checked);
+        new ToggleSwitch(pane.querySelector(`#ruleset-actions-gen-reset-mount`), {
+            id: 'ruleset-actions-gen-reset',
+            label: 'Auto-reset worlds',
+            description: 'Re-seed affected worlds after generating.',
+            initialValue: controller.getGenAutoReset(),
+            onChange: controller.setGenAutoReset
         });
     }
 
     _renderMutatePane() {
         const pane = this.panes.mutate;
+        const controller = this.appContext.rulesetActionController;
 
         pane.innerHTML = `
-            <div class="form-group" id="ruleset-actions-mutate-rate-mount"></div>
-            <div class="form-group" id="ruleset-actions-mutate-mode-mount"></div>
-            <div class="form-group" id="ruleset-actions-mutate-scope-mount"></div>
-            <div class="form-group" id="ruleset-actions-ensure-mutation-mount"></div>
-            <div class="form-group-buttons">
-                <button class="button" data-action="mutate">Mutate</button>
-                <button class="button" data-action="clone">Clone</button>
-                <button class="button" data-action="clone-mutate">Clone & Mutate</button>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Mutation rate</span>
+                <div id="ruleset-actions-mutate-rate-mount"></div>
+            </div>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Mutation method</span>
+                <div id="ruleset-actions-mutate-mode-mount"></div>
+            </div>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Apply to</span>
+                <div id="ruleset-actions-mutate-scope-mount"></div>
+            </div>
+            <div id="ruleset-actions-ensure-mutation-mount"></div>
+            <button class="button ruleset-primary-action" data-action="mutate">Mutate Ruleset</button>
+            <div class="ruleset-secondary-actions">
+                <button class="button" data-action="clone" title="Copy the selected world's ruleset to the others">Clone</button>
+                <button class="button" data-action="clone-mutate" title="Copy the ruleset to the others, then mutate each copy">Clone &amp; Mutate</button>
             </div>
         `;
 
         new SliderComponent(pane.querySelector(`#ruleset-actions-mutate-rate-mount`), {
-            ...this.appContext.rulesetActionController.getMutationRateSliderConfig(),
+            ...controller.getMutationRateSliderConfig(),
+            label: '',
             id: `ruleset-actions-mutate-rate`,
-            value: this.appContext.rulesetActionController.getMutateRate(),
+            value: controller.getMutateRate(),
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-mode-mount`), {
-            label: 'Mutation Mode:',
+            label: '',
             type: 'radio',
             name: `ruleset-actions-mutate-mode`,
-            initialValue: this.appContext.rulesetActionController.getMutateMode(),
-            items: this.appContext.rulesetActionController.getMutationModeConfig(),
-            onChange: this.appContext.rulesetActionController.setMutateMode
+            initialValue: controller.getMutateMode(),
+            items: controller.getMutationModeConfig(),
+            onChange: controller.setMutateMode
         });
 
         new SwitchComponent(pane.querySelector(`#ruleset-actions-mutate-scope-mount`), {
-            label: 'Apply to:',
+            label: '',
             type: 'radio',
             name: `ruleset-actions-mutate-scope`,
-            initialValue: this.appContext.rulesetActionController.getMutateScope(),
-            items: this.appContext.rulesetActionController.getMutationScopeConfig(),
-            onChange: this.appContext.rulesetActionController.setMutateScope
+            initialValue: controller.getMutateScope(),
+            items: controller.getMutationScopeConfig(),
+            onChange: controller.setMutateScope
         });
 
-        new SwitchComponent(pane.querySelector(`#ruleset-actions-ensure-mutation-mount`), {
-            type: 'checkbox',
-            name: `ruleset-actions-ensure-mutation`,
-            initialValue: this.appContext.rulesetActionController.getEnsureMutation(),
-            items: [{ value: 'ensure', text: 'Ensure at least one mutation' }],
-            onChange: this.appContext.rulesetActionController.setEnsureMutation
+        new ToggleSwitch(pane.querySelector(`#ruleset-actions-ensure-mutation-mount`), {
+            id: 'ruleset-actions-ensure-mutation',
+            label: 'Ensure at least one change',
+            description: 'Guarantee a mutation even at low rates.',
+            initialValue: controller.getEnsureMutation(),
+            onChange: controller.setEnsureMutation
         });
     }
 
@@ -162,24 +202,28 @@ export class RulesetActionsComponent extends BaseComponent {
         ).join('');
 
         pane.innerHTML = `
-            <p class="breed-hint">Flag worlds as <strong>parents</strong> (click a cell below, or press
-            <kbd>B</kbd> on the selected world). The remaining worlds become offspring recombined from
-            the parent genepool. One parent ≈ clone&nbsp;&amp; mutate; two or more cross-breed.</p>
-            <div class="form-group">
-                <label>Parent worlds:</label>
+            <p class="ruleset-hint">Mark worlds as <strong>parents</strong> below (or press <kbd>B</kbd> on a
+            world). The remaining worlds become offspring recombined from the parents' genepool — one
+            parent ≈ clone&nbsp;&amp; mutate, two or more cross-breed.</p>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Parent worlds</span>
                 <div class="breed-parent-grid">${grid}</div>
                 <div class="breed-parent-readout" id="ruleset-actions-breed-readout"></div>
             </div>
-            <div class="form-group" id="ruleset-actions-breed-mode-mount"></div>
-            <div class="form-group" id="ruleset-actions-breed-rate-mount"></div>
-            <div class="form-group-buttons">
-                <button class="button" data-action="breed-clear" title="Clear all parent flags">Clear Parents</button>
-                <button class="button" data-action="breed" title="Recombine the parent genepool into the offspring worlds">Breed Offspring</button>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Inheritance</span>
+                <div id="ruleset-actions-breed-mode-mount"></div>
             </div>
+            <div class="ruleset-field">
+                <span class="ruleset-field-label">Offspring mutation</span>
+                <div id="ruleset-actions-breed-rate-mount"></div>
+            </div>
+            <button class="button ruleset-primary-action" data-action="breed" title="Recombine the parent genepool into the offspring worlds">Breed Offspring</button>
+            <button class="button ruleset-secondary-full" data-action="breed-clear" title="Clear all parent flags">Clear Parents</button>
         `;
 
         new SwitchComponent(pane.querySelector('#ruleset-actions-breed-mode-mount'), {
-            label: 'Inheritance:',
+            label: '',
             type: 'radio',
             name: 'ruleset-actions-breed-mode',
             initialValue: controller.getBreedMode(),
@@ -189,6 +233,7 @@ export class RulesetActionsComponent extends BaseComponent {
 
         new SliderComponent(pane.querySelector('#ruleset-actions-breed-rate-mount'), {
             ...controller.getBreedMutationRateSliderConfig(),
+            label: '',
             id: 'ruleset-actions-breed-rate',
             value: controller.getBreedMutationRate(),
         });
@@ -278,7 +323,6 @@ export class RulesetActionsComponent extends BaseComponent {
         }
         this.panes[paneName].classList.remove('hidden');
         this.segments[paneName].classList.add('active');
+        if (this.blurb) this.blurb.textContent = PANE_BLURBS[paneName] || '';
     }
-
-
 }

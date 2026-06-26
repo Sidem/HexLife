@@ -1,7 +1,9 @@
 import { BaseComponent } from './BaseComponent.js';
 import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
+import { ToggleSwitch } from './ToggleSwitch.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import { ICONS } from '../icons.js';
 
 export class ControlsComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -14,26 +16,39 @@ export class ControlsComponent extends BaseComponent {
 
     render() {
         this.element.innerHTML = `
-            <div class="tool-group">
-                <h5>Speed</h5>
-                <div id="controls-speed-slider-mount"></div>
-            </div>
-            <div class="tool-group">
-                <h5>Brush Size</h5>
-                <div id="controls-brush-slider-mount"></div>
-            </div>
-            <div class="tool-group">
-                <h5>Interaction</h5>
-                <div id="controls-brush-mode-mount"></div>
+            <section class="control-section">
+                <h5 class="control-section-title">Simulation</h5>
+                <div class="control-field">
+                    <span class="control-field-label">Speed</span>
+                    <div id="controls-speed-slider-mount"></div>
+                </div>
+            </section>
+
+            <section class="control-section">
+                <h5 class="control-section-title">Drawing</h5>
+                <div class="control-field">
+                    <span class="control-field-label">Brush size</span>
+                    <div id="controls-brush-slider-mount"></div>
+                </div>
+                <div class="control-field">
+                    <span class="control-field-label">Brush action</span>
+                    <div id="controls-brush-mode-mount"></div>
+                </div>
                 <div id="controls-pause-while-drawing-mount"></div>
-            </div>
-            <div class="tool-group">
-                <h5>Visualization</h5>
-                <div id="controls-ruleset-viz-mount"></div>
-                <div id="controls-show-minimap-overlay-mount"></div>
-                <div id="controls-show-status-badges-mount"></div>
-                <div id="controls-show-command-toasts-mount"></div>
-            </div>
+            </section>
+
+            <section class="control-section">
+                <h5 class="control-section-title">Display</h5>
+                <div class="control-field">
+                    <span class="control-field-label">Cell coloring</span>
+                    <div id="controls-ruleset-viz-mount"></div>
+                </div>
+                <div class="control-toggle-list">
+                    <div id="controls-show-minimap-overlay-mount"></div>
+                    <div id="controls-show-status-badges-mount"></div>
+                    <div id="controls-show-command-toasts-mount"></div>
+                </div>
+            </section>
         `;
 
         const simController = this.appContext.simulationController;
@@ -42,7 +57,7 @@ export class ControlsComponent extends BaseComponent {
         const vizController = this.appContext.visualizationController;
 
         new SliderComponent(this.element.querySelector(`#controls-speed-slider-mount`), {
-            id: `controls-speed-slider`, 
+            id: `controls-speed-slider`,
             ...simController.getSpeedConfig(),
             value: simController.getSpeed(),
             showValue: true,
@@ -50,7 +65,7 @@ export class ControlsComponent extends BaseComponent {
         });
 
         new SliderComponent(this.element.querySelector(`#controls-brush-slider-mount`), {
-            id: `controls-brush-slider`, 
+            id: `controls-brush-slider`,
             ...brushController.getBrushConfig(),
             value: brushController.getBrushSize(),
             showValue: true,
@@ -60,54 +75,49 @@ export class ControlsComponent extends BaseComponent {
         new SwitchComponent(this.element.querySelector(`#controls-brush-mode-mount`), {
             type: 'radio',
             name: `controls-brush-mode`,
-            label: 'Brush Mode:',
             initialValue: interactionController.getBrushMode(),
             items: [
-                { value: 'invert', text: 'Invert' },
-                { value: 'draw', text: 'Draw' },
-                { value: 'erase', text: 'Erase' }
+                { value: 'invert', text: `${ICONS.shuffle}<span>Invert</span>` },
+                { value: 'draw', text: `${ICONS.pencil}<span>Draw</span>` },
+                { value: 'erase', text: `${ICONS.eraser}<span>Erase</span>` }
             ],
             onChange: (mode) => EventBus.dispatch(EVENTS.COMMAND_SET_BRUSH_MODE, mode)
         });
 
-        new SwitchComponent(this.element.querySelector(`#controls-pause-while-drawing-mount`), {
-            type: 'checkbox',
-            name: `controls-pause-while-drawing`, 
+        new ToggleSwitch(this.element.querySelector(`#controls-pause-while-drawing-mount`), {
+            id: 'controls-pause-while-drawing',
+            label: 'Pause while drawing',
+            description: 'Freeze the simulation while you paint cells.',
             initialValue: interactionController.getPauseWhileDrawing(),
-            items: [{ value: 'pause', text: 'Pause While Drawing' }],
             onChange: (shouldPause) => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_WHILE_DRAWING, shouldPause)
         });
 
         new SwitchComponent(this.element.querySelector(`#controls-ruleset-viz-mount`), {
             type: 'radio',
-            name: `controls-ruleset-viz`, 
-            label: 'Display Type:',
+            name: `controls-ruleset-viz`,
             initialValue: vizController.getVizType(),
             items: vizController.getVisualizationOptions(),
             onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type)
         });
 
-        new SwitchComponent(this.element.querySelector(`#controls-show-minimap-overlay-mount`), {
-            type: 'checkbox',
-            name: `controls-show-minimap-overlay`, 
+        new ToggleSwitch(this.element.querySelector(`#controls-show-minimap-overlay-mount`), {
+            id: 'controls-show-minimap-overlay',
+            label: 'Minimap overlays',
             initialValue: vizController.getShowMinimapOverlay(),
-            items: [{ value: 'show', text: 'Show Minimap Overlays' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, shouldShow)
         });
 
-        new SwitchComponent(this.element.querySelector(`#controls-show-status-badges-mount`), {
-            type: 'checkbox',
-            name: `controls-show-status-badges`,
+        new ToggleSwitch(this.element.querySelector(`#controls-show-status-badges-mount`), {
+            id: 'controls-show-status-badges',
+            label: 'Status badges',
             initialValue: vizController.getShowStatusBadges(),
-            items: [{ value: 'show', text: 'Show Status Badges' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_STATUS_BADGES, shouldShow)
         });
 
-        new SwitchComponent(this.element.querySelector(`#controls-show-command-toasts-mount`), {
-            type: 'checkbox',
-            name: `controls-show-command-toasts`,
+        new ToggleSwitch(this.element.querySelector(`#controls-show-command-toasts-mount`), {
+            id: 'controls-show-command-toasts',
+            label: 'Action toasts',
             initialValue: vizController.getShowCommandToasts(),
-            items: [{ value: 'show', text: 'Show Action Toasts' }],
             onChange: (shouldShow) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, shouldShow)
         });
     }
