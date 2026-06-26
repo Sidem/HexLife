@@ -12,6 +12,8 @@
     padding-bottom: 10px;
     border-bottom: 1px solid #444;
     margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .panel-header-controls .info-text {
@@ -19,18 +21,9 @@
     flex-grow: 1;
 }
 
-.state-control {
-    grid-column: span 2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: rgba(0,0,0,0.2);
-    padding: 5px 8px;
-    border-radius: 4px;
-}
-
 .state-mode-label {
-    font-size: 0.9em;
+    font-size: 0.85em;
+    color: #aaa;
 }
 
 .state-mode-value {
@@ -46,29 +39,22 @@
     flex-grow: 1; /* Allow grid to take available space */
 }
 
-.world-config-cell .state-control {
-    grid-column: span 2;
-}
-
-.world-ruleset-name {
-    grid-column: span 2;
-    font-size: 0.8em;
-    font-style: italic;
-    color: #9fa8c0;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
+/* --- World cell --- */
 .world-config-cell {
     border: 1px solid #333;
     border-radius: 6px;
-    padding: 5px;
+    padding: 8px;
     background-color: rgba(255, 255, 255, 0.03);
-    display: grid;
-    grid-template-columns: 0.5fr 0.5fr;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wsc-cell-header {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 6px;
 }
 
 .world-label {
@@ -77,49 +63,71 @@
     color: #bbb;
 }
 
+.wsc-ruleset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
 .world-config-cell .ruleset-viz-container {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex-shrink: 0;
 }
 
-.world-config-cell .ruleset-hex {
-    font-family: monospace;
-    font-size: 0.9em;
-    background-color: #3a3a3a;
-    padding: 3px 6px;
+.world-ruleset-name {
+    font-size: 0.8em;
+    font-style: italic;
+    color: #9fa8c0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+}
+
+/* Initial-state thumbnail + mode + edit */
+.wsc-state-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 6px;
     border-radius: 4px;
 }
 
-.setting-control {
-    width: 100%;
+.world-state-preview {
+    width: 48px;
+    height: 42px;
+    flex-shrink: 0;
+    border: 1px solid #444;
+    border-radius: 3px;
+    background-color: #16181d;
+    image-rendering: pixelated;
+}
+
+.wsc-state-info {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
     gap: 5px;
-}
-
-.setting-control label {
-    font-size: 0.8em;
-    color: #aaa;
-    text-align: center;
-}
-
-.density-control .slider-component-container {
-    width: 100%;
-}
-
-.density-control .slider-component-container input[type="range"] {
-    width: 100%;
+    flex: 1;
     min-width: 0;
 }
 
+.wsc-state-info .button {
+    padding: 4px 10px;
+    font-size: 0.8em;
+    min-width: 0;
+}
+
+/* Compact enable switch in the header */
 .enable-control label.checkbox-label {
-    padding: 6px 12px;
-    font-size: 0.85em;
+    padding: 4px 10px;
+    font-size: 0.8em;
     text-align: center;
-    width: 100%;
-    box-sizing: border-box;
 }
 
 .world-config-cell .button.set-ruleset-button {
@@ -128,7 +136,7 @@
     font-size: 0.8em;
     min-width: 0;
     width: 100%;
-    margin-top: 5px;
+    margin-top: auto;
 }
 
 .panel-actions {
@@ -143,7 +151,7 @@
 .panel-actions .button {
     width: 100%;
     padding: 12px;
-    font-size: 1em;
+    font-size: 0.95em;
 }
 
 /* Mobile Overrides */
@@ -152,16 +160,11 @@
         grid-template-columns: repeat(2, 1fr); /* Mobile: 2 columns */
         gap: 8px;
     }
-    
-    .world-config-cell {
-        padding: 8px;
-        gap: 6px;
-    }
-    
+
     .world-label {
         font-size: 0.85em;
     }
-    
+
     .panel-actions {
         flex-direction: column;
         gap: 8px;
@@ -178,4 +181,4 @@
     .world-config-grid {
         grid-template-columns: 1fr; /* Very small screens: 1 column */
     }
-} 
+}

@@ -1,11 +1,11 @@
 import * as Config from '../../core/config.js';
 import { BaseComponent } from './BaseComponent.js';
-import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
+import { renderInitialStatePreview } from './initialStatePreview.js';
 
 export class WorldSetupComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -46,9 +46,9 @@ export class WorldSetupComponent extends BaseComponent {
             </div>
             <div id="world-setup-config-grid" class="world-config-grid"></div>
             <div id="world-setup-panel-actions" class="panel-actions">
-                <button class="button" data-action="apply-state-all">Apply Initial State to All</button>
-                <button class="button" data-action="reset-states">Reset States to Default</button>
-                <button class="button" data-action="reset-all-worlds">Apply & Reset All Worlds</button>
+                <button class="button" data-action="apply-state-all" title="Copy the selected world's initial-state settings to all 9 worlds">Copy Selected &rarr; All</button>
+                <button class="button" data-action="reset-states" title="Reset every world's initial-state settings back to the default random fill">Reset to Defaults</button>
+                <button class="button" data-action="reset-all-worlds" title="Re-seed all 9 worlds from their current initial-state settings">Regenerate All Worlds</button>
             </div>
         `;
         
@@ -106,14 +106,21 @@ export class WorldSetupComponent extends BaseComponent {
             cell.className = 'world-config-cell';
 
             cell.innerHTML = `
-                <div class="world-label">World ${i}</div>
-                <div class="ruleset-viz-container"></div>
-                <div class="world-ruleset-name" title="This world's ruleset name"></div>
-                <div class="setting-control state-control">
-                    <span class="state-mode-label">Mode: <b class="state-mode-value">Density</b></span>
-                    <button class="button" data-action="edit-state" data-world-index="${i}">Edit...</button>
+                <div class="wsc-cell-header">
+                    <span class="world-label">World ${i}</span>
+                    <div class="enable-control"><div id="world-setup-enable-switch-mount-${i}"></div></div>
                 </div>
-                <div class="setting-control enable-control"><div id="world-setup-enable-switch-mount-${i}"></div></div>
+                <div class="wsc-ruleset-row">
+                    <div class="ruleset-viz-container"></div>
+                    <div class="world-ruleset-name" title="This world's ruleset name"></div>
+                </div>
+                <div class="wsc-state-row">
+                    <canvas class="world-state-preview" aria-hidden="true"></canvas>
+                    <div class="wsc-state-info">
+                        <span class="state-mode-label">Start: <b class="state-mode-value">Random fill</b></span>
+                        <button class="button" data-action="edit-state" data-world-index="${i}">Edit&hellip;</button>
+                    </div>
+                </div>
                 <button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>
             `;
 
@@ -138,6 +145,8 @@ export class WorldSetupComponent extends BaseComponent {
                 vizContainer,
                 rulesetName: cell.querySelector('.world-ruleset-name'),
                 stateModeValue: cell.querySelector('.state-mode-value'),
+                statePreview: cell.querySelector('.world-state-preview'),
+                lastStateKey: null,
                 enableSwitch,
                 enableSwitchLabel: enableSwitchMount.querySelector('label')
             };
@@ -221,9 +230,20 @@ export class WorldSetupComponent extends BaseComponent {
             cache.vizContainer.innerHTML = ''; 
             cache.vizContainer.appendChild(svg);
 
-            const mode = settings.initialState?.mode || 'density';
-            cache.stateModeValue.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
-            
+            const initialState = settings.initialState || { mode: 'density' };
+            const mode = initialState.mode || 'density';
+            cache.stateModeValue.textContent = mode === 'clusters' ? 'Clumps' : 'Random fill';
+
+            // Render the per-world initial-state thumbnail; cache by config so repeated refreshes
+            // (e.g. ruleset-viz changes) don't needlessly regenerate it.
+            if (cache.statePreview) {
+                const stateKey = JSON.stringify(initialState);
+                if (stateKey !== cache.lastStateKey) {
+                    cache.lastStateKey = stateKey;
+                    renderInitialStatePreview(cache.statePreview, initialState, { maxDim: 64, seed: i + 1 });
+                }
+            }
+
             cache.enableSwitch.setValue(settings.enabled);
             if (cache.enableSwitchLabel) {
                 cache.enableSwitchLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';
