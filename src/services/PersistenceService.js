@@ -281,7 +281,7 @@ export function saveEmbeddingGallery(entries) {
 export function loadColorSettings() {
     const defaults = {
         mode: 'preset',
-        activePreset: 'default',
+        activePreset: 'monochrome',
         customGradient: {
             on: ['#3cb44b', '#ffe119'],
             off: ['#1a4a23', '#665a0a']

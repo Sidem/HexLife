@@ -16,7 +16,7 @@ export const PRESET_PALETTES = {
     monochrome: {
         name: 'Monochrome',
         gradient: ['#FFFFFF'],
-        offGradient: ['#333333']
+        offGradient: ['#111111']
     },
     synthwave: {
         name: 'Synthwave',
