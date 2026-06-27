@@ -113,11 +113,28 @@
             </div>
 
             <div id="statsDisplayContainer" class="stats-container" data-tour-id="stats-display-container">
-                <span>Tick: <span id="stat-tick">--</span></span>
-                <span>Ratio: <span id="stat-ratio">--</span>%</span>
-                <span>Brush: <span id="stat-brush-size">--</span></span>
-                <span>FPS: <span id="stat-fps">--</span></span>
-                <span>TPS: <span id="stat-actual-tps">--</span>/<span id="stat-target-tps">--</span></span>
+                <div class="stat-tile" title="Simulation tick (step count) of the selected world">
+                    <span class="stat-label">Tick</span>
+                    <span class="stat-value"><span id="stat-tick">--</span></span>
+                </div>
+                <div class="stat-tile" title="Share of living cells in the selected world right now">
+                    <span class="stat-label">Active</span>
+                    <span class="stat-value"><span id="stat-ratio">--</span><span class="stat-unit">%</span></span>
+                </div>
+                <span class="stat-sep" aria-hidden="true"></span>
+                <div class="stat-tile stat-tile-brush" title="Drawing brush size (hex radius)">
+                    <span class="stat-label">Brush</span>
+                    <span class="stat-value"><span id="stat-brush-size">--</span></span>
+                </div>
+                <span class="stat-sep" aria-hidden="true"></span>
+                <div class="stat-tile stat-tile-fps" title="Render frames per second">
+                    <span class="stat-label">FPS</span>
+                    <span class="stat-value"><span id="stat-fps">--</span></span>
+                </div>
+                <div class="stat-tile" title="Simulation speed — actual ticks per second / target">
+                    <span class="stat-label">TPS</span>
+                    <span class="stat-value"><span id="stat-actual-tps">--</span><span class="stat-sub">/<span id="stat-target-tps">--</span></span></span>
+                </div>
             </div>
         </div>
 

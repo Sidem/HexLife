@@ -28,6 +28,181 @@
 .controls-component-content .control-field-label {
     font-size: 0.82em;
     color: var(--text-secondary);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.controls-component-content .control-field-hint {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+/* --- Stepper (speed / brush size) --- */
+.stepper-component {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stepper-control {
+    display: flex;
+    align-items: stretch;
+    height: 34px;
+    border: 1px solid var(--border, #4a4a4a);
+    border-radius: 7px;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.25);
+}
+
+.stepper-btn {
+    flex: 0 0 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: none;
+    color: var(--text-secondary, #ccc);
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 0.12s ease, color 0.12s ease;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.stepper-btn svg { width: 17px; height: 17px; }
+
+.stepper-btn:hover:not(:disabled) {
+    background-color: var(--accent, #0078d4);
+    color: #fff;
+}
+
+.stepper-btn:active:not(:disabled) {
+    background-color: var(--accent-hover, #0a6cbf);
+}
+
+.stepper-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.stepper-readout {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    border-left: 1px solid var(--border, #4a4a4a);
+    border-right: 1px solid var(--border, #4a4a4a);
+    padding: 0 6px;
+}
+
+.stepper-input {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text, #fff);
+    font-size: 1.05em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    padding: 0;
+    -moz-appearance: textfield;
+}
+
+.stepper-input:focus {
+    color: var(--accent, #4aa3ff);
+}
+
+.stepper-unit {
+    flex-shrink: 0;
+    font-size: 0.72em;
+    color: var(--text-muted, #888);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.stepper-presets {
+    display: flex;
+    gap: 5px;
+}
+
+.stepper-preset {
+    flex: 1 1 0;
+    padding: 5px 4px;
+    font-size: 0.76em;
+    color: var(--text-secondary, #bbb);
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    white-space: nowrap;
+}
+
+.stepper-preset:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text, #fff);
+}
+
+.stepper-preset.active {
+    background-color: var(--accent-soft, rgba(0, 120, 212, 0.22));
+    border-color: var(--accent, #0078d4);
+    color: var(--text, #fff);
+}
+
+.stepper-component.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* --- Brush size: footprint preview beside the stepper --- */
+.brush-size-control {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.brush-preview {
+    flex: 0 0 64px;
+    width: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    background-color: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--border, #4a4a4a);
+    border-radius: 7px;
+}
+
+.brush-preview-svg {
+    max-width: 100%;
+    max-height: 52px;
+}
+
+.brush-preview-svg polygon {
+    fill: var(--accent, #3cb44b);
+    stroke: rgba(0, 0, 0, 0.45);
+    stroke-width: 0.6;
+}
+
+.brush-stepper-col {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.brush-coverage {
+    font-size: 0.75em;
+    color: var(--text-muted, #888);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
 }
 
 .controls-component-content .control-toggle-list {

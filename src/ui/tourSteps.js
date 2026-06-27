@@ -149,17 +149,17 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ControlsComponent }
     }, {
-        element: '[id*="controls-speed-slider"]',
+        element: '[id*="controls-speed-stepper"]',
         title: 'Simulation Speed',
-        content: "Adjust the target <span class=\"onboarding-highlight-text\">Ticks Per Second (TPS)</span> for all worlds. Higher values run the simulation faster.",
+        content: "Set the target <span class=\"onboarding-highlight-text\">Ticks Per Second (TPS)</span> for all worlds. Tap a preset, use the <span class=\"onboarding-highlight-text\">&minus;/+</span> buttons (hold to ramp), scroll, or type an exact value. Higher runs faster.",
         primaryAction: { text: 'Next' },
         // Re-assert the popout so the step self-heals on Back navigation.
         onBeforeShow: () => { if (!appContext.uiManager.isMobile()) showView({ desktop: { type: 'popout', name: 'controls' } }); },
         advanceOn: { type: 'click' }
     }, {
-        element: '[id*="controls-brush-slider"]',
+        element: '[id*="controls-brush-stepper"]',
         title: 'Brush Size',
-        content: "Adjust the size of your drawing brush. <br><br><b>Desktop Pro-Tip:</b> Use `Ctrl + Mouse Wheel` over the grid to adjust size on the fly.",
+        content: "Set how many cells your brush paints &mdash; the preview shows the exact hex footprint and cell count. <br><br><b>Desktop Pro-Tip:</b> Use `Ctrl + Mouse Wheel` over the grid to adjust size on the fly.",
         primaryAction: { text: 'Finish' },
         onBeforeShow: () => { if (!appContext.uiManager.isMobile()) showView({ desktop: { type: 'popout', name: 'controls' } }); },
         advanceOn: { type: 'click' }

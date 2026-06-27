@@ -221,14 +221,18 @@ select:focus {
     color: var(--accent);
 }
 
-/* Stats read as labelled, tabular values instead of a text soup */
+/* Stats read as compact metric tiles instead of a text soup */
 #statsDisplayContainer {
     font-variant-numeric: tabular-nums;
     color: var(--text-muted);
 }
 
-#statsDisplayContainer span span {
+#statsDisplayContainer .stat-value {
     color: var(--text-primary);
+}
+
+#statsDisplayContainer .stat-sep {
+    background-color: var(--border);
 }
 
 .ruleset-history-controls .button-icon,
@@ -485,8 +489,7 @@ screen and (pointer: coarse) and (hover: none) {
         overflow: hidden;
     }
 
-    #statsDisplayContainer > span,
-    #statsDisplayContainer > span:first-child {
+    #statsDisplayContainer .stat-tile {
         min-width: 0;
         white-space: nowrap;
     }

@@ -112,41 +112,72 @@
 .ruleset-display-toggle:not(.has-name) #rulesetDisplayCode { opacity: 1; }
 
 
+/* Stats read as compact metric tiles: a small muted label stacked over a bold,
+   tabular value, with hairline separators grouping world | tools | performance. */
 #statsDisplayContainer {
     display: flex;
-    gap: 15px;
     align-items: center;
     justify-content: flex-end; /* Align to the right on desktop */
+    gap: 12px;
 }
 
-#statsDisplayContainer > span {
-    min-width: 35px;
-    display: inline-block;
-    text-align: left;
+.stat-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    line-height: 1.1;
 }
 
-#statsDisplayContainer span span {
-    font-weight: bold;
-    color: #f0f0f0;
-    display: inline-block;
-    text-align: right;
+.stat-label {
+    font-size: 0.58rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted, #8a8a92);
+    white-space: nowrap;
+}
+
+.stat-value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-primary, #f0f0f0);
     /* Equal-width digits so a value's box never reflows as it ticks */
     font-variant-numeric: tabular-nums;
 }
 
-#statsDisplayContainer > span:first-child {
-    min-width: 60px;
+/* Right-align the primary number so its reserved width pads on the left */
+.stat-value > span:first-child {
+    display: inline-block;
+    text-align: right;
 }
 
-/* Reserve a fixed width for each numeric value. Without this, the stats
-   column's width changes as rapidly-updating values (FPS/TPS/tick) gain or
-   lose digits, which shifts the centered #rulesetDisplayContainer. */
-#stat-tick { min-width: 6ch; }
-#stat-ratio { min-width: 3ch; }
-#stat-brush-size { min-width: 2ch; }
-#stat-fps { min-width: 3ch; }
-#stat-actual-tps,
-#stat-target-tps { min-width: 4ch; }
+.stat-unit,
+.stat-sub {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--text-muted, #8a8a92);
+}
+
+.stat-sep {
+    align-self: center;
+    flex-shrink: 0;
+    width: 1px;
+    height: 22px;
+    background-color: var(--border, #4a4a4a);
+}
+
+/* Reserve a fixed width for each rapidly-updating numeric value. Without this, the
+   stats column's width changes as FPS/TPS/tick gain or lose digits, which shifts
+   the centered #rulesetDisplayContainer. */
+#stat-tick { min-width: 5ch; }
+#stat-ratio { min-width: 4ch; }
+#stat-fps { min-width: 2ch; }
+#stat-actual-tps { min-width: 3ch; }
 
 /* App Menu Popout */
 #appMenuPopout {
@@ -180,7 +211,16 @@ screen and (pointer: coarse) and (hover: none) {
         width: 100%;
         justify-content: space-around; /* Space out stats evenly */
         flex-wrap: wrap; /* Allow stats to wrap if needed */
-        gap: 10px;
+        gap: 8px 16px;
+    }
+
+    /* Center each tile and drop the separators once the row can wrap. */
+    .stat-tile {
+        align-items: center;
+    }
+
+    .stat-sep {
+        display: none;
     }
 
     .ruleset-display-toggle {
@@ -189,10 +229,8 @@ screen and (pointer: coarse) and (hover: none) {
 
     /* Hide less critical stats on very small screens if necessary */
     @media (max-width: 360px) {
-        #statsDisplayContainer > span:nth-child(3) { /* Brush */
-            display: none;
-        }
-        #statsDisplayContainer > span:nth-child(4) { /* FPS */
+        .stat-tile-brush,
+        .stat-tile-fps {
             display: none;
         }
     }
