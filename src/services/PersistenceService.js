@@ -23,7 +23,8 @@ const KEYS = {
     EMBEDDING_GALLERY: `${LS_KEY_PREFIX}embeddingGallery`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
-    COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`
+    COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`,
+    PUBLIC_THUMB_CACHE: `${LS_KEY_PREFIX}publicThumbCache`,
 };
 
 function _getItem(key) {
@@ -276,6 +277,30 @@ export function loadEmbeddingGallery() {
 
 export function saveEmbeddingGallery(entries) {
     _setItem(KEYS.EMBEDDING_GALLERY, entries);
+}
+
+// Client-side cache of evolved-world thumbnails for PUBLIC library rulesets (keyed by ruleset hex).
+// Public rulesets that carry a paired initial condition get their thumbnail baked on demand and cached
+// here, so the committed library JSON stays small (it stores only the IC choice, not the image).
+export function loadPublicThumbCache() {
+    return _getItem(KEYS.PUBLIC_THUMB_CACHE) || {};
+}
+
+export function savePublicThumb(hex, thumb) {
+    if (!hex || !thumb) return;
+    const cache = loadPublicThumbCache();
+    cache[hex] = thumb;
+    try {
+        localStorage.setItem(KEYS.PUBLIC_THUMB_CACHE, JSON.stringify(cache));
+    } catch (e) {
+        // Thumbnails are the only large field; on quota overflow drop the cache rather than lose data.
+        if (e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) {
+            console.warn('savePublicThumb: quota exceeded, clearing the public thumbnail cache.');
+            try { localStorage.removeItem(KEYS.PUBLIC_THUMB_CACHE); } catch { /* ignore */ }
+            return;
+        }
+        console.error('Error saving public thumbnail cache:', e);
+    }
 }
 
 export function loadColorSettings() {

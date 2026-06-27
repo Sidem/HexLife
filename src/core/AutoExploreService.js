@@ -66,6 +66,38 @@ export const IC_SUITE = [
             },
         },
     },
+    {
+        // The mirror of the single seed: a saturated grid with one empty cell — "what erodes a full field?".
+        // DensityStrategy special-cases density 1.0 as an all-ON grid with a single OFF centre cell.
+        label: 'inverted',
+        initialState: { mode: 'density', params: { density: 1.0 } },
+    },
+    {
+        // Many small clusters — a busy, broken-up field for rules that need lots of seeds to ignite.
+        label: 'scatter',
+        initialState: {
+            mode: 'clusters',
+            params: {
+                count: 30, density: 0.75, densityVariation: 0.2,
+                diameter: 5, diameterVariation: 2,
+                eccentricity: 0.2, orientation: 0, orientationVariation: 1.0,
+                gaussianStdDev: 2.5,
+            },
+        },
+    },
+    {
+        // Few elongated, eccentric clusters — probes anisotropic / directional rule behaviour.
+        label: 'streaks',
+        initialState: {
+            mode: 'clusters',
+            params: {
+                count: 6, density: 0.8, densityVariation: 0.15,
+                diameter: 22, diameterVariation: 6,
+                eccentricity: 0.82, orientation: 30, orientationVariation: 0.6,
+                gaussianStdDev: 2.6,
+            },
+        },
+    },
 ];
 
 /** Tunable knobs for the explore loop (the score weights live in InterestingnessScore.SCORE_CONFIG). */

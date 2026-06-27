@@ -76,6 +76,9 @@ async function initialize() {
     }
     console.log("GPU detection:", detection);
 
+    // Capture the dev curation flag BEFORE loadFromUrl, which may strip query params via replaceState.
+    const curateMode = new URLSearchParams(window.location.search).has('curate');
+
     const sharedSettings = SettingsLoader.loadFromUrl();
 
     // Resolve the grid size before constructing anything that depends on grid dimensions (workers,
@@ -126,6 +129,16 @@ async function initialize() {
     const app = new Application(appContext);
     if (window.__headless) window.__hexlife = appContext; // headless-only debug handle for in-browser verification
     app.run();
+
+    // DEV-only: library IC curation tool. Opened with `?curate=1`; lazily imported so it never ships
+    // in a normal session's hot path. Waits for the workers (the bake engine borrows a live world).
+    if (curateMode) {
+        import('./ui/dev/LibraryCurationOverlay.js')
+            .then(({ LibraryCurationOverlay }) => {
+                appContext._curationOverlay = new LibraryCurationOverlay(appContext);
+            })
+            .catch(err => console.error('Failed to load curation overlay:', err));
+    }
 }
 
 initialize().catch(err => {

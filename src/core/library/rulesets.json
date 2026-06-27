@@ -3,234 +3,595 @@
     "name": "Rain freezing",
     "description": "",
     "tags": [],
-    "hex": "200110000006000C8903020805009804"
+    "hex": "200110000006000C8903020805009804",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.05
+      }
+    },
+    "seed": 10003
   },
   {
     "name": "Rain up 1",
     "description": "",
     "tags": [],
-    "hex": "00000111A40000204482045480000100"
+    "hex": "00000111A40000204482045480000100",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Moving Cracks",
     "description": "",
     "tags": [],
-    "hex": "004180808001D20490122500400D0800"
+    "hex": "004180808001D20490122500400D0800",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 30,
+        "density": 0.75,
+        "densityVariation": 0.2,
+        "diameter": 5,
+        "diameterVariation": 2,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2.5
+      }
+    },
+    "seed": 10008
   },
   {
     "name": "Lichtenberg figures",
     "description": "",
     "tags": [],
-    "hex": "400811081000190281004A0844200020"
+    "hex": "400811081000190281004A0844200020",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.05
+      }
+    },
+    "seed": 10003
   },
   {
     "name": "Lichtenberg figures 2",
     "description": "",
     "tags": [],
-    "hex": "01000109C0140044A2009A8023228048"
+    "hex": "01000109C0140044A2009A8023228048",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Stabilizing Chaos 1 (single cell active inoculation)",
     "description": "",
     "tags": [],
-    "hex": "68808000800000007AC8A184C8128420"
+    "hex": "68808000800000007AC8A184C8128420",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Stabilizing Chaos 2 (uncertain)",
     "description": "",
     "tags": [],
-    "hex": "986CD1F428E9008456CB7D9FC96B3465"
+    "hex": "986CD1F428E9008456CB7D9FC96B3465",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.05
+      }
+    },
+    "seed": 10003
   },
   {
     "name": "Oscillators 1",
     "description": "",
     "tags": [],
-    "hex": "16284880608080000010024004082001"
+    "hex": "16284880608080000010024004082001",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   },
   {
     "name": "Oscillators 2 / Spinners",
     "description": "",
     "tags": [],
-    "hex": "120C11B442568E21134E30A85A40C880"
+    "hex": "120C11B442568E21134E30A85A40C880",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Spontaneous Gliders",
     "description": "",
     "tags": [],
-    "hex": "12482080480080006880800180010117"
+    "hex": "12482080480080006880800180010117",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 30,
+        "density": 0.75,
+        "densityVariation": 0.2,
+        "diameter": 5,
+        "diameterVariation": 2,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2.5
+      }
+    },
+    "seed": 10008
   },
   {
     "name": "Amoeba 1",
     "description": "",
     "tags": [],
-    "hex": "8157327A1F4C7AC80152275D1C3F67B7"
+    "hex": "8157327A1F4C7AC80152275D1C3F67B7",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Game of life-like 1",
     "description": "",
     "tags": [],
-    "hex": "16686880688080000117177E177E7EE8"
+    "hex": "16686880688080000117177E177E7EE8",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Game of life-like 2",
     "description": "",
     "tags": [],
-    "hex": "16696882698090480117177E177E7EE8"
+    "hex": "16696882698090480117177E177E7EE8",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Game of life-like 3",
     "description": "",
     "tags": [],
-    "hex": "16686881688181160117177E177E7EE8"
+    "hex": "16686881688181160117177E177E7EE8",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.5
+      }
+    },
+    "seed": 10001
   },
   {
     "name": "Organic crystals",
     "description": "",
     "tags": [],
-    "hex": "84304E4024A82000162D5CB263E49A49"
+    "hex": "84304E4024A82000162D5CB263E49A49",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 5,
+        "density": 1,
+        "densityVariation": 0.1,
+        "diameter": 8,
+        "diameterVariation": 3,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2
+      }
+    },
+    "seed": 10006
   },
   {
     "name": "Chains",
     "description": "",
     "tags": [],
-    "hex": "0860021D400412C2C8008E110205A182"
+    "hex": "0860021D400412C2C8008E110205A182",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 30,
+        "density": 0.75,
+        "densityVariation": 0.2,
+        "diameter": 5,
+        "diameterVariation": 2,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2.5
+      }
+    },
+    "seed": 10008
   },
   {
     "name": "War (Caution: flickering)",
     "description": "",
     "tags": [],
-    "hex": "FFFFFFFEFFFEFEE81669699669969668"
+    "hex": "FFFFFFFEFFFEFEE81669699669969668",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.5
+      }
+    },
+    "seed": 10001
   },
   {
     "name": "Burning Cuts",
     "description": "",
     "tags": [],
-    "hex": "90FBB2E4BFBC90BF69FF93038DD1BF7B"
+    "hex": "90FBB2E4BFBC90BF69FF93038DD1BF7B",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Dying Culture",
     "description": "",
     "tags": [],
-    "hex": "0117177F177F7FFEFEE8E881E8818116"
+    "hex": "0117177F177F7FFEFEE8E881E8818116",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Mandala 1 (with hidden stability)",
     "description": "",
     "tags": [],
-    "hex": "6880800180010116E880800080000001"
+    "hex": "6880800180010116E880800080000001",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   },
   {
     "name": "Exothermic reaction requiring activation energy",
     "description": "",
     "tags": [],
-    "hex": "16686880688080006880800080000001"
+    "hex": "16686880688080006880800080000001",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 1,
+        "density": 1,
+        "densityVariation": 0,
+        "diameter": 6,
+        "diameterVariation": 0,
+        "eccentricity": 0,
+        "orientation": 0,
+        "orientationVariation": 0,
+        "gaussianStdDev": 2
+      }
+    },
+    "seed": 10005
   },
   {
     "name": "Crowded line growth",
     "description": "",
     "tags": [],
-    "hex": "00A0090080A804200412C00422140000"
+    "hex": "00A0090080A804200412C00422140000",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 6,
+        "density": 0.8,
+        "densityVariation": 0.15,
+        "diameter": 22,
+        "diameterVariation": 6,
+        "eccentricity": 0.82,
+        "orientation": 30,
+        "orientationVariation": 0.6,
+        "gaussianStdDev": 2.6
+      }
+    },
+    "seed": 10009
   },
   {
     "name": "Healing cracks",
     "description": "",
     "tags": [],
-    "hex": "00818180043200B880430008334140E0"
+    "hex": "00818180043200B880430008334140E0",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Dancer 1",
     "description": "",
     "tags": [],
-    "hex": "0088800010028810820000F431000D08"
+    "hex": "0088800010028810820000F431000D08",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 1,
+        "density": 1,
+        "densityVariation": 0,
+        "diameter": 6,
+        "diameterVariation": 0,
+        "eccentricity": 0,
+        "orientation": 0,
+        "orientationVariation": 0,
+        "gaussianStdDev": 2
+      }
+    },
+    "seed": 10005
   },
   {
     "name": "Dancer 2",
     "description": "",
     "tags": [],
-    "hex": "60000044000000044000190A08406104"
+    "hex": "60000044000000044000190A08406104",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 1,
+        "density": 1,
+        "densityVariation": 0,
+        "diameter": 6,
+        "diameterVariation": 0,
+        "eccentricity": 0,
+        "orientation": 0,
+        "orientationVariation": 0,
+        "gaussianStdDev": 2
+      }
+    },
+    "seed": 10005
   },
   {
     "name": "Spears in Rain",
     "description": "",
     "tags": [],
-    "hex": "00248110000200838101085400000010"
+    "hex": "00248110000200838101085400000010",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 30,
+        "density": 0.75,
+        "densityVariation": 0.2,
+        "diameter": 5,
+        "diameterVariation": 2,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2.5
+      }
+    },
+    "seed": 10008
   },
   {
     "name": "Crystal Growth high activation energy (Caution: flickering)",
     "description": "",
     "tags": [],
-    "hex": "177F7FFF7FFFFFFF0000000000000000"
+    "hex": "177F7FFF7FFFFFFF0000000000000000",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.05
+      }
+    },
+    "seed": 10003
   },
   {
     "name": "Stable Exchange",
     "description": "",
     "tags": [],
-    "hex": "12080081400181171249219649169669"
+    "hex": "12080081400181171249219649169669",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   },
   {
     "name": "Striped curtain",
     "description": "",
     "tags": [],
-    "hex": "01020109C0140044A6009A80E3228048"
+    "hex": "01020109C0140044A6009A80E3228048",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Mutated oscillators",
     "description": "",
     "tags": [],
-    "hex": "12482080480080016880811580170737"
+    "hex": "12482080480080016880811580170737",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Organic reduction",
     "description": "",
     "tags": [],
-    "hex": "8143200A190050C86993824B950971DF"
+    "hex": "8143200A190050C86993824B950971DF",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.5
+      }
+    },
+    "seed": 10001
   },
   {
     "name": "Organic reduction 2",
     "description": "",
     "tags": [],
-    "hex": "8143200A190050C869D3A24B9D0971DF"
+    "hex": "8143200A190050C869D3A24B9D0971DF",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Organic reduction 3",
     "description": "",
     "tags": [],
-    "hex": "81422008180040806993824B950971DF"
+    "hex": "81422008180040806993824B950971DF",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.3
+      }
+    },
+    "seed": 10002
   },
   {
     "name": "Burning crystal fractures",
     "description": "",
     "tags": [],
-    "hex": "6880801080040200E9D6B2689E486881"
+    "hex": "6880801080040200E9D6B2689E486881",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   },
   {
     "name": "Lazers",
     "description": "",
     "tags": [],
-    "hex": "2505020A152DFF2CBB21326B0277901F"
+    "hex": "2505020A152DFF2CBB21326B0277901F",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 30,
+        "density": 0.75,
+        "densityVariation": 0.2,
+        "diameter": 5,
+        "diameterVariation": 2,
+        "eccentricity": 0.2,
+        "orientation": 0,
+        "orientationVariation": 1,
+        "gaussianStdDev": 2.5
+      }
+    },
+    "seed": 10008
   },
   {
     "name": "Stable exchange oscillators",
     "description": "",
     "tags": [],
-    "hex": "120900834101915F1249218649129469"
+    "hex": "120900834101915F1249218649129469",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   },
   {
     "name": "Freeze after 15k ticks",
     "description": "",
     "tags": [],
-    "hex": "12080081400181177AC9A196C9169669"
+    "hex": "12080081400181177AC9A196C9169669",
+    "initialState": {
+      "mode": "clusters",
+      "params": {
+        "count": 1,
+        "density": 1,
+        "densityVariation": 0,
+        "diameter": 6,
+        "diameterVariation": 0,
+        "eccentricity": 0,
+        "orientation": 0,
+        "orientationVariation": 0,
+        "gaussianStdDev": 2
+      }
+    },
+    "seed": 10005
   },
   {
     "name": "Bloody rivers",
     "description": "",
     "tags": [],
-    "hex": "046368C2290890C9134F30AB5B41D8DF"
+    "hex": "046368C2290890C9134F30AB5B41D8DF",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 0.85
+      }
+    },
+    "seed": 10004
   },
   {
     "name": "Burning line (find it)",
     "description": "",
     "tags": [],
-    "hex": "120901874113957F68C1A11689161669"
+    "hex": "120901874113957F68C1A11689161669",
+    "initialState": {
+      "mode": "density",
+      "params": {
+        "density": 1
+      }
+    },
+    "seed": 10007
   }
 ]

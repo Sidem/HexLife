@@ -2,6 +2,29 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { rulesetName } from '../../utils/utils.js';
 
+/** Current personal-ruleset entry schema. v2 adds the paired initial condition + thumbnail. */
+export const RULESET_SCHEMA_VERSION = 2;
+
+/**
+ * Bring a stored ruleset entry up to the current schema. Legacy entries (no `schemaVersion`) keep
+ * working — the v2 fields default to empty/`null`, so they behave exactly as before until a save
+ * pairs an initial condition or bakes a thumbnail. Pure; safe to map over the loaded array.
+ * @param {object} entry
+ * @returns {object}
+ */
+export function normalizeRulesetEntry(entry) {
+    if (!entry || typeof entry !== 'object') return entry;
+    return {
+        initialState: null,
+        seed: null,
+        thumb: null,
+        ...entry,
+        // Coerce any stray/absent tags to an array so the UI/search can rely on the shape.
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+        schemaVersion: RULESET_SCHEMA_VERSION,
+    };
+}
+
 export class LibraryController {
     constructor() {
         this.libraryData = null;
@@ -14,7 +37,7 @@ export class LibraryController {
 
     init(libraryData) {
         this.libraryData = libraryData;
-        this.userLibrary = PersistenceService.loadUserRulesets();
+        this.userLibrary = PersistenceService.loadUserRulesets().map(normalizeRulesetEntry);
         this.userPatterns = PersistenceService.loadUserPatterns();
 
         EventBus.subscribe(EVENTS.COMMAND_COPY_PATTERN, () => {
@@ -153,27 +176,46 @@ export class LibraryController {
 
     /**
      * Adds or updates a ruleset in the user's personal library.
-     * @param {{name: string, description: string, hex: string, id?: string}} rulesetData 
+     * @param {{name: string, description?: string, hex: string, id?: string, tags?: string[],
+     *   initialState?: {mode: string, params: object}|null, seed?: number|null,
+     *   thumb?: string|null}} rulesetData The `initialState`/`seed` pair the ruleset was generated
+     *   from (optional), and an optional evolved-world `thumb` data-URL.
      */
     saveUserRuleset(rulesetData) {
         const existingIndex = rulesetData.id ? this.userLibrary.findIndex(r => r.id === rulesetData.id) : -1;
 
         if (existingIndex > -1) {
-            
-            this.userLibrary[existingIndex] = { ...this.userLibrary[existingIndex], ...rulesetData };
+            // Merge over the existing entry (a rename/edit shouldn't drop a previously-paired IC or
+            // thumbnail unless the caller explicitly supplies new ones), then re-normalize the shape.
+            this.userLibrary[existingIndex] = normalizeRulesetEntry({ ...this.userLibrary[existingIndex], ...rulesetData });
         } else {
-            
-            const newRule = {
+            this.userLibrary.unshift(normalizeRulesetEntry({
                 id: String(Date.now()),
                 createdAt: new Date().toISOString(),
                 ...rulesetData
-            };
-            this.userLibrary.unshift(newRule);
+            }));
         }
 
         PersistenceService.saveUserRulesets(this.userLibrary);
         EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
         EventBus.dispatch(EVENTS.USER_RULESET_SAVED, { ruleset: rulesetData });
+    }
+
+    /**
+     * Persist a freshly-baked thumbnail onto an existing personal entry (used by the lazy backfill).
+     * No-op if the id is unknown. By default fires USER_LIBRARY_CHANGED so the open list re-renders;
+     * pass `{ silent: true }` (the backfill path) to persist without a re-render — the caller updates
+     * the single card's image directly, avoiding a re-render storm as each thumbnail lands.
+     * @param {string} id
+     * @param {string} thumb data-URL
+     * @param {{silent?: boolean}} [opts]
+     */
+    setUserRulesetThumb(id, thumb, { silent = false } = {}) {
+        const idx = this.userLibrary.findIndex(r => r.id === id);
+        if (idx < 0 || !thumb) return;
+        this.userLibrary[idx] = { ...this.userLibrary[idx], thumb };
+        PersistenceService.saveUserRulesets(this.userLibrary);
+        if (!silent) EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
     }
 
     /**

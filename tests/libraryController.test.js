@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { LibraryController } from '../src/ui/controllers/LibraryController.js';
+import {
+    LibraryController,
+    normalizeRulesetEntry,
+    RULESET_SCHEMA_VERSION,
+} from '../src/ui/controllers/LibraryController.js';
 import { rulesetName } from '../src/utils/utils.js';
 
 // getDisplayName resolves a ruleset's library name (personal > public) or falls back
@@ -37,5 +41,74 @@ describe('LibraryController.getDisplayName', () => {
     it('is robust when libraryData is missing', () => {
         const lc = new LibraryController(); // no init: libraryData is null
         expect(lc.getDisplayName(HEX_B)).toEqual({ name: rulesetName(HEX_B), isDerived: true });
+    });
+});
+
+describe('normalizeRulesetEntry (schema v2)', () => {
+    it('upgrades a legacy entry, defaulting the new fields without losing data', () => {
+        const legacy = { id: '1', name: 'Old', description: 'd', hex: HEX_A, createdAt: 'then' };
+        const out = normalizeRulesetEntry(legacy);
+        expect(out).toMatchObject({
+            id: '1', name: 'Old', description: 'd', hex: HEX_A, createdAt: 'then',
+            tags: [], initialState: null, seed: null, thumb: null,
+            schemaVersion: RULESET_SCHEMA_VERSION,
+        });
+    });
+
+    it('preserves a paired initial state, seed, thumb and tags', () => {
+        const v2 = {
+            id: '2', name: 'New', hex: HEX_B,
+            tags: ['gliders'], initialState: { mode: 'density', params: { density: 0.1 } },
+            seed: 99, thumb: 'data:image/jpeg;base64,xxx',
+        };
+        const out = normalizeRulesetEntry(v2);
+        expect(out.tags).toEqual(['gliders']);
+        expect(out.initialState).toEqual({ mode: 'density', params: { density: 0.1 } });
+        expect(out.seed).toBe(99);
+        expect(out.thumb).toBe('data:image/jpeg;base64,xxx');
+        expect(out.schemaVersion).toBe(RULESET_SCHEMA_VERSION);
+    });
+
+    it('coerces a non-array tags field to an empty array', () => {
+        expect(normalizeRulesetEntry({ hex: HEX_A, tags: 'oops' }).tags).toEqual([]);
+    });
+});
+
+describe('LibraryController.saveUserRuleset (schema v2)', () => {
+    function makeLc() {
+        const lc = new LibraryController();
+        lc.userLibrary = [];
+        lc.libraryData = { rulesets: [], patterns: [] };
+        // saveUserRuleset persists + dispatches; stub those side effects out for the unit test.
+        return lc;
+    }
+
+    it('normalizes a new entry to v2 with the paired IC retained', () => {
+        const lc = makeLc();
+        lc.saveUserRuleset({
+            name: 'Spiral', hex: HEX_A,
+            initialState: { mode: 'clusters', params: { count: 5 } }, seed: 3, tags: ['t'],
+        });
+        const saved = lc.getUserLibrary()[0];
+        expect(saved.schemaVersion).toBe(RULESET_SCHEMA_VERSION);
+        expect(saved.initialState).toEqual({ mode: 'clusters', params: { count: 5 } });
+        expect(saved.seed).toBe(3);
+        expect(saved.tags).toEqual(['t']);
+        expect(saved.id).toBeTruthy();
+    });
+
+    it('a rename (id match) keeps the previously-paired IC and thumb', () => {
+        const lc = makeLc();
+        lc.userLibrary = [normalizeRulesetEntry({
+            id: '5', name: 'Old name', hex: HEX_A,
+            initialState: { mode: 'density', params: { density: 0.5 } }, seed: 7, thumb: 'data:x',
+        })];
+        lc.saveUserRuleset({ id: '5', name: 'New name', description: 'desc' });
+        const saved = lc.getUserLibrary()[0];
+        expect(saved.name).toBe('New name');
+        expect(saved.description).toBe('desc');
+        expect(saved.initialState).toEqual({ mode: 'density', params: { density: 0.5 } });
+        expect(saved.seed).toBe(7);
+        expect(saved.thumb).toBe('data:x');
     });
 });

@@ -404,7 +404,15 @@ export class ExploreComponent extends BaseComponent {
             }
             EventBus.dispatch(EVENTS.COMMAND_RETEST_EXPLORE_FIND, { find: entry });
         } else if (action === 'save') {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, { hex: entry.hex, name: entry.mnemonic });
+            // Carry the find's paired initial condition + seed + thumbnail into the save modal so the
+            // saved library entry reproduces the find's behavior via "Load + IC" with no re-baking.
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, {
+                hex: entry.hex,
+                name: entry.mnemonic,
+                initialState: entry.initialState || null,
+                seed: entry.seed ?? null,
+                thumb: entry.thumb || null,
+            });
         } else if (action === 'share') {
             const url = new URL(window.location.href);
             url.search = `?r=${entry.hex}`;

@@ -51,5 +51,8 @@
 
 @import url('src/ui/views/MoreView.css');
 
+/* DEV-only library IC curation overlay (?curate=1). */
+@import url('src/ui/dev/LibraryCurationOverlay.css');
+
 /* 7. Design Token Theme Layer — must be imported LAST so it wins the cascade */
 @import url('src/styles/theme.css');

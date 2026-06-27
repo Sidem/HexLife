@@ -1,6 +1,23 @@
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { formatHexCode } from '../utils/utils.js';
 
+/**
+ * Short, human-friendly label for a paired initial condition, shown as the "IC" badge on a library
+ * card. Falls back to the raw mode name for forward-compat IC types this build doesn't label yet.
+ * @param {{mode: string, params?: object}} initialState
+ * @returns {string}
+ */
+export function icBadgeLabel(initialState) {
+    const mode = initialState?.mode;
+    if (mode === 'clusters') return 'IC · clumps';
+    if (mode === 'density') {
+        const d = initialState?.params?.density;
+        if (Number.isFinite(d)) return `IC · ${Math.round(d * 100)}% fill`;
+        return 'IC · random fill';
+    }
+    return mode ? `IC · ${mode}` : 'IC';
+}
+
 export class RulesetDisplayFactory {
     constructor(appContext) {
         this.appContext = appContext;
@@ -37,38 +54,63 @@ export class RulesetDisplayFactory {
     }
 
     /**
-     * Creates a list item for the Ruleset Library (Public or Personal).
-     * @param {object} ruleData - The full ruleset object.
+     * Creates a card for the Ruleset Library (Public or Personal). The hero is the evolved-world
+     * thumbnail when the entry has one (schema v2); otherwise it falls back to the lazily-rendered
+     * rule-viz glyph (the IntersectionObserver path). When the entry carries a paired initial
+     * condition it shows an "IC" badge and a "Load + IC" action that replays ruleset + IC + seed.
+     * @param {object} ruleData - The full ruleset object (may include `tags`, `initialState`, `thumb`).
      * @param {boolean} isPersonal - True if it's from the user's library.
-     * @returns {HTMLElement} The created list item element.
+     * @returns {HTMLElement} The created card element.
      */
     createLibraryListItem(ruleData, isPersonal = false) {
         const item = document.createElement('div');
-        item.className = 'library-item' + (isPersonal ? ' personal' : '');
+        item.className = 'library-card' + (isPersonal ? ' personal' : '');
+        item.dataset.hex = ruleData.hex;
+        if (ruleData.id) item.dataset.id = ruleData.id;
+
+        const hasIC = !!(ruleData.initialState && ruleData.initialState.mode);
+        const tags = Array.isArray(ruleData.tags) ? ruleData.tags : [];
+
+        const hero = ruleData.thumb
+            ? `<img class="library-card-thumb-img" src="${this._escapeAttr(ruleData.thumb)}" alt="" loading="lazy" />`
+            : `<div class="viz-placeholder"></div>`;
+        const icBadge = hasIC
+            ? `<span class="library-card-ic-badge" title="Paired initial condition">${this._escape(icBadgeLabel(ruleData.initialState))}</span>`
+            : '';
+        const tagChips = tags.length
+            ? `<div class="library-card-tags">${tags.map(t => `<span class="tag-chip">${this._escape(t)}</span>`).join('')}</div>`
+            : '';
+
+        const actions = [`<button class="button" data-action="${isPersonal ? 'load-personal' : 'load-rule'}">Load</button>`];
+        if (hasIC) actions.push(`<button class="button button-subtle" data-action="load-with-ic" title="Load this ruleset with its paired initial state">Load + IC</button>`);
+        if (isPersonal) actions.push(`<button class="button-icon" data-action="manage-personal" title="More options">${'⋯'}</button>`);
 
         item.innerHTML = `
-            <div class="viz-placeholder"></div>
-            <div class="library-item-info">
-                <div class="name">${ruleData.name}</div>
-                <div class="description">${ruleData.description || 'No description.'}</div>
+            <div class="library-card-thumb">${hero}${icBadge}</div>
+            <div class="library-card-body">
+                <div class="library-card-title">
+                    <span class="name">${this._escape(ruleData.name || '')}</span>
+                </div>
+                <div class="description">${this._escape(ruleData.description || 'No description.')}</div>
+                ${tagChips}
             </div>
-            <div class="library-item-actions" data-id="${ruleData.id || ''}" data-hex="${ruleData.hex}">
-            </div>
+            <div class="library-card-actions">${actions.join('')}</div>
         `;
 
-        const actionsContainer = item.querySelector('.library-item-actions');
-        if (isPersonal) {
-            actionsContainer.innerHTML = `
-                <button class="button" data-action="load-personal">Load</button>
-                <button class="button-icon" data-action="manage-personal" title="More options">...</button>
-            `;
-        } else {
-            actionsContainer.innerHTML = `<button class="button" data-action="load-rule">Load</button>`;
+        // Only the glyph fallback needs the lazy rule-viz render; a real thumbnail is already drawn.
+        if (!ruleData.thumb) {
+            this.observedElements.set(item, { hex: ruleData.hex });
+            this.observer.observe(item);
         }
-
-        this.observedElements.set(item, { hex: ruleData.hex });
-        this.observer.observe(item);
         return item;
+    }
+
+    _escape(str) {
+        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    _escapeAttr(str) {
+        return String(str).replace(/"/g, '&quot;');
     }
 
     /**
