@@ -160,7 +160,7 @@ Capture what you've discovered and take it with you.
   * **Ruleset Editor (📝):** A powerful interface for viewing and modifying rulesets with multiple modes.
       * **Modes:** View and edit rules individually (**Detailed**), grouped by neighbor count (**Neighbor Count**), or grouped by rotational symmetry (**Rotational Symmetry**), which is the default.
       * **Interactive Editing:** Click on rule visualizations to toggle their output state. Changes can be applied to the selected world or all worlds, with an option to auto-reset upon change.
-  * **World Setup Panel (🌐):** Configure the **grid size** (shared across all worlds), plus the initial density and enabled/disabled state for each of the 9 worlds individually. Includes a "Use Main Ruleset" button to quickly propagate the selected world's ruleset to another world, and bulk actions for applying settings across worlds at once.
+  * **World Setup Panel (🌐):** Configure the **grid size** (shared across all worlds), plus the initial density and enabled/disabled state for each of the 9 worlds individually. Includes a "Use Selected Ruleset" button to quickly propagate the selected world's ruleset to another world, and bulk actions for applying settings across worlds at once.
   * **Analysis Panel (📈):** Houses a plugin system for data visualization and analysis.
       * **Ratio History Plot:** Visualizes the history of the active cell ratio for the selected world.
       * **Entropy Plot:** Visualizes the history of **Binary Entropy** (based on activity ratio) or **Block Entropy** (based on 7-cell hexagonal patterns). Includes controls to enable/disable entropy sampling and adjust the sampling rate.

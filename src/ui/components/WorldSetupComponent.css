@@ -1,8 +1,19 @@
+/* Make this panel's content area a flex column so the component below can size
+   itself against a definite height. Without this, `.panel-content-area` is
+   content-sized, the `height:100%` chain never resolves, and the grid pushes the
+   bulk-action buttons off the bottom of the panel (requiring a page scroll). */
+#worldSetupPanel .panel-content-area {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
 .world-setup-component-content {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    height: 100%; /* Allow flex to work */
+    flex: 1 1 auto; /* fill the panel content area */
+    min-height: 0;  /* allow inner grid to shrink & scroll instead of overflowing */
 }
 
 .panel-header-controls {
@@ -37,6 +48,10 @@
     grid-template-columns: repeat(3, 1fr); /* Desktop-first: 3 columns */
     overflow-y: auto; /* Make grid scrollable if content overflows */
     flex-grow: 1; /* Allow grid to take available space */
+    /* Without min-height:0 a flex item refuses to shrink below its content height,
+       so the grid pushes the panel-actions off the bottom of the panel instead of
+       scrolling internally. This keeps the bulk-action buttons pinned & visible. */
+    min-height: 0;
 }
 
 /* --- World cell --- */

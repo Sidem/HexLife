@@ -121,7 +121,7 @@ export class WorldSetupComponent extends BaseComponent {
                         <button class="button" data-action="edit-state" data-world-index="${i}">Edit&hellip;</button>
                     </div>
                 </div>
-                <button class="button set-ruleset-button" data-world-index="${i}" title="Apply selected world's ruleset to World ${i} & reset">Use Main Ruleset</button>
+                <button class="button set-ruleset-button" data-world-index="${i}" title="Copy the selected world's ruleset to World ${i} & reset it">Use Selected Ruleset</button>
             `;
 
             const vizContainer = cell.querySelector('.ruleset-viz-container');

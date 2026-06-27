@@ -261,13 +261,13 @@ export const getTours = (appContext) => {
     }, {
         element: '#world-setup-config-grid .world-config-cell:nth-child(5)',
         title: 'Per-World Configuration',
-        content: "Every world has its own card: <span class=\"onboarding-highlight-text\">Edit...</span> sets its initial state (density or clusters), the switch <span class=\"onboarding-highlight-text\">enables/disables</span> it, and <span class=\"onboarding-highlight-text\">Use Main Ruleset</span> copies the selected world's rules here.",
+        content: "Every world has its own card: <span class=\"onboarding-highlight-text\">Edit...</span> sets its initial state (random fill or clumps), the switch <span class=\"onboarding-highlight-text\">enables/disables</span> it, and <span class=\"onboarding-highlight-text\">Use Selected Ruleset</span> copies the selected world's rules here.",
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     }, {
         element: '#world-setup-panel-actions',
         title: 'Bulk Actions',
-        content: "These buttons act on all worlds at once: apply the selected world's initial state everywhere, restore defaults, or <span class=\"onboarding-highlight-text\">Apply &amp; Reset All Worlds</span> to start a fresh, controlled experiment.",
+        content: "These buttons act on all worlds at once: <span class=\"onboarding-highlight-text\">Copy Selected &rarr; All</span> applies the selected world's initial state everywhere, <span class=\"onboarding-highlight-text\">Reset to Defaults</span> restores defaults, and <span class=\"onboarding-highlight-text\">Regenerate All Worlds</span> re-seeds them for a fresh, controlled experiment.",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }];
@@ -522,20 +522,20 @@ export const getTours = (appContext) => {
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
         title: 'Step 7: Configure Central World Density',
-        content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure 'Density' mode is selected and set the density slider to 50%. Then save the changes.",
+        content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure <span class=\"onboarding-highlight-text\">'Random fill'</span> mode is selected and set the <span class=\"onboarding-highlight-text\">Fill amount</span> slider to 50% (or pick the <span class=\"onboarding-highlight-text\">'Balanced'</span> preset). Then save the changes.",
         //primaryAction: { text: 'Configure Density' },
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
         title: 'Step 8: Apply to All Worlds',
-        content: "Now click 'Apply Initial State to All' to set the same 50% density configuration across all worlds, creating a level playing field for our mutations.",
+        content: "Now click <span class=\"onboarding-highlight-text\">'Copy Selected &rarr; All'</span> to set the same 50% Random fill configuration across all worlds, creating a level playing field for our mutations.",
         //primaryAction: { text: 'Apply to All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 9: Reset Worlds',
-        content: "Finally, click 'Apply & Reset All Worlds' to reset all worlds with the new initial density settings.",
+        content: "Finally, click <span class=\"onboarding-highlight-text\">'Regenerate All Worlds'</span> to re-seed all worlds with the new initial Random fill settings.",
         //primaryAction: { text: 'Reset All' },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
