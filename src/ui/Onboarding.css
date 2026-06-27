@@ -1,48 +1,38 @@
-@keyframes pulse-highlight {
-    0% { box-shadow: 0 0 8px rgba(255, 255, 255, 0.7); }
-    50% { box-shadow: 0 0 16px 4px rgba(255, 255, 255, 0.9); }
-    100% { box-shadow: 0 0 8px rgba(255, 255, 255, 0.7); }
+@keyframes ob-ring-pulse {
+    0%   { box-shadow: 0 0 0 1px rgba(240, 198, 116, 0.9), 0 0 12px 2px rgba(240, 198, 116, 0.5); }
+    50%  { box-shadow: 0 0 0 2px rgba(240, 198, 116, 1),   0 0 20px 6px rgba(240, 198, 116, 0.75); }
+    100% { box-shadow: 0 0 0 1px rgba(240, 198, 116, 0.9), 0 0 12px 2px rgba(240, 198, 116, 0.5); }
 }
 
+/* Container only — the visible dimming is done by the four .ob-dim panels so
+   the spotlight hole is stacking-context-proof and the target stays clickable. */
 #onboarding-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: rgba(0, 0, 0, 0.7);
+    inset: 0;
     z-index: 2000;
-    pointer-events: none;
-    transition: all 0.3s ease-in-out;
-    backdrop-filter: blur(2px);
+    pointer-events: none; /* hole passes clicks through; panels re-enable below */
 }
 
-#onboarding-overlay.interactive {
+/* The four panels that frame the spotlight hole. They swallow clicks, which is
+   what makes the tour modal — only the uncovered target rect stays interactive. */
+.ob-dim {
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(2px);
     pointer-events: auto;
 }
 
-.onboarding-highlight {
-    /*position: relative;*/
-    z-index: 5001 !important;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
-    animation: pulse-highlight 2s infinite;
-    pointer-events: auto !important;
-    border-radius: 4px; 
-    transition: all 0.3s ease-in-out;
+/* Glow ring drawn around the spotlight hole; never intercepts pointer events. */
+.ob-ring {
+    position: fixed;
+    display: none;
+    border-radius: 6px;
+    pointer-events: none;
+    animation: ob-ring-pulse 2s infinite ease-in-out;
 }
 
-.onboarding-highlight.onboarding-highlight-no-filter {
-    animation: none;
-    box-shadow: 0 0 10px 3px rgba(255, 240, 150, 0.85);
-    border: 1px solid rgba(255, 240, 150, 0.9);
-}
-
-.onboarding-canvas-highlight {
-    display: block !important;
-    box-shadow: 0 0 0 500vmax rgba(0, 0, 0, 0.7);
-    border: 2px solid #f0c674;
-    z-index: 2000;
-    animation: pulse-highlight 2s infinite;
+@media (prefers-reduced-motion: reduce) {
+    .ob-ring { animation: none; box-shadow: 0 0 0 2px rgba(240, 198, 116, 1), 0 0 16px 4px rgba(240, 198, 116, 0.6); }
 }
 
 #onboarding-tooltip {
@@ -95,8 +85,23 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
     background-color: rgba(0, 0, 0, 0.2);
     padding: 10px 15px;
+}
+
+#onboarding-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+#onboarding-step-counter {
+    color: #999;
+    font-size: 0.8em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 #onboarding-tooltip .button {

@@ -2,6 +2,7 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { ICONS } from '../icons.js';
+import { TOUR_CATALOG } from '../tourSteps.js';
 
 export class LearningComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -13,27 +14,15 @@ export class LearningComponent extends BaseComponent {
             return;
         }
         
-        // ids must match the tour names registered in tourSteps.js
-        this.availableTours = [
-            { id: 'core', name: 'Core Orientation', section: 'Missions' },
-            { id: 'appliedEvolution', name: 'Applied Evolution', section: 'Missions' },
-            { id: 'personal_library', name: 'Chronicle Your Discoveries', section: 'Missions' },
-            { id: 'evolutionLoop', name: 'The Evolution Loop', section: 'Experiments' },
-            { id: 'sparkOfLife', name: 'The Spark of Life', section: 'Experiments' },
-            { id: 'controls', name: 'Simulation Controls', section: 'Tutorials' },
-            { id: 'patterns', name: 'Patterns', section: 'Tutorials' },
-            { id: 'ruleset_actions', name: 'Ruleset Actions', section: 'Tutorials' },
-            { id: 'editor', name: 'The Ruleset Editor', section: 'Tutorials' },
-            { id: 'worldsetup', name: 'World Setup', section: 'Tutorials' },
-            { id: 'explore', name: 'Auto-Explore', section: 'Tutorials' },
-            { id: 'analysis', name: 'Analysis Tools', section: 'Tutorials' },
-            { id: 'rulerank', name: 'Rule Usage Ranking', section: 'Tutorials', desktopOnly: true },
-            { id: 'chromaLab', name: 'Chroma Lab', section: 'Tutorials', desktopOnly: true },
-            { id: 'resetClear', name: 'Reset & Clear', section: 'Tutorials', desktopOnly: true },
-            { id: 'saveLoad', name: 'Save, Load & Share', section: 'Tutorials' },
-            { id: 'history', name: 'Ruleset History', section: 'Tutorials', desktopOnly: true },
-        ];
-        
+        // Single source of truth lives in tourSteps.js (TOUR_CATALOG) so the Hub
+        // list can't drift out of sync with the registered tours.
+        this.availableTours = TOUR_CATALOG.map(t => ({
+            id: t.id,
+            name: t.name,
+            section: t.section,
+            desktopOnly: t.platform === 'desktopOnly',
+        }));
+
         this.tourItemCache = {};
 
         this.render(); 

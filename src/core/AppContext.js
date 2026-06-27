@@ -50,6 +50,8 @@ export class AppContext {
             content: document.getElementById('onboarding-tooltip-content'),
             primaryBtn: document.getElementById('onboarding-action-primary'),
             secondaryBtn: document.getElementById('onboarding-action-secondary'),
+            backBtn: document.getElementById('onboarding-action-back'),
+            counter: document.getElementById('onboarding-step-counter'),
             progressBar: document.getElementById('onboarding-progress-bar'),
         }, this);
 

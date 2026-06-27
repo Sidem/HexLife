@@ -18,6 +18,11 @@ import { ChromaLabComponent } from './components/ChromaLabComponent.js';
  */
 export const getTours = (appContext) => {
 
+    // Stable hex of the "Spontaneous Gliders" library ruleset (src/core/library/
+    // rulesets.json). The library item carries it on `.library-item-actions[data-hex]`,
+    // so this selector survives reordering of the public library.
+    const GLIDERS_LOAD_BTN = '#ruleset-library-public-content .library-item-actions[data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
+
     /**
      * A helper function to ensure a consistent state before starting any tour.
      * Hides all panels and popouts and returns to the main simulation view on mobile.
@@ -148,12 +153,15 @@ export const getTours = (appContext) => {
         title: 'Simulation Speed',
         content: "Adjust the target <span class=\"onboarding-highlight-text\">Ticks Per Second (TPS)</span> for all worlds. Higher values run the simulation faster.",
         primaryAction: { text: 'Next' },
+        // Re-assert the popout so the step self-heals on Back navigation.
+        onBeforeShow: () => { if (!appContext.uiManager.isMobile()) showView({ desktop: { type: 'popout', name: 'controls' } }); },
         advanceOn: { type: 'click' }
     }, {
         element: '[id*="controls-brush-slider"]',
         title: 'Brush Size',
         content: "Adjust the size of your drawing brush. <br><br><b>Desktop Pro-Tip:</b> Use `Ctrl + Mouse Wheel` over the grid to adjust size on the fly.",
         primaryAction: { text: 'Finish' },
+        onBeforeShow: () => { if (!appContext.uiManager.isMobile()) showView({ desktop: { type: 'popout', name: 'controls' } }); },
         advanceOn: { type: 'click' }
     }];
 
@@ -294,12 +302,14 @@ export const getTours = (appContext) => {
         title: 'Birth Rules',
         content: "This column ranks the rules that most often make cells <span class=\"onboarding-highlight-text\">become active</span>. They are the engines of growth in your universe.",
         primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'rulerank' } }),
         advanceOn: { type: 'click' }
     }, {
         element: '#deactivation-rank',
         title: 'Death Rules',
         content: "This column ranks the rules that switch cells <span class=\"onboarding-highlight-text\">off</span>. The balance between both columns shapes whether a world grows, dies out, or stabilizes. Run the simulation to see the ranking update live.",
         primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'rulerank' } }),
         advanceOn: { type: 'click' }
     }];
 
@@ -478,11 +488,13 @@ export const getTours = (appContext) => {
         onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
         advanceOn: { type: 'click' }
     }, {
-        element: '#ruleset-library-public-content .library-item:nth-child(10) .button',
+        // Target by the ruleset's stable hex (data-hex), NOT its list position —
+        // a `:nth-child(N)` here breaks the moment the library is reordered.
+        element: GLIDERS_LOAD_BTN,
         title: "Step 3: Load 'Spontaneous Gliders'",
         content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
         //primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (_step) => { document.querySelector('#ruleset-library-public-content .library-item:nth-child(10) .button')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+        onBeforeShow: (_step) => { document.querySelector(GLIDERS_LOAD_BTN)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
@@ -708,7 +720,7 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
-    return {
+    const tours = {
         core,
         evolutionLoop,
         sparkOfLife,
@@ -728,4 +740,49 @@ export const getTours = (appContext) => {
         saveLoad,
         personal_library
     };
+
+    // DEV guard: the Learning Hub list (TOUR_CATALOG) and the registered tours
+    // must stay in lock-step. This caught `ruleset_library` silently missing
+    // from the Hub for a long time — fail loud in dev so it can't recur.
+    if (import.meta.env && import.meta.env.DEV) {
+        const registered = new Set(Object.keys(tours));
+        const catalogued = new Set(TOUR_CATALOG.map(t => t.id));
+        for (const id of registered) if (!catalogued.has(id)) console.warn(`[tours] "${id}" is registered but missing from TOUR_CATALOG (won't appear in the Learning Hub).`);
+        for (const id of catalogued) if (!registered.has(id)) console.warn(`[tours] TOUR_CATALOG lists "${id}" but no such tour is registered.`);
+    }
+
+    return tours;
 };
+
+/**
+ * The single source of truth for which tours appear in the Learning Hub, in
+ * what order, under what section, and with what display name. Both
+ * {@link getTours} (via the DEV guard above) and the LearningComponent consume
+ * this, so the Hub list can no longer drift out of sync with the registry.
+ *
+ * `platform: 'desktopOnly'` hides the entry on mobile (those panels have no
+ * mobile surface yet).
+ */
+export const TOUR_CATALOG = [
+    // Missions — multi-step guided experiments that teach a full workflow.
+    { id: 'core',             name: 'Core Orientation',          section: 'Missions' },
+    { id: 'appliedEvolution', name: 'Applied Evolution',         section: 'Missions' },
+    { id: 'personal_library', name: 'Chronicle Your Discoveries', section: 'Missions' },
+    // Experiments — short, hands-on, learn-by-doing loops.
+    { id: 'evolutionLoop',    name: 'The Evolution Loop',        section: 'Experiments' },
+    { id: 'sparkOfLife',      name: 'The Spark of Life',         section: 'Experiments' },
+    // Tutorials — one panel / feature each.
+    { id: 'controls',         name: 'Simulation Controls',       section: 'Tutorials' },
+    { id: 'patterns',         name: 'Patterns',                  section: 'Tutorials' },
+    { id: 'ruleset_actions',  name: 'Ruleset Actions',           section: 'Tutorials' },
+    { id: 'ruleset_library',  name: 'Ruleset Library',           section: 'Tutorials' },
+    { id: 'editor',           name: 'The Ruleset Editor',        section: 'Tutorials' },
+    { id: 'worldsetup',       name: 'World Setup',               section: 'Tutorials' },
+    { id: 'explore',          name: 'Auto-Explore',              section: 'Tutorials' },
+    { id: 'analysis',         name: 'Analysis Tools',            section: 'Tutorials' },
+    { id: 'rulerank',         name: 'Rule Usage Ranking',        section: 'Tutorials', platform: 'desktopOnly' },
+    { id: 'chromaLab',        name: 'Chroma Lab',                section: 'Tutorials', platform: 'desktopOnly' },
+    { id: 'resetClear',       name: 'Reset & Clear',             section: 'Tutorials', platform: 'desktopOnly' },
+    { id: 'saveLoad',         name: 'Save, Load & Share',        section: 'Tutorials' },
+    { id: 'history',          name: 'Ruleset History',           section: 'Tutorials', platform: 'desktopOnly' },
+];
