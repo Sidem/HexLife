@@ -109,3 +109,62 @@ FAB stack so users discover it.
 - This doc is a working plan; shipped detail still lands in `PATCHNOTES.md`. The roadmap in `CLAUDE.md`
   covers complementary visual-design items (CVD palette, light theme, destructive-op safeguard) that
   intersect with 4/5/7 above.
+
+---
+
+## Next-session handoff — #4, #8, #7 (start here)
+
+**Status as of commit `2c2e273` (pushed to `main`, deployed to Pages):** items 1, 2-lite, 3, 6 are live.
+Below are the concrete touch-points for the next three, grounded in the current code.
+
+**Verify in the headless preview** (rAF is suspended in the hidden browser): `preview_start` the
+`hexlife-dev` launch config, then load `http://localhost:<port>/HexLife/?headless=1` (a plain
+`location.reload()` drops the `?headless=1` query and stalls the app — always re-navigate to the full
+URL). Debug handle: `window.__hexlife` (worldManager, eventBus, appContext, simulationController, …).
+WebGL screenshots hang — assert via DOM/state, not screenshots. `npm run test:run` + `npm run lint`
+before committing; validate the prod bundle with `npx vite build` (skip the wasm step — binary is
+git-tracked, CI rebuilds it).
+
+### #4 — Legible simulation status + demote FPS/TPS  *(C2 · I3)*
+- **Status word.** `MinimapOverlays._computeStatus(stats)` (`src/ui/MinimapOverlays.js`) already returns
+  the extinct / saturated / cycling (`↻N`) classification. Lift that pure function out (or export it) and
+  reuse it in `TopInfoBar` to show a plain-language chip for the **selected** world — e.g. "Died out",
+  "Full", "Cycling ↻N", "Active". `TopInfoBar.updateStatsDisplay(stats)` already receives the selected
+  world's stats via `WORLD_STATS_UPDATED`; add a `.stat-tile` for status (new markup in
+  `index.html` `#statsDisplayContainer`, styled in `TopInfoBar.css`).
+- **Demote telemetry.** FPS/TPS tiles live at `index.html:133-143` (`#stat-fps`, `#stat-tps-bar`). Give
+  them a muted/secondary treatment (smaller, lower-contrast) or gate them behind a persisted "show
+  performance" UI setting (`PersistenceService` UI setting, like `toolbarExpanded`). Keep Tick + Active
+  prominent.
+- Acceptance: a run that dies out shows "Died out"; an oscillator shows "Cycling ↻N"; FPS/TPS read as
+  secondary. No reflow of the centred ruleset identity (the stats column already reserves fixed widths —
+  preserve that discipline for the new tile).
+
+### #8 — Canvas-interaction discoverability  *(C1 · I3)*
+- A **one-time** hint that the 3×3 minimaps are click-to-focus and the big view is drawable. Cheapest:
+  a dismissible hint (toast via `COMMAND_SHOW_TOAST`, or a small transient overlay near the canvas) shown
+  once after the loader hides — gate on a persisted flag (new `PersistenceService` UI setting, e.g.
+  `seenCanvasHint`) so it never repeats. Don't collide with the auto-start `core` tour
+  (`Application.js:141`): show it only when the tour is **not** active / already completed
+  (`onboardingManager.isActive()` / `loadOnboardingStates()`).
+- Optional polish: a hover cursor/affordance on minimaps (selection hit-testing is in
+  `InputManager.getCoordsFromPointerEvent`).
+- Acceptance: first run shows the hint once; never again after dismissal/reload; never overlaps the tour.
+
+### #7 — Plain-language naming & contextual empty-states  *(C2 · I3)*
+- **Naming.** The expanded toolbar rail already uses human labels (Colors, Rule Usage, Generate &
+  Mutate — see `TOOLBAR_BUTTON_LABELS` in `Toolbar.js`). The **panel titles** still read as jargon:
+  `index.html` `#chromaLabTitle` ("Chroma Lab"), `#rankPanelTitle` ("Rule Usage Ranking"),
+  `#rulesetActionsTitle`, etc. Add plain-language subtitles to those `<h3>`/`<h4>` headers (keep the
+  jargon, pair it with a human gloss). **HTML-edit gotcha:** include the full tag through `>` when
+  editing element openers (see CLAUDE.md).
+- **Empty-states.** Give the Explore and Library panels a self-describing message before they have
+  content: `src/ui/components/ExploreComponent.js` (no run yet) and `RulesetLibraryComponent.js` (empty
+  personal library). One-sentence "what this does / how to start".
+- Acceptance: a newcomer can read each panel's purpose without a tooltip; empty Explore/Library explain
+  themselves.
+
+### Suggested order & sizing
+`#8` (C1) is the quickest standalone win; `#4` (C2) is the biggest comprehension gain; `#7` (C2) is two
+independent sub-tasks (naming vs. empty-states) that can ship separately. Recommend **#4 → #8 → #7**, or
+do `#8` first as a warm-up. Mark each ☑ here and add a one-liner to `PATCHNOTES.md` when shipped.
