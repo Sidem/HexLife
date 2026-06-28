@@ -98,3 +98,89 @@
         }
     }
 }
+
+/* ============================================================================
+   Item #1 — Tiered, labelled, expandable desktop rail.
+   Collapsed (default) = today's icon rail. Expanded = icon + text-label rows
+   with group headers. Toggled via the pinned expand button; persisted.
+   ============================================================================ */
+@media screen and (min-width: 769px) {
+    /* No width transition: animating the rail width would resize the canvas flex
+       slot every frame (repeated WebGL FBO reallocation). Expand/collapse is a
+       single, deliberate, instant change instead. */
+
+    .toolbar-button {
+        position: relative;
+        gap: 10px;
+        overflow: hidden;
+    }
+
+    .toolbar-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+    }
+
+    .toolbar-icon svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+    }
+
+    .toolbar-label {
+        display: none;
+        white-space: nowrap;
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+
+    .toolbar-group-header {
+        display: none;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--text-muted, #87878f);
+        padding: 8px 12px 2px;
+        white-space: nowrap;
+    }
+
+    .toolbar-expand-toggle {
+        color: var(--text-muted, #87878f);
+    }
+
+    /* ---- Expanded state ---- */
+    #vertical-toolbar.is-expanded {
+        width: 200px;
+        align-items: stretch;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    #vertical-toolbar.is-expanded .toolbar-button {
+        width: 100%;
+        height: 36px;
+        justify-content: flex-start;
+        padding: 0 10px;
+    }
+
+    #vertical-toolbar.is-expanded .toolbar-label {
+        display: inline;
+    }
+
+    #vertical-toolbar.is-expanded .toolbar-group-header {
+        display: block;
+    }
+
+    #vertical-toolbar.is-expanded .toolbar-separator {
+        display: none;
+    }
+
+    /* Toggle arrow points "inward" once the rail is open. */
+    #vertical-toolbar.is-expanded .toolbar-expand-toggle .toolbar-icon {
+        transform: scaleX(-1);
+    }
+}

@@ -29,6 +29,7 @@ import { MinimapOverlays } from './MinimapOverlays.js';
 import { ScrubBar } from './ScrubBar.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
 import { ToastManager } from './ToastManager.js';
+import { CommandPalette } from './components/CommandPalette.js';
 import { ICONS } from './icons.js';
 
 
@@ -128,6 +129,9 @@ export class UIManager {
         this.initialStateConfigModal = new InitialStateConfigModal(document.getElementById('modal-container'), this.appContext);
         
         this.toastManager = new ToastManager(document.getElementById('toast-container'));
+
+        // Ctrl/⌘-K command palette (desktop launcher; refuses to open on mobile).
+        this.commandPalette = new CommandPalette(appContext);
 
         this.setupGlobalEventListeners();
         this._setupHelpTriggerListeners();
@@ -442,6 +446,11 @@ export class UIManager {
         
         if (this.rulesetDisplayFactory) {
             this.rulesetDisplayFactory.destroy();
+        }
+
+        if (this.commandPalette) {
+            this.commandPalette.destroy();
+            this.commandPalette = null;
         }
 
         Object.values(this.mobileViews).forEach(view => {

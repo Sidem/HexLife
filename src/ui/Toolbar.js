@@ -2,7 +2,43 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { PatternsComponent } from './components/PatternsComponent.js';
+import * as PersistenceService from '../services/PersistenceService.js';
 import { ICONS } from './icons.js';
+
+// Short, plain-language labels shown beside each icon when the rail is expanded.
+// They double as the `aria-label` for every icon-only control (closing the a11y
+// gap where the name was previously only on `title`).
+const TOOLBAR_BUTTON_LABELS = {
+    playPauseButton: 'Play / Pause',
+    controlsButton: 'Speed & Brush',
+    resetClearButton: 'Reset / Clear',
+    patternsButton: 'Patterns',
+    rulesetActionsButton: 'Generate & Mutate',
+    libraryButton: 'Library',
+    editRuleButton: 'Edit Ruleset',
+    setupPanelButton: 'World Setup',
+    exploreButton: 'Auto-Explore',
+    analysisPanelButton: 'Analysis',
+    rankPanelButton: 'Rule Usage',
+    saveStateButton: 'Save State',
+    loadStateButton: 'Load State',
+    exportPngButton: 'Export PNG',
+    recordWebmButton: 'Record Video',
+    shareButton: 'Share',
+    colorPanelButton: 'Colors',
+    shortcutsButton: 'Shortcuts',
+    helpButton: 'Learning Hub',
+};
+
+// A header is injected before the first button of each group; shown only when the
+// rail is expanded (the hairline separators serve the collapsed icon rail).
+const TOOLBAR_GROUP_HEADERS = {
+    controlsButton: 'Simulate',
+    rulesetActionsButton: 'Rules',
+    exploreButton: 'Discover',
+    saveStateButton: 'Capture',
+    colorPanelButton: 'Settings',
+};
 
 const TOOLBAR_BUTTON_ICONS = {
     controlsButton: ICONS.sliders,
@@ -80,9 +116,13 @@ export class Toolbar {
             helpButton: document.getElementById('helpButton'),
         };
         for (const [elementId, svg] of Object.entries(TOOLBAR_BUTTON_ICONS)) {
-            if (this.uiElements[elementId]) this.uiElements[elementId].innerHTML = svg;
+            this._decorateButton(elementId, svg);
         }
+        // Play/Pause carries a dynamic glyph; decorate it once so it gains a label +
+        // aria-label, then updatePauseButtonVisual only swaps the inner icon.
+        this._decorateButton('playPauseButton', ICONS.play);
         this.updatePauseButtonVisual(this.appContext.simulationController?.getIsPaused() ?? true);
+        this._buildToolbarChrome();
         this._initPopoutPanels();
         this._initPopoutControls();
         this._setupToolbarButtonListeners();
@@ -90,6 +130,77 @@ export class Toolbar {
 
     }
     
+    /**
+     * Wraps a toolbar button's glyph in a `.toolbar-icon` span and appends a
+     * `.toolbar-label` (revealed only in the expanded rail). The label is also set
+     * as the button's `aria-label` so the control has a robust accessible name.
+     * @private
+     */
+    _decorateButton(elementId, svg) {
+        const el = this.uiElements[elementId];
+        if (!el) return;
+        const label = TOOLBAR_BUTTON_LABELS[elementId] || el.title || '';
+        el.innerHTML = `<span class="toolbar-icon">${svg}</span><span class="toolbar-label">${label}</span>`;
+        if (label) el.setAttribute('aria-label', label);
+    }
+
+    /** Swaps only the inner glyph of a decorated button, preserving its label. @private */
+    _setButtonIcon(el, svg) {
+        if (!el) return;
+        const iconSpan = el.querySelector('.toolbar-icon');
+        if (iconSpan) iconSpan.innerHTML = svg;
+        else el.innerHTML = svg;
+    }
+
+    /**
+     * Injects the group headers and the expand/collapse toggle, then restores the
+     * persisted rail state. Collapsed (default) is byte-identical to the icon rail.
+     * @private
+     */
+    _buildToolbarChrome() {
+        if (!this.toolbarElement) return;
+
+        for (const [elementId, text] of Object.entries(TOOLBAR_GROUP_HEADERS)) {
+            const el = this.uiElements[elementId];
+            if (!el || !el.parentNode) continue;
+            const header = document.createElement('div');
+            header.className = 'toolbar-group-header';
+            header.setAttribute('aria-hidden', 'true');
+            header.textContent = text;
+            el.parentNode.insertBefore(header, el);
+        }
+
+        const toggle = document.createElement('button');
+        toggle.id = 'toolbarExpandToggle';
+        toggle.className = 'toolbar-button toolbar-expand-toggle';
+        toggle.innerHTML = `<span class="toolbar-icon">${ICONS.panelRight}</span><span class="toolbar-label">Collapse</span>`;
+        this.toolbarElement.insertBefore(toggle, this.toolbarElement.firstChild);
+        this._expandToggle = toggle;
+        toggle.addEventListener('click', () =>
+            this._setToolbarExpanded(!this.toolbarElement.classList.contains('is-expanded')));
+
+        this._setToolbarExpanded(
+            PersistenceService.loadUISetting('toolbarExpanded', false),
+            { persist: false, resize: false }
+        );
+    }
+
+    /**
+     * Toggles the labelled rail. Changing the rail width reflows the canvas flex
+     * slot, so a synthetic resize lets the WebGL renderer recompute its layout.
+     * @private
+     */
+    _setToolbarExpanded(expanded, { persist = true, resize = true } = {}) {
+        if (!this.toolbarElement) return;
+        this.toolbarElement.classList.toggle('is-expanded', expanded);
+        if (this._expandToggle) {
+            this._expandToggle.setAttribute('aria-label', expanded ? 'Collapse toolbar' : 'Expand toolbar');
+            this._expandToggle.title = expanded ? 'Collapse toolbar' : 'Expand toolbar labels';
+        }
+        if (persist) PersistenceService.saveUISetting('toolbarExpanded', expanded);
+        if (resize) window.dispatchEvent(new Event('resize'));
+    }
+
     _initPopoutPanels() {
         this.popoutConfig.forEach(config => {
             const buttonElement = this.uiElements[config.buttonId];
@@ -198,7 +309,7 @@ export class Toolbar {
     updateRecordButtonVisual(isRecording) {
         const button = this.uiElements?.recordWebmButton;
         if (!button) return;
-        button.innerHTML = isRecording ? ICONS.stopCircle : ICONS.video;
+        this._setButtonIcon(button, isRecording ? ICONS.stopCircle : ICONS.video);
         button.title = isRecording ? 'Stop recording & save WebM' : 'Record WebM video of the canvas';
         button.classList.toggle('is-recording', !!isRecording);
     }
@@ -215,7 +326,7 @@ export class Toolbar {
 
     updatePauseButtonVisual(isPaused) {
         if (this.uiElements?.playPauseButton) {
-            this.uiElements.playPauseButton.innerHTML = isPaused ? ICONS.play : ICONS.pause;
+            this._setButtonIcon(this.uiElements.playPauseButton, isPaused ? ICONS.play : ICONS.pause);
             this.uiElements.playPauseButton.title = isPaused ? "[P]lay Simulation" : "[P]ause Simulation";
         }
     }

@@ -225,6 +225,56 @@
     font-size: 1em;
 }
 
+/* ---- Item #3: the always-visible "rule deck" (Surprise / Generate / Mutate) ---- */
+.ruleset-deck-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+
+.rule-deck-button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-secondary, #b9b9c2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.rule-deck-button svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.rule-deck-button:hover {
+    background-color: var(--surface-3, #2e2e34);
+    color: var(--text-primary, #f2f2f4);
+}
+
+.rule-deck-button:active {
+    transform: scale(0.96);
+}
+
+/* Surprise Me leads the deck with an amber icon, but sits flush like its
+   siblings at rest (no filled/"selected"-looking background). */
+.rule-deck-surprise {
+    color: var(--accent, #f0c674);
+}
+
+.rule-deck-surprise:hover {
+    background-color: var(--surface-3, #2e2e34);
+    color: var(--accent-bright, #ffd98e);
+}
+
 /* App Menu Popout */
 #appMenuPopout {
     z-index: 1100; /* Ensure it's on top */
@@ -243,6 +293,12 @@ screen and (pointer: coarse) and (hover: none) {
 
     /* Hide the App Menu button on mobile, its functionality moves to the 'More' view */
     #appMenuButton {
+        display: none;
+    }
+
+    /* The rule deck is desktop-only; mobile's left FAB stack already covers
+       Generate / Mutate, and the top bar is too cramped for it. */
+    .ruleset-deck-controls {
         display: none;
     }
 

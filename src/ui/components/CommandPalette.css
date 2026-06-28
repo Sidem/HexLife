@@ -1,0 +1,179 @@
+/* ============================================================================
+   Command palette (Ctrl/⌘-K) — item #6.
+   A centred modal launcher over a dimmed backdrop. Desktop-only.
+   ============================================================================ */
+.command-palette-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+.command-palette-overlay.hidden {
+    display: none;
+}
+
+.command-palette-box {
+    width: min(620px, 92vw);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--surface-2, #242428);
+    border: 1px solid var(--border, #3c3c44);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: var(--shadow-panel, 0 18px 48px rgba(0, 0, 0, 0.55));
+    overflow: hidden;
+}
+
+.command-palette-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle, #2e2e33);
+}
+
+.command-palette-leading {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted, #87878f);
+    flex-shrink: 0;
+}
+
+.command-palette-leading svg {
+    width: 18px;
+    height: 18px;
+}
+
+.command-palette-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary, #f2f2f4);
+    font-size: 1.02rem;
+    padding: 2px 0;
+}
+
+.command-palette-input::placeholder {
+    color: var(--text-muted, #87878f);
+}
+
+.command-palette-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.command-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+}
+
+.command-palette-item.is-active {
+    background-color: var(--accent-soft, rgba(240, 198, 116, 0.14));
+}
+
+.cp-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: var(--text-secondary, #b9b9c2);
+}
+
+.command-palette-item.is-active .cp-icon {
+    color: var(--accent, #f0c674);
+}
+
+.cp-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.cp-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+
+.cp-title {
+    color: var(--text-primary, #f2f2f4);
+    font-size: 0.92rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cp-sub {
+    color: var(--text-muted, #87878f);
+    font-size: 0.74rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cp-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.cp-cat {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #87878f);
+}
+
+.cp-hint,
+.command-palette-footer kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary, #b9b9c2);
+    background-color: var(--surface-3, #2e2e34);
+    border: 1px solid var(--border, #3c3c44);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+
+.command-palette-empty {
+    padding: 18px 12px;
+    text-align: center;
+    color: var(--text-muted, #87878f);
+    font-size: 0.9rem;
+}
+
+.command-palette-footer {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-subtle, #2e2e33);
+    color: var(--text-muted, #87878f);
+    font-size: 0.72rem;
+}
+
+.command-palette-footer span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}

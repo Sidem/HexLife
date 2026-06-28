@@ -303,6 +303,8 @@ export const EVENTS = {
     COMMAND_SHOW_MOBILE_VIEW: 'command:showMobileView',
     /** @event Emitted with no payload to command all popout and draggable panels to hide. */
     COMMAND_HIDE_ALL_OVERLAYS: 'command:hideAllOverlays',
+    /** @param {{show?: boolean}} [data] - Command to show, hide, or toggle the Ctrl/⌘-K command palette. */
+    COMMAND_TOGGLE_COMMAND_PALETTE: 'command:toggleCommandPalette',
 
     
     /** @param {{scope: 'all'|'selected'}} data - The new scope from a UI component. */

@@ -47,6 +47,7 @@ export class KeyboardShortcutManager {
             { key: 'a', description: 'Toggle analysis panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'analysis' }) },
             { key: 'n', description: 'Toggle ruleset actions panel', category: 'Panels', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'rulesetactions' }) },
             { key: 'Escape', description: 'Close active popout or top-most panel', category: 'Global', handler: () => this._handleEscape() },
+            { key: 'k', ctrlKey: true, displayKey: 'Ctrl / ⌘ + K', description: 'Open the command palette', category: 'Global', handler: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_COMMAND_PALETTE) },
 
             // Simulation Controls
             { key: 'p', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {

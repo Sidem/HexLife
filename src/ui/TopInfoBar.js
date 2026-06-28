@@ -42,6 +42,7 @@ export class TopInfoBar {
         if (this.uiElements.historyButton) this.uiElements.historyButton.innerHTML = ICONS.history;
         if (this.uiElements.saveRulesetButton) this.uiElements.saveRulesetButton.innerHTML = ICONS.star;
 
+        this._buildRuleDeck();
         this._setupEventListeners();
 
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
@@ -66,6 +67,71 @@ export class TopInfoBar {
         }
         
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
+    }
+
+    /**
+     * Builds the always-visible "rule deck" — the core creative loop (Surprise /
+     * Generate / Mutate) docked beside the ruleset identity so the 90% action never
+     * needs a panel. Desktop-only (mobile keeps its FAB stack); hidden via CSS there.
+     * @private
+     */
+    _buildRuleDeck() {
+        const container = this.uiElements.rulesetDisplayContainer;
+        const anchor = this.uiElements.saveRulesetButton;
+        if (!container || !anchor) return;
+
+        const deck = document.createElement('div');
+        deck.className = 'ruleset-deck-controls';
+        deck.setAttribute('data-tour-id', 'rule-deck');
+
+        const makeBtn = (id, iconSvg, label, tourId) => {
+            const b = document.createElement('button');
+            b.id = id;
+            b.className = 'button-icon rule-deck-button';
+            b.innerHTML = iconSvg;
+            b.title = label;
+            b.setAttribute('aria-label', label);
+            if (tourId) b.setAttribute('data-tour-id', tourId);
+            deck.appendChild(b);
+            return b;
+        };
+
+        // Surprise Me leads the deck as the hero action. It is dispatched on click
+        // only — it never auto-fires and does not touch the onboarding tour.
+        const surpriseBtn = makeBtn('ruleDeckSurprise', ICONS.wand,
+            'Surprise me — fresh random rule on all 9 worlds, then play', 'surprise-me-button');
+        surpriseBtn.classList.add('rule-deck-surprise');
+        const generateBtn = makeBtn('ruleDeckGenerate', ICONS.sparkles, 'Generate a new ruleset (G)');
+        const cloneMutateBtn = makeBtn('ruleDeckCloneMutate', ICONS.copyPlus, 'Clone & mutate other worlds (M)');
+
+        container.insertBefore(deck, anchor);
+
+        surpriseBtn.addEventListener('click', () => this._surpriseMe());
+        generateBtn.addEventListener('click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated new ruleset' });
+        });
+        cloneMutateBtn.addEventListener('click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned ruleset to all worlds & mutated others' });
+        });
+    }
+
+    /**
+     * One-click "wow": generate a fresh random ruleset across all 9 worlds, reseed,
+     * and start playing — independent of the user's saved scope / auto-reset settings,
+     * so it behaves identically on a brand-new visit.
+     * @private
+     */
+    _surpriseMe() {
+        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
+            bias: Math.random(),
+            generationMode: 'r_sym',
+            applyScope: 'all',
+            shouldReset: true
+        });
+        EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: '✨ Surprise! New random rule on all worlds.', type: 'success' });
     }
 
     _setupEventListeners() {
