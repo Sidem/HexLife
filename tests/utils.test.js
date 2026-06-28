@@ -17,6 +17,7 @@ import {
     mirrorPatternCells,
     patternToHexSVG,
     hammingDistanceHex,
+    formatCompactNumber,
 } from '../src/utils/utils.js';
 
 describe('ruleset hex <-> array round-trip', () => {
@@ -441,6 +442,38 @@ describe('mirrorPatternCells (hex reflection about the origin)', () => {
         const chiral = [[0, 0], [1, 0], [2, 1]];
         expect(mirrorPatternCells(chiral, 0, false)).not.toEqual(chiral);
         expect(mirrorPatternCells(chiral, 0, true)).not.toEqual(chiral);
+    });
+});
+
+describe('formatCompactNumber (width-bounded counter display)', () => {
+    it('shows values below 10k verbatim', () => {
+        expect(formatCompactNumber(0)).toBe('0');
+        expect(formatCompactNumber(7)).toBe('7');
+        expect(formatCompactNumber(9999)).toBe('9999');
+    });
+
+    it('compacts thousands and millions to one decimal below 100 of the unit', () => {
+        expect(formatCompactNumber(10000)).toBe('10.0k');
+        expect(formatCompactNumber(12345)).toBe('12.3k');
+        expect(formatCompactNumber(1250000)).toBe('1.3M');
+        expect(formatCompactNumber(2000000000)).toBe('2.0B');
+    });
+
+    it('drops the decimal at or above 100 of the unit', () => {
+        expect(formatCompactNumber(123456)).toBe('123k');
+        expect(formatCompactNumber(123456789)).toBe('123M');
+    });
+
+    it('keeps every compacted string within 5 characters (no reflow)', () => {
+        for (const n of [10000, 99999, 123456, 999999, 1234567, 12345678, 999999999, 9999999999]) {
+            expect(formatCompactNumber(n).length).toBeLessThanOrEqual(5);
+        }
+    });
+
+    it('returns a placeholder for nullish / NaN input', () => {
+        expect(formatCompactNumber(undefined)).toBe('--');
+        expect(formatCompactNumber(null)).toBe('--');
+        expect(formatCompactNumber(NaN)).toBe('--');
     });
 });
 

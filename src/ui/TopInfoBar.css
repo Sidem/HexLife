@@ -173,11 +173,57 @@
 
 /* Reserve a fixed width for each rapidly-updating numeric value. Without this, the
    stats column's width changes as FPS/TPS/tick gain or lose digits, which shifts
-   the centered #rulesetDisplayContainer. */
+   the centered #rulesetDisplayContainer. The tick/TPS counters are also rendered
+   compactly (12.3k) by formatCompactNumber so their width stays bounded. */
 #stat-tick { min-width: 5ch; }
-#stat-ratio { min-width: 4ch; }
-#stat-fps { min-width: 2ch; }
-#stat-actual-tps { min-width: 3ch; }
+#stat-fps { min-width: 3ch; }
+#stat-brush-size { min-width: 2ch; }
+
+/* Visual stats: a small fixed-width meter bar makes a 0–100% quantity (cell
+   activity, speed vs. target) readable at a glance, and — being fixed width —
+   never reflows the bar as the value changes. */
+.stat-value--meter {
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+}
+
+.stat-meter {
+    width: 38px;
+    height: 5px;
+    flex-shrink: 0;
+    border-radius: 3px;
+    background-color: var(--border-subtle, #2e2e33);
+    overflow: hidden;
+}
+
+.stat-meter-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 3px;
+    background-color: var(--accent, #f0c674);
+    transition: width 0.2s ease-out;
+}
+
+.stat-meter-num {
+    display: inline-block;
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--text-muted, #8a8a92);
+    text-align: right;
+    /* Right-aligned with a reserved box so the digits pad on the left and the
+       tile width never changes as the number gains or loses a character. */
+}
+
+.stat-tile-active .stat-meter-num { min-width: 6.5ch; }
+.stat-tile-tps .stat-meter-num { min-width: 7.5ch; }
+
+/* The percent sign / "/target" suffix keep the muted weight inside the meter num. */
+.stat-meter-num .stat-unit,
+.stat-meter-num .stat-sub {
+    font-size: 1em;
+}
 
 /* App Menu Popout */
 #appMenuPopout {

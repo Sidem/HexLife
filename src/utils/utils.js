@@ -335,11 +335,42 @@ export function formatHexCode(hexCode) {
     let formatted = "";
     for (let i = 0; i < 32; i += 4) {
         formatted += hexCode.substring(i, i + 4);
-        if (i < 28) { 
+        if (i < 28) {
              formatted += " ";
         }
     }
     return formatted;
+}
+
+/**
+ * Formats an integer count into a width-bounded compact string (e.g. 12345 → "12.3k",
+ * 1_200_000 → "1.2M"). Keeps the rendered width to at most ~5 characters so a
+ * rapidly-incrementing counter (like the simulation tick) never reflows the layout
+ * around it. Values below 10k are shown verbatim.
+ * @param {number} n
+ * @returns {string}
+ */
+export function formatCompactNumber(n) {
+    if (n === undefined || n === null || Number.isNaN(n)) return '--';
+    const abs = Math.abs(n);
+    if (abs < 10000) return String(n);
+    const units = [
+        { value: 1e9, suffix: 'B' },
+        { value: 1e6, suffix: 'M' },
+        { value: 1e3, suffix: 'k' },
+    ];
+    for (const { value, suffix } of units) {
+        if (abs >= value) {
+            const scaled = n / value;
+            // One decimal below 100 of the unit ("12.3k"), none above ("123k"),
+            // so the string stays within 5 characters across every magnitude. The
+            // 99.95 cutoff keeps a value that would round to 100.0 (e.g. 99999 →
+            // "100k", not "100.0k") on the no-decimal side.
+            const text = Math.abs(scaled) < 99.95 ? scaled.toFixed(1) : Math.round(scaled).toString();
+            return text + suffix;
+        }
+    }
+    return String(n);
 }
 
 // Two-word digest vocabulary for deriving a human-friendly ruleset identity from a

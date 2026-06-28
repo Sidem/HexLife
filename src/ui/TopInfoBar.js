@@ -1,5 +1,5 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { formatHexCode } from '../utils/utils.js';
+import { formatHexCode, formatCompactNumber } from '../utils/utils.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { ICONS } from './icons.js';
@@ -20,10 +20,12 @@ export class TopInfoBar {
             rulesetDisplayCode: document.getElementById('rulesetDisplayCode'),
             statTick: document.getElementById('stat-tick'),
             statRatio: document.getElementById('stat-ratio'),
+            statRatioBar: document.getElementById('stat-ratio-bar'),
             statBrushSize: document.getElementById('stat-brush-size'),
             statFps: document.getElementById('stat-fps'),
             statActualTps: document.getElementById('stat-actual-tps'),
             statTargetTps: document.getElementById('stat-target-tps'),
+            statTpsBar: document.getElementById('stat-tps-bar'),
             undoButton: document.getElementById('undoButton'),
             redoButton: document.getElementById('redoButton'),
             historyButton: document.getElementById('historyButton'),
@@ -190,16 +192,27 @@ export class TopInfoBar {
         if (!stats || !this.uiElements) return;
         if (stats.worldIndex !== undefined && stats.worldIndex !== this.worldManager.getSelectedWorldIndex()) return;
         
-        this.uiElements.statTick.textContent = stats.tick !== undefined ? String(stats.tick) : '--';
-        this.uiElements.statRatio.textContent = stats.ratio !== undefined ? (stats.ratio * 100).toFixed(2) : '--';
+        this.uiElements.statTick.textContent = stats.tick !== undefined ? formatCompactNumber(stats.tick) : '--';
+
+        const ratioPct = stats.ratio !== undefined ? stats.ratio * 100 : null;
+        this.uiElements.statRatio.textContent = ratioPct !== null ? ratioPct.toFixed(1) : '--';
+        if (this.uiElements.statRatioBar) {
+            this.uiElements.statRatioBar.style.width = `${ratioPct !== null ? Math.max(0, Math.min(100, ratioPct)) : 0}%`;
+        }
     }
 
     updatePerformanceDisplay(fps, tpsOfSelectedWorld, targetTps) {
         if (this.uiElements?.statFps) this.uiElements.statFps.textContent = fps !== undefined ? String(fps) : '--';
-        if (this.uiElements?.statActualTps) this.uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? String(Math.round(tpsOfSelectedWorld)) : '--';
+        if (this.uiElements?.statActualTps) this.uiElements.statActualTps.textContent = tpsOfSelectedWorld !== undefined ? formatCompactNumber(Math.round(tpsOfSelectedWorld)) : '--';
+        const speed = this.appContext.simulationController.getSpeed();
+        const target = targetTps !== undefined ? targetTps : speed;
         if (this.uiElements?.statTargetTps) {
-            const speed = this.appContext.simulationController.getSpeed();
-            this.uiElements.statTargetTps.textContent = targetTps !== undefined ? String(targetTps) : String(speed);
+            this.uiElements.statTargetTps.textContent = formatCompactNumber(target);
+        }
+        // Meter shows how close the world is running to its target speed.
+        if (this.uiElements?.statTpsBar) {
+            const ratio = target > 0 && tpsOfSelectedWorld !== undefined ? (tpsOfSelectedWorld / target) * 100 : 0;
+            this.uiElements.statTpsBar.style.width = `${Math.max(0, Math.min(100, ratio))}%`;
         }
     }
 
