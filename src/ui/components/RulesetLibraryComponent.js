@@ -160,7 +160,12 @@ export class RulesetLibraryComponent extends BaseComponent {
         const userRulesets = this.appContext.libraryController.getUserLibrary();
 
         if (userRulesets.length === 0) {
-            personalList.innerHTML = `<p class="empty-state-text">You haven't saved any rulesets yet. Click the <span class="inline-icon">${ICONS.star}</span> icon to save the current ruleset!</p>`;
+            personalList.innerHTML = `
+                <div class="panel-empty-state">
+                    <div class="panel-empty-state-icon">${ICONS.star}</div>
+                    <p class="panel-empty-state-title">No saved rulesets yet</p>
+                    <p class="panel-empty-state-desc">This is your personal collection. Find a rule you like, then click the <span class="inline-icon">${ICONS.star}</span> <strong>Save</strong> button in the top bar to keep it here.</p>
+                </div>`;
             return;
         }
 

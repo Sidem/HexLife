@@ -124,17 +124,21 @@
                         <span class="stat-meter-num"><span id="stat-ratio">--</span><span class="stat-unit">%</span></span>
                     </span>
                 </div>
+                <div class="stat-tile stat-tile-status" title="Plain-language state of the selected world">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value"><span id="stat-status" class="status-chip status-unknown">—</span></span>
+                </div>
                 <span class="stat-sep" aria-hidden="true"></span>
                 <div class="stat-tile stat-tile-brush" title="Drawing brush size (hex radius)">
                     <span class="stat-label">Brush</span>
                     <span class="stat-value"><span id="stat-brush-size">--</span></span>
                 </div>
                 <span class="stat-sep" aria-hidden="true"></span>
-                <div class="stat-tile stat-tile-fps" title="Render frames per second">
+                <div class="stat-tile stat-tile-fps stat-tile--secondary" title="Render frames per second (engineering telemetry)">
                     <span class="stat-label">FPS</span>
                     <span class="stat-value"><span id="stat-fps">--</span></span>
                 </div>
-                <div class="stat-tile stat-tile-tps" title="Simulation speed — actual ticks per second / target">
+                <div class="stat-tile stat-tile-tps stat-tile--secondary" title="Simulation speed — actual ticks per second / target (engineering telemetry)">
                     <span class="stat-label">TPS</span>
                     <span class="stat-value stat-value--meter">
                         <span class="stat-meter" aria-hidden="true"><span id="stat-tps-bar" class="stat-meter-fill"></span></span>
@@ -264,21 +268,21 @@
 
         <div id="rulesetEditorPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetEditorTitle" data-tour-id="ruleset-editor-panel">
             <button id="closeEditorButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rulesetEditorTitle">Ruleset Editor<button class="button-help-trigger" data-tour-name="editor" title="Help with this feature">[?]</button></h3>
+            <h3 id="rulesetEditorTitle">Ruleset Editor<button class="button-help-trigger" data-tour-name="editor" title="Help with this feature">[?]</button><span class="panel-subtitle">Hand-tune the rules of life</span></h3>
             <div class="panel-content-area">
             </div>
         </div>
 
         <div id="worldSetupPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="setupPanelTitle" data-tour-id="setup-panel">
             <button class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="setupPanelTitle">World Setup<button class="button-help-trigger" data-tour-name="worldsetup" title="Help with this feature">[?]</button></h3>
+            <h3 id="setupPanelTitle">World Setup<button class="button-help-trigger" data-tour-name="worldsetup" title="Help with this feature">[?]</button><span class="panel-subtitle">Starting cells &amp; grid layout</span></h3>
             <div class="panel-content-area">
             </div>
         </div>
 
         <div id="analysisPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="analysisPanelTitle" data-tour-id="analysis-panel">
             <button id="closeAnalysisPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="analysisPanelTitle">Analysis Tools<button class="button-help-trigger" data-tour-name="analysis" title="Help with this feature">[?]</button></h3>
+            <h3 id="analysisPanelTitle">Analysis Tools<button class="button-help-trigger" data-tour-name="analysis" title="Help with this feature">[?]</button><span class="panel-subtitle">Measure &amp; plot behaviour</span></h3>
             <div class="panel-content-area">
                 <!-- This will be populated by AnalysisComponent -->
             </div>
@@ -286,7 +290,7 @@
 
         <div id="ruleRankPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rankPanelTitle" data-tour-id="rule-rank-panel">
             <button id="closeRankPanelButton" class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rankPanelTitle">Rule Usage Ranking<button class="button-help-trigger" data-tour-name="rulerank" title="Help with this feature">[?]</button></h3>
+            <h3 id="rankPanelTitle">Rule Usage Ranking<button class="button-help-trigger" data-tour-name="rulerank" title="Help with this feature">[?]</button><span class="panel-subtitle">Which rules fire most often</span></h3>
             <div id="ruleRankContent" class="panel-content-area">
             </div>
         </div>
@@ -300,28 +304,28 @@
         
         <div id="rulesetActionsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetActionsTitle" data-tour-id="ruleset-actions-panel">
             <button class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rulesetActionsTitle">Ruleset Actions<button class="button-help-trigger" data-tour-name="ruleset_actions" title="Help with this feature">[?]</button></h3>
+            <h3 id="rulesetActionsTitle">Ruleset Actions<button class="button-help-trigger" data-tour-name="ruleset_actions" title="Help with this feature">[?]</button><span class="panel-subtitle">Generate, mutate &amp; breed rules</span></h3>
             <div class="panel-content-area" id="ruleset-actions-content-mount">
             </div>
         </div>
 
         <div id="rulesetLibraryPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="rulesetLibraryTitle" data-tour-id="ruleset-library-panel">
             <button class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="rulesetLibraryTitle">Ruleset Library<button class="button-help-trigger" data-tour-name="ruleset_library" title="Help with this feature">[?]</button></h3>
+            <h3 id="rulesetLibraryTitle">Ruleset Library<button class="button-help-trigger" data-tour-name="ruleset_library" title="Help with this feature">[?]</button><span class="panel-subtitle">Your saved &amp; built-in rules</span></h3>
             <div class="panel-content-area" id="ruleset-library-content-mount">
             </div>
         </div>
         
         <div id="explorePanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="explorePanelTitle" data-tour-id="explore-panel">
             <button class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="explorePanelTitle">Auto-Explore</h3>
+            <h3 id="explorePanelTitle">Auto-Explore<span class="panel-subtitle">Auto-search for interesting life</span></h3>
             <div class="panel-content-area">
             </div>
         </div>
 
         <div id="chromaLabPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="chromaLabTitle">
             <button class="close-panel-button" title="Close Panel">&times;</button>
-            <h3 id="chromaLabTitle">Chroma Lab</h3>
+            <h3 id="chromaLabTitle">Chroma Lab<span class="panel-subtitle">Cell colours &amp; palettes</span></h3>
             <div class="panel-content-area">
             </div>
         </div>

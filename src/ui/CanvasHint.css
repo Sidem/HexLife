@@ -1,0 +1,82 @@
+/* One-time canvas-interaction hint (UX item #8). A small, dismissible card docked at
+   the bottom-centre of the main view; non-modal and pointer-passthrough except for the
+   card itself, so it never blocks the canvas it is describing. */
+.canvas-hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translate(-50%, 12px);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: min(440px, 90%);
+    padding: 10px 12px 10px 14px;
+    border-radius: 10px;
+    background-color: rgba(34, 34, 40, 0.96);
+    border: 1px solid var(--border, #4a4a4a);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    color: var(--text-primary, #f0f0f0);
+    opacity: 0;
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.canvas-hint.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.canvas-hint.fade-out {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+}
+
+.canvas-hint-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.canvas-hint-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.canvas-hint-text strong {
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.canvas-hint-text span {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: var(--text-secondary, #c8c8d0);
+}
+
+.canvas-hint-dismiss {
+    flex-shrink: 0;
+    align-self: stretch;
+    padding: 0 12px;
+    border: 1px solid var(--accent, #f0c674);
+    border-radius: 7px;
+    background-color: transparent;
+    color: var(--accent, #f0c674);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.canvas-hint-dismiss:hover {
+    background-color: var(--accent, #f0c674);
+    color: #1a1a1a;
+}
+
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+    .canvas-hint {
+        bottom: calc(var(--bottom-tab-bar-height, 56px) + 14px);
+    }
+}

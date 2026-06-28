@@ -1,6 +1,7 @@
 import { BaseComponent } from './components/BaseComponent.js';
 import { EVENTS } from '../services/EventBus.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import { computeWorldStatus } from './worldStatus.js';
 import * as Config from '../core/config.js';
 
 export class MinimapOverlays extends BaseComponent {
@@ -136,7 +137,7 @@ export class MinimapOverlays extends BaseComponent {
             const badgeEl = this.statusBadgeElements[i];
             const showBadges = vizState?.showStatusBadges ?? false;
             const status = (badgeEl && showBadges && worldStatus?.renderData.enabled)
-                ? MinimapOverlays._computeStatus(worldStatus.stats)
+                ? computeWorldStatus(worldStatus.stats)
                 : null;
             if (status) {
                 badgeEl.className = `world-status-badge ${status.type}`;
@@ -237,21 +238,4 @@ export class MinimapOverlays extends BaseComponent {
         }
     }
 
-    // Classify a world's terminal state from already-computed stats. Extinct/saturated take
-    // precedence over cycling (a period-1 cycle at ratio 0/1 is really just dead/full). Returns
-    // null for an actively-evolving world so no badge is shown.
-    static _computeStatus(stats) {
-        if (!stats) return null;
-        if (stats.ratio <= 0) {
-            return { type: 'extinct', label: '✕', title: 'Extinct — all cells dead' };
-        }
-        if (stats.ratio >= 1) {
-            return { type: 'saturated', label: '■', title: 'Saturated — all cells alive' };
-        }
-        if (stats.isInCycle) {
-            const period = stats.cycleLength || 0;
-            return { type: 'cycling', label: `↻${period}`, title: `Stable cycle — period ${period}` };
-        }
-        return null;
-    }
 }

@@ -79,7 +79,21 @@ discovery), and future-proofs against toolbar crowding. Cheap because every acti
 
 ## Next up (not in this iteration)
 
-### 4. Legible simulation status in the top bar  *(C2 · I3)*
+### Shipped this session — ☑ #4, #8, #7 (2026-06-28)
+*293 JS tests green (+9 from `tests/worldStatus.test.js`) · lint clean (0 errors) · `npx vite build`
+clean · verified live in the headless preview (status chip → Died out / Full / Cycling ↻N / Active;
+FPS/TPS demoted; one-time canvas hint shows once then never again across reload; panel subtitles +
+Explore/Library empty-states render).*
+- **#4** — extracted the status classifier into a pure shared module `src/ui/worldStatus.js`
+  (`computeWorldStatus` reused by `MinimapOverlays`; `computeStatusWord` adds the "Active" case). New
+  `#stat-status` chip in the top bar (fixed 84px width so the centred ruleset identity never reflows);
+  FPS/TPS tiles get `.stat-tile--secondary` muted treatment.
+- **#8** — `src/ui/CanvasHint.js` + `.css`, triggered from `Application.#maybeShowCanvasHint` after the
+  loader hides; gated by persisted `seenCanvasHint` and suppressed while the `core` tour is active.
+- **#7** — `.panel-subtitle` glosses on every jargon panel `<h3>` in `index.html`; richer
+  `.panel-empty-state` blocks for the Explore gallery and the personal Ruleset Library.
+
+### 4. Legible simulation status in the top bar — ☑  *(C2 · I3)*
 `MinimapOverlays._computeStatus` already classifies extinct / saturated / cycling (`↻N`). Surface a
 plain-language word ("Died out" / "Chaotic" / "Cycling ↻") for the selected world in the top bar, and
 demote FPS/TPS (engineering telemetry) to a smaller/secondary treatment or a toggle.
@@ -89,14 +103,14 @@ Reconcile the two paradigms (anchored popouts vs. free draggable panels). Defaul
 (opening one closes others) with a "close all / reset layout" affordance; expose free multi-panel as an
 advanced preference.
 
-### 7. Plain-language naming & contextual empty-states  *(C2 · I3)*
+### 7. Plain-language naming & contextual empty-states — ☑  *(C2 · I3)*
 Pair jargon with human words in panel headers/tooltips (Chroma Lab → *Colors*; Rule Rank → *Rule usage*;
 Ruleset → *the rules of life*). Add self-describing empty-states to the Explore and Library panels. Keep
 the auto-start `core` tour short; full feature tour on demand.
 
-### 8. Canvas-interaction discoverability  *(C1 · I3)*
+### 8. Canvas-interaction discoverability — ☑  *(C1 · I3)*
 One-time hint that minimaps are click-to-focus and the big canvas is drawable; hover affordances on the
-3×3 grid.
+3×3 grid. *(Shipped the one-time hint; the optional minimap hover-cursor affordance is left as polish.)*
 
 ### 9. Mobile tab-bar consolidation  *(C2 · I2)*
 The bottom tab bar carries 7 destinations (`index.html:328-357`), past the comfortable 5. Merge
@@ -112,7 +126,11 @@ FAB stack so users discover it.
 
 ---
 
-## Next-session handoff — #4, #8, #7 (start here)
+## Next-session handoff — #4, #8, #7 ✅ DONE (2026-06-28)
+
+**#4, #8, #7 shipped & verified this session** (see "Shipped this session" above). The touch-point notes
+below are retained for reference. **Next up:** #5 (single-panel focus + reset layout) and #9 (mobile
+tab-bar consolidation), plus the optional minimap hover-cursor polish from #8.
 
 **Status as of commit `2c2e273` (pushed to `main`, deployed to Pages):** items 1, 2-lite, 3, 6 are live.
 Below are the concrete touch-points for the next three, grounded in the current code.

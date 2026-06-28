@@ -179,6 +179,74 @@
 #stat-fps { min-width: 3ch; }
 #stat-brush-size { min-width: 2ch; }
 
+/* Plain-language status chip for the selected world. A fixed reserved width keeps the
+   centered ruleset identity from shifting as the word changes ("Active" → "Cycling ↻12").
+   Colours mirror the minimap status badges (.world-status-badge.*). */
+.status-chip {
+    display: inline-block;
+    box-sizing: border-box;
+    min-width: 84px;
+    padding: 1px 8px;
+    text-align: center;
+    white-space: nowrap;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+}
+
+.status-chip.status-active {
+    background-color: rgba(70, 170, 90, 0.22);
+    border-color: rgba(110, 210, 130, 0.5);
+    color: #b6f0c4;
+}
+
+.status-chip.status-extinct {
+    background-color: rgba(60, 60, 70, 0.85);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #c8c8d0;
+}
+
+.status-chip.status-saturated {
+    background-color: rgba(230, 170, 30, 0.9);
+    border-color: rgba(255, 230, 150, 0.8);
+    color: #1a1a1a;
+}
+
+.status-chip.status-cycling {
+    background-color: rgba(20, 130, 160, 0.9);
+    border-color: rgba(140, 220, 240, 0.8);
+    color: #e8fbff;
+}
+
+.status-chip.status-unknown {
+    background-color: var(--border-subtle, #2e2e33);
+    border-color: var(--border, #4a4a4a);
+    color: var(--text-muted, #8a8a92);
+}
+
+/* FPS/TPS are engineering telemetry — demote them to a smaller, lower-contrast
+   treatment so Tick / Active / Status (the comprehension stats) read as primary. */
+.stat-tile--secondary .stat-label {
+    color: var(--text-muted, #6f6f78);
+    font-size: 0.52rem;
+}
+
+.stat-tile--secondary .stat-value,
+.stat-tile--secondary .stat-meter-num {
+    font-size: 0.78rem;
+    color: var(--text-muted, #8a8a92);
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.stat-tile--secondary .stat-meter {
+    width: 30px;
+    height: 4px;
+}
+
 /* Visual stats: a small fixed-width meter bar makes a 0–100% quantity (cell
    activity, speed vs. target) readable at a glance, and — being fixed width —
    never reflows the bar as the value changes. */

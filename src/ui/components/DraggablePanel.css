@@ -97,3 +97,17 @@
         }
     }
 }
+
+/* Plain-language gloss paired with a panel's jargon title (UX item #7). Kept on its
+   own muted line below the title; not a drag handle, so it reads as a subtitle. */
+.panel-subtitle {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.72em;
+    font-weight: 500;
+    font-style: italic;
+    text-align: center;
+    color: var(--text-muted, #9a9aa4);
+    cursor: default;
+    user-select: none;
+}

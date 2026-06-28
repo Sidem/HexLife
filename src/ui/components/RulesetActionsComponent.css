@@ -448,6 +448,51 @@ button.tag-chip.tag-filter.active {
     line-height: 1.5;
 }
 
+/* Richer, self-describing empty-state (UX item #7) — a centred icon + heading + one
+   line of "what this is / how to start". Shared by the Explore gallery and the
+   personal Ruleset Library when they have no content yet. */
+.panel-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    padding: 24px 18px;
+    color: var(--text-muted, #9a9aa4);
+}
+
+.panel-empty-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    opacity: 0.7;
+}
+
+.panel-empty-state-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.panel-empty-state-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-secondary, #d0d0d8);
+}
+
+.panel-empty-state-desc {
+    margin: 0;
+    max-width: 32ch;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.panel-empty-state-desc strong {
+    color: var(--text-secondary, #d0d0d8);
+}
+
 /* Save-Ruleset modal: multi-IC preview chooser. */
 .srm-ic-section .srm-ic-hint {
     margin: 2px 0 8px;

@@ -315,7 +315,12 @@ export class ExploreComponent extends BaseComponent {
         if (countEl) countEl.textContent = `(${entries.length})`;
 
         if (entries.length === 0) {
-            this.galleryList.innerHTML = `<p class="empty-state-text">No finds yet. Click "Start" to begin exploring — interesting rulesets will collect here.</p>`;
+            this.galleryList.innerHTML = `
+                <div class="panel-empty-state">
+                    <div class="panel-empty-state-icon">${ICONS.compass}</div>
+                    <p class="panel-empty-state-title">No finds yet</p>
+                    <p class="panel-empty-state-desc">Press <strong>Start</strong> above to auto-search all nine worlds. The most interesting rulesets it discovers collect here, best-first.</p>
+                </div>`;
             return;
         }
 

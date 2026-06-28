@@ -2,6 +2,8 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as Renderer from '../rendering/renderer.js';
 import { rulesetName } from '../utils/utils.js';
 import { WebmRecorder } from '../services/WebmRecorder.js';
+import { showCanvasHint } from '../ui/CanvasHint.js';
+import * as PersistenceService from '../services/PersistenceService.js';
 
 export class Application {
     constructor(appContext) {
@@ -135,10 +137,13 @@ export class Application {
                 updateLoadingStatus("Finalizing...");
                 setTimeout(() => {
                     loadingIndicator.style.opacity = '0';
-                    setTimeout(() => { 
+                    setTimeout(() => {
                         loadingIndicator.style.display = 'none';
                         // The unified 'core' tour adapts its steps to mobile/desktop itself.
                         this.appContext.onboardingManager.startTour('core');
+                        // First-run canvas-interaction hint — only when the tour isn't
+                        // taking over the screen (the tour itself teaches these gestures).
+                        this.#maybeShowCanvasHint();
                     }, 500);
                 }, 250);
             }
@@ -156,6 +161,20 @@ export class Application {
             EventBus.dispatch(EVENTS.PERFORMANCE_METRICS_UPDATED, { fps: actualFps, tps: selectedStats.tps || 0, targetTps: targetTps });
         }
         requestAnimationFrame(this.renderLoop.bind(this));
+    }
+
+    /**
+     * Show the one-time canvas-interaction hint, gated so it never repeats and never
+     * overlaps the onboarding tour. On a true first visit the 'core' tour is active
+     * (and teaches these gestures itself), so the hint is suppressed; it surfaces on a
+     * later visit once the tour is no longer auto-starting. The flag is set the moment
+     * it shows, so a reload won't replay it.
+     */
+    #maybeShowCanvasHint = () => {
+        if (PersistenceService.loadUISetting('seenCanvasHint', false)) return;
+        if (this.appContext.onboardingManager?.isActive()) return;
+        PersistenceService.saveUISetting('seenCanvasHint', true);
+        showCanvasHint();
     }
 
     #handleResize = () => {

@@ -2,6 +2,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { formatHexCode, formatCompactNumber } from '../utils/utils.js';
 import { PopoutPanel } from './components/PopoutPanel.js';
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
+import { computeStatusWord } from './worldStatus.js';
 import { ICONS } from './icons.js';
 
 export class TopInfoBar {
@@ -21,6 +22,7 @@ export class TopInfoBar {
             statTick: document.getElementById('stat-tick'),
             statRatio: document.getElementById('stat-ratio'),
             statRatioBar: document.getElementById('stat-ratio-bar'),
+            statStatus: document.getElementById('stat-status'),
             statBrushSize: document.getElementById('stat-brush-size'),
             statFps: document.getElementById('stat-fps'),
             statActualTps: document.getElementById('stat-actual-tps'),
@@ -264,6 +266,16 @@ export class TopInfoBar {
         this.uiElements.statRatio.textContent = ratioPct !== null ? ratioPct.toFixed(1) : '--';
         if (this.uiElements.statRatioBar) {
             this.uiElements.statRatioBar.style.width = `${ratioPct !== null ? Math.max(0, Math.min(100, ratioPct)) : 0}%`;
+        }
+
+        // Plain-language state chip ("Active" / "Died out" / "Full" / "Cycling ↻N") for
+        // the selected world — surfaces the same classification the minimap badges use.
+        if (this.uiElements.statStatus) {
+            const status = computeStatusWord(stats);
+            const el = this.uiElements.statStatus;
+            if (el.textContent !== status.word) el.textContent = status.word;
+            el.className = `status-chip status-${status.type}`;
+            el.title = status.title;
         }
     }
 
