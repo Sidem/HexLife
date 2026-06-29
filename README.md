@@ -1,211 +1,167 @@
+<div align="center">
+
+<img src="favicon.svg" alt="HexLife Explorer logo" width="96" height="96" />
+
 # HexLife Explorer
 
-**Live Demo:** [Try HexLife Explorer](https://sidem.github.io/HexLife/)
+**An interactive, high-performance cellular automaton playground on a hexagonal grid.**
 
-HexLife Explorer is an interactive, high-performance web-based cellular automaton simulator that operates on a hexagonal grid. It allows users to discover and explore complex emergent behaviors by defining custom rulesets. The simulation leverages WebGL2 for efficient rendering and employs Web Workers to run multiple, concurrent "worlds," each with its own unique state and rules. The core simulation logic is written in Rust and compiled to WebAssembly (Wasm) for maximum performance.
+Discover emergent life by designing rulesets — or let the built-in evolutionary search find the interesting ones for you.
 
-## Highlights
+[**▶ Try the Live Demo**](https://sidem.github.io/HexLife/)
 
-  * 🧭 **Auto-Explore** — an automated evolutionary search that hunts for "interesting" rulesets across a suite of initial conditions, scores them on spatial structure / entropy / criticality / motion (and, optionally, **perceptual novelty via a vision-model embedding**), and banks the best finds in a persistent, **visual gallery with live thumbnails**. Pause/resume the hunt, cap it to a generation budget, and re-test any find on demand.
-  * 🔬 **Nine concurrent worlds** running independent Rust/Wasm simulations in parallel Web Workers, composed with one instanced WebGL2 draw call per world.
-  * ⏪ **State-history scrub-back** — pause and rewind the selected world up to a few hundred ticks to replay "what just happened," step-by-step or by dragging a timeline.
-  * 🎥 **Media export** — grab a full-resolution **PNG** snapshot of the selected world or record the live composited canvas to an animated **WebM** video, both saved straight to disk.
-  * ✂️ **Hex-aware pattern capture & copy/paste** — marquee-select live cells and stamp them back anywhere; placement preserves the grid's column-stagger phase so patterns never distort (`Ctrl`+`C` / `Ctrl`+`V`).
-  * 🧪 **Guided experiments & onboarding tours** in the Learning Hub teach the core loops hands-on.
-  * 🔗 **Shareable everything** — rulesets are 32-char hex strings with human-friendly mnemonic names; full setups encode into a single share link.
-  * ⚡ **Engineered for performance** — bit-packed state buffers, transfer-back buffer pools, dirty-flag-gated rendering, and a zero-GPU-work idle path.
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Rust](https://img.shields.io/badge/Rust-WebAssembly-orange?logo=rust&logoColor=white)
+![WebGL2](https://img.shields.io/badge/WebGL2-instanced-990000?logo=webgl&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 
-## Core Concepts
+</div>
 
-  * **Hexagonal Grid:** The simulation takes place on a flat-top hexagonal grid where each cell has six direct neighbors and **consecutive columns are staggered by half a hex** (odd columns dropped half a row). The grid wraps toroidally, connecting opposite edges. Because offset coordinates are not translation-invariant on a staggered grid, pattern placement converts through axial coordinates to preserve a captured shape's phase.
-  * **Cellular Automata:** Each cell exists in one of two states: active (alive) or inactive (dead). A cell's state in the next generation (tick) is determined by its current state and the states of its six neighbors, according to a 128-bit ruleset.
-  * **Rulesets:** The automaton's behavior is defined by a ruleset of 128 rules. Each rule corresponds to a unique local configuration (the center cell's state and its 6 neighbors, 2^7 = 128 possibilities). The ruleset is represented as a 32-character hexadecimal string that can be easily shared and modified.
+---
 
-## Architecture Overview
+HexLife runs **nine concurrent worlds** side-by-side, each a hexagonal cellular automaton with its own ruleset and state. The simulation core is written in **Rust → WebAssembly**, every world ticks in its own **Web Worker**, and rendering is a single **instanced WebGL2** draw call per world. The result stays smooth enough to evolve, mutate, and compare rulesets in real time.
 
-HexLife Explorer is built on a modern, decoupled architecture designed for performance and maintainability.
+## ✨ Features
 
-  * **Wasm Simulation Core:** The most computationally intensive task—the simulation tick logic—is executed in WebAssembly. The `run_tick` function, written in Rust, iterates over every cell, calculates its next state based on the provided ruleset, and updates the state buffers with maximum efficiency.
-  * **Multi-Worker Simulation:** The application runs 9 concurrent simulation "worlds," arranged in a 3x3 grid. Each world's logic, including its Wasm instance, runs in a dedicated Web Worker (`WorldWorker.js`). This ensures parallel computation and a responsive, non-blocking UI.
-  * **Main Thread Orchestration:**
-      * `WorldManager.js`: The central controller that manages the lifecycle of all `WorldProxy` instances, handles global settings (speed, pause state, brush size), and processes UI commands via an `EventBus`.
-      * `WorldProxy.js`: A main-thread interface (Proxy Pattern) for each `WorldWorker`, facilitating message passing for commands and receiving state and statistics updates.
-  * **High-Performance Rendering Engine (WebGL2):**
-      * `renderer.js`: Manages all WebGL2 operations. It employs a **render-to-texture** technique where each world is first drawn into an offscreen Framebuffer Object (FBO). These textures are then composed onto the main canvas.
-      * **Instanced Rendering:** All hexagons within a world are drawn in a single, highly efficient draw call using instanced rendering, defined in the vertex shader (`vertex.glsl.txt`).
-      * **GLSL Shaders:** Custom shaders handle hexagon positioning, dynamic cell coloring based on the rule that determined its state, and hover effects (`fragment.glsl.txt`).
-  * **Component-Based UI & State Management:**
-      * `UIManager.js` / `PanelManager.js`: These classes initialize and manage all UI components, popouts, and draggable panels, binding them to the `EventBus` for communication.
-      * **Draggable Panels:** The UI features draggable panels (`DraggablePanel.js`) for major features like the Ruleset Editor, World Setup, and Analysis tools, providing a flexible user workspace.
-      * `EventBus.js`: A publish/subscribe system that decouples all major components, from UI controls to the World Manager, enhancing maintainability.
-      * `PersistenceService.js`: Manages saving and loading of user settings—including rulesets, world configurations, and UI panel states—to `localStorage`.
+- 🧭 **Auto-Explore** — an evolutionary search that hunts for "interesting" rulesets, scores them on structure / entropy / criticality / motion (plus optional CLIP-based perceptual novelty), and banks the best finds in a persistent **visual gallery**. [See how it works ↓](#-auto-explore)
+- 🔬 **Nine concurrent worlds** — compare how different rulesets or seeds evolve, all at once.
+- 🎨 **Rule-based coloring** — cells are tinted by *which rule* set their state, turning the dynamics into a visible fingerprint.
+- ⏪ **Scrub-back history** — pause and rewind the selected world hundreds of ticks to replay what just happened, then branch from any point.
+- ✂️ **Pattern copy/paste** — marquee-select live cells and stamp them anywhere; placement is hex-phase-aware so shapes never distort (`Ctrl`+`C` / `Ctrl`+`V`).
+- 🧬 **Ruleset toolkit** — generate (random / neighbor-count / symmetry), hand-edit, mutate, clone, and breed rulesets.
+- 🎥 **Media export** — full-resolution **PNG** snapshots and live **WebM** recordings, straight to disk.
+- 🔗 **Shareable everything** — rulesets are 32-char hex strings with friendly mnemonic names; whole setups encode into one share link.
+- 📱 **Responsive** — a dedicated mobile UI with a bottom tab bar and touch controls.
+- 🎓 **Guided onboarding** — interactive tours and hands-on experiments in the Learning Hub.
 
-## Key Features
+## 🚀 Getting Started
 
-### 1\. Multi-World Simulation
+**Prerequisites:** [Node.js](https://nodejs.org/) 18+ and a browser with **WebGL2 + hardware acceleration** enabled.
 
-  * **Concurrent Worlds:** Run 9 simulations simultaneously, allowing for direct comparison of how different rulesets or initial conditions evolve.
-  * **Per-World Configuration:** Each of the 9 worlds can have its own distinct ruleset, initial density of active cells, and can be individually enabled or disabled via the **World Setup Panel**.
-  * **Visual Layout:** A large main view displays the selected world, while a 3x3 mini-map provides an overview and allows for quick selection.
+```bash
+git clone https://github.com/Sidem/HexLife.git
+cd HexLife
+npm install
+npm run dev          # → http://localhost:5173
+```
 
-### 2\. Dynamic Cell Coloring & Visualization
+The compiled Wasm engine is checked into the repo, so `npm run dev` works **without a Rust toolchain**. You only need Rust if you want to rebuild the engine.
 
-  * **Rule-Based Coloring:** Cells are colored based on the specific rule (0-127) that determined their current state. This provides a "fingerprint" of the automaton's activity, with the color spectrum defined in `ruleVizUtils.js` and applied in the fragment shader via a Color Look-Up Table (LUT).
-  * **State & Hover Differentiation:** The fragment shader differentiates cell states (active vs. inactive) by adjusting color saturation and brightness. It also applies a highlight effect to cells under the mouse cursor.
-  * **Minimap Status Badges:** Each minimap can show an at-a-glance status badge — **extinct** (died out), **saturated** (fully active), or **cycling** (`↻N`, a detected period-`N` loop) — computed from each world's live statistics. Toggle them with the "Show Status Badges" option.
+| Command | What it does |
+| :--- | :--- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Rebuild Wasm + production build into `dist/` |
+| `npm run test:run` | Run the JS test suites once (Vitest) |
+| `npm run lint` | Lint the codebase (ESLint) |
+| `npm run typecheck` | Type-check opt-in files (`tsc --noEmit`) |
 
-### 3\. Interactive Controls & UI
+<details>
+<summary>Rebuilding the Rust/Wasm engine</summary>
 
-  * **Responsive Mobile UI:** Features a distinct mobile interface with a bottom tab bar, quick-action FABs, and touch-friendly controls for a seamless experience on any device.
-  * **Learning Hub & Onboarding:** An interactive tour system (`OnboardingManager.js`) walks new users through every panel — simulation controls, ruleset actions, the editor, world setup, analysis tools, rule-usage ranking, history, and reset/clear. The Hub also offers hands-on **Experiments** — guided, input-agnostic missions such as the *evolution loop* (mutate → pick → repeat) and *spark of life* (clear → draw → play) — that teach the core creative loops by doing.
-  * **Toolbar & Popouts:** A vertical toolbar provides quick access to primary functions. Most controls are housed in popout panels (`PopoutPanel.js`) that appear next to their trigger button, keeping the interface clean.
-  * **Playback & Speed (⏩):** Globally play/pause the simulation (`P` key) and adjust the target Ticks Per Second (TPS) for all worlds.
-  * **Brush Interaction (🖌️):** Draw on the main world's canvas to toggle cell states. Brush size can be adjusted with a slider or the mouse wheel (`Ctrl + Wheel`). The simulation can automatically pause during a drawing stroke for precise edits.
-  * **Ruleset Management:**
-      * **Generate New Rules (✨):** Create new rulesets using different modes: **Random** (with a configurable bias), **N-Count** (based on the number of active neighbors), or **R-Sym** (based on rotational symmetry groups).
-      * **Set/Copy Ruleset (\#️⃣):** Directly input a 32-character hex string to apply a ruleset, or copy the current world's ruleset to the clipboard.
-      * **Mutate & Clone (🧬):** Clone the selected ruleset to the other worlds, optionally mutating each copy. Mutation rate and mode are configurable, making it easy to spawn a family of variations from one promising rule.
-      * **Breed Worlds (🧬):** Cross two parent worlds' rulesets (uniform or rotational-symmetry crossover, with optional post-mutation) and inject the offspring into the remaining worlds — a manual companion to Auto-Explore's automated breeding.
-      * **Content Library (📚):** Access the Library of pre-discovered rulesets and patterns.
-  * **State Management & Sharing:**
-      * **Save/Load (💾/📂):** Save the complete state of the selected world (cell states, ruleset, and tick count) to a JSON file. Load a previously saved state to continue a simulation.
-      * **Share Link (🔗):** Generate a unique URL that encodes the current setup (rulesets, densities, selected world, camera position) to share with others.
-      * **Export PNG (📷) / Record Video (🎥):** Snapshot the selected world to a full-resolution PNG, or record the live canvas to a WebM clip (see **Media Export** below).
-  * **Reset/Clear (🔄):** Reset worlds to their initial random density or clear them completely to an active or inactive state.
-  * **Patterns (✂️):** Capture a region of live cells and reuse it elsewhere.
-      * **Copy region (`Ctrl`+`C`):** Drag a marquee over active cells to copy them to an in-memory clipboard.
-      * **Paste (`Ctrl`+`V`):** Stamp the copied pattern under the cursor. Placement is **hex-phase-aware** — the captured shape is reproduced exactly at any anchor, regardless of column parity, by translating through axial coordinates.
-      * **Capture & Save:** Name a captured region and store it in your personal pattern library (persisted to `localStorage`). Saved patterns show a true-to-grid hexagon thumbnail and can be re-placed at any time.
+Requires [Rust](https://rustup.rs/) and [`wasm-pack`](https://rustwasm.github.io/wasm-pack/). Then:
 
-### 4\. Auto-Explore (🧭)
+```bash
+npm run build:wasm                                  # rebuild the Wasm binary
+cargo test --manifest-path hexlife-wasm/Cargo.toml  # run the Rust tick-engine tests
+```
 
-An automated, evolutionary search for interesting rulesets — point it at the grid and let it evolve rulesets worth looking at.
+</details>
 
-  * **Two-stage evaluation (screen → confirm):** every candidate is first *screened* with short Wasm evaluation bursts across a suite of initial conditions (chaos / sparse / seed). Only candidates that clear the find threshold pay for a longer *confirmation* burst that filters out transients and labels long-period cyclers (tagged `↻N` in the gallery) — so the cheap screening pass stays fast while the finds you keep are real.
-  * **Interestingness score:** a pure, tunable objective combining σ≈1 criticality, mid-band block entropy, **spatial-structure** and **heterogeneity** terms (a join-count statistic that rewards real structure over homogeneous churn), temporal entropy variance, active-cell **transport/mobility**, rule-usage diversity, and activity fluctuation — plus an **optional, default-off perceptual novelty term** (ASAL-style CLIP-embedding trajectory novelty) — with hard kills for extinct / saturated / frozen / short-cycle behaviors. Every knob lives in an exported config object.
-  * **Generation loop:** champion + mutated and crossover-bred offspring evolve over generations with deterministic per-(generation, world, IC) seeding, while a MAP-Elites-style **behavior archive** keeps a diverse gallery — a near-identical hex sibling must out-score its family or it's rejected, so the gallery never fills with duplicates.
-  * **Visual gallery:** banked finds persist across sessions, each shown with a **rendered thumbnail** plus per-component score bars, and can be applied, saved, shared, or bred further. Per-world score badges surface the search live on the minimaps, and killed candidates show their kill reason on hover.
-  * **Loop controls:** **Pause / Resume** the hunt without losing progress, set an optional **generation budget** to stop automatically (with a "best find" summary toast), and **re-test (🔄)** any gallery entry to re-confirm its score on demand.
+## 🧠 Core Concepts
 
-#### Initial-condition suite
+- **Hexagonal grid** — a flat-top hex grid where each cell has six neighbors and consecutive columns are staggered by half a hex. The grid wraps toroidally (opposite edges connect).
+- **Two-state cells** — every cell is *active* or *inactive*. Its next state depends on its own state plus its six neighbors.
+- **128-bit rulesets** — a center cell + 6 neighbors give 2⁷ = 128 possible local configurations, so a ruleset is exactly 128 bits, written as a **32-character hex string** that's trivial to share and edit.
 
-Each candidate is judged not on one starting grid but on a **suite of initial conditions (ICs)**, because the same ruleset can be lifeless from one seed and teeming from another. All ICs are deterministically seeded, so a find is exactly reproducible. The panel's IC toggles let you run any subset:
+## 🧭 Auto-Explore
 
-| IC | Mode | What it probes |
+Point it at the grid and let it evolve rulesets worth looking at. Candidates are **screened** with short evaluation bursts, and only promising ones pay for a longer **confirmation** burst that filters out transients and flags long-period cyclers. Survivors are banked into a deduplicated gallery (MAP-Elites-style) with rendered thumbnails and per-component score bars — ready to apply, save, share, or breed further. Pause/resume the hunt, cap it to a generation budget, or re-test any find on demand.
+
+Each candidate is judged across a **suite of initial conditions**, because one ruleset can be lifeless from one seed and teeming from another:
+
+| IC | Seeding | What it probes |
 | :--- | :--- | :--- |
-| **Chaos** | Uniform random, density **0.5** | Behavior emerging from a fully-mixed, high-energy soup. |
-| **Sparse** | Uniform random, density **0.05** | Whether structure can *grow* from near-emptiness (favors gliders/replicators). |
-| **Seed** | A single **compact cluster** (~6-cell Gaussian blob) | Whether one small blob organizes, spreads, or collapses. |
-| **Clusters** | **Several** scattered clusters (5 blobs, ~8 cells each) | Whether separate seeds collide, merge, or launch travelling structures. |
+| **Chaos** | Random, density 0.5 | Behavior from a fully-mixed soup |
+| **Sparse** | Random, density 0.05 | Whether structure can grow from near-emptiness |
+| **Seed** | One ~6-cell blob | Whether a single seed organizes or collapses |
+| **Clusters** | Several scattered blobs | Whether separate seeds collide or travel |
 
-The **Seed** and **Clusters** ICs drop Gaussian-falloff blobs into an otherwise empty grid (not a literal single center cell — a lone cell rarely does anything under most rules); Chaos and Sparse are uniform-noise fields covering the opposite end of the spectrum.
+<details>
+<summary><b>How a candidate is scored</b> — the interestingness objective</summary>
 
-> **Fixed in this version:** the cluster ICs were previously declared with the wrong strategy key (`'cluster'` vs the engine's `'clusters'`), so they **silently fell back to a fully-saturated `density: 1.0` grid** that was instantly killed — the "seed" condition was effectively dead weight. They now place real clusters, and a dedicated multi-cluster **Clusters** IC was added.
+<br>
 
-The per-IC scores are combined into one headline number with a **soft-max** (temperature 0.15, so the combine leans toward the world's *best* IC) plus a small (0.2) plain-mean robustness bonus — a ruleset that shines under one IC isn't dragged down by being dull under another, but consistency across ICs is still rewarded.
+The score is a pure, tunable objective. Four **hard kills** zero it outright — *extinct*, *saturated* (≥99% active), *frozen* (≤0.5 cells changing/tick), and *short-cycle* (period ≤ 4) — then the survivors are ranked on the weighted, normalized terms below. Terms are dropped and the rest renormalized for entries that lack them (e.g. no damage probe, or finds made without the optional vision model), so each candidate is judged only on the terms it has.
 
-#### Evaluation length (tick budgets)
+| Term | Weight | Measures |
+| :--- | :---: | :--- |
+| **Structure** | 0.31 | Join-count spatial order — domains, fronts, gliders vs. salt-and-pepper noise *(most weighted)* |
+| **σ (criticality)** | 0.16 | Damage-spreading probe; peaks at the edge of chaos (σ ≈ 1) |
+| **Temporal** | 0.13 | Variance of block entropy over time — Wuensche's complex-rule discriminator |
+| **Transport** | 0.11 | Drift of the active-cell centroid — coherently moving structure (gliders) |
+| **Heterog.** | 0.11 | Order and disorder coexisting in different regions at once |
+| **Novelty** | 0.12 | *Optional, off by default.* CLIP-embedding trajectory novelty ([ASAL-style](https://arxiv.org/abs/2412.17799)) |
+| **Entropy** | 0.07 | Block-entropy mid-band — structured but not pure noise |
+| **Diversity** | 0.07 | Shannon entropy of rule-usage — a rich rule vocabulary |
+| **Flux** | 0.04 | Activity arriving in bursts (avalanches) rather than steady churn |
 
-There is **no fixed cap on how long a candidate runs**. (The "400" elsewhere in the codebase is the longest *cycle period* the detector can recognize — `CYCLE_DETECTION_MAX_PERIOD` — not an evaluation length.) The two stages run for:
+Per-IC scores are combined with a soft-max (favoring each world's best IC) plus a small plain-mean robustness bonus. The same components can be measured for any world on demand from the **Analysis → Interestingness Metrics** panel.
 
-  * **Screening burst — the "Ticks / Evaluation" slider, default 160, now adjustable up to 5000 ticks** (after a 20-tick warm-up that's discarded so start-up transients don't pollute the metrics). Cheap, run on all nine candidates every generation; raise it when you want behavior that only emerges over a longer horizon to be visible to the screen itself.
-  * **Confirmation burst — 600 ticks** (and automatically scaled up so it's never shorter than the screening burst), run only on candidates that clear the find threshold. Its job is to expose long-horizon fates the short screen can't see — a quiet death, a late saturation, or settling into a long cycle. A cycle of period ≤ 120 found here tags the find `↻N` and penalizes (but keeps) it.
+> **Perceptual novelty (opt-in):** enabling the CLIP toggle lazily downloads a small image encoder (browser-cached) into a dedicated worker and adds the perceptual **Novelty** term. It degrades gracefully — if the model can't load, the search continues on the statistical terms unchanged.
 
-#### How a candidate is scored — the component values
+</details>
 
-The gallery's per-component bars expose the raw ingredients of the interestingness score. Each is normalized to **[0, 1]**, then combined with the weights shown (criticality is dropped and the rest renormalized if no damage-probe ran; the two spatial terms, the temporal-variance term, the transport term and the perceptual-novelty term are likewise dropped for gallery entries that predate them or that were found without the optional vision model — so a candidate is always judged on the terms it actually has):
+## 🏗️ Architecture
 
-| Value | Weight | How it's measured | What a high value means |
-| :--- | :---: | :--- | :--- |
-| **σ** (criticality) | 0.16 | A **damage-spreading probe**: the grid is cloned, one cell is flipped, and both copies run side-by-side while the Hamming distance between them is tracked over a 64-tick window. σ = `exp(slope)` of a log-linear fit to that distance — the average per-tick growth factor of a one-cell perturbation. The term is a Gaussian peaked at **σ = 1** (in log space, τ = 0.6). | The automaton sits at the **edge of chaos**: σ < 1 = perturbations heal (frozen/ordered), σ > 1 = they explode (full chaos), σ ≈ 1 = information propagates without dying or blowing up — where the most interesting computation lives. |
-| **Entropy** (entropy band) | 0.07 | Mean **block entropy**: for every cell, take its 7-cell neighborhood (center + 6 neighbors → one of 2⁷ = 128 patterns), build the histogram of those patterns across the grid, and take its Shannon entropy normalized to [0, 1]. Scored as a Gaussian peaked at a **mid-band target of 0.4** (τ = 0.18). | The grid is **structured but not noise**. Entropy near 0 = uniform/repetitive (dull); near 1 = maximal randomness (TV static); the mid-band is where recognizable, varied local patterns coexist. |
-| **Flux** (fluctuation) | 0.04 | The **coefficient of variation** (std ÷ mean) of the *changed-cell count* — how many cells flip state each tick — across the burst. Scored by half-saturation: `cv / (cv + 0.3)`. | Activity comes in **bursts rather than a steady hum** — large fluctuations in how much is changing are a hallmark of susceptibility near a critical point (avalanches, sweeping fronts) rather than uniform churn. |
-| **Diversity** (rule diversity) | 0.07 | Every tick, each cell's next state is decided by exactly one of the 128 rules; the engine tallies how often each rule fires (a 128-bin histogram). This is the **Shannon entropy of that histogram**, normalized by log₂(128). | The dynamics draw on a **rich rule vocabulary**. Near 0 = one or two rules do all the work (monotonous); near 1 = many distinct local situations arise and are handled differently (complex behavior). |
-| **Structure** (spatial structure) | 0.31 | A **join-count statistic** (`spatial_order`): it compares how often neighboring cells share the same state against what pure random mixing would produce. ~0 = well-mixed; **positive = clustering** (like-with-like domains); **negative = anti-correlation** (checkerboard/stripes). The score rewards *deviation in either direction*, half-saturating at 0.12. | The grid has **genuine spatial organization** — domains, fronts, gliders, lattices — rather than salt-and-pepper noise. This is the **most heavily weighted term**: it's the one signal that reliably separates a structured glider soup from homogeneous high-activity "churn" (which maxes out σ/entropy/flux but is visually boring). |
-| **Heterog.** (spatial heterogeneity) | 0.11 | The **across-cell variance** of each cell's block-entropy surprisal (−log₂p ÷ 7), averaged over the burst (`block_entropy_stats` returns mean *and* this variance). Half-saturates at 0.02. | **Order and disorder coexist in different regions** at the same time — calm zones beside busy ones, rather than the whole grid behaving identically. Spatially uniform behavior (everywhere-ordered or everywhere-chaotic) scores low; a patchwork scores high. |
-| **Temporal** (temporal entropy variance) | 0.13 | The variance of the grid's **block entropy over *time*** — the spread of the per-sample entropy values across the burst (the temporal sibling of Heterog., which measures variance across *space*). Half-saturates at 0.005. | The automaton's order/disorder balance **swings as it runs** rather than holding steady. This is Wuensche's complex-rule discriminator: *ordered* rules settle to a low stable entropy and *chaotic* rules sit at a high stable one — only **complex** rules (the glider-bearing ones) show large entropy *swings*. It reinforces Structure rather than competing with it. (It's only safe to reward because the confirmation burst hard-penalizes long cyclers downstream, which would otherwise inflate it.) |
-| **Transport** (mobility) | 0.11 | The mean per-tick drift speed of the **active-cell centroid**, computed on the torus as a per-axis **circular mean** (each coordinate → an angle θ = 2π·coord/dim, accumulate Σsin/Σcos, take the resultant angle) and differenced between samples along the shortest path around the wrap. Each axis's displacement is **gated by its concentration** (the resultant's mean length R ∈ [0, 1]): a spread-out / near-saturated field has a near-zero resultant whose *angle is meaningless noise*, so R ≈ 0 zeroes it out, while a compact mass has R ≈ 1. Reported as `metrics.transport.meanSpeed` (cells/tick) and scored by half-saturation at 0.1. | The pattern contains **coherently moving structure** — gliders, spaceships, travelling fronts — that carries a localized active region across the grid. This is a *direct* motion signal (ASAL-style mobility): a translating mass drifts the centroid steadily (measured ≈ 0.24 cells/tick → term ≈ 0.7 for the reference glider rule), whereas a dense homogeneous churn keeps it pinned and spread (measured ≈ 0.001 → term ≈ 0.01). It reinforces Structure with the one thing a static spatial statistic can't see — net displacement over time. |
-| **Novelty** (open-endedness) | 0.12 | **Optional, off by default.** When the perceptual objective is enabled, a small vision model (CLIP, via transformers.js) runs in its own worker and embeds a short trajectory of the find's rendered frames; the term is the **mean cosine distance between consecutive frame embeddings** (half-saturating at 0.08) — how fast the *look* of the automaton keeps changing. With the model off or unavailable this term is simply absent (the score renormalizes over the others), so the statistical objective is unchanged. | The automaton is **perceptually open-ended** — it keeps evolving into visually-new states rather than freezing or thrashing in place, measured the way a human-aligned foundation model "sees" it (the [ASAL](https://arxiv.org/abs/2412.17799) approach of Kumar et al. 2024). A still life barely moves in embedding space; an ever-evolving glider menagerie keeps stepping into new territory. |
+A decoupled, performance-first design:
 
-Before any of this is computed, four **hard kills** zero the score outright: **extinct** (died out), **saturated** (≥99% active), **frozen** (≤0.5 cells changing per tick on average), and **short-cycle** (a detected period ≤ 4 — blinkers and fixed points). These weed out the degenerate regimes cheaply so the graded terms only ever rank the survivors.
+- **Simulation core** — `run_tick` in Rust/Wasm; all per-cell buffers live in Wasm linear memory, bit-packed (8 cells/byte).
+- **Concurrency** — one Web Worker per world (9 total) for parallel, non-blocking computation.
+- **Rendering** — `renderer.js` draws each world into its own FBO with one instanced WebGL2 draw call, composed into the selected view + 3×3 minimap; redraws are gated by dirty flags.
+- **Orchestration** — `WorldManager` (central controller) drives one `WorldProxy` per worker; UI ↔ logic communicate through a publish/subscribe `EventBus`.
+- **Persistence** — settings, rulesets, world configs, and panel layouts are saved to `localStorage`.
 
-> **Perceptual objective (experimental, opt-in):** the **Perceptual novelty (CLIP)** toggle in the Explore panel turns on the ASAL-style objective above. The first time it's enabled it lazily downloads a small CLIP image encoder (tens of MB, then browser-cached) into a dedicated worker; finds are then additionally scored on perceptual **Novelty** and illuminated in a second embedding-keyed archive. It **degrades gracefully** — if the model can't load (old browser, offline), the panel says so and the search continues on the statistical terms with no change in behavior. Default off.
+<details>
+<summary>Key modules</summary>
 
-> **Measure any world on demand:** the same eight values can be computed for the selected world from the **Analysis panel → Interestingness Metrics** plugin. Click **Measure** and it runs one non-destructive evaluation burst (snapshotting and restoring the world afterwards) and renders the component bars + composite score. The σ damage probe is the expensive part, so it's behind a toggle, and the burst length is adjustable — measurement is opt-in precisely because it's heavier than the live stats. See [§8 Advanced Draggable Panels](#8-advanced-draggable-panels).
+| Module | Role |
+| :--- | :--- |
+| `hexlife-wasm/src/lib.rs` | Rust tick engine (`World::run_tick`) |
+| `src/core/WorldWorker.js` | Per-world worker; holds typed-array views into Wasm memory |
+| `src/core/WorldProxy.js` | Main-thread proxy for one worker |
+| `src/core/WorldManager.js` | Central controller; settings, scope resolution, commands |
+| `src/rendering/renderer.js` | WebGL2 render-to-texture + instanced drawing |
+| `src/services/EventBus.js` | Pub/sub event catalog decoupling UI from logic |
+| `src/core/AutoExploreService.js` | Evolutionary search loop + behavior archive |
 
-> **Design note — a possible σ variant.** Today's σ perturbs one **cell** and measures how that damage spreads through *state space* (the edge-of-chaos signal). A complementary idea is to perturb one **rule** instead — flip a single bit of the 128-entry ruleset, run the original and mutated rulesets side by side, and measure how fast their grids diverge. That measures something different: not edge-of-chaos dynamics but the ruleset's **mutational brittleness** — how sensitive its behavior is to a one-rule change, which is exactly the perturbation the evolutionary loop applies. It's noted here as a future direction; it isn't implemented yet.
+</details>
 
-#### Generation budget
+## ⌨️ Keyboard Shortcuts
 
-A **generation** is one full round of the evolutionary loop: the nine worlds each evaluate a candidate (the reigning champion plus mutated and crossover-bred offspring), the best is banked, and a new champion + runner-up are chosen to breed the next round. By default the loop runs **unlimited** until you stop it. Setting a **generation budget** (the panel's numeric input) caps it: the search tracks the best score seen and, once it has completed that many generations, **stops automatically and toasts a summary** (e.g. *"Explored 50 generations — best 0.86 Frosted-Willow"*). Use it to bound a hands-off run or to get a reproducible, fixed-effort sweep.
+<details>
+<summary>Full shortcut reference</summary>
 
-### 5\. State History Scrub-Back (⏪)
+<br>
 
-Pause the simulation and rewind the selected world to see exactly how it got to where it is.
+| Keys | Action |
+| :--- | :--- |
+| `P` | Play / pause |
+| `Escape` | Close active popout or panel |
+| `1`–`9` | Select world (numpad layout) |
+| `Shift`+`1`–`9` | Toggle world's enabled state |
+| `N` / `E` / `S` / `A` | Toggle Ruleset Actions / Editor / World Setup / Analysis panel |
+| `G` | Generate new ruleset |
+| `M` / `Shift`+`M` | Clone & mutate others / mutate selected |
+| `O` / `I` | Clone selected ruleset to all / invert it |
+| `R` / `Shift`+`R` | Reset all worlds / selected world |
+| `C` / `Shift`+`C` | Clear all worlds / selected world |
+| `D` / `Shift`+`D` | Reset densities & reset all / apply selected density to all |
+| `Ctrl`+`C` / `Ctrl`+`V` | Copy / paste a cell-region pattern |
+| `←` / `→` | Step back / forward one tick (while paused) |
+| `Ctrl`+`Z` / `Ctrl`+`Shift`+`Z` | Undo / redo ruleset change |
 
-  * **Replay the recent past:** the selected world records a rolling ring of its last few hundred ticks (bit-packed frames). While paused, a **scrub bar** appears with a timeline slider (oldest → present), ±1 / ±10 step buttons, a live tick label, and a **Live** button to snap back to the present.
-  * **Step with the keyboard:** `←` and `→` step one tick backward / forward while paused.
-  * **Branch from the past:** stepping the simulation forward (or drawing) from a scrubbed-back point truncates the discarded future and continues from there — useful for "what if I'd nudged it here?" exploration.
-  * **Focused & cheap:** history is captured for the selected world only (so memory stays bounded to one world's ring), and it cleanly resets on any state discontinuity — reset, load, or ruleset change.
+</details>
 
-### 6\. Media Export (🎥 / 📷)
+## 📄 License
 
-Capture what you've discovered and take it with you.
-
-  * **PNG snapshot (📷):** export the selected world at full render resolution to a PNG, named `hexlife-<mnemonic>-t<tick>.png` so the ruleset and tick are baked into the filename.
-  * **WebM video (🎥):** record the **live composited canvas** — exactly what you see, selected view plus minimap — to an animated WebM via `MediaRecorder`. Toggle the toolbar button (it pulses red while recording); stopping saves `hexlife-<mnemonic>-t<tick>.webm` to disk. Codec negotiation prefers VP9 > VP8 > generic WebM based on browser support.
-
-### 7\. Advanced Draggable Panels
-
-  * **Ruleset Editor (📝):** A powerful interface for viewing and modifying rulesets with multiple modes.
-      * **Modes:** View and edit rules individually (**Detailed**), grouped by neighbor count (**Neighbor Count**), or grouped by rotational symmetry (**Rotational Symmetry**), which is the default.
-      * **Interactive Editing:** Click on rule visualizations to toggle their output state. Changes can be applied to the selected world or all worlds, with an option to auto-reset upon change.
-  * **World Setup Panel (🌐):** Configure the **grid size** (shared across all worlds), plus the initial density and enabled/disabled state for each of the 9 worlds individually. Includes a "Use Selected Ruleset" button to quickly propagate the selected world's ruleset to another world, and bulk actions for applying settings across worlds at once.
-  * **Analysis Panel (📈):** Houses a plugin system for data visualization and analysis.
-      * **Ratio History Plot:** Visualizes the history of the active cell ratio for the selected world.
-      * **Entropy Plot:** Visualizes the history of **Binary Entropy** (based on activity ratio) or **Block Entropy** (based on 7-cell hexagonal patterns). Includes controls to enable/disable entropy sampling and adjust the sampling rate.
-      * **Interestingness Metrics:** On-demand measurement of the selected world's dynamics across the Auto-Explore score components (σ / Entropy / Flux / Diversity / Structure / Heterog. / Temporal / Transport) plus the composite score. Click **Measure** to run one short, non-destructive evaluation burst (the world is snapshotted and restored); the σ damage probe and the burst length are adjustable since they're compute-intensive. The result renders as the same component bars used in the Explore gallery (the perceptual **Novelty** term is Explore-only, so it reads n/a here).
-  * **Rule Rank Panel (🏆):** Provides a real-time ranking of which rules are being used most frequently. It features a dual-column layout to separately rank rules that cause cells to become **active** versus those that cause them to become **inactive**, offering deep insight into the automaton's dynamics.
-
-### 8\. Keyboard Shortcuts
-
-A rich set of keyboard shortcuts enhances usability for power users.
-
-| Keys | Action | Scope / Notes |
-| :--- | :--- | :--- |
-| **Global Controls** | | |
-| `P` | Play / Pause Simulation | Global |
-| `Escape` | Close active popout or panel | Global |
-| `1` - `9` | Select World 1 through 9 | Follows numpad layout |
-| `Shift` + `1`-`9` | Toggle World's Enabled State | Follows numpad layout |
-| | | |
-| **Actions & Panels** | | |
-| `N` | Toggle **Ruleset Actions** panel | |
-| `E` | Toggle **Ruleset Editor** panel | |
-| `S` | Toggle **World Setup** panel | |
-| `A` | Toggle **Analysis** panel | |
-| `G` | **Generate** new ruleset | Uses settings from the ✨ panel. |
-| `M` | **Clone & Mutate** all other worlds | Uses settings from the 🧬 panel. |
-| `Shift`+`M` | **Mutate** selected/all worlds | Uses settings from the 🧬 panel. |
-| `O` | **Clone** selected ruleset to all others | |
-| `I` | **Invert** the selected world's ruleset | |
-| | | |
-| **Reset & Clear** | | |
-| `R` | **Reset** all enabled worlds | Reseeds with configured initial densities. |
-| `Shift`+`R` | **Reset** the selected world only | |
-| `C` | **Clear** all enabled worlds | |
-| `Shift`+`C` | **Clear** the selected world only | |
-| `D` | **Reset Densities** to default & Reset All | |
-| `Shift`+`D` | **Apply Selected Density to All** & Reset All | |
-| | | |
-| **Patterns** | | |
-| `Ctrl`+`C` | **Copy** a region of cells as a pattern | Drag a marquee to capture. Ignored while page text is selected. |
-| `Ctrl`+`V` | **Paste** the copied pattern | Phase-preserving placement under the cursor. |
-| | | |
-| **State Scrub** | | |
-| `←` | **Step back** one tick | While paused; opens the scrub bar. |
-| `→` | **Step forward** one tick | While paused. |
-| | | |
-| **History** | | |
-| `Ctrl`+`Z` | **Undo** ruleset change | For the selected world. |
-| `Ctrl`+`Shift`+`Z` | **Redo** ruleset change | For the selected world. |
+Released under the [MIT License](LICENSE) — © 2025 Sidem.
