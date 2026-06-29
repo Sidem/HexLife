@@ -38,8 +38,9 @@
     }
     </script>
     <!-- CSS link will be injected by Vite during build -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" href="favicon.svg">
 </head>
 
 <body>
@@ -92,7 +93,28 @@
     <div id="app-container">
         <div id="top-info-bar">
             <div id="appMenuButton" class="button-like" tabindex="0">
-                <div id="appLogo">⬡</div>
+                <div id="appLogo" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28">
+                        <defs>
+                            <radialGradient id="appLogoCore" cx="50%" cy="42%" r="65%">
+                                <stop offset="0%" stop-color="#fff2c2"/>
+                                <stop offset="55%" stop-color="#ffcd40"/>
+                                <stop offset="100%" stop-color="#f5a623"/>
+                            </radialGradient>
+                            <filter id="appLogoGlow" x="-60%" y="-60%" width="220%" height="220%">
+                                <feGaussianBlur stdDeviation="0.64" result="b"/>
+                                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+                        <polygon points="25.17,11.23 29.30,13.62 29.30,18.38 25.17,20.77 21.05,18.38 21.05,13.62" fill="#f3b53d"/>
+                        <polygon points="20.59,19.18 24.71,21.56 24.71,26.33 20.59,28.71 16.46,26.33 16.46,21.56" fill="#f3b53d"/>
+                        <polygon points="11.41,19.18 15.54,21.56 15.54,26.33 11.41,28.71 7.29,26.33 7.29,21.56" fill="#f3b53d"/>
+                        <polygon points="6.83,11.23 10.95,13.62 10.95,18.38 6.83,20.77 2.70,18.38 2.70,13.62" fill="#f3b53d"/>
+                        <polygon points="11.41,3.29 15.54,5.67 15.54,10.44 11.41,12.82 7.29,10.44 7.29,5.67" fill="#f3b53d"/>
+                        <polygon points="20.59,3.29 24.71,5.67 24.71,10.44 20.59,12.82 16.46,10.44 16.46,5.67" fill="#f3b53d"/>
+                        <polygon points="16.00,11.23 20.13,13.62 20.13,18.38 16.00,20.77 11.87,18.38 11.87,13.62" fill="url(#appLogoCore)" filter="url(#appLogoGlow)"/>
+                    </svg>
+                </div>
                 <span id="appTitle">HexLife Explorer</span>
             </div>
 

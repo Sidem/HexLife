@@ -31,8 +31,23 @@
 }
 
 #appLogo {
-    font-size: 1.5rem;
-    color: #FFFF00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+#appLogo svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+    transition: transform 0.3s ease;
+}
+
+#appMenuButton:hover #appLogo svg {
+    transform: scale(1.08) rotate(30deg);
 }
 
 #appTitle {

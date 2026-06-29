@@ -6,7 +6,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: #1e1e1e;
+    background: radial-gradient(circle at 50% 38%, #20222a 0%, #16171b 70%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -17,51 +17,81 @@
 }
 
 #loading-indicator .loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
 }
 
 #loading-title {
-    margin-top: 20px;
-    font-size: 1.2em;
-    color: #f0f0f0;
+    margin-top: 28px;
+    font-size: 1.45em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(180deg, #fff4cf 0%, #ffcd40 60%, #f5a623 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 
 #loading-status {
-    font-size: 0.9em;
-    color: #aaa;
+    font-size: 0.8em;
+    color: #8c8f99;
     margin-top: 10px;
     min-height: 20px;
+    letter-spacing: 0.3px;
     transition: color 0.3s;
 }
 
+/* ---- Honeycomb loader: 9 hexes = the app's 3x3 worlds ---- */
 .loader-grid {
-    display: block;
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: 120px;
+    height: 147px;
 }
 
 .loader-hex {
-    width: 50px;
-    height: 57.73px;
+    width: 48px;
+    height: 42px;
     position: absolute;
-    background-color: #333;
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    transition: background-color 0.5s ease-in-out, transform 0.3s ease;
-    transform: scale(0.95) rotate(90deg) translate(-50%, -50%);
+    background-color: #2b2d36;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    transform: scale(0.9);
+    animation: hexBreathe 2.4s ease-in-out infinite;
+    will-change: transform, background-color, filter;
 }
 
+/* A wave of "life" ripples through the dormant grid while workers spin up. */
+@keyframes hexBreathe {
+    0%, 100% { background-color: #25272f; transform: scale(0.86); filter: brightness(0.9); }
+    50%      { background-color: #3a3d49; transform: scale(0.92); filter: brightness(1.15); }
+}
+
+/* A world's worker is ready: its cell ignites in gold and pops. */
 .loader-hex.active {
-    background-color: #f0c674;
-    transform: scale(1.0) rotate(90deg) translate(-50%, -50%);
+    background-color: #f3b53d;
+    animation: hexIgnite 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    filter: drop-shadow(0 0 6px rgba(245, 182, 40, 0.65));
 }
 
-#loader-hex-0 { left: 0%; top: 40%; }
-#loader-hex-1 { left: 16%; top: 70%; }
-#loader-hex-2 { left: 16%; top: 12%; }
-#loader-hex-3 { left: 32%; top: -18%; }
-#loader-hex-4 { left: 32%; top: 40%; }
-#loader-hex-5 { left: 32%; top: 98%; }
-#loader-hex-6 { left: 48%; top: 70%; }
-#loader-hex-7 { left: 48%; top: 12%; }
-#loader-hex-8 { left: 64%; top: 40%; }
+@keyframes hexIgnite {
+    0%   { transform: scale(0.9); filter: brightness(1.8) drop-shadow(0 0 0 transparent); }
+    60%  { transform: scale(1.08); }
+    100% { transform: scale(0.98); filter: brightness(1) drop-shadow(0 0 6px rgba(245, 182, 40, 0.6)); }
+}
+
+/* Staggered 3x3 honeycomb (flat-top, alternating-column offset). */
+#loader-hex-0 { left: 0;    top: 0;    animation-delay: 0s;    }
+#loader-hex-1 { left: 36px; top: 21px; animation-delay: 0.5s;  }
+#loader-hex-2 { left: 72px; top: 0;    animation-delay: 1s;    }
+#loader-hex-3 { left: 0;    top: 42px; animation-delay: 0.25s; }
+#loader-hex-4 { left: 36px; top: 63px; animation-delay: 0.75s; }
+#loader-hex-5 { left: 72px; top: 42px; animation-delay: 1.25s; }
+#loader-hex-6 { left: 0;    top: 84px; animation-delay: 0.4s;  }
+#loader-hex-7 { left: 36px; top: 105px;animation-delay: 0.9s;  }
+#loader-hex-8 { left: 72px; top: 84px; animation-delay: 1.4s;  }
+
+@media (prefers-reduced-motion: reduce) {
+    .loader-hex { animation: none; }
+    .loader-hex.active { animation: none; }
+}
