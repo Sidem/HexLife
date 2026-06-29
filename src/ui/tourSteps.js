@@ -252,13 +252,6 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
-        element: '#world-setup-grid-size-mount',
-        title: 'Grid Size',
-        content: "Choose how large each universe is. Bigger grids reveal larger structures but simulate more slowly. <span class=\"onboarding-highlight-text\">Changing this restarts the simulation.</span>",
-        primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
-        advanceOn: { type: 'click' }
-    }, {
         element: '#world-setup-config-grid .world-config-cell:nth-child(5)',
         title: 'Per-World Configuration',
         content: "Every world has its own card: <span class=\"onboarding-highlight-text\">Edit...</span> sets its initial state (random fill or clumps), the switch <span class=\"onboarding-highlight-text\">enables/disables</span> it, and <span class=\"onboarding-highlight-text\">Use Selected Ruleset</span> copies the selected world's rules here.",

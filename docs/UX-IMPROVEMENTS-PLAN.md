@@ -97,6 +97,9 @@ menu, the command palette, and the mobile **More** view.
   *destructive-op safeguard*. `WorldManager._guardDestructive` routes Clear All / Reset All through
   `COMMAND_SHOW_CONFIRMATION` (gating every dispatch source centrally — toolbar, FABs, keyboard, palette);
   selected-scope clear bypasses (it keeps scrub-back). Deterministic-resets toggle also surfaced here.
+- **Relocated world prefs** — **Grid size** + **Deterministic resets** moved out of World Setup into a new
+  Settings **Simulation** section (they're global prefs; now in one place). World Setup keeps only
+  per-world initial-state config + bulk actions; the orphaned "Grid Size" tour step was removed.
 - **Appearance** section is a "coming soon" placeholder (light theme + CVD palette are the next items it
   will host).
 

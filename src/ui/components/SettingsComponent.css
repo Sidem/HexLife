@@ -32,6 +32,11 @@
     color: var(--text-secondary, #c8c8d0);
 }
 
+.settings-component-content .settings-field-hint {
+    font-size: 0.85em;
+    color: var(--text-muted, #8a8a92);
+}
+
 .settings-component-content .settings-toggle-list {
     display: flex;
     flex-direction: column;

@@ -3,6 +3,7 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { ToggleSwitch } from './ToggleSwitch.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import * as Config from '../../core/config.js';
 
 /**
  * The global Settings / Preferences panel. A single home for cross-cutting preferences
@@ -45,10 +46,20 @@ export class SettingsComponent extends BaseComponent {
             </section>
 
             <section class="settings-section">
+                <h5 class="settings-section-title">Simulation</h5>
+                <div class="settings-field">
+                    <span class="settings-field-label">Grid size <span class="settings-field-hint">(restarts the simulation)</span></span>
+                    <div id="settings-grid-size-mount"></div>
+                </div>
+                <div class="settings-toggle-list">
+                    <div id="settings-deterministic-mount"></div>
+                </div>
+            </section>
+
+            <section class="settings-section">
                 <h5 class="settings-section-title">Behaviour</h5>
                 <div class="settings-toggle-list">
                     <div id="settings-confirm-destructive-mount"></div>
-                    <div id="settings-deterministic-mount"></div>
                 </div>
             </section>
 
@@ -115,5 +126,62 @@ export class SettingsComponent extends BaseComponent {
             initialValue: PersistenceService.loadUISetting('deterministic', true),
             onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_DETERMINISTIC_RESET, !!v),
         });
+
+        this._createGridSizeControl();
+    }
+
+    /**
+     * Grid-size selector. Changing it resizes the torus and restarts the simulation via a
+     * full page reload (the clean way to rebuild renderer buffers + all 9 workers), so the
+     * change is confirmed first and the visible selection reverts until the user commits.
+     * Moved here from World Setup so all global preferences live in one place.
+     */
+    _createGridSizeControl() {
+        const mount = this.element.querySelector('#settings-grid-size-mount');
+        if (!mount) return;
+
+        const presets = Config.GRID_SIZE_PRESETS;
+        const items = Object.entries(presets).map(([key, rows]) => {
+            const { cols } = Config.deriveGridDimensions(rows);
+            const label = key.charAt(0).toUpperCase() + key.slice(1);
+            return { value: key, text: `${label} (${rows}×${cols})` };
+        });
+
+        // Match the current live size to a preset (null if a custom size came in via share URL).
+        this._currentGridSizeKey = Object.keys(presets).find(k => presets[k] === Config.GRID_ROWS) || null;
+
+        this.gridSizeSwitch = new SwitchComponent(mount, {
+            type: 'radio',
+            name: 'settings-grid-size-switch',
+            initialValue: this._currentGridSizeKey,
+            items,
+            onChange: (value) => this._handleGridSizeChange(value),
+        });
+    }
+
+    _handleGridSizeChange(presetKey) {
+        const rows = Config.GRID_SIZE_PRESETS[presetKey];
+        if (!rows || rows === Config.GRID_ROWS) return;
+
+        const { rows: r, cols: c } = Config.deriveGridDimensions(rows);
+
+        // Revert the visible selection immediately; the change is only committed (with a page
+        // reload, which cleanly rebuilds the renderer buffers and all workers) if the user confirms.
+        this.gridSizeSwitch.setValue(this._currentGridSizeKey);
+
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+            title: 'Change grid size?',
+            message: `Resize the grid to ${r} × ${c} (${(r * c).toLocaleString()} cells) and restart the simulation? Rulesets and initial-state settings are kept; the current live evolution is not.`,
+            confirmLabel: 'Resize & Restart',
+            onConfirm: () => {
+                PersistenceService.saveUISetting('gridRows', rows);
+                window.location.reload();
+            },
+        });
+    }
+
+    destroy() {
+        if (this.gridSizeSwitch) this.gridSizeSwitch.destroy();
+        super.destroy?.();
     }
 }

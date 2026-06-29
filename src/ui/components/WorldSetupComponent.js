@@ -2,7 +2,6 @@ import * as Config from '../../core/config.js';
 import { BaseComponent } from './BaseComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
-import * as PersistenceService from '../../services/PersistenceService.js';
 import { formatHexCode } from '../../utils/utils.js';
 import { rulesetVisualizer } from '../../utils/rulesetVisualizer.js';
 import { renderInitialStatePreview } from './initialStatePreview.js';
@@ -25,7 +24,6 @@ export class WorldSetupComponent extends BaseComponent {
         this.render();
         this._setupInternalListeners();
         this._createWorldSetupGrid();
-        this._createGridSizeControl();
         this.refresh();
         
         EventBus.subscribe(EVENTS.WORLD_SETTINGS_CHANGED, () => this.refresh());
@@ -40,9 +38,7 @@ export class WorldSetupComponent extends BaseComponent {
     render() {
         this.element.innerHTML = `
             <div class="panel-header-controls">
-                <p class="editor-text info-text">Configure the initial state for each world.</p>
-                <div id="world-setup-deterministic-switch-mount"></div>
-                <div id="world-setup-grid-size-mount" class="grid-size-control"></div>
+                <p class="editor-text info-text">Configure the initial state for each world. Grid size and deterministic resets now live in <b>Settings</b>.</p>
             </div>
             <div id="world-setup-config-grid" class="world-config-grid"></div>
             <div id="world-setup-panel-actions" class="panel-actions">
@@ -88,16 +84,8 @@ export class WorldSetupComponent extends BaseComponent {
 
     _createWorldSetupGrid() {
         const grid = this.uiElements.worldSetupGrid;
-        grid.innerHTML = ''; 
+        grid.innerHTML = '';
         this.worldControlCache = [];
-
-        const deterministicSwitchMount = this.element.querySelector('#world-setup-deterministic-switch-mount');
-        new SwitchComponent(deterministicSwitchMount, {
-            type: 'checkbox', name: 'deterministic-reset-switch',
-            initialValue: this.worldManager.deterministic,
-            items: [{ value: 'deterministic', text: 'Deterministic Reset' }],
-            onChange: (isChecked) => EventBus.dispatch(EVENTS.COMMAND_SET_DETERMINISTIC_RESET, isChecked)
-        });
 
         const fragment = document.createDocumentFragment();
 
@@ -156,55 +144,6 @@ export class WorldSetupComponent extends BaseComponent {
         grid.appendChild(fragment);
     }
 
-    _createGridSizeControl() {
-        const mount = this.element.querySelector('#world-setup-grid-size-mount');
-        if (!mount) return;
-
-        const presets = Config.GRID_SIZE_PRESETS;
-        const items = Object.entries(presets).map(([key, rows]) => {
-            const { cols } = Config.deriveGridDimensions(rows);
-            const label = key.charAt(0).toUpperCase() + key.slice(1);
-            return { value: key, text: `${label} (${rows}×${cols})` };
-        });
-
-        // Match the current live size to a preset (null if a custom size came in via share URL).
-        this._currentGridSizeKey = Object.keys(presets).find(k => presets[k] === Config.GRID_ROWS) || null;
-
-        const labelEl = document.createElement('span');
-        labelEl.className = 'state-mode-label';
-        labelEl.innerHTML = 'Grid Size <span class="info-text">(restarts simulation)</span>';
-        mount.appendChild(labelEl);
-
-        this.gridSizeSwitch = new SwitchComponent(mount, {
-            type: 'radio',
-            name: 'world-setup-grid-size-switch',
-            initialValue: this._currentGridSizeKey,
-            items,
-            onChange: (value) => this._handleGridSizeChange(value)
-        });
-    }
-
-    _handleGridSizeChange(presetKey) {
-        const rows = Config.GRID_SIZE_PRESETS[presetKey];
-        if (!rows || rows === Config.GRID_ROWS) return;
-
-        const { rows: r, cols: c } = Config.deriveGridDimensions(rows);
-
-        // Revert the visible selection immediately; the change is only committed (with a page
-        // reload, which cleanly rebuilds the renderer buffers and all workers) if the user confirms.
-        this.gridSizeSwitch.setValue(this._currentGridSizeKey);
-
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
-            title: 'Change grid size?',
-            message: `Resize the grid to ${r} × ${c} (${(r * c).toLocaleString()} cells) and restart the simulation? Rulesets and initial-state settings are kept; the current live evolution is not.`,
-            confirmLabel: 'Resize & Restart',
-            onConfirm: () => {
-                PersistenceService.saveUISetting('gridRows', rows);
-                window.location.reload();
-            }
-        });
-    }
-
     /**
      * Updates the existing grid elements with new state.
      * This is now the only method called on state changes.
@@ -257,7 +196,6 @@ export class WorldSetupComponent extends BaseComponent {
             if (cache.enableSwitch) cache.enableSwitch.destroy();
         });
         this.worldControlCache = [];
-        if (this.gridSizeSwitch) this.gridSizeSwitch.destroy();
         super.destroy();
     }
 } 
