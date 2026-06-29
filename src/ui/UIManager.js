@@ -15,6 +15,7 @@ import { PatternsComponent } from './components/PatternsComponent.js';
 import { LearningComponent } from './components/LearningComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 import { ExploreComponent } from './components/ExploreComponent.js';
+import { SettingsComponent } from './components/SettingsComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
@@ -65,6 +66,7 @@ export class UIManager {
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
         explore: { constructor: ExploreComponent, title: 'Auto-Explore' },
+        settings: { constructor: SettingsComponent, title: 'Settings' },
         learning: { constructor: LearningComponent, title: 'Learning Hub (Alpha)' },
     };
 
@@ -98,6 +100,7 @@ export class UIManager {
             learning: new LearningComponent(appContext),
             chromaLab: new ChromaLabComponent(appContext),
             explore: new ExploreComponent(appContext),
+            settings: new SettingsComponent(appContext),
             shortcuts: new KeyboardShortcutsComponent(appContext)
         };
 

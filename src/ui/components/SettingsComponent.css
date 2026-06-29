@@ -1,0 +1,65 @@
+/* Settings / Preferences panel (UX). Mirrors the Controls panel's section/field rhythm
+   so the two read as siblings; toggle rows reuse the shared ToggleSwitch component. */
+.settings-component-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.settings-component-content .settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-component-content .settings-section-title {
+    margin: 0;
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-muted, #8a8a92);
+}
+
+.settings-component-content .settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.settings-component-content .settings-field-label {
+    font-size: 0.82em;
+    color: var(--text-secondary, #c8c8d0);
+}
+
+.settings-component-content .settings-toggle-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0 -8px;
+}
+
+/* Cell-coloring segmented switch fills the panel width, like Controls' switches. */
+.settings-component-content .switch-component-container .switch-group {
+    display: flex;
+    width: 100%;
+}
+
+.settings-component-content .switch-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 6px;
+}
+
+.settings-component-content .settings-coming-soon {
+    margin: 0;
+    font-size: 0.82em;
+    line-height: 1.45;
+    color: var(--text-muted, #9a9aa4);
+}
+
+.settings-component-content .settings-coming-soon strong {
+    color: var(--text-secondary, #d0d0d8);
+}

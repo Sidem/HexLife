@@ -25,6 +25,8 @@ export class TopInfoBar {
             statStatus: document.getElementById('stat-status'),
             statBrushSize: document.getElementById('stat-brush-size'),
             statFps: document.getElementById('stat-fps'),
+            statFpsTile: document.querySelector('.stat-tile-fps'),
+            statTpsTile: document.querySelector('.stat-tile-tps'),
             statActualTps: document.getElementById('stat-actual-tps'),
             statTargetTps: document.getElementById('stat-target-tps'),
             statTpsBar: document.getElementById('stat-tps-bar'),
@@ -51,6 +53,7 @@ export class TopInfoBar {
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
         this.updateBrushSizeDisplay(this.appContext.brushController.getBrushSize());
         this.updateUndoRedoButtons();
+        this.applyShowPerformance(this.appContext.visualizationController.getShowPerformance());
         if (this.uiElements?.statTargetTps) {
             this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getSpeed());
         }
@@ -66,6 +69,13 @@ export class TopInfoBar {
                 alignment: 'start'
             });
             this.appContext.toolbar?.registerPopout(this.popoutPanels.appMenu);
+
+            // The app-menu "Settings" entry opens the Settings panel (a second entry point
+            // beside the toolbar's gear button) and closes the menu behind it.
+            document.getElementById('appMenuSettingsButton')?.addEventListener('click', () => {
+                this.popoutPanels.appMenu?.hide();
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'settings', show: true });
+            });
         }
         
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
@@ -147,6 +157,7 @@ export class TopInfoBar {
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.updateStatsDisplay(this.worldManager.getSelectedWorldStats()));
         EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (size) => this.updateBrushSizeDisplay(size));
         EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => this.updatePerformanceDisplay(data.fps, data.tps, data.targetTps));
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_PERFORMANCE, (shouldShow) => this.applyShowPerformance(shouldShow));
         EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, () => {
             const hex = this.worldManager.getCurrentRulesetHex();
             this.updateMainRulesetDisplay(hex);
@@ -292,6 +303,21 @@ export class TopInfoBar {
             const ratio = target > 0 && tpsOfSelectedWorld !== undefined ? (tpsOfSelectedWorld / target) * 100 : 0;
             this.uiElements.statTpsBar.style.width = `${Math.max(0, Math.min(100, ratio))}%`;
         }
+    }
+
+    /**
+     * Show or hide the FPS/TPS telemetry tiles (and their preceding separator) per the
+     * persisted "Show performance" preference. Hidden by default-off users; the tiles keep
+     * updating in the background so re-enabling is instant.
+     */
+    applyShowPerformance(shouldShow) {
+        const show = !!shouldShow;
+        this.uiElements?.statFpsTile?.classList.toggle('hidden', !show);
+        this.uiElements?.statTpsTile?.classList.toggle('hidden', !show);
+        // The hairline separator directly before the FPS tile only makes sense when the
+        // telemetry group is visible.
+        const sep = this.uiElements?.statFpsTile?.previousElementSibling;
+        if (sep && sep.classList.contains('stat-sep')) sep.classList.toggle('hidden', !show);
     }
 
     updateBrushSizeDisplay(brushSize) {

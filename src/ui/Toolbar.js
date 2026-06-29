@@ -26,6 +26,7 @@ const TOOLBAR_BUTTON_LABELS = {
     recordWebmButton: 'Record Video',
     shareButton: 'Share',
     colorPanelButton: 'Colors',
+    settingsButton: 'Settings',
     shortcutsButton: 'Shortcuts',
     helpButton: 'Learning Hub',
 };
@@ -57,6 +58,7 @@ const TOOLBAR_BUTTON_ICONS = {
     recordWebmButton: ICONS.video,
     shareButton: ICONS.share,
     colorPanelButton: ICONS.palette,
+    settingsButton: ICONS.cog,
     shortcutsButton: ICONS.keyboard,
     helpButton: ICONS.graduationCap,
 };
@@ -112,6 +114,7 @@ export class Toolbar {
             analysisPanelButton: document.getElementById('analysisPanelButton'),
             rankPanelButton: document.getElementById('rankPanelButton'),
             colorPanelButton: document.getElementById('colorPanelButton'),
+            settingsButton: document.getElementById('settingsButton'),
             shortcutsButton: document.getElementById('shortcutsButton'),
             helpButton: document.getElementById('helpButton'),
         };
@@ -260,6 +263,7 @@ export class Toolbar {
             setupPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'worldsetup' }),
             exploreButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'explore' }),
             colorPanelButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'chromalab' }),
+            settingsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'settings' }),
             shortcutsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'shortcuts' }),
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },

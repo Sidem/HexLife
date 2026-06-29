@@ -84,6 +84,7 @@ export class CommandPalette {
             { title: 'Record / stop video', category: 'Capture', icon: ICONS.video, run: dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING) },
             { title: 'Share setup link', category: 'Capture', icon: ICONS.share, run: () => { this._openPopout('share'); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); } },
             { title: 'Colors (Chroma Lab)', category: 'Capture', icon: ICONS.palette, run: () => this._openPanel('chromalab') },
+            { title: 'Settings / preferences', category: 'Capture', icon: ICONS.cog, run: () => this._openPanel('settings') },
             { title: 'Keyboard shortcuts', category: 'Capture', icon: ICONS.keyboard, run: () => this._openPanel('shortcuts') },
             { title: 'Learning Hub', category: 'Capture', icon: ICONS.graduationCap, run: () => this._openPanel('learning') },
         ];

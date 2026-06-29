@@ -1,0 +1,119 @@
+import { BaseComponent } from './BaseComponent.js';
+import { SwitchComponent } from './SwitchComponent.js';
+import { ToggleSwitch } from './ToggleSwitch.js';
+import { EventBus, EVENTS } from '../../services/EventBus.js';
+import * as PersistenceService from '../../services/PersistenceService.js';
+
+/**
+ * The global Settings / Preferences panel. A single home for cross-cutting preferences
+ * that were previously scattered (display toggles lived under "Controls") or had no home
+ * at all (confirm-destructive-actions). Contextual settings stay where they belong — brush
+ * mode in Controls, search params in Explore — so this panel is intentionally not a catch-all.
+ *
+ * Every toggle is backed by the existing persisted UI-settings store via the same COMMAND_*
+ * events the old surfaces used, so behaviour and persistence are unchanged; only the location
+ * moves. Built as a shared component (one instance, mounted into the desktop draggable panel
+ * or the mobile view), matching the Controls/Explore pattern.
+ */
+export class SettingsComponent extends BaseComponent {
+    constructor(appContext, options = {}) {
+        super(null, options);
+        this.appContext = appContext;
+        this.element = document.createElement('div');
+        this.element.className = 'settings-component-content';
+        this.render();
+    }
+
+    getElement() {
+        return this.element;
+    }
+
+    render() {
+        this.element.innerHTML = `
+            <section class="settings-section">
+                <h5 class="settings-section-title">Display</h5>
+                <div class="settings-field">
+                    <span class="settings-field-label">Cell coloring</span>
+                    <div id="settings-ruleset-viz-mount"></div>
+                </div>
+                <div class="settings-toggle-list">
+                    <div id="settings-show-minimap-overlay-mount"></div>
+                    <div id="settings-show-status-badges-mount"></div>
+                    <div id="settings-show-command-toasts-mount"></div>
+                    <div id="settings-show-performance-mount"></div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h5 class="settings-section-title">Behaviour</h5>
+                <div class="settings-toggle-list">
+                    <div id="settings-confirm-destructive-mount"></div>
+                    <div id="settings-deterministic-mount"></div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h5 class="settings-section-title">Appearance</h5>
+                <p class="settings-coming-soon">Light theme and a colorblind-safe palette are coming soon. For now, customise cell colours in <strong>Chroma Lab</strong>.</p>
+            </section>
+        `;
+
+        const vizController = this.appContext.visualizationController;
+
+        new SwitchComponent(this.element.querySelector('#settings-ruleset-viz-mount'), {
+            type: 'radio',
+            name: 'settings-ruleset-viz',
+            initialValue: vizController.getVizType(),
+            items: vizController.getVisualizationOptions(),
+            onChange: (type) => EventBus.dispatch(EVENTS.COMMAND_SET_VISUALIZATION_TYPE, type),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-show-minimap-overlay-mount'), {
+            id: 'settings-show-minimap-overlay',
+            label: 'Minimap overlays',
+            description: 'Draw each minimap’s ruleset glyph over the 3×3 grid.',
+            initialValue: vizController.getShowMinimapOverlay(),
+            onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, v),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-show-status-badges-mount'), {
+            id: 'settings-show-status-badges',
+            label: 'Status badges',
+            description: 'Flag extinct / saturated / cycling worlds on the minimaps.',
+            initialValue: vizController.getShowStatusBadges(),
+            onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_STATUS_BADGES, v),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-show-command-toasts-mount'), {
+            id: 'settings-show-command-toasts',
+            label: 'Action toasts',
+            description: 'Show a brief confirmation when an action runs.',
+            initialValue: vizController.getShowCommandToasts(),
+            onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, v),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-show-performance-mount'), {
+            id: 'settings-show-performance',
+            label: 'Show performance (FPS / TPS)',
+            description: 'Display engineering telemetry in the top bar.',
+            initialValue: vizController.getShowPerformance(),
+            onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_SHOW_PERFORMANCE, v),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-confirm-destructive-mount'), {
+            id: 'settings-confirm-destructive',
+            label: 'Confirm destructive actions',
+            description: 'Ask before Clear All / Reset All (these affect all 9 worlds and can’t be undone).',
+            initialValue: PersistenceService.loadUISetting('confirmDestructiveActions', true),
+            onChange: (v) => PersistenceService.saveUISetting('confirmDestructiveActions', !!v),
+        });
+
+        new ToggleSwitch(this.element.querySelector('#settings-deterministic-mount'), {
+            id: 'settings-deterministic',
+            label: 'Deterministic resets',
+            description: 'Worlds sharing a starting density reset to identical grids.',
+            initialValue: PersistenceService.loadUISetting('deterministic', true),
+            onChange: (v) => EventBus.dispatch(EVENTS.COMMAND_SET_DETERMINISTIC_RESET, !!v),
+        });
+    }
+}

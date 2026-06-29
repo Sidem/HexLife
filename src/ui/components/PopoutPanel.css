@@ -317,7 +317,8 @@
         flex-direction: column;
     }
 
-    .popout-link-list li a {
+    .popout-link-list li a,
+    .popout-link-list li .popout-link-button {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -329,12 +330,25 @@
         font-size: 0.95em;
     }
 
-    .popout-link-list li a:hover {
+    /* The Settings entry is a <button> (it triggers an action, not navigation); reset the
+       native button chrome so it reads identically to the sibling link rows. */
+    .popout-link-list li .popout-link-button {
+        width: 100%;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+    }
+
+    .popout-link-list li a:hover,
+    .popout-link-list li .popout-link-button:hover {
         background-color: #0078d4;
         color: #ffffff;
     }
 
-    .popout-link-list li a .icon {
+    .popout-link-list li a .icon,
+    .popout-link-list li .popout-link-button .icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -344,5 +358,10 @@
         width: 16px;
         height: 16px;
         fill: currentColor;
+    }
+
+    .popout-link-list li .popout-link-button .icon svg {
+        width: 16px;
+        height: 16px;
     }
 }

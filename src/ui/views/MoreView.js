@@ -30,6 +30,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="library" title="Ruleset Library" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.library} Ruleset Library</button>
         <button class="button" data-action="patterns" title="Patterns" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.shapes} Patterns</button>
         <button class="button" data-action="explore" title="Auto-Explore" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.compass} Auto-Explore</button>
+        <button class="button" data-action="settings" title="Settings &amp; preferences" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.cog} Settings</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
     </div>
@@ -77,6 +78,10 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="explore"]'), 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'explore' });
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="settings"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'settings' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {

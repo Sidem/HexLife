@@ -30,6 +30,7 @@
 @import url('src/ui/components/RulesetActionsComponent.css');
 @import url('src/ui/components/ChromaLabComponent.css');
 @import url('src/ui/components/ExploreComponent.css');
+@import url('src/ui/components/SettingsComponent.css');
 @import url('src/ui/components/SaveRulesetModal.css');
 @import url('src/ui/components/SavePatternModal.css');
 @import url('src/ui/components/InitialStateConfigModal.css');

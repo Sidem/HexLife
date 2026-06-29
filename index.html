@@ -151,6 +151,14 @@
         <div id="appMenuPopout" class="popout-panel popout-menu hidden">
             <ul class="popout-link-list">
                 <li>
+                    <button id="appMenuSettingsButton" type="button" class="popout-link-button">
+                        <span class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
+                        Settings
+                    </button>
+                </li>
+                <li>
                     <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener">
                         <span class="icon">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
@@ -187,6 +195,7 @@
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
                 <div class="toolbar-separator" role="separator"></div>
                 <button id="colorPanelButton" class="toolbar-button" title="Chroma Lab - Color Customization">🎨</button>
+                <button id="settingsButton" class="toolbar-button" title="Settings &amp; preferences">🎛️</button>
                 <button id="shortcutsButton" class="toolbar-button" title="Keyboard Shortcuts">⌨️</button>
                 <button id="helpButton" class="toolbar-button" title="Help">🎓</button>
             </div>
@@ -326,6 +335,12 @@
         <div id="chromaLabPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="chromaLabTitle">
             <button class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="chromaLabTitle">Chroma Lab<span class="panel-subtitle">Cell colours &amp; palettes</span></h3>
+            <div class="panel-content-area">
+            </div>
+        </div>
+        <div id="settingsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="settingsPanelTitle" data-tour-id="settings-panel">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="settingsPanelTitle">Settings<span class="panel-subtitle">Your preferences</span></h3>
             <div class="panel-content-area">
             </div>
         </div>

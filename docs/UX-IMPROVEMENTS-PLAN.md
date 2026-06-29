@@ -79,6 +79,27 @@ discovery), and future-proofs against toolbar crowding. Cheap because every acti
 
 ## Next up (not in this iteration)
 
+### Shipped 2026-06-29 — ☑ Settings / Preferences panel (+ destructive-op safeguard)
+*293 JS tests green · lint clean (0 errors) · `npx vite build` clean · verified in the headless preview
+(panel renders 3 sections / 6 toggles / viz radio; show-performance hides FPS/TPS; Reset All / Clear All
+request confirmation when the gate is on and run straight through when off; selected-scope clear always
+bypasses).* A new global home for cross-cutting preferences, reachable from the toolbar gear, the app
+menu, the command palette, and the mobile **More** view.
+- New `src/ui/components/SettingsComponent.js` + `.css`; registered as a draggable panel (`#settingsPanel`,
+  trigger `settingsButton`) in `PanelManager`, added to `UIManager` shared components + `#mobileViewConfig`,
+  and to the `CommandPalette` list. New `cog` icon in `icons.js`.
+- **Relocated** the display toggles (cell coloring, minimap overlays, status badges, action toasts) out of
+  the "Controls" popout into Settings — Controls is now just Simulation + Drawing, matching its
+  "Speed & Brush" label. Single source of truth; same persisted settings, same `COMMAND_*` events.
+- **New: show-performance toggle** — `VisualizationController.getShowPerformance` + `COMMAND_SET_SHOW_PERFORMANCE`;
+  `TopInfoBar.applyShowPerformance` hides/shows the FPS/TPS tiles + their separator (the deferred half of #4).
+- **New: confirm-destructive-actions toggle** (default on) — delivers the CLAUDE.md roadmap
+  *destructive-op safeguard*. `WorldManager._guardDestructive` routes Clear All / Reset All through
+  `COMMAND_SHOW_CONFIRMATION` (gating every dispatch source centrally — toolbar, FABs, keyboard, palette);
+  selected-scope clear bypasses (it keeps scrub-back). Deterministic-resets toggle also surfaced here.
+- **Appearance** section is a "coming soon" placeholder (light theme + CVD palette are the next items it
+  will host).
+
 ### Shipped this session — ☑ #4, #8, #7 (2026-06-28)
 *293 JS tests green (+9 from `tests/worldStatus.test.js`) · lint clean (0 errors) · `npx vite build`
 clean · verified live in the headless preview (status chip → Died out / Full / Cycling ↻N / Active;

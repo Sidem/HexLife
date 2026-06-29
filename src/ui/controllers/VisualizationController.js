@@ -8,12 +8,15 @@ export class VisualizationController {
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_MINIMAP_OVERLAY, this.#handleSetShowMinimapOverlay);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_STATUS_BADGES, this.#handleSetShowStatusBadges);
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_COMMAND_TOASTS, this.#handleSetShowCommandToasts);
+        EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_PERFORMANCE, this.#handleSetShowPerformance);
     }
 
     getVizType = () => PersistenceService.loadUISetting('rulesetVizType', 'binary');
     getShowMinimapOverlay = () => PersistenceService.loadUISetting('showMinimapOverlay', true);
     getShowStatusBadges = () => PersistenceService.loadUISetting('showStatusBadges', true);
     getShowCommandToasts = () => PersistenceService.loadUISetting('showCommandToasts', true);
+    // FPS/TPS telemetry defaults to visible (matches pre-Settings behaviour).
+    getShowPerformance = () => PersistenceService.loadUISetting('showPerformance', true);
 
     getVisualizationOptions() {
         return [
@@ -40,5 +43,9 @@ export class VisualizationController {
 
     #handleSetShowCommandToasts = (shouldShow) => {
         PersistenceService.saveUISetting('showCommandToasts', !!shouldShow);
+    }
+
+    #handleSetShowPerformance = (shouldShow) => {
+        PersistenceService.saveUISetting('showPerformance', !!shouldShow);
     }
 } 

@@ -410,14 +410,12 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, this._applySelectedInitialStateToAll);
         EventBus.subscribe(EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, this._resetStatesToDefault);
         EventBus.subscribe(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, () => {
-            const baseSeed = Date.now();
-            this.worlds.forEach((proxy, idx) => {
-                if (this.worldSettings[idx]) {
-                    proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
-                    if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
-                }
+            this._guardDestructive({
+                title: 'Reset all 9 worlds?',
+                message: 'Re-seed every world with fresh random cells at its starting density. This affects all nine worlds and cannot be undone.',
+                confirmLabel: 'Reset all',
+                run: () => this._resetAllWorldsToInitialDensities(),
             });
-            EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
         });
         EventBus.subscribe(EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, (data) => {
             const primaryRulesetHex = this.worldSettings[this.selectedWorldIndex]?.rulesetHex;
@@ -444,21 +442,18 @@ export class WorldManager {
             PersistenceService.saveWorldSettings(this.worldSettings);
         });
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_WORLDS, (data) => {
-            const indicesToClear = this._getAffectedWorldIndices(data.scope);
-            indicesToClear.forEach(idx => {
-                const proxy = this.worlds[idx];
-                if (!proxy) return;
-
-                const initialState = this.worldSettings[idx]?.initialState;
-                if (!initialState) {
-                    console.warn(`World ${idx} has no initial state, skipping clear.`);
-                    return;
-                }
-                const clearStateConfig = { ...initialState, params: { ...initialState.params, density: 0 } };
-                proxy.sendCommand('RESET_WORLD', { isClearOperation: true, initialState: clearStateConfig });
-            });
-
-            if (data.scope === 'all') EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+            // Only the all-worlds clear is unrecoverable; a single world keeps scrub-back,
+            // so it bypasses the confirmation gate.
+            if (data?.scope === 'all') {
+                this._guardDestructive({
+                    title: 'Clear all 9 worlds?',
+                    message: 'Empty every cell to the inactive state across all nine worlds. This cannot be undone.',
+                    confirmLabel: 'Clear all',
+                    run: () => this._clearWorlds(data),
+                });
+            } else {
+                this._clearWorlds(data);
+            }
         });
         EventBus.subscribe(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE, this.saveSelectedWorldState);
         EventBus.subscribe(EVENTS.COMMAND_LOAD_WORLD_STATE, (data) => this.loadWorldState(data.worldIndex, data.loadedData));
@@ -571,6 +566,54 @@ export class WorldManager {
      */
     _getResetSeed(baseSeed, worldIndex) {
         return this.deterministic ? baseSeed : baseSeed + worldIndex;
+    }
+
+    /**
+     * Run a destructive all-worlds action, optionally behind a confirmation dialog. The
+     * "confirm destructive actions" preference (default on) is read live; when off, the
+     * action runs immediately. Routing through the EventBus keeps WorldManager UI-agnostic
+     * and gates every dispatch source (toolbar popout, FABs, keyboard, command palette) at
+     * once. The confirmation is requested via COMMAND_SHOW_CONFIRMATION; `run` performs the
+     * work directly on confirm (no command re-dispatch, so no loop).
+     * @param {{title:string, message:string, confirmLabel:string, run:()=>void}} opts
+     */
+    _guardDestructive({ title, message, confirmLabel, run }) {
+        if (PersistenceService.loadUISetting('confirmDestructiveActions', true)) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, { title, message, confirmLabel, onConfirm: run });
+        } else {
+            run();
+        }
+    }
+
+    /** Re-seed all worlds with fresh random cells at their configured densities. */
+    _resetAllWorldsToInitialDensities() {
+        const baseSeed = Date.now();
+        this.worlds.forEach((proxy, idx) => {
+            if (this.worldSettings[idx]) {
+                proxy.resetWorld(this.worldSettings[idx].initialState, this._getResetSeed(baseSeed, idx));
+                if (!this.isGloballyPaused && this.worldSettings[idx].enabled) proxy.startSimulation();
+            }
+        });
+        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
+    }
+
+    /** Empty cells to the inactive state across the scope's worlds (clear, not reset). */
+    _clearWorlds(data) {
+        const indicesToClear = this._getAffectedWorldIndices(data.scope);
+        indicesToClear.forEach(idx => {
+            const proxy = this.worlds[idx];
+            if (!proxy) return;
+
+            const initialState = this.worldSettings[idx]?.initialState;
+            if (!initialState) {
+                console.warn(`World ${idx} has no initial state, skipping clear.`);
+                return;
+            }
+            const clearStateConfig = { ...initialState, params: { ...initialState.params, density: 0 } };
+            proxy.sendCommand('RESET_WORLD', { isClearOperation: true, initialState: clearStateConfig });
+        });
+
+        if (data.scope === 'all') EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
     }
 
     /**
