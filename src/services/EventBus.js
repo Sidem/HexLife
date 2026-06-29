@@ -229,10 +229,18 @@ export const EVENTS = {
     COMMAND_SAVE_SELECTED_WORLD_STATE: 'command:saveSelectedWorldState', 
     /** @param {{worldIndex: number, loadedData: object}} data - The world to load the state into and the data to load. */
     COMMAND_LOAD_WORLD_STATE: 'command:loadWorldState',
-    /** @event Emitted with no payload to export the currently selected world's render as a PNG download. */
+    /** @event Emitted with no payload to quick-export the selected world as a native-resolution PNG. */
     COMMAND_EXPORT_WORLD_PNG: 'command:exportWorldPng',
-    /** @event Emitted with no payload to toggle WebM video recording of the live canvas (start ⇄ stop+download). */
+    /** @event No payload. If recording, stops & saves; otherwise opens the Capture Studio on the Video tab. */
     COMMAND_TOGGLE_WORLD_RECORDING: 'command:toggleWorldRecording',
+    /** @param {{tab?: 'screenshot'|'video'}} [data] - Open the Capture Studio modal (optionally on a given tab). */
+    COMMAND_SHOW_CAPTURE_STUDIO: 'command:showCaptureStudio',
+    /** @event No payload. Quick-record toggle (hotkey): start with last-used settings, or stop & save if recording. */
+    COMMAND_QUICK_TOGGLE_RECORDING: 'command:quickToggleRecording',
+    /** @event No payload. Pause ⇄ resume the active recording (hotkey / HUD button). */
+    COMMAND_TOGGLE_RECORDING_PAUSE: 'command:toggleRecordingPause',
+    /** @param {{elapsedMs:number, frames:number|null, format:'webm'|'gif', estBytes:number, paused:boolean}} data - Live recording progress for the HUD. */
+    CAPTURE_RECORDING_PROGRESS: 'simulation:captureRecordingProgress',
     /** @param {{worldIndex: number, col: number, row: number, brushSize: number}} data - Brush application details. */
     COMMAND_APPLY_BRUSH: 'command:applyBrush', 
     /** @param {{worldIndex: number, cellIndices: Set<number>}} data - A set of specific cell indices to toggle. */

@@ -615,7 +615,7 @@ export function captureWorldImageData(worldIndex, size = 224) {
  * @param {number} worldIndex
  * @returns {HTMLCanvasElement|null}
  */
-function _captureWorldToCanvas(worldIndex) {
+function _captureWorldToCanvas(worldIndex, reuseCanvas = null) {
     if (!gl || worldIndex < 0 || worldIndex >= worldFBOs.length) return null;
     const fboData = worldFBOs[worldIndex];
     if (!fboData) return null;
@@ -627,7 +627,8 @@ function _captureWorldToCanvas(worldIndex) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     // WebGL's FBO origin is bottom-left; flip rows into top-left image orientation.
-    const out = document.createElement('canvas');
+    // Reuse the caller's canvas (recording hot path) to avoid per-frame allocation.
+    const out = reuseCanvas || document.createElement('canvas');
     out.width = size;
     out.height = size;
     const ctx = out.getContext('2d');
@@ -645,4 +646,113 @@ function _captureWorldToCanvas(worldIndex) {
 /** The live main canvas element (used by the media-export feature for WebM capture). */
 export function getCanvasElement() {
     return canvas;
+}
+
+// --- Capture Studio compositor ---------------------------------------------
+// Arbitrary-resolution stills/recording, built on the per-world FBOs (already
+// drawn every frame; the selected world's FBO already bakes in camera pan/zoom).
+// All resolution logic lives in 2D so no GL layout refactor is needed, and it
+// works for both capture sources ('selected' world / 'canvas' as-seen composite).
+
+// Reusable per-world readback canvases (RENDER_TEXTURE_SIZE²) so the per-frame
+// recording path doesn't allocate a fresh canvas for every world every frame.
+const _captureCanvasPool = new Map();
+function _poolCanvasFor(worldIndex) {
+    let c = _captureCanvasPool.get(worldIndex);
+    if (!c) {
+        c = document.createElement('canvas');
+        c.width = Config.RENDER_TEXTURE_SIZE;
+        c.height = Config.RENDER_TEXTURE_SIZE;
+        _captureCanvasPool.set(worldIndex, c);
+    }
+    return c;
+}
+
+// Convert a Config float color array ([r,g,b,a] in 0..1) to a CSS color string.
+function _floatColorToCss(c) {
+    const r = Math.round((c[0] ?? 0) * 255);
+    const g = Math.round((c[1] ?? 0) * 255);
+    const b = Math.round((c[2] ?? 0) * 255);
+    const a = c[3] ?? 1;
+    return `rgba(${r},${g},${b},${a})`;
+}
+
+/**
+ * Draw one frame of the chosen capture source into a caller-supplied 2D context,
+ * scaled to `width`×`height`. Used by both the one-shot still path and the
+ * per-frame recording loop.
+ * @param {CanvasRenderingContext2D} ctx Destination 2D context (sized width×height).
+ * @param {{source:'selected'|'canvas', width:number, height:number, selectedIndex:number, background?:boolean}} opts
+ * @returns {boolean} true if a frame was composed.
+ */
+export function composeCaptureFrame(ctx, { source, width, height, selectedIndex, background = true } = {}) {
+    if (!gl || !ctx || !(width > 0) || !(height > 0)) return false;
+
+    if (background) {
+        ctx.fillStyle = _floatColorToCss(Config.BACKGROUND_COLOR);
+        ctx.fillRect(0, 0, width, height);
+    } else {
+        ctx.clearRect(0, 0, width, height);
+    }
+
+    if (source === 'selected') {
+        const c = _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex));
+        if (!c) return false;
+        ctx.drawImage(c, 0, 0, width, height);
+        return true;
+    }
+
+    // 'canvas' — reproduce the on-screen composite (selected view + 3×3 minimap)
+    // at the target resolution by scaling the cached live-canvas layout rects.
+    if (!layoutCache || !layoutCache.selectedView || !layoutCache.miniMap) return false;
+    if (!canvas || !canvas.width || !canvas.height) return false;
+    const sx = width / canvas.width;
+    const sy = height / canvas.height;
+
+    const sv = layoutCache.selectedView;
+    const selC = _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex));
+    if (selC) ctx.drawImage(selC, sv.x * sx, sv.y * sy, sv.width * sx, sv.height * sy);
+
+    const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = layoutCache.miniMap;
+    for (let i = 0; i < Config.NUM_WORLDS; i++) {
+        const row = Math.floor(i / Config.WORLD_LAYOUT_COLS);
+        const col = i % Config.WORLD_LAYOUT_COLS;
+        const mx = gridContainerX + col * (miniMapW + miniMapSpacing);
+        const my = gridContainerY + row * (miniMapH + miniMapSpacing);
+        const dx = mx * sx, dy = my * sy, dw = miniMapW * sx, dh = miniMapH * sy;
+        // Disabled worlds carry their dim overlay in the FBO already, so a plain
+        // readback reproduces them faithfully — no special-casing needed.
+        const c = _captureWorldToCanvas(i, _poolCanvasFor(i));
+        if (c) ctx.drawImage(c, dx, dy, dw, dh);
+        if (i === selectedIndex) {
+            ctx.strokeStyle = _floatColorToCss(Config.SELECTION_OUTLINE_COLOR);
+            ctx.lineWidth = Math.max(1.5, Math.min(dw, dh) * 0.02);
+            ctx.strokeRect(dx, dy, dw, dh);
+        }
+    }
+    return true;
+}
+
+/**
+ * One-shot still capture of the chosen source at an arbitrary resolution/format.
+ * @param {{source:'selected'|'canvas', width:number, height:number, selectedIndex:number, format?:'png'|'jpeg', quality?:number}} opts
+ * @returns {Promise<Blob|null>|null} resolves to the encoded image blob, or null if capture is unavailable.
+ */
+export function captureSourceToBlob({ source, width, height, selectedIndex, format = 'png', quality = 0.92 } = {}) {
+    if (!gl) return null;
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(width));
+    out.height = Math.max(1, Math.round(height));
+    const ctx = out.getContext('2d');
+    if (!ctx) return null;
+    const ok = composeCaptureFrame(ctx, { source, width: out.width, height: out.height, selectedIndex });
+    if (!ok) return null;
+    const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    return new Promise((resolve) => out.toBlob(resolve, mime, quality));
+}
+
+/** The live canvas aspect ratio (width/height), for source-aware resolution presets. */
+export function getLiveCanvasAspect() {
+    if (!canvas || !canvas.height) return 16 / 9;
+    return canvas.width / canvas.height;
 }

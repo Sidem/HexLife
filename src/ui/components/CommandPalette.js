@@ -80,7 +80,8 @@ export class CommandPalette {
             // ---- Capture & app ----
             { title: 'Save world state', category: 'Capture', icon: ICONS.save, run: dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE) },
             { title: 'Load world state', category: 'Capture', icon: ICONS.folderOpen, run: () => document.getElementById('loadStateButton')?.click() },
-            { title: 'Export PNG snapshot', category: 'Capture', icon: ICONS.camera, run: dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG) },
+            { title: 'Open Capture Studio', category: 'Capture', icon: ICONS.camera, run: dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' }) },
+            { title: 'Quick screenshot (PNG, selected world)', category: 'Capture', icon: ICONS.camera, run: dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG) },
             { title: 'Record / stop video', category: 'Capture', icon: ICONS.video, run: dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING) },
             { title: 'Share setup link', category: 'Capture', icon: ICONS.share, run: () => { this._openPopout('share'); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); } },
             { title: 'Colors (Chroma Lab)', category: 'Capture', icon: ICONS.palette, run: () => this._openPanel('chromalab') },

@@ -14,6 +14,7 @@ function icon(content, { filled = false } = {}) {
 export const ICONS = {
     play: icon('<path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2z"/>', { filled: true }),
     pause: icon('<rect x="5.5" y="4" width="4.5" height="16" rx="1"/><rect x="14" y="4" width="4.5" height="16" rx="1"/>', { filled: true }),
+    gripVertical: icon('<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>', { filled: true }),
     chevronLeft: icon('<path d="m15 18-6-6 6-6"/>'),
     chevronRight: icon('<path d="m9 18 6-6-6-6"/>'),
     skipBack: icon('<path d="M18 4.8a1 1 0 0 1 1.5.86v12.68a1 1 0 0 1-1.5.86l-9-5.66a1 1 0 0 1 0-1.72z"/><rect x="4" y="4" width="3" height="16" rx="1"/>', { filled: true }),

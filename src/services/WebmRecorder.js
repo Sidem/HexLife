@@ -45,23 +45,42 @@ export class WebmRecorder {
     }
 
     get isRecording() {
-        return !!this._recorder && this._recorder.state === 'recording';
+        return !!this._recorder && (this._recorder.state === 'recording' || this._recorder.state === 'paused');
+    }
+
+    get isPaused() {
+        return !!this._recorder && this._recorder.state === 'paused';
+    }
+
+    /** Pause encoding without ending the clip (MediaRecorder keeps the chunks accumulated so far). */
+    pause() {
+        if (this._recorder && this._recorder.state === 'recording') this._recorder.pause();
+    }
+
+    /** Resume a paused recording. */
+    resume() {
+        if (this._recorder && this._recorder.state === 'paused') this._recorder.resume();
     }
 
     /**
      * Begin recording the given canvas.
-     * @param {HTMLCanvasElement} canvas The live render canvas.
-     * @param {{fps?: number}} [opts] Capture frame rate (default 30).
+     * @param {HTMLCanvasElement} canvas The render canvas (live or an offscreen capture canvas).
+     * @param {{fps?: number, videoBitsPerSecond?: number}} [opts] Capture frame rate (default 30)
+     *   and optional target bitrate (quality). Omitting the bitrate lets the encoder choose.
      * @throws if unsupported, already recording, or the stream/recorder cannot be created.
      */
-    start(canvas, { fps = 30 } = {}) {
+    start(canvas, { fps = 30, videoBitsPerSecond } = {}) {
         if (this.isRecording) throw new Error('Already recording.');
         if (!WebmRecorder.isSupported()) throw new Error('Recording is not supported in this browser.');
         if (!canvas || typeof canvas.captureStream !== 'function') throw new Error('Canvas is not capturable.');
 
         const stream = canvas.captureStream(fps);
         this._mimeType = pickWebmMimeType(MediaRecorder.isTypeSupported);
-        const options = this._mimeType ? { mimeType: this._mimeType } : undefined;
+        const options = {};
+        if (this._mimeType) options.mimeType = this._mimeType;
+        if (Number.isFinite(videoBitsPerSecond) && videoBitsPerSecond > 0) {
+            options.videoBitsPerSecond = videoBitsPerSecond;
+        }
         this._recorder = new MediaRecorder(stream, options);
         this._chunks = [];
         this._recorder.ondataavailable = (e) => {

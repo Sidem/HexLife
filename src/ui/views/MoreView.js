@@ -23,8 +23,8 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="save">Save World State</button>
         <label for="mobileFileInput" class="button file-input-label">Load World State</label>
         <input type="file" id="mobileFileInput" accept=".txt,.json" style="display: none;">
-        <button class="button" data-action="export-png" title="Export PNG snapshot of selected world" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.camera} Export PNG</button>
-        <button class="button" data-action="record-webm" title="Record WebM video of the canvas" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.video} <span data-record-label>Record Video</span></button>
+        <button class="button" data-action="capture-studio" title="Capture Studio — screenshots & recording" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.camera} Capture Studio</button>
+        <button class="button" data-action="record-webm" title="Record video of the canvas" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.video} <span data-record-label>Record Video</span></button>
         <button class="button" data-action="share">Share Setup</button>
         <button class="button" data-action="save-ruleset-mobile" title="Save current ruleset" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.star} Save Ruleset</button>
         <button class="button" data-action="library" title="Ruleset Library" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.library} Ruleset Library</button>
@@ -48,8 +48,8 @@ export class MoreView extends BaseComponent {
             EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE);
         });
 
-        this._addDOMListener(this.element.querySelector('[data-action="export-png"]'), 'click', () => {
-            EventBus.dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG);
+        this._addDOMListener(this.element.querySelector('[data-action="capture-studio"]'), 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' });
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="record-webm"]'), 'click', () => {

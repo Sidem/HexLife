@@ -160,6 +160,14 @@ export class KeyboardShortcutManager {
             { key: 'f', displayOnly: true, description: 'Mirror pattern horizontally', category: 'Patterns (while placing)' },
             { key: 'f', shiftKey: true, displayOnly: true, description: 'Mirror pattern vertically', category: 'Patterns (while placing)' },
 
+            // Capture / recording
+            { key: 'v', description: 'Record video — start (last settings) / stop & save', category: 'Capture', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_QUICK_TOGGLE_RECORDING);
+            }},
+            { key: 'v', shiftKey: true, description: 'Pause / resume the active recording', category: 'Capture', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_RECORDING_PAUSE);
+            }},
+
             // History
             { key: 'z', ctrlKey: true, description: 'Undo ruleset change', category: 'History', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.appContext.worldManager.getSelectedWorldIndex() });

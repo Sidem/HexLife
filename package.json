@@ -28,5 +28,8 @@
         "vite": "^6.3.5",
         "vitest": "^4.1.8",
         "wasm-pack": "^0.0.0"
+    },
+    "dependencies": {
+        "gifenc": "^1.0.3"
     }
 }

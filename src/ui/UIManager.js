@@ -29,6 +29,7 @@ import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
 import { ScrubBar } from './ScrubBar.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
+import { CaptureStudioModal } from './components/CaptureStudioModal.js';
 import { ToastManager } from './ToastManager.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { ICONS } from './icons.js';
@@ -130,7 +131,8 @@ export class UIManager {
         this.confirmationDialog = new ConfirmationDialog(document.getElementById('dialog-container'));
         
         this.initialStateConfigModal = new InitialStateConfigModal(document.getElementById('modal-container'), this.appContext);
-        
+        this.captureStudioModal = new CaptureStudioModal(document.getElementById('modal-container'), this.appContext);
+
         this.toastManager = new ToastManager(document.getElementById('toast-container'));
 
         // Ctrl/⌘-K command palette (desktop launcher; refuses to open on mobile).
@@ -333,6 +335,9 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, (data) => {
             this.savePatternModal.show(data);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, (data) => {
+            this.captureStudioModal.show(data || {});
         });
         EventBus.subscribe(EVENTS.COMMAND_SHOW_CONFIRMATION, (data) => {
             this.confirmationDialog.show(data);

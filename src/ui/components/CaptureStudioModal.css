@@ -1,0 +1,312 @@
+#capture-studio-modal .modal-content {
+    max-width: 480px;
+    width: 92%;
+    z-index: 9999;
+}
+
+#capture-studio-modal h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#capture-studio-modal h3 svg {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+}
+
+/* --- Tabs --- */
+#capture-studio-modal .cs-tabs {
+    display: flex;
+    gap: 4px;
+    background-color: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin: 6px 0 14px;
+}
+
+#capture-studio-modal .cs-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background-color 0.12s, color 0.12s;
+}
+
+#capture-studio-modal .cs-tab svg { width: 16px; height: 16px; }
+
+#capture-studio-modal .cs-tab:hover:not(:disabled) {
+    background-color: var(--surface-3);
+    color: var(--text-primary);
+}
+
+#capture-studio-modal .cs-tab.active {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+#capture-studio-modal .cs-tab:disabled { opacity: 0.5; cursor: default; }
+
+/* --- Preview --- */
+#capture-studio-modal .cs-preview-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+#capture-studio-modal .cs-preview-canvas {
+    max-width: 100%;
+    max-height: 200px;
+    background-color: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: block;
+}
+
+#capture-studio-modal .cs-preview-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+#capture-studio-modal .cs-dims-label {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- Fields --- */
+#capture-studio-modal .cs-field {
+    margin-bottom: 12px;
+}
+
+#capture-studio-modal .cs-field-label {
+    display: block;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+/* Segmented toggles */
+#capture-studio-modal .cs-segmented {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background-color: var(--surface-1);
+}
+
+#capture-studio-modal .cs-segmented button {
+    flex: 1;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color 0.12s, color 0.12s;
+}
+
+#capture-studio-modal .cs-segmented button:last-child { border-right: none; }
+
+#capture-studio-modal .cs-segmented button:hover:not(:disabled) {
+    background-color: var(--surface-3);
+    color: var(--text-primary);
+}
+
+#capture-studio-modal .cs-segmented button.active {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+#capture-studio-modal .cs-segmented button:disabled { opacity: 0.5; cursor: default; }
+
+/* Resolution */
+#capture-studio-modal .cs-res-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#capture-studio-modal .cs-preset-select {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+}
+
+#capture-studio-modal .cs-custom-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+#capture-studio-modal .cs-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#capture-studio-modal .cs-custom-row input {
+    width: 80px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+}
+
+#capture-studio-modal .cs-custom-x,
+#capture-studio-modal .cs-custom-unit {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+/* Sliders inside the studio (3-column like the IC modal) */
+#capture-studio-modal .slider-component-container {
+    display: grid;
+    grid-template-columns: 90px 1fr 54px;
+    align-items: center;
+    gap: 8px;
+}
+
+#capture-studio-modal .slider-component-container label {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+#capture-studio-modal .cs-gif-budget,
+#capture-studio-modal .cs-rec-status {
+    margin: 2px 0 10px;
+    font-size: 0.8em;
+}
+
+#capture-studio-modal .cs-rec-status {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/* Primary action */
+#capture-studio-modal .cs-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: var(--accent);
+    border-color: transparent;
+    color: var(--on-accent);
+    font-weight: 600;
+}
+
+#capture-studio-modal .cs-primary svg { width: 18px; height: 18px; }
+
+#capture-studio-modal .cs-primary:hover { background-color: var(--accent-bright); color: var(--on-accent); }
+
+#capture-studio-modal .cs-primary.is-recording {
+    background-color: var(--danger);
+    color: #fff;
+}
+
+#capture-studio-modal .hidden { display: none !important; }
+
+/* --- Recording HUD (floats over the canvas, survives modal close) --- */
+#capture-rec-hud {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    background-color: rgba(28, 28, 32, 0.94);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    box-shadow: var(--shadow-popout);
+    color: var(--text-primary);
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(8px);
+}
+
+#capture-rec-hud.hidden { display: none; }
+
+#capture-rec-hud.is-dragging { cursor: grabbing; user-select: none; }
+
+#capture-rec-hud .cs-hud-grip {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-muted);
+    cursor: grab;
+    margin-left: -2px;
+}
+
+#capture-rec-hud .cs-hud-grip svg { width: 16px; height: 16px; }
+
+#capture-rec-hud .cs-hud-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--danger);
+    animation: cs-hud-blink 1s steps(2, start) infinite;
+}
+
+@keyframes cs-hud-blink { 50% { opacity: 0.25; } }
+
+/* Paused: solid amber dot (no blink) so the state reads at a glance. */
+#capture-rec-hud.is-paused .cs-hud-dot {
+    background-color: var(--accent);
+    animation: none;
+}
+
+#capture-rec-hud .cs-hud-size { color: var(--text-muted); }
+
+#capture-rec-hud .cs-hud-pause,
+#capture-rec-hud .cs-hud-stop {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 999px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#capture-rec-hud .cs-hud-pause {
+    background-color: var(--surface-4);
+    color: var(--text-primary);
+}
+
+#capture-rec-hud .cs-hud-stop {
+    background-color: var(--danger);
+    color: #fff;
+}
+
+#capture-rec-hud .cs-hud-pause svg,
+#capture-rec-hud .cs-hud-stop svg { width: 15px; height: 15px; }
+
+#capture-rec-hud .cs-hud-pause:hover,
+#capture-rec-hud .cs-hud-stop:hover { filter: brightness(1.15); }

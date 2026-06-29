@@ -34,6 +34,7 @@
 @import url('src/ui/components/SaveRulesetModal.css');
 @import url('src/ui/components/SavePatternModal.css');
 @import url('src/ui/components/InitialStateConfigModal.css');
+@import url('src/ui/components/CaptureStudioModal.css');
 @import url('src/ui/components/ActionsPopover.css');
 @import url('src/styles/Toast.css');
 @import url('src/ui/CanvasHint.css');

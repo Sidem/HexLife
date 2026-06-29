@@ -22,7 +22,7 @@ const TOOLBAR_BUTTON_LABELS = {
     rankPanelButton: 'Rule Usage',
     saveStateButton: 'Save State',
     loadStateButton: 'Load State',
-    exportPngButton: 'Export PNG',
+    exportPngButton: 'Screenshot',
     recordWebmButton: 'Record Video',
     shareButton: 'Share',
     colorPanelButton: 'Colors',
@@ -268,7 +268,7 @@ export class Toolbar {
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
             saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
-            exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_EXPORT_WORLD_PNG),
+            exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' }),
             recordWebmButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING),
             loadStateButton: () => {
                 this.uiElements.fileInput.accept = ".txt,.json";

@@ -10,8 +10,9 @@ import { VisualizationController } from '../ui/controllers/VisualizationControll
 import { WorldsController } from '../ui/controllers/WorldsController.js';
 import { ColorController } from '../ui/controllers/ColorController.js';
 import { initRulesetVisualizer } from '../utils/rulesetVisualizer.js';
-import { PanelManager } from '../ui/PanelManager.js'; 
+import { PanelManager } from '../ui/PanelManager.js';
 import { Toolbar } from '../ui/Toolbar.js';
+import { CaptureService } from '../services/CaptureService.js';
 import { OnboardingManager } from '../ui/OnboardingManager.js';
 import { getTours } from '../ui/tourSteps.js';
 
@@ -39,6 +40,7 @@ export class AppContext {
         this.colorController = new ColorController();
         initRulesetVisualizer(this.visualizationController.getVizType());
         this.worldsController = new WorldsController();
+        this.captureService = new CaptureService(this);
         this.panelManager = new PanelManager(this);
         this.panelManager.init(libraryData);
 
