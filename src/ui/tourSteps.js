@@ -140,7 +140,7 @@ export const getTours = (appContext) => {
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '#colorPanelButton',
         title: 'A Splash of Color',
-        content: () => "Cells are <span class=\"onboarding-highlight-text\">monochrome</span> right now &mdash; calm and clear to start. But color is HexLife's secret weapon: in the <span class=\"onboarding-highlight-text\">Chroma Lab</span> (the palette icon" + (appContext.uiManager.isMobile() ? ', under the <span class=\"onboarding-highlight-text\">Tools</span> menu' : '') + ") you can color cells by <span class=\"onboarding-highlight-text\">which rule fired</span> &mdash; try the <span class=\"onboarding-highlight-text\">Symmetry Groups</span> palette to see your ruleset's hidden structure. It has its own <span class=\"onboarding-highlight-text\">[?]</span> guide when you're ready.",
+        content: () => "Cells are <span class=\"onboarding-highlight-text\">monochrome</span> right now &mdash; calm and clear to start. But color is HexLife's secret weapon: in the <span class=\"onboarding-highlight-text\">Chroma Lab</span> (the palette icon" + (appContext.uiManager.isMobile() ? ', under the <span class="onboarding-highlight-text">Tools</span> menu' : '') +") you can color cells by <span class=\"onboarding-highlight-text\">which rule fired</span> &mdash; try the <span class=\"onboarding-highlight-text\">Symmetry Groups</span> palette to see your ruleset's hidden structure. It has its own <span class=\"onboarding-highlight-text\">[?]</span> guide when you're ready.",
         primaryAction: { text: 'Good to Know' },
         advanceOn: { type: 'click' }
     }, {
