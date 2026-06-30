@@ -507,10 +507,13 @@ export const getTours = (appContext) => {
     }, {
         element: '[data-pane="library"]',
         title: 'Step 2: Open the Library',
-        content: "Now, select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
-        primaryAction: { text: 'Done' },
-        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} }); setTimeout(() => document.querySelector('[data-pane="library"]')?.click(), 100) },
-        advanceOn: { type: 'click' }
+        content: "Select the <span class=\"onboarding-highlight-text\">Library</span> tab within the panel.",
+        // Skip entirely when the Library tab is already active (it is by default
+        // when the panel opens) — don't make the user click an already-selected
+        // tab. When it isn't active, advance on the user actually clicking it.
+        condition: () => !document.querySelector('[data-pane="library"]')?.classList.contains('active'),
+        onBeforeShow: () => showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} }),
+        advanceOn: { type: 'click', target: 'element' }
     }, {
         // Target by the ruleset's stable hex (data-hex), NOT its list position —
         // a `:nth-child(N)` here breaks the moment the library is reordered.
@@ -545,22 +548,23 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED, condition: (worldIndex) => worldIndex === 4 }
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
-        title: 'Step 7: Configure Central World Density',
+        title: "Step 7: Configure Central World's Random Fill",
         content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure <span class=\"onboarding-highlight-text\">'Random fill'</span> mode is selected and set the <span class=\"onboarding-highlight-text\">Fill amount</span> slider to 50% (or pick the <span class=\"onboarding-highlight-text\">'Balanced'</span> preset). Then save the changes.",
         //primaryAction: { text: 'Configure Density' },
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
-        title: 'Step 8: Apply to All Worlds',
+        title: 'Step 8: Copy Selected &rarr; All',
         content: "Now click <span class=\"onboarding-highlight-text\">'Copy Selected &rarr; All'</span> to set the same 50% Random fill configuration across all worlds, creating a level playing field for our mutations.",
-        //primaryAction: { text: 'Apply to All' },
+        // Re-assert the panel so the button is present and gets highlighted.
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 9: Reset Worlds',
         content: "Finally, click <span class=\"onboarding-highlight-text\">'Regenerate All Worlds'</span> to re-seed all worlds with the new initial Random fill settings.",
-        //primaryAction: { text: 'Reset All' },
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
@@ -573,14 +577,27 @@ export const getTours = (appContext) => {
         element: '[data-pane="mutate"]',
         title: 'Step 11: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
-        primaryAction: { text: 'Done' },
-        onBeforeShow: (_step) => { showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }); setTimeout(() => document.querySelector('[data-pane="mutate"]')?.click(), 100) },
-        advanceOn: { type: 'click' }
+        // Same as Step 2: skip when Mutate is already the active tab, otherwise
+        // advance on the user clicking the highlighted tab itself.
+        condition: () => !document.querySelector('[data-pane="mutate"]')?.classList.contains('active'),
+        onBeforeShow: () => showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }),
+        advanceOn: { type: 'click', target: 'element' }
     }, {
-        element: () => '#ruleset-actions-mutate-pane button[data-action="clone-mutate"]',
+        // Highlight the whole mutate pane (not just the button) so the rate
+        // slider and mode radios are inside the interactive hole — the spotlight
+        // is modal, so a button-only highlight blocked the user from adjusting them.
+        element: () => '#ruleset-actions-mutate-pane',
         title: 'Step 12: Run the Experiment',
-        content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the <span class=\"onboarding-highlight-text\">Mutation Rate is ~10%</span> and <span class=\"onboarding-highlight-text\">Mode is R-Sym</span> for best results.",
-        //primaryAction: { text: 'Clone & Mutate' },
+        content: "We've preset the recommended <span class=\"onboarding-highlight-text\">R-Sym</span> mode and a <span class=\"onboarding-highlight-text\">~10% Mutation Rate</span> &mdash; the sweet spot for evolving structured rules. Tweak them if you like, then press <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> to copy our 'Gliders' ruleset to all nine worlds and mutate each copy uniquely.",
+        onBeforeShow: () => {
+            showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} });
+            // Preset R-Sym + ~10% by driving the real inputs; each control's
+            // change handler persists the choice (the operation reads it live).
+            const rsym = document.getElementById('ruleset-actions-mutate-mode-r_sym');
+            if (rsym && !rsym.checked) { rsym.checked = true; rsym.dispatchEvent(new Event('change', { bubbles: true })); }
+            const rate = document.getElementById('ruleset-actions-mutate-rate');
+            if (rate && rate.value !== '10') { rate.value = '10'; rate.dispatchEvent(new Event('change', { bubbles: true })); }
+        },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
         delayAfter: 1000
     }, {
@@ -643,12 +660,15 @@ export const getTours = (appContext) => {
         element: '[data-library-filter="personal"]',
         title: 'Step 4: View Your Rulesets',
         content: "The library contains both public and personal rules. <span class=\"onboarding-highlight-text\">Click on 'My Rulesets'</span> to see your saved creations.",
-        primaryAction: { text: 'Click My Rulesets' },
-        onBeforeShow: (_step) => {
+        // Skip if already on the personal filter; otherwise advance on the user
+        // clicking the highlighted 'My Rulesets' sub-tab itself (not a separate
+        // button), so the step's instruction matches what actually advances it.
+        condition: () => !document.querySelector('[data-library-filter="personal"]')?.classList.contains('active'),
+        onBeforeShow: () => {
             showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} });
-            setTimeout(() => { document.querySelector('[data-pane="library"]')?.click(); }, 150);
+            document.querySelector('[data-pane="library"]')?.click();
         },
-        advanceOn: { type: 'click' }
+        advanceOn: { type: 'click', target: 'element' }
     }, {
         element: '.library-item.personal [data-action="manage-personal"]',
         title: 'Step 5: Manage & Share',
