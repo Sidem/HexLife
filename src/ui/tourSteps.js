@@ -110,14 +110,16 @@ export const getTours = (appContext) => {
         title: 'The Flow of Time',
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock. Let's see what these worlds are currently doing.",
         //primaryAction: { text: 'Click the Play Button' },
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
+        delayAfter: 700
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'The Observation Deck',
         content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click any mini-map view</span> to shift your focus.",
         //primaryAction: { text: 'Select a Different World' },
-        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        delayAfter: 800
     }, {
         element: 'body',
         title: 'The Spark of Creation',
@@ -131,7 +133,10 @@ export const getTours = (appContext) => {
         title: 'Draw on the Grid',
         content: "Now, <span class=\"onboarding-highlight-text\">click and drag (or touch and drag)</span> on the main view to bring cells to life. The simulation pauses automatically while you draw.",
         //primaryAction: { text: 'Try Drawing on the Grid' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+        // The brush event fires on the very first painted cell — hold the step a
+        // beat so the user sees their cells appear before the tooltip moves on.
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
+        delayAfter: 1200
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="learning"]' : '#helpButton',
         title: 'Your Lab Assistant',
@@ -550,7 +555,8 @@ export const getTours = (appContext) => {
         title: 'Step 12: Run the Experiment',
         content: "Press <span class=\"onboarding-highlight-text\">Clone & Mutate</span>. This copies our 'Gliders' ruleset to all nine worlds and applies a unique, small mutation to each. Make sure the <span class=\"onboarding-highlight-text\">Mutation Rate is ~10%</span> and <span class=\"onboarding-highlight-text\">Mode is R-Sym</span> for best results.",
         //primaryAction: { text: 'Clone & Mutate' },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        delayAfter: 1000
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
@@ -558,7 +564,8 @@ export const getTours = (appContext) => {
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
         onBeforeShow: () => { showView({ mobile: {view: 'simulate'} }); },
         //primaryAction: { text: 'Select a World' },
-        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        delayAfter: 800
     }, {
         element: '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 14: Evolve Again!',
@@ -645,19 +652,24 @@ export const getTours = (appContext) => {
         title: 'Step 1: Mutate',
         content: "Press <span class=\"onboarding-highlight-text\">M</span> to run <b>Clone &amp; Mutate</b>: the selected world's ruleset is copied into all nine worlds, then each copy is nudged by a small random mutation. <br><br>On mobile, tap the <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> quick-action button. Watch the minimap &mdash; all nine worlds change at once.",
         onBeforeShow: () => { showView({ mobile: { view: 'simulate' } }); },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+        // Let the freshly-mutated grid render before advancing — all nine worlds
+        // change at once and that change is the whole point of the step.
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        delayAfter: 1000
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'Step 2: Observe & Select',
         content: "Each of the nine worlds now runs a slightly different ruleset. Scan them and <span class=\"onboarding-highlight-text\">click the world that looks most alive</span> to you &mdash; the busiest, the most structured, the strangest. That choice is your selection pressure.",
-        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED }
+        advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        delayAfter: 800
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
         title: 'Step 3: Repeat',
         content: "Now press <span class=\"onboarding-highlight-text\">M</span> again. Your chosen world becomes the new parent, and nine fresh mutations of <i>it</i> fill the grid. Do this a few times and you're breeding rulesets &mdash; each generation drifts toward whatever you keep picking.",
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE }
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        delayAfter: 1000
     }, {
         element: 'body',
         title: "That's the Whole Loop",
@@ -698,13 +710,17 @@ export const getTours = (appContext) => {
         highlightType: 'canvas',
         title: 'Step 1: Seed a Spark',
         content: "<span class=\"onboarding-highlight-text\">Click and drag (or touch and drag)</span> on the main view to paint living cells onto the blank grid. A small cluster is plenty &mdash; the rules do the rest.",
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH }
+        // Brush event fires on the first cell — hold so the seeded cluster is visible.
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
+        delayAfter: 1200
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'Step 2: Start Time',
         content: "Now press <span class=\"onboarding-highlight-text\">P</span> (or the Play button) to start the universal clock and watch your spark evolve under the current ruleset.",
         condition: (appContext) => appContext.simulationController.getIsPaused(),
-        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused }
+        // Linger so the spark visibly begins to evolve before the closing step.
+        advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
+        delayAfter: 1500
     }, {
         element: 'body',
         title: 'State + Rules = Behavior',
