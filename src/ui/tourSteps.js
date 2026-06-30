@@ -138,6 +138,12 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
         delayAfter: 1200
     }, {
+        element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '#colorPanelButton',
+        title: 'A Splash of Color',
+        content: () => "Cells are <span class=\"onboarding-highlight-text\">monochrome</span> right now &mdash; calm and clear to start. But color is HexLife's secret weapon: in the <span class=\"onboarding-highlight-text\">Chroma Lab</span> (the palette icon" + (appContext.uiManager.isMobile() ? ', under the <span class=\"onboarding-highlight-text\">Tools</span> menu' : '') + ") you can color cells by <span class=\"onboarding-highlight-text\">which rule fired</span> &mdash; try the <span class=\"onboarding-highlight-text\">Symmetry Groups</span> palette to see your ruleset's hidden structure. It has its own <span class=\"onboarding-highlight-text\">[?]</span> guide when you're ready.",
+        primaryAction: { text: 'Good to Know' },
+        advanceOn: { type: 'click' }
+    }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="learning"]' : '#helpButton',
         title: 'Your Lab Assistant',
         content: "Excellent. For every other tool, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon for a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help/Learn button</span> to restart this orientation at any time. Good luck, Researcher.",
@@ -373,27 +379,47 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
+    // Helpers so the Chroma Lab tour can drive the live coloring mode while it
+    // explains each one. The component is a single shared instance, so flipping
+    // the mode here updates both the panel UI and the simulation immediately.
+    const setChromaMode = (mode) => appContext.colorController.setMode(mode);
+    const restoreCalmPalette = () => appContext.colorController.applyPreset('monochrome');
+
     const chromaLab = [{
         element: '#colorPanelButton',
         title: 'Tutorial: Chroma Lab',
-        content: "Color is HexLife's primary information channel &mdash; it encodes which rule fired in each cell. The <span class=\"onboarding-highlight-text\">Chroma Lab</span> lets you recolor the simulation to taste.",
+        content: "New worlds start in calm <span class=\"onboarding-highlight-text\">Monochrome</span> &mdash; just on/off cells, nothing to overwhelm you. But color is HexLife's most powerful lens: it can reveal <span class=\"onboarding-highlight-text\">which of the 128 rules fired</span> in every cell. The <span class=\"onboarding-highlight-text\">Chroma Lab</span> is where you turn that lens on.",
         primaryAction: { text: 'Open Chroma Lab' },
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'chromalab' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ChromaLabComponent }
     }, {
         element: '#chroma-mode-select',
-        title: 'Coloring Modes',
-        content: "Switch between <span class=\"onboarding-highlight-text\">Preset Palettes</span>, coloring by <span class=\"onboarding-highlight-text\">Neighbor Count</span>, or by <span class=\"onboarding-highlight-text\">Symmetry Groups</span> &mdash; each tells a different visual story about how your ruleset behaves.",
+        title: 'Three Ways to Color',
+        content: "This picks <i>what the color means</i>. <span class=\"onboarding-highlight-text\">Preset Palettes</span> are ready-made looks; <span class=\"onboarding-highlight-text\">Neighbor Count</span> colors each cell by how many living neighbors triggered it; <span class=\"onboarding-highlight-text\">Symmetry Groups</span> colors by the <i>shape</i> of rule that fired. We'll look at presets, then the powerful Symmetry view.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'chromalab' } }),
+        onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
         advanceOn: { type: 'click' }
     }, {
         element: '#chroma-preset-section',
         title: 'Preset Palettes',
-        content: "Pick a ready-made palette here. Keep <span class=\"onboarding-highlight-text\">Ensure flicker-proof presets</span> on to avoid harsh frame-to-frame flicker on busy rulesets. Your choice is saved automatically.",
+        content: "Ready-made looks. <span class=\"onboarding-highlight-text\">Monochrome</span> (the default) keeps things quiet; <span class=\"onboarding-highlight-text\">Default Spectrum</span> gives every rule its own hue so structure pops. The <span class=\"onboarding-highlight-text\">Symmetry Groups</span> and <span class=\"onboarding-highlight-text\">Neighbor Counts</span> entries here are one-click shortcuts into the modes below. Keep <span class=\"onboarding-highlight-text\">flicker-proof presets</span> on for busy rulesets &mdash; your choice is saved automatically.",
+        primaryAction: { text: 'Show me Symmetry Groups' },
+        onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#chroma-symmetry-section',
+        title: 'Symmetry Groups &mdash; the big idea',
+        content: "A cell has six neighbors, so many of the 128 rules are really the <i>same pattern rotated</i>. HexLife bundles each pattern with all its rotations into a <span class=\"onboarding-highlight-text\">symmetry group</span> &mdash; the little hex diagram shows the pattern and <span class=\"onboarding-highlight-text\">Orbit</span> is how many rotations belong to it. Color a group once and <i>every</i> rotation of it lights up the same, so the grid <span class=\"onboarding-highlight-text\">visually reveals which rule families your ruleset actually uses</span>. The <span class=\"onboarding-highlight-text\">Cell OFF / Cell ON</span> columns set the color for a dead vs. living center cell &mdash; click any swatch to recolor that whole family.",
+        primaryAction: { text: 'Next' },
+        onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('symmetry'); },
+        advanceOn: { type: 'click' }
+    }, {
+        element: '#chroma-mode-select',
+        title: "You're in control of the lens",
+        content: "That's the whole idea: color is a <i>lens</i> on the rules, not just decoration. We've set you back to the calm <span class=\"onboarding-highlight-text\">Monochrome</span> default &mdash; switch to <span class=\"onboarding-highlight-text\">Symmetry Groups</span> or <span class=\"onboarding-highlight-text\">Default Spectrum</span> from here whenever you want to see the machinery underneath.",
         primaryAction: { text: 'Finish' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'chromalab' } }),
+        onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); restoreCalmPalette(); },
         advanceOn: { type: 'click' }
     }];
 
@@ -780,7 +806,9 @@ export const TOUR_CATALOG = [
     // Experiments — short, hands-on, learn-by-doing loops.
     { id: 'evolutionLoop',    name: 'The Evolution Loop',        section: 'Experiments' },
     { id: 'sparkOfLife',      name: 'The Spark of Life',         section: 'Experiments' },
-    // Tutorials — one panel / feature each.
+    // Tutorials — one panel / feature each. Chroma Lab leads: with the new
+    // monochrome default, learning how color maps to rules pays off early.
+    { id: 'chromaLab',        name: 'Chroma Lab',                section: 'Tutorials', platform: 'desktopOnly' },
     { id: 'controls',         name: 'Simulation Controls',       section: 'Tutorials' },
     { id: 'patterns',         name: 'Patterns',                  section: 'Tutorials' },
     { id: 'ruleset_actions',  name: 'Ruleset Actions',           section: 'Tutorials' },
@@ -790,7 +818,6 @@ export const TOUR_CATALOG = [
     { id: 'explore',          name: 'Auto-Explore',              section: 'Tutorials' },
     { id: 'analysis',         name: 'Analysis Tools',            section: 'Tutorials' },
     { id: 'rulerank',         name: 'Rule Usage Ranking',        section: 'Tutorials', platform: 'desktopOnly' },
-    { id: 'chromaLab',        name: 'Chroma Lab',                section: 'Tutorials', platform: 'desktopOnly' },
     { id: 'resetClear',       name: 'Reset & Clear',             section: 'Tutorials', platform: 'desktopOnly' },
     { id: 'saveLoad',         name: 'Save, Load & Share',        section: 'Tutorials' },
     { id: 'history',          name: 'Ruleset History',           section: 'Tutorials', platform: 'desktopOnly' },
