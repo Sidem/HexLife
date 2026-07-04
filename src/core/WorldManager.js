@@ -32,6 +32,10 @@ export class WorldManager {
         this.rulesetService = new RulesetService(this.symmetryData);
         this.worldSettings = [];
         this.initialDefaultRulesetHex = "";
+        // While a thumbnail-bake batch borrows a scratch world, its evaluation-burst STATE_UPDATE echoes
+        // must NOT reconcile persisted worldSettings / fire UI ruleset events for that world (they carry
+        // the transient baked ruleset, not the world's real one). -1 = no bake in flight.
+        this._bakingWorldIndex = -1;
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
         // Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
@@ -203,6 +207,11 @@ export class WorldManager {
     _handleProxyUpdate = (worldIndex, _updateType) => {
         const proxy = this.worlds[worldIndex];
         if (!proxy) return;
+
+        // A thumbnail bake batch is borrowing this world: its bursts carry a transient ruleset/state,
+        // so don't let those echoes clobber persisted worldSettings or fire UI updates for it. The
+        // batch restores the world and dispatches its true state when it finishes.
+        if (worldIndex === this._bakingWorldIndex) return;
 
         const stats = proxy.getLatestStats();
 
@@ -1319,107 +1328,173 @@ export class WorldManager {
     }
 
     /**
-     * Bake an evolved-world thumbnail for a (ruleset × initial-condition × seed) combo WITHOUT
-     * disturbing the user's view — the "borrow-and-restore" engine behind the Ruleset Library
-     * previews. Borrows the selected world exactly like {@link measureSelectedWorld}: snapshot its
-     * cells/tick/ruleset, apply the target ruleset, seed-reset to the target IC, run a burst, capture
-     * the rendered frame (the SAME two-rAF FBO grab the auto-explore gallery uses), then restore the
-     * snapshot via `LOAD_STATE`. Returns a JPEG data-URL, or `null` on any failure (capture
-     * unavailable, Auto-Explore running, bad ruleset) so callers can fall back to the rule glyph.
-     * @param {{hex: string, initialState: object, seed?: number|null, ticks?: number}} opts
-     * @returns {Promise<string|null>}
+     * Pick a scratch world for thumbnail baking: a non-selected, enabled, initialized world. Baking
+     * borrows it (evolve → capture → restore) so the user's large SELECTED view is never disturbed —
+     * only that world's small minimap cell briefly flickers. Enabled is required because a disabled
+     * world's FBO renders the "disabled" overlay, not the evolved cells, so its capture would be blank.
+     * Starts scanning just after the selected world for a stable, deterministic choice. Returns -1 when
+     * no other enabled world is available (falls back to no-op baking → glyph placeholders).
+     * @returns {number}
      */
-    bakeThumbnail = async ({ hex, initialState, seed = null, ticks = EXPLORE_CONFIG.evalTicks } = {}) => {
-        if (this.autoExploreService?.isRunning()) return null;
-        if (!hex || hex === 'Error' || hex === 'N/A' || !initialState) return null;
+    _pickScratchWorldIndex = () => {
+        const sel = this.selectedWorldIndex;
+        const n = this.worlds.length;
+        for (let step = 1; step < n; step++) {
+            const idx = (sel + step) % n;
+            const proxy = this.worlds[idx];
+            if (proxy?.isInitialized && this.worldSettings[idx]?.enabled) return idx;
+        }
+        return -1;
+    };
 
-        const idx = this.selectedWorldIndex;
-        const proxy = this.worlds[idx];
-        if (!proxy) return null;
+    /**
+     * Bracket a sequence of thumbnail bakes on a scratch (non-selected) world — the "borrow-and-restore"
+     * engine behind the Ruleset Library previews. Snapshots the scratch world's exact cells/tick/ruleset
+     * ONCE, suppresses its burst echoes from reconciling worldSettings (via `_bakingWorldIndex`), runs
+     * `body(bake)` — where each `bake(job)` applies a ruleset, seed-resets to an IC, evolves a burst and
+     * captures the rendered frame — then restores the snapshot in a SINGLE `LOAD_STATE` and releases the
+     * guard. Capturing the restore ruleset once (not per-bake off stale proxy stats) is what keeps the
+     * world from being left on a leftover baked ruleset. Jobs with no `initialState` fall back to the
+     * selected world's current IC, so unpaired library entries still get a preview. Never throws.
+     * @param {(bake: (job: {hex: string, initialState?: object, seed?: number|null, ticks?: number}) => Promise<string|null>) => Promise<any>} body
+     * @returns {Promise<any>}
+     */
+    _withScratchBakeWorld = (body) => {
+        // Serialize bake batches so overlapping snapshot/restore of the scratch world can't corrupt it: a
+        // save-triggered backfill may cancel + restart a sweep while a prior batch is still mid-burst, so
+        // each batch waits for the previous one's restore before it snapshots. `_bakeChain` is the tail.
+        const run = async () => {
+        // No scratch world (Auto-Explore running, or no other enabled world): run body with a no-op bake
+        // so callers still resolve (all thumbs null) without snapshot/guard/restore side effects.
+        const noopBake = async () => null;
+        if (this.autoExploreService?.isRunning()) return body(noopBake);
 
-        // Snapshot the exact pre-bake state (cells + tick + ruleset) for a non-destructive restore.
+        const idx = this._pickScratchWorldIndex();
+        const proxy = idx >= 0 ? this.worlds[idx] : null;
+        if (!proxy) return body(noopBake);
+
+        // Snapshot the exact pre-bake state ONCE for a single non-destructive restore. The ruleset comes
+        // from worldSettings (the stable main-thread source of truth), NOT live proxy stats — which lag
+        // the worker's echoes and would otherwise capture a previous bake's transient ruleset.
         const savedCells = proxy.latestStateArray ? new Uint8Array(proxy.latestStateArray) : null;
-        if (!savedCells || savedCells.length !== Config.NUM_CELLS) return null;
+        if (!savedCells || savedCells.length !== Config.NUM_CELLS) return body(noopBake);
         const savedTick = proxy.getLatestStats().tick || 0;
-        const savedRulesetArray = this.getCurrentRulesetArray();
-
-        let rulesetArray;
+        const savedHex = this.worldSettings[idx]?.rulesetHex;
+        let savedRulesetArray;
         try {
-            rulesetArray = hexToRuleset(hex);
+            savedRulesetArray = hexToRuleset(savedHex);
         } catch {
-            return null;
+            return body(noopBake);
         }
 
+        this._bakingWorldIndex = idx;
+
+        const bake = async ({ hex, initialState, seed = null, ticks = EXPLORE_CONFIG.evalTicks } = {}) => {
+            if (!hex || hex === 'Error' || hex === 'N/A') return null;
+            // Unpaired entries (no IC of their own) bake against the selected world's current IC.
+            const ic = initialState || this.worldSettings[this.selectedWorldIndex]?.initialState;
+            if (!ic) return null;
+            let rulesetArray;
+            try {
+                rulesetArray = hexToRuleset(hex);
+            } catch {
+                return null;
+            }
+            try {
+                // Apply the target ruleset, seed-reset to the target IC, then evolve a burst — mirroring
+                // AutoExploreService._evaluateCandidate (setRuleset → resetWorld → runEvaluation). A finite
+                // seed reproduces the exact paired layout; a falsy seed lets the worker pick a fresh one.
+                proxy.setRuleset(rulesetArray.buffer.slice(0));
+                proxy.resetWorld(ic, Number.isFinite(seed) ? seed : 0);
+                await proxy.runEvaluation({
+                    ticks,
+                    sampleEvery: EXPLORE_CONFIG.sampleEvery,
+                    warmupTicks: EXPLORE_CONFIG.warmupTicks,
+                    probe: { enabled: false, probeTicks: EXPLORE_CONFIG.probeTicks },
+                });
+                return await this._captureExploreThumbnail(idx);
+            } catch {
+                return null;
+            }
+        };
+
         try {
-            // Apply the target ruleset, seed-reset to the target IC, then evolve a burst — mirroring
-            // AutoExploreService._evaluateCandidate (setRuleset → resetWorld → runEvaluation).
-            proxy.setRuleset(rulesetArray.buffer.slice(0));
-            // A finite seed reproduces the exact paired layout; a falsy seed lets the worker pick a
-            // fresh random one (RESET_WORLD treats a falsy seed as Math.random).
-            proxy.resetWorld(initialState, Number.isFinite(seed) ? seed : 0);
-            await proxy.runEvaluation({
-                ticks,
-                sampleEvery: EXPLORE_CONFIG.sampleEvery,
-                warmupTicks: EXPLORE_CONFIG.warmupTicks,
-                probe: { enabled: false, probeTicks: EXPLORE_CONFIG.probeTicks },
-            });
-            return await this._captureExploreThumbnail(idx);
-        } catch {
-            return null;
+            return await body(bake);
         } finally {
-            // Restore the exact pre-bake cells/tick/ruleset (LOAD_STATE rewrites the worker buffers).
+            // Restore the exact pre-bake cells/tick/ruleset ONCE (LOAD_STATE rewrites the worker buffers),
+            // then release the guard so the world's real STATE_UPDATE echoes flow to the UI again.
             proxy.sendCommand('LOAD_STATE', {
                 newStateBuffer: savedCells.buffer.slice(0),
                 newRulesetBuffer: savedRulesetArray.buffer.slice(0),
                 worldTick: savedTick,
             }, [savedCells.buffer.slice(0), savedRulesetArray.buffer.slice(0)]);
+            this._bakingWorldIndex = -1;
         }
+        };
+
+        const result = (this._bakeChain || Promise.resolve()).then(run, run);
+        // Chain tail swallows outcome so one batch's failure never blocks the next.
+        this._bakeChain = result.then(() => {}, () => {});
+        return result;
     };
 
     /**
+     * Bake a single evolved-world thumbnail for a (ruleset × initial-condition × seed) combo WITHOUT
+     * disturbing the user's selected view (baked on a scratch non-selected world; see
+     * {@link _withScratchBakeWorld}). Returns a JPEG data-URL, or `null` on any failure (capture
+     * unavailable, Auto-Explore running, bad ruleset, no IC) so callers can fall back to the rule glyph.
+     * @param {{hex: string, initialState?: object, seed?: number|null, ticks?: number}} job
+     * @returns {Promise<string|null>}
+     */
+    bakeThumbnail = async (job) => this._withScratchBakeWorld((bake) => bake(job));
+
+    /**
      * Bake thumbnails for a list of (hex, initialState, seed) jobs one at a time (sequential so the
-     * single borrowed world is never contended). Each job's `onResult(dataUrl)` callback fires as its
-     * bake resolves. Returns the array of data-URLs (null entries for failures). Used by the Library's
-     * save-time multi-IC chooser and its lazy backfill of entries that lack a thumbnail.
-     * @param {Array<{hex: string, initialState: object, seed?: number|null, ticks?: number,
+     * single borrowed scratch world is never contended). Each job's `onResult(dataUrl)` callback fires
+     * as its bake resolves. Returns the array of data-URLs (null entries for failures). Used by the
+     * Library's save-time multi-IC chooser and its lazy backfill of entries that lack a thumbnail.
+     * @param {Array<{hex: string, initialState?: object, seed?: number|null, ticks?: number,
      *   onResult?: (thumb: string|null) => void}>} jobs
      * @returns {Promise<Array<string|null>>}
      */
-    bakeThumbnails = async (jobs = []) => {
+    bakeThumbnails = async (jobs = []) => this._withScratchBakeWorld(async (bake) => {
         const out = [];
         for (const job of jobs) {
-            if (this.autoExploreService?.isRunning()) { out.push(null); continue; }
-            const thumb = await this.bakeThumbnail(job);
+            const thumb = await bake(job);
             out.push(thumb);
             try { job.onResult?.(thumb); } catch { /* callback errors must not abort the queue */ }
         }
         return out;
-    };
+    });
 
     /**
-     * Lazily fill in missing thumbnails for library entries that carry an initial condition but have no
-     * `thumb` yet, invoking `onBaked(entry, thumb)` so the caller persists each its own way (personal
-     * entries write to the user library; public entries write to the public-thumb cache). One bake at a
-     * time, capped per call so opening the library never stalls; abortable via the returned handle.
-     * Skips entirely while Auto-Explore is running.
-     * @param {Array<{hex: string, initialState: object, seed?: number|null, thumb?: string|null}>} entries
-     * @param {{onBaked: (entry: object, thumb: string) => void, max?: number}} ctx
+     * Lazily fill in missing thumbnails for library entries, invoking `onResult(entry, thumb)` so the
+     * caller persists each its own way (personal entries write to the user library; public entries write
+     * to the public-thumb cache). Entries with a paired initial condition bake from it; unpaired entries
+     * bake from the selected world's current IC (via {@link _withScratchBakeWorld}). One bake at a time,
+     * capped per call so opening the library never stalls; abortable via the returned handle. The whole
+     * sweep is bracketed by a single snapshot/restore of the scratch world.
+     * `onResult(entry, thumb)` fires after each bake resolves (thumb is `null` on failure) so the caller
+     * can persist successes AND remember attempts — that lets it skip already-tried entries on the next
+     * sweep instead of re-baking the whole library on every save.
+     * @param {Array<{hex: string, initialState?: object, seed?: number|null, thumb?: string|null}>} entries
+     * @param {{onResult: (entry: object, thumb: string|null) => void, max?: number}} ctx
      * @returns {{cancel: () => void}}
      */
-    backfillMissingThumbnails = (entries, { onBaked, max = 8 } = {}) => {
+    backfillMissingThumbnails = (entries, { onResult, max = 8 } = {}) => {
         let cancelled = false;
         const pending = (entries || [])
-            .filter(e => e && e.hex && e.initialState && !e.thumb)
+            .filter(e => e && e.hex && !e.thumb)
             .slice(0, max);
 
-        (async () => {
+        this._withScratchBakeWorld(async (bake) => {
             for (const entry of pending) {
-                if (cancelled || this.autoExploreService?.isRunning()) return;
-                const thumb = await this.bakeThumbnail({ hex: entry.hex, initialState: entry.initialState, seed: entry.seed });
                 if (cancelled) return;
-                if (thumb) onBaked?.(entry, thumb);
+                const thumb = await bake({ hex: entry.hex, initialState: entry.initialState, seed: entry.seed });
+                if (cancelled) return;
+                onResult?.(entry, thumb);
             }
-        })();
+        });
 
         return { cancel: () => { cancelled = true; } };
     };

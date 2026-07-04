@@ -24,6 +24,9 @@ export class RulesetLibraryComponent extends BaseComponent {
         this.filterState = { query: '', tag: null, sort: 'recent' };
         // Handle for the in-flight lazy thumbnail backfill so we can cancel it on re-render/destroy.
         this._backfillHandle = null;
+        // Keys of entries we've already tried to bake this pane-lifetime (success OR fail), so a save /
+        // library change re-bakes only genuinely-new entries instead of sweeping the whole library again.
+        this._backfillAttempted = new Set();
         this.element = document.createElement('div');
         this.element.className = 'ruleset-actions-container';
 
@@ -192,18 +195,25 @@ export class RulesetLibraryComponent extends BaseComponent {
         if (!wm?.backfillMissingThumbnails || wm.autoExploreService?.isRunning?.()) return;
 
         const cache = PersistenceService.loadPublicThumbCache();
+        const seen = this._backfillAttempted;
+        // Include entries WITHOUT a paired IC too — the bake engine falls back to the selected world's
+        // current IC so favourited/plain rulesets get a preview. Skip anything already tried this pane
+        // lifetime so a save doesn't re-launch a full-library sweep.
         const personal = this.appContext.libraryController.getUserLibrary()
-            .filter(r => r.initialState && !r.thumb)
+            .filter(r => !r.thumb && !seen.has(`personal:${r.id}`))
             .map(r => ({ ...r, __scope: 'personal' }));
         const publicMissing = (this.libraryData?.rulesets || [])
-            .filter(r => r.initialState && !cache[r.hex])
+            .filter(r => !cache[r.hex] && !seen.has(`public:${r.hex}`))
             .map(r => ({ ...r, __scope: 'public' }));
         const jobs = [...personal, ...publicMissing];
         if (jobs.length === 0) return;
 
         this._backfillHandle = wm.backfillMissingThumbnails(jobs, {
             max: 24,
-            onBaked: (entry, thumb) => {
+            onResult: (entry, thumb) => {
+                // Remember every attempt (success or fail) so later saves/re-renders skip it.
+                seen.add(entry.__scope === 'personal' ? `personal:${entry.id}` : `public:${entry.hex}`);
+                if (!thumb) return;
                 if (entry.__scope === 'personal') {
                     this.appContext.libraryController.setUserRulesetThumb(entry.id, thumb, { silent: true });
                     this._applyThumbToCard('#ruleset-library-personal-content', entry.id, null, thumb);
