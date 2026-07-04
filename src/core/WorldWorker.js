@@ -61,6 +61,17 @@ let detectedCycle = [];
 let cyclePlaybackIndex = 0;
 let cycleStartChecksum = null;
 
+// --- "Perfect run" recording ------------------------------------------------
+// START_RUN_RECORDING banks the SELECTED world's EXACT per-tick trajectory from its current (initial)
+// state until the state first re-visits an earlier recorded frame (the loop closes) or a frame cap is
+// hit, then ships the frames to the main thread to bake a perfectly-looping GIF. This is its own
+// detector — a stateChecksum → [recorded-frame indices] map, exact-verified — so it fires at the FIRST
+// genuine repeat (one full period before the live cycle-playback lock-in) and is independent of it.
+let isRunRecording = false;
+let runFrames = [];               // { state: packed Uint8Array, rules: Uint8Array, activeCount }
+let runChecksumIndex = new Map(); // stateChecksum -> [indices into runFrames] (buckets guard collisions)
+let runMaxFrames = 0;
+
 // --- Auto-explore evaluation burst (Phase 2) ---------------------------------
 // A RUN_EVALUATION command runs the current (ruleset × state) for a fixed number of ticks in a
 // tight chunked loop, collecting the cheap interestingness proxies the engine now exposes
@@ -190,6 +201,9 @@ function resetCycleState() {
     checksumWindowCounts.clear();
     stateChecksumQueue = [];
     lastSentChecksum = null;
+    // A state/ruleset discontinuity (reset/load/ruleset/brush/shift/disable) invalidates an in-flight
+    // run recording — abort it so the main thread's pending bake resolves cleanly instead of hanging.
+    if (isRunRecording) finishRunRecording(-1, true);
 }
 
 // Abort an in-progress cycle-detection attempt without discarding the checksum history. Used when a
@@ -214,6 +228,77 @@ function captureCycleFrame(activeCount) {
         rules: jsRuleIndexArray.slice(),
         activeCount
     };
+}
+
+// --- "Perfect run" recording helpers ----------------------------------------
+// Arm a run recording: reset the bank and capture the current (initial) state as frame 0.
+function startRunRecording(maxFrames) {
+    if (!jsStateArray) return;
+    runFrames = [];
+    runChecksumIndex = new Map();
+    runMaxFrames = Number.isFinite(maxFrames) && maxFrames > 0 ? Math.floor(maxFrames) : 300;
+    isRunRecording = true;
+    const active = jsStateArray.reduce((s, c) => s + c, 0);
+    pushRunFrame(stateChecksum(), packCells(jsStateArray), active);
+}
+
+// Append one recorded frame (packed state already computed by the caller) and index its checksum.
+function pushRunFrame(checksum, packedState, activeCount) {
+    runFrames.push({ state: packedState, rules: jsRuleIndexArray.slice(), activeCount });
+    const idx = runFrames.length - 1;
+    const bucket = runChecksumIndex.get(checksum);
+    if (bucket) bucket.push(idx);
+    else runChecksumIndex.set(checksum, [idx]);
+}
+
+// Per-live-tick hook: record the just-produced state, or finish if it closes a loop / hits the cap.
+function recordRunTick(checksum, activeCount) {
+    const packed = packCells(jsStateArray);
+    const bucket = runChecksumIndex.get(checksum);
+    if (bucket) {
+        for (const idx of bucket) {
+            // The recurring checksum reflects a genuinely identical state ⇒ the loop closes at idx.
+            if (statesEqual(packed, runFrames[idx].state)) { finishRunRecording(idx); return; }
+        }
+    }
+    pushRunFrame(checksum, packed, activeCount);
+    if (runFrames.length >= runMaxFrames) { finishRunRecording(-1); return; }
+    if (runFrames.length % 25 === 0) {
+        self.postMessage({ type: 'RUN_RECORDING_PROGRESS', worldIndex, frames: runFrames.length });
+    }
+}
+
+// Ship the banked trajectory as (transient frames + one cycle period), or the whole thing when it hit
+// the cap without closing, then reset. `cycleStartIndex < 0` means no cycle; `cancelled` ships nothing.
+function finishRunRecording(cycleStartIndex, cancelled = false) {
+    if (!isRunRecording) return;
+    isRunRecording = false;
+    const frames = runFrames;
+    runFrames = [];
+    runChecksumIndex = new Map();
+
+    if (cancelled) {
+        self.postMessage({ type: 'RUN_RECORDING_COMPLETE', worldIndex, cancelled: true });
+        return;
+    }
+
+    const transientFrames = cycleStartIndex >= 0 ? frames.slice(0, cycleStartIndex) : frames;
+    const cycleFrames = cycleStartIndex >= 0 ? frames.slice(cycleStartIndex) : [];
+    // Each frame's state/rules buffers are freshly owned (packCells / slice) and each frame appears in
+    // exactly one of the two disjoint slices, so transferring their buffers is safe (no aliasing).
+    const transfers = [];
+    const ser = (arr) => arr.map((f) => {
+        transfers.push(f.state.buffer, f.rules.buffer);
+        return { stateBuffer: f.state.buffer, rulesBuffer: f.rules.buffer };
+    });
+    self.postMessage({
+        type: 'RUN_RECORDING_COMPLETE',
+        worldIndex,
+        transient: ser(transientFrames),
+        cycle: ser(cycleFrames),
+        cycleLength: cycleFrames.length,
+        cappedWithoutCycle: cycleStartIndex < 0,
+    }, transfers);
 }
 
 // --- State-history scrub-back helpers ---------------------------------------
@@ -596,6 +681,11 @@ function runTick() {
 
     const newStateChecksum = stateChecksum();
 
+    // Perfect-run recording banks every live tick's state (never during cycle playback — that just
+    // replays already-recorded frames). May finish the recording (loop closed / cap hit) as a side effect.
+    if (isRunRecording && !isCyclePlaybackMode) {
+        recordRunTick(newStateChecksum, activeCount);
+    }
 
     if (isDetectingCycle) {
         if (newStateChecksum === cycleStartChecksum && statesEqual(packCells(jsStateArray), detectedCycle[0].state)) {
@@ -1318,6 +1408,34 @@ self.onmessage = async function(event) {
         case 'STATE_HISTORY_STEP_LIVE': {
             // Advance exactly one tick while paused (forward step past the recorded tip).
             if (!isEvaluating) stepLive();
+            break;
+        }
+        case 'GET_CYCLE_FRAMES': {
+            // Ship copies of the detected cycle's frames (bit-packed state + rule indices each) so
+            // the main thread can bake a frame-exact perfect-loop GIF. Null when no cycle is locked
+            // in (or mid-eval — the burst owns the buffers and the cycle bookkeeping).
+            if (isEvaluating || !isCyclePlaybackMode || detectedCycle.length === 0) {
+                self.postMessage({ type: 'CYCLE_FRAMES', worldIndex, frames: null, length: 0 });
+                break;
+            }
+            const transfers = [];
+            const frames = detectedCycle.map((f) => {
+                const state = f.state.slice();
+                const rules = f.rules.slice();
+                transfers.push(state.buffer, rules.buffer);
+                return { stateBuffer: state.buffer, rulesBuffer: rules.buffer };
+            });
+            self.postMessage({ type: 'CYCLE_FRAMES', worldIndex, frames, length: frames.length }, transfers);
+            break;
+        }
+        case 'START_RUN_RECORDING': {
+            // Arm the perfect-run recorder from the current (initial) state. Not during an eval burst.
+            if (!isEvaluating) startRunRecording(command.data && command.data.maxFrames);
+            break;
+        }
+        case 'STOP_RUN_RECORDING': {
+            // Manual early stop → finish with whatever's banked (transient only, no cycle).
+            if (isRunRecording) finishRunRecording(-1);
             break;
         }
         case 'RECLAIM_BUFFERS': {

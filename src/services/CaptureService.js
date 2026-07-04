@@ -11,7 +11,7 @@
  */
 import { EventBus, EVENTS } from './EventBus.js';
 import * as Renderer from '../rendering/renderer.js';
-import { rulesetName } from '../utils/utils.js';
+import { rulesetName, unpackCellsInto } from '../utils/utils.js';
 import { WebmRecorder } from './WebmRecorder.js';
 import { GifRecorder } from './GifRecorder.js';
 import * as PersistenceService from './PersistenceService.js';
@@ -19,6 +19,9 @@ import * as PersistenceService from './PersistenceService.js';
 const SETTINGS_KEY = 'captureStudio';
 const GIF_MAX_EDGE = 600;        // GIF frames are held in memory, so cap the resolution.
 const GIF_MAX_FRAMES = 300;      // hard upper bound on banked frames regardless of fps × duration.
+const GIF_MIN_FRAME_DELAY_MS = 20; // GIF decoders clamp shorter delays way up (to ~100ms), not down.
+const RUN_MAX_FRAMES = 600;      // hard cap on a composed perfect-run GIF (transient + cycle × repeats).
+const RUN_MAX_CYCLE_REPEATS = 10;
 
 /** Default Capture Studio options (also the persistence shape). */
 export const CAPTURE_DEFAULTS = {
@@ -32,6 +35,9 @@ export const CAPTURE_DEFAULTS = {
     fps: 30,
     videoQuality: 0.7,           // 0..1, maps to WebM bitrate
     maxDurationSec: 15,
+    cycleDurationSec: 2,         // total loop length for the perfect-loop cycle GIF export
+    runCycleRepeats: 3,          // perfect-run: how many times to repeat the detected cycle
+    runMaxFrames: 300,           // perfect-run: frame cap when no cycle is ever detected
     useCustom: false,
     customWidth: 1280,
     customHeight: 1280,
@@ -115,6 +121,55 @@ export function webmBitrate(width, height, fps, quality) {
     const q = Math.min(1, Math.max(0, quality));
     const bitsPerPixel = 0.05 + q * 0.20; // ~0.05 (small files) .. 0.25 (crisp)
     return Math.max(250_000, Math.round(width * height * fps * bitsPerPixel));
+}
+
+/**
+ * Per-frame delay for a perfect-loop cycle GIF: the user picks the total loop duration and each of
+ * the cycle's frames gets an equal share, floored at the minimum delay GIF decoders honor (shorter
+ * delays get clamped UP to ~100ms by browsers, wrecking the loop). Returns the effective total so
+ * the UI can report when the floor stretched the requested duration.
+ * @param {number} cycleLength Number of frames in the detected cycle.
+ * @param {number} totalDurationSec Requested duration of one full loop, in seconds.
+ * @returns {{delayMs: number, effectiveTotalMs: number}}
+ */
+export function cycleGifTiming(cycleLength, totalDurationSec) {
+    const n = Math.max(1, Math.round(cycleLength || 1));
+    const requestedMs = Math.max(0, (totalDurationSec || 0) * 1000);
+    const delayMs = Math.max(GIF_MIN_FRAME_DELAY_MS, requestedMs / n);
+    return { delayMs, effectiveTotalMs: delayMs * n };
+}
+
+/**
+ * Per-frame GIF delay for a fixed playback rate (the perfect-run recorder plays every recorded state
+ * at this cadence). Floored at the minimum delay GIF decoders honor.
+ * @param {number} fps Target frames per second (clamped 1..60).
+ * @returns {number} delay in milliseconds
+ */
+export function perFrameDelayMs(fps) {
+    const f = Math.min(60, Math.max(1, Math.round(fps || 20)));
+    return Math.max(GIF_MIN_FRAME_DELAY_MS, Math.round(1000 / f));
+}
+
+/**
+ * Compose a perfect-run GIF frame list from the worker's banked trajectory: the transient frames
+ * (initial state → cycle entry) followed by the detected cycle repeated `repeats` times. When no
+ * cycle was found the transient IS the whole recording (no repetition). Truncated to `maxFrames` to
+ * bound memory / encode time; reports whether truncation happened.
+ * @param {{state:Uint8Array, rules:Uint8Array}[]} transient
+ * @param {{state:Uint8Array, rules:Uint8Array}[]} cycle
+ * @param {number} repeats
+ * @param {number} maxFrames
+ * @returns {{frames: object[], truncated: boolean}}
+ */
+export function composeRunFrames(transient, cycle, repeats, maxFrames = RUN_MAX_FRAMES) {
+    const t = Array.isArray(transient) ? transient : [];
+    const c = Array.isArray(cycle) ? cycle : [];
+    const reps = Math.min(RUN_MAX_CYCLE_REPEATS, Math.max(1, Math.round(repeats || 1)));
+    const frames = [...t];
+    for (let r = 0; c.length > 0 && r < reps; r++) frames.push(...c);
+    const cap = Math.max(1, Math.round(maxFrames || RUN_MAX_FRAMES));
+    const truncated = frames.length > cap;
+    return { frames: truncated ? frames.slice(0, cap) : frames, truncated };
 }
 
 /** Rough GIF budget for the UI: frame count and an approximate encoded size. */
@@ -412,6 +467,257 @@ export class CaptureService {
         this._recordCtx = null;
         this._rafId = 0;
     }
+
+    // ---- Frame-exact GIF baking (cycle export + perfect-run recording) ----
+    get isExportingCycle() {
+        return !!this._cycleExportBusy;
+    }
+
+    get isRunRecording() {
+        return !!this._runRec;
+    }
+
+    /** Two-rAF settle: lets the main render loop redraw a dirty world FBO before an FBO readback. */
+    _twoRafs() {
+        return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+
+    /**
+     * Render an ordered list of worker frames (bit-packed state + rule indices each) into a GIF blob
+     * by borrowing world `idx`'s main-thread display buffers one frame at a time: snapshot → write →
+     * redraw the FBO at the live camera (exact on-screen zoom) → FBO readback → restore. The worker
+     * simulation state is never touched. Caller is responsible for pausing the sim first so live
+     * STATE_UPDATEs don't overwrite the borrowed buffers mid-bake.
+     * @param {number} idx selected world index
+     * @param {{state:Uint8Array, rules:Uint8Array}[]} frames
+     * @param {number} delayMs per-frame display duration
+     * @param {{width:number, height:number}} dims
+     * @returns {Promise<Blob|null>}
+     */
+    async _renderFramesToGifBlob(idx, frames, delayMs, dims) {
+        const proxy = this.appContext.worldManager.worlds?.[idx];
+        if (!proxy || !proxy.latestStateArray || !proxy.latestRuleIndexArray) return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = dims.width;
+        canvas.height = dims.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        // Copies, not views — the backing buffers rejoin the worker's reclaim traffic on resume.
+        const snapshot = { state: new Uint8Array(proxy.latestStateArray), rules: new Uint8Array(proxy.latestRuleIndexArray) };
+        const recorder = new GifRecorder();
+        try {
+            recorder.start({ width: dims.width, height: dims.height, maxFrames: frames.length });
+            for (const frame of frames) {
+                // Re-read the arrays each iteration: a straggler STATE_UPDATE may have swapped them.
+                unpackCellsInto(frame.state, proxy.latestStateArray, proxy.latestStateArray.length);
+                proxy.latestRuleIndexArray.set(frame.rules);
+                proxy.renderDirty = true;
+                await this._twoRafs();
+                Renderer.composeCaptureFrame(ctx, { source: 'selected', width: dims.width, height: dims.height, selectedIndex: idx });
+                recorder.addFrame(ctx.getImageData(0, 0, dims.width, dims.height), delayMs);
+            }
+            return await recorder.encode();
+        } finally {
+            recorder.cancel();
+            // Put the borrowed display buffers back before handing control to the live stream again.
+            if (proxy.latestStateArray && proxy.latestRuleIndexArray) {
+                proxy.latestStateArray.set(snapshot.state);
+                proxy.latestRuleIndexArray.set(snapshot.rules);
+                proxy.renderDirty = true;
+            }
+        }
+    }
+
+    /**
+     * Export the selected world's detected cycle as a frame-exact, perfectly-looping GIF: one GIF
+     * frame per cycle frame (a period-12 cycle → a 12-frame GIF), each shown for an equal share of
+     * the requested total loop duration. Frames come straight from the worker's cycle-playback bank
+     * (`GET_CYCLE_FRAMES`) — not from timed screen sampling — so the loop seam is exact.
+     * @param {{width:number, height:number, totalDurationSec:number}} opts
+     * @returns {Promise<boolean>}
+     */
+    async exportCycleGif({ width, height, totalDurationSec } = {}) {
+        if (this.isRecording || this._cycleExportBusy || this._runRec) {
+            this._toast('Finish the current capture first.', 'error');
+            return false;
+        }
+        const wm = this.appContext.worldManager;
+        if (wm.autoExploreService?.isRunning?.()) {
+            this._toast('Stop Auto-Explore before exporting a cycle GIF.', 'error');
+            return false;
+        }
+        const idx = wm.getSelectedWorldIndex();
+        const proxy = wm.worlds?.[idx];
+        const stats = proxy?.getLatestStats?.();
+        if (!proxy || !stats?.isInCycle || !(stats.cycleLength > 0)) {
+            this._toast('No cycle detected on the selected world.', 'error');
+            return false;
+        }
+
+        const dims = clampGifDimensions(Math.max(1, Math.round(width || 0) || 1280), Math.max(1, Math.round(height || 0) || 1280));
+        this._cycleExportBusy = true;
+        const sim = this.appContext.simulationController;
+        const wasPaused = sim ? sim.getIsPaused() : true;
+        try {
+            // Freeze the STATE_UPDATE stream so the buffers we borrow stay put, then let any in-flight
+            // update land before we read the cycle.
+            if (!wasPaused) EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+            await this._twoRafs();
+
+            const frames = await proxy.getCycleFrames();
+            if (!frames || frames.length === 0) {
+                this._toast('The cycle dissolved before it could be captured.', 'error');
+                return false;
+            }
+            if (frames.length > GIF_MAX_FRAMES) {
+                this._toast(`Cycle too long to export (${frames.length} frames, max ${GIF_MAX_FRAMES}).`, 'error');
+                return false;
+            }
+            const { delayMs } = cycleGifTiming(frames.length, totalDurationSec);
+            this._toast(`Capturing cycle (${frames.length} frames)…`, 'info');
+            const blob = await this._renderFramesToGifBlob(idx, frames, delayMs, dims);
+            if (!blob) {
+                this._toast('Could not capture the cycle.', 'error');
+                return false;
+            }
+            const hex = wm.getCurrentRulesetHex();
+            const tick = wm.getSelectedWorldStats().tick || 0;
+            this._downloadBlob(blob, buildCaptureFilename(`${rulesetName(hex)}-cycle${frames.length}`, tick, 'gif'));
+            this._toast(`Saved perfect-loop GIF (${frames.length} frames).`, 'success');
+            return true;
+        } catch (err) {
+            console.error('Cycle GIF export failed:', err);
+            this._toast('Could not export the cycle GIF.', 'error');
+            return false;
+        } finally {
+            if (!wasPaused) EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+            this._cycleExportBusy = false;
+        }
+    }
+
+    /**
+     * Arm a "perfect run" recording of the selected world: pause at the current (initial) state, then
+     * — the moment the user presses Play — bank EVERY tick's exact state until the run falls into a
+     * cycle (then repeat that cycle `cycleRepeats` times) or hits `maxFrames` without one, and bake a
+     * GIF. Frames are the worker's exact trajectory (`START_RUN_RECORDING`), not timed screen samples,
+     * so nothing is missed no matter the sim speed; they're rendered at the live camera (exact zoom).
+     * Resolves once the GIF is saved (or the recording is cancelled). The recording HUD (V / its Stop
+     * button) drives an early stop.
+     * @param {{width:number, height:number, maxFrames:number, cycleRepeats:number, fps:number}} opts
+     * @returns {Promise<boolean>}
+     */
+    async armRunRecording({ width, height, maxFrames, cycleRepeats, fps } = {}) {
+        if (this.isRecording || this._cycleExportBusy || this._runRec) {
+            this._toast('Finish the current capture first.', 'error');
+            return false;
+        }
+        const wm = this.appContext.worldManager;
+        if (wm.autoExploreService?.isRunning?.()) {
+            this._toast('Stop Auto-Explore before recording a run.', 'error');
+            return false;
+        }
+        const idx = wm.getSelectedWorldIndex();
+        const proxy = wm.worlds?.[idx];
+        if (!proxy) {
+            this._toast('No selected world to record.', 'error');
+            return false;
+        }
+
+        const dims = clampGifDimensions(Math.max(1, Math.round(width || 0) || 1280), Math.max(1, Math.round(height || 0) || 1280));
+        const cap = Math.min(RUN_MAX_FRAMES, Math.max(1, Math.round(maxFrames || 300)));
+        const repeats = Math.min(RUN_MAX_CYCLE_REPEATS, Math.max(1, Math.round(cycleRepeats || 3)));
+        const delayMs = perFrameDelayMs(fps || 20);
+
+        // Start paused at the current (initial) state; the user presses Play to run it.
+        const sim = this.appContext.simulationController;
+        if (sim && !sim.getIsPaused()) EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+
+        this._runRec = { idx, dims, repeats, delayMs, frames: 0 };
+        EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: true, mode: 'run' });
+        this._toast('Run recording armed — press Play to record from the current state.', 'info');
+
+        let result;
+        try {
+            result = await proxy.startRunRecording(cap, (frames) => {
+                if (!this._runRec) return;
+                this._runRec.frames = frames;
+                EventBus.dispatch(EVENTS.CAPTURE_RECORDING_PROGRESS, { mode: 'run', frames, format: 'gif', elapsedMs: 0, estBytes: 0, paused: false });
+            });
+        } catch (err) {
+            console.error('Run recording failed:', err);
+            this._toast('Run recording failed.', 'error');
+            this._runRec = null;
+            EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: false });
+            return false;
+        }
+        return this._bakeRunRecording(result);
+    }
+
+    /** Finish a run recording: compose transient + cycle × repeats and bake the GIF. */
+    async _bakeRunRecording(result) {
+        const ctx = this._runRec;
+        this._runRec = null;
+        const done = () => EventBus.dispatch(EVENTS.WORLD_RECORDING_STATE_CHANGED, { recording: false });
+        if (!ctx || !result || result.cancelled) {
+            this._toast('Run recording cancelled.', 'info');
+            done();
+            return false;
+        }
+
+        const { idx, dims, repeats, delayMs } = ctx;
+        const { frames, truncated } = composeRunFrames(result.transient, result.cycle, repeats, RUN_MAX_FRAMES);
+        if (frames.length === 0) {
+            this._toast('Nothing was recorded.', 'error');
+            done();
+            return false;
+        }
+
+        const wm = this.appContext.worldManager;
+        const sim = this.appContext.simulationController;
+        const wasPaused = sim ? sim.getIsPaused() : true;
+        this._cycleExportBusy = true; // lock other captures during the bake
+        try {
+            if (!wasPaused) EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, true);
+            await this._twoRafs();
+            this._toast(`Rendering run (${frames.length} frames)…`, 'info');
+            const blob = await this._renderFramesToGifBlob(idx, frames, delayMs, dims);
+            if (!blob) {
+                this._toast('Could not render the run.', 'error');
+                return false;
+            }
+            const hex = wm.getCurrentRulesetHex();
+            const tick = wm.getSelectedWorldStats().tick || 0;
+            const tag = result.cappedWithoutCycle ? `run${frames.length}` : `run-loop${result.cycleLength}`;
+            this._downloadBlob(blob, buildCaptureFilename(`${rulesetName(hex)}-${tag}`, tick, 'gif'));
+            const how = result.cappedWithoutCycle
+                ? `${frames.length} frames, no cycle found`
+                : `cycle ×${repeats}`;
+            this._toast(`Saved run GIF (${how}${truncated ? ', truncated' : ''}).`, 'success');
+            return true;
+        } catch (err) {
+            console.error('Run GIF bake failed:', err);
+            this._toast('Could not render the run.', 'error');
+            return false;
+        } finally {
+            this._cycleExportBusy = false;
+            if (!wasPaused) EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+            done();
+        }
+    }
+
+    /** Finish an armed run recording early (HUD Stop) — bakes whatever's been captured so far. */
+    stopRunRecording() {
+        if (!this._runRec) return false;
+        const proxy = this.appContext.worldManager.worlds?.[this._runRec.idx];
+        proxy?.stopRunRecording();
+        return true;
+    }
+
+    /** Stop whichever capture is active (used by the shared HUD Stop button). */
+    stopActive = () => {
+        if (this._runRec) this.stopRunRecording();
+        else if (this.isRecording) this.stopRecording();
+    };
 
     /**
      * Resolve concrete dimensions from a saved settings object (used by quick-record so the hotkey

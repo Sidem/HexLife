@@ -207,6 +207,37 @@
     font-weight: 600;
 }
 
+/* Perfect-loop cycle export */
+#capture-studio-modal .cs-cycle-block {
+    margin: 4px 0 12px;
+    padding: 10px 12px;
+    background-color: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+#capture-studio-modal .cs-cycle-status {
+    margin: 0 0 8px;
+    font-size: 0.8em;
+}
+
+#capture-studio-modal .cs-cycle-export,
+#capture-studio-modal .cs-run-arm {
+    width: 100%;
+    margin-top: 8px;
+}
+
+#capture-studio-modal .cs-cycle-export:disabled,
+#capture-studio-modal .cs-run-arm:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+#capture-studio-modal .cs-run-status {
+    margin: 0 0 8px;
+    font-size: 0.8em;
+}
+
 /* Primary action */
 #capture-studio-modal .cs-primary {
     display: inline-flex;

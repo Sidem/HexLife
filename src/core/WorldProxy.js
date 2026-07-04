@@ -202,6 +202,47 @@ export class WorldProxy {
                 }
                 break;
             }
+            case 'CYCLE_FRAMES': {
+                // Resolve a pending getCycleFrames() request with per-frame views (state stays
+                // bit-packed — the consumer unpacks), or null when no cycle is locked in.
+                if (this._pendingCycleFrames) {
+                    const resolve = this._pendingCycleFrames;
+                    this._pendingCycleFrames = null;
+                    const frames = data.frames
+                        ? data.frames.map((f) => ({
+                            state: new Uint8Array(f.stateBuffer),
+                            rules: new Uint8Array(f.rulesBuffer),
+                        }))
+                        : null;
+                    resolve(frames);
+                }
+                break;
+            }
+            case 'RUN_RECORDING_PROGRESS': {
+                if (this._runRecordingProgress) this._runRecordingProgress(data.frames);
+                break;
+            }
+            case 'RUN_RECORDING_COMPLETE': {
+                // Resolve the pending startRunRecording() with the banked trajectory (per-frame views;
+                // state stays bit-packed), or a cancelled marker on a discontinuity/early-abort.
+                if (this._pendingRunRecording) {
+                    const resolve = this._pendingRunRecording;
+                    this._pendingRunRecording = null;
+                    this._runRecordingProgress = null;
+                    if (data.cancelled) { resolve({ cancelled: true }); break; }
+                    const map = (arr) => (arr || []).map((f) => ({
+                        state: new Uint8Array(f.stateBuffer),
+                        rules: new Uint8Array(f.rulesBuffer),
+                    }));
+                    resolve({
+                        transient: map(data.transient),
+                        cycle: map(data.cycle),
+                        cycleLength: data.cycleLength || 0,
+                        cappedWithoutCycle: !!data.cappedWithoutCycle,
+                    });
+                }
+                break;
+            }
         }
     }
 
@@ -275,6 +316,27 @@ export class WorldProxy {
             this.sendCommand('RUN_EVALUATION', opts);
         });
     }
+    // Fetch the worker's detected-cycle frames (bit-packed state + rule indices per frame) for the
+    // perfect-loop GIF export. Resolves null when no cycle is locked in. Single-pending contract
+    // like runEvaluation: a newer request supersedes an older unresolved one.
+    getCycleFrames() {
+        return new Promise((resolve) => {
+            this._pendingCycleFrames = resolve;
+            this.sendCommand('GET_CYCLE_FRAMES', {});
+        });
+    }
+    // Arm a perfect-run recording (frame 0 = current state). Resolves when the recording finishes —
+    // the sim reaching a cycle, hitting `maxFrames`, a manual stopRunRecording(), or a discontinuity
+    // (resolves `{cancelled:true}`). `onProgress(frames)` fires periodically while frames accumulate.
+    startRunRecording(maxFrames, onProgress) {
+        return new Promise((resolve) => {
+            this._pendingRunRecording = resolve;
+            this._runRecordingProgress = onProgress || null;
+            this.sendCommand('START_RUN_RECORDING', { maxFrames });
+        });
+    }
+    // Finish an armed run recording early with whatever's banked (worker replies RUN_RECORDING_COMPLETE).
+    stopRunRecording() { this.sendCommand('STOP_RUN_RECORDING', {}); }
     // --- State-history scrub-back (selected world only) ---------------------
     // Enable/disable recording of recent state frames. The main thread captures only on the selected
     // world so the ring's memory is bounded to one world.

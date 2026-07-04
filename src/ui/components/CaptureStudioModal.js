@@ -105,6 +105,19 @@ export class CaptureStudioModal extends BaseComponent {
                     <div class="cs-field cs-webm-quality"></div>
                     <div class="cs-field cs-duration"></div>
                     <p class="cs-gif-budget info-text hidden"></p>
+                    <div class="cs-cycle-block">
+                        <span class="cs-field-label">Perfect loop</span>
+                        <p class="cs-cycle-status info-text"></p>
+                        <div class="cs-field cs-cycle-duration"></div>
+                        <button type="button" class="button cs-cycle-export">Export cycle GIF</button>
+                    </div>
+                    <div class="cs-cycle-block cs-run-block">
+                        <span class="cs-field-label">Perfect run (record from start)</span>
+                        <p class="cs-run-status info-text">Arms paused at the current state; press Play to record every frame until a cycle is found, then loops it.</p>
+                        <div class="cs-field cs-run-repeats"></div>
+                        <div class="cs-field cs-run-maxframes"></div>
+                        <button type="button" class="button cs-run-arm">Arm run recording</button>
+                    </div>
                     <p class="cs-rec-status info-text hidden" role="status"></p>
                 </div>
 
@@ -138,6 +151,13 @@ export class CaptureStudioModal extends BaseComponent {
             webmQuality: this.element.querySelector('.cs-webm-quality'),
             duration: this.element.querySelector('.cs-duration'),
             gifBudget: this.element.querySelector('.cs-gif-budget'),
+            cycleStatus: this.element.querySelector('.cs-cycle-status'),
+            cycleDuration: this.element.querySelector('.cs-cycle-duration'),
+            cycleExportBtn: this.element.querySelector('.cs-cycle-export'),
+            runStatus: this.element.querySelector('.cs-run-status'),
+            runRepeats: this.element.querySelector('.cs-run-repeats'),
+            runMaxFrames: this.element.querySelector('.cs-run-maxframes'),
+            runArmBtn: this.element.querySelector('.cs-run-arm'),
             recStatus: this.element.querySelector('.cs-rec-status'),
             primaryBtn: this.element.querySelector('.cs-primary'),
             closeActionBtn: this.element.querySelector('[data-action="close"]'),
@@ -167,6 +187,21 @@ export class CaptureStudioModal extends BaseComponent {
             id: 'cs-duration', label: 'Max length', min: 1, max: 60, step: 1, unit: 's',
             value: this.settings.maxDurationSec, showValue: true,
             onInput: (v) => { this.settings.maxDurationSec = v; this._persist(); this._updateBudget(); },
+        });
+        this.sliders.cycleDuration = new SliderComponent(this.ui.cycleDuration, {
+            id: 'cs-cycle-duration', label: 'Loop duration', min: 0.2, max: 10, step: 0.1, unit: 's',
+            value: this.settings.cycleDurationSec, showValue: true,
+            onInput: (v) => { this.settings.cycleDurationSec = v; this._persist(); },
+        });
+        this.sliders.runRepeats = new SliderComponent(this.ui.runRepeats, {
+            id: 'cs-run-repeats', label: 'Cycle repeats', min: 1, max: 10, step: 1, unit: '×',
+            value: this.settings.runCycleRepeats, showValue: true,
+            onInput: (v) => { this.settings.runCycleRepeats = v; this._persist(); },
+        });
+        this.sliders.runMaxFrames = new SliderComponent(this.ui.runMaxFrames, {
+            id: 'cs-run-maxframes', label: 'Max frames (no cycle)', min: 60, max: 600, step: 10,
+            value: this.settings.runMaxFrames, showValue: true,
+            onInput: (v) => { this.settings.runMaxFrames = v; this._persist(); },
         });
     }
 
@@ -204,6 +239,8 @@ export class CaptureStudioModal extends BaseComponent {
         this._addDOMListener(this.ui.customH, 'change', (e) => { this.settings.customHeight = this._clampCustom(e.target.value); e.target.value = this.settings.customHeight; this._persist(); this._updateDims(); });
 
         this._addDOMListener(this.ui.primaryBtn, 'click', this._onPrimary);
+        this._addDOMListener(this.ui.cycleExportBtn, 'click', this._onCycleExport);
+        this._addDOMListener(this.ui.runArmBtn, 'click', this._onArmRun);
     }
 
     _wireSegmented(group, onChange) {
@@ -250,6 +287,7 @@ export class CaptureStudioModal extends BaseComponent {
         this._syncCustomVisibility();
         this._syncFormatVisibility();
         this._syncRecordingUi(this.capture.isRecording);
+        this._updateCycleUi();
         this._updateDims();
     }
 
@@ -375,6 +413,8 @@ export class CaptureStudioModal extends BaseComponent {
 
     _refreshPreview() {
         if (!this._visible) return;
+        this._updateCycleUi();
+        this._updateRunUi();
         const ctx = this.ui.preview.getContext('2d');
         if (!ctx) return;
         const selectedIndex = this.appContext.worldManager.getSelectedWorldIndex();
@@ -386,7 +426,56 @@ export class CaptureStudioModal extends BaseComponent {
         });
     }
 
+    /**
+     * Refresh the perfect-loop section from the selected world's live cycle status. Piggybacks on
+     * the 250ms preview timer (cycles come and go as the sim runs), so keep the DOM writes cheap.
+     */
+    _updateCycleUi() {
+        if (this.settings.tab !== 'video') return;
+        const stats = this.appContext.worldManager.getSelectedWorldStats();
+        const inCycle = !!(stats && stats.isInCycle && stats.cycleLength > 0);
+        const busy = this.capture.isRecording || this.capture.isExportingCycle;
+        const label = inCycle ? `Export cycle GIF (${stats.cycleLength} frames)` : 'Export cycle GIF';
+        const status = inCycle
+            ? `Cycle detected: ${stats.cycleLength} frames — exports one GIF frame per cycle frame for a seamless loop.`
+            : 'No cycle detected on the selected world — let a rule settle into a repeating pattern first.';
+        if (this.ui.cycleExportBtn.textContent !== label) this.ui.cycleExportBtn.textContent = label;
+        if (this.ui.cycleStatus.textContent !== status) this.ui.cycleStatus.textContent = status;
+        this.ui.cycleExportBtn.disabled = !inCycle || busy || this.capture.isRunRecording;
+    }
+
+    /** Enable/disable the perfect-run arm button based on capture busyness. */
+    _updateRunUi() {
+        if (this.settings.tab !== 'video') return;
+        const busy = this.capture.isRecording || this.capture.isExportingCycle || this.capture.isRunRecording;
+        this.ui.runArmBtn.disabled = busy;
+    }
+
     // ---- actions ----
+    _onCycleExport = () => {
+        const { width, height } = this._currentDims();
+        this.capture.exportCycleGif({
+            width, height,
+            totalDurationSec: this.settings.cycleDurationSec,
+        });
+        this._updateCycleUi();
+    };
+
+    _onArmRun = () => {
+        if (this.capture.isRecording || this.capture.isExportingCycle || this.capture.isRunRecording) return;
+        const { width, height } = this._currentDims();
+        // Fire-and-forget: armRunRecording resolves only when the whole run finishes (cycle/cap/stop),
+        // so we don't await it. It dispatches WORLD_RECORDING_STATE_CHANGED to raise the HUD; get the
+        // modal out of the way so Play and the HUD take over, just like a normal recording start.
+        this.capture.armRunRecording({
+            width, height,
+            maxFrames: this.settings.runMaxFrames,
+            cycleRepeats: this.settings.runCycleRepeats,
+            fps: this.settings.fps,
+        });
+        this.hide();
+    };
+
     _onPrimary = () => {
         if (this.settings.tab === 'screenshot') {
             const { width, height } = this._currentDims();
@@ -438,7 +527,7 @@ export class CaptureStudioModal extends BaseComponent {
             pause: this.hud.querySelector('.cs-hud-pause'),
             stop: this.hud.querySelector('.cs-hud-stop'),
         };
-        this._addDOMListener(this.hudUi.stop, 'click', () => this.capture.stopRecording());
+        this._addDOMListener(this.hudUi.stop, 'click', () => this.capture.stopActive());
         this._addDOMListener(this.hudUi.pause, 'click', () => this.capture.togglePause());
         this._initHudDrag();
         this._restoreHudPosition();
@@ -497,10 +586,18 @@ export class CaptureStudioModal extends BaseComponent {
         }
     }
 
-    _onRecordingState = ({ recording }) => {
+    _onRecordingState = ({ recording, mode }) => {
+        this._recMode = recording ? (mode || 'clip') : null;
         this.hud.classList.toggle('hidden', !recording);
+        // Pause/resume only applies to timed clip/GIF recording — a perfect-run's cadence is the sim's
+        // own Play/Pause, so hide the HUD pause button in run mode.
+        this.hudUi.pause.classList.toggle('hidden', this._recMode === 'run');
         if (recording) {
             this._restoreHudPosition();
+            if (mode === 'run') {
+                this.hudUi.time.textContent = 'Armed';
+                this.hudUi.size.textContent = 'press Play';
+            }
         } else {
             this.hudUi.time.textContent = '0:00';
             this.hudUi.size.textContent = '';
@@ -514,7 +611,16 @@ export class CaptureStudioModal extends BaseComponent {
         this.hudUi.pause.innerHTML = paused ? `${ICONS.play} Resume` : `${ICONS.pause} Pause`;
     }
 
-    _onProgress = ({ elapsedMs, frames, format, estBytes, paused }) => {
+    _onProgress = ({ elapsedMs, frames, format, estBytes, paused, mode }) => {
+        // Perfect-run recording reports a live frame count, not elapsed time / size.
+        if (mode === 'run') {
+            this.hudUi.time.textContent = 'Recording';
+            this.hudUi.size.textContent = `${frames || 0} frames`;
+            if (this._visible && this.settings.tab === 'video') {
+                this.ui.recStatus.textContent = `● Recording run — ${frames || 0} frames captured`;
+            }
+            return;
+        }
         const total = Math.floor(elapsedMs / 1000);
         const mm = Math.floor(total / 60);
         const ss = String(total % 60).padStart(2, '0');
