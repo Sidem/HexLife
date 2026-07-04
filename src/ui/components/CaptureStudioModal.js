@@ -42,8 +42,8 @@ export class CaptureStudioModal extends BaseComponent {
         this.element.className = 'modal-overlay hidden';
         this.element.innerHTML = `
             <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="capture-studio-title">
-                <h3 id="capture-studio-title">${ICONS.camera} Capture Studio</h3>
                 <button class="modal-close-button" aria-label="Close">&times;</button>
+                <h3 id="capture-studio-title">${ICONS.camera} Capture Studio</h3>
 
                 <div class="cs-tabs" role="tablist" aria-label="Capture type">
                     <button type="button" class="cs-tab" data-tab="screenshot" role="tab">${ICONS.camera}<span>Screenshot</span></button>

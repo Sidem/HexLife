@@ -2,6 +2,20 @@
     max-width: 480px;
     width: 92%;
     z-index: 9999;
+    /* Short viewports: keep the studio inside the screen and scroll internally
+       instead of overflowing (clipped top & bottom by the centered overlay). */
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+}
+
+/* Keep the close (×) pinned to the top-right corner while the body scrolls.
+   The button is the first child, so float+sticky sits it on the title's line
+   and holds it in view as the content scrolls (.modal-content is the scroller). */
+#capture-studio-modal .modal-close-button {
+    position: sticky;
+    top: 0;
+    float: right;
+    margin-left: auto;
 }
 
 #capture-studio-modal h3 {
