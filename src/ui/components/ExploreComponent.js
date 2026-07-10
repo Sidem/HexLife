@@ -167,6 +167,7 @@ export class ExploreComponent extends BaseComponent {
                 { value: 'single', text: 'Single' },
                 { value: 'r_sym', text: 'R-Sym' },
                 { value: 'n_count', text: 'N-Count' },
+                { value: 'totalistic', text: 'Totalistic' },
             ],
             onChange: (v) => PersistenceService.saveUISetting(SETTING_KEYS.mode, v),
         });

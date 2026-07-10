@@ -185,17 +185,17 @@ export const EVENTS = {
     COMMAND_INCREMENT_BRUSH_SIZE: 'command:incrementBrushSize',
     /** @param {'invert'|'draw'|'erase'} mode - The desired brush interaction mode. */
     COMMAND_SET_BRUSH_MODE: 'command:setBrushMode', 
-    /** @param {{bias: number, generationMode: 'random'|'n_count'|'r_sym', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
-    COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset', 
+    /** @param {{bias: number, generationMode: 'random'|'n_count'|'r_sym'|'totalistic', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
+    COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset',
     /** @param {{hexString: string, resetScopeForThisChange: 'all'|'selected'|'none'}} data - The ruleset to set. */
-    COMMAND_SET_RULESET: 'command:setRuleset', 
-    /** @param {{mutationRate: number, scope: 'all'|'selected', mode: 'single'|'r_sym'|'n_count'}} data - Parameters for mutating a ruleset. */
+    COMMAND_SET_RULESET: 'command:setRuleset',
+    /** @param {{mutationRate: number, scope: 'all'|'selected', mode: 'single'|'r_sym'|'n_count'|'totalistic'}} data - Parameters for mutating a ruleset. */
     COMMAND_MUTATE_RULESET: 'command:mutateRuleset',
-    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count', ensureMutation: boolean}} data - Parameters for cloning and mutating. */
+    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count'|'totalistic', ensureMutation: boolean}} data - Parameters for cloning and mutating. */
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
     /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
     COMMAND_CLONE_RULESET: 'command:cloneRuleset',
-    /** @param {{mode: 'uniform'|'r_sym'|'n_count', postMutationRate: number}} data - Breed from the genepool: recombine all worlds flagged `isParent` into every non-parent world. */
+    /** @param {{mode: 'uniform'|'r_sym'|'n_count'|'totalistic', postMutationRate: number}} data - Breed from the genepool: recombine all worlds flagged `isParent` into every non-parent world. */
     COMMAND_BREED_WORLDS: 'command:breedWorlds',
     /** @event A user-initiated command to execute the genepool breed with the controller's current inheritance mode + offspring-mutation rate. */
     COMMAND_EXECUTE_BREED_WORLDS: 'command:executeBreedWorlds',

@@ -21,9 +21,13 @@ export class RulesetService {
 
     /**
      * Generate a fresh ruleset hex.
-     * - `n_count`: one random output per (centerState × neighbor-count) bucket.
-     * - `r_sym`:   one random output per (centerState × canonical orbit) group.
-     * - default:   each of the 128 entries flipped independently.
+     * - `n_count`:    one random output per (centerState × neighbor-count) bucket.
+     * - `totalistic`: one output per totalistic sum (centerState + active-neighbor count, 0–7) —
+     *                 the classic plain-totalistic CA constraint. 8 buckets, so the whole space is
+     *                 2^8 = 256 rulesets; strictly coarser than `n_count` (a totalistic ruleset is
+     *                 an n_count ruleset whose (cs=1, n) bucket always equals its (cs=0, n+1) bucket).
+     * - `r_sym`:      one random output per (centerState × canonical orbit) group.
+     * - default:      each of the 128 entries flipped independently.
      * @param {number} bias - Probability of a 1 output.
      * @param {string} generationMode
      * @param {() => number} [rng=Math.random]
@@ -36,6 +40,15 @@ export class RulesetService {
                 for (let nan = 0; nan <= 6; nan++) {
                     const out = rng() < bias ? 1 : 0;
                     for (let m = 0; m < 64; m++) if (Symmetry.countSetBits(m) === nan) tempRuleset[(cs << 6) | m] = out;
+                }
+            }
+        } else if (generationMode === 'totalistic') {
+            for (let sum = 0; sum <= 7; sum++) {
+                const out = rng() < bias ? 1 : 0;
+                for (let cs = 0; cs <= 1; cs++) {
+                    for (let m = 0; m < 64; m++) {
+                        if (cs + Symmetry.countSetBits(m) === sum) tempRuleset[(cs << 6) | m] = out;
+                    }
                 }
             }
         } else if (generationMode === 'r_sym') {
@@ -59,11 +72,13 @@ export class RulesetService {
 
     /**
      * Produce a mutated copy of `sourceHex`.
-     * - `single`:  flip each of the 128 entries with probability `mutationRate`.
-     * - `r_sym`:   flip whole canonical orbit groups (per centerState).
-     * - `n_count`: flip whole neighbor-count buckets, seeded from `referenceRuleset`'s
-     *              effective output (matches the legacy behaviour where the n_count
-     *              mode read the *selected* world's effective rule, not the source).
+     * - `single`:     flip each of the 128 entries with probability `mutationRate`.
+     * - `r_sym`:      flip whole canonical orbit groups (per centerState).
+     * - `n_count`:    flip whole neighbor-count buckets, seeded from `referenceRuleset`'s
+     *                 effective output (matches the legacy behaviour where the n_count
+     *                 mode read the *selected* world's effective rule, not the source).
+     * - `totalistic`: flip whole totalistic-sum buckets (centerState + active-neighbor count,
+     *                 0–7), seeded from `referenceRuleset`'s effective output exactly like `n_count`.
      * @param {string} sourceHex
      * @param {number} mutationRate
      * @param {string} mutationMode
@@ -113,6 +128,21 @@ export class RulesetService {
                     }
                 }
             }
+        } else if (mutationMode === 'totalistic') {
+            for (let sum = 0; sum <= 7; sum++) {
+                if (rng() < mutationRate) {
+                    const currentEffectiveOutput = RulesetService.getEffectiveRuleForTotalisticSum(referenceRuleset, sum);
+                    const newOutput = (currentEffectiveOutput === 2) ? Math.round(rng()) : 1 - currentEffectiveOutput;
+
+                    for (let cs = 0; cs <= 1; cs++) {
+                        for (let mask = 0; mask < 64; mask++) {
+                            if (cs + Symmetry.countSetBits(mask) === sum) {
+                                rules[(cs << 6) | mask] = newOutput;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         return rulesetToHex(rules);
@@ -128,13 +158,15 @@ export class RulesetService {
      * - `n_count`: per `(centerState × neighbor-count bucket)`, pick one parent wholesale and copy
      *              its outputs across every mask with that active-neighbor count, so totalistic
      *              behaviour is inherited as a unit (mirrors n_count mutation/generation).
+     * - `totalistic`: per totalistic-sum bucket (centerState + active-neighbor count, 0–7), pick one
+     *              parent wholesale and copy its outputs across the whole bucket.
      * An optional low post-crossover mutation rate flips each entry independently (single-bit), to
      * inject fresh variation the way breeding pipelines usually do. With `postMutationRate=0` every
      * child bit is taken verbatim from A or B (and breeding identical parents is the identity).
      * Pure — the injectable `rng` keeps it deterministically testable like the rest of the algebra.
      * @param {string} hexA
      * @param {string} hexB
-     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
+     * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
      * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
      * @returns {string} 32-char hex
@@ -151,12 +183,13 @@ export class RulesetService {
      * - `r_sym`:   per `(centerState × canonical orbit)` group. Falls back to `uniform` if symmetryData
      *              is unavailable.
      * - `n_count`: per `(centerState × neighbor-count bucket)`.
+     * - `totalistic`: per totalistic-sum bucket (centerState + active-neighbor count, 0–7).
      * With a single parent every unit is taken from it (so a 1-parent pool + `postMutationRate` is
      * exactly clone-and-mutate). With two parents the rng-draw order and parent choice are identical to
      * the binary `crossoverHexes` (`floor(rng()*2)` matches `rng() < 0.5`), so existing callers/tests
      * are byte-identical. The injectable `rng` keeps it deterministic.
      * @param {string[]} hexes - One or more 32-char ruleset hexes.
-     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
+     * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
      * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
      * @returns {string} 32-char hex ('Error'/empty pool yields a zeroed ruleset).
@@ -186,6 +219,18 @@ export class RulesetService {
                     const parent = pickParent();
                     for (let mask = 0; mask < 64; mask++) {
                         if (Symmetry.countSetBits(mask) === nan) {
+                            const idx = (cs << 6) | mask;
+                            child[idx] = parent[idx];
+                        }
+                    }
+                }
+            }
+        } else if (mode === 'totalistic') {
+            for (let sum = 0; sum <= 7; sum++) {
+                const parent = pickParent();
+                for (let cs = 0; cs <= 1; cs++) {
+                    for (let mask = 0; mask < 64; mask++) {
+                        if (cs + Symmetry.countSetBits(mask) === sum) {
                             const idx = (cs << 6) | mask;
                             child[idx] = parent[idx];
                         }
@@ -223,6 +268,28 @@ export class RulesetService {
         for (let mask = 0; mask < 64; mask++) {
             if (Symmetry.countSetBits(mask) === numActiveNeighbors) {
                 const output = ruleset[(centerState << 6) | mask];
+                if (firstOutput === -1) firstOutput = output;
+                else if (firstOutput !== output) return 2;
+            }
+        }
+        return firstOutput === -1 ? 2 : firstOutput;
+    }
+
+    /**
+     * The effective output shared by every rule entry whose totalistic sum
+     * (centerState + active-neighbor count) equals `sum`, or 2 ("mixed") if the
+     * outputs disagree or the ruleset is missing/invalid.
+     * @param {Uint8Array|null} ruleset
+     * @param {number} sum - Totalistic sum in [0, 7].
+     * @returns {0|1|2}
+     */
+    static getEffectiveRuleForTotalisticSum(ruleset, sum) {
+        if (!ruleset) return 2;
+        let firstOutput = -1;
+        for (let cs = 0; cs <= 1; cs++) {
+            for (let mask = 0; mask < 64; mask++) {
+                if (cs + Symmetry.countSetBits(mask) !== sum) continue;
+                const output = ruleset[(cs << 6) | mask];
                 if (firstOutput === -1) firstOutput = output;
                 else if (firstOutput !== output) return 2;
             }

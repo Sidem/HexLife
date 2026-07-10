@@ -14,6 +14,22 @@ function seq(values) {
     return () => values[i++ % values.length];
 }
 
+// True iff every rule entry with the same totalistic sum (centerState + neighbor count) agrees.
+function isTotalistic(rules) {
+    for (let sum = 0; sum <= 7; sum++) {
+        let first = -1;
+        for (let cs = 0; cs <= 1; cs++) {
+            for (let mask = 0; mask < 64; mask++) {
+                if (cs + countSetBits(mask) !== sum) continue;
+                const out = rules[(cs << 6) | mask];
+                if (first === -1) first = out;
+                else if (first !== out) return false;
+            }
+        }
+    }
+    return true;
+}
+
 let service;
 let symmetryData;
 beforeAll(() => {
@@ -60,6 +76,33 @@ describe('RulesetService.getEffectiveRuleForNeighborCount', () => {
             }
         }
         expect(RulesetService.getEffectiveRuleForNeighborCount(rules, 0, 2)).toBe(2);
+    });
+});
+
+describe('RulesetService.getEffectiveRuleForTotalisticSum', () => {
+    it('returns 2 (mixed) for a null ruleset', () => {
+        expect(RulesetService.getEffectiveRuleForTotalisticSum(null, 3)).toBe(2);
+    });
+
+    it('returns the uniform output of a totalistic-sum bucket', () => {
+        const zeros = hexToRuleset(ALL_ZERO);
+        for (let sum = 0; sum <= 7; sum++) {
+            expect(RulesetService.getEffectiveRuleForTotalisticSum(zeros, sum)).toBe(0);
+        }
+        const ones = hexToRuleset(ALL_ONE);
+        for (let sum = 0; sum <= 7; sum++) {
+            expect(RulesetService.getEffectiveRuleForTotalisticSum(ones, sum)).toBe(1);
+        }
+    });
+
+    it('returns 2 when a totalistic-sum bucket is mixed', () => {
+        const rules = hexToRuleset(ALL_ZERO);
+        // sum=3 is reachable by (cs=0, 3 neighbors) and (cs=1, 2 neighbors); make them disagree.
+        // Flip a single (cs=0, 3-neighbor) entry so the bucket is no longer uniform.
+        for (let mask = 0; mask < 64; mask++) {
+            if (countSetBits(mask) === 3) { rules[(0 << 6) | mask] = 1; break; }
+        }
+        expect(RulesetService.getEffectiveRuleForTotalisticSum(rules, 3)).toBe(2);
     });
 });
 
@@ -126,6 +169,43 @@ describe('RulesetService.generateMutatedHex (n_count)', () => {
     });
 });
 
+describe('RulesetService.generateMutatedHex (totalistic)', () => {
+    it('keeps every totalistic-sum bucket uniform and flips all buckets at rate 1', () => {
+        // Source is totalistic (ALL_ZERO); reference is itself; rng always passes => every bucket flips.
+        const out = service.generateMutatedHex(ALL_ZERO, 1, 'totalistic', hexToRuleset(ALL_ZERO), () => 0);
+        const rules = hexToRuleset(out);
+        expect(isTotalistic(rules)).toBe(true);
+        // Every bucket was uniformly 0 and flips to 1 => all ones.
+        expect(out).toBe(ALL_ONE);
+    });
+
+    it('flips nothing when rng never passes — equals source', () => {
+        const out = service.generateMutatedHex(ALL_ZERO, 0.5, 'totalistic', hexToRuleset(ALL_ZERO), () => 0.999);
+        expect(out).toBe(ALL_ZERO);
+    });
+
+    it('consumes an extra Math.round(rng()) draw when the reference bucket is mixed', () => {
+        // Build a reference whose sum=0 bucket is uniform (0) but sum=1 bucket is mixed.
+        const ref = hexToRuleset(ALL_ZERO);
+        // sum=1 reachable by (cs=0, 1 neighbor) and (cs=1, 0 neighbors); disagree them.
+        ref[(1 << 6) | 0] = 1; // (cs=1, 0 neighbors) => 1, while (cs=0, 1 neighbor) stays 0 => mixed
+        // Exact draw stream (8 sum-gates ascending + 1 extra for the mixed sum=1 bucket):
+        //   sum=0: gate 0 (pass), uniform ref (0) => newOutput 1, NO extra draw.
+        //   sum=1: gate 0 (pass), mixed ref => extra draw 0.9 => Math.round(0.9)=1.
+        //   sum=2..7: gate 0.999 (no pass).
+        const rng = seq([0, 0, 0.9, 0.999, 0.999, 0.999, 0.999, 0.999, 0.999]);
+        const out = service.generateMutatedHex(ALL_ZERO, 0.5, 'totalistic', ref, rng);
+        const rules = hexToRuleset(out);
+        expect(isTotalistic(rules)).toBe(true);
+        // sum=0 bucket (only (cs=0,0 neighbors)) set to 1; sum=1 bucket set to 1.
+        expect(rules[(0 << 6) | 0]).toBe(1);
+        for (let mask = 0; mask < 64; mask++) {
+            if (countSetBits(mask) === 1) expect(rules[(0 << 6) | mask]).toBe(1);
+        }
+        expect(rules[(1 << 6) | 0]).toBe(1);
+    });
+});
+
 describe('RulesetService.generateRandomRulesetHex', () => {
     it('all-ones when rng always below bias', () => {
         expect(service.generateRandomRulesetHex(0.5, 'single', () => 0)).toBe(ALL_ONE);
@@ -161,6 +241,36 @@ describe('RulesetService.generateRandomRulesetHex', () => {
                     }
                 }
             }
+        }
+    });
+
+    it('totalistic output keeps sum-buckets uniform (8 ascending draws)', () => {
+        // seq([0, 0.9]) => sums 0,2,4,6 draw 0 (=> output 1); sums 1,3,5,7 draw 0.9 (=> output 0).
+        const out = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0, 0.9]));
+        const rules = hexToRuleset(out);
+        expect(isTotalistic(rules)).toBe(true);
+        // Pin the 8-draw ascending contract: bucket output = (sum even ? 1 : 0).
+        for (let sum = 0; sum <= 7; sum++) {
+            expect(RulesetService.getEffectiveRuleForTotalisticSum(rules, sum)).toBe(sum % 2 === 0 ? 1 : 0);
+        }
+    });
+
+    it('totalistic output is nested inside n_count (buckets uniform, cs=1/n == cs=0/n+1)', () => {
+        const out = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0, 0.9]));
+        const rules = hexToRuleset(out);
+        // Every neighbor-count bucket is uniform (never mixed) ...
+        for (const cs of [0, 1]) {
+            for (let nan = 0; nan <= 6; nan++) {
+                expect(RulesetService.getEffectiveRuleForNeighborCount(rules, cs, nan)).not.toBe(2);
+            }
+        }
+        // ... and the diagonal identity that distinguishes totalistic from n_count holds.
+        for (let n = 0; n <= 6; n++) {
+            const lo = RulesetService.getEffectiveRuleForNeighborCount(rules, 0, n);      // sum = n
+            const hi = RulesetService.getEffectiveRuleForNeighborCount(rules, 1, n);      // sum = n+1
+            const loNext = RulesetService.getEffectiveRuleForNeighborCount(rules, 0, n + 1); // sum = n+1
+            if (n < 6) expect(hi).toBe(loNext);
+            expect(lo).toBe(RulesetService.getEffectiveRuleForTotalisticSum(rules, n));
         }
     });
 });
@@ -227,10 +337,35 @@ describe('RulesetService.crossoverHexes', () => {
         }
     });
 
+    it('totalistic: each totalistic-sum bucket is taken wholesale from a single parent', () => {
+        const out = service.crossoverHexes(hexA, hexB, 'totalistic', seq([0, 0.9]));
+        // Parents need not be totalistic; only that each sum-bucket is inherited wholesale.
+        const a = hexToRuleset(hexA), b = hexToRuleset(hexB), child = hexToRuleset(out);
+        for (let sum = 0; sum <= 7; sum++) {
+            // Collect the bucket's indices, find the parent it took from its first entry, assert the rest.
+            const idxs = [];
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let mask = 0; mask < 64; mask++) {
+                    if (cs + countSetBits(mask) === sum) idxs.push((cs << 6) | mask);
+                }
+            }
+            const fromA = child[idxs[0]] === a[idxs[0]];
+            for (const idx of idxs) expect(child[idx]).toBe(fromA ? a[idx] : b[idx]);
+        }
+    });
+
+    it('totalistic: two totalistic parents breed a totalistic child', () => {
+        const tA = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0, 0.9]));
+        const tB = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0.9, 0]));
+        const out = service.crossoverHexes(tA, tB, 'totalistic', seq([0, 0.9]));
+        expect(isTotalistic(hexToRuleset(out))).toBe(true);
+    });
+
     it('breeding identical parents is the identity (no post-mutation)', () => {
         expect(service.crossoverHexes(hexA, hexA, 'uniform', seq([0, 0.9]))).toBe(hexA);
         expect(service.crossoverHexes(hexA, hexA, 'r_sym', seq([0, 0.9]))).toBe(hexA);
         expect(service.crossoverHexes(hexA, hexA, 'n_count', seq([0, 0.9]))).toBe(hexA);
+        expect(service.crossoverHexes(hexA, hexA, 'totalistic', seq([0, 0.9]))).toBe(hexA);
     });
 
     it('is deterministic under an injected rng', () => {
@@ -259,7 +394,7 @@ describe('RulesetService.crossoverPoolHexes (genepool)', () => {
     const hexC = '0FF00FF00FF00FF00FF00FF00FF00FF0';
 
     it('two-parent pool is byte-identical to crossoverHexes (same rng sequence)', () => {
-        for (const mode of ['uniform', 'r_sym', 'n_count']) {
+        for (const mode of ['uniform', 'r_sym', 'n_count', 'totalistic']) {
             const draws = [0.1, 0.8, 0.3, 0.9, 0.2, 0.6, 0.05, 0.95, 0.4, 0.55, 0.7, 0.15, 0.85, 0.25];
             const pool = service.crossoverPoolHexes([hexA, hexB], mode, seq(draws), 0);
             const bin = service.crossoverHexes(hexA, hexB, mode, seq(draws), 0);
@@ -271,6 +406,7 @@ describe('RulesetService.crossoverPoolHexes (genepool)', () => {
         // No mutation: pure clone of the only parent, regardless of mode.
         expect(service.crossoverPoolHexes([hexA], 'r_sym', () => 0.4, 0)).toBe(hexA);
         expect(service.crossoverPoolHexes([hexA], 'n_count', () => 0.4, 0)).toBe(hexA);
+        expect(service.crossoverPoolHexes([hexA], 'totalistic', () => 0.4, 0)).toBe(hexA);
         // Full mutation flips every bit (clone then invert).
         expect(service.crossoverPoolHexes([hexA], 'uniform', () => 0, 1)).toBe(RulesetService.invertHex(hexA));
     });

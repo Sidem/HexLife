@@ -57,6 +57,7 @@ export class RulesetActionController {
         return [
             { value: 'random', text: 'Random' },
             { value: 'n_count', text: 'N-Count' },
+            { value: 'totalistic', text: 'Totalistic' },
             { value: 'r_sym', text: 'R-Sym' }
         ];
     }
@@ -65,7 +66,8 @@ export class RulesetActionController {
         return [
             { value: 'single', text: 'Single' },
             { value: 'r_sym', text: 'R-Sym' },
-            { value: 'n_count', text: 'N-Count' }
+            { value: 'n_count', text: 'N-Count' },
+            { value: 'totalistic', text: 'Totalistic' }
         ];
     }
 
@@ -79,8 +81,9 @@ export class RulesetActionController {
     getBreedModeConfig() {
         return [
             { value: 'uniform', text: 'Uniform' },
-            { value: 'r_sym', text: 'Symmetry' },
-            { value: 'n_count', text: 'N-Count' }
+            { value: 'r_sym', text: 'R-Sym' },
+            { value: 'n_count', text: 'N-Count' },
+            { value: 'totalistic', text: 'Totalistic' }
         ];
     }
 
