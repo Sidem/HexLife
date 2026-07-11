@@ -8,6 +8,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+/.claude
 
 # Rust / wasm-pack
 /hexlife-wasm/pkg
@@ -29,3 +30,5 @@ pnpm-debug.log*
 GEMINI.md
 CLAUDE.md
 PATCHNOTES.md
+ROADMAP.md
+CLAUDE-CODE-CHEATSHEET.pdf
