@@ -28,7 +28,11 @@ let quadBuffers;
 let hexVAO;
 let quadVAO;
 let hexLUTTexture = null;
+// Scratch LUT texture for palette-override captures (baked thumbnails); lazily created.
+let overrideLUTTexture = null;
 let disabledTextTexture = null;
+// Retained for on-demand (outside the frame loop) single-world redraws + preview LUT swaps.
+let rendererAppContext = null;
 
 // --- Per-world FBO dirty tracking -------------------------------------------
 // A world's FBO only needs redrawing when its visual inputs change. The cell
@@ -63,6 +67,7 @@ function updateColorLUTTexture(colorSettings, symmetryData, rulesetArray) {
 
 export function initRenderer(canvasElement, appContext) {
     canvas = canvasElement;
+    rendererAppContext = appContext;
     gl = canvas.getContext('webgl2');
     if (!gl) {
         alert("WebGL 2 not supported!");
@@ -149,6 +154,15 @@ export function initRenderer(canvasElement, appContext) {
         updateColorLUTTexture(settings, appContext.worldManager.getSymmetryData());
         // The LUT change alters every world's appearance but produces no STATE_UPDATE,
         // so force an FBO redraw on the next frame.
+        appContext.worldManager.markAllWorldsRenderDirty();
+    });
+
+    // Transient palette preview (Chroma Lab hover): retint every world live WITHOUT persisting
+    // anything. Only the renderer listens — UI components keep showing the saved settings. A null
+    // payload ends the preview and re-applies the saved settings.
+    EventBus.subscribe(EVENTS.COLOR_PREVIEW_CHANGED, (settings) => {
+        const effective = settings || appContext.colorController.getSettings();
+        updateColorLUTTexture(effective, appContext.worldManager.getSymmetryData());
         appContext.worldManager.markAllWorldsRenderDirty();
     });
     
@@ -585,6 +599,100 @@ export function captureWorldThumbnail(worldIndex, size = 96, quality = 0.5) {
     if (!ctx) return null;
     ctx.drawImage(full, 0, 0, size, size);
     return thumb.toDataURL('image/jpeg', quality);
+}
+
+/**
+ * Redraw ONE world's FBO immediately (outside the dirty-flag frame loop) with the given LUT texture.
+ * Powers the palette-independent thumbnail capture: draw with the fixed thumbnail LUT, read back,
+ * then redraw with the live LUT so nothing user-visible changes. Mirrors the per-world block of
+ * renderWorldsToTextures exactly (same uniforms/buffers) minus the dirty bookkeeping — it must not
+ * clear renderDirty, or the frame loop would skip a genuinely-pending repaint. Returns true when
+ * the draw ran (world enabled + views present).
+ * @param {number} worldIndex
+ * @param {WebGLTexture} lutTexture
+ * @returns {boolean}
+ */
+function _redrawWorldFBO(worldIndex, lutTexture) {
+    if (!gl || !rendererAppContext || !lutTexture) return false;
+    const fboData = worldFBOs[worldIndex];
+    if (!fboData) return false;
+    const worldData = rendererAppContext.worldManager.getWorldsRenderData()[worldIndex];
+    if (!worldData || !worldData.enabled) return false;
+    if (!worldData.jsStateArray || !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) return false;
+
+    const selectedWorldIndex = rendererAppContext.worldManager.getSelectedWorldIndex();
+    const camera = rendererAppContext.worldManager.getCurrentCameraState();
+
+    gl.viewport(0, 0, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
+    gl.useProgram(hexShaderProgram);
+    gl.bindVertexArray(hexVAO);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, lutTexture);
+    gl.uniform1i(hexUniformLocations.colorLUT, 1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboData.fbo);
+    gl.clearColor(...Config.BACKGROUND_COLOR);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const textureHexSize = Utils.calculateHexSizeForTexture();
+    gl.uniform2f(hexUniformLocations.resolution, Config.RENDER_TEXTURE_SIZE, Config.RENDER_TEXTURE_SIZE);
+    gl.uniform1f(hexUniformLocations.hexSize, textureHexSize);
+    gl.uniform1f(hexUniformLocations.hoverFilledDarkenFactor, Config.HOVER_FILLED_DARKEN_FACTOR);
+    gl.uniform1f(hexUniformLocations.hoverInactiveLightenFactor, Config.HOVER_INACTIVE_LIGHTEN_FACTOR);
+    if (worldIndex === selectedWorldIndex && camera) {
+        gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
+        gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
+    } else {
+        gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
+        gl.uniform1f(hexUniformLocations.zoom, 1.0);
+    }
+    WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
+    WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
+    WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
+    if (worldData.jsGhostStateArray) {
+        WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
+    }
+    gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+    gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return true;
+}
+
+/**
+ * Capture a world thumbnail rendered with an OVERRIDE color LUT instead of the live palette — the
+ * palette-independent capture path for baked library thumbnails (pass
+ * {@link generateThumbnailLUT}'s data). Redraws the world's FBO with the override LUT, captures,
+ * then repaints with the live LUT so the visible minimap is undisturbed. Falls back to a plain
+ * live-palette capture when the override draw can't run.
+ * @param {number} worldIndex
+ * @param {Uint8Array} lutData 128x2 RGBA LUT texture data.
+ * @param {number} [size=96]
+ * @param {number} [quality=0.5]
+ * @returns {string|null}
+ */
+export function captureWorldThumbnailWithLUT(worldIndex, lutData, size = 96, quality = 0.5) {
+    if (!gl || !lutData) return captureWorldThumbnail(worldIndex, size, quality);
+    if (!overrideLUTTexture) {
+        overrideLUTTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, overrideLUTTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    } else {
+        gl.bindTexture(gl.TEXTURE_2D, overrideLUTTexture);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RGBA, gl.UNSIGNED_BYTE, lutData);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+    if (!_redrawWorldFBO(worldIndex, overrideLUTTexture)) {
+        return captureWorldThumbnail(worldIndex, size, quality);
+    }
+    const thumb = captureWorldThumbnail(worldIndex, size, quality);
+    _redrawWorldFBO(worldIndex, hexLUTTexture); // repaint with the live palette
+    return thumb;
 }
 
 /**

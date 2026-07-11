@@ -338,3 +338,30 @@
     justify-content: center;
     padding: 3px;
 }
+
+/* Shared-search replay banner (one-shot; removed on Start). */
+.explore-shared-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background-color: #3f3a2c;
+    border: 1px solid #6a5a2a;
+    border-radius: 6px;
+    color: #e8d28a;
+    font-size: 0.85em;
+}
+
+.explore-shared-banner .inline-icon svg {
+    display: block;
+}
+
+/* "Copy search link" sits at the right edge of the status row. */
+.explore-share-search {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+}

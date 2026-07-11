@@ -275,6 +275,7 @@ export class UIManager {
             button.className = 'mobile-fab secondary-fab';
             button.innerHTML = `<span class="icon">${action.icon}</span>`;
             button.title = action.title;
+            button.setAttribute('aria-label', action.title);
             button.addEventListener('click', () => {
                 EventBus.dispatch(action.command, action.payload);
             });

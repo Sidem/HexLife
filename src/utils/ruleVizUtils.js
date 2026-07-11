@@ -147,6 +147,34 @@ export function generateColorLUT(colorSettings, symmetryData) {
 }
 
 /**
+ * Fixed monochrome LUT for baked thumbnails (library cards, save-modal IC previews). Thumbnails used
+ * to capture whatever Chroma Lab palette was active, making entries non-comparable with each other
+ * and subject to non-CVD-safe palettes. This ramp is palette-independent and hue-free (CVD-proof):
+ * rule-index maps to LUMINANCE — not a binary on/off — so rule-domain structure (different regions
+ * firing different rules) still reads at thumbnail sizes. ON cells span a bright band, OFF cells a
+ * dark band, with a hard gap between the bands so state always dominates rule identity.
+ * @returns {Uint8Array} 128x2 RGBA texture data (row 0 = OFF outputs, row 1 = ON outputs).
+ */
+export function generateThumbnailLUT() {
+    const width = 128;
+    const data = new Uint8Array(width * 2 * 4);
+    for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
+        const t = ruleIndex / (width - 1);
+        for (let outputState = 0; outputState < 2; outputState++) {
+            const l = outputState === 1
+                ? Math.round(150 + t * 105) // ON: 150..255
+                : Math.round(6 + t * 58);   // OFF: 6..64
+            const dataIndex = (outputState * width + ruleIndex) * 4;
+            data[dataIndex] = l;
+            data[dataIndex + 1] = l;
+            data[dataIndex + 2] = l;
+            data[dataIndex + 3] = 255;
+        }
+    }
+    return data;
+}
+
+/**
  * Generates a single rule color based on color settings.
  * @param {number} ruleIndex The rule index (0-127)
  * @param {number} outputState The output state of the rule (0 or 1).

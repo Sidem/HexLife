@@ -93,6 +93,38 @@ export class ColorController {
         this.#saveAndDispatch();
     }
 
+    /**
+     * Set the free-form custom gradient (Chroma Lab "Gradient" tab) and switch to gradient mode:
+     * all 128 rules are painted along the `on` ramp (active cells) / `off` ramp (inactive cells).
+     * @param {{on: string[], off: string[], autoOff?: boolean}} gradient - Hex color stop lists
+     *   (each ≥1 stop). `autoOff` records that the off ramp is auto-derived from the on ramp.
+     */
+    setCustomGradient({ on, off, autoOff }) {
+        if (!Array.isArray(on) || on.length === 0 || !Array.isArray(off) || off.length === 0) return;
+        this.settings.customGradient = { on: [...on], off: [...off], autoOff: autoOff !== false };
+        this.settings.mode = 'gradient';
+        this.#saveAndDispatch();
+    }
+
+    /**
+     * Live-preview a palette WITHOUT persisting anything (Chroma Lab hover / picker drag). Merges
+     * `partial` over the saved settings and dispatches COLOR_PREVIEW_CHANGED — only the renderer
+     * listens, so the canvas retints while every UI surface keeps showing the saved settings.
+     * Always pair with {@link endPreview}.
+     * @param {object} partial - Color-settings fields to override for the preview.
+     */
+    previewSettings(partial) {
+        this._previewActive = true;
+        EventBus.dispatch(EVENTS.COLOR_PREVIEW_CHANGED, { ...this.settings, ...partial });
+    }
+
+    /** End a live preview and re-apply the saved settings to the canvas. No-op if none is active. */
+    endPreview() {
+        if (!this._previewActive) return;
+        this._previewActive = false;
+        EventBus.dispatch(EVENTS.COLOR_PREVIEW_CHANGED, null);
+    }
+
     setColorForGroup(groupType, groupKey, stateType, newColor) {
         if (groupType === 'neighbor_count') {
             if (!this.settings.customNeighborColors[groupKey]) {

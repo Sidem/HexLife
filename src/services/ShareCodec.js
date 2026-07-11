@@ -95,6 +95,37 @@ export class ShareCodec {
     }
 
     /**
+     * Build a shareable auto-explore SEARCH link: replays the identical search trajectory (same
+     * champions, mutants, finds) on another machine. The starting ruleset rides in the standard `r`
+     * param so the normal load path applies it to the worlds; `xs` carries the run's base seed and
+     * `xc` the explore-config subset that shapes the trajectory. Grid size is included (as the
+     * standard `g` param) when it differs from the default, since seeds are grid-dependent.
+     * @param {object} descriptor
+     * @param {number} descriptor.baseSeed - The run's base seed (AutoExploreService._exploreBaseSeed).
+     * @param {string} descriptor.seedHex - 32-char ruleset hex the search started from.
+     * @param {object} [descriptor.config] - Explore-config subset (mutationRate, mutationMode,
+     *   evalTicks, maxGenerations, icLabels).
+     * @param {number} [descriptor.gridRows] - Current grid row count.
+     * @param {string} descriptor.origin
+     * @param {string} descriptor.pathname
+     * @returns {string} Full shareable URL.
+     */
+    static encodeSearch({ baseSeed, seedHex, config, gridRows, origin, pathname }) {
+        const params = new URLSearchParams();
+        if (/^[0-9a-fA-F]{32}$/.test(seedHex || '')) {
+            params.set('r', seedHex);
+        }
+        params.set('xs', String(Math.floor(baseSeed)));
+        if (config && typeof config === 'object') {
+            params.set('xc', JSON.stringify(config));
+        }
+        if (gridRows && gridRows !== Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY]) {
+            params.set('g', gridRows);
+        }
+        return `${origin}${pathname}?${params.toString()}`;
+    }
+
+    /**
      * Parse URL search params into a `sharedSettings` object. Pure: takes a
      * `URLSearchParams` (no window access). Returns `{}` for an empty param set.
      * @param {URLSearchParams} params
@@ -166,6 +197,25 @@ export class ShareCodec {
             const camParts = params.get('cam').split(',').map(Number);
             if (camParts.length === 3 && !camParts.some(isNaN)) {
                 sharedSettings.camera = { x: camParts[0], y: camParts[1], zoom: camParts[2] };
+            }
+        }
+
+        // Auto-explore search replay descriptor (see encodeSearch): xs = base seed, xc = explore
+        // config subset. The starting ruleset rides in the standard `r` param, parsed above.
+        if (params.has('xs')) {
+            const baseSeed = parseInt(params.get('xs'), 10);
+            if (Number.isFinite(baseSeed)) {
+                const search = { baseSeed };
+                if (sharedSettings.rulesetHex) search.seedHex = sharedSettings.rulesetHex;
+                if (params.has('xc')) {
+                    try {
+                        const config = JSON.parse(params.get('xc'));
+                        if (config && typeof config === 'object') search.config = config;
+                    } catch (e) {
+                        console.warn('Failed to parse explore search config from URL:', e);
+                    }
+                }
+                sharedSettings.exploreSearch = search;
             }
         }
 

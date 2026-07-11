@@ -3,7 +3,9 @@ import { SliderComponent } from './SliderComponent.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import * as Config from '../../core/config.js';
 import { EXPLORE_CONFIG, IC_SUITE } from '../../core/AutoExploreService.js';
+import { ShareCodec } from '../../services/ShareCodec.js';
 import { ICONS } from '../icons.js';
 
 /**
@@ -56,6 +58,7 @@ export class ExploreComponent extends BaseComponent {
         this.worldManager = appContext.worldManager;
         this.service = this.worldManager.autoExploreService;
         this.sliders = {};
+        this._consumeSharedSearch();
         this.element = document.createElement('div');
         this.element.className = 'explore-component-content';
         this.render();
@@ -73,6 +76,32 @@ export class ExploreComponent extends BaseComponent {
         this._renderGallery();
     }
 
+    /**
+     * Consume a shared search link (?xs=…&xc=…, parsed into sharedSettings.exploreSearch): prefill
+     * the persisted search settings from the link's config so render() picks them up, and stash the
+     * base seed so the next Start replays the identical trajectory. One-shot: cleared on Start.
+     */
+    _consumeSharedSearch() {
+        const shared = this.worldManager.sharedSettings?.exploreSearch || null;
+        this._pendingBaseSeed = null;
+        if (!shared || !Number.isFinite(shared.baseSeed)) return;
+        this._pendingBaseSeed = Math.floor(shared.baseSeed);
+        const cfg = shared.config || {};
+        if (typeof cfg.mutationRate === 'number') PersistenceService.saveUISetting(SETTING_KEYS.rate, Math.round(cfg.mutationRate * 100));
+        if (typeof cfg.mutationMode === 'string') PersistenceService.saveUISetting(SETTING_KEYS.mode, cfg.mutationMode);
+        if (typeof cfg.evalTicks === 'number') PersistenceService.saveUISetting(SETTING_KEYS.ticks, cfg.evalTicks);
+        if (typeof cfg.maxGenerations === 'number') PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, cfg.maxGenerations);
+        if (Array.isArray(cfg.icLabels) && cfg.icLabels.length > 0) PersistenceService.saveUISetting(SETTING_KEYS.icLabels, cfg.icLabels);
+        // Deferred so the toast lands after the UI (incl. ToastManager) has finished booting.
+        setTimeout(() => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: 'Shared search loaded — open Auto-Explore and press Start to replay it.',
+                type: 'info',
+                duration: 6000,
+            });
+        }, 1200);
+    }
+
     render() {
         const ratePct = PersistenceService.loadUISetting(SETTING_KEYS.rate, Math.round(EXPLORE_CONFIG.mutationRate * 100));
         const mode = PersistenceService.loadUISetting(SETTING_KEYS.mode, EXPLORE_CONFIG.mutationMode);
@@ -88,9 +117,15 @@ export class ExploreComponent extends BaseComponent {
                 <p class="explore-blurb">Searches all 9 worlds for "interesting" rulesets near the edge of chaos. Each candidate is scored across an initial-condition suite; the best feed the next generation.</p>
             </div>
             <div class="tool-group">
+                ${this._pendingBaseSeed != null ? `
+                <div class="explore-shared-banner" id="explore-shared-banner">
+                    <span class="inline-icon">${ICONS.share}</span>
+                    <span>Shared search loaded (seed ${this._pendingBaseSeed}) — press <strong>Start</strong> to replay it exactly.</span>
+                </div>` : ''}
                 <div class="explore-status" id="explore-status">
                     <span class="explore-status-state" data-field="state">Idle</span>
                     <span class="explore-status-detail" data-field="detail"></span>
+                    <button class="button-icon explore-share-search" data-action="copy-search-link" title="Copy a link that replays this search exactly (same seed, same finds)" aria-label="Copy search link">${ICONS.share}</button>
                 </div>
                 <div class="form-group-buttons explore-run-buttons">
                     <button class="button action-button" data-action="start"><span class="inline-icon">${ICONS.compass}</span> Start</button>
@@ -130,7 +165,7 @@ export class ExploreComponent extends BaseComponent {
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
-                    <button class="button-icon" data-action="clear-gallery" title="Clear the session gallery">${ICONS.trash}</button>
+                    <button class="button-icon" data-action="clear-gallery" title="Clear the session gallery" aria-label="Clear the session gallery">${ICONS.trash}</button>
                 </div>
                 <div id="explore-gallery-list" class="explore-gallery-list"></div>
             </div>
@@ -196,6 +231,8 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
+        this._addDOMListener(this.element.querySelector('[data-action="copy-search-link"]'), 'click', () => this._copySearchLink());
+
         this._addDOMListener(this.element.querySelector('[data-action="clear-gallery"]'), 'click', () => {
             if (this.service.getGalleryEntries().length === 0) return;
             EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
@@ -246,13 +283,38 @@ export class ExploreComponent extends BaseComponent {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Select at least one initial condition to explore.', type: 'error' });
             return;
         }
-        EventBus.dispatch(EVENTS.COMMAND_START_AUTO_EXPLORE, {
+        const payload = {
             mutationRate: this.sliders.rate.getValue() / 100,
             mutationMode: this.element.querySelector('input[name="explore-mutation-mode"]:checked')?.value || EXPLORE_CONFIG.mutationMode,
             evalTicks: this.sliders.ticks.getValue(),
             maxGenerations: Math.max(0, Math.floor(Number(this.budgetInput?.value) || 0)),
             icLabels,
+        };
+        // One-shot replay seed from a shared search link (see _consumeSharedSearch).
+        if (this._pendingBaseSeed != null) {
+            payload.baseSeed = this._pendingBaseSeed;
+            this._pendingBaseSeed = null;
+            this.element.querySelector('#explore-shared-banner')?.remove();
+        }
+        EventBus.dispatch(EVENTS.COMMAND_START_AUTO_EXPLORE, payload);
+    }
+
+    /** Copy a link that replays the current (or most recent) search trajectory exactly. */
+    _copySearchLink() {
+        const descriptor = this.service.getSearchDescriptor();
+        if (!descriptor) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Run a search first — then you can share it.', type: 'info' });
+            return;
+        }
+        const url = ShareCodec.encodeSearch({
+            ...descriptor,
+            gridRows: Config.GRID_ROWS,
+            origin: window.location.origin,
+            pathname: window.location.pathname,
         });
+        navigator.clipboard.writeText(url)
+            .then(() => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Search link copied — it replays this exact search.', type: 'success' }))
+            .catch(() => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not copy link.', type: 'error' }));
     }
 
     _togglePause() {
@@ -359,10 +421,10 @@ export class ExploreComponent extends BaseComponent {
                         </div>
                         ${bars}
                         <div class="explore-find-actions">
-                            <button class="button-icon" data-action="apply" title="Apply to selected world (ruleset + winning IC)">${ICONS.target}</button>
-                            <button class="button-icon" data-action="retest" title="Re-test this find on the selected world (re-scores it)">${ICONS.refreshCw}</button>
-                            <button class="button-icon" data-action="save" title="Save ruleset to your library">${ICONS.star}</button>
-                            <button class="button-icon" data-action="share" title="Copy share link">${ICONS.share}</button>
+                            <button class="button-icon" data-action="apply" title="Apply to selected world (ruleset + winning IC)" aria-label="Apply find to selected world">${ICONS.target}</button>
+                            <button class="button-icon" data-action="retest" title="Re-test this find on the selected world (re-scores it)" aria-label="Re-test find">${ICONS.refreshCw}</button>
+                            <button class="button-icon" data-action="save" title="Save ruleset to your library" aria-label="Save ruleset to library">${ICONS.star}</button>
+                            <button class="button-icon" data-action="share" title="Copy share link" aria-label="Copy share link">${ICONS.share}</button>
                         </div>
                     </div>
                 </div>

@@ -43,6 +43,22 @@ export const PRESET_PALETTES = {
         gradient: ['#673AB7', '#B39DDB', '#E1BEE7'],
         offGradient: ['#21123a', '#433c57', '#5a495c']
     },
+    // Perceptually-uniform, colorblind-safe ramps (matplotlib's viridis / cividis families).
+    // Rule identity is the app's primary information channel, so these are correctness options,
+    // not decoration: luminance rises monotonically along the ramp, which every class of color
+    // vision reads the same way. `cvdSafe` drives the badge in the Chroma Lab preset cards.
+    viridis: {
+        name: 'Viridis',
+        cvdSafe: true,
+        gradient: ['#440154', '#414487', '#2A788E', '#22A884', '#7AD151', '#FDE725'],
+        offGradient: ['#12000f', '#101322', '#0b2229', '#0a2f26', '#233d18', '#4a430b']
+    },
+    cividis: {
+        name: 'Cividis',
+        cvdSafe: true,
+        gradient: ['#00224E', '#35456C', '#666970', '#948E77', '#C8B866', '#FEE838'],
+        offGradient: ['#000a18', '#0f1420', '#1e1f21', '#2b2a23', '#3b371e', '#4c4511']
+    },
     neighborGradient: {
         name: 'Neighbor Counts',
         logic: 'neighbor_count', // Special key to identify this as a logic-based preset

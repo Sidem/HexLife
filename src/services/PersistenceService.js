@@ -282,13 +282,22 @@ export function saveEmbeddingGallery(entries) {
 // Client-side cache of evolved-world thumbnails for PUBLIC library rulesets (keyed by ruleset hex).
 // Public rulesets that carry a paired initial condition get their thumbnail baked on demand and cached
 // here, so the committed library JSON stays small (it stores only the IC choice, not the image).
+// `__v` versions the bake pipeline: v2 = fixed monochrome thumbnail LUT. A version mismatch discards
+// the whole cache so palette-dependent v1 thumbs rebake instead of mixing looks with new mono ones.
+const PUBLIC_THUMB_CACHE_VERSION = 2;
+
 export function loadPublicThumbCache() {
-    return _getItem(KEYS.PUBLIC_THUMB_CACHE) || {};
+    const cache = _getItem(KEYS.PUBLIC_THUMB_CACHE) || {};
+    if (cache.__v !== PUBLIC_THUMB_CACHE_VERSION) return {};
+    const thumbs = { ...cache };
+    delete thumbs.__v;
+    return thumbs;
 }
 
 export function savePublicThumb(hex, thumb) {
     if (!hex || !thumb) return;
     const cache = loadPublicThumbCache();
+    cache.__v = PUBLIC_THUMB_CACHE_VERSION;
     cache[hex] = thumb;
     try {
         localStorage.setItem(KEYS.PUBLIC_THUMB_CACHE, JSON.stringify(cache));

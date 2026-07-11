@@ -12,28 +12,46 @@
     overflow: hidden;
 }
 
-.chroma-mode-section {
+/* --- Tab strip -------------------------------------------------------------- */
+
+.chroma-tabs {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #444;
+    gap: 4px;
+    padding: 3px;
+    background-color: #262626;
+    border: 1px solid #444;
+    border-radius: 8px;
     flex-shrink: 0;
 }
 
-.chroma-mode-section h4 {
-    margin: 0;
-    color: #ccc;
+.chroma-tab {
+    flex: 1;
+    padding: 7px 10px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: #aaa;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-#chroma-mode-select {
-    flex-grow: 1;
-    padding: 8px;
+.chroma-tab:hover {
+    color: #eee;
     background-color: #333;
-    color: white;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 0.9em;
+}
+
+.chroma-tab.active {
+    background-color: #3f3a2c;
+    color: #f0c674;
+    font-weight: bold;
+}
+
+.chroma-tab-hint {
+    margin: 6px 2px 8px;
+    color: #999;
+    font-size: 0.82em;
+    flex-shrink: 0;
 }
 
 .chroma-section {
@@ -44,63 +62,99 @@
     gap: 10px;
 }
 
-.chroma-section h4 {
-    margin: 0 0 5px 0;
-    color: #f0c674;
-    border-bottom: 1px solid #444;
-    padding-bottom: 5px;
-}
+/* --- Palettes tab ------------------------------------------------------------ */
 
-/* Preset Styles */
 .preset-visualizations {
     display: grid;
-    grid-template-columns: repeat(4, 150px);
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 10px;
 }
 
 .preset-vis-container {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 8px;
-    border: 2px solid #555;
-    background-color: #3a3a3a;
-    border-radius: 4px;
+    padding: 8px 8px 10px;
+    border: 2px solid #4a4a4a;
+    background-color: #333;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    color: inherit;
+    font: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .preset-vis-container:hover {
     border-color: #f0c674;
     transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
 
 .preset-vis-container.active {
     border-color: #f0c674;
-    background-color: #4a4a4a;
-    font-weight: bold;
+    background-color: #3f3a2c;
     box-shadow: 0 0 8px rgba(240, 198, 116, 0.4);
 }
 
 .preset-vis-container img {
     width: 100%;
-    height: 40px;
+    height: 44px;
     object-fit: fill;
-    image-rendering: pixelated; /* Ensures sharp pixels */
-    border: 1px solid #777;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 1px solid #666;
 }
 
-.preset-vis-container span {
+.preset-vis-container .preset-name {
     font-size: 0.85em;
     color: #eee;
 }
 
+.preset-active-check {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: #f0c674;
+    color: #1e1e1e;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.preset-active-check svg {
+    width: 14px;
+    height: 14px;
+    stroke: #1e1e1e;
+}
+
+.preset-vis-container.active .preset-active-check {
+    display: flex;
+}
+
+.preset-badge {
+    font-size: 0.68em;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 9px;
+    letter-spacing: 0.02em;
+}
+
+.preset-badge--cvd {
+    background-color: #1d3a2a;
+    border: 1px solid #2e7d4f;
+    color: #7fd8a4;
+}
+
 .preset-controls {
     display: flex;
-    justify-content: center;
     align-items: center;
-    padding: 10px 0;
+    padding: 4px 2px 10px;
     border-bottom: 1px solid #444;
 }
 
@@ -110,6 +164,7 @@
     gap: 8px;
     color: #ccc;
     font-size: 0.9em;
+    cursor: pointer;
 }
 
 .preset-controls input[type="checkbox"] {
@@ -117,18 +172,226 @@
     height: 16px;
 }
 
+.preset-controls-hint {
+    color: #888;
+    font-size: 0.85em;
+}
+
 .preset-warning {
-    background-color: #fff3cd;
-    border: 1px solid #ffeaa7;
-    color: #856404;
+    background-color: #3a3222;
+    border: 1px solid #6a5a2a;
+    color: #e8d28a;
     padding: 10px;
-    border-radius: 4px;
+    border-radius: 6px;
     text-align: center;
     font-size: 0.85em;
     margin-bottom: 10px;
 }
 
-/* Group Color Styles */
+/* --- Gradient tab -------------------------------------------------------------- */
+
+.chroma-gradient-lab {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 2px;
+}
+
+.chroma-gradient-preview img {
+    display: block;
+    width: 100%;
+    height: 56px;
+    object-fit: fill;
+    image-rendering: pixelated;
+    border-radius: 6px;
+    border: 1px solid #666;
+}
+
+.chroma-gradient-preview-labels {
+    display: flex;
+    justify-content: space-between;
+    color: #888;
+    font-size: 0.75em;
+    margin-top: 3px;
+}
+
+.chroma-stops-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chroma-stops-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.chroma-stops-head h5 {
+    margin: 0;
+    color: #ddd;
+}
+
+.chroma-stops-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.chroma-stop-chip {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px solid #666;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.chroma-stop-chip:hover {
+    transform: scale(1.08);
+    border-color: #f0c674;
+}
+
+.chroma-stop-remove {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    border: none;
+    background-color: #444;
+    color: #ddd;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chroma-stop-remove:hover {
+    background-color: #b33;
+    color: #fff;
+}
+
+.chroma-stop-add {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px dashed #666;
+    background: none;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.chroma-stop-add:hover {
+    border-color: #f0c674;
+    color: #f0c674;
+}
+
+.chroma-auto-off {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.chroma-gradient-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 2px;
+}
+
+.chroma-shuffle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Hidden proxy for the browser's native color picker. */
+.chroma-native-color {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- Fine-Tune tab -------------------------------------------------------------- */
+
+.chroma-finetune-switch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.chroma-finetune-switch-label {
+    color: #ccc;
+    font-size: 0.9em;
+}
+
+.chroma-subtabs {
+    display: flex;
+    gap: 3px;
+    padding: 2px;
+    background-color: #262626;
+    border: 1px solid #444;
+    border-radius: 6px;
+}
+
+.chroma-subtab {
+    padding: 5px 10px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: #aaa;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+
+.chroma-subtab:hover {
+    color: #eee;
+}
+
+.chroma-subtab.active {
+    background-color: #3f3a2c;
+    color: #f0c674;
+    font-weight: bold;
+}
+
+.chroma-finetune-hint {
+    margin: 0 2px;
+    color: #999;
+    font-size: 0.82em;
+    flex-shrink: 0;
+}
+
+.chroma-finetune-hint kbd {
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.9em;
+}
+
+.chroma-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
 .color-group-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -141,6 +404,7 @@
 .color-group-column {
     display: flex;
     flex-direction: column;
+    gap: 6px;
 }
 
 .color-group-column h5 {
@@ -159,7 +423,7 @@
     justify-content: center;
     gap: 4px;
     font-size: 0.8em;
-    font-weight: normal; /* Keep action text normal weight */
+    font-weight: normal;
 }
 
 .select-all-swatches {
@@ -180,7 +444,7 @@
 
 .color-group {
     border: 1px solid #444;
-    border-radius: 4px;
+    border-radius: 6px;
     background-color: #2c2c2c;
     display: flex;
     flex-direction: column;
@@ -211,7 +475,7 @@
 }
 
 .color-swatch-wrapper {
-    position: relative; /* Needed for positioning the marker */
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -220,6 +484,10 @@
     padding: 4px;
     border-radius: 3px;
     border: 1px solid transparent;
+}
+
+.color-swatch-wrapper:hover {
+    border-color: #666;
 }
 
 .color-swatch-wrapper.selected {
@@ -240,7 +508,8 @@
     border-radius: 3px;
 }
 
-/* Color Palette Modal */
+/* --- Color picker modal ------------------------------------------------------ */
+
 #color-palette-modal {
     position: fixed;
     z-index: 9999;
@@ -248,21 +517,27 @@
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.6);
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
 }
 
-.color-palette-content {
+.color-palette-panel {
     background: #2c2c2c;
     padding: 20px;
     border-radius: 8px;
     border: 1px solid #666;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.color-palette-content {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 10px;
-    max-width: 400px;
 }
 
 .palette-color {
@@ -279,15 +554,43 @@
     border-color: #fff;
 }
 
-/* Batch Action Bar */
+.palette-custom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #444;
+}
+
+.palette-custom-row label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    font-size: 0.9em;
+}
+
+.palette-custom-row input[type="color"] {
+    width: 44px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #666;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+/* --- Batch action bar --------------------------------------------------------- */
+
 #chroma-batch-action-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
-    background-color: #2a2a2a;
-    border: 1px solid #555;
-    border-radius: 4px;
+    padding: 8px 10px;
+    background-color: #3f3a2c;
+    border: 1px solid #6a5a2a;
+    border-radius: 6px;
     margin-bottom: 10px;
     flex-shrink: 0;
 }
@@ -297,6 +600,12 @@
     color: #f0c674;
 }
 
+.batch-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .batch-swatch {
     padding: 5px 10px;
     width: auto;
@@ -304,6 +613,7 @@
     white-space: nowrap;
     background-color: #555;
     border: 2px dashed #f0c674;
+    border-radius: 4px;
     cursor: pointer;
 }
 
@@ -331,7 +641,7 @@
     font-size: 10px;
     font-weight: bold;
     box-shadow: 0 0 4px black;
-    pointer-events: none; /* Make sure it doesn't interfere with clicks */
+    pointer-events: none;
 }
 
 /* Gradient Creator Modal */
@@ -342,17 +652,21 @@
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.6);
+    background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+#gradient-creator-modal .color-palette-content {
+    margin-top: 4px;
 }
 
 #gradient-preview-strip {
     height: 30px;
     border: 1px solid #555;
     border-radius: 4px;
-    margin-bottom: 15px;
+    margin-bottom: 8px;
     background-color: #222;
     transition: background 0.3s ease;
 }
@@ -361,13 +675,13 @@
 .reset-column-defaults {
     font-size: 0.75em;
     padding: 2px 6px;
-    border: 1px solid #7c3a3a; /* Reddish border */
+    border: 1px solid #7c3a3a;
     background-color: #4a3a3a;
-    color: #fca5a5; /* Light red text */
+    color: #fca5a5;
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-left: 8px; /* Add some space */
+    margin-left: 8px;
 }
 
 .reset-column-defaults:hover {
@@ -378,16 +692,18 @@
 
 /* Flicker Warning */
 .flicker-warning {
-    background-color: #fff3cd;
-    border: 1px solid #ffeaa7;
-    color: #856404;
+    background-color: #3a3222;
+    border: 1px solid #6a5a2a;
+    color: #e8d28a;
     padding: 12px;
-    border-radius: 4px;
+    border-radius: 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     margin-bottom: 10px;
     font-size: 0.9em;
+    flex-shrink: 0;
 }
 
 .flicker-warning .deflicker-btn {
@@ -398,6 +714,7 @@
     border-radius: 3px;
     cursor: pointer;
     font-size: 0.85em;
+    white-space: nowrap;
 }
 
 .flicker-warning .deflicker-btn:hover {

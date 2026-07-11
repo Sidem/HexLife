@@ -7,6 +7,22 @@ import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
 import { trajectoryNovelty, meanVector } from './analysis/EmbeddingNovelty.js';
 
 /**
+ * Tiny deterministic PRNG (same routine as WorldWorker's) for the population builder: mutants and
+ * crossover children must derive from the run's base seed, or a shared search link couldn't replay
+ * the identical generation sequence.
+ * @param {number} a
+ * @returns {() => number}
+ */
+function mulberry32(a) {
+    return function () {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+/**
  * Phase 4 of the auto-explore roadmap: the generation loop that ties Phases 1–3 together into the
  * flagship "auto-explore" feature.
  *
@@ -210,6 +226,18 @@ export class AutoExploreService {
     }
 
     /**
+     * Descriptor for reproducing the current (or most recent — persisted across sessions) search:
+     * base seed + starting ruleset + the config subset that shapes the trajectory. Null when no
+     * search has ever run. Consumed by the Explore panel's "copy search link".
+     * @returns {{baseSeed: number, seedHex: string, config: object}|null}
+     */
+    getSearchDescriptor() {
+        if (this._searchDescriptor) return this._searchDescriptor;
+        const persisted = PersistenceService.loadUISetting('exploreLastSearch', null);
+        return (persisted && Number.isFinite(persisted.baseSeed) && persisted.seedHex) ? persisted : null;
+    }
+
+    /**
      * Resolve which IC-suite conditions to evaluate over. Unknown/empty selections fall back to the
      * full suite so a misconfigured toggle never produces a zero-IC (un-scoreable) run.
      * @param {string[]|null|undefined} labels
@@ -262,7 +290,23 @@ export class AutoExploreService {
         this.wm._setAllWorldsEnabledForExplore(true);
 
         this.state = EXPLORE_STATE.RUNNING;
-        this._exploreBaseSeed = Date.now();
+        // Reproducible searches (share-the-seed): an explicit baseSeed replays the identical
+        // generation sequence — same per-(gen, world, IC) reset seeds AND same mutants/children
+        // (the population rng derives from it, see _buildPopulation). No seed ⇒ fresh random base.
+        this._exploreBaseSeed = Number.isFinite(options.baseSeed) ? Math.floor(options.baseSeed) : Date.now();
+        // Persist a descriptor of this run so it can be shared / reproduced after the fact.
+        this._searchDescriptor = {
+            baseSeed: this._exploreBaseSeed,
+            seedHex,
+            config: {
+                mutationRate: this.options.mutationRate,
+                mutationMode: this.options.mutationMode,
+                evalTicks: this.options.evalTicks,
+                maxGenerations: this.options.maxGenerations,
+                icLabels: this.options.icLabels || null,
+            },
+        };
+        PersistenceService.saveUISetting('exploreLastSearch', this._searchDescriptor);
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('started'));
         // Fire-and-forget; the loop self-checks the run token / state on every await boundary.
         this._runLoop(this._runToken).catch((err) => {
@@ -671,14 +715,19 @@ export class AutoExploreService {
         const canBreed = this.runnerUpHex && this.runnerUpHex !== championHex;
         const numChildren = canBreed ? Math.min(crossoverChildren, otherIndices.length) : 0;
 
+        // Deterministic per-generation rng seeded from the run's base seed, so a replayed base seed
+        // reproduces the exact mutants/children (the other half of search reproducibility beside the
+        // per-(gen, world, IC) reset seeds in _seedFor).
+        const rng = mulberry32((this._exploreBaseSeed + this.generation * 7919) >>> 0);
+
         population[selectedIdx] = championHex;
         otherIndices.forEach((idx, k) => {
             let hex;
             if (k < numChildren) {
                 // A low post-crossover mutation rate injects fresh variation into each child.
-                hex = rs.crossoverHexes(championHex, this.runnerUpHex, crossoverMode, Math.random, mutationRate);
+                hex = rs.crossoverHexes(championHex, this.runnerUpHex, crossoverMode, rng, mutationRate);
             } else {
-                hex = rs.generateMutatedHex(championHex, mutationRate, mutationMode, referenceRuleset);
+                hex = rs.generateMutatedHex(championHex, mutationRate, mutationMode, referenceRuleset, rng);
             }
             if (!hex || hex === 'Error') hex = championHex;
             population[idx] = hex;

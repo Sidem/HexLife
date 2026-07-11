@@ -9,6 +9,7 @@ import { EmbeddingService } from '../services/EmbeddingService.js';
 import { scoreSingleIC } from './analysis/InterestingnessScore.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import * as Renderer from '../rendering/renderer.js';
+import { generateThumbnailLUT } from '../utils/ruleVizUtils.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
 
 export class WorldManager {
@@ -1091,6 +1092,31 @@ export class WorldManager {
     });
 
     /**
+     * Capture a BAKED thumbnail with the fixed monochrome luminance LUT instead of the live palette
+     * (see {@link generateThumbnailLUT}) so library previews are comparable across entries and
+     * CVD-proof regardless of the user's Chroma Lab choice. Same two-rAF wait + never-throws contract
+     * as {@link _captureExploreThumbnail} (which stays live-palette: the explore gallery deliberately
+     * shows "what you see").
+     * @param {number} worldIndex
+     * @returns {Promise<string|null>}
+     */
+    _captureBakedThumbnail = (worldIndex) => new Promise((resolve) => {
+        try {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    try {
+                        resolve(Renderer.captureWorldThumbnailWithLUT(worldIndex, generateThumbnailLUT()));
+                    } catch {
+                        resolve(null);
+                    }
+                });
+            });
+        } catch {
+            resolve(null);
+        }
+    });
+
+    /**
      * Capture a world's current render as raw ImageData for the perceptual objective's embedding worker
      * (v3.0). Same two-rAF wait as the thumbnail capture (let the renderer draw the world's latest eval
      * frame before reading its FBO); resolves null on any failure so the search never throws on capture.
@@ -1412,7 +1438,7 @@ export class WorldManager {
                     warmupTicks: EXPLORE_CONFIG.warmupTicks,
                     probe: { enabled: false, probeTicks: EXPLORE_CONFIG.probeTicks },
                 });
-                return await this._captureExploreThumbnail(idx);
+                return await this._captureBakedThumbnail(idx);
             } catch {
                 return null;
             }

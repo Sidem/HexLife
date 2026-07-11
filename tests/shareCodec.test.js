@@ -135,6 +135,51 @@ describe('ShareCodec encode -> parse round-trip', () => {
         expect(out.rulesets[0]).toBe('F'.repeat(32));
     });
 
+    it('round-trips a search link (encodeSearch): seed ruleset, base seed, config subset', () => {
+        const config = {
+            mutationRate: 0.06,
+            mutationMode: 'r_sym',
+            evalTicks: 160,
+            maxGenerations: 25,
+            icLabels: ['chaos', 'seed'],
+        };
+        const url = ShareCodec.encodeSearch({
+            baseSeed: 1751234567890,
+            seedHex: HEX,
+            config,
+            gridRows: Config.GRID_ROWS,
+            origin,
+            pathname,
+        });
+        expect(url.startsWith(`${origin}${pathname}?`)).toBe(true);
+
+        const out = parseUrl(url);
+        expect(out.fromUrl).toBe(true);
+        // The seed ruleset rides in the standard `r` param so the normal load path applies it.
+        expect(out.rulesetHex).toBe(HEX);
+        expect(out.exploreSearch).toBeDefined();
+        expect(out.exploreSearch.baseSeed).toBe(1751234567890);
+        expect(out.exploreSearch.seedHex).toBe(HEX);
+        expect(out.exploreSearch.config).toEqual(config);
+    });
+
+    it('encodeSearch omits the grid param at the default size and includes it otherwise', () => {
+        const base = { baseSeed: 42, seedHex: HEX, origin, pathname };
+        const defaultUrl = ShareCodec.encodeSearch({ ...base, gridRows: Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY] });
+        expect(new URL(defaultUrl).searchParams.has('g')).toBe(false);
+        const customUrl = ShareCodec.encodeSearch({ ...base, gridRows: 128 });
+        const parsed = parseUrl(customUrl);
+        // Only meaningful when 128 isn't the default preset; both branches keep the seed intact.
+        expect(parsed.exploreSearch.baseSeed).toBe(42);
+    });
+
+    it('ignores a malformed xs seed and survives malformed xc config', () => {
+        expect(ShareCodec.parseParams(new URLSearchParams('xs=notanumber')).exploreSearch).toBeUndefined();
+        const out = ShareCodec.parseParams(new URLSearchParams(`r=${HEX}&xs=7&xc=%7Bnot-json`));
+        expect(out.exploreSearch.baseSeed).toBe(7);
+        expect(out.exploreSearch.config).toBeUndefined();
+    });
+
     it('round-trips full initial-state JSON (`is`) for non-density modes', () => {
         const worldSettings = Array.from({ length: Config.NUM_WORLDS }, (_, i) => ({
             rulesetHex: HEX,

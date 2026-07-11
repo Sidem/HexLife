@@ -46,6 +46,14 @@ export class TopInfoBar {
         if (this.uiElements.historyButton) this.uiElements.historyButton.innerHTML = ICONS.history;
         if (this.uiElements.saveRulesetButton) this.uiElements.saveRulesetButton.innerHTML = ICONS.star;
 
+        // With the emoji gone and the SVGs aria-hidden, `title` is these buttons' only name
+        // source — the weakest one (not reliably announced, never shown on keyboard focus).
+        // Promote each icon-only control's title to an explicit aria-label.
+        for (const el of [this.uiElements.historyButton, this.uiElements.saveRulesetButton,
+            this.uiElements.undoButton, this.uiElements.redoButton, this.uiElements.appMenuButton]) {
+            if (el && el.title && !el.getAttribute('aria-label')) el.setAttribute('aria-label', el.title);
+        }
+
         this._buildRuleDeck();
         this._setupEventListeners();
 
@@ -364,5 +372,7 @@ export class TopInfoBar {
             this.uiElements.saveRulesetButton.style.cursor = 'pointer';
             this.uiElements.saveRulesetButton.title = 'Save this ruleset to your personal library.';
         }
+        // Keep the accessible name in step with the state-dependent title.
+        this.uiElements.saveRulesetButton.setAttribute('aria-label', this.uiElements.saveRulesetButton.title);
     }
 }

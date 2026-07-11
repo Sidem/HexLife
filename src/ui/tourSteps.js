@@ -394,16 +394,16 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ChromaLabComponent }
     }, {
-        element: '#chroma-mode-select',
+        element: '#chroma-tabs',
         title: 'Three Ways to Color',
-        content: "This picks <i>what the color means</i>. <span class=\"onboarding-highlight-text\">Preset Palettes</span> are ready-made looks; <span class=\"onboarding-highlight-text\">Neighbor Count</span> colors each cell by how many living neighbors triggered it; <span class=\"onboarding-highlight-text\">Symmetry Groups</span> colors by the <i>shape</i> of rule that fired. We'll look at presets, then the powerful Symmetry view.",
+        content: "These tabs pick <i>what the color means</i>. <span class=\"onboarding-highlight-text\">Palettes</span> are ready-made looks; <span class=\"onboarding-highlight-text\">Gradient</span> paints all 128 rules along a ramp you design (or roll at random); <span class=\"onboarding-highlight-text\">Fine-Tune</span> hand-colors individual rule families. We'll look at palettes, then the powerful Symmetry view.",
         primaryAction: { text: 'Next' },
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
         advanceOn: { type: 'click' }
     }, {
         element: '#chroma-preset-section',
         title: 'Preset Palettes',
-        content: "Ready-made looks. <span class=\"onboarding-highlight-text\">Monochrome</span> (the default) keeps things quiet; <span class=\"onboarding-highlight-text\">Default Spectrum</span> gives every rule its own hue so structure pops. The <span class=\"onboarding-highlight-text\">Symmetry Groups</span> and <span class=\"onboarding-highlight-text\">Neighbor Counts</span> entries here are one-click shortcuts into the modes below. Keep <span class=\"onboarding-highlight-text\">flicker-proof presets</span> on for busy rulesets &mdash; your choice is saved automatically.",
+        content: "Ready-made looks &mdash; <span class=\"onboarding-highlight-text\">hover any card to preview it live</span> on your worlds, click to keep it. <span class=\"onboarding-highlight-text\">Monochrome</span> (the default) keeps things quiet; <span class=\"onboarding-highlight-text\">Default Spectrum</span> gives every rule its own hue so structure pops; <span class=\"onboarding-highlight-text\">Viridis</span> and <span class=\"onboarding-highlight-text\">Cividis</span> are colorblind-safe ramps. Keep the <span class=\"onboarding-highlight-text\">birth/death flash guard</span> on for busy rulesets &mdash; your choice is saved automatically.",
         primaryAction: { text: 'Show me Symmetry Groups' },
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
         advanceOn: { type: 'click' }
@@ -415,9 +415,9 @@ export const getTours = (appContext) => {
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('symmetry'); },
         advanceOn: { type: 'click' }
     }, {
-        element: '#chroma-mode-select',
+        element: '#chroma-tabs',
         title: "You're in control of the lens",
-        content: "That's the whole idea: color is a <i>lens</i> on the rules, not just decoration. We've set you back to the calm <span class=\"onboarding-highlight-text\">Monochrome</span> default &mdash; switch to <span class=\"onboarding-highlight-text\">Symmetry Groups</span> or <span class=\"onboarding-highlight-text\">Default Spectrum</span> from here whenever you want to see the machinery underneath.",
+        content: "That's the whole idea: color is a <i>lens</i> on the rules, not just decoration. We've set you back to the calm <span class=\"onboarding-highlight-text\">Monochrome</span> default &mdash; come back to these tabs whenever you want to see the machinery underneath, or hit <span class=\"onboarding-highlight-text\">Surprise me</span> on the Gradient tab for a fresh coat of paint.",
         primaryAction: { text: 'Finish' },
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); restoreCalmPalette(); },
         advanceOn: { type: 'click' }

@@ -363,11 +363,13 @@ export const EVENTS = {
     COMMAND_SHOW_CONFIRMATION: 'command:showConfirmation',
     /** @param {object} settings - The complete color settings object from the ColorController. */
     COLOR_SETTINGS_CHANGED: 'ui:colorSettingsChanged',
+    /** @param {object|null} settings - Transient palette preview (Chroma Lab hover): a full color-settings object to render live WITHOUT persisting, or null to end the preview and re-apply the saved settings. Only the renderer listens; UI components keep reflecting the saved settings. */
+    COLOR_PREVIEW_CHANGED: 'ui:colorPreviewChanged',
     /** @param {boolean} shouldShow - Whether to show the command toasts. */
     COMMAND_SET_SHOW_COMMAND_TOASTS: 'command:setShowCommandToasts',
 
     // --- Auto-explore (Phase 4) ---
-    /** @param {Partial<import('../core/AutoExploreService.js').EXPLORE_CONFIG>} [options] - Optional overrides (mutationRate, mutationMode, evalTicks, IC-suite knobs). Starts the auto-explore generation loop seeded from the selected world's ruleset. */
+    /** @param {Partial<import('../core/AutoExploreService.js').EXPLORE_CONFIG> & {baseSeed?: number}} [options] - Optional overrides (mutationRate, mutationMode, evalTicks, IC-suite knobs). `baseSeed` replays a prior search's exact trajectory (shared search links); omitted ⇒ a fresh random base seed. Starts the auto-explore generation loop seeded from the selected world's ruleset. */
     COMMAND_START_AUTO_EXPLORE: 'command:startAutoExplore',
     /** @param {{adopt?: boolean}} [data] - Stop the auto-explore loop and restore pre-explore worlds. When `adopt` is true, keep the current champion ruleset in the selected world instead of restoring it. */
     COMMAND_STOP_AUTO_EXPLORE: 'command:stopAutoExplore',

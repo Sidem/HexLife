@@ -65,7 +65,7 @@ export class SettingsComponent extends BaseComponent {
 
             <section class="settings-section">
                 <h5 class="settings-section-title">Appearance</h5>
-                <p class="settings-coming-soon">Light theme and a colorblind-safe palette are coming soon. For now, customise cell colours in <strong>Chroma Lab</strong>.</p>
+                <p class="settings-coming-soon">Colorblind-safe palettes (Viridis &amp; Cividis) live in <strong>Chroma Lab &rarr; Palettes</strong>. A light theme is coming soon.</p>
             </section>
         `;
 
