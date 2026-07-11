@@ -4,6 +4,7 @@ import { ToggleSwitch } from './ToggleSwitch.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import * as Config from '../../core/config.js';
+import { APP_VERSION } from '../../version.js';
 
 /**
  * The global Settings / Preferences panel. A single home for cross-cutting preferences
@@ -67,7 +68,13 @@ export class SettingsComponent extends BaseComponent {
                 <h5 class="settings-section-title">Appearance</h5>
                 <p class="settings-coming-soon">Colorblind-safe palettes (Viridis &amp; Cividis) live in <strong>Chroma Lab &rarr; Palettes</strong>. A light theme is coming soon.</p>
             </section>
+
+            <footer class="settings-version" title="Git commit this build was made from — compare against the latest commit on GitHub to spot a stale cached page">
+                Build <code id="settings-version-code"></code>
+            </footer>
         `;
+        // textContent (not template interpolation): the injected build string must never be parsed as HTML.
+        this.element.querySelector('#settings-version-code').textContent = APP_VERSION;
 
         const vizController = this.appContext.visualizationController;
 

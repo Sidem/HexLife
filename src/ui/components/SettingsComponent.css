@@ -68,3 +68,17 @@
 .settings-component-content .settings-coming-soon strong {
     color: var(--text-secondary, #d0d0d8);
 }
+
+.settings-component-content .settings-version {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color, #33333d);
+    font-size: 0.78em;
+    color: var(--text-muted, #9a9aa4);
+    text-align: right;
+}
+
+.settings-component-content .settings-version code {
+    font-size: inherit;
+    color: var(--text-secondary, #d0d0d8);
+}

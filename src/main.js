@@ -10,6 +10,9 @@ import { SettingsLoader } from './services/SettingsLoader.js';
 import * as PersistenceService from './services/PersistenceService.js';
 import rulesetLibrary from './core/library/rulesets.json';
 import patternLibrary from './core/library/patterns.json';
+import { APP_VERSION } from './version.js';
+
+console.info(`HexLife Explorer build ${APP_VERSION}`);
 
 let gl;
 let appContext;
