@@ -141,8 +141,9 @@ export const EXPLORE_CONFIG = {
     icLabels: null,
     /** Crossover children (champion × runner-up) bred per generation once a runner-up exists. */
     crossoverChildren: 3,
-    /** Crossover recombination mode (RulesetService.crossoverHexes). */
-    crossoverMode: 'r_sym',
+    /** Crossover recombination mode (RulesetService.crossoverHexes); null ⇒ follow mutationMode
+     *  (`'single'` maps to `'uniform'`), so breeding respects the selected constraint mode. */
+    crossoverMode: null,
     /** Minimum candidate score to bank a find into the gallery archive. */
     findThreshold: 0.45,
     /** Max gallery entries to persist (best-first; archive itself is unbounded in memory). */
@@ -267,10 +268,21 @@ export class AutoExploreService {
         this._bestScoreSeen = 0;
         this._runToken++;
 
-        const seedHex = this.wm.getCurrentRulesetHex();
-        if (!seedHex || seedHex === 'Error' || seedHex === 'N/A') {
+        const rawSeedHex = this.wm.getCurrentRulesetHex();
+        if (!rawSeedHex || rawSeedHex === 'Error' || rawSeedHex === 'N/A') {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cannot auto-explore: selected world has no valid ruleset.', type: 'error' });
             return;
+        }
+        // A constrained mode's mutation/crossover flips whole inheritance units but never repairs
+        // asymmetry already in the seed — project the seed onto the mode's subspace up front so
+        // every candidate the search produces actually satisfies the selected constraint.
+        const seedHex = this.wm.rulesetService.projectToMode(rawSeedHex, this.options.mutationMode);
+        if (seedHex.toUpperCase() !== rawSeedHex.toUpperCase()) {
+            const modeLabel = { r_sym: 'R-Sym', n_count: 'N-Count', totalistic: 'Totalistic' }[this.options.mutationMode] || this.options.mutationMode;
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: `Seed ruleset projected onto the ${modeLabel} constraint (majority vote per group).`,
+                type: 'info',
+            });
         }
         this.championHex = seedHex;
         this._activeICSuite = this._resolveICSuite(this.options.icLabels);
@@ -706,6 +718,11 @@ export class AutoExploreService {
     _buildPopulation(championHex, numWorlds, selectedIdx) {
         const rs = this.wm.rulesetService;
         const { mutationRate, mutationMode, crossoverMode, crossoverChildren } = this.options;
+        // Breeding respects the search's constraint mode: each inheritance unit (orbit group /
+        // count bucket / sum bucket) is an atomic gene, inherited wholesale from one parent, and
+        // the post-crossover mutation flips those same units — so children stay inside the mode's
+        // subspace. An explicit crossoverMode option still overrides.
+        const breedMode = crossoverMode || (mutationMode === 'single' ? 'uniform' : mutationMode);
         const referenceRuleset = hexToRuleset(championHex);
         const population = new Array(numWorlds);
 
@@ -725,7 +742,7 @@ export class AutoExploreService {
             let hex;
             if (k < numChildren) {
                 // A low post-crossover mutation rate injects fresh variation into each child.
-                hex = rs.crossoverHexes(championHex, this.runnerUpHex, crossoverMode, rng, mutationRate);
+                hex = rs.crossoverHexes(championHex, this.runnerUpHex, breedMode, rng, mutationRate);
             } else {
                 hex = rs.generateMutatedHex(championHex, mutationRate, mutationMode, referenceRuleset, rng);
             }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { RulesetService } from '../src/core/RulesetService.js';
 import * as Symmetry from '../src/core/Symmetry.js';
-import { hexToRuleset } from '../src/utils/utils.js';
+import { hexToRuleset, rulesetToHex } from '../src/utils/utils.js';
 import { countSetBits } from '../src/core/Symmetry.js';
 
 const ALL_ZERO = '0'.repeat(32);
@@ -381,6 +381,47 @@ describe('RulesetService.crossoverHexes', () => {
         expect(out).toBe(RulesetService.invertHex(hexA));
     });
 
+    it('r_sym post-crossover mutation flips whole orbit groups (rate 1, identical symmetric parents => invert)', () => {
+        const sym = service.generateRandomRulesetHex(0.5, 'r_sym', seq([0, 0.9]));
+        // Identical parents => child = sym; rate-1 r_sym post-mutation flips every group => invert.
+        const out = service.crossoverHexes(sym, sym, 'r_sym', () => 0, 1);
+        expect(out).toBe(RulesetService.invertHex(sym));
+    });
+
+    it('r_sym breeding + post-mutation keeps the child orbit-uniform (mode subspace is closed)', () => {
+        const symA = service.generateRandomRulesetHex(0.5, 'r_sym', seq([0, 0.9]));
+        const symB = service.generateRandomRulesetHex(0.5, 'r_sym', seq([0.9, 0, 0]));
+        const out = service.crossoverHexes(symA, symB, 'r_sym', seq([0.1, 0.6, 0.4, 0.8]), 0.5);
+        const child = hexToRuleset(out);
+        for (const group of symmetryData.canonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = child[(cs << 6) | group.members[0]];
+                for (const m of group.members) {
+                    expect(child[(cs << 6) | m]).toBe(ref);
+                }
+            }
+        }
+    });
+
+    it('totalistic breeding + post-mutation keeps the child totalistic', () => {
+        const tA = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0, 0.9]));
+        const tB = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0.9, 0]));
+        const out = service.crossoverHexes(tA, tB, 'totalistic', seq([0.1, 0.6, 0.4, 0.8]), 0.5);
+        expect(isTotalistic(hexToRuleset(out))).toBe(true);
+    });
+
+    it('n_count breeding + post-mutation keeps every neighbor-count bucket uniform', () => {
+        const nA = service.generateRandomRulesetHex(0.5, 'n_count', seq([0, 0.9]));
+        const nB = service.generateRandomRulesetHex(0.5, 'n_count', seq([0.9, 0]));
+        const out = service.crossoverHexes(nA, nB, 'n_count', seq([0.1, 0.6, 0.4, 0.8]), 0.5);
+        const child = hexToRuleset(out);
+        for (const cs of [0, 1]) {
+            for (let nan = 0; nan <= 6; nan++) {
+                expect(RulesetService.getEffectiveRuleForNeighborCount(child, cs, nan)).not.toBe(2);
+            }
+        }
+    });
+
     it('r_sym falls back to uniform when symmetryData is missing', () => {
         const bare = new RulesetService(null);
         const out = bare.crossoverHexes(hexA, hexB, 'r_sym', () => 0);
@@ -436,6 +477,70 @@ describe('RulesetService.crossoverPoolHexes (genepool)', () => {
 
     it('empty pool yields a zeroed ruleset', () => {
         expect(service.crossoverPoolHexes([], 'uniform', () => 0)).toBe('0'.repeat(32));
+    });
+});
+
+describe('RulesetService.projectToMode', () => {
+    const hexA = '12482080480080006880800180010117';
+
+    it('single (and unknown) modes return the hex unchanged', () => {
+        expect(service.projectToMode(hexA, 'single')).toBe(hexA);
+        expect(service.projectToMode(hexA, 'bogus')).toBe(hexA);
+    });
+
+    it('r_sym returns an already-symmetric ruleset bit-identical', () => {
+        const sym = service.generateRandomRulesetHex(0.5, 'r_sym', seq([0, 0.9]));
+        expect(service.projectToMode(sym, 'r_sym')).toBe(sym);
+    });
+
+    it('r_sym projection makes every canonical orbit uniform', () => {
+        const out = service.projectToMode(hexA, 'r_sym');
+        const rules = hexToRuleset(out);
+        for (const group of symmetryData.canonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = rules[(cs << 6) | group.members[0]];
+                for (const m of group.members) {
+                    expect(rules[(cs << 6) | m]).toBe(ref);
+                }
+            }
+        }
+    });
+
+    it('r_sym projection takes the majority output of each orbit', () => {
+        const group3 = symmetryData.canonicalRepresentatives.find(g => g.members.length === 3);
+        const rules = hexToRuleset(ALL_ZERO);
+        // Two of three members ON => majority 1.
+        rules[(0 << 6) | group3.members[0]] = 1;
+        rules[(0 << 6) | group3.members[1]] = 1;
+        const out = hexToRuleset(service.projectToMode(rulesetToHex(rules), 'r_sym'));
+        for (const m of group3.members) expect(out[(0 << 6) | m]).toBe(1);
+    });
+
+    it('r_sym projection breaks ties with the first (lowest-index) orbit member', () => {
+        const group2 = symmetryData.canonicalRepresentatives.find(g => g.members.length === 2);
+        const rules = hexToRuleset(ALL_ZERO);
+        // 1-1 split: first member 0, second member 1 => tie resolves to the first member's 0.
+        rules[(0 << 6) | group2.members[1]] = 1;
+        const out = hexToRuleset(service.projectToMode(rulesetToHex(rules), 'r_sym'));
+        for (const m of group2.members) expect(out[(0 << 6) | m]).toBe(0);
+    });
+
+    it('n_count projection makes every neighbor-count bucket uniform', () => {
+        const out = hexToRuleset(service.projectToMode(hexA, 'n_count'));
+        for (const cs of [0, 1]) {
+            for (let nan = 0; nan <= 6; nan++) {
+                expect(RulesetService.getEffectiveRuleForNeighborCount(out, cs, nan)).not.toBe(2);
+            }
+        }
+    });
+
+    it('totalistic projection yields a totalistic ruleset', () => {
+        expect(isTotalistic(hexToRuleset(service.projectToMode(hexA, 'totalistic')))).toBe(true);
+    });
+
+    it('r_sym without symmetryData returns the hex unchanged', () => {
+        const bare = new RulesetService(null);
+        expect(bare.projectToMode(hexA, 'r_sym')).toBe(hexA);
     });
 });
 

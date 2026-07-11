@@ -88,17 +88,34 @@ export class RulesetService {
      * @returns {string} 32-char hex
      */
     generateMutatedHex(sourceHex, mutationRate, mutationMode, referenceRuleset = null, rng = Math.random) {
+        if (mutationMode === 'r_sym' && !this._canonicalGroups()) return sourceHex;
         const rules = hexToRuleset(sourceHex);
+        this._mutateUnitsInPlace(rules, mutationRate, mutationMode, referenceRuleset, rng);
+        return rulesetToHex(rules);
+    }
 
-        if (mutationMode === 'single') {
-            for (let i = 0; i < 128; i++) {
-                if (rng() < mutationRate) {
-                    rules[i] = 1 - rules[i];
-                }
-            }
-        } else if (mutationMode === 'r_sym') {
-            const canonicalGroups = this.symmetryData.canonicalRepresentatives;
-            if (!canonicalGroups || canonicalGroups.length === 0) return sourceHex;
+    /** The canonical orbit groups, or null when symmetryData is unavailable. */
+    _canonicalGroups() {
+        const groups = this.symmetryData && this.symmetryData.canonicalRepresentatives;
+        return groups && groups.length > 0 ? groups : null;
+    }
+
+    /**
+     * Shared mutation core: flip whole inheritance units of `rules` in place, per `mode` (the unit
+     * shapes and draw order documented on {@link generateMutatedHex}). `single` flips per-bit;
+     * unknown modes mutate nothing. Used by both mutation and the post-crossover mutation so a
+     * mode-constrained ruleset stays inside its mode's subspace.
+     * @param {Uint8Array} rules
+     * @param {number} mutationRate
+     * @param {string} mode
+     * @param {Uint8Array|null} referenceRuleset - Seeds `n_count`/`totalistic` flips (2 = mixed ⇒
+     *        extra `Math.round(rng())` draw).
+     * @param {() => number} rng
+     */
+    _mutateUnitsInPlace(rules, mutationRate, mode, referenceRuleset, rng) {
+        if (mode === 'r_sym') {
+            const canonicalGroups = this._canonicalGroups();
+            if (!canonicalGroups) return;
 
             for (const group of canonicalGroups) {
                 for (let cs = 0; cs <= 1; cs++) {
@@ -112,7 +129,7 @@ export class RulesetService {
                     }
                 }
             }
-        } else if (mutationMode === 'n_count') {
+        } else if (mode === 'n_count') {
             for (let cs = 0; cs <= 1; cs++) {
                 for (let nan = 0; nan <= 6; nan++) {
                     if (rng() < mutationRate) {
@@ -128,7 +145,7 @@ export class RulesetService {
                     }
                 }
             }
-        } else if (mutationMode === 'totalistic') {
+        } else if (mode === 'totalistic') {
             for (let sum = 0; sum <= 7; sum++) {
                 if (rng() < mutationRate) {
                     const currentEffectiveOutput = RulesetService.getEffectiveRuleForTotalisticSum(referenceRuleset, sum);
@@ -143,9 +160,14 @@ export class RulesetService {
                     }
                 }
             }
+        } else if (mode === 'single') {
+            for (let i = 0; i < 128; i++) {
+                if (rng() < mutationRate) {
+                    rules[i] = 1 - rules[i];
+                }
+            }
         }
-
-        return rulesetToHex(rules);
+        // Unknown modes mutate nothing (matches the pre-extraction behaviour).
     }
 
     /**
@@ -160,15 +182,18 @@ export class RulesetService {
      *              behaviour is inherited as a unit (mirrors n_count mutation/generation).
      * - `totalistic`: per totalistic-sum bucket (centerState + active-neighbor count, 0–7), pick one
      *              parent wholesale and copy its outputs across the whole bucket.
-     * An optional low post-crossover mutation rate flips each entry independently (single-bit), to
-     * inject fresh variation the way breeding pipelines usually do. With `postMutationRate=0` every
-     * child bit is taken verbatim from A or B (and breeding identical parents is the identity).
+     * An optional low post-crossover mutation rate injects fresh variation the way breeding
+     * pipelines usually do — flipping the same inheritance units the mode recombines (whole orbit
+     * groups for `r_sym`, buckets for `n_count`/`totalistic`, per-bit for `uniform`), so the child
+     * stays inside the mode's subspace. With `postMutationRate=0` every child bit is taken verbatim
+     * from A or B (and breeding identical parents is the identity).
      * Pure — the injectable `rng` keeps it deterministically testable like the rest of the algebra.
      * @param {string} hexA
      * @param {string} hexB
      * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
-     * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
+     * @param {number} [postMutationRate=0] - Post-crossover flip probability per inheritance unit
+     *        (the unit follows `mode`: orbit group / count bucket / sum bucket / single bit).
      * @returns {string} 32-char hex
      */
     crossoverHexes(hexA, hexB, mode = 'r_sym', rng = Math.random, postMutationRate = 0) {
@@ -191,7 +216,8 @@ export class RulesetService {
      * @param {string[]} hexes - One or more 32-char ruleset hexes.
      * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
-     * @param {number} [postMutationRate=0] - Per-entry post-crossover single-bit flip probability.
+     * @param {number} [postMutationRate=0] - Post-crossover flip probability per inheritance unit
+     *        (the unit follows `mode`: orbit group / count bucket / sum bucket / single bit).
      * @returns {string} 32-char hex ('Error'/empty pool yields a zeroed ruleset).
      */
     crossoverPoolHexes(hexes, mode = 'r_sym', rng = Math.random, postMutationRate = 0) {
@@ -245,12 +271,89 @@ export class RulesetService {
         }
 
         if (postMutationRate > 0) {
-            for (let i = 0; i < 128; i++) {
-                if (rng() < postMutationRate) child[i] = 1 - child[i];
-            }
+            // The post-crossover mutation flips the SAME inheritance units the crossover treats as
+            // atomic genes (per-bit for uniform / an unavailable r_sym), so a mode-constrained child
+            // never picks up a unit-breaking stray bit — each mode's subspace is closed under
+            // breeding (auto-explore relies on this).
+            const unitMode = (mode === 'r_sym' && canonicalGroups && canonicalGroups.length > 0) || mode === 'n_count' || mode === 'totalistic'
+                ? mode : 'single';
+            this._mutateUnitsInPlace(child, postMutationRate, unitMode, child, rng);
         }
 
         return rulesetToHex(child);
+    }
+
+    /**
+     * Project a ruleset hex onto a constraint mode's subspace by majority vote over each of the
+     * mode's inheritance units (`r_sym`: canonical orbit group × centerState; `n_count`:
+     * neighbor-count bucket × centerState; `totalistic`: totalistic-sum bucket). Ties take the
+     * unit's first (lowest-index) entry, so the projection is deterministic; a ruleset already in
+     * the subspace is returned bit-identical. `single`/unknown modes (and `r_sym` without
+     * symmetryData) return the hex unchanged. Auto-explore uses this to coerce a free-form seed
+     * ruleset into the selected search mode before mutating it — unit-wise mutation flips whole
+     * units but never repairs asymmetry the seed already carries.
+     * @param {string} hex
+     * @param {string} mode
+     * @returns {string} 32-char hex
+     */
+    projectToMode(hex, mode) {
+        const units = this._unitsForMode(mode);
+        if (!units) return hex;
+        const rules = hexToRuleset(hex);
+        for (const unit of units) {
+            let ones = 0;
+            for (const idx of unit) ones += rules[idx];
+            const out = ones * 2 > unit.length ? 1 : ones * 2 < unit.length ? 0 : rules[unit[0]];
+            for (const idx of unit) rules[idx] = out;
+        }
+        return rulesetToHex(rules);
+    }
+
+    /**
+     * The inheritance units (arrays of rule indices) a constraint mode treats as atomic genes, or
+     * null for `single`/unknown modes (and `r_sym` without symmetryData) — i.e. no constraint.
+     * @param {string} mode
+     * @returns {number[][]|null}
+     */
+    _unitsForMode(mode) {
+        if (mode === 'r_sym') {
+            const groups = this._canonicalGroups();
+            if (!groups) return null;
+            const units = [];
+            for (const group of groups) {
+                for (let cs = 0; cs <= 1; cs++) {
+                    units.push(group.members.map((m) => (cs << 6) | m));
+                }
+            }
+            return units;
+        }
+        if (mode === 'n_count') {
+            const units = [];
+            for (let cs = 0; cs <= 1; cs++) {
+                for (let nan = 0; nan <= 6; nan++) {
+                    const unit = [];
+                    for (let mask = 0; mask < 64; mask++) {
+                        if (Symmetry.countSetBits(mask) === nan) unit.push((cs << 6) | mask);
+                    }
+                    units.push(unit);
+                }
+            }
+            return units;
+        }
+        if (mode === 'totalistic') {
+            const units = [];
+            for (let sum = 0; sum <= 7; sum++) {
+                const unit = [];
+                for (let cs = 0; cs <= 1; cs++) {
+                    for (let mask = 0; mask < 64; mask++) {
+                        if (cs + Symmetry.countSetBits(mask) === sum) unit.push((cs << 6) | mask);
+                    }
+                }
+                units.push(unit);
+            }
+            return units;
+        }
+        return null;
     }
 
     /**
