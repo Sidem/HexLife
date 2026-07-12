@@ -365,3 +365,259 @@
     justify-content: center;
     padding: 3px;
 }
+
+/* --- Scoring customization (v3.1) --- */
+.explore-scoring-group > summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.explore-scoring-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.explore-scoring-group > summary h5 {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+}
+
+.explore-scoring-group > summary h5::before {
+    content: '\25B8';
+    font-size: 0.8em;
+    color: var(--text-muted, #87878f);
+    transition: transform 0.15s ease;
+}
+
+.explore-scoring-group[open] > summary h5::before {
+    transform: rotate(90deg);
+}
+
+.explore-scoring-preset-chip {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--text-muted, #87878f);
+    border: 1px solid var(--border-subtle, #444);
+    border-radius: 999px;
+    padding: 1px 8px;
+}
+
+.explore-scoring-blurb {
+    margin: 0;
+    font-size: 0.8em;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+.explore-scoring-info-glyph {
+    color: var(--text-secondary, #b9b9c2);
+}
+
+#explore-scoring-mount {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 6px;
+}
+
+#explore-scoring-mount.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+/* All-zero weights: everything would score 0 — flag the whole block. */
+#explore-scoring-mount.all-zero .explore-scoring-rows {
+    outline: 1px solid var(--danger, #cf6a6a);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm, 6px);
+}
+
+.explore-scoring-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.explore-scoring-preset {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary, #e6e6ea);
+    font-size: 0.85em;
+}
+
+.explore-scoring-reset {
+    flex: 0 0 auto;
+}
+
+.explore-scoring-preset-desc {
+    margin: 0;
+    font-size: 0.78em;
+    color: var(--text-muted, #87878f);
+    line-height: 1.35;
+    min-height: 1.2em;
+}
+
+.explore-scoring-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.explore-scoring-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 4px;
+}
+
+.explore-scoring-row .explore-scoring-slider-mount {
+    min-width: 0;
+}
+
+.explore-scoring-info {
+    padding: 2px 6px;
+    font-size: 0.9em;
+    color: var(--text-muted, #87878f);
+    border-radius: 50%;
+    line-height: 1;
+}
+
+.explore-scoring-info:hover,
+.explore-scoring-row.explainer-open .explore-scoring-info {
+    color: var(--accent, #f0c674);
+}
+
+.explore-scoring-explainer {
+    grid-column: 1 / -1;
+}
+
+.explore-scoring-advanced {
+    border-top: 1px dashed var(--border-subtle, #444);
+    padding-top: 6px;
+}
+
+.explore-scoring-advanced-title {
+    margin: 0 0 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--text-muted, #87878f);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* --- Per-term explainer (shared: Scoring panel + Analysis plugin) --- */
+.term-explainer {
+    margin: 4px 0 8px;
+    padding: 8px 10px;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border-subtle, #3a3a40);
+    border-radius: var(--radius-sm, 6px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.term-explainer-desc {
+    margin: 0;
+    font-size: 0.78em;
+    color: var(--text-secondary, #b9b9c2);
+    line-height: 1.45;
+}
+
+.term-explainer-minmax {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.75em;
+    color: var(--text-muted, #87878f);
+}
+
+.term-curve {
+    max-width: 100%;
+    height: auto;
+    color: var(--text-muted, #87878f);
+}
+
+.term-curve-base {
+    stroke: var(--border-subtle, #444);
+    stroke-width: 1;
+}
+
+.term-curve-guide {
+    stroke: var(--text-muted, #87878f);
+    stroke-width: 1;
+    opacity: 0.6;
+}
+
+.term-curve-line {
+    stroke: var(--accent, #f0c674);
+    stroke-width: 1.6;
+}
+
+.term-curve-marker {
+    fill: var(--info, #6ab0f3);
+    stroke: var(--surface-1, #1d1d20);
+    stroke-width: 1;
+}
+
+.term-curve-marker-label,
+.term-curve-axis {
+    font-size: 9px;
+    fill: var(--text-muted, #87878f);
+}
+
+/* --- Uniform-chaos penalty surfaces (v3.1) --- */
+.explore-bar-fill--penalty {
+    background-color: var(--warning, #d8a04b);
+}
+
+.explore-find-chaos {
+    font-size: 0.72em;
+    color: var(--warning, #d8a04b);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0 6px;
+    white-space: nowrap;
+}
+
+/* Analysis plugin: clickable rows + inline explainers reuse the shared term-explainer look. */
+.explore-bar-row--expandable {
+    cursor: pointer;
+}
+
+.explore-bar-row--expandable:hover .explore-bar-label {
+    color: var(--accent, #f0c674);
+}
+
+/* --- CLIP model selection (v3.1) --- */
+.explore-embedding-model {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-left: 22px;
+}
+
+.explore-embedding-model-select {
+    padding: 3px 6px;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary, #e6e6ea);
+    font-size: 0.82em;
+    max-width: 100%;
+}
+
+.explore-embedding-model-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.explore-embedding-model-hint {
+    line-height: 1.35;
+}

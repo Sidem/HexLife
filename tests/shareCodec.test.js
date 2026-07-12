@@ -163,6 +163,38 @@ describe('ShareCodec encode -> parse round-trip', () => {
         expect(out.exploreSearch.config).toEqual(config);
     });
 
+    it('round-trips v3.1 custom scoring + findThreshold in the xc blob', () => {
+        const config = {
+            mutationRate: 0.06,
+            mutationMode: 'r_sym',
+            evalTicks: 160,
+            maxGenerations: 0,
+            icLabels: null,
+            findThreshold: 0.55,
+            scoring: {
+                weights: {
+                    criticality: 5, entropyBand: 4, fluctuation: 2, ruleDiversity: 4,
+                    spatialStructure: 30, spatialHeterogeneity: 5, temporalEntropyVariance: 15,
+                    transport: 30, openEndedness: 5,
+                },
+                uniformPenaltyPct: 70,
+                findThreshold: 0.55,
+            },
+        };
+        const url = ShareCodec.encodeSearch({ baseSeed: 99, seedHex: HEX, config, origin, pathname });
+        const out = parseUrl(url);
+        expect(out.exploreSearch.config).toEqual(config);
+    });
+
+    it('legacy xc without scoring/findThreshold still parses (pre-v3.1 links)', () => {
+        const config = { mutationRate: 0.06, mutationMode: 'single', evalTicks: 160, maxGenerations: 5, icLabels: ['chaos'] };
+        const url = ShareCodec.encodeSearch({ baseSeed: 7, seedHex: HEX, config, origin, pathname });
+        const out = parseUrl(url);
+        expect(out.exploreSearch.config).toEqual(config);
+        expect(out.exploreSearch.config.scoring).toBeUndefined();
+        expect(out.exploreSearch.config.findThreshold).toBeUndefined();
+    });
+
     it('encodeSearch omits the grid param at the default size and includes it otherwise', () => {
         const base = { baseSeed: 42, seedHex: HEX, origin, pathname };
         const defaultUrl = ShareCodec.encodeSearch({ ...base, gridRows: Config.GRID_SIZE_PRESETS[Config.DEFAULT_GRID_SIZE_KEY] });

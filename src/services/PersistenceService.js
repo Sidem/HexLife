@@ -271,12 +271,33 @@ export function saveExploreGallery(entries) {
 // Perceptual auto-explore illumination archive (v3.0): compact embedding-cell entries (hex + score +
 // random-projection cell key — NO raw vectors, so it stays small). Keyed separately from the main
 // gallery; only written/read when the embedding objective is in use.
-export function loadEmbeddingGallery() {
-    return _getItem(KEYS.EMBEDDING_GALLERY) || [];
+// v3.1: the blob is namespaced by the CLIP model id ({ modelId, entries }) — SimHash cells from
+// different embedding models/spaces are not comparable, so a model switch must start fresh. Legacy
+// plain-array blobs (pre-namespacing) were written by the then-only default model.
+const LEGACY_EMBEDDING_MODEL_ID = 'Xenova/clip-vit-base-patch16';
+
+/**
+ * @param {string|null} [expectedModelId] Active model id; a blob stored for a different model loads
+ *   as empty (self-invalidation). null/undefined skips the check.
+ * @returns {object[]}
+ */
+export function loadEmbeddingGallery(expectedModelId = null) {
+    const blob = _getItem(KEYS.EMBEDDING_GALLERY);
+    if (!blob) return [];
+    if (Array.isArray(blob)) {
+        return (!expectedModelId || expectedModelId === LEGACY_EMBEDDING_MODEL_ID) ? blob : [];
+    }
+    if (!Array.isArray(blob.entries)) return [];
+    if (expectedModelId && blob.modelId && blob.modelId !== expectedModelId) return [];
+    return blob.entries;
 }
 
-export function saveEmbeddingGallery(entries) {
-    _setItem(KEYS.EMBEDDING_GALLERY, entries);
+/**
+ * @param {object[]} entries
+ * @param {string|null} [modelId] Model id the entries belong to (namespaces the blob).
+ */
+export function saveEmbeddingGallery(entries, modelId = null) {
+    _setItem(KEYS.EMBEDDING_GALLERY, { modelId: modelId || null, entries });
 }
 
 // Client-side cache of evolved-world thumbnails for PUBLIC library rulesets (keyed by ruleset hex).

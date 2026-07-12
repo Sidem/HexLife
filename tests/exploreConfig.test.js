@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EXPLORE_CONFIG, IC_SUITE } from '../src/core/AutoExploreService.js';
 import { CYCLE_DETECTION_MAX_PERIOD } from '../src/core/config.js';
+import { FIND_THRESHOLD_MIN, FIND_THRESHOLD_MAX } from '../src/core/analysis/ScoringPresets.js';
 
 // v2.4: the confirmation pass tags/penalizes cycles up to confirmCycleMaxPeriod. The worker can only
 // *detect* a cycle whose period is ≤ CYCLE_DETECTION_MAX_PERIOD, so the explore threshold must stay
@@ -27,6 +28,13 @@ describe('EXPLORE_CONFIG ↔ worker cycle detection', () => {
     // v2.7: the generation budget defaults to unlimited so existing behaviour is unchanged.
     it('maxGenerations defaults to 0 (unlimited)', () => {
         expect(EXPLORE_CONFIG.maxGenerations).toBe(0);
+    });
+
+    // v3.1: the default threshold must sit inside the advanced slider's clamp range, or the UI
+    // could never represent (or share-links could silently alter) the default behavior.
+    it('findThreshold lies within the advanced-slider bounds', () => {
+        expect(EXPLORE_CONFIG.findThreshold).toBeGreaterThanOrEqual(FIND_THRESHOLD_MIN);
+        expect(EXPLORE_CONFIG.findThreshold).toBeLessThanOrEqual(FIND_THRESHOLD_MAX);
     });
 });
 

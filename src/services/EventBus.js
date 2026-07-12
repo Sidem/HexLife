@@ -389,6 +389,8 @@ export const EVENTS = {
     EXPLORE_FIND_ADDED: 'explore:findAdded',
     /** @param {{enabled: boolean}} data - Toggle the optional foundation-model (CLIP) perceptual auto-explore objective (v3.0). When enabled, the embedding model lazily loads in its own worker; the statistical objective is unchanged when disabled (default). */
     COMMAND_SET_EMBEDDING_ENABLED: 'command:setEmbeddingEnabled',
+    /** @param {{modelId: string}} data - Switch the perceptual objective's CLIP checkpoint (v3.1; one of EmbeddingService's EMBEDDING_MODELS ids). Refused while a search is running; a switch replaces the model-specific perceptual archive (cells from different embedding spaces are not comparable). */
+    COMMAND_SET_EMBEDDING_MODEL: 'command:setEmbeddingModel',
     /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean}} data - The perceptual-objective embedding provider changed status (toggled, model loading, ready, or degraded after a failure). */
     EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
 };

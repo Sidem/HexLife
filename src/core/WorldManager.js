@@ -5,8 +5,9 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService, EXPLORE_CONFIG } from './AutoExploreService.js';
-import { EmbeddingService } from '../services/EmbeddingService.js';
+import { EmbeddingService, EMBEDDING_CONFIG, EMBEDDING_MODELS } from '../services/EmbeddingService.js';
 import { scoreSingleIC } from './analysis/InterestingnessScore.js';
+import { sanitizeScoring, buildScoreConfig } from './analysis/ScoringPresets.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import * as Renderer from '../rendering/renderer.js';
 import { generateThumbnailLUT } from '../utils/ruleVizUtils.js';
@@ -42,8 +43,16 @@ export class WorldManager {
         // Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
         // ASAL). Default off (persisted setting); lazily loads a CLIP image encoder in its own worker
         // only when enabled, and degrades to the statistical objective on any failure.
+        // The CLIP checkpoint is user-selectable (v3.1); an unknown persisted id (e.g. a since-
+        // removed option) falls back to the default so a stale setting can never wedge the provider.
+        const persistedModelId = PersistenceService.loadUISetting('embeddingModelId', EMBEDDING_CONFIG.modelId);
         this.embeddingService = new EmbeddingService({
             enabled: PersistenceService.loadUISetting('embeddingEnabled', false),
+            config: {
+                modelId: EMBEDDING_MODELS.some((m) => m.id === persistedModelId)
+                    ? persistedModelId
+                    : EMBEDDING_CONFIG.modelId,
+            },
         });
         // If the user previously opted in, warm the (browser-cached) model now so the panel shows a
         // truthful ready/error status instead of a stuck "will load on demand"; fire-and-forget and
@@ -267,6 +276,21 @@ export class WorldManager {
             const enabled = !!(data && data.enabled);
             PersistenceService.saveUISetting('embeddingEnabled', enabled);
             this.embeddingService.setEnabled(enabled);
+        });
+        // CLIP checkpoint switch (v3.1): refuse mid-run (the search owns the provider AND the
+        // perceptual archive keys are model-specific), else persist + swap the model and replace
+        // the model-namespaced archive.
+        EventBus.subscribe(EVENTS.COMMAND_SET_EMBEDDING_MODEL, (data) => {
+            const modelId = data && data.modelId;
+            if (!modelId || !EMBEDDING_MODELS.some((m) => m.id === modelId)) return;
+            if (this.autoExploreService.isRunning()) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the search before switching the CLIP model.', type: 'error' });
+                return;
+            }
+            if (modelId === this.embeddingService.getModelId()) return;
+            PersistenceService.saveUISetting('embeddingModelId', modelId);
+            this.embeddingService.setModel(modelId);
+            this.autoExploreService.onEmbeddingModelChanged();
         });
     }
 
@@ -1335,12 +1359,16 @@ export class WorldManager {
                 warmupTicks: EXPLORE_CONFIG.warmupTicks,
                 probe: { enabled: !!probe, probeTicks: EXPLORE_CONFIG.probeTicks },
             });
-            const scored = scoreSingleIC({ ...metrics, icLabel: 'measure' });
+            // Score under the user's CURRENT scoring settings (v3.1) so the Analysis panel matches
+            // what a run started right now would compute (defaults when the setting is absent).
+            const scoreCfg = buildScoreConfig(sanitizeScoring(PersistenceService.loadUISetting('exploreScoring', null)));
+            const scored = scoreSingleIC({ ...metrics, icLabel: 'measure' }, scoreCfg);
             return {
                 score: scored.score,
                 components: scored.components,
                 killed: scored.killed,
                 killReason: scored.killReason,
+                raw: scored.raw,
                 tick: savedTick,
             };
         } finally {

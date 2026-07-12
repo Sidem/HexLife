@@ -7,6 +7,10 @@ import * as Config from '../../core/config.js';
 import { EXPLORE_CONFIG, IC_SUITE } from '../../core/AutoExploreService.js';
 import { ShareCodec } from '../../services/ShareCodec.js';
 import { ICONS } from '../icons.js';
+import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
+import { ExploreScoringPanel } from './ExploreScoringPanel.js';
+import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
+import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
 
 /**
  * Phase 6 UI for the auto-explore feature (the dual-surface "Explore" panel: desktop popout/panel +
@@ -27,19 +31,10 @@ const SETTING_KEYS = {
     ticks: 'exploreEvalTicks',
     icLabels: 'exploreICLabels',
     maxGenerations: 'exploreMaxGenerations',
+    scoring: 'exploreScoring',
+    scoringOpen: 'exploreScoringOpen',
+    embeddingModel: 'embeddingModelId',
 };
-
-const COMPONENT_META = [
-    { key: 'criticality', label: 'σ', usedFlag: 'criticalityUsed' },
-    { key: 'entropyBand', label: 'Entropy' },
-    { key: 'fluctuation', label: 'Flux' },
-    { key: 'ruleDiversity', label: 'Diversity' },
-    { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed' },
-    { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed' },
-    { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed' },
-    { key: 'transport', label: 'Transport', usedFlag: 'transportUsed' },
-    { key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed' },
-];
 
 /** Human-readable status line for the perceptual-objective toggle, keyed by EMBEDDING_STATUS. */
 const EMBEDDING_STATUS_TEXT = {
@@ -92,6 +87,14 @@ export class ExploreComponent extends BaseComponent {
         if (typeof cfg.evalTicks === 'number') PersistenceService.saveUISetting(SETTING_KEYS.ticks, cfg.evalTicks);
         if (typeof cfg.maxGenerations === 'number') PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, cfg.maxGenerations);
         if (Array.isArray(cfg.icLabels) && cfg.icLabels.length > 0) PersistenceService.saveUISetting(SETTING_KEYS.icLabels, cfg.icLabels);
+        // v3.1: a shared search may carry custom scoring (weights/penalty) and a find threshold —
+        // both shape the trajectory, so a faithful replay must adopt them. Sanitized (untrusted URL).
+        if (cfg.scoring || Number.isFinite(cfg.findThreshold)) {
+            PersistenceService.saveUISetting(SETTING_KEYS.scoring, sanitizeScoring({
+                ...(cfg.scoring || {}),
+                findThreshold: Number.isFinite(cfg.findThreshold) ? cfg.findThreshold : cfg.scoring?.findThreshold,
+            }));
+        }
         // Deferred so the toast lands after the UI (incl. ToastManager) has finished booting.
         setTimeout(() => {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
@@ -111,10 +114,13 @@ export class ExploreComponent extends BaseComponent {
         const status = this.service.getStatus();
         const embeddingEnabled = !!status.embeddingEnabled;
         const embeddingStatus = status.embeddingStatus || 'disabled';
+        const scoringOpen = !!PersistenceService.loadUISetting(SETTING_KEYS.scoringOpen, false);
+        const activeModelId = this.worldManager.embeddingService?.getModelId?.()
+            || PersistenceService.loadUISetting(SETTING_KEYS.embeddingModel, EMBEDDING_MODELS[0].id);
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
-                <p class="explore-blurb">Searches all 9 worlds for "interesting" rulesets near the edge of chaos. Each candidate is scored across an initial-condition suite; the best feed the next generation.</p>
+                <p class="explore-blurb">Searches all 9 worlds for "interesting" rulesets near the edge of chaos. Each generation: candidates are <strong>screened</strong> cheaply across an initial-condition suite, promising ones are <strong>confirmed</strong> with a long burst, and survivors are <strong>banked</strong> in the gallery — the best two breed the next generation. The Scoring section below decides what "interesting" means.</p>
             </div>
             <div class="tool-group">
                 ${this._pendingBaseSeed != null ? `
@@ -159,9 +165,22 @@ export class ExploreComponent extends BaseComponent {
                         <input type="checkbox" id="explore-embedding-enabled" ${embeddingEnabled ? 'checked' : ''}>
                         <span>Perceptual novelty (CLIP) <span class="explore-field-hint">experimental</span></span>
                     </label>
+                    <div class="explore-embedding-model" id="explore-embedding-model-field" ${embeddingEnabled ? '' : 'hidden'}>
+                        <label class="explore-field-label" for="explore-embedding-model">Vision model</label>
+                        <select id="explore-embedding-model" class="explore-embedding-model-select">
+                            ${EMBEDDING_MODELS.map((m) => `<option value="${this._escape(m.id)}" title="${this._escape(m.detail)}" ${m.id === activeModelId ? 'selected' : ''}>${this._escape(m.label)}</option>`).join('')}
+                        </select>
+                        <div class="explore-field-hint explore-embedding-model-hint">${this._escape(EMBEDDING_MODELS.find((m) => m.id === activeModelId)?.detail || '')} Changing models resets the perceptual-novelty archive (different models see differently).</div>
+                    </div>
                     <div class="explore-embedding-status" id="explore-embedding-status" data-status="${embeddingStatus}">${this._escape(EMBEDDING_STATUS_TEXT[embeddingStatus] || '')}</div>
                 </div>
             </div>
+            <details class="tool-group explore-scoring-group" id="explore-scoring-group" ${scoringOpen ? 'open' : ''}>
+                <summary class="explore-scoring-summary">
+                    <h5>Scoring <span class="explore-scoring-preset-chip" data-field="preset-chip"></span></h5>
+                </summary>
+                <div id="explore-scoring-mount"></div>
+            </details>
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
@@ -183,6 +202,16 @@ export class ExploreComponent extends BaseComponent {
         this.budgetInput = this.element.querySelector('#explore-max-generations');
         this.embeddingToggle = this.element.querySelector('#explore-embedding-enabled');
         this.embeddingStatusEl = this.element.querySelector('#explore-embedding-status');
+        this.embeddingModelField = this.element.querySelector('#explore-embedding-model-field');
+        this.embeddingModelSelect = this.element.querySelector('#explore-embedding-model');
+        this.scoringGroup = this.element.querySelector('#explore-scoring-group');
+
+        // Scoring panel (v3.1): user-customizable objective. The summary chip mirrors the active
+        // preset; explainer curve markers follow the current best find's measured raw metrics.
+        this.scoringPanel = new ExploreScoringPanel(this.element.querySelector('#explore-scoring-mount'), {
+            onChange: (_scoring, presetKey) => this._updatePresetChip(presetKey),
+        });
+        this._updatePresetChip(this.scoringPanel.getPresetKey());
 
         this.sliders.rate = new SliderComponent(this.element.querySelector('#explore-mutation-rate-mount'), {
             id: 'explore-mutation-rate',
@@ -254,6 +283,24 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
+        if (this.embeddingModelSelect) {
+            this._addDOMListener(this.embeddingModelSelect, 'change', () => {
+                const modelId = this.embeddingModelSelect.value;
+                const hintEl = this.element.querySelector('.explore-embedding-model-hint');
+                if (hintEl) {
+                    const detail = EMBEDDING_MODELS.find((m) => m.id === modelId)?.detail || '';
+                    hintEl.textContent = `${detail} Changing models resets the perceptual-novelty archive (different models see differently).`;
+                }
+                EventBus.dispatch(EVENTS.COMMAND_SET_EMBEDDING_MODEL, { modelId });
+            });
+        }
+
+        if (this.scoringGroup) {
+            this._addDOMListener(this.scoringGroup, 'toggle', () => {
+                PersistenceService.saveUISetting(SETTING_KEYS.scoringOpen, this.scoringGroup.open);
+            });
+        }
+
         this._addDOMListener(this.galleryList, 'click', (e) => this._onGalleryClick(e));
 
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
@@ -269,6 +316,12 @@ export class ExploreComponent extends BaseComponent {
             this.embeddingStatusEl.dataset.status = status;
             this.embeddingStatusEl.textContent = EMBEDDING_STATUS_TEXT[status] || '';
         }
+        if (this.embeddingModelField) this.embeddingModelField.hidden = !payload.enabled;
+    }
+
+    _updatePresetChip(presetKey) {
+        const chip = this.element.querySelector('[data-field="preset-chip"]');
+        if (chip) chip.textContent = presetKey === 'custom' ? 'Custom' : (SCORING_PRESETS[presetKey]?.label || '');
     }
 
     _readICLabels() {
@@ -283,12 +336,28 @@ export class ExploreComponent extends BaseComponent {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Select at least one initial condition to explore.', type: 'error' });
             return;
         }
+        // v3.1 custom objective. Weights that sum to zero over the terms a run can actually
+        // measure would score every candidate 0 and bank nothing — refuse loudly instead.
+        const scoring = this.scoringPanel.getScoring();
+        const embeddingsOn = !!this.embeddingToggle?.checked;
+        const effectiveKeys = embeddingsOn ? WEIGHT_KEYS : WEIGHT_KEYS.filter((k) => k !== 'openEndedness');
+        if (effectiveKeys.every((k) => (scoring.weights[k] || 0) === 0)) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: embeddingsOn
+                    ? 'All scoring weights are 0 — nothing would ever be banked. Raise at least one weight.'
+                    : 'All active scoring weights are 0 (Novelty needs the CLIP objective enabled). Raise at least one other weight.',
+                type: 'error',
+            });
+            return;
+        }
         const payload = {
             mutationRate: this.sliders.rate.getValue() / 100,
             mutationMode: this.element.querySelector('input[name="explore-mutation-mode"]:checked')?.value || EXPLORE_CONFIG.mutationMode,
             evalTicks: this.sliders.ticks.getValue(),
             maxGenerations: Math.max(0, Math.floor(Number(this.budgetInput?.value) || 0)),
             icLabels,
+            scoring,
+            findThreshold: scoring.findThreshold,
         };
         // One-shot replay seed from a shared search link (see _consumeSharedSearch).
         if (this._pendingBaseSeed != null) {
@@ -350,6 +419,8 @@ export class ExploreComponent extends BaseComponent {
             this.runButtons.pause.textContent = state === 'paused' ? 'Resume' : 'Pause';
         }
         if (this.budgetInput) this.budgetInput.disabled = isRunning;
+        this.scoringPanel?.setDisabled(isRunning);
+        if (this.embeddingModelSelect) this.embeddingModelSelect.disabled = isRunning;
 
         const stateEl = this.statusEl?.querySelector('[data-field="state"]');
         const detailEl = this.statusEl?.querySelector('[data-field="detail"]');
@@ -393,6 +464,8 @@ export class ExploreComponent extends BaseComponent {
             html += `<p class="empty-state-text">Showing top ${shown.length} of ${entries.length} finds.</p>`;
         }
         this.galleryList.innerHTML = html;
+        // Best find's measured raw metrics drive the Scoring explainer curve markers (v3.1).
+        this.scoringPanel?.setMarkers(entries[0]?.rawMetrics || null);
     }
 
     _renderFind(entry, index) {
@@ -403,6 +476,11 @@ export class ExploreComponent extends BaseComponent {
         // Honest labeling (v2.4, principle 3): a confirmed long cycle is a legitimate category — tag it.
         const cyclicChip = entry.cyclic
             ? `<span class="explore-find-cyclic" title="Settles into a period-${entry.cyclic} cycle">↻${entry.cyclic}</span>`
+            : '';
+        // Honest labeling of the uniform-chaos penalty (v3.1): show the factor that scaled the score.
+        const uf = entry.perComponent?.uniformFactor;
+        const chaosChip = (entry.perComponent?.uniformUsed && typeof uf === 'number' && uf < 0.995)
+            ? `<span class="explore-find-chaos" title="${this._escape(UNIFORM_FACTOR_META.hint)}">chaos ×${uf.toFixed(2)}</span>`
             : '';
         // Visual preview (v2.6, F6). v1/old entries have no `thumb` (principle 4) — show a placeholder.
         const thumb = entry.thumb
@@ -417,7 +495,7 @@ export class ExploreComponent extends BaseComponent {
                             <span class="explore-find-score" title="Interestingness score">${score}</span>
                             <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
                             <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
-                            ${cyclicChip}
+                            ${cyclicChip}${chaosChip}
                         </div>
                         ${bars}
                         <div class="explore-find-actions">
@@ -435,7 +513,7 @@ export class ExploreComponent extends BaseComponent {
     // Debug surface: per-component score breakdown. Each bar is the component's [0,1] contribution.
     _renderComponentBars(perComponent) {
         if (!perComponent) return '';
-        const rows = COMPONENT_META.map(({ key, label, usedFlag }) => {
+        let rows = COMPONENT_META.map(({ key, label, usedFlag, hint }) => {
             // A gated term shows "n/a" unless its flag is truthy (σ with no probe; spatial terms on
             // v1/old entries that predate them — flag absent ⇒ n/a). Ungated terms always render.
             const used = !usedFlag || !!perComponent[usedFlag];
@@ -443,13 +521,26 @@ export class ExploreComponent extends BaseComponent {
             const pct = Math.round(val * 100);
             const valText = used ? val.toFixed(2) : 'n/a';
             return `
-                <div class="explore-bar-row" title="${label}: ${valText}">
+                <div class="explore-bar-row" title="${this._escape(`${label} — ${hint}`)}">
                     <span class="explore-bar-label">${label}</span>
                     <span class="explore-bar-track"><span class="explore-bar-fill" style="width:${pct}%"></span></span>
                     <span class="explore-bar-val">${valText}</span>
                 </div>
             `;
         }).join('');
+        // Uniform-chaos factor (v3.1): a multiplier on the whole score, not a weighted term — the
+        // bar shows the factor itself (full = no penalty) and turns amber when it bit.
+        if (perComponent.uniformUsed && typeof perComponent.uniformFactor === 'number') {
+            const uf = Math.max(0, Math.min(1, perComponent.uniformFactor));
+            const penalized = uf < 0.995;
+            rows += `
+                <div class="explore-bar-row" title="${this._escape(`${UNIFORM_FACTOR_META.label} — ${UNIFORM_FACTOR_META.hint}`)}">
+                    <span class="explore-bar-label">${UNIFORM_FACTOR_META.label}</span>
+                    <span class="explore-bar-track"><span class="explore-bar-fill${penalized ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(uf * 100)}%"></span></span>
+                    <span class="explore-bar-val">×${uf.toFixed(2)}</span>
+                </div>
+            `;
+        }
         return `<div class="explore-find-bars">${rows}</div>`;
     }
 

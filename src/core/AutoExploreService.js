@@ -2,6 +2,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { hexToRuleset, rulesetName } from '../utils/utils.js';
 import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from './analysis/InterestingnessScore.js';
+import { sanitizeScoring, buildScoreConfig, isDefaultScoring } from './analysis/ScoringPresets.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
 import { trajectoryNovelty, meanVector } from './analysis/EmbeddingNovelty.js';
@@ -188,6 +189,8 @@ export class AutoExploreService {
         /** Runner-up of the latest generation — the second parent for crossover breeding. */
         this.runnerUpHex = null;
         this.options = { ...EXPLORE_CONFIG };
+        /** Score config for the current run (v3.1 user-customizable scoring); defaults otherwise. */
+        this._scoreConfig = SCORE_CONFIG;
         this.archive = new BehaviorArchive();
         /** Perceptual illumination archive (v3.0): a second MAP-Elites-lite archive keyed by the
          *  foundation-model embedding, running alongside `archive`. Populated only when embeddings are
@@ -262,6 +265,12 @@ export class AutoExploreService {
         // otherwise a long screen would be "confirmed" by a shorter look — defeating screen-cheap/confirm-
         // expensive. Scale it up to match without ever shortening the configured confirm length.
         this.options.confirmTicks = Math.max(this.options.confirmTicks, this.options.evalTicks);
+        // v3.1 user-customizable scoring: `options.scoring` (weights/uniform-penalty in slider units,
+        // from the Scoring panel or a share link) overrides the default objective for this run.
+        // `options.findThreshold` rides the EXPLORE_CONFIG spread above. Absent ⇒ tuned defaults.
+        this._scoreConfig = options.scoring
+            ? buildScoreConfig(sanitizeScoring(options.scoring))
+            : SCORE_CONFIG;
         this.generation = 0;
         this.runnerUpHex = null;
         /** Best base score observed this run (for the generation-budget completion toast, v2.7). */
@@ -316,8 +325,15 @@ export class AutoExploreService {
                 evalTicks: this.options.evalTicks,
                 maxGenerations: this.options.maxGenerations,
                 icLabels: this.options.icLabels || null,
+                findThreshold: this.options.findThreshold,
             },
         };
+        // Custom scoring changes champion selection, so a replay needs it; omitted when default
+        // (short URLs, and old links keep replaying under whatever the current defaults are).
+        if (options.scoring) {
+            const scoring = sanitizeScoring(options.scoring);
+            if (!isDefaultScoring(scoring)) this._searchDescriptor.config.scoring = scoring;
+        }
         PersistenceService.saveUISetting('exploreLastSearch', this._searchDescriptor);
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('started'));
         // Fire-and-forget; the loop self-checks the run token / state on every await boundary.
@@ -406,9 +422,12 @@ export class AutoExploreService {
             return;
         }
 
-        const confirmIC = scoreSingleIC({ ...metrics, icLabel: find.icLabel });
+        // Score the re-test under the user's CURRENT scoring settings (v3.1) — the same config the
+        // next run would use — so a retested entry ranks consistently with fresh finds.
+        const scoreCfg = buildScoreConfig(sanitizeScoring(PersistenceService.loadUISetting('exploreScoring', null)));
+        const confirmIC = scoreSingleIC({ ...metrics, icLabel: find.icLabel }, scoreCfg);
         const confirmed = applyConfirmation(find.screenScore ?? oldScore, confirmIC, metrics, {
-            ...SCORE_CONFIG,
+            ...scoreCfg,
             confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod ?? EXPLORE_CONFIG.confirmCycleMaxPeriod,
             confirmCyclePenalty: this.options.confirmCyclePenalty ?? EXPLORE_CONFIG.confirmCyclePenalty,
         });
@@ -417,6 +436,7 @@ export class AutoExploreService {
             score: confirmed.finalScore,
             cyclic: confirmed.cyclic,
             perComponent: confirmIC.components,
+            rawMetrics: confirmIC.raw || null,
         });
         this._persistGallery();
         EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find, gallerySize: this.archive.size, retested: true });
@@ -568,7 +588,7 @@ export class AutoExploreService {
         const ev = await this._evaluateCandidate(worldIndex, hex, token);
         if (!ev || ev.perIC.length === 0 || token !== this._runToken) return null;
 
-        const scored = scoreCandidate(ev.perIC);
+        const scored = scoreCandidate(ev.perIC, this._scoreConfig);
         const screenScore = scored.score;
         const winMetrics = ev.perIC[scored.winningIC] || {};
 
@@ -601,9 +621,9 @@ export class AutoExploreService {
                 }
             }
 
-            const confirmIC = scoreSingleIC({ ...confirmMetrics, icLabel: winMetrics.icLabel });
+            const confirmIC = scoreSingleIC({ ...confirmMetrics, icLabel: winMetrics.icLabel }, this._scoreConfig);
             confirmed = applyConfirmation(screenScore, confirmIC, confirmMetrics, {
-                ...SCORE_CONFIG,
+                ...this._scoreConfig,
                 confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod,
                 confirmCyclePenalty: this.options.confirmCyclePenalty,
             });
@@ -810,11 +830,19 @@ export class AutoExploreService {
             const oe = embedding.openEndedness;
             perComponent = {
                 ...scored.perComponent,
-                openEndedness: oe / (oe + SCORE_CONFIG.openEndednessHalfSat),
+                openEndedness: oe / (oe + this._scoreConfig.openEndednessHalfSat),
                 openEndednessUsed: true,
             };
         }
+        // Raw metric inputs of the winning IC (v3.1) — feed the UI's per-term explainer curve
+        // markers. The confirmation-measured open-endedness overlays the screen value, matching
+        // the perComponent overlay above. Legacy entries simply lack the field.
+        let rawMetrics = (scored.perIC && scored.perIC[scored.winningIC]) ? scored.perIC[scored.winningIC].raw : null;
+        if (embedding && Number.isFinite(embedding.openEndedness)) {
+            rawMetrics = { ...(rawMetrics || {}), openEndedness: embedding.openEndedness };
+        }
         return {
+            rawMetrics,
             hex: ev.hex,
             mnemonic: rulesetName(ev.hex),
             score: confirmed.finalScore,
@@ -874,9 +902,16 @@ export class AutoExploreService {
 
     // --- Perceptual illumination archive persistence (v3.0; compact, no raw vectors) --------------
 
+    /** Model id namespacing the perceptual archive: cells from different CLIP models are not comparable. */
+    _embeddingModelId() {
+        return (this.embeddingProvider && this.embeddingProvider.getModelId)
+            ? this.embeddingProvider.getModelId()
+            : null;
+    }
+
     _loadEmbeddingGallery() {
         try {
-            this.embeddingArchive.loadEntries(PersistenceService.loadEmbeddingGallery());
+            this.embeddingArchive.loadEntries(PersistenceService.loadEmbeddingGallery(this._embeddingModelId()));
         } catch (e) {
             console.warn('AutoExploreService: failed to load embedding gallery', e);
         }
@@ -884,14 +919,27 @@ export class AutoExploreService {
 
     _persistEmbeddingGallery() {
         const entries = this.embeddingArchive.getEntries().slice(0, this.options.maxGalleryEntries);
-        PersistenceService.saveEmbeddingGallery(entries);
+        PersistenceService.saveEmbeddingGallery(entries, this._embeddingModelId());
+    }
+
+    /**
+     * The perceptual (CLIP) model changed: SimHash cell keys — and even the projection's
+     * dimensionality — are model-specific, so the in-memory archive must be REPLACED (a fresh
+     * instance re-derives its projection lazily from the next vector's dim; clear() would keep a
+     * stale-dim projection and silently mis-hash). The persisted gallery self-invalidates on the
+     * modelId mismatch at load. Only valid while idle (WorldManager guards this).
+     */
+    onEmbeddingModelChanged() {
+        this.embeddingArchive = new EmbeddingArchive();
+        this._loadEmbeddingGallery();
+        this._persistEmbeddingGallery();
     }
 
     clearGallery() {
         this.archive.clear();
         this.embeddingArchive.clear();
         PersistenceService.saveExploreGallery([]);
-        PersistenceService.saveEmbeddingGallery([]);
+        PersistenceService.saveEmbeddingGallery([], this._embeddingModelId());
         EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: null, gallerySize: 0, cleared: true });
     }
 }

@@ -544,6 +544,123 @@ describe('applyConfirmation (v2.4 helper)', () => {
     });
 });
 
+// --- v3.1: uniform-chaos penalty + custom weights ------------------------------
+
+describe('scoreSingleIC — uniform-chaos penalty (v3.1)', () => {
+    it('penalizes high-coverage structureless churn (factor < 1)', () => {
+        const r = scoreSingleIC(uniformChurn()); // finalRatio 0.9, spatialOrder ≈ 0
+        expect(r.components.uniformUsed).toBe(true);
+        expect(r.components.uniformFactor).toBeLessThan(1);
+        expect(r.components.uniformFactor).toBeGreaterThan(0);
+    });
+
+    it('leaves low-coverage worlds untouched (factor exactly 1 below the coverage ramp)', () => {
+        const r = scoreSingleIC(structuredCritical()); // finalRatio 0.3 < uniformCoverageMin
+        expect(r.components.uniformUsed).toBe(true);
+        expect(r.components.uniformFactor).toBe(1);
+    });
+
+    it('structure rescues a dense world: same coverage, more structure ⇒ milder factor', () => {
+        const dense = uniformChurn();
+        const structuredDense = scoreSingleIC({ ...dense, spatialOrder: { mean: 0.4, last: 0.4 } });
+        const churn = scoreSingleIC(dense);
+        expect(structuredDense.components.uniformFactor).toBeGreaterThan(churn.components.uniformFactor);
+    });
+
+    it('strength 0 reproduces the pre-v3.1 score exactly', () => {
+        const cfg = { ...SCORE_CONFIG, uniformPenaltyStrength: 0 };
+        const off = scoreSingleIC(uniformChurn(), cfg);
+        const on = scoreSingleIC(uniformChurn());
+        expect(off.components.uniformFactor).toBe(1);
+        expect(on.score).toBeCloseTo(off.score * on.components.uniformFactor, 12);
+    });
+
+    it('is skipped (factor 1, unused) when spatialOrder is absent (legacy metrics)', () => {
+        const m = uniformChurn();
+        delete m.spatialOrder;
+        const r = scoreSingleIC(m);
+        expect(r.components.uniformUsed).toBe(false);
+        expect(r.components.uniformFactor).toBe(1);
+    });
+
+    it('kill path reports a neutral factor', () => {
+        const r = scoreSingleIC(exploding());
+        expect(r.components.uniformFactor).toBe(1);
+        expect(r.components.uniformUsed).toBe(false);
+        expect(r.raw).toBeNull();
+    });
+});
+
+describe('scoreSingleIC — raw metric inputs (v3.1 explainer markers)', () => {
+    it('exposes the raw inputs behind each term, null-gated on absence', () => {
+        const r = scoreSingleIC(structuredCritical());
+        expect(r.raw.sigma).toBe(1.0);
+        expect(r.raw.blockEntropyMean).toBeCloseTo(0.4, 10);
+        expect(r.raw.cv).toBe(1.0);
+        expect(r.raw.spatialOrderMean).toBe(0.5);
+        expect(r.raw.finalRatio).toBeCloseTo(0.3, 10);
+        expect(r.raw.transportSpeed).toBeNull();   // no transport field
+        expect(r.raw.openEndedness).toBeNull();    // embeddings off
+    });
+});
+
+describe('Score v3.1 — real fixtures (the strengthened chaos regression)', () => {
+    const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
+    const churn = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' });
+
+    it('churn-sparse now screens BELOW the find threshold (0.45) with margin', () => {
+        expect(churn.score).toBeLessThan(0.35);
+    });
+
+    it('the penalty actually bit on churn (coverage 0.917, structure ≈ 0.13)', () => {
+        expect(churn.components.uniformFactor).toBeLessThan(0.7);
+    });
+
+    it('gliders-chaos is untouched by the penalty (coverage below the ramp)', () => {
+        const cfg = { ...SCORE_CONFIG, uniformPenaltyStrength: 0 };
+        const unpenalized = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }, cfg).score;
+        expect(glidersChaos).toBeCloseTo(unpenalized, 12);
+    });
+
+    it('the gliders−churn gap widened to ≥0.25 (was ≥0.10)', () => {
+        expect(glidersChaos - churn.score).toBeGreaterThanOrEqual(0.25);
+    });
+});
+
+describe('scoreSingleIC — custom weights (v3.1 sliders)', () => {
+    it('is renormalization-invariant: scaling every weight leaves the score unchanged', () => {
+        const scaled = Object.fromEntries(Object.entries(SCORE_CONFIG.weights).map(([k, v]) => [k, v * 7]));
+        const a = scoreSingleIC(structuredCritical()).score;
+        const b = scoreSingleIC(structuredCritical(), { ...SCORE_CONFIG, weights: scaled }).score;
+        expect(b).toBeCloseTo(a, 12);
+    });
+
+    it('a zero weight removes the term\'s influence entirely', () => {
+        const base = structuredCritical();
+        const noSigmaWeight = { ...SCORE_CONFIG, weights: { ...SCORE_CONFIG.weights, criticality: 0 } };
+        const goodSigma = scoreSingleIC({ ...base, sigma: 1.0 }, noSigmaWeight).score;
+        const badSigma = scoreSingleIC({ ...base, sigma: 50 }, noSigmaWeight).score;
+        expect(goodSigma).toBeCloseTo(badSigma, 12);
+    });
+
+    it('all-zero weights yield score 0 without NaN', () => {
+        const zero = Object.fromEntries(Object.keys(SCORE_CONFIG.weights).map((k) => [k, 0]));
+        const r = scoreSingleIC(structuredCritical(), { ...SCORE_CONFIG, weights: zero });
+        expect(r.score).toBe(0);
+        expect(Number.isNaN(r.score)).toBe(false);
+    });
+
+    it('maxing a single weight makes that term dominate the ranking', () => {
+        const onlyStructure = {
+            ...SCORE_CONFIG,
+            weights: { ...Object.fromEntries(Object.keys(SCORE_CONFIG.weights).map((k) => [k, 0])), spatialStructure: 1 },
+        };
+        const structured = scoreSingleIC(structuredCritical(), onlyStructure).score;
+        const churn = scoreSingleIC({ ...uniformChurn(), finalRatio: 0.3 }, onlyStructure).score; // low coverage: isolate the weight effect
+        expect(structured).toBeGreaterThan(churn * 5);
+    });
+});
+
 describe('SCORE_CONFIG is the single tuning surface', () => {
     it('an injected config with a wider criticality τ broadens the σ tolerance', () => {
         const cfg = { ...SCORE_CONFIG, criticalityTau: 2.0 };

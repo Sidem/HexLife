@@ -1,28 +1,22 @@
 import { IAnalysisPlugin } from './IAnalysisPlugin.js';
 import { EVENTS } from '../../../services/EventBus.js';
 import * as PersistenceService from '../../../services/PersistenceService.js';
+import { COMPONENT_META, UNIFORM_FACTOR_META, renderTermExplainer } from '../scoringTermMeta.js';
 
 /**
- * On-demand "interestingness" metrics for the selected world. The eight component values
- * (σ / Entropy / Flux / Diversity / Structure / Heterog. / Temporal / Transport) are the same ones Auto-Explore scores a
- * candidate on, but they're only produced by an evaluation burst — so rather than computing them live
- * on the hot tick path, this plugin runs ONE burst on demand (the Measure button) via
- * WorldManager.measureSelectedWorld (non-destructive: it snapshots and restores the world) and renders
- * the breakdown. The σ damage probe is the expensive part, so it's behind a toggle.
+ * On-demand "interestingness" metrics for the selected world. The component values are the same
+ * ones Auto-Explore scores a candidate on (shared {@link COMPONENT_META}), but they're only
+ * produced by an evaluation burst — so rather than computing them live on the hot tick path, this
+ * plugin runs ONE burst on demand (the Measure button) via WorldManager.measureSelectedWorld
+ * (non-destructive: it snapshots and restores the world) and renders the breakdown. The σ damage
+ * probe is the expensive part, so it's behind a toggle. Scored under the user's current Scoring
+ * settings (v3.1), so this panel always agrees with what Auto-Explore would compute right now.
+ *
+ * Educational surface (v3.1): every bar row is clickable — it expands the term's explainer with
+ * the actual score curve and a marker at THIS measurement's raw value.
  *
  * Mirrors the gallery's per-component bars (same labels + CSS classes) so the two surfaces read alike.
  */
-const COMPONENT_META = [
-    { key: 'criticality', label: 'σ', usedFlag: 'criticalityUsed', hint: 'Edge-of-chaos: how a one-cell perturbation spreads (peaks at σ≈1).' },
-    { key: 'entropyBand', label: 'Entropy', hint: 'Mid-band block entropy — structured, not uniform, not noise.' },
-    { key: 'fluctuation', label: 'Flux', hint: 'Burstiness of how many cells change per tick (susceptibility proxy).' },
-    { key: 'ruleDiversity', label: 'Diversity', hint: 'Shannon spread of which of the 128 rules actually fire.' },
-    { key: 'spatialStructure', label: 'Structure', usedFlag: 'spatialUsed', hint: 'Join-count spatial order — domains/gliders vs salt-and-pepper.' },
-    { key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed', hint: 'Order and disorder coexisting in different regions.' },
-    { key: 'temporalEntropyVariance', label: 'Temporal', usedFlag: 'temporalVarUsed', hint: 'Entropy swinging over time (Wuensche) — complex rules, not steady order or chaos.' },
-    { key: 'transport', label: 'Transport', usedFlag: 'transportUsed', hint: 'Active-cell centroid drift — coherent motion (gliders/spaceships) vs a pinned churn.' },
-    { key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed', hint: 'Perceptual (CLIP) trajectory novelty — only measured by Auto-Explore when the embedding objective is on; n/a here.' },
-];
 
 const SETTING_PROBE = 'analysisMeasureProbe';
 const SETTING_TICKS = 'analysisMeasureTicks';
@@ -43,7 +37,7 @@ export class InterestingnessMetricsPlugin extends IAnalysisPlugin {
 
         this.mountPoint.innerHTML = `
             <div class="interestingness-metrics-plugin">
-                <p class="im-blurb">Measure the selected world's dynamics — the same eight terms Auto-Explore ranks rulesets on. Runs one short evaluation burst; the world is restored afterwards.</p>
+                <p class="im-blurb">Measure the selected world's dynamics — the same terms Auto-Explore ranks rulesets on, scored under your current Scoring settings. Runs one short evaluation burst; the world is restored afterwards. Click a result row to see how that term's score is computed.</p>
                 <div class="im-controls">
                     <label class="im-ticks-field">Ticks:
                         <input type="number" id="im-ticks" min="40" max="5000" step="20" value="${ticks}">
@@ -66,6 +60,14 @@ export class InterestingnessMetricsPlugin extends IAnalysisPlugin {
 
         this._onMeasureClick = () => this._measure();
         this.uiElements.measureBtn.addEventListener('click', this._onMeasureClick);
+        // Expandable per-term explainers (v3.1): click a bar row to see what the term measures and
+        // where this measurement landed on its score curve.
+        this._onResultsClick = (e) => {
+            const row = e.target.closest('.explore-bar-row[data-term]');
+            if (!row || !this.uiElements.results.contains(row)) return;
+            this._toggleExplainer(row);
+        };
+        this.uiElements.results.addEventListener('click', this._onResultsClick);
         this._onProbeChange = () => PersistenceService.saveUISetting(SETTING_PROBE, this.uiElements.probeInput.checked);
         this.uiElements.probeInput.addEventListener('change', this._onProbeChange);
         this._onTicksChange = () => PersistenceService.saveUISetting(SETTING_TICKS, this._readTicks());
@@ -131,19 +133,50 @@ export class InterestingnessMetricsPlugin extends IAnalysisPlugin {
     // Reuse the gallery's bar markup (explore-* classes) so both surfaces look identical.
     _renderComponentBars(components) {
         if (!components) return '';
-        const rows = COMPONENT_META.map(({ key, label, usedFlag, hint }) => {
+        let rows = COMPONENT_META.map(({ key, label, usedFlag, hint }) => {
             const used = !usedFlag || !!components[usedFlag];
             const val = used ? Math.max(0, Math.min(1, components[key] || 0)) : 0;
             const pct = Math.round(val * 100);
             const valText = used ? val.toFixed(2) : 'n/a';
             return `
-                <div class="explore-bar-row" title="${label} — ${hint}">
+                <div class="explore-bar-row explore-bar-row--expandable" data-term="${key}" title="${label} — ${hint} (click to explain)">
                     <span class="explore-bar-label">${label}</span>
                     <span class="explore-bar-track"><span class="explore-bar-fill" style="width:${pct}%"></span></span>
                     <span class="explore-bar-val">${valText}</span>
-                </div>`;
+                </div>
+                <div class="im-term-explainer" data-term-explainer="${key}" hidden></div>`;
         }).join('');
+        // Uniform-chaos factor (v3.1): multiplies the whole score; amber when it bit.
+        if (components.uniformUsed && typeof components.uniformFactor === 'number') {
+            const uf = Math.max(0, Math.min(1, components.uniformFactor));
+            const penalized = uf < 0.995;
+            rows += `
+                <div class="explore-bar-row explore-bar-row--expandable" data-term="uniformFactor" title="${UNIFORM_FACTOR_META.label} — ${UNIFORM_FACTOR_META.hint} (click to explain)">
+                    <span class="explore-bar-label">${UNIFORM_FACTOR_META.label}</span>
+                    <span class="explore-bar-track"><span class="explore-bar-fill${penalized ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(uf * 100)}%"></span></span>
+                    <span class="explore-bar-val">×${uf.toFixed(2)}</span>
+                </div>
+                <div class="im-term-explainer" data-term-explainer="uniformFactor" hidden></div>`;
+        }
         return `<div class="explore-find-bars">${rows}</div>`;
+    }
+
+    _toggleExplainer(row) {
+        const term = row.dataset.term;
+        const box = this.uiElements.results.querySelector(`[data-term-explainer="${term}"]`);
+        if (!box) return;
+        const open = box.hidden;
+        if (open && !box.innerHTML) {
+            if (term === 'uniformFactor') {
+                box.innerHTML = renderTermExplainer(UNIFORM_FACTOR_META, null, { showWeightSemantics: false });
+            } else {
+                const meta = COMPONENT_META.find((m) => m.key === term);
+                const raw = this.lastResult?.raw?.[meta?.rawKey];
+                if (meta) box.innerHTML = renderTermExplainer(meta, raw ?? null, { showWeightSemantics: false });
+            }
+        }
+        box.hidden = !open;
+        row.classList.toggle('explainer-open', open);
     }
 
     onDataUpdate() { /* on-demand only — no live stream consumed */ }
@@ -160,6 +193,7 @@ export class InterestingnessMetricsPlugin extends IAnalysisPlugin {
         if (this.uiElements.measureBtn) this.uiElements.measureBtn.removeEventListener('click', this._onMeasureClick);
         if (this.uiElements.probeInput) this.uiElements.probeInput.removeEventListener('change', this._onProbeChange);
         if (this.uiElements.ticksInput) this.uiElements.ticksInput.removeEventListener('change', this._onTicksChange);
+        if (this.uiElements.results) this.uiElements.results.removeEventListener('click', this._onResultsClick);
         this.uiElements = {};
         this.lastResult = null;
         super.destroy();

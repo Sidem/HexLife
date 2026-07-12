@@ -93,6 +93,26 @@
  * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
  * @property {boolean} transportUsed   Whether transport.meanSpeed was present and the transport term counted (v2.9).
  * @property {boolean} openEndednessUsed Whether an embedding trajectory was present and the perceptual term counted (v3.0).
+ * @property {number} uniformFactor  Multiplicative uniform-chaos factor applied to the combined score
+ *   (v3.1): 1 = no penalty, lower = high-coverage structureless churn. Not a weighted term.
+ * @property {boolean} uniformUsed   Whether the uniform-chaos penalty could be evaluated (needs
+ *   finalRatio + the v2.1 spatialOrder metric; false on legacy metrics ⇒ factor forced to 1).
+ */
+
+/**
+ * Raw metric inputs behind each graded term, for UI explainers that plot the term's shape function
+ * with a marker at the measured value (v3.1). Fields are null when the metric is absent.
+ * @typedef {object} RawTermInputs
+ * @property {number|null} sigma             Damage-spreading σ (criticality input).
+ * @property {number|null} blockEntropyMean  Mean block entropy (entropyBand input).
+ * @property {number|null} cv                Changed-count CV (fluctuation input).
+ * @property {number|null} ruleDiversityNorm Normalized rule-usage Shannon entropy (ruleDiversity input).
+ * @property {number|null} spatialOrderMean  Mean spatial-order statistic (spatialStructure input).
+ * @property {number|null} spatialVariance   Across-block surprisal variance (spatialHeterogeneity input).
+ * @property {number|null} temporalVariance  Temporal block-entropy variance (temporalEntropyVariance input).
+ * @property {number|null} transportSpeed    Mean centroid drift speed (transport input).
+ * @property {number|null} openEndedness     Raw trajectory novelty (openEndedness input).
+ * @property {number|null} finalRatio        Final active-cell ratio (uniform-chaos penalty input).
  */
 
 /**
@@ -102,6 +122,7 @@
  * @property {boolean} killed              True if a hard kill signal fired (score forced to 0).
  * @property {string|null} killReason      'extinct' | 'saturated' | 'frozen' | 'short-cycle' | null.
  * @property {string|null} icLabel
+ * @property {RawTermInputs|null} raw      Raw metric inputs per term (v3.1; null on the kill path).
  */
 
 /**
@@ -222,6 +243,28 @@ export const SCORE_CONFIG = {
      *  similar in a vision-model embedding. */
     openEndednessHalfSat: 0.08,
 
+    // --- Uniform-chaos penalty (v3.1): a MULTIPLICATIVE factor on the combined score, not a tenth
+    // weighted term. Rationale (measured on tests/fixtures/exploreEvalFixtures.json): homogeneous
+    // full-coverage churn maxes five of the nine graded terms (criticality≈1, entropyBand≈1,
+    // fluctuation≈0.81, heterogeneity≈0.84), so churn_sparse_160 lands at ≈0.49 — ABOVE the 0.45
+    // findThreshold — and floods the gallery whenever confirmation misses its cycle. A weighted
+    // coverage term cannot fix this: drop-and-renormalize dilutes it (weight 0.12→0.20 only moves
+    // churn to 0.448→0.425, within noise of the threshold). The multiplicative factor
+    //   1 − strength · covFrac · (1 − spatialStructure),
+    //   covFrac = clamp01((finalRatio − uniformCoverageMin) / (uniformCoverageMax − uniformCoverageMin))
+    // is decisive instead: churn (coverage 0.917, structure 0.13) → ×0.566 → 0.28, while
+    // gliders_chaos (coverage < 0.5) is untouched (factor 1) — the gliders−churn gap widens from
+    // 0.20 to 0.41. Structure rescues legitimately dense rules by design (coverage 0.85 at
+    // structure 0.6 → only ×0.8). Mirrors the confirmCyclePenalty pattern: an honest, surfaced,
+    // user-tunable multiplier rather than silent rejection. Skipped (factor 1) when finalRatio or
+    // the v2.1 spatialOrder metric is absent (legacy metrics).
+    /** Penalty strength in [0,1]: 0 disables; 1 can zero a fully uniform blanket of chaos. */
+    uniformPenaltyStrength: 0.5,
+    /** finalRatio where the coverage ramp starts (below this the penalty is always 0). */
+    uniformCoverageMin: 0.5,
+    /** finalRatio where coverage counts as fully "blanketed" (covFrac saturates at 1). */
+    uniformCoverageMax: 0.8,
+
     // --- Confirmation pass (v2.4 two-stage eval; consumed by applyConfirmation). The operational
     // copies live in AutoExploreService.EXPLORE_CONFIG and are passed through; these are the defaults
     // that keep the pure helper self-contained and unit-testable. ---
@@ -315,10 +358,13 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 temporalVarUsed: false,
                 transportUsed: false,
                 openEndednessUsed: false,
+                uniformFactor: 1,
+                uniformUsed: false,
             },
             killed: true,
             killReason,
             icLabel,
+            raw: null,
         };
     }
 
@@ -409,7 +455,20 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += openEndedness * w.openEndedness;
         den += w.openEndedness;
     }
-    const score = den > 0 ? num / den : 0;
+    // --- Uniform-chaos penalty (v3.1): multiplicative suppression of high-coverage structureless
+    // churn — see the SCORE_CONFIG rationale. Needs finalRatio AND the v2.1 spatialOrder metric
+    // (the structure term is what rescues dense-but-structured rules); factor 1 otherwise.
+    const uniformUsed = hasSpatialOrder && Number.isFinite(metrics.finalRatio);
+    let uniformFactor = 1;
+    if (uniformUsed && cfg.uniformPenaltyStrength > 0) {
+        const covSpan = cfg.uniformCoverageMax - cfg.uniformCoverageMin;
+        const covFrac = covSpan > 0
+            ? Math.min(1, Math.max(0, (/** @type {number} */(metrics.finalRatio) - cfg.uniformCoverageMin) / covSpan))
+            : (/** @type {number} */(metrics.finalRatio) >= cfg.uniformCoverageMax ? 1 : 0);
+        uniformFactor = 1 - cfg.uniformPenaltyStrength * covFrac * (1 - spatialStructure);
+    }
+
+    const score = den > 0 ? (num / den) * uniformFactor : 0;
 
     return {
         score,
@@ -418,10 +477,23 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
             spatialStructure, spatialHeterogeneity, temporalEntropyVariance, transport, openEndedness,
             criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
             openEndednessUsed: hasOpenEndedness,
+            uniformFactor, uniformUsed,
         },
         killed: false,
         killReason: null,
         icLabel,
+        raw: {
+            sigma: criticalityUsed ? /** @type {number} */(sigma) : null,
+            blockEntropyMean: metrics.blockEntropy ? be : null,
+            cv: metrics.changed ? cv : null,
+            ruleDiversityNorm: metrics.ruleUsageDelta ? ruleUsageDiversity(metrics.ruleUsageDelta) : null,
+            spatialOrderMean: hasSpatialOrder ? /** @type {number} */(soMean) : null,
+            spatialVariance: hasSpatialVar ? /** @type {number} */(sv) : null,
+            temporalVariance: hasTemporalVar ? /** @type {number} */(tv) : null,
+            transportSpeed: hasTransport ? /** @type {number} */(tp) : null,
+            openEndedness: hasOpenEndedness ? /** @type {number} */(oe) : null,
+            finalRatio: Number.isFinite(metrics.finalRatio) ? /** @type {number} */(metrics.finalRatio) : null,
+        },
     };
 }
 
@@ -451,6 +523,7 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
                 openEndedness: 0,
                 criticalityUsed: false, spatialUsed: false, temporalVarUsed: false, transportUsed: false,
                 openEndednessUsed: false,
+                uniformFactor: 1, uniformUsed: false,
             },
             winningIC: -1,
         };

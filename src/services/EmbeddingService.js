@@ -37,6 +37,30 @@ export const EMBEDDING_CONFIG = {
     embedTimeoutMs: 20000,
 };
 
+/**
+ * Vetted transformers.js-compatible CLIP image encoders the UI offers (v3.1). Every entry works
+ * with the worker's `CLIPVisionModelWithProjection` + `AutoProcessor` load path unchanged; they
+ * differ in download size, inference speed, and embedding fidelity/dimensionality. Sizes are the
+ * q8-quantized vision-encoder ONNX weights fetched (once, then browser-cached) from the HF Hub.
+ */
+export const EMBEDDING_MODELS = [
+    {
+        id: 'Xenova/clip-vit-base-patch16',
+        label: 'CLIP ViT-B/16 — balanced (default)',
+        detail: '~90 MB download, 512-D embeddings. The tuned default.',
+    },
+    {
+        id: 'Xenova/clip-vit-base-patch32',
+        label: 'CLIP ViT-B/32 — faster, coarser',
+        detail: '~85 MB download, 512-D embeddings. Coarser patches: quicker, less spatial detail.',
+    },
+    {
+        id: 'Xenova/clip-vit-large-patch14',
+        label: 'CLIP ViT-L/14 — best quality, heavy',
+        detail: '~300 MB download, 768-D embeddings. WebGPU strongly recommended.',
+    },
+];
+
 /** Coarse provider status, surfaced to the UI via {@link EVENTS.EMBEDDING_STATUS_CHANGED}. */
 export const EMBEDDING_STATUS = Object.freeze({
     DISABLED: 'disabled', // toggle off (the default)
@@ -65,6 +89,9 @@ export class EmbeddingService {
         this._reqId = 0;
         /** @type {Map<number, (v: Float32Array|null) => void>} pending embed resolvers, keyed by request id. */
         this._pending = new Map();
+        /** Worker generation: bumped by every teardown so a stale init timeout/error from a
+         *  previous worker (e.g. after a model switch mid-load) can't touch the current one. */
+        this._initToken = 0;
     }
 
     /** @returns {boolean} */
@@ -75,6 +102,31 @@ export class EmbeddingService {
     /** @returns {string} One of EMBEDDING_STATUS. */
     getStatus() {
         return this.status;
+    }
+
+    /** @returns {string} The active model id (namespaces the perceptual archive). */
+    getModelId() {
+        return this.config.modelId;
+    }
+
+    /**
+     * Switch to a different embedding model (v3.1). Tears the current worker down (resolving any
+     * in-flight embeds null) and — when enabled — kicks off a fresh lazy load of the new model.
+     * The caller (WorldManager) is responsible for invalidating the model-specific perceptual
+     * archive and for refusing the switch mid-run. No-op for the current or an unknown id.
+     * @param {string} modelId One of {@link EMBEDDING_MODELS}.
+     */
+    setModel(modelId) {
+        if (modelId === this.config.modelId) return;
+        if (!EMBEDDING_MODELS.some((m) => m.id === modelId)) return;
+        this._teardown();
+        this.config.modelId = modelId;
+        if (this.enabled) {
+            this._setStatus(EMBEDDING_STATUS.LOADING);
+            this.ensureReady();
+        } else {
+            this._setStatus(EMBEDDING_STATUS.DISABLED);
+        }
     }
 
     _setStatus(status, message) {
@@ -113,9 +165,16 @@ export class EmbeddingService {
 
         this._readyPromise = new Promise((resolve) => {
             let settled = false;
+            const token = this._initToken;
             const finish = (ok, message) => {
                 if (settled) return;
                 settled = true;
+                if (token !== this._initToken) {
+                    // This load was superseded by a teardown (disable / model switch) — resolve the
+                    // stale promise without touching the CURRENT worker or status.
+                    resolve(false);
+                    return;
+                }
                 if (ok) {
                     this._setStatus(EMBEDDING_STATUS.READY);
                 } else {
@@ -221,6 +280,7 @@ export class EmbeddingService {
     }
 
     _teardown() {
+        this._initToken++;
         if (this.worker) {
             try { this.worker.terminate(); } catch { /* ignore */ }
             this.worker = null;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EmbeddingService, EMBEDDING_STATUS } from '../src/services/EmbeddingService.js';
+import { EmbeddingService, EMBEDDING_STATUS, EMBEDDING_MODELS, EMBEDDING_CONFIG } from '../src/services/EmbeddingService.js';
 
 /** A fake module worker: records posted messages, lets a test push worker→host messages. */
 function makeFakeWorker() {
@@ -162,5 +162,91 @@ describe('EmbeddingService — enable/disable lifecycle', () => {
         const p = svc.embed(frame);
         svc.dispose();
         expect(await p).toBeNull();
+    });
+});
+
+// --- v3.1: user-selectable CLIP checkpoint -----------------------------------
+
+describe('EmbeddingService - model selection (v3.1)', () => {
+    it('defaults to the first vetted model and exposes it via getModelId', () => {
+        const { svc } = makeService(true);
+        expect(EMBEDDING_MODELS.some((m) => m.id === EMBEDDING_CONFIG.modelId)).toBe(true);
+        expect(svc.getModelId()).toBe(EMBEDDING_CONFIG.modelId);
+    });
+
+    it('setModel tears the old worker down and INITs a fresh one with the new id', async () => {
+        const { svc, worker } = makeService(true);
+        const ready = svc.ensureReady();
+        worker().emit({ type: 'READY' });
+        await ready;
+        const oldWorker = worker();
+
+        const nextId = EMBEDDING_MODELS[1].id;
+        svc.setModel(nextId);
+        expect(oldWorker.terminated).toBe(true);
+        expect(svc.getModelId()).toBe(nextId);
+        expect(svc.getStatus()).toBe(EMBEDDING_STATUS.LOADING);
+        // setModel kicks off a fresh lazy load: a NEW worker got INIT with the new model id.
+        const newWorker = worker();
+        expect(newWorker).not.toBe(oldWorker);
+        expect(newWorker.lastOfType('INIT').modelId).toBe(nextId);
+        newWorker.emit({ type: 'READY' });
+        expect(await svc.ensureReady()).toBe(true);
+    });
+
+    it('resolves in-flight embeds null on a model switch', async () => {
+        const { svc, worker } = makeService(true);
+        const ready = svc.ensureReady();
+        worker().emit({ type: 'READY' });
+        await ready;
+
+        const p = svc.embed(frame);
+        svc.setModel(EMBEDDING_MODELS[1].id);
+        expect(await p).toBeNull();
+    });
+
+    it('is a no-op for the current id or an unknown id', async () => {
+        const { svc, worker } = makeService(true);
+        const ready = svc.ensureReady();
+        worker().emit({ type: 'READY' });
+        await ready;
+        const w = worker();
+
+        svc.setModel(svc.getModelId());
+        expect(w.terminated).toBe(false);
+        svc.setModel('Evil/unvetted-model');
+        expect(w.terminated).toBe(false);
+        expect(svc.getModelId()).toBe(EMBEDDING_CONFIG.modelId);
+    });
+
+    it('while disabled, setModel swaps the id without spawning a worker', () => {
+        const { svc, worker } = makeService(false);
+        svc.setModel(EMBEDDING_MODELS[2].id);
+        expect(svc.getModelId()).toBe(EMBEDDING_MODELS[2].id);
+        expect(svc.getStatus()).toBe(EMBEDDING_STATUS.DISABLED);
+        expect(worker()).toBeNull();
+    });
+
+    it('a stale init timeout from a superseded load cannot wreck the new worker (token guard)', async () => {
+        vi.useFakeTimers();
+        try {
+            const { svc, worker } = makeService(true, { initTimeoutMs: 100 });
+            const p1 = svc.ensureReady(); // load #1 in flight, never answered
+            const w1 = worker();
+            svc.setModel(EMBEDDING_MODELS[1].id); // supersedes load #1, starts load #2
+            const w2 = worker();
+            w2.emit({ type: 'READY' });
+            expect(await svc.ensureReady()).toBe(true);
+            expect(svc.getStatus()).toBe(EMBEDDING_STATUS.READY);
+
+            // Load #1's timeout fires AFTER the switch: it must not touch worker #2 or the status.
+            await vi.advanceTimersByTimeAsync(150);
+            expect(await p1).toBe(false); // the stale promise resolves false...
+            expect(svc.getStatus()).toBe(EMBEDDING_STATUS.READY); // ...without clobbering status
+            expect(w2.terminated).toBe(false);
+            expect(w1.terminated).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
