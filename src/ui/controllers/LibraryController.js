@@ -1,6 +1,7 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { rulesetName } from '../../utils/utils.js';
+import { encodePack, mergeRulesets } from '../../services/LibraryPackCodec.js';
 
 /** Current personal-ruleset entry schema. v2 adds the paired initial condition + thumbnail. */
 export const RULESET_SCHEMA_VERSION = 2;
@@ -216,6 +217,39 @@ export class LibraryController {
         this.userLibrary[idx] = { ...this.userLibrary[idx], thumb };
         PersistenceService.saveUserRulesets(this.userLibrary);
         if (!silent) EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
+    }
+
+    /**
+     * Serialize the entire personal library into a portable pack JSON string (schema-v2 entries,
+     * volatile id/createdAt/schemaVersion stripped, oversized thumbs dropped by the codec).
+     * @returns {string}
+     */
+    exportPackJSON() {
+        return encodePack({ rulesets: this.userLibrary });
+    }
+
+    /**
+     * Merge decoded pack rulesets into the personal library, deduping BY HEX (ids are re-minted, so
+     * they can't be the identity). Adds happen in one batch: fresh ids/timestamps, a single persist,
+     * and a single {@link EVENTS.USER_LIBRARY_CHANGED}. Idempotent — re-importing the same pack adds 0.
+     * @param {object[]} decodedRulesets Already sanitized by {@link decodePack}.
+     * @returns {{added: number, skipped: number}}
+     */
+    importRulesets(decodedRulesets) {
+        const { toAdd, added, skipped } = mergeRulesets(this.userLibrary, decodedRulesets);
+        if (toAdd.length) {
+            const stamp = Date.now();
+            const fresh = toAdd.map((entry, i) => normalizeRulesetEntry({
+                ...entry,
+                id: `${stamp}-${i}`,
+                createdAt: new Date().toISOString(),
+            }));
+            // Newest-first, matching saveUserRuleset's unshift ordering.
+            this.userLibrary = [...fresh, ...this.userLibrary];
+            PersistenceService.saveUserRulesets(this.userLibrary);
+            EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
+        }
+        return { added, skipped };
     }
 
     /**

@@ -3,9 +3,10 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
 import { ICONS } from '../icons.js';
-import { rulesetName } from '../../utils/utils.js';
+import { rulesetName, downloadFile } from '../../utils/utils.js';
 import * as InitialStateCodec from '../../services/InitialStateCodec.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { decodePack, toPublicLibraryEntry } from '../../services/LibraryPackCodec.js';
 
 /**
  * The Ruleset Library menu: load saved rulesets (public + personal) or set one
@@ -84,6 +85,9 @@ export class RulesetLibraryComponent extends BaseComponent {
                     <option value="recent">Recent</option>
                     <option value="name">Name A–Z</option>
                 </select>
+                <button class="button-icon library-pack-btn" data-action="export-pack" title="Export your rulesets as a shareable pack file" aria-label="Export rulesets to a pack file">${ICONS.download}</button>
+                <button class="button-icon library-pack-btn" data-action="import-pack" title="Import rulesets from a pack file" aria-label="Import rulesets from a pack file">${ICONS.upload}</button>
+                <input type="file" class="library-import-input" accept="application/json,.json" hidden aria-hidden="true" />
             </div>
             <div class="library-tag-filters" id="ruleset-library-tag-filters"></div>
             <div class="library-filter-tabs">
@@ -277,6 +281,10 @@ export class RulesetLibraryComponent extends BaseComponent {
                 this.filterState.sort = e.target.value;
                 this._renderPublicLibrary();
                 this._renderPersonalLibrary();
+            } else if (e.target.matches('.library-import-input')) {
+                const file = e.target.files && e.target.files[0];
+                e.target.value = ''; // allow re-importing the same file
+                if (file) this._handleImportFile(file);
             }
         });
 
@@ -284,6 +292,14 @@ export class RulesetLibraryComponent extends BaseComponent {
             const target = e.target;
             const action = target.dataset.action;
             const rulesetActionController = this.appContext.rulesetActionController;
+
+            // Pack export/import toolbar buttons (resolve past the inner SVG).
+            const packBtn = target.closest('.library-pack-btn');
+            if (packBtn) {
+                if (packBtn.dataset.action === 'export-pack') this._exportPack();
+                else libraryPane.querySelector('.library-import-input')?.click();
+                return;
+            }
 
             // Tag filter chip toggle.
             const tagChip = target.closest('[data-tag-filter]');
@@ -377,6 +393,19 @@ export class RulesetLibraryComponent extends BaseComponent {
                     });
                 }
 
+                // One-paste path into a public-library PR: emit the committed rulesets.json shape.
+                popoverActions.push({
+                    label: 'Copy as public-library JSON',
+                    callback: () => {
+                        const json = JSON.stringify(toPublicLibraryEntry(rule), null, 2);
+                        navigator.clipboard.writeText(json).then(() => {
+                            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Public-library JSON copied — paste it into a rulesets.json PR.', type: 'success' });
+                        }).catch(() => {
+                            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not access the clipboard.', type: 'error' });
+                        });
+                    }
+                });
+
                 popoverActions.push({
                     label: 'Delete',
                     callback: () => {
@@ -417,6 +446,49 @@ export class RulesetLibraryComponent extends BaseComponent {
         this._renderPersonalLibrary();
         this._scheduleThumbnailBackfill();
     };
+
+    /** Download the personal library as a dated pack file (no-op with a toast when it's empty). */
+    _exportPack() {
+        const lc = this.appContext.libraryController;
+        if (lc.getUserLibrary().length === 0) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'No saved rulesets to export yet.', type: 'info' });
+            return;
+        }
+        const date = new Date().toISOString().slice(0, 10);
+        downloadFile(`hexlife-rulesets-${date}.json`, lc.exportPackJSON(), 'application/json');
+    }
+
+    /** Read + decode a chosen pack file, then confirm-gate the merge and toast the result. */
+    async _handleImportFile(file) {
+        let decoded;
+        try {
+            decoded = decodePack(await file.text());
+        } catch (err) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Import failed: ${err.message}`, type: 'error' });
+            return;
+        }
+        const rulesets = decoded.rulesets;
+        if (rulesets.length === 0) {
+            const detail = decoded.finds.length > 0 ? ' (this pack only contains explore finds — import it from the Explore panel).' : '.';
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `No importable rulesets in that file${detail}`, type: 'info' });
+            return;
+        }
+        const preview = rulesets.slice(0, 5).map(r => `• ${r.name}`).join('\n');
+        const more = rulesets.length > 5 ? `\n…and ${rulesets.length - 5} more` : '';
+        const warnLine = decoded.warnings.length ? `\n\n${decoded.warnings.length} item(s) were cleaned up on import.` : '';
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+            title: 'Import rulesets',
+            message: `Add ${rulesets.length} ruleset(s) to your personal library? Duplicates (same rule) are skipped.\n\n${preview}${more}${warnLine}`,
+            confirmLabel: 'Import',
+            onConfirm: () => {
+                const { added, skipped } = this.appContext.libraryController.importRulesets(rulesets);
+                const msg = added > 0
+                    ? `Imported ${added} ruleset(s)${skipped ? `, skipped ${skipped} duplicate(s)` : ''}.`
+                    : `Nothing new to import — all ${skipped} already in your library.`;
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: msg, type: added > 0 ? 'success' : 'info' });
+            },
+        });
+    }
 
     destroy() {
         this._backfillHandle?.cancel();

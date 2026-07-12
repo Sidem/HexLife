@@ -127,6 +127,36 @@ Per-IC scores are combined with a soft-max (favoring each world's best IC) plus 
 
 </details>
 
+## 🤝 Sharing & Contributing Rulesets
+
+Your discoveries don't have to stay on one device. Both the **Ruleset Library** and the **Auto-Explore gallery** can export a portable **pack file** (`hexlife-pack`, versioned JSON) and import one back:
+
+- **Ruleset Library toolbar** — the ⬇ button downloads all your saved rulesets as `hexlife-rulesets-<date>.json`; the ⬆ button imports a pack (duplicates, matched by rule, are skipped).
+- **Auto-Explore gallery header** — the same ⬇ / ⬆ pair exports/imports gallery finds. Imported finds are re-scored into the archive (better scores win their behavior cell). Import is disabled while a search is running.
+
+Packs are treated as untrusted input: every entry is sanitized on import (bad rule codes are dropped, over-long text is clamped, and thumbnails over 64 KB or that aren't image data-URLs are dropped). Perceptual (CLIP embedding) cell keys are stripped on import — they're specific to the exporter's model — so a pack made with embeddings **on** imports cleanly on a device with them **off**, and scores stay honest.
+
+### Getting a ruleset into the public library (PR path)
+
+The bundled public library lives in [`src/core/library/rulesets.json`](src/core/library/rulesets.json). To contribute a rule:
+
+1. In the Ruleset Library, open a saved rule's **⋯ menu → "Copy as public-library JSON"**. This copies a single entry in the committed shape:
+
+   ```json
+   {
+     "name": "Spiral Weaver",
+     "description": "A tidy little glider gun.",
+     "tags": ["gliders", "spiral"],
+     "hex": "12482080480080006880800180010117",
+     "initialState": { "mode": "clusters", "params": { "count": 5, "density": 0.7 } },
+     "seed": 4242
+   }
+   ```
+
+2. Open a PR adding that entry to the `rulesets.json` array. **Do not include a `thumb`** — thumbnails are baked client-side on demand and cached locally, so the committed JSON stays small. `initialState`/`seed` are optional (include them when a rule only shines from a specific starting condition).
+
+Additions to the public library are curated/manual by design — there is no auto-merge.
+
 ## ⌨️ Keyboard Shortcuts
 
 <details>

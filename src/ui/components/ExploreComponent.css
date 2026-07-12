@@ -170,6 +170,12 @@
     padding-bottom: 4px;
 }
 
+.explore-gallery-actions {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+
 .explore-gallery-header h5 {
     margin: 0;
     border: none;

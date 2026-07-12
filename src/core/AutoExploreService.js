@@ -5,6 +5,7 @@ import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from '
 import { sanitizeScoring, buildScoreConfig, isDefaultScoring } from './analysis/ScoringPresets.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
+import { encodePack } from '../services/LibraryPackCodec.js';
 import { trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
 
 /**
@@ -1110,5 +1111,45 @@ export class AutoExploreService {
         PersistenceService.saveExploreGallery([]);
         PersistenceService.saveEmbeddingGallery([], this._embeddingModelId());
         EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: null, gallerySize: 0, cleared: true });
+    }
+
+    /**
+     * Serialize the current gallery (statistical archive, best-first) into a portable pack JSON
+     * string. The perceptual archive is intentionally NOT exported — its SimHash cells are
+     * model-specific and would be stripped on import anyway.
+     * @returns {string}
+     */
+    exportGalleryPackJSON() {
+        return encodePack({ finds: this.archive.getEntries() });
+    }
+
+    /**
+     * Merge decoded pack finds into the session gallery via the normal {@link BehaviorArchive.tryInsert}
+     * semantics (best-per-cell + family dedupe). The codec already stripped each find's opaque
+     * embedding `cellKey` and reset `descriptorKind: 'stats'`, so the statistical descriptor is
+     * re-derived from `metrics` here — a pack made with embeddings ON imports cleanly with them OFF.
+     * Persists once and dispatches one gallery refresh. **Refused while a run is active.**
+     * @param {object[]} decodedFinds Already sanitized by {@link decodePack}.
+     * @returns {{added: number, improved: number, rejected: number}}
+     */
+    importGalleryFinds(decodedFinds) {
+        if (this.isRunning()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the run before importing finds.', type: 'error' });
+            return { added: 0, improved: 0, rejected: 0 };
+        }
+        let added = 0;
+        let improved = 0;
+        let rejected = 0;
+        for (const find of decodedFinds || []) {
+            // No cellKeyOverride: the stats descriptor is re-derived from metrics (embedding cells
+            // were stripped on decode and never trusted cross-device).
+            const res = this.archive.tryInsert(find);
+            if (res.added) added++;
+            else if (res.improved) improved++;
+            else rejected++;
+        }
+        if (added || improved) this._persistGallery();
+        EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: null, gallerySize: this.archive.size, imported: true });
+        return { added, improved, rejected };
     }
 }

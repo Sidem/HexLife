@@ -5,6 +5,7 @@ import {
     RULESET_SCHEMA_VERSION,
 } from '../src/ui/controllers/LibraryController.js';
 import { rulesetName } from '../src/utils/utils.js';
+import { decodePack } from '../src/services/LibraryPackCodec.js';
 
 // getDisplayName resolves a ruleset's library name (personal > public) or falls back
 // to the deterministic derived mnemonic. Constructed directly with injected library
@@ -110,5 +111,54 @@ describe('LibraryController.saveUserRuleset (schema v2)', () => {
         expect(saved.initialState).toEqual({ mode: 'density', params: { density: 0.5 } });
         expect(saved.seed).toBe(7);
         expect(saved.thumb).toBe('data:x');
+    });
+});
+
+describe('LibraryController pack export / import', () => {
+    function makeLc(user = []) {
+        const lc = new LibraryController();
+        lc.userLibrary = user.map(normalizeRulesetEntry);
+        lc.libraryData = { rulesets: [], patterns: [] };
+        return lc;
+    }
+
+    it('exportPackJSON round-trips through decodePack back to the same rulesets', () => {
+        const lc = makeLc([
+            { id: '1', createdAt: 't', name: 'One', hex: HEX_A, tags: ['a'] },
+            { id: '2', createdAt: 't', name: 'Two', hex: HEX_B, initialState: { mode: 'density', params: { density: 0.2 } }, seed: 5 },
+        ]);
+        const { rulesets, warnings } = decodePack(lc.exportPackJSON());
+        expect(warnings).toEqual([]);
+        expect(rulesets.map(r => r.hex).sort()).toEqual([HEX_A, HEX_B].sort());
+        // Volatile fields are stripped by the codec.
+        expect(rulesets.every(r => r.id === undefined && r.schemaVersion === undefined)).toBe(true);
+    });
+
+    it('importRulesets adds new entries with fresh ids and normalized schema', () => {
+        const lc = makeLc();
+        const { added, skipped } = lc.importRulesets([
+            { name: 'Imported', hex: HEX_A, tags: [], initialState: null, seed: null },
+        ]);
+        expect(added).toBe(1);
+        expect(skipped).toBe(0);
+        const saved = lc.getUserLibrary()[0];
+        expect(saved.name).toBe('Imported');
+        expect(saved.id).toBeTruthy();
+        expect(saved.schemaVersion).toBe(RULESET_SCHEMA_VERSION);
+    });
+
+    it('importRulesets dedupes by hex and is idempotent on re-import', () => {
+        const lc = makeLc([{ id: 'x', name: 'Existing', hex: HEX_A }]);
+        const incoming = [
+            { name: 'Dup', hex: HEX_A, tags: [], initialState: null, seed: null },
+            { name: 'Fresh', hex: HEX_B, tags: [], initialState: null, seed: null },
+        ];
+        const first = lc.importRulesets(incoming);
+        expect(first).toEqual({ added: 1, skipped: 1 });
+        expect(lc.getUserLibrary()).toHaveLength(2);
+        // Re-importing the same pack adds nothing.
+        const second = lc.importRulesets(incoming);
+        expect(second).toEqual({ added: 0, skipped: 2 });
+        expect(lc.getUserLibrary()).toHaveLength(2);
     });
 });

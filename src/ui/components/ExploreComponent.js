@@ -6,6 +6,8 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import * as Config from '../../core/config.js';
 import { EXPLORE_CONFIG, IC_SUITE, POPULATION_MIN, POPULATION_MAX } from '../../core/AutoExploreService.js';
 import { ShareCodec } from '../../services/ShareCodec.js';
+import { downloadFile } from '../../utils/utils.js';
+import { decodePack } from '../../services/LibraryPackCodec.js';
 import { ICONS } from '../icons.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
@@ -246,8 +248,13 @@ export class ExploreComponent extends BaseComponent {
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
-                    <button class="button-icon" data-action="clear-gallery" title="Clear the session gallery" aria-label="Clear the session gallery">${ICONS.trash}</button>
+                    <div class="explore-gallery-actions">
+                        <button class="button-icon" data-action="export-gallery" title="Export the gallery finds as a shareable pack file" aria-label="Export gallery to a pack file">${ICONS.download}</button>
+                        <button class="button-icon" data-action="import-gallery" title="Import gallery finds from a pack file" aria-label="Import gallery finds from a pack file">${ICONS.upload}</button>
+                        <button class="button-icon" data-action="clear-gallery" title="Clear the session gallery" aria-label="Clear the session gallery">${ICONS.trash}</button>
+                    </div>
                 </div>
+                <input type="file" class="explore-import-input" accept="application/json,.json" hidden aria-hidden="true" />
                 <div id="explore-gallery-list" class="explore-gallery-list"></div>
             </div>
         `;
@@ -362,6 +369,16 @@ export class ExploreComponent extends BaseComponent {
                 confirmLabel: 'Clear',
                 onConfirm: () => EventBus.dispatch(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY),
             });
+        });
+
+        this._addDOMListener(this.element.querySelector('[data-action="export-gallery"]'), 'click', () => this._exportGallery());
+        this._addDOMListener(this.element.querySelector('[data-action="import-gallery"]'), 'click', () => {
+            this.element.querySelector('.explore-import-input')?.click();
+        });
+        this._addDOMListener(this.element.querySelector('.explore-import-input'), 'change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (file) this._handleImportFile(file);
         });
 
         // Persist IC-suite toggles as they change (read live at start time).
@@ -519,6 +536,52 @@ export class ExploreComponent extends BaseComponent {
         navigator.clipboard.writeText(url)
             .then(() => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Search link copied — it replays this exact search.', type: 'success' }))
             .catch(() => EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not copy link.', type: 'error' }));
+    }
+
+    /** Download the session gallery as a dated pack file (no-op with a toast when it's empty). */
+    _exportGallery() {
+        if (this.service.getGalleryEntries().length === 0) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'No gallery finds to export yet.', type: 'info' });
+            return;
+        }
+        const date = new Date().toISOString().slice(0, 10);
+        downloadFile(`hexlife-finds-${date}.json`, this.service.exportGalleryPackJSON(), 'application/json');
+    }
+
+    /** Read + decode a chosen pack file, then confirm-gate the gallery merge and toast the result. */
+    async _handleImportFile(file) {
+        if (this.service.isRunning()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the run before importing finds.', type: 'error' });
+            return;
+        }
+        let decoded;
+        try {
+            decoded = decodePack(await file.text());
+        } catch (err) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Import failed: ${err.message}`, type: 'error' });
+            return;
+        }
+        const finds = decoded.finds;
+        if (finds.length === 0) {
+            const detail = decoded.rulesets.length > 0 ? ' (this pack only contains rulesets — import it from the Ruleset Library).' : '.';
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `No importable finds in that file${detail}`, type: 'info' });
+            return;
+        }
+        const warnLine = decoded.warnings.length ? `\n\n${decoded.warnings.length} item(s) were cleaned up on import.` : '';
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+            title: 'Import gallery finds',
+            message: `Merge ${finds.length} find(s) into your session gallery? Each is scored into the archive; better scores win their cell, near-duplicates are dropped.${warnLine}`,
+            confirmLabel: 'Import',
+            onConfirm: () => {
+                const { added, improved, rejected } = this.service.importGalleryFinds(finds);
+                const parts = [];
+                if (added) parts.push(`${added} added`);
+                if (improved) parts.push(`${improved} improved`);
+                if (rejected) parts.push(`${rejected} skipped`);
+                const msg = added || improved ? `Imported: ${parts.join(', ')}.` : `Nothing new — ${rejected} already covered.`;
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: msg, type: added || improved ? 'success' : 'info' });
+            },
+        });
     }
 
     _togglePause() {
