@@ -4,7 +4,7 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import * as Config from '../../core/config.js';
-import { EXPLORE_CONFIG, IC_SUITE } from '../../core/AutoExploreService.js';
+import { EXPLORE_CONFIG, IC_SUITE, POPULATION_MIN, POPULATION_MAX } from '../../core/AutoExploreService.js';
 import { ShareCodec } from '../../services/ShareCodec.js';
 import { ICONS } from '../icons.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
@@ -29,12 +29,25 @@ const SETTING_KEYS = {
     rate: 'exploreMutationRatePct',
     mode: 'exploreMutationMode',
     ticks: 'exploreEvalTicks',
+    population: 'explorePopulationSize',
     icLabels: 'exploreICLabels',
     maxGenerations: 'exploreMaxGenerations',
     scoring: 'exploreScoring',
     scoringOpen: 'exploreScoringOpen',
     embeddingModel: 'embeddingModelId',
+    targetPrompt: 'exploreTargetPrompt',
+    targetBank: 'exploreTargetBankThreshold',
 };
+
+/** Cap on the target prompt length (chars) — sanitized here and again in AutoExploreService/share links. */
+const TARGET_PROMPT_MAXLEN = 200;
+
+/** Strip control chars and clamp length from an untrusted prompt (UI input, persisted, or share link). */
+function sanitizeTargetPrompt(value) {
+    if (typeof value !== 'string') return '';
+    // eslint-disable-next-line no-control-regex
+    return value.replace(/[\u0000-\u001F\u007F]+/g, ' ').slice(0, TARGET_PROMPT_MAXLEN).trim();
+}
 
 /** Human-readable status line for the perceptual-objective toggle, keyed by EMBEDDING_STATUS. */
 const EMBEDDING_STATUS_TEXT = {
@@ -45,6 +58,9 @@ const EMBEDDING_STATUS_TEXT = {
 };
 
 const MAX_GALLERY_RENDER = 40;
+
+/** Population presets (multiples of 9 keep the per-worker queues balanced; any int in range is valid). */
+const POPULATION_OPTIONS = [9, 18, 27, 36, 54, 72, 108, 144];
 
 export class ExploreComponent extends BaseComponent {
     constructor(appContext, options = {}) {
@@ -85,8 +101,19 @@ export class ExploreComponent extends BaseComponent {
         if (typeof cfg.mutationRate === 'number') PersistenceService.saveUISetting(SETTING_KEYS.rate, Math.round(cfg.mutationRate * 100));
         if (typeof cfg.mutationMode === 'string') PersistenceService.saveUISetting(SETTING_KEYS.mode, cfg.mutationMode);
         if (typeof cfg.evalTicks === 'number') PersistenceService.saveUISetting(SETTING_KEYS.ticks, cfg.evalTicks);
+        // Population size shapes the trajectory (Stage 2). Adopt it only when it's a valid integer in
+        // range; drop silently otherwise so a malformed link can't wedge the search at a bad size.
+        if (Number.isInteger(cfg.populationSize) && cfg.populationSize >= POPULATION_MIN && cfg.populationSize <= POPULATION_MAX) {
+            PersistenceService.saveUISetting(SETTING_KEYS.population, cfg.populationSize);
+        }
         if (typeof cfg.maxGenerations === 'number') PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, cfg.maxGenerations);
         if (Array.isArray(cfg.icLabels) && cfg.icLabels.length > 0) PersistenceService.saveUISetting(SETTING_KEYS.icLabels, cfg.icLabels);
+        // v3.2 supervised target search: a shared prompt shapes the trajectory, so replay adopts it —
+        // sanitized (untrusted URL: control chars stripped, length-capped). Only when non-empty.
+        if (typeof cfg.targetPrompt === 'string') {
+            const prompt = sanitizeTargetPrompt(cfg.targetPrompt);
+            if (prompt) PersistenceService.saveUISetting(SETTING_KEYS.targetPrompt, prompt);
+        }
         // v3.1: a shared search may carry custom scoring (weights/penalty) and a find threshold —
         // both shape the trajectory, so a faithful replay must adopt them. Sanitized (untrusted URL).
         if (cfg.scoring || Number.isFinite(cfg.findThreshold)) {
@@ -109,6 +136,13 @@ export class ExploreComponent extends BaseComponent {
         const ratePct = PersistenceService.loadUISetting(SETTING_KEYS.rate, Math.round(EXPLORE_CONFIG.mutationRate * 100));
         const mode = PersistenceService.loadUISetting(SETTING_KEYS.mode, EXPLORE_CONFIG.mutationMode);
         const ticks = PersistenceService.loadUISetting(SETTING_KEYS.ticks, EXPLORE_CONFIG.evalTicks);
+        const populationSize = this._sanitizePopulation(
+            PersistenceService.loadUISetting(SETTING_KEYS.population, EXPLORE_CONFIG.populationSize),
+        );
+        // Offer the presets, plus the current value if a share link brought a non-preset size in-range.
+        const popValues = POPULATION_OPTIONS.includes(populationSize)
+            ? POPULATION_OPTIONS
+            : [...POPULATION_OPTIONS, populationSize].sort((a, b) => a - b);
         const icLabels = PersistenceService.loadUISetting(SETTING_KEYS.icLabels, IC_SUITE.map(ic => ic.label));
         const maxGenerations = PersistenceService.loadUISetting(SETTING_KEYS.maxGenerations, EXPLORE_CONFIG.maxGenerations);
         const status = this.service.getStatus();
@@ -117,6 +151,10 @@ export class ExploreComponent extends BaseComponent {
         const scoringOpen = !!PersistenceService.loadUISetting(SETTING_KEYS.scoringOpen, false);
         const activeModelId = this.worldManager.embeddingService?.getModelId?.()
             || PersistenceService.loadUISetting(SETTING_KEYS.embeddingModel, EMBEDDING_MODELS[0].id);
+        const targetPrompt = sanitizeTargetPrompt(PersistenceService.loadUISetting(SETTING_KEYS.targetPrompt, ''));
+        const targetBank = this._sanitizeTargetBank(
+            PersistenceService.loadUISetting(SETTING_KEYS.targetBank, EXPLORE_CONFIG.targetBankThreshold),
+        );
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
@@ -145,6 +183,12 @@ export class ExploreComponent extends BaseComponent {
                 <div class="form-group" id="explore-mutation-rate-mount"></div>
                 <div class="form-group" id="explore-mutation-mode-mount"></div>
                 <div class="form-group" id="explore-eval-ticks-mount"></div>
+                <div class="form-group explore-population-field">
+                    <label class="explore-field-label" for="explore-population">Population <span class="explore-field-hint">candidates / generation</span></label>
+                    <select id="explore-population" class="explore-population-select" title="How many candidate rulesets to evaluate each generation. They time-share the 9 worlds (candidate c runs on world c mod 9); larger populations search harder but take longer per generation. 9 matches the classic one-per-world behaviour.">
+                        ${popValues.map(v => `<option value="${v}" ${v === populationSize ? 'selected' : ''}>${v}${v === EXPLORE_CONFIG.populationSize ? ' (one per world)' : ''}</option>`).join('')}
+                    </select>
+                </div>
                 <div class="form-group explore-ic-toggles">
                     <label class="explore-field-label">Initial Conditions</label>
                     <div class="explore-ic-checkboxes">
@@ -174,6 +218,24 @@ export class ExploreComponent extends BaseComponent {
                     </div>
                     <div class="explore-embedding-status" id="explore-embedding-status" data-status="${embeddingStatus}">${this._escape(EMBEDDING_STATUS_TEXT[embeddingStatus] || '')}</div>
                 </div>
+                <div class="form-group explore-target-field" id="explore-target-field">
+                    <label class="explore-field-label" for="explore-target-prompt">
+                        Find life that looks like…
+                        <span class="explore-mode-chip" data-field="mode-chip" title="Statistical: no vision model. Open-ended: perceptual novelty. Target: evolution steered toward your prompt."></span>
+                    </label>
+                    <input type="text" id="explore-target-prompt" class="explore-target-input" maxlength="${TARGET_PROMPT_MAXLEN}"
+                        placeholder="e.g. spirals, a maze, gliders" value="${this._escape(targetPrompt)}"
+                        ${embeddingEnabled ? '' : 'disabled'}
+                        title="Type what you want the search to hunt for. Evolution is steered toward frames a vision model (CLIP) reads as your prompt (ASAL supervised target search). Requires the perceptual-novelty toggle above.">
+                    <div class="explore-field-hint explore-target-hint" data-field="target-hint">${embeddingEnabled
+                        ? 'Steers evolution toward frames that match your prompt. Leave empty for open-ended novelty.'
+                        : 'Enable “Perceptual novelty (CLIP)” above to search by prompt.'}</div>
+                    <div class="explore-target-advanced" id="explore-target-advanced" ${embeddingEnabled ? '' : 'hidden'}>
+                        <label class="explore-field-label" for="explore-target-bank">Match threshold <span class="explore-field-hint">bank finds with cosine ≥ this</span></label>
+                        <input type="number" id="explore-target-bank" class="explore-budget-input" min="0" max="1" step="0.01" value="${targetBank}"
+                            title="A target-mode find enters the gallery only when its mean frame→prompt cosine similarity reaches this. CLIP image-text similarities sit around 0.1–0.35, so 0.22 keeps the genuine matches.">
+                    </div>
+                </div>
             </div>
             <details class="tool-group explore-scoring-group" id="explore-scoring-group" ${scoringOpen ? 'open' : ''}>
                 <summary class="explore-scoring-summary">
@@ -200,11 +262,17 @@ export class ExploreComponent extends BaseComponent {
             adopt: this.element.querySelector('[data-action="adopt"]'),
         };
         this.budgetInput = this.element.querySelector('#explore-max-generations');
+        this.populationSelect = this.element.querySelector('#explore-population');
         this.embeddingToggle = this.element.querySelector('#explore-embedding-enabled');
         this.embeddingStatusEl = this.element.querySelector('#explore-embedding-status');
         this.embeddingModelField = this.element.querySelector('#explore-embedding-model-field');
         this.embeddingModelSelect = this.element.querySelector('#explore-embedding-model');
+        this.targetInput = this.element.querySelector('#explore-target-prompt');
+        this.targetBankInput = this.element.querySelector('#explore-target-bank');
+        this.targetAdvanced = this.element.querySelector('#explore-target-advanced');
+        this.targetHintEl = this.element.querySelector('[data-field="target-hint"]');
         this.scoringGroup = this.element.querySelector('#explore-scoring-group');
+        this._updateModeChip();
 
         // Scoring panel (v3.1): user-customizable objective. The summary chip mirrors the active
         // preset; explainer curve markers follow the current best find's measured raw metrics.
@@ -257,6 +325,30 @@ export class ExploreComponent extends BaseComponent {
                 const v = Math.max(0, Math.floor(Number(this.budgetInput.value) || 0));
                 this.budgetInput.value = v;
                 PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, v);
+            });
+        }
+
+        if (this.populationSelect) {
+            this._addDOMListener(this.populationSelect, 'change', () => {
+                PersistenceService.saveUISetting(SETTING_KEYS.population, this._sanitizePopulation(this.populationSelect.value));
+            });
+        }
+
+        if (this.targetInput) {
+            // Persist + refresh the mode chip live; dispatch the command so any other surface can react.
+            this._addDOMListener(this.targetInput, 'input', () => {
+                const prompt = sanitizeTargetPrompt(this.targetInput.value);
+                PersistenceService.saveUISetting(SETTING_KEYS.targetPrompt, prompt);
+                EventBus.dispatch(EVENTS.COMMAND_SET_EXPLORE_TARGET_PROMPT, { prompt });
+                this._updateModeChip();
+            });
+        }
+
+        if (this.targetBankInput) {
+            this._addDOMListener(this.targetBankInput, 'change', () => {
+                const v = this._sanitizeTargetBank(this.targetBankInput.value);
+                this.targetBankInput.value = v;
+                PersistenceService.saveUISetting(SETTING_KEYS.targetBank, v);
             });
         }
 
@@ -317,11 +409,49 @@ export class ExploreComponent extends BaseComponent {
             this.embeddingStatusEl.textContent = EMBEDDING_STATUS_TEXT[status] || '';
         }
         if (this.embeddingModelField) this.embeddingModelField.hidden = !payload.enabled;
+        // The mode chip + target-field gating depend on the embedding toggle.
+        this._updateModeChip();
     }
 
     _updatePresetChip(presetKey) {
         const chip = this.element.querySelector('[data-field="preset-chip"]');
         if (chip) chip.textContent = presetKey === 'custom' ? 'Custom' : (SCORING_PRESETS[presetKey]?.label || '');
+    }
+
+    /** Coerce any inbound population value (UI select, persisted, or share link) to an int in range. */
+    _sanitizePopulation(value) {
+        const n = Math.floor(Number(value));
+        if (!Number.isFinite(n)) return EXPLORE_CONFIG.populationSize;
+        return Math.min(POPULATION_MAX, Math.max(POPULATION_MIN, n));
+    }
+
+    /** Coerce the target-match banking threshold to a cosine in [0,1] (2 dp), defaulting to the config. */
+    _sanitizeTargetBank(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return EXPLORE_CONFIG.targetBankThreshold;
+        return Math.round(Math.min(1, Math.max(0, n)) * 100) / 100;
+    }
+
+    /**
+     * Update the search-mode chip + target-field gating from the live embedding toggle and prompt input:
+     * Statistical (no vision model) → Open-ended (perceptual novelty, no prompt) → 🎯 Target (prompt set).
+     */
+    _updateModeChip() {
+        const embeddingsOn = !!this.embeddingToggle?.checked;
+        const hasPrompt = !!(this.targetInput && sanitizeTargetPrompt(this.targetInput.value));
+        const chip = this.element.querySelector('[data-field="mode-chip"]');
+        if (chip) {
+            const label = !embeddingsOn ? 'Statistical' : (hasPrompt ? '🎯 Target' : 'Open-ended');
+            chip.textContent = label;
+            chip.dataset.mode = !embeddingsOn ? 'statistical' : (hasPrompt ? 'target' : 'open');
+        }
+        if (this.targetInput) this.targetInput.disabled = !embeddingsOn;
+        if (this.targetAdvanced) this.targetAdvanced.hidden = !embeddingsOn;
+        if (this.targetHintEl) {
+            this.targetHintEl.textContent = embeddingsOn
+                ? 'Steers evolution toward frames that match your prompt. Leave empty for open-ended novelty.'
+                : 'Enable “Perceptual novelty (CLIP)” above to search by prompt.';
+        }
     }
 
     _readICLabels() {
@@ -354,10 +484,15 @@ export class ExploreComponent extends BaseComponent {
             mutationRate: this.sliders.rate.getValue() / 100,
             mutationMode: this.element.querySelector('input[name="explore-mutation-mode"]:checked')?.value || EXPLORE_CONFIG.mutationMode,
             evalTicks: this.sliders.ticks.getValue(),
+            populationSize: this._sanitizePopulation(this.populationSelect?.value),
             maxGenerations: Math.max(0, Math.floor(Number(this.budgetInput?.value) || 0)),
             icLabels,
             scoring,
             findThreshold: scoring.findThreshold,
+            // Supervised target search (v3.2): the prompt only takes effect when embeddings are on (the
+            // service also re-checks). targetBankThreshold gates which matches enter the gallery.
+            targetPrompt: embeddingsOn ? sanitizeTargetPrompt(this.targetInput?.value) : '',
+            targetBankThreshold: this._sanitizeTargetBank(this.targetBankInput?.value),
         };
         // One-shot replay seed from a shared search link (see _consumeSharedSearch).
         if (this._pendingBaseSeed != null) {
@@ -419,8 +554,12 @@ export class ExploreComponent extends BaseComponent {
             this.runButtons.pause.textContent = state === 'paused' ? 'Resume' : 'Pause';
         }
         if (this.budgetInput) this.budgetInput.disabled = isRunning;
+        if (this.populationSelect) this.populationSelect.disabled = isRunning;
         this.scoringPanel?.setDisabled(isRunning);
         if (this.embeddingModelSelect) this.embeddingModelSelect.disabled = isRunning;
+        // Target controls are read at Start; a running search also can't have embeddings toggled off.
+        if (this.targetInput) this.targetInput.disabled = isRunning || !this.embeddingToggle?.checked;
+        if (this.targetBankInput) this.targetBankInput.disabled = isRunning;
 
         const stateEl = this.statusEl?.querySelector('[data-field="state"]');
         const detailEl = this.statusEl?.querySelector('[data-field="detail"]');
@@ -432,7 +571,9 @@ export class ExploreComponent extends BaseComponent {
         if (detailEl) {
             if (isRunning) {
                 const gen = payload.generation ?? 0;
-                const best = typeof payload.bestScore === 'number' ? ` · best ${payload.bestScore.toFixed(2)}` : '';
+                // In target mode `bestScore` is the best prompt-match cosine, so label it "match".
+                const bestLabel = payload.targetMode ? 'match' : 'best';
+                const best = typeof payload.bestScore === 'number' ? ` · ${bestLabel} ${payload.bestScore.toFixed(2)}` : '';
                 detailEl.textContent = `gen ${gen}${best}`;
             } else {
                 detailEl.textContent = '';
@@ -482,6 +623,10 @@ export class ExploreComponent extends BaseComponent {
         const chaosChip = (entry.perComponent?.uniformUsed && typeof uf === 'number' && uf < 0.995)
             ? `<span class="explore-find-chaos" title="${this._escape(UNIFORM_FACTOR_META.hint)}">chaos ×${uf.toFixed(2)}</span>`
             : '';
+        // Supervised target search (v3.2): a find banked in target mode carries its trajectory→prompt match.
+        const targetChip = (typeof entry.targetSimilarity === 'number')
+            ? `<span class="explore-find-target" title="Mean cosine similarity of this find's frames to the target prompt (higher = closer match)">🎯 ${entry.targetSimilarity.toFixed(2)}</span>`
+            : '';
         // Visual preview (v2.6, F6). v1/old entries have no `thumb` (principle 4) — show a placeholder.
         const thumb = entry.thumb
             ? `<img class="explore-find-thumb" src="${this._escape(entry.thumb)}" alt="" loading="lazy" />`
@@ -495,7 +640,7 @@ export class ExploreComponent extends BaseComponent {
                             <span class="explore-find-score" title="Interestingness score">${score}</span>
                             <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
                             <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
-                            ${cyclicChip}${chaosChip}
+                            ${cyclicChip}${chaosChip}${targetChip}
                         </div>
                         ${bars}
                         <div class="explore-find-actions">

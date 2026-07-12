@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { EventBus } from '../src/services/EventBus.js';
+import { EventBus, EVENTS } from '../src/services/EventBus.js';
 
 // Each test uses a unique event name so the module-level subscription registry stays isolated.
 let counter = 0;
@@ -81,5 +81,36 @@ describe('EventBus unsubscribe (regression for index-capture bug)', () => {
 
     it('dispatching an event with no subscribers is safe', () => {
         expect(() => EventBus.dispatch('test:never:subscribed', {})).not.toThrow();
+    });
+});
+
+// Dev-only guard: an event name that isn't a registered EVENTS value is almost always a typo (it would
+// silently never match). Vitest runs with import.meta.env.DEV === true, so the guard is active here.
+describe('EventBus unregistered-event warning (DEV guard)', () => {
+    it('warns (once) when dispatching a name that is not a registered EVENTS value', () => {
+        const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const bad = 'command:definitelyNotARegisteredEvent_guardtest';
+        EventBus.dispatch(bad, {});
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy.mock.calls[0][0]).toContain(bad);
+        // Deduped: a second dispatch of the same bad name does not warn again.
+        EventBus.dispatch(bad, {});
+        expect(spy).toHaveBeenCalledTimes(1);
+        spy.mockRestore();
+    });
+
+    it('warns when subscribing to a name that is not a registered EVENTS value', () => {
+        const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        EventBus.subscribe('ui:anotherUnregisteredEvent_guardtest', () => {});
+        expect(spy).toHaveBeenCalledTimes(1);
+        spy.mockRestore();
+    });
+
+    it('is silent for a valid EVENTS value on both subscribe and dispatch', () => {
+        const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        EventBus.subscribe(EVENTS.EXPLORE_PROGRESS, () => {});
+        EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, { phase: 'test' });
+        expect(spy).not.toHaveBeenCalled();
+        spy.mockRestore();
     });
 });

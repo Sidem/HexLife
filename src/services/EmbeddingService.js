@@ -89,6 +89,10 @@ export class EmbeddingService {
         this._reqId = 0;
         /** @type {Map<number, (v: Float32Array|null) => void>} pending embed resolvers, keyed by request id. */
         this._pending = new Map();
+        /** @type {Map<string, Float32Array>} Cache of embedded target prompts, keyed `${modelId} ${prompt}`
+         *  (v3.2). Text inference is deterministic per model version, so a repeated prompt round-trips at
+         *  most once; cleared on teardown (a model switch invalidates every cached vector). */
+        this._textCache = new Map();
         /** Worker generation: bumped by every teardown so a stale init timeout/error from a
          *  previous worker (e.g. after a model switch mid-load) can't touch the current one. */
         this._initToken = 0;
@@ -257,6 +261,51 @@ export class EmbeddingService {
         return out;
     }
 
+    /**
+     * Embed a natural-language target prompt into a (L2-normalized) CLIP text embedding, comparable by
+     * cosine against the image embeddings from {@link embed} (v3.2, ASAL supervised target search).
+     * Resolves null on any failure (disabled, empty prompt, model not ready, inference error, timeout)
+     * so the search degrades to the statistical objective rather than stalling or throwing. A repeated
+     * `(modelId, prompt)` resolves from cache without a second worker round-trip.
+     * @param {string} prompt
+     * @returns {Promise<Float32Array|null>}
+     */
+    async embedText(prompt) {
+        if (!this.enabled) return null;
+        const text = typeof prompt === 'string' ? prompt.trim() : '';
+        if (!text) return null;
+        const cacheKey = `${this.config.modelId} ${text}`;
+        const cached = this._textCache.get(cacheKey);
+        if (cached) return cached;
+
+        if (this.status !== EMBEDDING_STATUS.READY) {
+            const ready = await this.ensureReady();
+            if (!ready) return null;
+        }
+        if (!this.worker) return null;
+
+        const id = ++this._reqId;
+        const vec = await new Promise((resolve) => {
+            let settled = false;
+            const done = (v) => {
+                if (settled) return;
+                settled = true;
+                this._pending.delete(id);
+                resolve(v);
+            };
+            this._pending.set(id, done);
+            try {
+                this.worker.postMessage({ type: 'EMBED_TEXT', id, text });
+            } catch {
+                done(null);
+                return;
+            }
+            setTimeout(() => done(null), this.config.embedTimeoutMs);
+        });
+        if (vec && vec.length) this._textCache.set(cacheKey, vec);
+        return vec;
+    }
+
     _onWorkerMessage(data, finishInit) {
         if (!data) return;
         switch (data.type) {
@@ -276,6 +325,16 @@ export class EmbeddingService {
                 if (resolve) resolve(null);
                 break;
             }
+            case 'EMBED_TEXT_RESULT': {
+                const resolve = this._pending.get(data.id);
+                if (resolve) resolve(data.embedding ? new Float32Array(data.embedding) : null);
+                break;
+            }
+            case 'EMBED_TEXT_ERROR': {
+                const resolve = this._pending.get(data.id);
+                if (resolve) resolve(null);
+                break;
+            }
         }
     }
 
@@ -289,6 +348,8 @@ export class EmbeddingService {
         // Resolve any in-flight embeds as null so awaiting callers don't hang.
         for (const resolve of this._pending.values()) resolve(null);
         this._pending.clear();
+        // A model switch (the only teardown that changes the vector space) invalidates cached prompts.
+        this._textCache.clear();
     }
 
     /** Tear down the worker and clear state (idempotent). */

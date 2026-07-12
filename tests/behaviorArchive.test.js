@@ -193,6 +193,70 @@ describe('BehaviorArchive family dedupe (F5)', () => {
     });
 });
 
+describe('BehaviorArchive embedding-first descriptor (v3.2, roadmap #3)', () => {
+    it('cellKeyOverride banks look-different-but-stats-alike finds in DISTINCT cells', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0); // identical stats ⇒ same statistical cell
+        a.tryInsert({ hex: 'aa', score: 0.5, metrics: m, descriptorKind: 'embedding' }, { cellKeyOverride: 'e:1010' });
+        a.tryInsert({ hex: 'bb', score: 0.6, metrics: m, descriptorKind: 'embedding' }, { cellKeyOverride: 'e:0101' });
+        // Without the override these two would collide onto one statistical cell; the perceptual keys split them.
+        expect(a.size).toBe(2);
+        expect(a.getEntries().map(e => e.cellKey).sort()).toEqual(['e:0101', 'e:1010']);
+    });
+
+    it('stamps the override cellKey and keeps best-per-cell within an override cell', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0);
+        a.tryInsert({ hex: 'lo', score: 0.4, metrics: m, descriptorKind: 'embedding' }, { cellKeyOverride: 'e:1111' });
+        const better = a.tryInsert({ hex: 'hi', score: 0.9, metrics: metrics(0.9, 0.9, 0.3), descriptorKind: 'embedding' }, { cellKeyOverride: 'e:1111' });
+        expect(better.improved).toBe(true);
+        expect(a.size).toBe(1);
+        expect(a.getEntries()[0].hex).toBe('hi');
+        expect(a.getEntries()[0].cellKey).toBe('e:1111');
+    });
+
+    it('noveltyMultiplier honours the perceptual cell override', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.3, 0.4, 1.0);
+        a.tryInsert({ hex: 'occupy', score: 0.7, metrics: m, descriptorKind: 'embedding' }, { cellKeyOverride: 'e:1010' });
+        // Same perceptual cell, weaker score ⇒ penalized; a DIFFERENT perceptual cell ⇒ novel (1).
+        expect(a.noveltyMultiplier(m, 0.5, 'x', 'e:1010')).toBe(ARCHIVE_CONFIG.occupiedNoveltyMultiplier);
+        expect(a.noveltyMultiplier(m, 0.5, 'x', 'e:0101')).toBe(1);
+    });
+
+    it('embeddings-OFF path (no override) is unchanged: statistical cell is used', () => {
+        const a = new BehaviorArchive();
+        const m = metrics(0.34, 0.57, 1.0);
+        a.tryInsert({ hex: 'x', score: 0.5, metrics: m });
+        expect(a.getEntries()[0].cellKey).toBe('3|5|b2'); // the statistical descriptor, exactly as before
+    });
+
+    it('round-trips embedding-keyed entries: the opaque cellKey is preserved on reload', () => {
+        const a = new BehaviorArchive();
+        a.loadEntries([
+            { hex: 'aa', score: 0.5, cellKey: 'e:1010', descriptorKind: 'embedding', metrics: metrics(0.3, 0.4, 1.0) },
+            { hex: 'bb', score: 0.6, cellKey: 'e:0101', descriptorKind: 'embedding', metrics: metrics(0.3, 0.4, 1.0) },
+            // A legacy (stats) entry alongside them re-derives its key normally.
+            { hex: 'cc', score: 0.7, metrics: metrics(0.34, 0.57, 1.0) },
+        ]);
+        expect(a.size).toBe(3);
+        const byHex = Object.fromEntries(a.getEntries().map(e => [e.hex, e.cellKey]));
+        expect(byHex.aa).toBe('e:1010'); // preserved verbatim (not recomputed from stats)
+        expect(byHex.bb).toBe('e:0101');
+        expect(byHex.cc).toBe('3|5|b2'); // stats entry re-derived
+    });
+
+    it('reload keeps the best per embedding cell (self-heals a duplicated dump)', () => {
+        const a = new BehaviorArchive();
+        a.loadEntries([
+            { hex: 'lo', score: 0.4, cellKey: 'e:1111', descriptorKind: 'embedding', metrics: metrics(0.3, 0.4, 1.0) },
+            { hex: 'hi', score: 0.8, cellKey: 'e:1111', descriptorKind: 'embedding', metrics: metrics(0.3, 0.4, 1.0) },
+        ]);
+        expect(a.size).toBe(1);
+        expect(a.getEntries()[0].hex).toBe('hi');
+    });
+});
+
 describe('BehaviorArchive persistence round-trip', () => {
     it('loadEntries rebuilds cells and self-heals duplicates (best per cell wins)', () => {
         const a = new BehaviorArchive();

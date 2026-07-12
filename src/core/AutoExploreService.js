@@ -5,7 +5,7 @@ import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from '
 import { sanitizeScoring, buildScoreConfig, isDefaultScoring } from './analysis/ScoringPresets.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
-import { trajectoryNovelty, meanVector } from './analysis/EmbeddingNovelty.js';
+import { trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
 
 /**
  * Tiny deterministic PRNG (same routine as WorldWorker's) for the population builder: mutants and
@@ -117,8 +117,18 @@ export const IC_SUITE = [
     },
 ];
 
+/** Clamp bounds for the search population size (Stage 2). Nine keeps replays byte-identical to the
+ *  pre-Stage-2 "population == the 9 rendered worlds" behaviour; larger fans more candidates through the
+ *  same 9 workers via per-worker queues. */
+export const POPULATION_MIN = 9;
+export const POPULATION_MAX = 144;
+
 /** Tunable knobs for the explore loop (the score weights live in InterestingnessScore.SCORE_CONFIG). */
 export const EXPLORE_CONFIG = {
+    /** Candidates evaluated per generation (Stage 2). 9 == byte-identical to the pre-decoupling
+     *  behaviour (one candidate per rendered world). Larger populations time-share the same 9 workers
+     *  through per-worker queues (candidate `c` runs on world `c % 9`). Clamp: integer, 9–144. */
+    populationSize: 9,
     /** Ticks per (cheap) screening evaluation burst. */
     evalTicks: 160,
     /** Ticks discarded at the start of a burst before metrics accumulate (kills transient pollution, F2). */
@@ -156,6 +166,15 @@ export const EXPLORE_CONFIG = {
     embeddingFrames: 6,
     /** Ticks advanced between captured trajectory frames (spacing of the perceptual time series). */
     embeddingFrameTicks: 50,
+    // --- Supervised target search (v3.2, ASAL; only active when embeddings are on AND a prompt is set) --
+    /** Natural-language target ("find life that looks like…"). Empty ⇒ the statistical / open-ended
+     *  pipeline, UNCHANGED — an empty prompt is byte-identical to Stage 2 (an acceptance criterion). */
+    targetPrompt: '',
+    /** Reserved weight for future target/statistical blending (parked; selection is pure targetSim today). */
+    targetWeight: 0.7,
+    /** Minimum trajectory→prompt cosine similarity to bank a target-mode find into the gallery. CLIP
+     *  image-text similarities sit in ~[0.1, 0.35]; 0.22 keeps only the genuine matches. */
+    targetBankThreshold: 0.22,
 };
 
 const EXPLORE_STATE = Object.freeze({ IDLE: 'idle', RUNNING: 'running', PAUSED: 'paused' });
@@ -225,6 +244,8 @@ export class AutoExploreService {
             embeddingEnabled: !!(this.embeddingProvider && this.embeddingProvider.isEnabled()),
             embeddingStatus: this.embeddingProvider && this.embeddingProvider.getStatus ? this.embeddingProvider.getStatus() : 'disabled',
             embeddingCells: this.embeddingArchive.size,
+            targetMode: !!this._targetMode,
+            targetPrompt: this._targetPrompt || '',
             options: { ...this.options },
         };
     }
@@ -306,6 +327,33 @@ export class AutoExploreService {
             }).catch(() => { this.embeddingEnabled = false; });
         }
 
+        // Supervised target search (v3.2, ASAL https://arxiv.org/abs/2412.17799): active iff embeddings
+        // are on AND the caller supplied a non-empty prompt AND the provider can embed text. The target
+        // vector resolves lazily (fire-and-forget, like ensureReady) — a generation that runs before it
+        // lands scores statistically (degrade, don't block). A null result (model failed to embed the
+        // prompt) toasts once and falls back to the statistical objective for the whole run.
+        this._targetPrompt = '';
+        this._targetVector = null;
+        this._targetMode = false;
+        const rawPrompt = typeof this.options.targetPrompt === 'string' ? this.options.targetPrompt.trim() : '';
+        if (this.embeddingEnabled && rawPrompt && typeof this.embeddingProvider.embedText === 'function') {
+            this._targetPrompt = rawPrompt;
+            this._targetMode = true;
+            const token = this._runToken;
+            Promise.resolve(this.embeddingProvider.embedText(rawPrompt)).then((vec) => {
+                if (token !== this._runToken) return;
+                if (vec && vec.length) {
+                    this._targetVector = vec;
+                } else {
+                    this._targetMode = false;
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                        message: 'Could not embed the target prompt — searching with the statistical objective.',
+                        type: 'info',
+                    });
+                }
+            }).catch(() => { if (token === this._runToken) this._targetMode = false; });
+        }
+
         this._snapshot = this.wm._captureAutoExploreSnapshot();
         // A full-grid search needs every world running, regardless of prior enabled flags.
         this.wm._setAllWorldsEnabledForExplore(true);
@@ -328,6 +376,18 @@ export class AutoExploreService {
                 findThreshold: this.options.findThreshold,
             },
         };
+        // Population size shapes the trajectory (more candidates ⇒ different champions), so a replay
+        // needs it — but omit it when 9 to keep old links short/valid and byte-identical (a link with
+        // no populationSize replays under the default 9). Mirrors how `scoring` is omitted at default.
+        const popSize = this._resolvePopulationSize();
+        if (popSize !== EXPLORE_CONFIG.populationSize) this._searchDescriptor.config.populationSize = popSize;
+        // Supervised target search (v3.2): a prompt shapes the trajectory (it drives selection), so a
+        // faithful replay needs it — carried only when non-empty to keep statistical-search links short
+        // and byte-identical. Cross-device replay is best-effort (webgpu/wasm numerics differ marginally).
+        if (this._targetPrompt) {
+            this._searchDescriptor.config.targetPrompt = this._targetPrompt;
+            this._searchDescriptor.config.targetWeight = this.options.targetWeight;
+        }
         // Custom scoring changes champion selection, so a replay needs it; omitted when default
         // (short URLs, and old links keep replaying under whatever the current defaults are).
         if (options.scoring) {
@@ -481,46 +541,79 @@ export class AutoExploreService {
      * @param {number} token
      */
     async _runGeneration(token) {
-        const worlds = this.wm.worlds;
+        const numWorlds = this.wm.worlds.length;
         const selectedIdx = this.wm.selectedWorldIndex;
-        const population = this._buildPopulation(this.championHex, worlds.length, selectedIdx);
+        const populationSize = this._resolvePopulationSize();
+        const population = this._buildPopulation(this.championHex, populationSize, selectedIdx);
 
-        // Apply each candidate's ruleset to its world up front (so the user sees the population).
-        population.forEach((hex, idx) => this.wm._applyExploreRuleset(idx, hex));
-
-        // Each world screens its candidate over the IC suite and, if promising, runs ONE long
-        // confirmation burst on the SAME world — all concurrent, NO cross-world barrier (each world
-        // owns its worker, so world A's confirmation never waits on world B's screen).
-        const results = await Promise.all(
-            population.map((hex, idx) => this._screenAndConfirm(idx, hex, token))
-        );
+        // Stage 2: the population is decoupled from the 9 rendered worlds. Each world drains a queue of
+        // candidates (candidate `c` runs on world `c % numWorlds`) — sequential within a world, all 9
+        // worlds concurrent, and NO cross-batch barrier: a fast world starts its next candidate while a
+        // slow one is still mid-confirm. The world's ruleset is (re)applied immediately before each
+        // candidate's evaluation, so the minimap shows a rolling subset of the population. At
+        // populationSize 9 each queue is exactly one candidate (c === w), i.e. the pre-Stage-2 behaviour.
+        const results = new Array(population.length).fill(null);
+        const workerLoops = [];
+        for (let w = 0; w < numWorlds; w++) {
+            workerLoops.push((async () => {
+                for (let c = w; c < population.length; c += numWorlds) {
+                    if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return;
+                    this.wm._applyExploreRuleset(w, population[c]); // rolling minimap display
+                    results[c] = await this._screenAndConfirm(w, population[c], token, c);
+                }
+            })());
+        }
+        await Promise.all(workerLoops);
         if (token !== this._runToken) return;
 
         // Bank confirmed finds, then rank by novelty-weighted *confirmed* score.
         const ranked = [];
         const finds = [];
         let embeddingChanged = false;
-        // Per-world score/kill snapshot for the minimap badges (results[idx] ↔ world idx).
-        const perWorldScores = new Array(population.length).fill(null);
+        // Per-DISPLAYED-SLOT score/kill snapshot for the minimap badges: length == numWorlds, and
+        // slot `c % numWorlds` is overwritten as its queued candidates finish, so at generation end it
+        // holds each world's LAST candidate. (MinimapOverlays consumes this under the same field name.)
+        const perWorldScores = new Array(numWorlds).fill(null);
 
+        const targetBankThreshold = this._resolveTargetBankThreshold();
         results.forEach((r, idx) => {
             if (!r || r.scored.perIC.length === 0) return;
             const { scored, screenScore, winMetrics, confirmed, embedding } = r;
-            // The score that drives selection + the gallery: the confirmed final score when a
-            // confirmation ran (so the period-84 screen-trap can't become champion), else the screen.
+            // The statistical score, always banked HONESTLY as the gallery `score` (chips/bars keep
+            // meaning): the confirmed final score when a confirmation ran (so the period-84 screen-trap
+            // can't win), else the screen. In target mode selection is driven by `targetSim` instead.
             const baseScore = confirmed ? confirmed.finalScore : screenScore;
             const embVector = embedding ? embedding.vector : null;
-            // Pass the candidate hex so the incumbent champion isn't penalized against itself (F3).
-            let selectionScore = baseScore * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex);
+            // Embedding-first gallery descriptor (v3.0/v3.2, roadmap #3): when an embedding is available,
+            // the find is keyed by its perceptual SimHash cell (prefixed `e:` so it never collides with a
+            // statistical `r|e|σ` key) — for both novelty pressure and the gallery cell it occupies.
+            const statsCellOverride = (this.embeddingEnabled && embVector)
+                ? `e:${this.embeddingArchive.cellKeyFor(embVector)}`
+                : null;
+            // Target similarity (v3.2): mean trajectory→prompt cosine, present only in target mode with a
+            // resolved prompt vector + captured trajectory. Null ⇒ this candidate scores statistically
+            // (the target vector hasn't resolved yet, or no embedding was captured) — degrade, don't block.
+            const targetSim = (this._targetMode && embedding && Number.isFinite(embedding.targetSimilarity))
+                ? embedding.targetSimilarity
+                : null;
+            const targetActive = this._targetMode && targetSim != null;
+            const selBase = targetActive ? targetSim : baseScore;
+            // Pass the candidate hex so the incumbent champion isn't penalized against itself (F3), and
+            // the perceptual cell override so novelty pressure matches the embedding-first descriptor.
+            let selectionScore = selBase * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex, statsCellOverride);
             // Perceptual illumination (v3.0): when an embedding is available, also push the search away
             // from perceptually-explored cells — the second (embedding-keyed) novelty pressure.
             if (this.embeddingEnabled && embVector) {
                 selectionScore *= this.embeddingArchive.noveltyMultiplier(embVector, baseScore, r.hex);
             }
-            ranked.push({ r, scored, winMetrics, selectionScore, baseScore });
+            // The score surfaced to the UI/progress: targetSim in target mode (labelled "match"), else base.
+            const reportScore = targetActive ? targetSim : baseScore;
+            ranked.push({ r, scored, winMetrics, selectionScore, baseScore, reportScore, targetSim });
 
             const winIC = scored.perIC[scored.winningIC];
-            perWorldScores[idx] = {
+            // Candidate `idx` was displayed on world `idx % numWorlds`; later candidates on the same
+            // world overwrite the slot (rolling display).
+            perWorldScores[idx % numWorlds] = {
                 score: baseScore,
                 killed: winIC ? winIC.killed : false,
                 killReason: winIC ? winIC.killReason : null,
@@ -529,21 +622,29 @@ export class AutoExploreService {
 
             // Bank only candidates that survived a confirmation burst (rejected-at-confirm are dropped).
             // A cycle-penalized find is still banked — it's a legitimate, honestly-tagged category.
+            // Banking gate: statistical mode banks every survivor (findThreshold already gated screening).
+            // Target mode (v3.2) instead gates on the target match — the user asked for things that look
+            // like X, so bank the top matches (targetSim ≥ targetBankThreshold), not the statistical score.
             if (confirmed && !confirmed.rejected) {
-                const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb, embedding);
-                const res = this.archive.tryInsert(entry);
-                if (res.added || res.improved) finds.push(entry);
-                // Mirror into the perceptual illumination archive (keyed by the find's embedding).
-                if (embVector) {
-                    this.embeddingArchive.tryInsert({
-                        hex: entry.hex,
-                        mnemonic: entry.mnemonic,
-                        score: entry.score,
-                        openEndedness: embedding.openEndedness,
-                        generation: this.generation,
-                        vector: embVector,
-                    });
-                    embeddingChanged = true;
+                const bankOk = this._targetMode
+                    ? (targetSim != null && targetSim >= targetBankThreshold)
+                    : true;
+                if (bankOk) {
+                    const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb, embedding, statsCellOverride);
+                    const res = this.archive.tryInsert(entry, { cellKeyOverride: statsCellOverride });
+                    if (res.added || res.improved) finds.push(entry);
+                    // Mirror into the perceptual illumination archive (keyed by the find's embedding).
+                    if (embVector) {
+                        this.embeddingArchive.tryInsert({
+                            hex: entry.hex,
+                            mnemonic: entry.mnemonic,
+                            score: entry.score,
+                            openEndedness: embedding.openEndedness,
+                            generation: this.generation,
+                            vector: embVector,
+                        });
+                        embeddingChanged = true;
+                    }
                 }
             }
         });
@@ -561,14 +662,17 @@ export class AutoExploreService {
         this.runnerUpHex = ranked.length > 1 ? ranked[1].r.hex : null;
 
         if (bestHex) this.championHex = bestHex;
-        if (bestScored && bestScored.baseScore > this._bestScoreSeen) this._bestScoreSeen = bestScored.baseScore;
+        // In target mode `reportScore` is the target-match cosine (labelled "match" in the UI); otherwise
+        // it's the statistical base score. Both `_bestScoreSeen` and the progress bestScore follow it.
+        if (bestScored && bestScored.reportScore > this._bestScoreSeen) this._bestScoreSeen = bestScored.reportScore;
 
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('generation', {
-            bestScore: bestScored ? bestScored.baseScore : 0,
+            bestScore: bestScored ? bestScored.reportScore : 0,
             bestHex,
             bestComponents: bestScored ? bestScored.scored.perComponent : null,
             perWorldScores,
             selectedWorldIndex: selectedIdx,
+            targetMode: this._targetMode,
         }));
     }
 
@@ -578,14 +682,17 @@ export class AutoExploreService {
      * IC, the SAME stored seed. The confirmation sees long-horizon outcomes (a quiet death, a late
      * cycle) the 160-tick screen can't (F2). Pure scoring/confirmation logic lives in
      * InterestingnessScore; this method just sequences the worker bursts. Returns null if aborted.
-     * @param {number} worldIndex
+     * @param {number} worldIndex - Which of the 9 workers runs this candidate (selects the proxy).
      * @param {string} hex
      * @param {number} token
+     * @param {number} [candidateIndex=worldIndex] - Position in the population; keys the reset seeds so
+     *   the trajectory is world-placement-independent (Stage 2). Defaults to worldIndex for callers that
+     *   don't decouple (populationSize 9 ⇒ candidateIndex === worldIndex).
      * @returns {Promise<{hex: string, perIC: object[], scored: object, screenScore: number,
      *   winMetrics: object, confirmed: {finalScore: number, cyclic: number|null, rejected: boolean}|null}|null>}
      */
-    async _screenAndConfirm(worldIndex, hex, token) {
-        const ev = await this._evaluateCandidate(worldIndex, hex, token);
+    async _screenAndConfirm(worldIndex, hex, token, candidateIndex = worldIndex) {
+        const ev = await this._evaluateCandidate(worldIndex, hex, token, candidateIndex);
         if (!ev || ev.perIC.length === 0 || token !== this._runToken) return null;
 
         const scored = scoreCandidate(ev.perIC, this._scoreConfig);
@@ -594,7 +701,16 @@ export class AutoExploreService {
 
         let confirmed = null;
         let embedding = null;
-        if (screenScore >= this.options.findThreshold && winMetrics.initialState) {
+        // Screening gate. Statistical mode: only candidates whose cheap screen clears `findThreshold` pay
+        // for confirmation. Target mode (v3.2): confirm EVERY candidate that survives the hard kills
+        // (extinct/saturated/frozen/short-cycle still die) regardless of the statistical score — the
+        // vision model, not the statistical proxy, must drive selection, or a prompt-matching-but-
+        // statistically-dull candidate would never be seen by the model. This is what makes it ASAL-faithful.
+        const winICScore = scored.perIC[scored.winningIC];
+        const passesGate = this._targetMode
+            ? !!(winICScore && !winICScore.killed)
+            : screenScore >= this.options.findThreshold;
+        if (passesGate && winMetrics.initialState) {
             if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
             const proxy = this.wm.worlds[worldIndex];
             proxy.resetWorld(winMetrics.initialState, winMetrics.seed);
@@ -646,10 +762,14 @@ export class AutoExploreService {
      * then advances the world in small sub-bursts, capturing one frame between each, and embeds every
      * frame with the (off-thread) foundation model. Returns `{ openEndedness, vector }` — the trajectory
      * novelty and the mean embedding (the perceptual archive key) — or null on any failure / abort /
-     * fewer than two usable embeddings (the caller then degrades gracefully).
+     * fewer than two usable embeddings (the caller then degrades gracefully). In supervised target mode
+     * (v3.2) it also returns `targetSimilarity`: the mean cosine similarity of the trajectory's frame
+     * embeddings to the run's target-prompt vector (mean is robust to one noisy frame). Raw cosine is
+     * stored — CLIP's image-text similarity range (~[0.1, 0.35]) is NOT renormalized, only relative
+     * order matters for selection.
      * @param {number} worldIndex
      * @param {number} token
-     * @returns {Promise<{openEndedness: number, vector: Float32Array}|null>}
+     * @returns {Promise<{openEndedness: number, vector: Float32Array, targetSimilarity?: number}|null>}
      */
     async _captureEmbedding(worldIndex, token) {
         if (!this.embeddingEnabled || !this.frameProvider || !this.embeddingProvider) return null;
@@ -688,7 +808,14 @@ export class AutoExploreService {
 
         const vector = meanVector(embeds);
         if (!vector) return null;
-        return { openEndedness: trajectoryNovelty(embeds), vector };
+        const result = { openEndedness: trajectoryNovelty(embeds), vector };
+        // Supervised target search (v3.2): score each frame against the prompt vector and average.
+        if (this._targetVector && this._targetVector.length) {
+            let sum = 0;
+            for (const e of embeds) sum += cosineSimilarity(e, this._targetVector);
+            result.targetSimilarity = sum / embeds.length;
+        }
+        return result;
     }
 
     /**
@@ -730,12 +857,15 @@ export class AutoExploreService {
      * worlds get a mix of champion×runner-up crossover children (when a runner-up exists — i.e. from
      * generation 1 on) and independent mutants of the champion. Crossover recombines two good
      * families, mutation explores around the champion — together they balance exploit and explore.
+     * At populationSize 9 the candidate list is the 3×3 grid; a larger population adds more crossover
+     * children + mutants in the same ascending-index / children-first order (the rng consumption order
+     * is unchanged, so a 9-candidate replay is byte-identical — pinned by the golden test).
      * @param {string} championHex
-     * @param {number} numWorlds
-     * @param {number} selectedIdx
+     * @param {number} populationSize
+     * @param {number} selectedIdx - Guaranteed < 9 ≤ populationSize (the selected world holds the champion).
      * @returns {string[]}
      */
-    _buildPopulation(championHex, numWorlds, selectedIdx) {
+    _buildPopulation(championHex, populationSize, selectedIdx) {
         const rs = this.wm.rulesetService;
         const { mutationRate, mutationMode, crossoverMode, crossoverChildren } = this.options;
         // Breeding respects the search's constraint mode: each inheritance unit (orbit group /
@@ -744,10 +874,10 @@ export class AutoExploreService {
         // subspace. An explicit crossoverMode option still overrides.
         const breedMode = crossoverMode || (mutationMode === 'single' ? 'uniform' : mutationMode);
         const referenceRuleset = hexToRuleset(championHex);
-        const population = new Array(numWorlds);
+        const population = new Array(populationSize);
 
         const otherIndices = [];
-        for (let i = 0; i < numWorlds; i++) if (i !== selectedIdx) otherIndices.push(i);
+        for (let i = 0; i < populationSize; i++) if (i !== selectedIdx) otherIndices.push(i);
         // Breed crossover children only when we have a distinct runner-up to cross with.
         const canBreed = this.runnerUpHex && this.runnerUpHex !== championHex;
         const numChildren = canBreed ? Math.min(crossoverChildren, otherIndices.length) : 0;
@@ -774,12 +904,13 @@ export class AutoExploreService {
 
     /**
      * Evaluate one candidate over the full IC suite on its world. Returns null if aborted.
-     * @param {number} worldIndex
+     * @param {number} worldIndex - The worker that runs the bursts.
      * @param {string} hex
      * @param {number} token
+     * @param {number} [candidateIndex=worldIndex] - Population position; keys the reset seeds.
      * @returns {Promise<{hex: string, perIC: object[]}|null>}
      */
-    async _evaluateCandidate(worldIndex, hex, token) {
+    async _evaluateCandidate(worldIndex, hex, token, candidateIndex = worldIndex) {
         const proxy = this.wm.worlds[worldIndex];
         if (!proxy) return null;
         const suite = this._activeICSuite || IC_SUITE;
@@ -787,7 +918,7 @@ export class AutoExploreService {
         for (let i = 0; i < suite.length; i++) {
             if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
             const ic = suite[i];
-            const seed = this._seedFor(worldIndex, i);
+            const seed = this._seedFor(candidateIndex, i);
             proxy.resetWorld(ic.initialState, seed);
             const result = await proxy.runEvaluation({
                 ticks: this.options.evalTicks,
@@ -801,9 +932,39 @@ export class AutoExploreService {
         return { hex, perIC };
     }
 
-    /** Deterministic per-(generation, world, IC) reset seed; stored on the winning find for replay. */
-    _seedFor(worldIndex, icIndex) {
-        return this._exploreBaseSeed + this.generation * 9973 + worldIndex * 97 + icIndex;
+    /**
+     * Deterministic per-(generation, candidate, IC) reset seed; stored on the winning find for replay.
+     * Keyed by CANDIDATE index (not world index) so the trajectory is independent of which of the 9
+     * workers happens to evaluate a candidate — at populationSize 9 the candidate index equals the world
+     * index, so seeds are byte-identical to the pre-Stage-2 code (the golden test pins this). Collision
+     * analysis: `gen*9973 + candidate*97 + ic` is distinct for every (gen ≤ 50, candidate < 144, ic < 7)
+     * — the first collision needs Δcandidate ≈ 2776 (see tests/autoExploreDeterminism.test.js).
+     */
+    _seedFor(candidateIndex, icIndex) {
+        return this._exploreBaseSeed + this.generation * 9973 + candidateIndex * 97 + icIndex;
+    }
+
+    /**
+     * Resolve the effective population size for this run: the configured `populationSize`, sanitized to
+     * an integer clamped to [POPULATION_MIN, POPULATION_MAX], defaulting to 9 (byte-identical replay).
+     * @returns {number}
+     */
+    _resolvePopulationSize() {
+        const raw = this.options.populationSize;
+        if (!Number.isFinite(raw)) return EXPLORE_CONFIG.populationSize;
+        return Math.min(POPULATION_MAX, Math.max(POPULATION_MIN, Math.floor(raw)));
+    }
+
+    /**
+     * Resolve the target-mode banking threshold (v3.2): the configured `targetBankThreshold`, clamped to
+     * a sane cosine range, defaulting to EXPLORE_CONFIG's 0.22. Entries whose trajectory→prompt cosine
+     * clears this are banked into the gallery.
+     * @returns {number}
+     */
+    _resolveTargetBankThreshold() {
+        const raw = Number(this.options.targetBankThreshold);
+        if (!Number.isFinite(raw)) return EXPLORE_CONFIG.targetBankThreshold;
+        return Math.min(1, Math.max(0, raw));
     }
 
     /**
@@ -816,12 +977,15 @@ export class AutoExploreService {
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
      * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
-     * @param {{openEndedness: number, vector: Float32Array}|null} [embedding] Perceptual trajectory
-     *   result (v3.0); when present, its open-endedness term is overlaid onto the (screen-derived)
-     *   component breakdown so the gallery bar reflects the perceptual signal the confirmation measured.
+     * @param {{openEndedness: number, vector: Float32Array, targetSimilarity?: number}|null} [embedding]
+     *   Perceptual trajectory result (v3.0); when present, its open-endedness term is overlaid onto the
+     *   (screen-derived) component breakdown so the gallery bar reflects the perceptual signal the
+     *   confirmation measured, and its `targetSimilarity` (v3.2) is stored for the target-match chip.
+     * @param {string|null} [cellKeyOverride] Perceptual SimHash cell the entry is banked under (v3.2);
+     *   sets `descriptorKind: 'embedding'` so persistence preserves the (unrecomputable) key on reload.
      * @returns {import('./analysis/BehaviorArchive.js').ArchiveEntry}
      */
-    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, embedding = null) {
+    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, embedding = null, cellKeyOverride = null) {
         // Screening is model-free, so its perComponent has no perceptual term. The open-endedness is
         // measured during confirmation; overlay it (the half-saturation reward + flag) so the gallery's
         // "Novelty" bar shows it. The other eight terms keep their screen values (screening measures them).
@@ -850,6 +1014,11 @@ export class AutoExploreService {
             cyclic: confirmed.cyclic,
             thumb: thumb || null,
             openEndedness: embedding && Number.isFinite(embedding.openEndedness) ? embedding.openEndedness : undefined,
+            // Supervised target search (v3.2): the trajectory→prompt match, for the gallery "target" chip.
+            targetSimilarity: embedding && Number.isFinite(embedding.targetSimilarity) ? embedding.targetSimilarity : undefined,
+            // Which descriptor keyed this entry (roadmap #3): 'embedding' when banked under a perceptual
+            // SimHash cell, else 'stats'. loadEntries preserves the opaque embedding key on reload.
+            descriptorKind: cellKeyOverride ? 'embedding' : 'stats',
             perComponent,
             winningIC: scored.winningIC,
             icLabel: winMetrics.icLabel,

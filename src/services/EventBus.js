@@ -35,6 +35,36 @@ function logEvent(eventType, data) {
     );
 }
 
+/**
+ * Registered-event set, built lazily from `EVENTS` (which is defined below this object). Dev-only guard:
+ * a subscribe/dispatch with a name that isn't a registered `EVENTS` value is almost always a typo or a
+ * raw string literal that will silently never match — surface it once per bad name.
+ * @type {Set<string>|null}
+ */
+let _knownEvents = null;
+const _warnedUnknownEvents = new Set();
+
+/**
+ * @returns {boolean} Whether the dev-only build (Vite `import.meta.env.DEV`) is active. Guarded so the
+ * module still loads where `import.meta.env` is undefined (e.g. a non-Vite runtime).
+ */
+function isDevBuild() {
+    try { return !!(/** @type {any} */ (import.meta).env?.DEV); } catch { return false; }
+}
+
+/**
+ * Dev-only: warn (once per name) when an event name isn't a registered `EVENTS` value.
+ * @param {string} op - 'subscribe' | 'dispatch' (for the message).
+ * @param {string} eventType
+ */
+function warnIfUnknownEvent(op, eventType) {
+    if (!isDevBuild()) return;
+    if (!_knownEvents) _knownEvents = new Set(Object.values(EVENTS));
+    if (_knownEvents.has(eventType) || _warnedUnknownEvents.has(eventType)) return;
+    _warnedUnknownEvents.add(eventType);
+    console.warn(`EventBus.${op}: "${eventType}" is not a registered EVENTS value (typo or raw string literal?).`);
+}
+
 export const EventBus = {
     /**
      * @param {string} eventType
@@ -42,6 +72,7 @@ export const EventBus = {
      * @returns {() => void} Unsubscribe function.
      */
     subscribe(eventType, callback) {
+        warnIfUnknownEvent('subscribe', eventType);
         if (!subscriptions[eventType]) {
             subscriptions[eventType] = [];
         }
@@ -63,6 +94,7 @@ export const EventBus = {
      * @param {*} [data] - The event payload (see `EVENTS` for per-event shapes).
      */
     dispatch(eventType, data) {
+        warnIfUnknownEvent('dispatch', eventType);
         logEvent(eventType, data);
         if (subscriptions[eventType]) {
             [...subscriptions[eventType]].forEach(callback => {
@@ -383,7 +415,7 @@ export const EVENTS = {
     COMMAND_APPLY_EXPLORE_FIND: 'command:applyExploreFind',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry}} data - Re-evaluate a gallery find on the selected world over a confirmation-length burst and update its stored score. Only valid when no run is active. */
     COMMAND_RETEST_EXPLORE_FIND: 'command:retestExploreFind',
-    /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null, perWorldScores?: Array<{score:number, killed:boolean, killReason:string|null}|null>, selectedWorldIndex?: number}} data - Auto-explore loop progress (per generation + lifecycle transitions). */
+    /** @param {{phase: string, state: 'idle'|'running'|'paused', generation: number, championHex: string|null, gallerySize: number, bestScore?: number, bestHex?: string, bestComponents?: object|null, perWorldScores?: Array<{score:number, killed:boolean, killReason:string|null}|null>, selectedWorldIndex?: number, targetMode?: boolean}} data - Auto-explore loop progress (per generation + lifecycle transitions). In target mode (v3.2) `bestScore` is the best target-match cosine, not the statistical score. */
     EXPLORE_PROGRESS: 'explore:progress',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */
     EXPLORE_FIND_ADDED: 'explore:findAdded',
@@ -391,6 +423,8 @@ export const EVENTS = {
     COMMAND_SET_EMBEDDING_ENABLED: 'command:setEmbeddingEnabled',
     /** @param {{modelId: string}} data - Switch the perceptual objective's CLIP checkpoint (v3.1; one of EmbeddingService's EMBEDDING_MODELS ids). Refused while a search is running; a switch replaces the model-specific perceptual archive (cells from different embedding spaces are not comparable). */
     COMMAND_SET_EMBEDDING_MODEL: 'command:setEmbeddingModel',
+    /** @param {{prompt: string}} data - Set the supervised target-search prompt ("find life that looks like…", v3.2, ASAL). Persisted as the `exploreTargetPrompt` UI setting and read at the next Start (threaded into COMMAND_START_AUTO_EXPLORE options like `scoring`); empty ⇒ the statistical/open-ended pipeline unchanged. Target mode also requires the CLIP embedding objective to be enabled. */
+    COMMAND_SET_EXPLORE_TARGET_PROMPT: 'command:setExploreTargetPrompt',
     /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean}} data - The perceptual-objective embedding provider changed status (toggled, model loading, ready, or degraded after a failure). */
     EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
 };

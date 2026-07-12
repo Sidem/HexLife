@@ -621,3 +621,55 @@
 .explore-embedding-model-hint {
     line-height: 1.35;
 }
+
+/* --- Supervised target search (v3.2, ASAL) --- */
+.explore-target-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.explore-target-input {
+    padding: 5px 8px;
+    background-color: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary, #e6e6ea);
+    font-size: 0.9em;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.explore-target-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.explore-mode-chip {
+    font-size: 0.7em;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    color: var(--text-muted, #87878f);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.explore-mode-chip[data-mode="open"] { color: var(--accent, #5a9bd4); }
+.explore-mode-chip[data-mode="target"] { color: var(--success, #4caf50); }
+
+.explore-target-advanced {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.explore-find-target {
+    font-size: 0.72em;
+    color: var(--success, #4caf50);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0 6px;
+    white-space: nowrap;
+}

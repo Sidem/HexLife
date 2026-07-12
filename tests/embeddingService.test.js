@@ -165,6 +165,96 @@ describe('EmbeddingService — enable/disable lifecycle', () => {
     });
 });
 
+// --- v3.2: text-prompt embedding (supervised target search) ------------------
+
+describe('EmbeddingService — embedText (v3.2)', () => {
+    async function ready() {
+        const { svc, worker } = makeService(true);
+        const p = svc.ensureReady();
+        worker().emit({ type: 'READY' });
+        await p;
+        return { svc, worker };
+    }
+
+    it('posts EMBED_TEXT and resolves the returned vector', async () => {
+        const { svc, worker } = await ready();
+        const p = svc.embedText('spirals');
+        const sent = worker().lastOfType('EMBED_TEXT');
+        expect(sent).toBeTruthy();
+        expect(sent.text).toBe('spirals');
+        const vec = new Float32Array([0.6, 0.8]);
+        worker().emit({ type: 'EMBED_TEXT_RESULT', id: sent.id, embedding: vec.buffer });
+        const out = await p;
+        expect(out).toBeInstanceOf(Float32Array);
+        expect(Array.from(out)).toEqual([Math.fround(0.6), Math.fround(0.8)]);
+    });
+
+    it('trims the prompt and resolves null on empty/disabled', async () => {
+        const { svc, worker } = await ready();
+        const before = worker().posted.length;
+        expect(await svc.embedText('   ')).toBeNull();
+        expect(worker().posted.length).toBe(before); // nothing posted for an empty prompt
+
+        const disabled = makeService(false).svc;
+        expect(await disabled.embedText('spirals')).toBeNull();
+    });
+
+    it('resolves null on EMBED_TEXT_ERROR', async () => {
+        const { svc, worker } = await ready();
+        const p = svc.embedText('maze');
+        const sent = worker().lastOfType('EMBED_TEXT');
+        worker().emit({ type: 'EMBED_TEXT_ERROR', id: sent.id, error: 'text tower failed' });
+        expect(await p).toBeNull();
+    });
+
+    it('times out to null when the worker never replies', async () => {
+        vi.useFakeTimers();
+        try {
+            const { svc: s2, worker: w2 } = makeService(true, { embedTimeoutMs: 50 });
+            const r = s2.ensureReady();
+            w2().emit({ type: 'READY' });
+            await r;
+            const p = s2.embedText('gliders');
+            await vi.advanceTimersByTimeAsync(60);
+            expect(await p).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('caches a resolved prompt: a repeat resolves without a second EMBED_TEXT', async () => {
+        const { svc, worker } = await ready();
+        const p1 = svc.embedText('spirals');
+        const sent = worker().lastOfType('EMBED_TEXT');
+        worker().emit({ type: 'EMBED_TEXT_RESULT', id: sent.id, embedding: new Float32Array([1, 0]).buffer });
+        await p1;
+        const postsAfterFirst = worker().posted.filter((m) => m.type === 'EMBED_TEXT').length;
+
+        const out2 = await svc.embedText('spirals'); // same (modelId, prompt) ⇒ cache hit
+        expect(Array.from(out2)).toEqual([1, 0]);
+        expect(worker().posted.filter((m) => m.type === 'EMBED_TEXT').length).toBe(postsAfterFirst);
+    });
+
+    it('teardown clears the prompt cache (a model switch re-embeds)', async () => {
+        const { svc, worker } = await ready();
+        const p1 = svc.embedText('spirals');
+        const s1 = worker().lastOfType('EMBED_TEXT');
+        worker().emit({ type: 'EMBED_TEXT_RESULT', id: s1.id, embedding: new Float32Array([1, 0]).buffer });
+        await p1;
+
+        svc.setModel(EMBEDDING_MODELS[1].id); // teardown → cache cleared, fresh worker
+        worker().emit({ type: 'READY' });
+        await svc.ensureReady();
+
+        const p2 = svc.embedText('spirals'); // must round-trip again (cache was cleared)
+        const s2 = worker().lastOfType('EMBED_TEXT');
+        expect(s2).toBeTruthy();
+        expect(s2.id).not.toBe(s1.id);
+        worker().emit({ type: 'EMBED_TEXT_RESULT', id: s2.id, embedding: new Float32Array([0, 1]).buffer });
+        expect(Array.from(await p2)).toEqual([0, 1]);
+    });
+});
+
 // --- v3.1: user-selectable CLIP checkpoint -----------------------------------
 
 describe('EmbeddingService - model selection (v3.1)', () => {
