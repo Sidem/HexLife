@@ -19,7 +19,7 @@ Design rulesets, draw life into the grid, and watch complex behavior emerge acro
 
 <img src="docs/media/mossy-bramble.gif" alt="A rotationally symmetric ruleset ('mossy bramble') growing from a single hexagonal seed, with rule-based coloring" width="49%" /> <img src="docs/media/mossy-bramble-mono.gif" alt="The same 'mossy bramble' ruleset rendered in plain monochrome cell states" width="49%" />
 
-<sub>One ruleset, two views — *mossy bramble* growing from a single seed. Right: plain cell states. Left: **rule-based coloring**, where each cell is tinted by which of the 128 rules fired — the dynamics become a visible fingerprint.</sub>
+<sub>One ruleset, two views — [*mossy bramble*](https://sidem.github.io/HexLife/?r=1208058540338537121906D3452DB35F) growing from a seed. Right: plain cell states. Left: **rule-based coloring**, where each cell is tinted by rules fired (respecting rotational symmetry), the dynamics become a visible fingerprint.</sub>
 
 </div>
 
