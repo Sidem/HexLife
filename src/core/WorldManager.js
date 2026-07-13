@@ -4,13 +4,12 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
-import { AutoExploreService, EXPLORE_CONFIG } from './AutoExploreService.js';
+import { AutoExploreService } from './AutoExploreService.js';
 import { EmbeddingService, EMBEDDING_CONFIG, EMBEDDING_MODELS } from '../services/EmbeddingService.js';
-import { scoreSingleIC } from './analysis/InterestingnessScore.js';
-import { sanitizeScoring, buildScoreConfig } from './analysis/ScoringPresets.js';
 import { ShareCodec } from '../services/ShareCodec.js';
-import * as Renderer from '../rendering/renderer.js';
-import { generateThumbnailLUT } from '../utils/ruleVizUtils.js';
+import { ThumbnailBakeService } from './ThumbnailBakeService.js';
+import { ExploreSessionCoordinator } from './ExploreSessionCoordinator.js';
+import { ScrubHistoryController } from './ScrubHistoryController.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
 
 export class WorldManager {
@@ -22,10 +21,9 @@ export class WorldManager {
         this.brushController = null;
         this.selectedWorldIndex = sharedSettings.selectedWorldIndex ?? Config.DEFAULT_SELECTED_WORLD_INDEX;
         this.isGloballyPaused = true;
-        // State-history scrub-back: the user's current view position on the selected world's recorded
-        // history (offset ticks back from the live tip; 0 = present) and whether they're parked there.
-        this.scrubOffset = 0;
-        this.isScrubbing = false;
+        // State-history scrub-back (selected world) is coordinated by ScrubHistoryController, which owns
+        // the view position + isScrubbing; the select-world and pause paths call into it.
+        this.scrubHistoryController = new ScrubHistoryController(this);
         this.deterministic = PersistenceService.loadUISetting('deterministic', true); // Add this
         this._hoverAffectedIndicesSet = new Set();
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);
@@ -34,10 +32,14 @@ export class WorldManager {
         this.rulesetService = new RulesetService(this.symmetryData);
         this.worldSettings = [];
         this.initialDefaultRulesetHex = "";
-        // While a thumbnail-bake batch borrows a scratch world, its evaluation-burst STATE_UPDATE echoes
-        // must NOT reconcile persisted worldSettings / fire UI ruleset events for that world (they carry
-        // the transient baked ruleset, not the world's real one). -1 = no bake in flight.
-        this._bakingWorldIndex = -1;
+        // Ruleset Library preview baking (borrow-and-restore on a scratch world). Owns the "currently
+        // baking world" index that _handleProxyUpdate reads to suppress a bake's transient burst echoes.
+        // Constructed before _initWorlds so the guard reference exists before any proxy update arrives.
+        this.thumbnailBakeService = new ThumbnailBakeService(this);
+        // Borrow-worlds session helper: auto-explore snapshot/restore, candidate application, render
+        // captures, and the Analysis panel's on-demand measure. Constructed before the AutoExploreService
+        // below so its lazily-invoked capture providers can resolve through this coordinator.
+        this.exploreSessionCoordinator = new ExploreSessionCoordinator(this);
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
         // Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
@@ -221,7 +223,7 @@ export class WorldManager {
         // A thumbnail bake batch is borrowing this world: its bursts carry a transient ruleset/state,
         // so don't let those echoes clobber persisted worldSettings or fire UI updates for it. The
         // batch restores the world and dispatches its true state when it finishes.
-        if (worldIndex === this._bakingWorldIndex) return;
+        if (worldIndex === this.thumbnailBakeService.bakingWorldIndex) return;
 
         const stats = proxy.getLatestStats();
 
@@ -330,23 +332,16 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_SELECT_WORLD, (newIndex) => {
             const prevIndex = this.selectedWorldIndex;
             if (newIndex !== prevIndex) {
-                // Hand scrub-back capture from the old selected world to the new one (one world records
-                // at a time → bounded memory). Leaving the old world's scrub state intact would strand
-                // it parked on a past frame, so resume it before clearing its capture.
-                if (this.isScrubbing) this.worlds[prevIndex]?.resumeHistory();
-                this.worlds[prevIndex]?.setHistoryCapture(false);
-                this.worlds[newIndex]?.setHistoryCapture(true);
-                this.isScrubbing = false;
-                this.scrubOffset = 0;
+                this.scrubHistoryController.handleWorldSelected(prevIndex, newIndex);
             }
             this.selectedWorldIndex = newIndex;
             this.dispatchSelectedWorldUpdates();
             EventBus.dispatch(EVENTS.SELECTED_WORLD_CHANGED, newIndex);
-            this._dispatchScrubState();
+            this.scrubHistoryController.dispatchScrubState();
         });
-        EventBus.subscribe(EVENTS.COMMAND_SCRUB_HISTORY, (data) => this.scrubSelectedHistory(data?.offset ?? 0));
-        EventBus.subscribe(EVENTS.COMMAND_STATE_STEP, (data) => this.stepSelectedHistory(data?.delta ?? 0));
-        EventBus.subscribe(EVENTS.COMMAND_EXIT_SCRUB, () => this.exitScrub());
+        EventBus.subscribe(EVENTS.COMMAND_SCRUB_HISTORY, (data) => this.scrubHistoryController.scrubSelectedHistory(data?.offset ?? 0));
+        EventBus.subscribe(EVENTS.COMMAND_STATE_STEP, (data) => this.scrubHistoryController.stepSelectedHistory(data?.delta ?? 0));
+        EventBus.subscribe(EVENTS.COMMAND_EXIT_SCRUB, () => this.scrubHistoryController.exitScrub());
         EventBus.subscribe(EVENTS.COMMAND_SET_ENTROPY_SAMPLING, (data) => {
             this.isEntropySamplingEnabled = data.enabled;
             this.entropySampleRate = data.rate;
@@ -965,75 +960,11 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
     }
 
-    // --- State-history scrub-back -------------------------------------------
-    // Emit the selected world's current scrub availability/position so the transport bar can render.
-    _dispatchScrubState = () => {
-        const proxy = this.worlds[this.selectedWorldIndex];
-        const length = proxy?.getLatestStats().historyLength ?? 0;
-        EventBus.dispatch(EVENTS.STATE_HISTORY_CHANGED, {
-            worldIndex: this.selectedWorldIndex,
-            length,
-            offset: this.scrubOffset,
-            isScrubbing: this.isScrubbing,
-        });
-    }
-
-    // Park the selected world on `offset` ticks back from its live tip. Pauses globally first (you
-    // can't sensibly scrub a running grid), then drives the worker's destructive playback.
-    scrubSelectedHistory = (offset) => {
-        const idx = this.selectedWorldIndex;
-        const proxy = this.worlds[idx];
-        if (!proxy) return;
-        const length = proxy.getLatestStats().historyLength ?? 0;
-        if (length === 0) return;
-        if (!this.isGloballyPaused) this.setGlobalPause(true);
-        this.scrubOffset = Math.max(0, Math.min(length - 1, Math.round(offset) || 0));
-        this.isScrubbing = true;
-        proxy.scrubHistory(this.scrubOffset);
-        this._dispatchScrubState();
-    }
-
-    // Step the scrub position by `delta` ticks (positive = back, negative = forward). Forward past the
-    // live tip advances the simulation one tick instead (a genuine single-step-forward while paused).
-    stepSelectedHistory = (delta) => {
-        const idx = this.selectedWorldIndex;
-        const proxy = this.worlds[idx];
-        if (!proxy) return;
-        if (!this.isGloballyPaused) this.setGlobalPause(true);
-        const length = proxy.getLatestStats().historyLength ?? 0;
-        const target = this.scrubOffset + (Math.round(delta) || 0);
-        if (target < 0) {
-            // Forward past the tip: advance the live sim. Drops scrub mode (the worker truncates).
-            this.isScrubbing = false;
-            this.scrubOffset = 0;
-            proxy.stepHistoryLive();
-        } else {
-            if (length === 0) return;
-            this.scrubOffset = Math.min(target, length - 1);
-            this.isScrubbing = true;
-            proxy.scrubHistory(this.scrubOffset);
-        }
-        this._dispatchScrubState();
-    }
-
-    // Leave scrub mode and return the selected world to its live tip (without resuming play).
-    exitScrub = () => {
-        if (!this.isScrubbing) return;
-        this.worlds[this.selectedWorldIndex]?.resumeHistory();
-        this.isScrubbing = false;
-        this.scrubOffset = 0;
-        this._dispatchScrubState();
-    }
-
     setGlobalPause = (isPaused) => {
         // Resuming play from a scrubbed-back frame: leave scrub mode so ticking continues forward from
         // the viewed frame (the worker also self-heals on START_SIMULATION, but clear our state here).
-        if (!isPaused && this.isScrubbing) {
-            this.worlds[this.selectedWorldIndex]?.resumeHistory();
-            this.isScrubbing = false;
-            this.scrubOffset = 0;
-            this._dispatchScrubState();
-        }
+        // exitScrub is a no-op when not scrubbing, so the unconditional call matches the prior guard.
+        if (!isPaused) this.scrubHistoryController.exitScrub();
         this.isGloballyPaused = isPaused;
         this.worlds.forEach(proxy => {
             if (this.isGloballyPaused || !proxy.getLatestStats().isEnabled) {
@@ -1052,163 +983,18 @@ export class WorldManager {
         }
     }
 
-    // --- Auto-explore support (Phase 4) -------------------------------------
+    // --- Auto-explore / measurement session (owned by ExploreSessionCoordinator) -------------
     // The AutoExploreService owns the search loop but mutates worlds through these helpers so the
-    // proxy/persistence dance stays in WorldManager. They deliberately avoid spamming localStorage
-    // and ruleset history during the search; the snapshot/restore pair brackets a whole session.
-
-    /** Snapshot the pre-explore worlds (rulesets, initial states, enabled flags) + pause state. */
-    _captureAutoExploreSnapshot = () => ({
-        isGloballyPaused: this.isGloballyPaused,
-        worlds: this.worldSettings.map(ws => ({
-            rulesetHex: ws.rulesetHex,
-            initialState: structuredClone(ws.initialState),
-            enabled: ws.enabled,
-        })),
-    });
-
-    /** Enable (or disable) every world for a full-grid search, without starting normal ticking. */
-    _setAllWorldsEnabledForExplore = (enabled) => {
-        this.worlds.forEach((proxy, idx) => {
-            if (this.worldSettings[idx]) this.worldSettings[idx].enabled = enabled;
-            proxy.setEnabled(enabled);
-        });
-        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-    };
-
-    /**
-     * Apply a candidate ruleset to a world during exploration. Lightweight: uploads to the worker and
-     * keeps `worldSettings.rulesetHex` in sync (so the worker's STATS echo doesn't re-trigger a
-     * persist), but pushes no history and writes no localStorage — the session is bracketed by
-     * snapshot/restore. Dispatches RULESET_CHANGED for the selected world so the UI tracks the champion.
-     */
-    _applyExploreRuleset = (worldIndex, hex) => {
-        const proxy = this.worlds[worldIndex];
-        const settings = this.worldSettings[worldIndex];
-        if (!proxy || !settings || hex === "Error") return;
-        proxy.setRuleset(hexToRuleset(hex).buffer.slice(0));
-        settings.rulesetHex = hex;
-        if (worldIndex === this.selectedWorldIndex) EventBus.dispatch(EVENTS.RULESET_CHANGED, hex);
-    };
-
-    /**
-     * Capture a small JPEG thumbnail of a world's current render for the explore gallery (v2.6, F6).
-     * Waits up to two animation frames so the renderer has a chance to draw the world's final eval
-     * frame (the worker posts a grid update before EVALUATION_RESULT) before reading its FBO. Resolves
-     * to null on any failure so the search loop never throws on capture (it also time-boxes the call).
-     * @param {number} worldIndex
-     * @returns {Promise<string|null>}
-     */
-    _captureExploreThumbnail = (worldIndex) => new Promise((resolve) => {
-        try {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    try {
-                        resolve(Renderer.captureWorldThumbnail(worldIndex));
-                    } catch {
-                        resolve(null);
-                    }
-                });
-            });
-        } catch {
-            resolve(null);
-        }
-    });
-
-    /**
-     * Capture a BAKED thumbnail with the fixed monochrome luminance LUT instead of the live palette
-     * (see {@link generateThumbnailLUT}) so library previews are comparable across entries and
-     * CVD-proof regardless of the user's Chroma Lab choice. Same two-rAF wait + never-throws contract
-     * as {@link _captureExploreThumbnail} (which stays live-palette: the explore gallery deliberately
-     * shows "what you see").
-     * @param {number} worldIndex
-     * @returns {Promise<string|null>}
-     */
-    _captureBakedThumbnail = (worldIndex) => new Promise((resolve) => {
-        try {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    try {
-                        resolve(Renderer.captureWorldThumbnailWithLUT(worldIndex, generateThumbnailLUT()));
-                    } catch {
-                        resolve(null);
-                    }
-                });
-            });
-        } catch {
-            resolve(null);
-        }
-    });
-
-    /**
-     * Capture a world's current render as raw ImageData for the perceptual objective's embedding worker
-     * (v3.0). Same two-rAF wait as the thumbnail capture (let the renderer draw the world's latest eval
-     * frame before reading its FBO); resolves null on any failure so the search never throws on capture.
-     * @param {number} worldIndex
-     * @returns {Promise<ImageData|null>}
-     */
-    _captureExploreFrame = (worldIndex) => new Promise((resolve) => {
-        try {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    try {
-                        resolve(Renderer.captureWorldImageData(worldIndex));
-                    } catch {
-                        resolve(null);
-                    }
-                });
-            });
-        } catch {
-            resolve(null);
-        }
-    });
-
-    /**
-     * Restore the worlds captured by {@link _captureAutoExploreSnapshot}. Re-applies each world's
-     * ruleset (without history), initial state and enabled flag, resets the grids, and restores the
-     * pre-explore pause state.
-     * @param {object} snapshot
-     * @param {{adoptChampionHex?: string|null}} [opts] - When `adoptChampionHex` is set, the selected
-     *   world keeps that ruleset (user adopted the find) instead of its pre-explore one.
-     */
-    _restoreAutoExploreSnapshot = (snapshot, opts = {}) => {
-        if (!snapshot) return;
-        const adoptHex = opts.adoptChampionHex || null;
-        const baseSeed = Date.now();
-        snapshot.worlds.forEach((snap, idx) => {
-            const settings = this.worldSettings[idx];
-            const proxy = this.worlds[idx];
-            if (!settings || !proxy) return;
-            const restoreHex = (adoptHex && idx === this.selectedWorldIndex) ? adoptHex : snap.rulesetHex;
-            settings.initialState = structuredClone(snap.initialState);
-            settings.enabled = snap.enabled;
-            proxy.setEnabled(snap.enabled);
-            this._commitRuleset(idx, restoreHex, {
-                addToHistory: false,
-                reset: true,
-                seed: this._getResetSeed(baseSeed, idx),
-            });
-        });
-        // Restore the pre-explore pause state (starts/stops enabled worlds as appropriate).
-        this.setGlobalPause(snapshot.isGloballyPaused);
-        PersistenceService.saveWorldSettings(this.worldSettings);
-        EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
-        EventBus.dispatch(EVENTS.ALL_WORLDS_RESET);
-        // NB: do NOT call dispatchSelectedWorldUpdates here — it reconciles worldSettings from the
-        // proxy's *cached* stats, which still hold the champion hex (the worker hasn't echoed the
-        // just-pushed restored ruleset yet) and would clobber the restore. Dispatch the restored
-        // truth directly instead; the worker's RESET_WORLD stats echo then re-syncs the proxy cache.
-        const selIdx = this.selectedWorldIndex;
-        const selHex = this.worldSettings[selIdx]?.rulesetHex;
-        if (selHex) {
-            EventBus.dispatch(EVENTS.RULESET_CHANGED, selHex);
-            PersistenceService.saveRuleset(selHex);
-            const selStats = this.worlds[selIdx]?.getLatestStats();
-            if (selStats) {
-                EventBus.dispatch(EVENTS.WORLD_STATS_UPDATED, { ...selStats, rulesetHex: selHex, worldIndex: selIdx });
-            }
-        }
-    };
+    // proxy/persistence dance stays out of the loop; the snapshot/restore pair brackets a whole
+    // session. The bodies live in ExploreSessionCoordinator now; these thin delegators preserve the
+    // surface AutoExploreService calls (and that the determinism/target tests mock on a fake wm), and
+    // the capture providers passed to AutoExploreService above.
+    _captureAutoExploreSnapshot = () => this.exploreSessionCoordinator._captureAutoExploreSnapshot();
+    _setAllWorldsEnabledForExplore = (enabled) => this.exploreSessionCoordinator._setAllWorldsEnabledForExplore(enabled);
+    _applyExploreRuleset = (worldIndex, hex) => this.exploreSessionCoordinator._applyExploreRuleset(worldIndex, hex);
+    _captureExploreThumbnail = (worldIndex) => this.exploreSessionCoordinator._captureExploreThumbnail(worldIndex);
+    _captureExploreFrame = (worldIndex) => this.exploreSessionCoordinator._captureExploreFrame(worldIndex);
+    _restoreAutoExploreSnapshot = (snapshot, opts) => this.exploreSessionCoordinator._restoreAutoExploreSnapshot(snapshot, opts);
 
     setGlobalSpeed = (speed) => {
         const newSpeed = Math.max(1, Math.min(Config.MAX_SIM_SPEED, speed));
@@ -1319,244 +1105,16 @@ export class WorldManager {
         });
     }
 
-    /**
-     * Run a one-off "interestingness" measurement on the selected world WITHOUT disturbing it, for the
-     * Analysis panel's on-demand metrics. Snapshots the exact current cells + tick, runs one evaluation
-     * burst (the SAME machinery Auto-Explore uses — `RUN_EVALUATION`), scores it with `scoreSingleIC`,
-     * then restores the snapshot so the burst doesn't fast-forward the user's world. Compute-intensive
-     * (especially the σ damage probe), hence on-demand rather than live.
-     * @param {{ticks?: number, probe?: boolean}} [opts] - `ticks` burst length; `probe` enables the σ probe.
-     * @returns {Promise<{score:number, components:object, killed:boolean, killReason:(string|null), tick:number}|null>}
-     */
-    measureSelectedWorld = async ({ ticks = EXPLORE_CONFIG.evalTicks, probe = true } = {}) => {
-        if (this.autoExploreService?.isRunning()) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop Auto-Explore before measuring a world.', type: 'error' });
-            return null;
-        }
-        const idx = this.selectedWorldIndex;
-        const proxy = this.worlds[idx];
-        if (!proxy) return null;
+    // The Analysis panel's on-demand non-destructive measurement now lives in
+    // ExploreSessionCoordinator; this delegator preserves the surface AnalysisComponent calls.
+    measureSelectedWorld = (opts) => this.exploreSessionCoordinator.measureSelectedWorld(opts);
 
-        const hex = this.getCurrentRulesetHex();
-        if (!hex || hex === 'Error' || hex === 'N/A') {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Selected world has no valid ruleset to measure.', type: 'error' });
-            return null;
-        }
-
-        // Snapshot the exact pre-measure state (cells + tick) for a non-destructive restore.
-        const savedCells = proxy.latestStateArray ? new Uint8Array(proxy.latestStateArray) : null;
-        if (!savedCells || savedCells.length !== Config.NUM_CELLS) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready to measure yet.', type: 'error' });
-            return null;
-        }
-        const savedTick = proxy.getLatestStats().tick || 0;
-        const rulesetArray = this.getCurrentRulesetArray();
-
-        try {
-            const metrics = await proxy.runEvaluation({
-                ticks,
-                sampleEvery: EXPLORE_CONFIG.sampleEvery,
-                warmupTicks: EXPLORE_CONFIG.warmupTicks,
-                probe: { enabled: !!probe, probeTicks: EXPLORE_CONFIG.probeTicks },
-            });
-            // Score under the user's CURRENT scoring settings (v3.1) so the Analysis panel matches
-            // what a run started right now would compute (defaults when the setting is absent).
-            const scoreCfg = buildScoreConfig(sanitizeScoring(PersistenceService.loadUISetting('exploreScoring', null)));
-            const scored = scoreSingleIC({ ...metrics, icLabel: 'measure' }, scoreCfg);
-            return {
-                score: scored.score,
-                components: scored.components,
-                killed: scored.killed,
-                killReason: scored.killReason,
-                raw: scored.raw,
-                tick: savedTick,
-            };
-        } finally {
-            // Restore the exact pre-measure cells/tick (LOAD_STATE rewrites the worker buffers).
-            proxy.sendCommand('LOAD_STATE', {
-                newStateBuffer: savedCells.buffer.slice(0),
-                newRulesetBuffer: rulesetArray.buffer.slice(0),
-                worldTick: savedTick,
-            }, [savedCells.buffer.slice(0), rulesetArray.buffer.slice(0)]);
-        }
-    }
-
-    /**
-     * Pick a scratch world for thumbnail baking: a non-selected, enabled, initialized world. Baking
-     * borrows it (evolve → capture → restore) so the user's large SELECTED view is never disturbed —
-     * only that world's small minimap cell briefly flickers. Enabled is required because a disabled
-     * world's FBO renders the "disabled" overlay, not the evolved cells, so its capture would be blank.
-     * Starts scanning just after the selected world for a stable, deterministic choice. Returns -1 when
-     * no other enabled world is available (falls back to no-op baking → glyph placeholders).
-     * @returns {number}
-     */
-    _pickScratchWorldIndex = () => {
-        const sel = this.selectedWorldIndex;
-        const n = this.worlds.length;
-        for (let step = 1; step < n; step++) {
-            const idx = (sel + step) % n;
-            const proxy = this.worlds[idx];
-            if (proxy?.isInitialized && this.worldSettings[idx]?.enabled) return idx;
-        }
-        return -1;
-    };
-
-    /**
-     * Bracket a sequence of thumbnail bakes on a scratch (non-selected) world — the "borrow-and-restore"
-     * engine behind the Ruleset Library previews. Snapshots the scratch world's exact cells/tick/ruleset
-     * ONCE, suppresses its burst echoes from reconciling worldSettings (via `_bakingWorldIndex`), runs
-     * `body(bake)` — where each `bake(job)` applies a ruleset, seed-resets to an IC, evolves a burst and
-     * captures the rendered frame — then restores the snapshot in a SINGLE `LOAD_STATE` and releases the
-     * guard. Capturing the restore ruleset once (not per-bake off stale proxy stats) is what keeps the
-     * world from being left on a leftover baked ruleset. Jobs with no `initialState` fall back to the
-     * selected world's current IC, so unpaired library entries still get a preview. Never throws.
-     * @param {(bake: (job: {hex: string, initialState?: object, seed?: number|null, ticks?: number}) => Promise<string|null>) => Promise<any>} body
-     * @returns {Promise<any>}
-     */
-    _withScratchBakeWorld = (body) => {
-        // Serialize bake batches so overlapping snapshot/restore of the scratch world can't corrupt it: a
-        // save-triggered backfill may cancel + restart a sweep while a prior batch is still mid-burst, so
-        // each batch waits for the previous one's restore before it snapshots. `_bakeChain` is the tail.
-        const run = async () => {
-        // No scratch world (Auto-Explore running, or no other enabled world): run body with a no-op bake
-        // so callers still resolve (all thumbs null) without snapshot/guard/restore side effects.
-        const noopBake = async () => null;
-        if (this.autoExploreService?.isRunning()) return body(noopBake);
-
-        const idx = this._pickScratchWorldIndex();
-        const proxy = idx >= 0 ? this.worlds[idx] : null;
-        if (!proxy) return body(noopBake);
-
-        // Snapshot the exact pre-bake state ONCE for a single non-destructive restore. The ruleset comes
-        // from worldSettings (the stable main-thread source of truth), NOT live proxy stats — which lag
-        // the worker's echoes and would otherwise capture a previous bake's transient ruleset.
-        const savedCells = proxy.latestStateArray ? new Uint8Array(proxy.latestStateArray) : null;
-        if (!savedCells || savedCells.length !== Config.NUM_CELLS) return body(noopBake);
-        const savedTick = proxy.getLatestStats().tick || 0;
-        const savedHex = this.worldSettings[idx]?.rulesetHex;
-        let savedRulesetArray;
-        try {
-            savedRulesetArray = hexToRuleset(savedHex);
-        } catch {
-            return body(noopBake);
-        }
-
-        this._bakingWorldIndex = idx;
-        EventBus.dispatch(EVENTS.WORLD_BAKING_STATE_CHANGED, { worldIndex: idx });
-
-        const bake = async ({ hex, initialState, seed = null, ticks = EXPLORE_CONFIG.evalTicks } = {}) => {
-            if (!hex || hex === 'Error' || hex === 'N/A') return null;
-            // Unpaired entries (no IC of their own) bake against the selected world's current IC.
-            const ic = initialState || this.worldSettings[this.selectedWorldIndex]?.initialState;
-            if (!ic) return null;
-            let rulesetArray;
-            try {
-                rulesetArray = hexToRuleset(hex);
-            } catch {
-                return null;
-            }
-            try {
-                // Apply the target ruleset, seed-reset to the target IC, then evolve a burst — mirroring
-                // AutoExploreService._evaluateCandidate (setRuleset → resetWorld → runEvaluation). A finite
-                // seed reproduces the exact paired layout; a falsy seed lets the worker pick a fresh one.
-                proxy.setRuleset(rulesetArray.buffer.slice(0));
-                proxy.resetWorld(ic, Number.isFinite(seed) ? seed : 0);
-                await proxy.runEvaluation({
-                    ticks,
-                    sampleEvery: EXPLORE_CONFIG.sampleEvery,
-                    warmupTicks: EXPLORE_CONFIG.warmupTicks,
-                    probe: { enabled: false, probeTicks: EXPLORE_CONFIG.probeTicks },
-                });
-                return await this._captureBakedThumbnail(idx);
-            } catch {
-                return null;
-            }
-        };
-
-        try {
-            return await body(bake);
-        } finally {
-            // Restore the exact pre-bake cells/tick/ruleset ONCE (LOAD_STATE rewrites the worker buffers),
-            // then release the guard so the world's real STATE_UPDATE echoes flow to the UI again.
-            proxy.sendCommand('LOAD_STATE', {
-                newStateBuffer: savedCells.buffer.slice(0),
-                newRulesetBuffer: savedRulesetArray.buffer.slice(0),
-                worldTick: savedTick,
-            }, [savedCells.buffer.slice(0), savedRulesetArray.buffer.slice(0)]);
-            this._bakingWorldIndex = -1;
-            EventBus.dispatch(EVENTS.WORLD_BAKING_STATE_CHANGED, { worldIndex: -1 });
-        }
-        };
-
-        const result = (this._bakeChain || Promise.resolve()).then(run, run);
-        // Chain tail swallows outcome so one batch's failure never blocks the next.
-        this._bakeChain = result.then(() => {}, () => {});
-        return result;
-    };
-
-    /**
-     * Bake a single evolved-world thumbnail for a (ruleset × initial-condition × seed) combo WITHOUT
-     * disturbing the user's selected view (baked on a scratch non-selected world; see
-     * {@link _withScratchBakeWorld}). Returns a JPEG data-URL, or `null` on any failure (capture
-     * unavailable, Auto-Explore running, bad ruleset, no IC) so callers can fall back to the rule glyph.
-     * @param {{hex: string, initialState?: object, seed?: number|null, ticks?: number}} job
-     * @returns {Promise<string|null>}
-     */
-    bakeThumbnail = async (job) => this._withScratchBakeWorld((bake) => bake(job));
-
-    /**
-     * Bake thumbnails for a list of (hex, initialState, seed) jobs one at a time (sequential so the
-     * single borrowed scratch world is never contended). Each job's `onResult(dataUrl)` callback fires
-     * as its bake resolves. Returns the array of data-URLs (null entries for failures). Used by the
-     * Library's save-time multi-IC chooser and its lazy backfill of entries that lack a thumbnail.
-     * @param {Array<{hex: string, initialState?: object, seed?: number|null, ticks?: number,
-     *   onResult?: (thumb: string|null) => void}>} jobs
-     * @returns {Promise<Array<string|null>>}
-     */
-    bakeThumbnails = async (jobs = []) => this._withScratchBakeWorld(async (bake) => {
-        const out = [];
-        for (const job of jobs) {
-            const thumb = await bake(job);
-            out.push(thumb);
-            try { job.onResult?.(thumb); } catch { /* callback errors must not abort the queue */ }
-        }
-        return out;
-    });
-
-    /**
-     * Lazily fill in missing thumbnails for library entries, invoking `onResult(entry, thumb)` so the
-     * caller persists each its own way (personal entries write to the user library; public entries write
-     * to the public-thumb cache). Entries with a paired initial condition bake from it; unpaired entries
-     * bake from the selected world's current IC (via {@link _withScratchBakeWorld}). One bake at a time,
-     * capped per call so opening the library never stalls; abortable via the returned handle. The whole
-     * sweep is bracketed by a single snapshot/restore of the scratch world.
-     * `onResult(entry, thumb)` fires after each bake resolves (thumb is `null` on failure) so the caller
-     * can persist successes AND remember attempts — that lets it skip already-tried entries on the next
-     * sweep instead of re-baking the whole library on every save.
-     * `onDone({ cancelled, remaining })` fires once the batch settles: `remaining` is how many missing
-     * entries were left unbaked by the per-call `max` cap, so the caller can schedule the next batch and
-     * cover the whole library over time instead of stalling after the first `max` entries.
-     * @param {Array<{hex: string, initialState?: object, seed?: number|null, thumb?: string|null}>} entries
-     * @param {{onResult: (entry: object, thumb: string|null) => void, onDone?: (info: {cancelled: boolean, remaining: number}) => void, max?: number}} ctx
-     * @returns {{cancel: () => void}}
-     */
-    backfillMissingThumbnails = (entries, { onResult, onDone, max = 8 } = {}) => {
-        let cancelled = false;
-        const missing = (entries || []).filter(e => e && e.hex && !e.thumb);
-        const pending = missing.slice(0, max);
-        const remaining = Math.max(0, missing.length - pending.length);
-
-        this._withScratchBakeWorld(async (bake) => {
-            for (const entry of pending) {
-                if (cancelled) return;
-                const thumb = await bake({ hex: entry.hex, initialState: entry.initialState, seed: entry.seed });
-                if (cancelled) return;
-                onResult?.(entry, thumb);
-            }
-        }).then(() => onDone?.({ cancelled, remaining }), () => onDone?.({ cancelled, remaining }));
-
-        return { cancel: () => { cancelled = true; } };
-    };
+    // Ruleset Library thumbnail baking is owned by ThumbnailBakeService (borrow-and-restore on a
+    // scratch world). These thin delegators preserve the public API used by SaveRulesetModal,
+    // RulesetLibraryComponent, and LibraryCurationOverlay.
+    bakeThumbnail = (job) => this.thumbnailBakeService.bakeThumbnail(job);
+    bakeThumbnails = (jobs = []) => this.thumbnailBakeService.bakeThumbnails(jobs);
+    backfillMissingThumbnails = (entries, ctx) => this.thumbnailBakeService.backfillMissingThumbnails(entries, ctx);
 
     /**
      * Toggle the selected world's ruleset lock. A locked world keeps its ruleset through the

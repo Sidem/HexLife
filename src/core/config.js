@@ -1,3 +1,5 @@
+import neighborDirs from './neighbor-dirs.json';
+
 // --- Grid dimensions ---------------------------------------------------------
 // The grid size is configurable at startup (persisted setting / share-URL `g` param). Dimensions
 // are derived from a single row count so the rendered grid keeps a roughly square aspect ratio,
@@ -123,31 +125,17 @@ export const DEFAULT_WORLD_ENABLED_STATES = [
 ];
 
 // ── Hex neighbor offsets ──────────────────────────────────────────────────────
-// CANONICAL SOURCE shared with the Wasm engine. These two tables are duplicated
-// verbatim as `NEIGHBOR_DIRS_ODD_R` / `NEIGHBOR_DIRS_EVEN_R` in
-// `hexlife-wasm/src/lib.rs` (where `compute_neighbor_indices` flattens them into the
-// per-cell neighbor table). They MUST stay byte-for-byte identical on both sides —
-// a mismatch silently changes the simulation. Drift is guarded on each side:
-//   • JS:   tests/neighborDirs.test.js pins these arrays to the canonical values.
-//   • Rust: `neighbor_dirs_match_canonical` in lib.rs pins the Rust copies.
-// If you edit one table, edit the other and update both pinned tests.
-export const NEIGHBOR_DIRS_ODD_R = [
-    [-1, +1],  // SW (Visual slot 0 - Bottom-left for odd cells)
-    [-1, 0],   // NW (Visual slot 1 - Top-left for odd cells)
-    [0, -1],   // N  (Visual slot 2 - Top center for odd cells)
-    [+1, 0],   // NE (Visual slot 3 - Top-right for odd cells)
-    [+1, +1],  // SE (Visual slot 4 - Bottom-right for odd cells)
-    [0, +1]    // S  (Visual slot 5 - Bottom center for odd cells)
-];
-
-export const NEIGHBOR_DIRS_EVEN_R = [ 
-    [-1, 0],   // SW (Visual slot 0 - Bottom-left)
-    [-1, -1],  // NW (Visual slot 1 - Top-left)
-    [0, -1],   // N  (Visual slot 2 - Top center)
-    [+1, -1],  // NE (Visual slot 3 - Top-right)
-    [+1, 0],   // SE (Visual slot 4 - Bottom-right, using E as closest)
-    [0, +1]    // S  (Visual slot 5 - Bottom center)
-];
+// SINGLE-SOURCED from `src/core/neighbor-dirs.json`, the one canonical copy shared with the Wasm
+// engine: `hexlife-wasm/build.rs` reads the same JSON and generates the Rust `NEIGHBOR_DIRS_ODD_R`
+// / `NEIGHBOR_DIRS_EVEN_R` consts (`compute_neighbor_indices` flattens them into the per-cell
+// neighbor table). A mismatch would silently change the simulation, so drift guards remain on each
+// side as backstops that the single source resolved to the canonical values:
+//   • JS:   tests/neighborDirs.test.js pins these arrays.
+//   • Rust: `neighbor_dirs_match_canonical` in lib.rs pins the generated consts.
+// Each of the 6 offsets is [dCol, dRow], ordered by visual slot: 0 SW (bottom-left), 1 NW
+// (top-left), 2 N (top center), 3 NE (top-right), 4 SE (bottom-right), 5 S (bottom center).
+export const NEIGHBOR_DIRS_ODD_R = neighborDirs.odd_r;
+export const NEIGHBOR_DIRS_EVEN_R = neighborDirs.even_r;
 
 /**
  * Configuration for logging EventBus events to the console.
