@@ -10,11 +10,16 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sidem.github.io/HexLife/">
     <meta property="og:title" content="HexLife Explorer - Interactive Hexagonal Cellular Automata">
-    <meta property="og:description" content="Discover emergent complexity with HexLife Explorer, a WebGL2 & Web Worker powered cellular automaton on a hexagonal grid.">
+    <meta property="og:description" content="Discover emergent complexity with HexLife Explorer, a Rust/WebAssembly & WebGL2 powered cellular automaton lab on a hexagonal grid.">
+    <meta property="og:image" content="https://sidem.github.io/HexLife/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A rotationally symmetric hexagonal cellular automaton pattern grown from a single seed in HexLife Explorer">
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://sidem.github.io/HexLife/">
     <meta property="twitter:title" content="HexLife Explorer - Interactive Hexagonal Cellular Automata">
-    <meta property="twitter:description" content="Discover emergent complexity with HexLife Explorer, a WebGL2 & Web Worker powered cellular automaton on a hexagonal grid.">
+    <meta property="twitter:description" content="Discover emergent complexity with HexLife Explorer, a Rust/WebAssembly & WebGL2 powered cellular automaton lab on a hexagonal grid.">
+    <meta property="twitter:image" content="https://sidem.github.io/HexLife/og-image.png">
     <meta name="theme-color" content="#1e1e1e">
 
     <script type="application/ld+json">
@@ -28,13 +33,15 @@
         "@type": "Offer",
         "price": "0"
       },
-      "abstract": "An interactive web-based cellular automaton simulator on a hexagonal grid, leveraging WebGL2 for high-performance rendering and Web Workers for concurrent simulations. Users can define custom rulesets and observe emergent behaviors.",
+      "abstract": "An interactive web-based cellular automaton simulator on a hexagonal grid. A Rust/WebAssembly tick engine runs nine concurrent worlds (one Web Worker each), rendered with instanced WebGL2. Users design 128-bit rulesets, share them as 32-character hex codes with mnemonic names, and run an evolutionary Auto-Explore search that hunts for interesting emergent behavior at the edge of chaos.",
       "url": "https://sidem.github.io/HexLife/",
+      "image": "https://sidem.github.io/HexLife/og-image.png",
+      "sameAs": "https://github.com/Sidem/HexLife",
       "author": {
         "@type": "Person",
         "name": "Sidem"
       },
-      "keywords": "cellular automata, hexagonal grid, WebGL, simulation, generative art, complex systems, web workers, javascript"
+      "keywords": "cellular automata, hexagonal grid, artificial life, alife, complex systems, emergence, edge of chaos, generative art, Rust, WebAssembly, WebGL2, web workers, simulation, evolutionary search, javascript"
     }
     </script>
     <!-- CSS link will be injected by Vite during build -->

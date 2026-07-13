@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use HexLife Explorer in your work, please cite it as below."
+title: "HexLife Explorer"
+type: software
+authors:
+  - name: "Sidem"
+abstract: >-
+  An interactive web-based cellular automaton laboratory on a hexagonal grid.
+  A Rust/WebAssembly tick engine runs nine concurrent worlds (one Web Worker
+  each), rendered with instanced WebGL2. Rulesets are 128-bit (32-character
+  hex) with deterministic mnemonic names, and an evolutionary Auto-Explore
+  search scores candidates on structure, criticality, block-entropy dynamics,
+  transport, and optional CLIP-embedding novelty to find interesting emergent
+  behavior.
+repository-code: "https://github.com/Sidem/HexLife"
+url: "https://sidem.github.io/HexLife/"
+license: MIT
+keywords:
+  - cellular automata
+  - hexagonal grid
+  - artificial life
+  - complex systems
+  - emergence
+  - edge of chaos
+  - generative art
+  - evolutionary search
+  - Rust
+  - WebAssembly
+  - WebGL2

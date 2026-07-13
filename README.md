@@ -15,11 +15,19 @@ Design rulesets, draw life into the grid, and watch complex behavior emerge acro
 ![WebGL2](https://img.shields.io/badge/WebGL2-instanced-990000?logo=webgl&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 
+<br>
+
+<img src="docs/media/mossy-bramble.gif" alt="A rotationally symmetric ruleset ('mossy bramble') growing from a single hexagonal seed, with rule-based coloring" width="49%" /> <img src="docs/media/mossy-bramble-mono.gif" alt="The same 'mossy bramble' ruleset rendered in plain monochrome cell states" width="49%" />
+
+<sub>One ruleset, two views — *mossy bramble* growing from a single seed. Right: plain cell states. Left: **rule-based coloring**, where each cell is tinted by which of the 128 rules fired — the dynamics become a visible fingerprint.</sub>
+
 </div>
 
 ---
 
 HexLife runs **nine concurrent worlds** side-by-side, each a hexagonal cellular automaton with its own ruleset and state. The simulation core is written in **Rust → WebAssembly**, every world ticks in its own **Web Worker**, and rendering is a single **instanced WebGL2** draw call per world. The result stays smooth enough to evolve, mutate, and compare rulesets in real time.
+
+It sits at the crossroads of **artificial life**, **complex systems**, and **generative art**: a laboratory for watching emergence happen — gliders, growth fronts, self-organizing textures — and for hunting the *edge of chaos* where the most interesting behavior lives.
 
 ## ✨ Features
 

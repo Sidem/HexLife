@@ -1,0 +1,22 @@
+# HexLife Explorer
+
+> HexLife Explorer is a free, open-source (MIT), web-based artificial-life laboratory: an interactive cellular automaton simulator on a hexagonal grid. A Rust/WebAssembly tick engine runs nine concurrent worlds (one Web Worker each), rendered with instanced WebGL2. Users design, mutate, and breed 128-bit rulesets, share them as 32-character hex codes with deterministic mnemonic names, and run an evolutionary Auto-Explore search that hunts for interesting emergent behavior at the edge of chaos.
+
+Key facts:
+
+- Live app: https://sidem.github.io/HexLife/ (runs entirely in the browser, no account or install; requires WebGL2)
+- Source code: https://github.com/Sidem/HexLife
+- Grid: flat-top hexagons, six neighbors per cell, toroidal wrapping
+- Rulesets: a center cell plus 6 neighbors give 2^7 = 128 local configurations, so a ruleset is exactly 128 bits, written as a 32-character hex string; every ruleset also gets a deterministic two-word mnemonic name
+- Nine worlds run side-by-side for comparing rulesets and seeds in real time
+- Auto-Explore scores candidate rulesets on structure, criticality (damage spreading, sigma near 1), block-entropy dynamics, transport (gliders), heterogeneity, and optional CLIP-embedding novelty (ASAL-style)
+- Features: rule-based cell coloring, scrub-back history, hex-aware pattern copy/paste, PNG/WebM export, share links, mobile UI, guided onboarding
+
+## Docs
+
+- [README](https://github.com/Sidem/HexLife/blob/main/README.md): features, architecture, ruleset format, keyboard shortcuts, how to contribute rulesets to the public library
+- [Public ruleset library](https://github.com/Sidem/HexLife/blob/main/src/core/library/rulesets.json): curated, PR-based collection of community rulesets
+
+## Topics
+
+Relevant to: cellular automata, hexagonal grids, artificial life (alife), complex systems, emergence, edge of chaos, generative art, evolutionary search, Rust, WebAssembly, WebGL2, Web Workers.
