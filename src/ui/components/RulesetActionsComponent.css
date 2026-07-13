@@ -575,6 +575,71 @@ button.tag-chip.tag-filter.active {
     font-size: 0.82em;
 }
 
+/* Save-Ruleset modal: tag picker (canonical toggle chips + Suggested row + custom add). */
+.srm-suggested-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.srm-suggested-row.hidden {
+    display: none;
+}
+
+.srm-suggested-label {
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #8a8a8a;
+}
+
+.srm-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+
+button.srm-tag-chip,
+button.srm-suggested-chip {
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+button.srm-tag-chip:hover,
+button.srm-suggested-chip:hover {
+    background-color: #4a4a4a;
+}
+
+button.srm-tag-chip.active {
+    background-color: #0078d4;
+    color: #fff;
+    border-color: #0078d4;
+}
+
+button.srm-suggested-chip {
+    border-style: dashed;
+    border-color: #6fa8dc;
+    color: #9cc6f5;
+}
+
+.srm-tag-remove {
+    margin-left: 5px;
+    opacity: 0.7;
+}
+
+.srm-custom-tag-row {
+    display: flex;
+    gap: 8px;
+}
+
+.srm-custom-tag-input {
+    flex: 1;
+    min-width: 0;
+}
+
 /* Desktop: keep the actions panel a sensible reading width instead of letting its widest content
    (the long Breed hint) stretch it toward the 90vw clamp. */
 @media screen and (min-width: 769px) {

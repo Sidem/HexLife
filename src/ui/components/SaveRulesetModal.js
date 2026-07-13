@@ -2,6 +2,13 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { rulesetName } from '../../utils/utils.js';
 import { IC_SUITE } from '../../core/AutoExploreService.js';
+import { CANONICAL_TAGS, tagLabel, isCanonicalTag, normalizeTag } from '../../core/tags.js';
+import {
+    suggestTagsFromStats,
+    suggestTagsFromEmbedding,
+    mergeSuggestions,
+    MAX_SUGGESTIONS,
+} from '../../core/analysis/tagSuggestions.js';
 
 // Fixed seeds for the preview bakes so a candidate's thumbnail reproduces the layout that gets saved
 // with it (the saved `seed` replays the exact same starting cells via "Load + IC").
@@ -16,6 +23,12 @@ export class SaveRulesetModal extends BaseComponent {
         this.chosenIC = null;
         this.candidates = [];
         this.isBaking = false;
+        /** Selected tag ids (canonical + custom), insertion-ordered. @type {Set<string>} */
+        this.selectedTags = new Set();
+        /** Currently-offered suggestion ids not already selected. @type {string[]} */
+        this._suggestions = [];
+        /** Token guarding the async (embedding) suggestion pass against a modal reopen. */
+        this._suggestToken = 0;
         this.render();
         this.hide();
     }
@@ -36,9 +49,17 @@ export class SaveRulesetModal extends BaseComponent {
                     <label for="ruleset-desc-input">Description (Optional)</label>
                     <textarea id="ruleset-desc-input" rows="3" maxlength="200" placeholder="e.g., 'A slow-growing pattern...'"></textarea>
                 </div>
-                <div class="form-group">
-                    <label for="ruleset-tags-input">Tags (Optional)</label>
-                    <input type="text" id="ruleset-tags-input" maxlength="120" placeholder="comma-separated, e.g. gliders, spiral">
+                <div class="form-group srm-tags-section">
+                    <label>Tags (Optional)</label>
+                    <div class="srm-suggested-row hidden">
+                        <span class="srm-suggested-label">Suggested</span>
+                        <div class="srm-suggested-chips"></div>
+                    </div>
+                    <div class="srm-tag-chips" role="group" aria-label="Toggle tags"></div>
+                    <div class="srm-custom-tag-row">
+                        <input type="text" class="srm-custom-tag-input" maxlength="24" placeholder="add a custom tag" aria-label="Add a custom tag">
+                        <button type="button" class="button button-subtle srm-custom-tag-add">Add</button>
+                    </div>
                 </div>
                 <div class="form-group srm-ic-section">
                     <label>Initial condition (Optional)</label>
@@ -65,7 +86,11 @@ export class SaveRulesetModal extends BaseComponent {
             title: this.element.querySelector('#save-ruleset-modal-title'),
             nameInput: this.element.querySelector('#ruleset-name-input'),
             descInput: this.element.querySelector('#ruleset-desc-input'),
-            tagsInput: this.element.querySelector('#ruleset-tags-input'),
+            suggestedRow: this.element.querySelector('.srm-suggested-row'),
+            suggestedChips: this.element.querySelector('.srm-suggested-chips'),
+            tagChips: this.element.querySelector('.srm-tag-chips'),
+            customTagInput: this.element.querySelector('.srm-custom-tag-input'),
+            customTagAdd: this.element.querySelector('.srm-custom-tag-add'),
             hexDisplay: this.element.querySelector('#ruleset-hex-display'),
             icGrid: this.element.querySelector('#srm-ic-grid'),
             bakeBtn: this.element.querySelector('.srm-bake-button'),
@@ -81,6 +106,13 @@ export class SaveRulesetModal extends BaseComponent {
         });
         this._addDOMListener(this.ui.bakeBtn, 'click', this._bakeCandidates);
         this._addDOMListener(this.ui.icGrid, 'click', this._onGridClick);
+        // Tag pickers: canonical toggle chips, one-tap Suggested chips, and custom-tag add.
+        this._addDOMListener(this.ui.tagChips, 'click', this._onTagChipClick);
+        this._addDOMListener(this.ui.suggestedChips, 'click', this._onSuggestedChipClick);
+        this._addDOMListener(this.ui.customTagAdd, 'click', this._addCustomTag);
+        this._addDOMListener(this.ui.customTagInput, 'keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); this._addCustomTag(); }
+        });
         this._addDOMListener(this.ui.saveBtn, 'click', this.handleSave);
         this._addDOMListener(this.ui.cancelBtn, 'click', this.hide);
         this._addDOMListener(this.ui.closeBtn, 'click', this.hide);
@@ -102,7 +134,15 @@ export class SaveRulesetModal extends BaseComponent {
             : "e.g., 'Crawling Crystals'";
         this.ui.nameInput.value = this.rulesetData.name || '';
         this.ui.descInput.value = this.rulesetData.description || '';
-        this.ui.tagsInput.value = Array.isArray(this.rulesetData.tags) ? this.rulesetData.tags.join(', ') : '';
+        this.selectedTags = new Set(
+            (Array.isArray(this.rulesetData.tags) ? this.rulesetData.tags : [])
+                .map(normalizeTag).filter(Boolean)
+        );
+        this.ui.customTagInput.value = '';
+        this._suggestions = [];
+        this._renderTags();
+        this._renderSuggestions();
+        this._computeSuggestions();
         this.ui.title.textContent = this.rulesetData.id ? 'Edit Ruleset' : 'Save Ruleset';
         this.ui.saveBtn.disabled = !this.ui.nameInput.value;
 
@@ -235,14 +275,151 @@ export class SaveRulesetModal extends BaseComponent {
         grid.innerHTML = tiles.join('');
     }
 
+    // --- Tag picker (roadmap #13 §T2) -------------------------------------------------------------
+
+    /** Render the canonical toggle chips plus any selected custom (non-canonical) tags as chips. */
+    _renderTags() {
+        const canonical = CANONICAL_TAGS.map(t => this._tagChipHTML(t.id, t.label));
+        // Selected free-form tags that aren't canonical get their own removable chips at the end.
+        const custom = [...this.selectedTags]
+            .filter(id => !isCanonicalTag(id))
+            .map(id => this._tagChipHTML(id, tagLabel(id), true));
+        this.ui.tagChips.innerHTML = [...canonical, ...custom].join('');
+    }
+
+    /** One toggle chip. `isCustom` chips show a removal affordance (they're not in the fixed vocab). */
+    _tagChipHTML(id, label, isCustom = false) {
+        const active = this.selectedTags.has(id);
+        return `<button type="button" class="tag-chip srm-tag-chip${active ? ' active' : ''}${isCustom ? ' srm-tag-chip--custom' : ''}"
+            data-tag-id="${this._escapeAttr(id)}" aria-pressed="${active}">${this._escape(label)}${isCustom ? '<span class="srm-tag-remove" aria-hidden="true">×</span>' : ''}</button>`;
+    }
+
+    /** Render the "Suggested" row (hidden when there's nothing fresh to offer). */
+    _renderSuggestions() {
+        const fresh = this._suggestions.filter(id => !this.selectedTags.has(id));
+        this.ui.suggestedRow.classList.toggle('hidden', fresh.length === 0);
+        this.ui.suggestedChips.innerHTML = fresh
+            .map(id => `<button type="button" class="tag-chip srm-suggested-chip" data-tag-id="${this._escapeAttr(id)}" title="Suggested — tap to add">+ ${this._escape(tagLabel(id))}</button>`)
+            .join('');
+    }
+
+    _onTagChipClick = (e) => {
+        const chip = e.target.closest('[data-tag-id]');
+        if (!chip) return;
+        this._toggleTag(chip.dataset.tagId);
+    };
+
+    _onSuggestedChipClick = (e) => {
+        const chip = e.target.closest('[data-tag-id]');
+        if (!chip) return;
+        this.selectedTags.add(chip.dataset.tagId);
+        this._renderTags();
+        this._renderSuggestions();
+    };
+
+    _toggleTag(id) {
+        if (!id) return;
+        if (this.selectedTags.has(id)) this.selectedTags.delete(id);
+        else this.selectedTags.add(id);
+        this._renderTags();
+        this._renderSuggestions();
+    }
+
+    _addCustomTag = () => {
+        const id = normalizeTag(this.ui.customTagInput.value);
+        this.ui.customTagInput.value = '';
+        if (!id) return;
+        this.selectedTags.add(id);
+        this._renderTags();
+        this._renderSuggestions();
+    };
+
+    /**
+     * Compute tag suggestions for the current candidate: the always-available stats heuristic first
+     * (rendered synchronously), then the optional embedding pass overlaid when CLIP is enabled + a
+     * thumbnail frame is available. Both sources never throw; failures just leave fewer suggestions.
+     */
+    _computeSuggestions() {
+        const token = ++this._suggestToken;
+        const statsSug = suggestTagsFromStats(this._statsMetrics());
+        this._suggestions = mergeSuggestions([], statsSug, MAX_SUGGESTIONS);
+        this._renderSuggestions();
+
+        this._embeddingSuggestions().then((embSug) => {
+            if (token !== this._suggestToken || !embSug.length) return; // superseded, or nothing to add
+            this._suggestions = mergeSuggestions(embSug, statsSug, MAX_SUGGESTIONS);
+            this._renderSuggestions();
+        }).catch(() => { /* never-throw: keep the stats suggestions */ });
+    }
+
+    /** Normalize the incoming metrics (gallery-entry `metrics` + `cyclic`) into the heuristic's shape. */
+    _statsMetrics() {
+        const m = this.rulesetData.metrics;
+        if (!m || typeof m !== 'object') return {};
+        return { ...m, cyclic: this.rulesetData.cyclic ?? m.cyclic ?? null };
+    }
+
+    /**
+     * Best-effort embedding suggestions (§T3): only when the embedding model is enabled + ready and a
+     * chosen/paired thumbnail exists to embed. Decodes the thumb data-URL to a frame, embeds it, embeds
+     * the canonical-tag bank (cached), and cosine-ranks. Resolves [] on any miss (degrade to stats).
+     * @returns {Promise<string[]>}
+     */
+    async _embeddingSuggestions() {
+        const svc = this.appContext.worldManager?.embeddingService;
+        const thumb = this.chosenIC?.thumb || this.rulesetData.thumb;
+        if (!svc || !svc.isEnabled?.() || !thumb) return [];
+        try {
+            const frame = await this._decodeThumbToFrame(thumb);
+            if (!frame) return [];
+            const [embedding, tagBank] = await Promise.all([
+                svc.embed(frame),
+                svc.embedTags(CANONICAL_TAGS),
+            ]);
+            if (!embedding || !tagBank.length) return [];
+            return suggestTagsFromEmbedding(embedding, tagBank);
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Decode a thumbnail data-URL into an ImageData-like frame ({data,width,height}) for embedding.
+     * Resolves null on any failure (bad URL, canvas unavailable). Browser-only; unused in tests.
+     * @param {string} dataUrl
+     * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
+     */
+    _decodeThumbToFrame(dataUrl) {
+        return new Promise((resolve) => {
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const size = 224;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) { resolve(null); return; }
+                        ctx.drawImage(img, 0, 0, size, size);
+                        resolve(ctx.getImageData(0, 0, size, size));
+                    } catch {
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = dataUrl;
+            } catch {
+                resolve(null);
+            }
+        });
+    }
+
     handleSave = () => {
         const name = this.ui.nameInput.value.trim();
         if (!name) return;
 
-        const tags = this.ui.tagsInput.value
-            .split(',')
-            .map(t => t.trim())
-            .filter(Boolean);
+        const tags = [...this.selectedTags];
 
         const saveData = {
             ...this.rulesetData,

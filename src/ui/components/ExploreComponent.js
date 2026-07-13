@@ -779,6 +779,9 @@ export class ExploreComponent extends BaseComponent {
                 initialState: entry.initialState || null,
                 seed: entry.seed ?? null,
                 thumb: entry.thumb || null,
+                // Carry the find's behaviour metrics so the save modal can pre-suggest tags (§T4).
+                metrics: entry.metrics || null,
+                cyclic: entry.cyclic ?? null,
             });
         } else if (action === 'share') {
             const url = new URL(window.location.href);

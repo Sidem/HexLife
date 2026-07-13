@@ -306,6 +306,25 @@ export class EmbeddingService {
         return vec;
     }
 
+    /**
+     * Embed a batch of canonical tags into a comparable tag bank (roadmap #13 §T3). Each tag's
+     * `promptText` is embedded once via {@link embedText} (deterministic ⇒ cached across calls), and
+     * only successfully-embedded tags are returned. Same never-throw contract: disabled / model not
+     * ready / every embed failing ⇒ `[]` (the caller silently degrades to the stats heuristic).
+     * @param {Array<{id: string, promptText: string}>} tags
+     * @returns {Promise<Array<{id: string, vector: Float32Array}>>}
+     */
+    async embedTags(tags) {
+        if (!this.enabled || !Array.isArray(tags) || tags.length === 0) return [];
+        const out = [];
+        for (const tag of tags) {
+            if (!tag || !tag.id || !tag.promptText) continue;
+            const vec = await this.embedText(tag.promptText);
+            if (vec && vec.length) out.push({ id: tag.id, vector: vec });
+        }
+        return out;
+    }
+
     _onWorkerMessage(data, finishInit) {
         if (!data) return;
         switch (data.type) {
