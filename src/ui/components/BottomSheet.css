@@ -1,49 +1,69 @@
+/* Bottom sheet (mobile redesign M2): non-blocking, draggable, snap points. */
+
 .bottom-sheet-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    /* P1: transparent + non-blocking so the live canvas behind stays interactive. */
+    background-color: transparent;
+    pointer-events: none;
     z-index: 6000;
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    opacity: 1;
-    transition: opacity 0.3s ease;
     padding-bottom: var(--bottom-tab-bar-height);
 }
 
 .bottom-sheet-overlay.hidden {
     display: none;
-    opacity: 0;
 }
 
 .bottom-sheet-panel {
     width: 100%;
     max-width: 600px;
+    height: 85vh;
+    max-height: 85vh;
     background-color: #2c2c2c;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
-    box-shadow: 0 -4px 15px rgba(0,0,0,0.3);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+    /* Transform is driven inline by BottomSheet.js (snap points + drag). */
     transform: translateY(100%);
-    transition: transform 0.3s ease-out;
     display: flex;
     flex-direction: column;
-    max-height: 80vh;
+    /* Only the panel captures pointer events; the backdrop passes them through. */
+    pointer-events: auto;
+    touch-action: none;
 }
 
-.bottom-sheet-panel.visible {
-    transform: translateY(0);
+.bottom-sheet-drag-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0 6px;
+    cursor: grab;
+    flex-shrink: 0;
+    touch-action: none;
+}
+
+.bottom-sheet-grabber {
+    display: block;
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background-color: #666;
 }
 
 .bottom-sheet-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 4px 16px 10px;
     border-bottom: 1px solid #444;
     flex-shrink: 0;
+    touch-action: none;
 }
 
 .bottom-sheet-title {
@@ -62,9 +82,13 @@
     cursor: pointer;
     line-height: 1;
     padding: 0;
+    width: 40px;
+    height: 40px;
 }
 
 .bottom-sheet-content {
     padding: 16px;
     overflow-y: auto;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
 }

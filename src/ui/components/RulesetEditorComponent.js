@@ -51,6 +51,11 @@ export class RulesetEditorComponent extends BaseComponent {
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
                 </select>
+                <label class="editor-advanced-toggle mobile-only" title="Reveal the full 128-cell bit grid">
+                    <input type="checkbox" id="ruleset-editor-advanced"> Advanced (128-bit grid)
+                </label>
+                <button id="ruleset-editor-continue-desktop" class="button mobile-only"
+                    title="Copy a share link to finish precise editing on desktop">Continue on desktop</button>
             </div>
             <div class="editor-apply-scope-controls">
                 <div id="ruleset-editor-scope-switch-mount"></div>
@@ -87,7 +92,42 @@ export class RulesetEditorComponent extends BaseComponent {
             rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),
             editorScopeSwitchMount: this.element.querySelector('#ruleset-editor-scope-switch-mount'),
             editorResetSwitchMount: this.element.querySelector('#ruleset-editor-reset-switch-mount'),
+            advancedToggle: this.element.querySelector('#ruleset-editor-advanced'),
+            continueDesktopButton: this.element.querySelector('#ruleset-editor-continue-desktop'),
         };
+    }
+
+    _isMobile() {
+        return !!this.appContext.uiManager?.isMobile?.();
+    }
+
+    /**
+     * Mobile simplification (mobile redesign M3): default to the coarse totalistic
+     * editor and keep the full 128-cell bit grid behind the "Advanced" toggle, so
+     * default mobile tap targets stay large. No effect on desktop.
+     */
+    _applyMobileGating() {
+        const modeSelect = this.uiElements.rulesetEditorMode;
+        if (!modeSelect) return;
+        const isMobile = this._isMobile();
+        const advanced = !!this.uiElements.advancedToggle?.checked;
+        const detailedOpt = modeSelect.querySelector('option[value="detailed"]');
+        if (detailedOpt) detailedOpt.disabled = isMobile && !advanced;
+
+        if (isMobile && !advanced && modeSelect.value === 'detailed') {
+            modeSelect.value = 'neighborCount';
+            PersistenceService.saveUISetting('rulesetEditorMode', 'neighborCount');
+            this._updateEditorGrids();
+        }
+    }
+
+    _defaultEditorMode() {
+        const saved = PersistenceService.loadUISetting('rulesetEditorMode', null);
+        if (this._isMobile()) {
+            // Never open the 128-cell grid by default on a phone.
+            return (saved === 'neighborCount' || saved === 'rotationalSymmetry') ? saved : 'neighborCount';
+        }
+        return saved || 'rotationalSymmetry';
     }
 
     refresh() {
@@ -99,6 +139,7 @@ export class RulesetEditorComponent extends BaseComponent {
         if (this.uiElements.editorRulesetInput && document.activeElement !== this.uiElements.editorRulesetInput) {
             this.uiElements.editorRulesetInput.value = (currentSelectedWorldHex === "Error" || currentSelectedWorldHex === "N/A") ? "" : currentSelectedWorldHex;
         }
+        this._applyMobileGating();
         this._updateEditorGrids();
     }
 
@@ -193,6 +234,24 @@ export class RulesetEditorComponent extends BaseComponent {
             this.uiElements.rulesetEditorMode.addEventListener('change', () => {
                 this._updateEditorGrids();
                 PersistenceService.saveUISetting('rulesetEditorMode', this.uiElements.rulesetEditorMode.value);
+            });
+        }
+
+        if (this.uiElements.advancedToggle) {
+            this.uiElements.advancedToggle.addEventListener('change', () => {
+                this._applyMobileGating();
+                // Expanding Advanced jumps straight to the full bit grid.
+                if (this.uiElements.advancedToggle.checked) {
+                    this.uiElements.rulesetEditorMode.value = 'detailed';
+                    PersistenceService.saveUISetting('rulesetEditorMode', 'detailed');
+                    this._updateEditorGrids();
+                }
+            });
+        }
+
+        if (this.uiElements.continueDesktopButton) {
+            this.uiElements.continueDesktopButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);
             });
         }
         
@@ -402,7 +461,7 @@ export class RulesetEditorComponent extends BaseComponent {
 
     _loadEditorSettings() {
         if (this.uiElements.rulesetEditorMode) {
-            this.uiElements.rulesetEditorMode.value = PersistenceService.loadUISetting('rulesetEditorMode', 'rotationalSymmetry');
+            this.uiElements.rulesetEditorMode.value = this._defaultEditorMode();
         }
     }
 

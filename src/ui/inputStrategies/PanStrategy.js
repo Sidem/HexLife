@@ -1,5 +1,14 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import * as Config from '../../core/config.js';
+
+// Swipe-to-page tuning (mobile redesign M4). A single-finger horizontal fling on
+// the selected view, at (or near) min zoom, pages between worlds. At min zoom the
+// camera cannot pan (clampCameraPan recenters), so the horizontal drag is otherwise
+// inert — making it the natural paging gesture without stealing real pans.
+const PAGE_MIN_ZOOM = 1.02;
+const PAGE_MIN_DX = 55;
+const PAGE_HORIZONTAL_RATIO = 1.4;
 
 /**
  * @class PanStrategy
@@ -78,6 +87,7 @@ export class PanStrategy extends BaseInputStrategy {
         this.touchState.lastPoint = { ...this.touchState.startPoint };
 
         if (touches.length >= 2) {
+            this.touchState.multiTouch = true;
             this.touchState.lastDistance = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
         }
     }
@@ -96,6 +106,7 @@ export class PanStrategy extends BaseInputStrategy {
         }
 
         if (touches.length >= 2) {
+            this.touchState.multiTouch = true;
             const newDist = Math.hypot(touches[1].clientX - touches[0].clientX, touches[1].clientY - touches[0].clientY);
             const pinchCenter = { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 };
             if (this.touchState.lastDistance > 0) {
@@ -122,13 +133,43 @@ export class PanStrategy extends BaseInputStrategy {
             if (viewType === 'mini' && worldIndexAtCursor !== null) {
                 EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, worldIndexAtCursor);
             }
+        } else if (endTouch && this.touchState.isDragging && event.touches.length === 0) {
+            // Last finger up after a drag — consider a page gesture.
+            this._maybePageWorld(endTouch);
         }
         this.resetTouchState();
+    }
+
+    /**
+     * Page between worlds on a single-finger horizontal fling at min zoom (M4).
+     * Never runs during a draw stroke (DrawStrategy is active in draw mode) or after
+     * a pinch (multiTouch), so it can't fire mid-gesture.
+     */
+    _maybePageWorld(endTouch) {
+        if (this.touchState.multiTouch) return;
+        const camera = this.manager.worldManager.getCurrentCameraState();
+        if (camera && camera.zoom > PAGE_MIN_ZOOM) return; // real pan is available; don't page
+
+        const startView = this.manager.getCoordsFromPointerEvent({
+            clientX: this.touchState.startPoint.x, clientY: this.touchState.startPoint.y,
+        }).viewType;
+        if (startView !== 'selected') return;
+
+        const dx = endTouch.clientX - this.touchState.startPoint.x;
+        const dy = endTouch.clientY - this.touchState.startPoint.y;
+        if (Math.abs(dx) < PAGE_MIN_DX || Math.abs(dx) < Math.abs(dy) * PAGE_HORIZONTAL_RATIO) return;
+
+        const dir = dx < 0 ? 1 : -1; // swipe left → next world
+        const count = Config.NUM_WORLDS;
+        const cur = this.manager.worldManager.getSelectedWorldIndex();
+        const target = ((cur + dir) % count + count) % count;
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, target);
     }
 
     resetTouchState() {
         this.touchState.isDown = false;
         this.touchState.isDragging = false;
         this.touchState.lastDistance = 0;
+        this.touchState.multiTouch = false;
     }
 }

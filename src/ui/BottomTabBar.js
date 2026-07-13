@@ -3,13 +3,10 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
 import { ICONS } from './icons.js';
 
 const TAB_ICONS = {
-    simulate: ICONS.hexagon,
-    rules: ICONS.sparkles,
-    editor: ICONS.pencil,
-    worlds: ICONS.globe,
-    analyze: ICONS.chartBars,
-    learning: ICONS.graduationCap,
-    more: ICONS.ellipsis,
+    watch: ICONS.hexagon,
+    discover: ICONS.sparkles,
+    build: ICONS.pencil,
+    library: ICONS.library,
 };
 
 
@@ -21,7 +18,7 @@ export class BottomTabBar extends BaseComponent {
 
         this._initButtons();
         this._setupEventListeners();
-        this.updateActiveButton('simulate');
+        this.updateActiveButton('watch');
     }
 
     _initButtons() {
@@ -38,7 +35,9 @@ export class BottomTabBar extends BaseComponent {
             this._addDOMListener(button, 'click', () => this.handleViewChange(view));
         });
         this._subscribeToEvent(EVENTS.MOBILE_VIEW_CHANGED, (data) => {
-            this.updateActiveButton(data.activeView);
+            // `activeTab` is the top-level tab to highlight (watch/discover/build/library);
+            // it is '' for gear-only views (More/Settings/Analysis) so no tab lights up.
+            this.updateActiveButton(data.activeTab ?? data.activeView);
         });
     }
 

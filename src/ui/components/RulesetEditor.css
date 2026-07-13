@@ -338,3 +338,30 @@
     /* Add any mobile-specific layout styles for the component here */
     padding-right: 0;
 }
+
+/* M3: mobile-only editor affordances — Advanced (128-bit) toggle + Continue on desktop.
+   Hidden on desktop (where the mode dropdown already exposes the full grid). */
+.ruleset-editor-component-content .mobile-only { display: none; }
+
+.ruleset-editor-component-content.mobile-context .editor-advanced-toggle.mobile-only {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #ccc;
+    font-size: 0.9em;
+    min-height: 40px;
+    cursor: pointer;
+}
+
+.ruleset-editor-component-content.mobile-context .editor-advanced-toggle.mobile-only input {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.ruleset-editor-component-content.mobile-context #ruleset-editor-continue-desktop.mobile-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+}

@@ -175,6 +175,14 @@
                     </span>
                 </div>
             </div>
+
+            <div id="mobileWorldPill" class="mobile-world-pill hidden" role="group" aria-label="World navigation">
+                <button class="world-pill-btn world-pill-prev" type="button" aria-label="Previous world"></button>
+                <span class="world-pill-label" aria-live="polite">1/9</span>
+                <button class="world-pill-btn world-pill-next" type="button" aria-label="Next world"></button>
+            </div>
+
+            <button id="mobileGearButton" class="mobile-gear-button hidden" type="button" title="More options" aria-label="More options"></button>
         </div>
 
         <div id="appMenuPopout" class="popout-panel popout-menu hidden">
@@ -234,7 +242,6 @@
             <div id="minimap-guide" style="position: absolute; pointer-events: none; box-sizing: border-box; display: none;"></div>
             <div id="mobile-canvas-controls" class="hidden">
                 <div id="mobile-fab-container-right" class="mobile-fab-container"></div>
-                <div id="mobile-fab-container-left" class="mobile-fab-container left"></div>
             </div>
         </div>
 
@@ -374,33 +381,21 @@
             </div>
         </div>
         <div id="bottom-tab-bar" class="hidden">
-            <button class="tab-bar-button active" data-view="simulate" title="Simulation View">
+            <button class="tab-bar-button active" data-view="watch" title="Watch the simulation">
                 <span class="icon">⬡</span>
-                <span class="label">Simulate</span>
+                <span class="label">Watch</span>
             </button>
-            <button class="tab-bar-button" data-view="rules" title="Ruleset Controls">
-                <span class="icon">🧬</span>
-                <span class="label">Rules</span>
+            <button class="tab-bar-button" data-view="discover" title="Discover rulesets">
+                <span class="icon">✨</span>
+                <span class="label">Discover</span>
             </button>
-            <button class="tab-bar-button" data-view="editor" title="Ruleset Editor">
+            <button class="tab-bar-button" data-view="build" title="Build rules, worlds &amp; edits">
                 <span class="icon">📝</span>
-                <span class="label">Editor</span>
+                <span class="label">Build</span>
             </button>
-            <button class="tab-bar-button" data-view="worlds" title="World Setup">
-                <span class="icon">🪐</span>
-                <span class="label">Worlds</span>
-            </button>
-            <button class="tab-bar-button" data-view="analyze" title="Analysis Tools">
-                <span class="icon">📊</span>
-                <span class="label">Analyze</span>
-            </button>
-            <button class="tab-bar-button" data-view="learning" title="Learning Hub">
-                <span class="icon">🎓</span>
-                <span class="label">Learn</span>
-            </button>
-            <button class="tab-bar-button" data-view="more" title="More Options">
-                <span class="icon">•••</span>
-                <span class="label">More</span>
+            <button class="tab-bar-button" data-view="library" title="Ruleset Library">
+                <span class="icon">📚</span>
+                <span class="label">Library</span>
             </button>
         </div>
     </div> 

@@ -2,7 +2,7 @@ import { BottomSheet } from './BottomSheet.js';
 import { ControlsComponent } from './ControlsComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
-import { ICONS } from '../icons.js';
+import { QUICK_ACTIONS, DEFAULT_FAB_SETTINGS, QUICK_ACTION_MAP, getEnabledQuickActionIds } from '../mobileQuickActions.js';
 
 
 
@@ -15,6 +15,9 @@ export class ToolsBottomSheet extends BottomSheet {
         this.attachEventListeners();
         this.contentContainer = this.sheetContent.querySelector('#mobileControlsMount');
         this.contentComponentType = ControlsComponent;
+
+        // Keep the quick-actions row in sync when the customize list changes.
+        this._subscribeToEvent(EVENTS.COMMAND_UPDATE_FAB_UI, () => this._renderQuickActions());
     }
 
     render() {
@@ -22,10 +25,11 @@ export class ToolsBottomSheet extends BottomSheet {
         content.className = 'tools-bottom-sheet-content';
 
         content.innerHTML = `
+            <div id="quick-actions-row" class="quick-actions-row" aria-label="Quick actions"></div>
             <div class="bottom-sheet-tabs">
                 <button class="tab-button active" data-tab="tools">Tools</button>
                 <button class="tab-button" data-tab="color">Color</button>
-                <button class="tab-button" data-tab="customize-fabs">Customize FABs</button>
+                <button class="tab-button" data-tab="customize-fabs">Customize</button>
             </div>
             <div class="bottom-sheet-panes">
                 <div id="tools-pane" class="pane active">
@@ -54,7 +58,36 @@ export class ToolsBottomSheet extends BottomSheet {
             mobileControlsMount.innerHTML = '';
         }
         this.controlsComponent = null;
+        this._renderQuickActions();
         this._initCustomizeFabsPane();
+    }
+
+    /**
+     * Render the pinned quick-actions row (mobile redesign M2) — the former left
+     * customizable FAB stack. Actions fire their command without dismissing the
+     * sheet, so the world reacts live behind the half-height sheet (P1).
+     */
+    _renderQuickActions() {
+        const row = this.sheetContent.querySelector('#quick-actions-row');
+        if (!row) return;
+        const fabSettings = PersistenceService.loadUISetting('fabSettings', DEFAULT_FAB_SETTINGS);
+        const ids = getEnabledQuickActionIds(fabSettings);
+        row.innerHTML = '';
+        if (ids.length === 0) {
+            row.innerHTML = '<span class="quick-actions-empty">Pick up to 3 quick actions in Customize.</span>';
+            return;
+        }
+        ids.forEach(id => {
+            const action = QUICK_ACTION_MAP[id];
+            const button = document.createElement('button');
+            button.className = 'quick-action-button';
+            button.type = 'button';
+            button.title = action.label;
+            button.setAttribute('aria-label', action.label);
+            button.innerHTML = `<span class="icon">${action.icon}</span><span class="quick-action-label">${action.label}</span>`;
+            button.addEventListener('click', () => EventBus.dispatch(action.command, action.payload));
+            row.appendChild(button);
+        });
     }
 
     show() {
@@ -80,28 +113,13 @@ export class ToolsBottomSheet extends BottomSheet {
 
     _initCustomizeFabsPane() {
         const fabActionList = this.sheetContent.querySelector('#fab-action-list');
-        // Icons mirror UIManager.renderCustomFabs' fabActionMap so the
-        // customization list matches the FABs it configures.
-        const actions = [
-            { id: 'generate', icon: ICONS.sparkles, text: 'Generate' },
-            { id: 'mutate', icon: ICONS.shuffle, text: 'Mutate' },
-            { id: 'clone', icon: ICONS.copy, text: 'Clone' },
-            { id: 'clone-mutate', icon: ICONS.copyPlus, text: 'Clone & Mutate' },
-            { id: 'clear-one', icon: ICONS.eraser, text: 'Clear' },
-            { id: 'clear-all', icon: ICONS.trash, text: 'Clear All' },
-            { id: 'reset-one', icon: ICONS.rotateCcw, text: 'Reset' },
-            { id: 'reset-all', icon: ICONS.refreshCw, text: 'Reset All' },
-            { id: 'reset-densities', icon: ICONS.droplet, text: 'Default Densities' },
-            { id: 'apply-density-all', icon: ICONS.target, text: 'Apply Density' }
-        ];
-
-        const savedSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true });
-        actions.forEach(action => {
+        const savedSettings = PersistenceService.loadUISetting('fabSettings', DEFAULT_FAB_SETTINGS);
+        QUICK_ACTIONS.forEach(action => {
             const isChecked = savedSettings.enabled.includes(action.id);
             const li = document.createElement('li');
             li.innerHTML = `
                 <span class="icon">${action.icon}</span>
-                <span class="text">${action.text}</span>
+                <span class="text">${action.label}</span>
                 <input type="checkbox" id="fab-toggle-${action.id}" class="checkbox-input fab-action-toggle" data-action-id="${action.id}" ${isChecked ? 'checked' : ''}>
                 <label for="fab-toggle-${action.id}" class="checkbox-label">${isChecked ? 'Enabled' : 'Disabled'}</label>
             `;

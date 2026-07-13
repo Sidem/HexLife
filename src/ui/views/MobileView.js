@@ -39,7 +39,7 @@ export class MobileView extends Panel {
 
     attachEventListeners() {
         this._addDOMListener(this.panelElement.querySelector('[data-action="close"]'), 'click', () => {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' });
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'watch' });
         });
     }
 

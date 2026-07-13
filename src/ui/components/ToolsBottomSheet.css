@@ -5,6 +5,56 @@
     padding: 10px;
 }
 
+/* Quick-actions row (mobile redesign M2) — pinned former left FAB stack. */
+.quick-actions-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    flex-shrink: 0;
+}
+
+.quick-action-button {
+    flex: 1;
+    min-width: 0;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 10px;
+    color: #eee;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.12s ease-out, transform 0.05s ease-out;
+}
+
+.quick-action-button:active {
+    background-color: #4a4a4a;
+    transform: scale(0.96);
+}
+
+.quick-action-button .icon {
+    display: flex;
+    color: #f0c674;
+}
+
+.quick-action-label {
+    font-size: 0.72em;
+    line-height: 1.1;
+    text-align: center;
+    color: #cfcfcf;
+}
+
+.quick-actions-empty {
+    color: #999;
+    font-size: 0.85em;
+    padding: 6px 2px;
+}
+
 .tool-group {
     display: flex;
     flex-direction: column;

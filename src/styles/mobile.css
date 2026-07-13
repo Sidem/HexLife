@@ -39,6 +39,76 @@ screen and (pointer: coarse) and (hover: none) {
         /* Top bar is the first item */
     }
 
+    /* --- Header gear (opens the full-screen More view) --- */
+    .mobile-gear-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        margin-left: auto;
+        padding: 0;
+        background: none;
+        border: none;
+        border-radius: var(--radius-sm, 6px);
+        color: #ccc;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-gear-button:active {
+        background-color: #3f3f3f;
+        color: #fff;
+    }
+
+    /* --- World-paging pill (M4 gesture fallback) --- */
+    .mobile-world-pill {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-left: auto;
+        flex-shrink: 0;
+        background-color: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 999px;
+        padding: 2px;
+    }
+
+    /* When both the pill and gear show, only the pill pushes right. */
+    .mobile-world-pill + .mobile-gear-button {
+        margin-left: 4px;
+    }
+
+    .world-pill-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        background: none;
+        border: none;
+        border-radius: 50%;
+        color: #ddd;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .world-pill-btn:active {
+        background-color: #444;
+        color: #fff;
+    }
+
+    .world-pill-label {
+        min-width: 34px;
+        text-align: center;
+        font-size: 0.85em;
+        font-variant-numeric: tabular-nums;
+        color: #f0c674;
+        font-weight: 600;
+    }
+
 
     /* --- Bottom Tab Bar --- */
     #bottom-tab-bar {

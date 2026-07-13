@@ -6,6 +6,7 @@ import { BottomTabBar } from './BottomTabBar.js';
 import { ToolsBottomSheet } from './components/ToolsBottomSheet.js';
 import { MoreView } from './views/MoreView.js';
 import { MobileView } from './views/MobileView.js';
+import { BuildView } from './views/BuildView.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
@@ -17,7 +18,6 @@ import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 import { ExploreComponent } from './components/ExploreComponent.js';
 import { SettingsComponent } from './components/SettingsComponent.js';
 import { downloadFile } from '../utils/utils.js';
-import * as PersistenceService from '../services/PersistenceService.js';
 import * as Config from '../core/config.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RuleRankComponent } from './components/RuleRankComponent.js';
@@ -45,7 +45,7 @@ export class UIManager {
         this.mode = 'desktop';
         this.mediaQueryList = window.matchMedia(MOBILE_QUERY);
         this.mobileViews = {};
-        this.activeMobileViewName = 'simulate';
+        this.activeMobileViewName = 'watch';
         this.managedComponents = [];
         this.sharedComponents = {}; 
         this.initialStateConfigModal = null; // Add this
@@ -59,17 +59,29 @@ export class UIManager {
         this.init();
     }
 
+    // Config-driven full-screen mobile views. Rules/Editor/Worlds are NOT here —
+    // they live under the segmented `build` view (BuildView), created eagerly in
+    // initMobileUI. `discover` is the Explore surface promoted to a primary tab.
     #mobileViewConfig = {
-        rules: { constructor: RulesetActionsComponent, title: 'Rulesets' },
+        discover: { constructor: ExploreComponent, title: 'Discover' },
         library: { constructor: RulesetLibraryComponent, title: 'Ruleset Library' },
         patterns: { constructor: PatternsComponent, title: 'Patterns' },
-        worlds: { constructor: WorldSetupComponent, title: 'World Setup' },
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
-        editor: { constructor: RulesetEditorComponent, title: 'Ruleset Editor' },
         explore: { constructor: ExploreComponent, title: 'Auto-Explore' },
         settings: { constructor: SettingsComponent, title: 'Settings' },
         learning: { constructor: LearningComponent, title: 'Learning Hub (Alpha)' },
     };
+
+    // Segments of the consolidated Build tab (mobile redesign M1).
+    #buildSegments = [
+        { id: 'rules', label: 'Rules', componentType: RulesetActionsComponent },
+        { id: 'editor', label: 'Editor', componentType: RulesetEditorComponent },
+        { id: 'worlds', label: 'Worlds', componentType: WorldSetupComponent },
+    ];
+
+    // Top-level tabs the bottom bar highlights. Views not listed (More/Settings/
+    // Analysis/etc. reached via the header gear) light up no tab.
+    static #MOBILE_TABS = new Set(['watch', 'discover', 'build', 'library']);
 
     /**
      * Initializes the entire UI layer, sets up mode detection,
@@ -195,6 +207,8 @@ export class UIManager {
             
             document.getElementById('bottom-tab-bar')?.classList.toggle('hidden', !this.isMobile());
             document.getElementById('mobile-canvas-controls')?.classList.toggle('hidden', !this.isMobile());
+            document.getElementById('mobileGearButton')?.classList.toggle('hidden', !this.isMobile());
+            document.getElementById('mobileWorldPill')?.classList.toggle('hidden', !this.isMobile());
             document.getElementById('vertical-toolbar')?.classList.toggle('hidden', this.isMobile());
 
             if (dispatchEvent) {
@@ -215,13 +229,23 @@ export class UIManager {
         if (mobileViewsContainer) {
             this.mobileViews.more = new MoreView(mobileViewsContainer, appContext);
             this.mobileViews.more.render();
+            this.mobileViews.build = new BuildView(mobileViewsContainer, appContext, this.#buildSegments);
         }
 
         const bottomTabBarEl = document.getElementById('bottom-tab-bar');
         if (bottomTabBarEl) new BottomTabBar(bottomTabBarEl, panelManager);
 
+        const gearButton = document.getElementById('mobileGearButton');
+        if (gearButton) {
+            gearButton.innerHTML = ICONS.cog;
+            gearButton.addEventListener('click', () => {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'more' });
+            });
+        }
+
+        this._initWorldPill();
+
         const fabRightContainer = document.getElementById('mobile-fab-container-right');
-        const fabLeftContainer = document.getElementById('mobile-fab-container-left');
 
         if (fabRightContainer) {
             fabRightContainer.innerHTML = `
@@ -243,70 +267,69 @@ export class UIManager {
             });
         }
 
-        this.renderCustomFabs(fabLeftContainer);
-        EventBus.subscribe(EVENTS.COMMAND_UPDATE_FAB_UI, () => this.renderCustomFabs(fabLeftContainer));
     }
 
-    renderCustomFabs(fabLeftContainer) {
-        if (!fabLeftContainer) return;
-        fabLeftContainer.innerHTML = '';
-        const fabActionMap = {
-            'generate': { icon: ICONS.sparkles, title: 'Generate', command: EVENTS.COMMAND_EXECUTE_GENERATE_RULESET, payload: {} },
-            'mutate': { icon: ICONS.shuffle, title: 'Mutate', command: EVENTS.COMMAND_EXECUTE_MUTATE_RULESET, payload: {} },
-            'clone': { icon: ICONS.copy, title: 'Clone', command: EVENTS.COMMAND_CLONE_RULESET, payload: {} },
-            'clone-mutate': { icon: ICONS.copyPlus, title: 'Clone & Mutate', command: EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE, payload: {} },
-            'clear-one': { icon: ICONS.eraser, title: 'Clear World', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'selected' } },
-            'clear-all': { icon: ICONS.trash, title: 'Clear All', command: EVENTS.COMMAND_CLEAR_WORLDS, payload: { scope: 'all' } },
-            'reset-one': { icon: ICONS.rotateCcw, title: 'Reset World', command: EVENTS.COMMAND_RESET_WORLDS_WITH_CURRENT_RULESET, payload: { scope: 'selected' } },
-            'reset-all': { icon: ICONS.refreshCw, title: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
-            'reset-densities': { icon: ICONS.droplet, title: 'Default Densities', command: EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, payload: {} },
-            'apply-density-all': { icon: ICONS.target, title: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, payload: {} }
+    /**
+     * World-paging pill in the top bar (mobile redesign M4) — the always-present
+     * fallback for the swipe-to-page gesture. `‹ N/9 ›` steps the selected world
+     * (wrapping) via COMMAND_SELECT_WORLD and mirrors SELECTED_WORLD_CHANGED.
+     */
+    _initWorldPill() {
+        const pill = document.getElementById('mobileWorldPill');
+        if (!pill) return;
+        const prev = pill.querySelector('.world-pill-prev');
+        const next = pill.querySelector('.world-pill-next');
+        const label = pill.querySelector('.world-pill-label');
+        prev.innerHTML = ICONS.chevronLeft;
+        next.innerHTML = ICONS.chevronRight;
+
+        const count = Config.NUM_WORLDS;
+        const step = (dir) => {
+            const cur = this.appContext.worldManager.getSelectedWorldIndex();
+            const target = ((cur + dir) % count + count) % count;
+            EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, target);
         };
+        prev.addEventListener('click', () => step(-1));
+        next.addEventListener('click', () => step(1));
 
-        const fabSettings = PersistenceService.loadUISetting('fabSettings', { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true, order: [] });
-        const orderedIds = (fabSettings.order && fabSettings.order.length > 0) ? fabSettings.order : fabSettings.enabled;
-        const enabledSet = new Set(fabSettings.enabled);
-
-        orderedIds.forEach(actionId => {
-            if (!enabledSet.has(actionId)) return; 
-            const action = fabActionMap[actionId];
-            if (!action) return;
-            const button = document.createElement('button');
-            button.className = 'mobile-fab secondary-fab';
-            button.innerHTML = `<span class="icon">${action.icon}</span>`;
-            button.title = action.title;
-            button.setAttribute('aria-label', action.title);
-            button.addEventListener('click', () => {
-                EventBus.dispatch(action.command, action.payload);
-            });
-            fabLeftContainer.appendChild(button);
-        });
+        const updateLabel = (idx) => {
+            const cur = (typeof idx === 'number') ? idx : this.appContext.worldManager.getSelectedWorldIndex();
+            label.textContent = `${cur + 1}/${count}`;
+        };
+        EventBus.subscribe(EVENTS.SELECTED_WORLD_CHANGED, (idx) => updateLabel(idx));
+        updateLabel();
     }
 
-    
+
     _placeComponentInView({ _view, contentComponentType, contentContainer }) {
-        if (!contentComponentType || !contentContainer) return;
+        this.mountSharedComponentInto(contentComponentType, contentContainer);
+    }
 
-        
+    /**
+     * Move a shared singleton component into a target container and apply the
+     * mobile/desktop context class + refresh. Shared by config-driven MobileViews
+     * (via VIEW_SHOWN) and the segmented BuildView.
+     * @param {Function} componentType constructor of the shared component
+     * @param {HTMLElement} container
+     */
+    mountSharedComponentInto(componentType, container) {
+        if (!componentType || !container) return;
+
         const componentToPlace = Object.values(this.sharedComponents).find(
-            component => component.constructor === contentComponentType
+            component => component.constructor === componentType
         );
+        if (!componentToPlace) return;
 
-        if (componentToPlace) {
-            
-            contentContainer.innerHTML = '';
-            contentContainer.appendChild(componentToPlace.getElement());
+        container.innerHTML = '';
+        container.appendChild(componentToPlace.getElement());
 
-            
-            const contextClass = this.isMobile() ? 'mobile-context' : 'desktop-context';
-            const oppositeClass = this.isMobile() ? 'desktop-context' : 'mobile-context';
-            componentToPlace.getElement().classList.add(contextClass);
-            componentToPlace.getElement().classList.remove(oppositeClass);
+        const contextClass = this.isMobile() ? 'mobile-context' : 'desktop-context';
+        const oppositeClass = this.isMobile() ? 'desktop-context' : 'mobile-context';
+        componentToPlace.getElement().classList.add(contextClass);
+        componentToPlace.getElement().classList.remove(oppositeClass);
 
-            
-            if (typeof componentToPlace.refresh === 'function') {
-                componentToPlace.refresh();
-            }
+        if (typeof componentToPlace.refresh === 'function') {
+            componentToPlace.refresh();
         }
     }
 
@@ -545,22 +568,49 @@ export class UIManager {
 
 
 
-    _showMobileViewInternal({ targetView }) {
+    /**
+     * Resolve a requested mobile-view id (including legacy ids and deep-link
+     * segments) to the new 4-tab structure. Returns `{ view, segment?, tab }`
+     * where `view` is the concrete mobile view to show ('watch' = bare canvas),
+     * `segment` optionally selects a Build sub-view, and `tab` is the bottom-bar
+     * tab to highlight ('' for gear-only views).
+     * @param {string} requested
+     * @param {string} [explicitSegment]
+     */
+    #resolveMobileTarget(requested, explicitSegment) {
+        // Legacy aliases → new homes.
+        if (requested === 'simulate') requested = 'watch';
+        else if (requested === 'explore') requested = 'discover';
+        else if (requested === 'rules' || requested === 'editor' || requested === 'worlds') {
+            explicitSegment = explicitSegment || requested;
+            requested = 'build';
+        }
+
+        const segment = requested === 'build' ? explicitSegment : undefined;
+        const tab = UIManager.#MOBILE_TABS.has(requested) ? requested : '';
+        return { view: requested, segment, tab };
+    }
+
+    _showMobileViewInternal({ targetView, segment }) {
         if (!this.isMobile()) return;
-        
+
+        const resolved = this.#resolveMobileTarget(targetView, segment);
+
         Object.values(this.mobileViews).forEach(v => v.hide());
-    
-        
-        this.#createMobileView(targetView);
-    
-        
-        const viewToShow = this.mobileViews[targetView];
+
+        if (resolved.view === 'build' && this.mobileViews.build && resolved.segment) {
+            this.mobileViews.build.setSegment(resolved.segment);
+        }
+
+        // 'watch' has no view entry — hiding everything reveals the live canvas.
+        this.#createMobileView(resolved.view);
+        const viewToShow = this.mobileViews[resolved.view];
         if (viewToShow) {
             viewToShow.show();
         }
 
-        this.activeMobileViewName = targetView;
-        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: targetView });
+        this.activeMobileViewName = resolved.view;
+        EventBus.dispatch(EVENTS.MOBILE_VIEW_CHANGED, { activeView: resolved.view, activeTab: resolved.tab });
     }
 
     #createMobileView(viewName) {

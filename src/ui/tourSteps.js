@@ -30,7 +30,7 @@ export const getTours = (appContext) => {
     const resetUIState = () => {
         EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         if (appContext.uiManager.isMobile()) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'simulate' });
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'watch' });
         }
     };
 
@@ -66,7 +66,7 @@ export const getTours = (appContext) => {
      */
     const showView = (config) => {
         if (appContext.uiManager.isMobile()) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: config.mobile.view });
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: config.mobile.view, segment: config.mobile.segment });
         } else {
             if(!config.desktop) return;
             const event = config.desktop.type === 'panel' ? EVENTS.COMMAND_TOGGLE_PANEL : EVENTS.COMMAND_TOGGLE_POPOUT;
@@ -181,7 +181,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Ruleset Actions',
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
-        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'rules' } }),
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'build', segment: 'rules' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
@@ -189,7 +189,7 @@ export const getTours = (appContext) => {
         title: 'Generate',
         content: "Create entirely new laws of physics. <span class=\"onboarding-highlight-text\">R-Sym</span> (Rotational Symmetry) is often best for creating structured, organic patterns.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: (step) => { showView({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'rules' } }); document.querySelector(step.element)?.click(); },
+        onBeforeShow: (step) => { showView({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'build', segment: 'rules' } }); document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }
     }, {
         element: '[data-pane="mutate"]',
@@ -236,7 +236,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: The Ruleset Editor',
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
-        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'editor' } }),
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'build', segment: 'editor' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetEditorComponent }
     }, {
@@ -244,7 +244,7 @@ export const getTours = (appContext) => {
         title: 'Toggling Outcomes',
         content: "The visualization shows a center cell and its six neighbors. The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule</span> to flip its output state.",
         primaryAction: { text: 'Click any Rule' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'editor' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'build', segment: 'editor' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE }
     }, {
         element: '#ruleset-editor-mode',
@@ -259,7 +259,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: World Setup',
         content: "Each of the nine universes can be configured independently. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel to manage them.",
         primaryAction: { text: 'Open Panel' },
-        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
@@ -353,7 +353,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Auto-Explore',
         content: "Let the Explorer hunt for you. Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span> near the edge of chaos, scoring and breeding the best automatically. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
         primaryAction: { text: 'Open Auto-Explore' },
-        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ExploreComponent }
     }, {
@@ -361,21 +361,21 @@ export const getTours = (appContext) => {
         title: 'Run the Search',
         content: "<span class=\"onboarding-highlight-text\">Start</span> begins the search; <span class=\"onboarding-highlight-text\">Pause</span>, <span class=\"onboarding-highlight-text\">Stop</span>, and <span class=\"onboarding-highlight-text\">Stop &amp; Keep</span> (which adopts the current champion into your selected world) end it. The status line above tracks the generation and best score.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         advanceOn: { type: 'click' }
     }, {
         element: '#explore-settings',
         title: 'Tune the Search',
         content: "Control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         advanceOn: { type: 'click' }
     }, {
         element: '.explore-gallery-group',
         title: 'The Gallery',
         content: "Every interesting find collects here, best-first, with a per-component score breakdown. Use the per-find actions to <span class=\"onboarding-highlight-text\">apply</span> it to the selected world, re-test, <span class=\"onboarding-highlight-text\">save</span> it to your library, or <span class=\"onboarding-highlight-text\">share</span> a link.",
         primaryAction: { text: 'Finish' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'explore' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         advanceOn: { type: 'click' }
     }];
 
@@ -447,7 +447,7 @@ export const getTours = (appContext) => {
         title: 'Tutorial: Reset & Clear',
         content: 'These actions manage the state of the cells on the grid.',
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => { resetUIState(); showView({ desktop: {type: 'popout', name: 'resetClear'}, mobile: {view: 'simulate' /* No mobile equivalent yet */} }) },
+        onBeforeShow: () => { resetUIState(); showView({ desktop: {type: 'popout', name: 'resetClear'}, mobile: {view: 'watch' /* No mobile equivalent yet */} }) },
         advanceOn: { type: 'click' }
     }, {
         element: '[data-tour-id="reset-clear-popout"] #resetAllButtonPopout',
@@ -544,27 +544,27 @@ export const getTours = (appContext) => {
         title: 'Step 6: Focus on Central World',
         content: "If your main view is not focused on the central world (World 4), click on the central cell in the minimap below to select it.",
         condition: (appContext) => appContext.worldManager.getSelectedWorldIndex() !== 4,
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED, condition: (worldIndex) => worldIndex === 4 }
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
         title: "Step 7: Configure Central World's Random Fill",
         content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure <span class=\"onboarding-highlight-text\">'Random fill'</span> mode is selected and set the <span class=\"onboarding-highlight-text\">Fill amount</span> slider to 50% (or pick the <span class=\"onboarding-highlight-text\">'Balanced'</span> preset). Then save the changes.",
         //primaryAction: { text: 'Configure Density' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
         title: 'Step 8: Copy Selected &rarr; All',
         content: "Now click <span class=\"onboarding-highlight-text\">'Copy Selected &rarr; All'</span> to set the same 50% Random fill configuration across all worlds, creating a level playing field for our mutations.",
         // Re-assert the panel so the button is present and gets highlighted.
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
         title: 'Step 9: Reset Worlds',
         content: "Finally, click <span class=\"onboarding-highlight-text\">'Regenerate All Worlds'</span> to re-seed all worlds with the new initial Random fill settings.",
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'worlds' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
@@ -580,7 +580,7 @@ export const getTours = (appContext) => {
         // Same as Step 2: skip when Mutate is already the active tab, otherwise
         // advance on the user clicking the highlighted tab itself.
         condition: () => !document.querySelector('[data-pane="mutate"]')?.classList.contains('active'),
-        onBeforeShow: () => showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} }),
+        onBeforeShow: () => showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'build', segment: 'rules'} }),
         advanceOn: { type: 'click', target: 'element' }
     }, {
         // Highlight the whole mutate pane (not just the button) so the rate
@@ -590,7 +590,7 @@ export const getTours = (appContext) => {
         title: 'Step 12: Run the Experiment',
         content: "We've preset the recommended <span class=\"onboarding-highlight-text\">R-Sym</span> mode and a <span class=\"onboarding-highlight-text\">~10% Mutation Rate</span> &mdash; the sweet spot for evolving structured rules. Tweak them if you like, then press <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> to copy our 'Gliders' ruleset to all nine worlds and mutate each copy uniquely.",
         onBeforeShow: () => {
-            showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'rules'} });
+            showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'build', segment: 'rules'} });
             // Preset R-Sym + ~10% by driving the real inputs; each control's
             // change handler persists the choice (the operation reads it live).
             const rsym = document.getElementById('ruleset-actions-mutate-mode-r_sym');
@@ -605,7 +605,7 @@ export const getTours = (appContext) => {
         highlightType: 'canvas',
         title: 'Step 13: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
-        onBeforeShow: () => { showView({ mobile: {view: 'simulate'} }); },
+        onBeforeShow: () => { showView({ mobile: {view: 'watch'} }); },
         //primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
         delayAfter: 800
