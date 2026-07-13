@@ -226,6 +226,14 @@ export class RulesetLibraryComponent extends BaseComponent {
                     this._applyThumbToCard('#ruleset-library-public-content', null, entry.hex, thumb);
                 }
             },
+            onDone: ({ cancelled, remaining }) => {
+                // The per-sweep cap bakes at most `max` entries; if more remain (e.g. a >24-entry public
+                // library), chain the next batch so the whole library fills in over successive sweeps
+                // instead of stalling. `seen` now excludes this batch, so each pass advances and the
+                // reschedule terminates once nothing missing is left. Skip if a newer sweep superseded us.
+                if (cancelled || remaining <= 0) return;
+                this._scheduleThumbnailBackfill();
+            },
         });
     }
 

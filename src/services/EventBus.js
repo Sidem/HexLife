@@ -181,6 +181,8 @@ export const EVENTS = {
     PERFORMANCE_METRICS_UPDATED: 'simulation:performanceMetricsUpdated',
     /** @param {{recording: boolean}} data - Whether WebM canvas recording is currently active (drives the record button visual). */
     WORLD_RECORDING_STATE_CHANGED: 'simulation:worldRecordingStateChanged',
+    /** @param {{worldIndex: number}} data - A world is being borrowed as the scratch world for library thumbnail baking (-1 when the batch finishes and the world is restored). Drives the "in use" minimap badge. */
+    WORLD_BAKING_STATE_CHANGED: 'simulation:worldBakingStateChanged',
     /** @param {{worldIndex: number}} data - The index of the world whose history changed. */
     HISTORY_CHANGED: 'simulation:historyChanged',
     /** @param {{worldIndex: number, length: number, offset: number, isScrubbing: boolean}} data - State-history scrub-back position/availability for the selected world (drives the transport bar). */

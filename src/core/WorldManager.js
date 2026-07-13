@@ -1442,6 +1442,7 @@ export class WorldManager {
         }
 
         this._bakingWorldIndex = idx;
+        EventBus.dispatch(EVENTS.WORLD_BAKING_STATE_CHANGED, { worldIndex: idx });
 
         const bake = async ({ hex, initialState, seed = null, ticks = EXPLORE_CONFIG.evalTicks } = {}) => {
             if (!hex || hex === 'Error' || hex === 'N/A') return null;
@@ -1483,6 +1484,7 @@ export class WorldManager {
                 worldTick: savedTick,
             }, [savedCells.buffer.slice(0), savedRulesetArray.buffer.slice(0)]);
             this._bakingWorldIndex = -1;
+            EventBus.dispatch(EVENTS.WORLD_BAKING_STATE_CHANGED, { worldIndex: -1 });
         }
         };
 
@@ -1531,15 +1533,18 @@ export class WorldManager {
      * `onResult(entry, thumb)` fires after each bake resolves (thumb is `null` on failure) so the caller
      * can persist successes AND remember attempts — that lets it skip already-tried entries on the next
      * sweep instead of re-baking the whole library on every save.
+     * `onDone({ cancelled, remaining })` fires once the batch settles: `remaining` is how many missing
+     * entries were left unbaked by the per-call `max` cap, so the caller can schedule the next batch and
+     * cover the whole library over time instead of stalling after the first `max` entries.
      * @param {Array<{hex: string, initialState?: object, seed?: number|null, thumb?: string|null}>} entries
-     * @param {{onResult: (entry: object, thumb: string|null) => void, max?: number}} ctx
+     * @param {{onResult: (entry: object, thumb: string|null) => void, onDone?: (info: {cancelled: boolean, remaining: number}) => void, max?: number}} ctx
      * @returns {{cancel: () => void}}
      */
-    backfillMissingThumbnails = (entries, { onResult, max = 8 } = {}) => {
+    backfillMissingThumbnails = (entries, { onResult, onDone, max = 8 } = {}) => {
         let cancelled = false;
-        const pending = (entries || [])
-            .filter(e => e && e.hex && !e.thumb)
-            .slice(0, max);
+        const missing = (entries || []).filter(e => e && e.hex && !e.thumb);
+        const pending = missing.slice(0, max);
+        const remaining = Math.max(0, missing.length - pending.length);
 
         this._withScratchBakeWorld(async (bake) => {
             for (const entry of pending) {
@@ -1548,7 +1553,7 @@ export class WorldManager {
                 if (cancelled) return;
                 onResult?.(entry, thumb);
             }
-        });
+        }).then(() => onDone?.({ cancelled, remaining }), () => onDone?.({ cancelled, remaining }));
 
         return { cancel: () => { cancelled = true; } };
     };

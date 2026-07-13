@@ -261,3 +261,53 @@
     min-width: 15px;
     font-size: 10px;
 }
+
+/* "In use for thumbnail baking" indicator: a dimming ring + a "baking…" pill over the scratch world
+   while the library borrows it (it flickers through transient rulesets during the bake). Driven by
+   WORLD_BAKING_STATE_CHANGED. */
+.world-baking-ring {
+    position: absolute;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 2px solid rgba(120, 180, 255, 0.8);
+    background: rgba(10, 20, 40, 0.45);
+    box-shadow: 0 0 8px rgba(120, 180, 255, 0.55), inset 0 0 10px rgba(120, 180, 255, 0.3);
+    pointer-events: none;
+    z-index: 51;
+}
+
+.world-baking-ring.hidden {
+    display: none;
+}
+
+.world-baking-badge {
+    position: absolute;
+    height: 20px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: rgba(20, 34, 60, 0.9);
+    color: #cfe3ff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+    z-index: 54;
+}
+
+.world-baking-badge.hidden {
+    display: none;
+}
+
+.world-baking-badge.mini {
+    height: 16px;
+    font-size: 9px;
+    padding: 0 4px;
+}

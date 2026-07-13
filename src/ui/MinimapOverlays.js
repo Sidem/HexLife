@@ -17,9 +17,13 @@ export class MinimapOverlays extends BaseComponent {
         this.lockBadgeElements = [];
         this.parentRingElements = [];
         this.parentBadgeElements = [];
+        this.bakingBadgeElements = [];
+        this.bakingRingElements = [];
         /** Per-world auto-explore scores (set while a search runs; null otherwise). */
         this._exploreScores = null;
         this._exploring = false;
+        /** Index of the world currently borrowed for library thumbnail baking (-1 = none). */
+        this._bakingWorldIndex = -1;
         this.init();
     }
 
@@ -75,6 +79,23 @@ export class MinimapOverlays extends BaseComponent {
             parentBadge.title = 'Breeding parent — a source for genepool breeding';
             this.mountPoint.appendChild(parentBadge);
             this.parentBadgeElements.push(parentBadge);
+
+            // "In use" indicator: while a world is borrowed as the scratch world for library thumbnail
+            // baking, a dimming ring + a "baking…" label mark it temporarily unavailable (it flickers
+            // through transient rulesets during the bake). Cleared when the batch restores the world.
+            const bakingRing = document.createElement('div');
+            bakingRing.className = 'world-baking-ring hidden';
+            bakingRing.dataset.worldId = i;
+            this.mountPoint.appendChild(bakingRing);
+            this.bakingRingElements.push(bakingRing);
+
+            const bakingBadge = document.createElement('div');
+            bakingBadge.className = 'world-baking-badge hidden';
+            bakingBadge.dataset.worldId = i;
+            bakingBadge.textContent = '⏳ baking…';
+            bakingBadge.title = 'Temporarily in use to render library thumbnails';
+            this.mountPoint.appendChild(bakingBadge);
+            this.bakingBadgeElements.push(bakingBadge);
         }
 
         this._subscribeToEvent(EVENTS.LAYOUT_UPDATED, this.handleLayoutUpdate);
@@ -84,6 +105,13 @@ export class MinimapOverlays extends BaseComponent {
         this._subscribeToEvent(EVENTS.UI_MODE_CHANGED, this.handleUIModeChange);
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this.handleExploreProgress);
         this._subscribeToEvent(EVENTS.WORLD_SETTINGS_CHANGED, this.updateOverlays);
+        this._subscribeToEvent(EVENTS.WORLD_BAKING_STATE_CHANGED, this.handleBakingStateChange);
+    }
+
+    // Track which world (if any) is borrowed for thumbnail baking so the next pass can mark it "in use".
+    handleBakingStateChange(payload) {
+        this._bakingWorldIndex = Number.isInteger(payload?.worldIndex) ? payload.worldIndex : -1;
+        this.updateOverlays();
     }
 
     handleLayoutUpdate(layout) {
@@ -98,6 +126,7 @@ export class MinimapOverlays extends BaseComponent {
         this.scoreBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
         this.lockBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
         this.parentBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
+        this.bakingBadgeElements.forEach(badge => badge.classList.toggle('mini', isMobile));
     }
 
     // Track the live per-world auto-explore scores so the next overlay pass can paint the badges.
@@ -211,6 +240,28 @@ export class MinimapOverlays extends BaseComponent {
             } else {
                 if (ringEl) ringEl.className = 'world-parent-ring hidden';
                 if (parentBadgeEl) parentBadgeEl.className = 'world-parent-badge hidden';
+            }
+
+
+            const bakingRingEl = this.bakingRingElements[i];
+            const bakingBadgeEl = this.bakingBadgeElements[i];
+            const isBaking = i === this._bakingWorldIndex;
+            if (bakingRingEl && bakingBadgeEl && isBaking) {
+                bakingRingEl.className = 'world-baking-ring';
+                bakingRingEl.style.left = `${miniX}px`;
+                bakingRingEl.style.top = `${miniY}px`;
+                bakingRingEl.style.width = `${miniMapW}px`;
+                bakingRingEl.style.height = `${miniMapH}px`;
+
+                bakingBadgeEl.className = 'world-baking-badge';
+                bakingBadgeEl.classList.toggle('mini', this.overlayElements[i]?.classList.contains('mini'));
+                // Centered horizontally, sitting just above vertical center of the minimap cell.
+                bakingBadgeEl.style.left = `${miniX + miniMapSpacing}px`;
+                bakingBadgeEl.style.top = `${miniY + miniMapH / 2 - 10}px`;
+                bakingBadgeEl.style.width = `${miniMapW - 2 * miniMapSpacing}px`;
+            } else {
+                if (bakingRingEl) bakingRingEl.className = 'world-baking-ring hidden';
+                if (bakingBadgeEl) bakingBadgeEl.className = 'world-baking-badge hidden';
             }
 
 
