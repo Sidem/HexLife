@@ -429,4 +429,6 @@ export const EVENTS = {
     COMMAND_SET_EXPLORE_TARGET_PROMPT: 'command:setExploreTargetPrompt',
     /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean}} data - The perceptual-objective embedding provider changed status (toggled, model loading, ready, or degraded after a failure). */
     EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
+    /** @param {{count: number, winner: 'a'|'b'|'skip'}} data - A swipe-to-judge "which is more interesting?" vote was banked (PLAY-LAYER-PLAN §S). `count` is the new total banked vote count; surfaces use it to update their "N votes banked" chips and the refit affordance. */
+    VOTE_RECORDED: 'explore:voteRecorded',
 };

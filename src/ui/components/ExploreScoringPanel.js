@@ -5,6 +5,7 @@ import {
     FIND_THRESHOLD_MIN, FIND_THRESHOLD_MAX,
     sanitizeScoring, detectPreset,
 } from '../../core/analysis/ScoringPresets.js';
+import { refitWeights, MIN_VOTES_FOR_REFIT } from '../../core/analysis/WeightRefit.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META, renderTermExplainer } from './scoringTermMeta.js';
 
 const SETTING_KEY = 'exploreScoring';
@@ -21,12 +22,15 @@ const SETTING_KEY = 'exploreScoring';
 export class ExploreScoringPanel {
     /**
      * @param {HTMLElement} mountPoint
-     * @param {{onChange?: (scoring: object, presetKey: string) => void}} [opts] `onChange` fires
+     * @param {{onChange?: (scoring: object, presetKey: string) => void,
+     *   voteBank?: import('../../core/analysis/VoteBank.js').VoteBank|null}} [opts] `onChange` fires
      *   after every persisted change (slider, preset, reset) with the sanitized scoring + preset key.
+     *   `voteBank` (§S3) enables the "Refit from my votes" affordance.
      */
-    constructor(mountPoint, { onChange = null } = {}) {
+    constructor(mountPoint, { onChange = null, voteBank = null } = {}) {
         this.mount = mountPoint;
         this.onChange = onChange;
+        this.voteBank = voteBank;
         this.scoring = sanitizeScoring(PersistenceService.loadUISetting(SETTING_KEY, null));
         /** @type {Record<string, SliderComponent>} */
         this.sliders = {};
@@ -51,10 +55,92 @@ export class ExploreScoringPanel {
 
     /** Grey out every control while a search is running (settings are read at Start). */
     setDisabled(disabled) {
+        this._disabled = !!disabled;
         this.mount.classList.toggle('disabled', !!disabled);
         for (const s of Object.values(this.sliders)) s.setDisabled(!!disabled);
         if (this.presetSelect) this.presetSelect.disabled = !!disabled;
         if (this.resetBtn) this.resetBtn.disabled = !!disabled;
+        this.refreshRefit();
+    }
+
+    /**
+     * Refresh the "Refit from my votes (N)" affordance from the current vote bank (§S3). Called on
+     * mount, whenever a vote is recorded (VOTE_RECORDED), and on enable/disable. No-op without a bank.
+     */
+    refreshRefit() {
+        if (!this.voteBank) return;
+        const decisive = this.voteBank.getDecisiveCount();
+        const countEl = this.mount.querySelector('[data-field="refit-count"]');
+        if (countEl) countEl.textContent = String(decisive);
+        const enough = decisive >= MIN_VOTES_FOR_REFIT && !this._disabled;
+        const btn = this.mount.querySelector('[data-action="refit"]');
+        if (btn) btn.disabled = !enough;
+        const hint = this.mount.querySelector('[data-field="refit-hint"]');
+        if (hint) {
+            hint.textContent = decisive >= MIN_VOTES_FOR_REFIT
+                ? ''
+                : `Rate at least ${MIN_VOTES_FOR_REFIT} pairs to refit (you have ${decisive}).`;
+        }
+    }
+
+    /** Compute a fit from the banked votes and show a before/after comparison (§S3). */
+    _runRefit() {
+        const box = this.mount.querySelector('[data-field="refit-result"]');
+        if (!this.voteBank || !box) return;
+        const res = refitWeights(this.voteBank.getVotes());
+        this._lastRefit = res;
+        box.hidden = false;
+        if (!res.ok) {
+            const msg = res.reason === 'not-enough-votes'
+                ? `Rate at least ${MIN_VOTES_FOR_REFIT} pairs first — you have ${res.nUsed}.`
+                : 'Your votes don\'t yet separate the signals cleanly. Rate a few more pairs (more decisively) and try again.';
+            box.innerHTML = `<p class="explore-scoring-refit-msg">${msg}</p>`;
+            return;
+        }
+        const rows = COMPONENT_META.map(({ key, label }) => {
+            const before = this.scoring.weights[key] ?? 0;
+            const after = res.weightsPct[key] ?? 0;
+            const changed = before !== after ? ' explore-scoring-refit-changed' : '';
+            return `
+                <div class="explore-scoring-refit-trow${changed}">
+                    <span class="explore-scoring-refit-tlabel">${label}</span>
+                    <span class="explore-scoring-refit-tbefore">${before}</span>
+                    <span class="explore-scoring-refit-tarrow">→</span>
+                    <span class="explore-scoring-refit-tafter">${after}</span>
+                </div>`;
+        }).join('');
+        box.innerHTML = `
+            <p class="explore-scoring-refit-summary">Fitted from <strong>${res.nUsed}</strong> votes · agrees with ${Math.round(res.accuracy * 100)}% of them. Relative weights (0–100):</p>
+            <div class="explore-scoring-refit-table">
+                <div class="explore-scoring-refit-trow explore-scoring-refit-thead">
+                    <span class="explore-scoring-refit-tlabel">Term</span>
+                    <span class="explore-scoring-refit-tbefore">Now</span>
+                    <span class="explore-scoring-refit-tarrow"></span>
+                    <span class="explore-scoring-refit-tafter">Fitted</span>
+                </div>
+                ${rows}
+            </div>
+            <div class="explore-scoring-refit-apply-row">
+                <button type="button" class="button action-button" data-action="apply-refit">Apply as my objective</button>
+            </div>`;
+    }
+
+    /** Apply the last computed fit to the weight sliders (an explicit, reversible user action, §S3). */
+    _applyRefit() {
+        if (!this._lastRefit || !this._lastRefit.ok) return;
+        const pct = this._lastRefit.weightsPct;
+        for (const k of WEIGHT_KEYS) {
+            const v = Math.max(0, Math.min(100, Math.round(Number(pct[k]) || 0)));
+            this.scoring.weights[k] = v;
+            this.sliders[k]?.setValue(v);
+        }
+        this.mount.classList.remove('all-zero');
+        this._persistAndNotify();
+        const box = this.mount.querySelector('[data-field="refit-result"]');
+        if (box) {
+            const date = new Date().toISOString().slice(0, 10);
+            box.innerHTML = `<p class="explore-scoring-refit-msg explore-scoring-refit-applied">Applied — Personal objective (fit from ${this._lastRefit.nUsed} votes, ${date}). Reselect a stock preset to revert.</p>`;
+        }
     }
 
     /**
@@ -112,6 +198,16 @@ export class ExploreScoringPanel {
                     <div class="explore-scoring-explainer" hidden></div>
                 </div>
             </div>
+            ${this.voteBank ? `
+            <div class="explore-scoring-refit" data-field="refit">
+                <h6 class="explore-scoring-advanced-title">Personalize from your votes</h6>
+                <p class="explore-scoring-refit-blurb">Rate finds head-to-head (the balance-scale button on the Gallery) to teach the objective what <em>you</em> find interesting, then refit these weights from your votes. Applying the fit becomes a "Custom" preset — reselect a stock preset to undo it.</p>
+                <div class="explore-scoring-refit-row">
+                    <button type="button" class="button explore-scoring-refit-btn" data-action="refit">Refit from my votes (<span data-field="refit-count">0</span>)</button>
+                    <span class="explore-scoring-refit-hint" data-field="refit-hint"></span>
+                </div>
+                <div class="explore-scoring-refit-result" data-field="refit-result" hidden></div>
+            </div>` : ''}
         `;
 
         this.presetSelect = this.mount.querySelector('#explore-scoring-preset');
@@ -169,11 +265,16 @@ export class ExploreScoringPanel {
             this._applyPreset('default', { resetThreshold: true });
         });
         this.mount.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-term-info]');
-            if (btn) this._toggleExplainer(btn.closest('.explore-scoring-row'));
+            const infoBtn = e.target.closest('[data-term-info]');
+            if (infoBtn) { this._toggleExplainer(infoBtn.closest('.explore-scoring-row')); return; }
+            const actionBtn = e.target.closest('[data-action]');
+            if (!actionBtn) return;
+            if (actionBtn.dataset.action === 'refit') this._runRefit();
+            else if (actionBtn.dataset.action === 'apply-refit') this._applyRefit();
         });
 
         this._syncPresetSelect();
+        this.refreshRefit();
     }
 
     _onWeightChange(key, value) {

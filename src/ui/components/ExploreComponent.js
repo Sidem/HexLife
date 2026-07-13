@@ -11,6 +11,8 @@ import { decodePack } from '../../services/LibraryPackCodec.js';
 import { ICONS } from '../icons.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
+import { ExploreRaterView } from './ExploreRaterView.js';
+import { VoteBank } from '../../core/analysis/VoteBank.js';
 import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
 import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
 
@@ -71,6 +73,8 @@ export class ExploreComponent extends BaseComponent {
         this.worldManager = appContext.worldManager;
         this.service = this.worldManager.autoExploreService;
         this.sliders = {};
+        // Swipe-to-judge vote bank (§S): shared by the desktop rater and the Scoring panel's refit.
+        this.voteBank = new VoteBank();
         this._consumeSharedSearch();
         this.element = document.createElement('div');
         this.element.className = 'explore-component-content';
@@ -249,12 +253,14 @@ export class ExploreComponent extends BaseComponent {
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
                     <div class="explore-gallery-actions">
+                        <button class="button-icon" data-action="rate-finds" title="Rate finds head-to-head to teach the objective what you find interesting" aria-label="Rate finds">${ICONS.scale}</button>
                         <button class="button-icon" data-action="export-gallery" title="Export the gallery finds as a shareable pack file" aria-label="Export gallery to a pack file">${ICONS.download}</button>
                         <button class="button-icon" data-action="import-gallery" title="Import gallery finds from a pack file" aria-label="Import gallery finds from a pack file">${ICONS.upload}</button>
                         <button class="button-icon" data-action="clear-gallery" title="Clear the session gallery" aria-label="Clear the session gallery">${ICONS.trash}</button>
                     </div>
                 </div>
                 <input type="file" class="explore-import-input" accept="application/json,.json" hidden aria-hidden="true" />
+                <div id="explore-rater-mount" class="explore-rater" hidden></div>
                 <div id="explore-gallery-list" class="explore-gallery-list"></div>
             </div>
         `;
@@ -262,6 +268,7 @@ export class ExploreComponent extends BaseComponent {
         this.statusEl = this.element.querySelector('#explore-status');
         this.settingsEl = this.element.querySelector('#explore-settings');
         this.galleryList = this.element.querySelector('#explore-gallery-list');
+        this.raterMount = this.element.querySelector('#explore-rater-mount');
         this.runButtons = {
             start: this.element.querySelector('[data-action="start"]'),
             pause: this.element.querySelector('[data-action="pause"]'),
@@ -285,6 +292,7 @@ export class ExploreComponent extends BaseComponent {
         // preset; explainer curve markers follow the current best find's measured raw metrics.
         this.scoringPanel = new ExploreScoringPanel(this.element.querySelector('#explore-scoring-mount'), {
             onChange: (_scoring, presetKey) => this._updatePresetChip(presetKey),
+            voteBank: this.voteBank,
         });
         this._updatePresetChip(this.scoringPanel.getPresetKey());
 
@@ -371,6 +379,8 @@ export class ExploreComponent extends BaseComponent {
             });
         });
 
+        this._addDOMListener(this.element.querySelector('[data-action="rate-finds"]'), 'click', () => this._toggleRating());
+
         this._addDOMListener(this.element.querySelector('[data-action="export-gallery"]'), 'click', () => this._exportGallery());
         this._addDOMListener(this.element.querySelector('[data-action="import-gallery"]'), 'click', () => {
             this.element.querySelector('.explore-import-input')?.click();
@@ -415,6 +425,42 @@ export class ExploreComponent extends BaseComponent {
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
         this._subscribeToEvent(EVENTS.EXPLORE_FIND_ADDED, this._onFindAdded);
         this._subscribeToEvent(EVENTS.EMBEDDING_STATUS_CHANGED, this._onEmbeddingStatus);
+        this._subscribeToEvent(EVENTS.VOTE_RECORDED, this._onVoteRecorded);
+    }
+
+    _onVoteRecorded() {
+        // Keep the Scoring panel's "Refit from my votes (N)" affordance in step with the bank.
+        this.scoringPanel?.refreshRefit();
+    }
+
+    /** Enter/exit the head-to-head "Rate finds" deck (§S2 desktop surface). */
+    _toggleRating() {
+        if (this.rater) { this._exitRating(); return; }
+        if (this.service.getGalleryEntries().filter((e) => e && e.thumb && e.perComponent).length < 2) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: 'Need at least two finds with previews to rate. Run a search first.',
+                type: 'info',
+            });
+            return;
+        }
+        this.element.classList.add('is-rating');
+        if (this.galleryList) this.galleryList.hidden = true;
+        if (this.raterMount) this.raterMount.hidden = false;
+        this.element.querySelector('[data-action="rate-finds"]')?.classList.add('is-active');
+        this.rater = new ExploreRaterView(this.raterMount, {
+            voteBank: this.voteBank,
+            getCandidates: () => this.service.getGalleryEntries(),
+            onExit: () => this._exitRating(),
+        });
+    }
+
+    _exitRating() {
+        if (this.rater) { this.rater.destroy(); this.rater = null; }
+        this.element.classList.remove('is-rating');
+        if (this.raterMount) this.raterMount.hidden = true;
+        if (this.galleryList) this.galleryList.hidden = false;
+        this.element.querySelector('[data-action="rate-finds"]')?.classList.remove('is-active');
+        this._renderGallery();
     }
 
     _onEmbeddingStatus(payload) {
@@ -794,5 +840,11 @@ export class ExploreComponent extends BaseComponent {
 
     _escape(str) {
         return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    destroy() {
+        if (this.rater) { this.rater.destroy(); this.rater = null; }
+        this.scoringPanel?.destroy?.();
+        super.destroy();
     }
 }

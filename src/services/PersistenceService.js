@@ -25,6 +25,7 @@ const KEYS = {
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`,
     PUBLIC_THUMB_CACHE: `${LS_KEY_PREFIX}publicThumbCache`,
+    INTERESTINGNESS_VOTES: `${LS_KEY_PREFIX}interestingnessVotes`,
 };
 
 function _getItem(key) {
@@ -374,4 +375,16 @@ export function loadColorSettings() {
 
 export function saveColorSettings(settings) {
     _setItem(KEYS.COLOR_SETTINGS, settings);
+}
+
+// Swipe-to-judge vote bank (PLAY-LAYER-PLAN §S1): append-only pairwise "which is more interesting?"
+// votes. Feeds the opt-in weight refit (§S3). Bounded (FIFO cap in VoteBank) so localStorage stays
+// small. Stored as a plain array of vote records; a malformed blob loads as empty.
+export function loadInterestingnessVotes() {
+    const votes = _getItem(KEYS.INTERESTINGNESS_VOTES);
+    return Array.isArray(votes) ? votes : [];
+}
+
+export function saveInterestingnessVotes(votes) {
+    _setItem(KEYS.INTERESTINGNESS_VOTES, Array.isArray(votes) ? votes : []);
 }
