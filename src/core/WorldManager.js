@@ -10,7 +10,9 @@ import { ShareCodec } from '../services/ShareCodec.js';
 import { ThumbnailBakeService } from './ThumbnailBakeService.js';
 import { ExploreSessionCoordinator } from './ExploreSessionCoordinator.js';
 import { ScrubHistoryController } from './ScrubHistoryController.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, base64ToCells, rulesetName } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, rulesetName } from '../utils/utils.js';
+import { parseStateFile } from '../utils/stateFile.js';
+import { stateLibraryService } from '../services/StateLibraryService.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -489,6 +491,7 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_LOCK, () => this.toggleSelectedWorldLock());
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_WORLD_PARENT, (data) => this.toggleWorldParent(data?.worldIndex));
         EventBus.subscribe(EVENTS.COMMAND_COPY_WORLD_STATE, (data) => this.copyWorldState(this.selectedWorldIndex, data.targetWorldIndex));
+        EventBus.subscribe(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, (data) => this.captureStateToLibrary(data?.assignScope ?? 'selected'));
         EventBus.subscribe(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, (data) => {
             if (this.worldSettings[data.worldIndex]) {
                 this.worldSettings[data.worldIndex].initialState = data.initialState;
@@ -1173,32 +1176,88 @@ export class WorldManager {
         EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Copied world ${sourceIndex + 1} state → world ${targetIndex + 1}` });
     };
 
+    /**
+     * Freeze the selected world's current cells into the Saved Starts library and (optionally) make
+     * that grid the world's — or every world's — initial state, so a plain reset replays it exactly.
+     *
+     * Non-destructive: nothing is reset, paused, or overwritten; only the *initial-state config*
+     * changes. The entry embeds its own cell payload, so it survives deletion from the library.
+     * @param {'selected'|'all'|'none'} [assignScope='selected']
+     * @returns {object|null} The stored entry (the pre-existing one when deduped), or null on refusal.
+     */
+    captureStateToLibrary = (assignScope = 'selected') => {
+        const idx = this.selectedWorldIndex;
+        const proxy = this.worlds[idx];
+        const stateArray = proxy?.latestStateArray;
+        if (!stateArray || stateArray.length !== Config.NUM_CELLS) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready yet.', type: 'error' });
+            return null;
+        }
+
+        const rulesetHex = this._getRulesetHexForWorld(idx);
+        const tick = proxy.getLatestStats()?.tick ?? 0;
+        let liveCells = 0;
+        for (let i = 0; i < stateArray.length; i++) liveCells += stateArray[i] ? 1 : 0;
+
+        const candidate = {
+            id: (globalThis.crypto?.randomUUID?.() ?? `ss-${Date.now()}-${Math.floor(Math.random() * 1e9)}`),
+            name: `${rulesetName(rulesetHex)} @ ${tick}`,
+            rows: Config.GRID_ROWS,
+            cols: Config.GRID_COLS,
+            stateB64: cellsToBase64(stateArray),
+            density: liveCells / (stateArray.length || 1),
+            rulesetHex,
+            capturedTick: tick,
+            createdAt: Date.now(),
+        };
+
+        const { entry, deduped, error } = stateLibraryService.add(candidate);
+        if (!entry) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: error || 'Could not save this start.', type: 'error' });
+            return null;
+        }
+
+        const initialState = stateLibraryService.buildInitialState(entry);
+        let assignmentNote = 'added to the library';
+        if (assignScope === 'selected' || assignScope === 'all') {
+            this.worldSettings[idx].initialState = initialState;
+            if (assignScope === 'all') {
+                // Deep-clones the selected world's initial state onto all nine, persists, dispatches.
+                this._applySelectedInitialStateToAll();
+                assignmentNote = 'set as the start for all worlds (R resets to it)';
+            } else {
+                PersistenceService.saveWorldSettings(this.worldSettings);
+                EventBus.dispatch(EVENTS.WORLD_SETTINGS_CHANGED, this.getWorldSettingsForUI());
+                assignmentNote = `set as world ${idx + 1}'s start (R resets to it)`;
+            }
+        }
+
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: `${deduped ? 'Already saved as' : 'Saved start'} "${entry.name}" — ${assignmentNote}`,
+        });
+        return entry;
+    };
+
     loadWorldState = (worldIndex, loadedData) => {
         if (worldIndex < 0 || worldIndex >= this.worlds.length) return;
-        if (loadedData.rows !== Config.GRID_ROWS || loadedData.cols !== Config.GRID_COLS) {
+        // Shape/decode validation (both the v2 base64 and the legacy number-array format) is shared
+        // with the toolbar's file input and the Saved Starts importer.
+        const parsed = parseStateFile(loadedData);
+        if (parsed.error) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: parsed.error, type: 'error' });
+            return;
+        }
+        if (parsed.rows !== Config.GRID_ROWS || parsed.cols !== Config.GRID_COLS) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Grid dimensions in file do not match current configuration.", type: 'error' });
             return;
         }
         const proxy = this.worlds[worldIndex];
-        const newRulesetArray = hexToRuleset(loadedData.rulesetHex);
-        // Accept both the v2 base64 byte format and the legacy JSON number-array format.
-        let newStateArray;
-        if (typeof loadedData.stateB64 === 'string') {
-            newStateArray = base64ToCells(loadedData.stateB64, Config.NUM_CELLS);
-        } else if (Array.isArray(loadedData.state)) {
-            newStateArray = Uint8Array.from(loadedData.state);
-        } else {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "Save file is missing world state data.", type: 'error' });
-            return;
-        }
-        if (newStateArray.length !== Config.NUM_CELLS) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: "State data length in file does not match current configuration.", type: 'error' });
-            return;
-        }
+        const newRulesetArray = hexToRuleset(parsed.rulesetHex);
+        const newStateArray = parsed.cells;
 
         if (this.worldSettings[worldIndex]) {
             // The ruleset reaches the worker via the LOAD_STATE command below, not setRuleset.
-            this._commitRuleset(worldIndex, loadedData.rulesetHex, { uploadToWorker: false });
+            this._commitRuleset(worldIndex, parsed.rulesetHex, { uploadToWorker: false });
             const newDensity = newStateArray.reduce((sum, val) => sum + val, 0) / (newStateArray.length || 1);
             this.worldSettings[worldIndex].initialState = {
                 mode: 'density',
@@ -1210,7 +1269,7 @@ export class WorldManager {
         proxy.sendCommand('LOAD_STATE', {
             newStateBuffer: newStateArray.buffer.slice(0),
             newRulesetBuffer: newRulesetArray.buffer.slice(0),
-            worldTick: loadedData.worldTick || 0
+            worldTick: parsed.worldTick
         }, [newStateArray.buffer.slice(0), newRulesetArray.buffer.slice(0)]);
 
         proxy.setEnabled(true);

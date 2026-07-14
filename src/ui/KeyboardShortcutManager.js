@@ -134,6 +134,16 @@ export class KeyboardShortcutManager {
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared selected world' });
             }},
 
+            // Saved Starts. The controlled-comparison recipe: pause on an interesting state →
+            // Shift+T → R. Every world then restarts from those exact cells under its own ruleset.
+            // The toast comes from the WorldManager handler, so every dispatch source shares it.
+            { key: 't', description: "Capture the current cells as a saved start & use it for this world's resets", category: 'Saved Starts', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'selected' });
+            }},
+            { key: 't', shiftKey: true, description: 'Capture the current cells and set them as the start for ALL worlds (then R)', category: 'Saved Starts', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'all' });
+            }},
+
             // Patterns
             { key: 'c', ctrlKey: true, skipWhenTextSelected: true, description: 'Copy a region of cells as a pattern', category: 'Patterns', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_COPY_PATTERN);

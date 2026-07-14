@@ -26,6 +26,7 @@ const KEYS = {
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`,
     PUBLIC_THUMB_CACHE: `${LS_KEY_PREFIX}publicThumbCache`,
     INTERESTINGNESS_VOTES: `${LS_KEY_PREFIX}interestingnessVotes`,
+    SAVED_STATES: `${LS_KEY_PREFIX}savedStates`,
 };
 
 function _getItem(key) {
@@ -389,4 +390,34 @@ export function loadInterestingnessVotes() {
 
 export function saveInterestingnessVotes(votes) {
     _setItem(KEYS.INTERESTINGNESS_VOTES, Array.isArray(votes) ? votes : []);
+}
+
+// Saved Starts: the library of captured initial states (StateLibraryService owns the CRUD).
+// Each entry carries its own bit-packed cell payload plus the dims it was captured at; a malformed
+// blob — or an entry missing the fields a reset would need — loads as empty rather than poisoning
+// a world's initial state.
+export function loadSavedStates() {
+    const entries = _getItem(KEYS.SAVED_STATES);
+    if (!Array.isArray(entries)) return [];
+    return entries.filter(e =>
+        e && typeof e === 'object' &&
+        typeof e.id === 'string' &&
+        typeof e.stateB64 === 'string' &&
+        Number.isFinite(e.rows) && Number.isFinite(e.cols)
+    );
+}
+
+/**
+ * Persist the saved-starts library.
+ * @param {object[]} entries
+ * @returns {boolean} False when the write failed (e.g. localStorage quota) — the caller toasts.
+ */
+export function saveSavedStates(entries) {
+    try {
+        localStorage.setItem(KEYS.SAVED_STATES, JSON.stringify(Array.isArray(entries) ? entries : []));
+        return true;
+    } catch (e) {
+        console.error('Error saving the saved-starts library to localStorage:', e);
+        return false;
+    }
 }

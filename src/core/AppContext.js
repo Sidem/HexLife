@@ -13,6 +13,7 @@ import { initRulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { PanelManager } from '../ui/PanelManager.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { CaptureService } from '../services/CaptureService.js';
+import { stateLibraryService } from '../services/StateLibraryService.js';
 import { OnboardingManager } from '../ui/OnboardingManager.js';
 import { getTours } from '../ui/tourSteps.js';
 
@@ -29,6 +30,8 @@ export class AppContext {
     constructor(sharedSettings, libraryData) {
         this.eventBus = EventBus;
         this.persistenceService = PersistenceService;
+        // Saved Starts library (shared instance; WorldManager captures into it, the modal browses it).
+        this.stateLibraryService = stateLibraryService;
         this.worldManager = new WorldManager(sharedSettings);
 
         this.brushController = new BrushController();

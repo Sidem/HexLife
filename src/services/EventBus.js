@@ -293,6 +293,10 @@ export const EVENTS = {
     COMMAND_TOGGLE_WORLD_LOCK: 'command:toggleWorldLock',
     /** @param {{targetWorldIndex: number}} data - Copy the selected world's cell state (not ruleset) onto the target world. */
     COMMAND_COPY_WORLD_STATE: 'command:copyWorldState',
+    /** @param {{assignScope: 'selected'|'all'|'none'}} data - Capture the selected world's current cells as a saved start, and assign it as the initial state of that world / all worlds / no world (library only). */
+    COMMAND_CAPTURE_STATE_TO_LIBRARY: 'command:captureStateToLibrary',
+    /** @param {object[]} entries - The full saved-starts library, after any add/rename/remove. */
+    SAVED_STATES_CHANGED: 'savedStates:changed',
     /** @param {{enabled: boolean, rate: number}} data - New parameters for entropy sampling. */
     COMMAND_SET_ENTROPY_SAMPLING: 'command:setEntropySampling', 
     /** @param {number} newIndex - The index of the world to select. */
