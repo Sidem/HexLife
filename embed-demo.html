@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HexLife Embed — Phase 1 dev page</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #16181c;
+            color: #d7dadc;
+            font: 14px/1.5 system-ui, sans-serif;
+        }
+        h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+        p.sub { margin: 0 0 20px; color: #888e96; }
+        #stage { width: 480px; height: 480px; }
+        canvas { display: block; width: 100%; height: 100%; background: #1a1a1a; }
+        #stats { margin-top: 12px; font-family: ui-monospace, monospace; color: #9aa4ae; }
+        code { color: #e0b341; }
+    </style>
+</head>
+<body>
+    <h1>HexLife embed runtime — EmbedSim + EmbedRenderer</h1>
+    <p class="sub">
+        Phase 1 dev page (#25). Hardcoded params, no custom element yet.
+        Debug handle: <code>window.__hexlifeEmbed</code>
+    </p>
+
+    <div id="stage"><canvas id="canvas"></canvas></div>
+    <div id="stats">booting…</div>
+
+    <script type="module">
+        import { EmbedSim, initEmbedWasm } from './src/embed/EmbedSim.js';
+        import { EmbedRenderer } from './src/embed/EmbedRenderer.js';
+
+        // Fixed params so the run is reproducible and can be cross-checked against the app.
+        const PARAMS = {
+            rulesetHex: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
+            rows: 64,
+            density: 0.5,
+            seed: 12345,
+            speed: 20,
+        };
+
+        const canvas = document.getElementById('canvas');
+        const statsEl = document.getElementById('stats');
+
+        await initEmbedWasm();
+
+        const sim = new EmbedSim(PARAMS);
+        const renderer = new EmbedRenderer(canvas, {
+            cols: sim.cols,
+            rows: sim.rows,
+            palette: 'synthwave',
+        });
+        renderer.resize(canvas.clientWidth, canvas.clientHeight);
+
+        let paused = false;
+        let last = performance.now();
+
+        function frame(now) {
+            const dt = now - last;
+            last = now;
+            if (!paused) sim.advance(dt);
+            renderer.draw(sim);
+            statsEl.textContent =
+                `tick ${sim.tickCount}  ·  grid ${sim.cols}×${sim.rows} (${sim.numCells} cells)  ·  ` +
+                `active ${(sim.activeCount / sim.numCells * 100).toFixed(1)}%  ·  checksum ${sim.checksum()}`;
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
+        // Mirrors the app's window.__hexlife convention so headless checks can drive this page.
+        window.__hexlifeEmbed = {
+            sim,
+            renderer,
+            params: PARAMS,
+            pause: () => { paused = true; },
+            play: () => { paused = false; last = performance.now(); },
+            /** Reset and run exactly n ticks — the determinism cross-check entry point. */
+            runTicks(n, seed = PARAMS.seed) {
+                paused = true;
+                sim.reset(seed);
+                for (let i = 0; i < n; i++) sim.tick();
+                return { tickCount: sim.tickCount, checksum: sim.checksum(), activeCount: sim.activeCount };
+            },
+        };
+    </script>
+</body>
+</html>

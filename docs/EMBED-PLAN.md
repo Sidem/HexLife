@@ -256,15 +256,40 @@ evolved 0.497 → 0.028), no console errors.
 **Gotcha found:** `deriveGridDimensions(96)` → **112 cols, not 110** (the even-column rounding
 after the ÷(√3/2)). Don't hand-derive these; the test pins them.
 
-### Phase 1 — embed runtime (sim + renderer, no element yet)
+### Phase 1 — embed runtime (sim + renderer, no element yet) — ✅ DONE 2026-07-14
 
-`EmbedSim` + `EmbedRenderer` driven from a bare `embed-demo.html` dev page with hardcoded params.
-- wasm `initSync` from inlined bytes; `World(cols, rows)`; view construction + post-tick mirror swap.
-- Seeded reset path replicating WorldWorker RESET_WORLD (state fill via DensityStrategy,
-  ruleIndex fill 255, zero next buffers, reset usage counters).
-- rAF accumulator loop with tick cap; instanced draw with LUT texture.
-**Accept:** demo page shows a live world visually identical to the app for the same params;
-100-tick checksum matches the app (manual cross-check is fine at this phase).
+`src/embed/EmbedSim.js` + `src/embed/EmbedRenderer.js`, driven from `embed-demo.html` (repo root)
+with hardcoded params and a `window.__hexlifeEmbed` debug handle.
+
+**Reuse held.** The sim imports `rng.js` / `rulesetHex.js` / `gridMath.js` / `DensityStrategy` and
+the same wasm `run_tick`; the renderer imports the **unforked** `shaders/*.glsl`, `webglUtils.js`
+and `generateColorLUT`. Only the renderer's *plumbing* is forked (one world, no FBOs, no minimap).
+Neither file imports `config.js` or `utils.js`.
+
+**Verified in the preview browser** (`/HexLife/embed-demo.html`):
+- Grid derivation matches: `rows:64 → 74 cols`, 4736 cells.
+- **Determinism:** seed 12345 → checksum `231200078` at tick 100, reproduced exactly on a second
+  run; seed 999 → a different checksum (so the check isn't vacuously passing on a constant).
+- **Render:** one instanced draw fills the canvas (95% of pixels non-background, **130 distinct
+  color buckets** ⇒ the rule-index LUT is genuinely being sampled), `gl.getError() === 0`.
+- **The cross-instance detachment trap is REAL and the registry catches it.** Constructing a second
+  256-row world grew wasm linear memory — sim #1's `state.buffer` identity changed — which without
+  the registry would have left every one of its views detached. With it, sim #1 was not detached and
+  still reproduced checksum `231200078`. Do not remove `refreshAllViews()`.
+
+**Two gotchas found:**
+- **The preview browser reports `document.visibilityState === 'hidden'`, so rAF NEVER FIRES there.**
+  The demo's animation loop is dead in that pane — this is not a bug in the loop. Drive ticks through
+  the debug handle (`__hexlifeEmbed.runTicks(n, seed)`) instead. (Also: WebGL screenshots hang
+  headless, so verify pixels via `gl.readPixels`, as above — not screenshots.)
+- The dev server's `base` is `/HexLife/`, so the page is at **`/HexLife/embed-demo.html`**; a bare
+  `/embed-demo.html` serves Vite's "did you mean" notice, and an HMR reload drops the path back to
+  the app root (same family as the known `?headless=1` query-drop gotcha).
+
+**Deferred to Phase 3 as planned:** wasm is loaded with `fetch(wasmUrl) → init({module_or_path})`
+rather than `initSync` on inlined bytes. `fetch` handles a real URL (dev) *and* a base64 `data:`
+URI (Vite lib build inlines it), so the same code path survives the Phase 3 build with no branch —
+and it sidesteps `instantiateStreaming`'s MIME check on data URIs.
 
 ### Phase 2 — custom element + policies
 

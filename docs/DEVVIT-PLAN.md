@@ -199,10 +199,31 @@ build pipeline, tests, docs — an agent can build and run locally.
 ### Phase 0 — scaffold + toolchain — ✅ MOSTLY DONE 2026-07-14
 
 App created (`hexlifeapp`), subreddit created (r/hexlife), CLI installed and authed, scaffold runs
-locally, **repo layout settled (in-repo at `devvit/`, see above)**. **Remaining:** `devvit playtest`
-the STOCK template on r/hexlife — unmodified, before any HexLife code — to prove the whole
-auth→upload→render loop works end-to-end. Do this first; it is 10 minutes and it isolates platform
-problems from our problems. **Requires owner approval to run** (it pushes code to Reddit).
+locally, **repo layout settled (in-repo at `devvit/`, see above)**, and the **stock template was
+playtested** (see below). **Remaining:** confirm the post actually *renders* (owner action — see
+below).
+
+#### Stock-template playtest, 2026-07-14 — upload/install ✅, render unconfirmed
+
+`devvit playtest hexlife`, run from `devvit/` on the unmodified template. Results:
+
+- **✅ The auth → build → upload → install loop works.** 7 WebView assets (~732 KB) uploaded;
+  `devvit list installs` shows `hexlifeapp` installed on **r/hexlife (v0.0.1)**. The positional
+  subreddit argument IS honored (no `dev.subreddit` field needed in `devvit.json`).
+- **⚠️ The CLI also announced "We'll create a default playtest subreddit for your app!" and an
+  `hexlifeapp_dev` subreddit now exists** (carrying Reddit's own "Devvit Admin Helper App"), even
+  though we passed an explicit subreddit. Unclear whether the CLI created it or it pre-dated the
+  run. Harmless, but know that playtest may mint a `r/<app-name>_dev` subreddit as a side effect.
+- **⚠️ `playtest`'s watch half needs `sh` on PATH.** The template's `watch` script is
+  `sh -c '…'`, so from PowerShell it dies with `'sh' is not recognized` and **live-reload-on-save
+  silently does not run** (the upload still succeeds — it just ships whatever `public/*.js` was
+  last built). Fix: prepend Git Bash before invoking, e.g.
+  `$env:PATH="C:\Program Files\Git\bin;"+$env:PATH` then
+  `fnm exec --using=22.6.0 -- npx.cmd devvit playtest hexlife`.
+- **❓ Rendering is NOT yet proven.** Install ≠ render. Someone must create a post via the
+  subreddit menu item **"[hexlifeapp] New Post"** in r/hexlife and open it. **Owner action** — an
+  agent must not post to Reddit. Until that is green, treat wasm/WebGL-in-webview as unverified and
+  do not conclude Phase 1's go/no-go.
 
 ### Phase 1 — wasm/WebGL smoke test in a real post (the go/no-go)
 
