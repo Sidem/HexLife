@@ -10,7 +10,7 @@ import { ShareCodec } from '../services/ShareCodec.js';
 import { ThumbnailBakeService } from './ThumbnailBakeService.js';
 import { ExploreSessionCoordinator } from './ExploreSessionCoordinator.js';
 import { ScrubHistoryController } from './ScrubHistoryController.js';
-import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, rulesetName } from '../utils/utils.js';
+import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, rulesetName, getGridCenterWorld } from '../utils/utils.js';
 import { parseStateFile } from '../utils/stateFile.js';
 import { stateLibraryService } from '../services/StateLibraryService.js';
 
@@ -1393,10 +1393,11 @@ export class WorldManager {
     }
 
     _initCameraStates(sharedCameraSettings) {
+        const gridCenter = getGridCenterWorld();
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const defaultCamera = {
-                x: Config.RENDER_TEXTURE_SIZE / 2,
-                y: Config.RENDER_TEXTURE_SIZE / 2,
+                x: gridCenter.x,
+                y: gridCenter.y,
                 zoom: 1.0
             };
 

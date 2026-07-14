@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as Config from '../src/core/config.js';
 import { ShareCodec } from '../src/services/ShareCodec.js';
+import { getGridCenterWorld } from '../src/utils/utils.js';
 
 const HEX = '12482080480080006880800180010117';
 
@@ -26,7 +27,9 @@ describe('ShareCodec.parseParams', () => {
 describe('ShareCodec encode -> parse round-trip', () => {
     const origin = 'https://sidem.github.io';
     const pathname = '/HexLife/';
-    const center = Config.RENDER_TEXTURE_SIZE / 2;
+    // The default/home camera sits on the grid center (see getGridCenterWorld), which encode()
+    // recognizes and omits from the URL.
+    const home = getGridCenterWorld();
 
     it('round-trips a shared ruleset, custom densities, disabled world, selection and camera', () => {
         const densities = Array.from({ length: Config.NUM_WORLDS }, (_, i) => (i + 1) / 20);
@@ -66,7 +69,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         const url = ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,
@@ -88,7 +91,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,
@@ -102,7 +105,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         const url = ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,
@@ -120,7 +123,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         const url = ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,
@@ -166,7 +169,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         const url = ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,
@@ -266,7 +269,7 @@ describe('ShareCodec encode -> parse round-trip', () => {
         const url = ShareCodec.encode({
             worldSettings,
             selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
-            camera: { x: center, y: center, zoom: 1.0 },
+            camera: { x: home.x, y: home.y, zoom: 1.0 },
             gridRows: Config.GRID_ROWS,
             origin,
             pathname,

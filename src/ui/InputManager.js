@@ -1,7 +1,7 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { getLayoutCache } from '../rendering/renderer.js';
-import { textureCoordsToGridCoords, calculateHexSizeForTexture } from '../utils/utils.js';
+import { textureCoordsToGridCoords, getGridWorldBounds } from '../utils/utils.js';
 
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
 import { ShiftWorldStrategy } from './inputStrategies/ShiftWorldStrategy.js';
@@ -230,13 +230,10 @@ export class InputManager {
     }
 
     _calculateGridBounds() {
-        const hexSize = calculateHexSizeForTexture();
-        this.gridWorldBounds = {
-            minX: -hexSize,
-            maxX: Config.GRID_COLS * (hexSize * 2 * 0.75) + hexSize,
-            minY: -hexSize,
-            maxY: Config.GRID_ROWS * (hexSize * Math.sqrt(3)) + hexSize
-        };
+        // Single-sourced from utils so the clamp's fallback center (grid smaller than the view)
+        // lands exactly on the same point as the default camera — otherwise the first zoom
+        // in/out visibly nudges an untouched view.
+        this.gridWorldBounds = getGridWorldBounds();
     }
     
     clampCameraPan() {

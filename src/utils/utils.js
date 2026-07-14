@@ -441,6 +441,36 @@ export function calculateHexSizeForTexture() {
 }
 
 /**
+ * True extents of the rendered hex grid in texture-world coordinates (the space the camera pans
+ * in), matching the geometry laid down by gridToPixelCoords: cell (0,0) centered at the origin,
+ * flat-top hexes, odd columns shifted down half a row.
+ * @returns {{minX: number, maxX: number, minY: number, maxY: number}}
+ */
+export function getGridWorldBounds() {
+    const hexSize = calculateHexSizeForTexture();
+    const horizSpacing = hexSize * 2 * 3 / 4;
+    const vertSpacing = hexSize * Math.sqrt(3);
+    return {
+        minX: -hexSize,
+        maxX: (Config.GRID_COLS - 1) * horizSpacing + hexSize,
+        minY: -vertSpacing / 2,
+        // last row center + odd-column half-row offset + half hex height
+        maxY: Config.GRID_ROWS * vertSpacing,
+    };
+}
+
+/**
+ * Center of the rendered grid in texture-world coordinates — the camera position that shows the
+ * grid dead-center. This is the default/home camera; it is NOT RENDER_TEXTURE_SIZE/2 because the
+ * grid is laid out from the origin, not centered in the texture.
+ * @returns {{x: number, y: number}}
+ */
+export function getGridCenterWorld() {
+    const b = getGridWorldBounds();
+    return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+}
+
+/**
  * Finds all hexagons within a certain distance from a starting point using a breadth-first search.
  * This function is optimized to avoid memory allocation in the hot path by using pre-allocated,
  * reusable data structures for the queue and visited set.

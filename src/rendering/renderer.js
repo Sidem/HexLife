@@ -457,8 +457,8 @@ function renderWorldsToTextures(appContext) {
                 gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
                 gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
             } else {
-                
-                gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
+                const gridCenter = Utils.getGridCenterWorld();
+                gl.uniform2f(hexUniformLocations.pan, gridCenter.x, gridCenter.y);
                 gl.uniform1f(hexUniformLocations.zoom, 1.0);
             }
             WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
@@ -650,7 +650,8 @@ function _redrawWorldFBO(worldIndex, lutTexture) {
         gl.uniform2f(hexUniformLocations.pan, camera.x, camera.y);
         gl.uniform1f(hexUniformLocations.zoom, camera.zoom);
     } else {
-        gl.uniform2f(hexUniformLocations.pan, Config.RENDER_TEXTURE_SIZE / 2, Config.RENDER_TEXTURE_SIZE / 2);
+        const gridCenter = Utils.getGridCenterWorld();
+        gl.uniform2f(hexUniformLocations.pan, gridCenter.x, gridCenter.y);
         gl.uniform1f(hexUniformLocations.zoom, 1.0);
     }
     WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);

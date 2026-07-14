@@ -1,4 +1,5 @@
 import * as Config from '../core/config.js';
+import { getGridCenterWorld } from '../utils/utils.js';
 
 /**
  * Share-link codec: encodes a world-settings snapshot into a shareable URL and
@@ -90,7 +91,8 @@ export class ShareCodec {
             params.set('g', gridRows);
         }
 
-        if (camera && (camera.zoom !== 1.0 || camera.x !== Config.RENDER_TEXTURE_SIZE / 2 || camera.y !== Config.RENDER_TEXTURE_SIZE / 2)) {
+        const home = getGridCenterWorld();
+        if (camera && (camera.zoom !== 1.0 || Math.abs(camera.x - home.x) > 0.05 || Math.abs(camera.y - home.y) > 0.05)) {
             params.set('cam', `${parseFloat(camera.x.toFixed(1))},${parseFloat(camera.y.toFixed(1))},${parseFloat(camera.zoom.toFixed(2))}`);
         }
 
