@@ -516,45 +516,10 @@ export function findHexagonsInNeighborhood(startCol, startRow, maxDistance, outA
     }
 }
 
-/**
- * Converts a 128-element Uint8Array ruleset into a 32-character hex string.
- * @param {Uint8Array} rulesetArray The 128-element array of 0s and 1s.
- * @returns {string} The 32-character uppercase hex string, or "Error".
- */
-export function rulesetToHex(rulesetArray) {
-    if (!rulesetArray || rulesetArray.length !== 128) return "Error";
-    let bin = ""; 
-    for (let i = 0; i < 128; i++) {
-        bin += rulesetArray[i];
-    }
-    try { 
-        return BigInt('0b' + bin).toString(16).toUpperCase().padStart(32, '0'); 
-    }
-    catch { 
-        return "Error"; 
-    }
-}
-
-/**
- * Converts a 32-character hex string into a 128-element Uint8Array ruleset.
- * @param {string} hexString The 32-character hex string.
- * @returns {Uint8Array} The 128-element Uint8Array. Returns a zeroed array on error.
- */
-export function hexToRuleset(hexString) {
-    const ruleset = new Uint8Array(128).fill(0);
-    if (!hexString || !/^[0-9a-fA-F]{32}$/.test(hexString)) {
-        return ruleset;
-    }
-    try {
-        let bin = BigInt('0x' + hexString).toString(2).padStart(128, '0');
-        for (let i = 0; i < 128; i++) {
-            ruleset[i] = bin[i] === '1' ? 1 : 0;
-        }
-    } catch (e) { 
-        console.error("Error converting hex to ruleset:", hexString, e); 
-    }
-    return ruleset;
-}
+// Ruleset ⇄ hex serialization now lives in `core/rulesetHex.js` (pure, importable without dragging
+// this module + config.js into the embeddable widget's bundle). Re-exported so call sites are
+// unchanged.
+export { rulesetToHex, hexToRuleset } from '../core/rulesetHex.js';
 
 /** Per-nibble popcount table (0..15 → number of set bits), for hammingDistanceHex. */
 const NIBBLE_POPCOUNT = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];

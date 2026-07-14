@@ -1,6 +1,8 @@
 // @ts-check
 
 import { dot } from './EmbeddingNovelty.js';
+// Deterministic PRNG: the random projection must be reproducible across sessions and machines.
+import { mulberry32 } from '../rng.js';
 
 /**
  * Perceptual **illumination archive** (ASAL-style), running alongside the hand-designed
@@ -48,23 +50,6 @@ export const EMBEDDING_ARCHIVE_CONFIG = {
  * @property {number} [openEndedness] The find's raw trajectory novelty (for inspection).
  * @property {number} [generation]   Generation the entry was found in.
  */
-
-/**
- * Mulberry32 — a tiny, fast, deterministic 32-bit PRNG. Same seed ⇒ same stream, in any JS engine, so
- * the random projection is reproducible across sessions and machines.
- * @param {number} seed
- * @returns {() => number} next() → float in [0,1)
- */
-function mulberry32(seed) {
-    let a = seed >>> 0;
-    return function next() {
-        a |= 0;
-        a = (a + 0x6d2b79f5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 /**
  * Build `numBits` deterministic random hyperplane normals of dimension `dim`. Entries are drawn

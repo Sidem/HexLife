@@ -7,22 +7,9 @@ import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
 import { encodePack } from '../services/LibraryPackCodec.js';
 import { trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
-
-/**
- * Tiny deterministic PRNG (same routine as WorldWorker's) for the population builder: mutants and
- * crossover children must derive from the run's base seed, or a shared search link couldn't replay
- * the identical generation sequence.
- * @param {number} a
- * @returns {() => number}
- */
-function mulberry32(a) {
-    return function () {
-        a |= 0; a = (a + 0x6D2B79F5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
+// Population builder (mutants + crossover children) must derive from the run's base seed, or a
+// shared search link couldn't replay the identical generation sequence.
+import { mulberry32 } from './rng.js';
 
 /**
  * Phase 4 of the auto-explore roadmap: the generation loop that ties Phases 1–3 together into the

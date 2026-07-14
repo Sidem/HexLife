@@ -3,6 +3,7 @@ import init, { World } from './wasm-engine/hexlife_wasm.js';
 import { rulesetToHex, findHexagonsInNeighborhood, packCells, unpackCellsInto } from '../utils/utils.js';
 import { Throttler } from '../utils/throttler.js';
 import { StateHistoryRing } from './StateHistoryRing.js';
+import { mulberry32 } from './rng.js';
 import { DensityStrategy } from './initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from './initialStateStrategies/ClusterStrategy.js';
 import { SavedStrategy } from './initialStateStrategies/SavedStrategy.js';
@@ -102,15 +103,6 @@ const strategies = {
     clusters: new ClusterStrategy(),
     saved: new SavedStrategy()
 };
-
-function mulberry32(a) {
-    return function() {
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      var t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    }
-}
 
 // Checksum of the current state buffer. The buffer lives in Wasm linear memory now, so this is
 // computed entirely inside Wasm (no array is copied across the boundary).

@@ -1,4 +1,5 @@
 import neighborDirs from './neighbor-dirs.json';
+import { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions } from './gridMath.js';
 
 // --- Grid dimensions ---------------------------------------------------------
 // The grid size is configurable at startup (persisted setting / share-URL `g` param). Dimensions
@@ -6,31 +7,13 @@ import neighborDirs from './neighbor-dirs.json';
 // and the column count is forced even so the flat-top odd-r hex layout wraps seamlessly on the
 // torus (an odd column count leaves a half-row jog at the wrap seam).
 //
+// The derivation math + presets live in `gridMath.js` (pure, side-effect free) so the embeddable
+// widget can share them without importing this module's live globals and import-time side effect.
+// Re-exported here so `Config.*` call sites are unchanged.
+export { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions };
+
 // These are intentionally mutable (`let`) and read live via the `Config.*` namespace everywhere.
 // Call setGridDimensions() once, before WorldManager / the renderer are constructed.
-const SQRT3_OVER_2 = Math.sqrt(3) / 2;
-
-/** Named row-count presets. Cols are derived (see deriveGridDimensions). 'medium' is the legacy size. */
-export const GRID_SIZE_PRESETS = {
-    small: 96,
-    medium: 192,
-    large: 384,
-    huge: 576,
-};
-export const DEFAULT_GRID_SIZE_KEY = 'medium';
-
-/**
- * Derives a seamless, ratio-preserving grid from a desired row count.
- * @param {number} rows Desired number of rows.
- * @returns {{rows: number, cols: number}} Sanitized rows and an even column count (cols ≈ rows·2/√3).
- */
-export function deriveGridDimensions(rows) {
-    const safeRows = Math.max(2, Math.round(rows) || GRID_SIZE_PRESETS[DEFAULT_GRID_SIZE_KEY]);
-    let cols = Math.round(safeRows / SQRT3_OVER_2); // rows * (1/(sqrt(3)/2)) == rows * 2/sqrt(3)
-    if (cols % 2 !== 0) cols += 1; // even columns => seamless toroidal wrap
-    return { rows: safeRows, cols };
-}
-
 export let GRID_ROWS = 0;
 export let GRID_COLS = 0;
 export let NUM_CELLS = 0;

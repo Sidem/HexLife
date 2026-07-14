@@ -10,6 +10,8 @@ import { DensityStrategy } from '../../core/initialStateStrategies/DensityStrate
 import { ClusterStrategy } from '../../core/initialStateStrategies/ClusterStrategy.js';
 import { SavedStrategy } from '../../core/initialStateStrategies/SavedStrategy.js';
 import * as Config from '../../core/config.js';
+// Same PRNG the worker uses, so a given (config, seed) previews like a real reset would look.
+import { mulberry32 } from '../../core/rng.js';
 
 const strategies = {
     density: new DensityStrategy(),
@@ -18,16 +20,6 @@ const strategies = {
     // down-scaled preview grid below is just another resample target — no special preview path.
     saved: new SavedStrategy(),
 };
-
-// Same PRNG the worker uses, so a given (config, seed) previews like a real reset would look.
-function mulberry32(a) {
-    return function () {
-        a |= 0; a = a + 0x6D2B79F5 | 0;
-        let t = Math.imul(a ^ a >>> 15, 1 | a);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-}
 
 /** Down-scaled preview dimensions that preserve the live grid's aspect ratio. */
 export function getPreviewDims(maxDim) {
