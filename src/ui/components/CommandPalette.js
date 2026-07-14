@@ -65,6 +65,20 @@ export class CommandPalette {
             { title: 'Clear all worlds', category: 'Simulate', hint: 'C', icon: ICONS.trash, run: () => { dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'all' })(); toast('Cleared all worlds'); } },
             { title: 'Clear selected world', category: 'Simulate', hint: 'Shift+C', icon: ICONS.eraser, run: () => { dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' })(); toast('Cleared selected world'); } },
 
+            // ---- Saved starts ---- (the handler owns the toast, so these just dispatch)
+            { title: 'Capture saved start', subtitle: "Freeze these cells and use them for this world's resets", category: 'Simulate', hint: 'T', icon: ICONS.save, run: dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'selected' }) },
+            { title: 'Capture saved start → all worlds', subtitle: 'Same starting cells everywhere — then press R to compare rulesets', category: 'Simulate', hint: 'Shift+T', icon: ICONS.save, run: dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'all' }) },
+            { title: 'Manage saved starts', subtitle: "Browse, rename, import or export the start library", category: 'Simulate', icon: ICONS.library, run: () => {
+                const wm = this.appContext.worldManager;
+                const worldIndex = wm.getSelectedWorldIndex();
+                const current = wm.getWorldSettingsForUI()[worldIndex]?.initialState;
+                // Open on the Saved tab: keep the world's own entry selected if it already uses one.
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_INITIAL_STATE_MODAL, {
+                    worldIndex,
+                    config: current?.mode === 'saved' ? current : { mode: 'saved', params: {} },
+                });
+            } },
+
             // ---- Open ----
             { title: 'Generate & Mutate panel', category: 'Open', hint: 'N', icon: ICONS.sparkles, run: () => this._openPanel('rulesetactions') },
             { title: 'Ruleset Library', category: 'Open', icon: ICONS.library, run: () => this._openPanel('library') },

@@ -42,6 +42,7 @@ export class WorldSetupComponent extends BaseComponent {
             </div>
             <div id="world-setup-config-grid" class="world-config-grid"></div>
             <div id="world-setup-panel-actions" class="panel-actions">
+                <button class="button" data-action="capture-start" title="Freeze the selected world's current cells as a saved start and use it for its resets (T)">Capture Selected &rarr; Saved Start</button>
                 <button class="button" data-action="apply-state-all" title="Copy the selected world's initial-state settings to all 9 worlds">Copy Selected &rarr; All</button>
                 <button class="button" data-action="reset-states" title="Reset every world's initial-state settings back to the default random fill">Reset to Defaults</button>
                 <button class="button" data-action="reset-all-worlds" title="Re-seed all 9 worlds from their current initial-state settings">Regenerate All Worlds</button>
@@ -60,6 +61,8 @@ export class WorldSetupComponent extends BaseComponent {
             const action = event.target.dataset.action;
             if (action === 'reset-all-worlds') {
                 EventBus.dispatch(EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES);
+            } else if (action === 'capture-start') {
+                EventBus.dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'selected' });
             } else if (action === 'apply-state-all') {
                 EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL);
             } else if (action === 'reset-states') {
@@ -170,8 +173,7 @@ export class WorldSetupComponent extends BaseComponent {
             cache.vizContainer.appendChild(svg);
 
             const initialState = settings.initialState || { mode: 'density' };
-            const mode = initialState.mode || 'density';
-            cache.stateModeValue.textContent = mode === 'clusters' ? 'Clumps' : 'Random fill';
+            this._renderStateModeLabel(cache.stateModeValue, initialState);
 
             // Render the per-world initial-state thumbnail; cache by config so repeated refreshes
             // (e.g. ruleset-viz changes) don't needlessly regenerate it.
@@ -188,6 +190,29 @@ export class WorldSetupComponent extends BaseComponent {
                 cache.enableSwitchLabel.textContent = settings.enabled ? 'Enabled' : 'Disabled';
             }
         }
+    }
+
+    /**
+     * Writes the `Start: …` value for one world. A saved start shows its entry name (truncated by
+     * CSS, full name on hover) and, when it was captured on a different grid size, a `⚠ scaled` hint
+     * — SavedStrategy resamples it, so it still works, but it is no longer cell-exact.
+     * @param {HTMLElement} el The `.state-mode-value` element.
+     * @param {{mode: string, params: object}} initialState
+     */
+    _renderStateModeLabel(el, initialState) {
+        const mode = initialState.mode || 'density';
+        if (mode !== 'saved') {
+            el.textContent = mode === 'clusters' ? 'Clumps' : 'Random fill';
+            el.title = '';
+            return;
+        }
+        const params = initialState.params || {};
+        const name = params.name || 'Untitled start';
+        const scaled = params.rows !== Config.GRID_ROWS || params.cols !== Config.GRID_COLS;
+        el.textContent = `Saved — ${name}${scaled ? ' ⚠ scaled' : ''}`;
+        el.title = scaled
+            ? `${name}\nCaptured on a ${params.cols}×${params.rows} grid — resampled onto the current ${Config.GRID_COLS}×${Config.GRID_ROWS} grid.`
+            : name;
     }
 
     destroy() {

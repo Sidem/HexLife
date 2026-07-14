@@ -19,6 +19,7 @@ export const QUICK_ACTIONS = [
     { id: 'reset-all', icon: ICONS.refreshCw, label: 'Reset All', command: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES, payload: {} },
     { id: 'reset-densities', icon: ICONS.droplet, label: 'Default Densities', command: EVENTS.COMMAND_RESET_INITIAL_STATES_TO_DEFAULT, payload: {} },
     { id: 'apply-density-all', icon: ICONS.target, label: 'Apply Density', command: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL, payload: {} },
+    { id: 'capture-start', icon: ICONS.save, label: 'Capture Start', command: EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, payload: { assignScope: 'selected' } },
 ];
 
 export const DEFAULT_FAB_SETTINGS = { enabled: ['generate', 'clone-mutate', 'reset-all'], locked: true, order: [] };

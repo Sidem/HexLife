@@ -39,6 +39,7 @@ export class ToolsBottomSheet extends BottomSheet {
                         <div class="reset-clear-buttons">
                             <button class="button" data-action="reset">Reset World</button>
                             <button class="button" data-action="clear">Clear World</button>
+                            <button class="button" data-action="capture-start">Save Start</button>
                         </div>
                     </div>
                 </div>
@@ -138,6 +139,10 @@ export class ToolsBottomSheet extends BottomSheet {
             } else if (action === 'clear') {
                 EventBus.dispatch(EVENTS.COMMAND_CLEAR_WORLDS, { scope: 'selected' });
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cleared Selected World' });
+                this.hide();
+            } else if (action === 'capture-start') {
+                // The WorldManager handler owns the toast (shared by every dispatch source).
+                EventBus.dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'selected' });
                 this.hide();
             }
             

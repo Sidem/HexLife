@@ -35,6 +35,12 @@
 .state-mode-label {
     font-size: 0.85em;
     color: #aaa;
+    /* A saved start's name can be long — keep it on one line and clip it (full name in `title`). */
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .state-mode-value {

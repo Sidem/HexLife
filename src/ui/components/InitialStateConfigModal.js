@@ -1,7 +1,11 @@
 import { BaseComponent } from './BaseComponent.js';
 import { SliderComponent } from './SliderComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
+import * as Config from '../../core/config.js';
 import { renderInitialStatePreview } from './initialStatePreview.js';
+import { cellsToBase64 } from '../../utils/utils.js';
+import { parseStateFile } from '../../utils/stateFile.js';
+import { ICONS } from '../icons.js';
 
 // Plain-language metadata for every tunable param, grouped so the dialog can show a small "basics"
 // set up front and tuck the fine-grained knobs behind an "Advanced" disclosure. paramKey values are
@@ -43,18 +47,38 @@ const DENSITY_PRESETS = [
 const DEFAULT_PARAMS = {
     density: { density: 0.5 },
     clusters: { count: 25, density: 0.7, densityVariation: 0.2, diameter: 10, diameterVariation: 5, eccentricity: 0.33, orientation: 0, orientationVariation: 1.0, distribution: 'gaussian', gaussianStdDev: 2.0 },
+    // Saved starts carry a captured payload, never defaults: an empty selection means "Save" is off.
+    saved: {},
 };
+
+/** "3m ago" / "2h ago" / "5d ago" — coarse is fine; this is a recency hint, not a timestamp. */
+function formatAge(createdAt) {
+    if (!Number.isFinite(createdAt)) return '';
+    const secs = Math.max(0, Math.floor((Date.now() - createdAt) / 1000));
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+    return `${Math.floor(secs / 86400)}d ago`;
+}
 
 export class InitialStateConfigModal extends BaseComponent {
     constructor(mountPoint, appContext) {
         super(mountPoint);
         this.appContext = appContext;
+        this.stateLibrary = appContext.stateLibraryService;
         this.config = {};
         this.worldIndex = -1;
         this.components = [];
         this.previewSeed = 1;
+        // Saved tab: which world(s) Save assigns to, plus the inline rename/delete row states.
+        this.applyScope = 'selected';
+        this.renamingId = null;
+        this.pendingDeleteId = null;
         this.render();
         this.hide();
+        EventBus.subscribe(EVENTS.SAVED_STATES_CHANGED, () => {
+            if (!this.element.classList.contains('hidden') && this.config.mode === 'saved') this._renderSavedList();
+        });
     }
 
     render() {
@@ -69,6 +93,7 @@ export class InitialStateConfigModal extends BaseComponent {
                 <div class="isc-mode-toggle" role="group" aria-label="Initial state mode">
                     <button type="button" class="isc-mode-button" data-mode="density">Random fill</button>
                     <button type="button" class="isc-mode-button" data-mode="clusters">Clumps</button>
+                    <button type="button" class="isc-mode-button" data-mode="saved">Saved</button>
                 </div>
 
                 <div class="isc-preview-block">
@@ -86,6 +111,23 @@ export class InitialStateConfigModal extends BaseComponent {
 
                 <div id="initial-state-params-container" class="params-container"></div>
 
+                <div class="isc-saved-block hidden">
+                    <div class="isc-saved-actions">
+                        <button type="button" class="button isc-capture-button" title="Freeze the selected world's current cells into the library">Capture current world</button>
+                        <button type="button" class="button isc-import-button" title="Import a saved world-state file as a start">Import&hellip;</button>
+                        <input type="file" class="isc-import-input" accept=".json,.txt" hidden />
+                    </div>
+                    <div class="isc-saved-list" role="listbox" aria-label="Saved starts"></div>
+                </div>
+
+                <div class="isc-scope-row hidden">
+                    <span class="isc-scope-label">Apply to</span>
+                    <div class="isc-scope-buttons" role="group" aria-label="Apply this start to">
+                        <button type="button" class="isc-scope-button active" data-scope="selected">This world</button>
+                        <button type="button" class="isc-scope-button" data-scope="all">All worlds</button>
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button class="button" id="cancel-state-config-button">Cancel</button>
                     <button class="button isc-save-button" id="confirm-state-config-button">Save</button>
@@ -98,9 +140,18 @@ export class InitialStateConfigModal extends BaseComponent {
             title: this.element.querySelector('#initial-state-modal-title'),
             modeButtons: Array.from(this.element.querySelectorAll('.isc-mode-button')),
             previewCanvas: this.element.querySelector('.isc-preview-canvas'),
+            previewCaption: this.element.querySelector('.isc-preview-caption'),
             regenerateBtn: this.element.querySelector('.isc-regenerate-button'),
+            presetsRow: this.element.querySelector('.isc-presets-row'),
             presetChips: this.element.querySelector('.isc-presets-chips'),
             paramsContainer: this.element.querySelector('#initial-state-params-container'),
+            savedBlock: this.element.querySelector('.isc-saved-block'),
+            savedList: this.element.querySelector('.isc-saved-list'),
+            captureBtn: this.element.querySelector('.isc-capture-button'),
+            importBtn: this.element.querySelector('.isc-import-button'),
+            importInput: this.element.querySelector('.isc-import-input'),
+            scopeRow: this.element.querySelector('.isc-scope-row'),
+            scopeButtons: Array.from(this.element.querySelectorAll('.isc-scope-button')),
             saveBtn: this.element.querySelector('#confirm-state-config-button'),
             cancelBtn: this.element.querySelector('#cancel-state-config-button'),
             closeBtn: this.element.querySelector('.modal-close-button'),
@@ -109,10 +160,18 @@ export class InitialStateConfigModal extends BaseComponent {
         this.ui.modeButtons.forEach(btn => {
             this._addDOMListener(btn, 'click', () => this._setMode(btn.dataset.mode));
         });
+        this.ui.scopeButtons.forEach(btn => {
+            this._addDOMListener(btn, 'click', () => this._setApplyScope(btn.dataset.scope));
+        });
         this._addDOMListener(this.ui.regenerateBtn, 'click', () => {
             this.previewSeed = (this.previewSeed + 1) >>> 0 || 1;
             this._updatePreview();
         });
+        this._addDOMListener(this.ui.captureBtn, 'click', () => {
+            EventBus.dispatch(EVENTS.COMMAND_CAPTURE_STATE_TO_LIBRARY, { assignScope: 'none' });
+        });
+        this._addDOMListener(this.ui.importBtn, 'click', () => this.ui.importInput.click());
+        this._addDOMListener(this.ui.importInput, 'change', (e) => this._handleImportFile(e));
         this._addDOMListener(this.ui.saveBtn, 'click', this._handleSave);
         this._addDOMListener(this.ui.cancelBtn, 'click', this.hide);
         this._addDOMListener(this.ui.closeBtn, 'click', this.hide);
@@ -126,6 +185,10 @@ export class InitialStateConfigModal extends BaseComponent {
         this.config = structuredClone(config);
         if (!this.config.mode) this.config.mode = 'density';
         this.previewSeed = 1;
+        this.applyScope = 'selected';
+        this.renamingId = null;
+        this.pendingDeleteId = null;
+        this._syncScopeButtons();
         this.ui.title.textContent = `Configure Initial State (World ${worldIndex})`;
         this._renderForMode();
         this.element.classList.remove('hidden');
@@ -147,20 +210,263 @@ export class InitialStateConfigModal extends BaseComponent {
         this.config.mode = mode;
         this.config.params = {}; // re-seed from defaults for the new mode
         this.previewSeed = 1;
+        this.renamingId = null;
+        this.pendingDeleteId = null;
         this._renderForMode();
     }
 
-    // Rebuilds mode-dependent UI: active mode button, presets, sliders, and the preview.
+    _setApplyScope(scope) {
+        this.applyScope = scope === 'all' ? 'all' : 'selected';
+        this._syncScopeButtons();
+    }
+
+    _syncScopeButtons() {
+        this.ui.scopeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.scope === this.applyScope));
+    }
+
+    // Rebuilds mode-dependent UI: active mode button, presets, sliders/picker, and the preview.
     _renderForMode() {
         const mode = this.config.mode;
+        const isSaved = mode === 'saved';
         this.ui.modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
 
         this._ensureDefaultParams(mode);
-        this._renderPresets();
-        this._renderParams();
+
+        // Generative modes get presets + sliders + a reshuffle button; saved starts get the library
+        // picker and an apply-to scope (their cells are fixed, so there is nothing to reshuffle).
+        this.ui.presetsRow.classList.toggle('hidden', isSaved);
+        this.ui.paramsContainer.classList.toggle('hidden', isSaved);
+        this.ui.savedBlock.classList.toggle('hidden', !isSaved);
+        this.ui.scopeRow.classList.toggle('hidden', !isSaved);
+        this.ui.regenerateBtn.classList.toggle('hidden', isSaved);
+        this.ui.previewCaption.textContent = isSaved
+            ? 'Preview of the highlighted start — every reset replays these exact cells.'
+            : 'Live preview — the exact layout reshuffles on every reset.';
+
+        if (isSaved) {
+            this._destroySliders();
+            this.ui.paramsContainer.innerHTML = '';
+            this._renderSavedList();
+        } else {
+            this._renderPresets();
+            this._renderParams();
+            this._syncActivePreset();
+        }
         this._updatePreview();
-        this._syncActivePreset();
+        this._syncSaveEnabled();
     }
+
+    _syncSaveEnabled() {
+        const needsPick = this.config.mode === 'saved' && !this.config.params?.stateB64;
+        this.ui.saveBtn.disabled = needsPick;
+        this.ui.saveBtn.title = needsPick ? 'Pick a saved start first' : '';
+    }
+
+    // --- Saved starts tab ---------------------------------------------------------------------
+
+    _renderSavedList() {
+        const list = this.ui.savedList;
+        list.innerHTML = '';
+        const entries = this.stateLibrary.getAll();
+
+        if (entries.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'info-text isc-saved-empty';
+            empty.innerHTML = 'No saved starts yet. Press <kbd>T</kbd> to capture the selected world, or use the button above.';
+            list.appendChild(empty);
+            return;
+        }
+
+        const selectedId = this.config.params?.id;
+        entries.forEach(entry => {
+            list.appendChild(this._renderSavedEntry(entry, entry.id === selectedId));
+        });
+    }
+
+    _renderSavedEntry(entry, isSelected) {
+        const scaled = entry.rows !== Config.GRID_ROWS || entry.cols !== Config.GRID_COLS;
+        const row = document.createElement('div');
+        row.className = 'isc-entry' + (isSelected ? ' is-selected' : '') + (scaled ? ' is-scaled' : '');
+        row.dataset.id = entry.id;
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+
+        const thumb = document.createElement('canvas');
+        thumb.className = 'isc-entry-thumb';
+        thumb.setAttribute('aria-hidden', 'true');
+        renderInitialStatePreview(thumb, this.stateLibrary.buildInitialState(entry), { maxDim: 48 });
+        row.appendChild(thumb);
+
+        const info = document.createElement('div');
+        info.className = 'isc-entry-info';
+
+        if (this.renamingId === entry.id) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'isc-entry-rename';
+            input.value = entry.name || '';
+            input.setAttribute('aria-label', 'New name');
+            // Rows are rebuilt on every list render, so their listeners live and die with the nodes
+            // (registering them on the component would pile up stale element refs).
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); this._commitRename(entry.id, input.value); }
+                if (e.key === 'Escape') { e.preventDefault(); this.renamingId = null; this._renderSavedList(); }
+            });
+            input.addEventListener('blur', () => this._commitRename(entry.id, input.value));
+            info.appendChild(input);
+            requestAnimationFrame(() => { input.focus(); input.select(); });
+        } else {
+            const name = document.createElement('span');
+            name.className = 'isc-entry-name';
+            name.textContent = entry.name || 'Untitled start';
+            name.title = entry.name || 'Untitled start';
+            info.appendChild(name);
+        }
+
+        const meta = document.createElement('span');
+        meta.className = 'isc-entry-meta';
+        const bits = [`tick ${entry.capturedTick ?? 0}`, formatAge(entry.createdAt)].filter(Boolean);
+        meta.textContent = bits.join(' · ');
+        if (scaled) {
+            const badge = document.createElement('span');
+            badge.className = 'isc-entry-badge';
+            badge.textContent = `⚠ scaled from ${entry.cols}×${entry.rows}`;
+            badge.title = `Captured on a ${entry.cols}×${entry.rows} grid; it will be resampled onto the current ${Config.GRID_COLS}×${Config.GRID_ROWS} grid.`;
+            meta.appendChild(document.createTextNode(' '));
+            meta.appendChild(badge);
+        }
+        info.appendChild(meta);
+        row.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'isc-entry-actions';
+        if (this.pendingDeleteId === entry.id) {
+            actions.classList.add('is-confirming');
+            const label = document.createElement('span');
+            label.className = 'isc-entry-confirm-label';
+            label.textContent = 'Delete?';
+            const yes = this._iconButton('Delete', 'Yes', () => {
+                this.pendingDeleteId = null;
+                this.stateLibrary.remove(entry.id);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Deleted saved start "${entry.name}"` });
+                this._renderSavedList();
+            });
+            yes.classList.add('isc-entry-danger');
+            const no = this._iconButton('Keep', 'No', () => { this.pendingDeleteId = null; this._renderSavedList(); });
+            actions.append(label, yes, no);
+        } else {
+            actions.appendChild(this._iconButton('Rename', ICONS.pencil, () => {
+                this.renamingId = entry.id;
+                this._renderSavedList();
+            }));
+            actions.appendChild(this._iconButton('Export as a world-state file', ICONS.download, () => this._exportEntry(entry)));
+            actions.appendChild(this._iconButton('Delete', ICONS.trash, () => {
+                this.pendingDeleteId = entry.id;
+                this._renderSavedList();
+            }));
+        }
+        row.appendChild(actions);
+
+        // Clicking anywhere else on the row selects the entry.
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('.isc-entry-actions') || e.target.closest('.isc-entry-rename')) return;
+            this._selectEntry(entry);
+        });
+
+        return row;
+    }
+
+    _iconButton(title, html, onClick) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'isc-entry-button';
+        btn.title = title;
+        btn.setAttribute('aria-label', title);
+        btn.innerHTML = html;
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    _selectEntry(entry) {
+        this.config = this.stateLibrary.buildInitialState(entry);
+        this.pendingDeleteId = null;
+        this.renamingId = null;
+        this._renderSavedList();
+        this._updatePreview();
+        this._syncSaveEnabled();
+    }
+
+    _commitRename(id, name) {
+        if (this.renamingId !== id) return;
+        this.renamingId = null;
+        const trimmed = (name || '').trim();
+        if (trimmed) {
+            this.stateLibrary.rename(id, trimmed);
+            // The world's assignment embeds the name, so keep the in-flight config label in step.
+            if (this.config.params?.id === id) this.config.params.name = trimmed;
+        }
+        this._renderSavedList();
+    }
+
+    /** Export as the same `hex_state_*.json` shape the Save State button writes, so it round-trips. */
+    _exportEntry(entry) {
+        const data = {
+            rows: entry.rows,
+            cols: entry.cols,
+            rulesetHex: entry.rulesetHex || '0'.repeat(32),
+            format: 'b64',
+            stateB64: entry.stateB64,
+            worldTick: entry.capturedTick || 0,
+        };
+        const slug = (entry.name || 'saved-start').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+        EventBus.dispatch(EVENTS.TRIGGER_DOWNLOAD, {
+            filename: `hex_state_${slug}.json`,
+            content: JSON.stringify(data, null, 2),
+            mimeType: 'application/json',
+        });
+    }
+
+    _handleImportFile(e) {
+        const file = e.target.files?.[0];
+        if (!file) { e.target.value = null; return; }
+        const reader = new FileReader();
+        reader.onload = (re) => {
+            try {
+                const parsed = parseStateFile(JSON.parse(re.target.result));
+                if (parsed.error) throw new Error(parsed.error);
+
+                let live = 0;
+                for (let i = 0; i < parsed.cells.length; i++) live += parsed.cells[i] ? 1 : 0;
+                const { entry, deduped, error } = this.stateLibrary.add({
+                    id: (globalThis.crypto?.randomUUID?.() ?? `ss-${Date.now()}-${Math.floor(Math.random() * 1e9)}`),
+                    name: file.name.replace(/\.(json|txt)$/i, '').slice(0, 60) || 'Imported start',
+                    rows: parsed.rows,
+                    cols: parsed.cols,
+                    stateB64: cellsToBase64(parsed.cells),
+                    density: live / (parsed.cells.length || 1),
+                    rulesetHex: parsed.rulesetHex,
+                    capturedTick: parsed.worldTick,
+                    createdAt: Date.now(),
+                });
+                if (!entry) throw new Error(error);
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: deduped ? `Already in the library as "${entry.name}"` : `Imported "${entry.name}"`,
+                });
+                this._selectEntry(entry);
+            } catch (err) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Import failed: ${err.message}`, type: 'error' });
+            } finally {
+                e.target.value = null;
+            }
+        };
+        reader.onerror = () => {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Error reading file.', type: 'error' });
+            e.target.value = null;
+        };
+        reader.readAsText(file);
+    }
+
+    // --- Generative modes ---------------------------------------------------------------------
 
     _renderPresets() {
         const mode = this.config.mode;
@@ -278,10 +584,23 @@ export class InitialStateConfigModal extends BaseComponent {
 
     _handleSave = () => {
         this.config.params = this._collectParams();
-        EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, {
-            worldIndex: this.worldIndex,
-            initialState: this.config,
+        if (this.config.mode === 'saved' && !this.config.params.stateB64) return;
+
+        // "All worlds" just fans the same command over every index — no new plumbing, and it works
+        // regardless of which world's Edit… button opened the modal.
+        const targets = (this.config.mode === 'saved' && this.applyScope === 'all')
+            ? Array.from({ length: Config.NUM_WORLDS }, (_, i) => i)
+            : [this.worldIndex];
+
+        targets.forEach(worldIndex => {
+            EventBus.dispatch(EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, {
+                worldIndex,
+                initialState: structuredClone(this.config),
+            });
         });
+        if (targets.length > 1) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Start applied to all ${Config.NUM_WORLDS} worlds (R resets to it)` });
+        }
         this.hide();
     }
 
