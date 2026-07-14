@@ -62,6 +62,94 @@
     gap: 10px;
 }
 
+/* --- Global hue-shift slider (applies across every tab) ---------------------- */
+
+.chroma-hue-shift {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background-color: #262626;
+    border: 1px solid #444;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.chroma-hue-shift > label {
+    color: #ccc;
+    font-size: 0.85em;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.chroma-hue-slider {
+    flex: 1;
+    min-width: 0;
+    height: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 6px;
+    /* Rainbow track communicates that this rotates hue around the wheel. */
+    background: linear-gradient(to right,
+        #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%,
+        #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+    cursor: pointer;
+}
+
+.chroma-hue-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f7f7f7;
+    border: 2px solid #1e1e1e;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+}
+
+.chroma-hue-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f7f7f7;
+    border: 2px solid #1e1e1e;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+}
+
+.chroma-hue-value {
+    min-width: 3.5ch;
+    text-align: right;
+    color: #f0c674;
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.chroma-hue-reset {
+    padding: 4px 8px;
+    font-size: 0.75em;
+    color: #ccc;
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.chroma-hue-reset:hover:not(:disabled) {
+    background-color: #4a4a4a;
+    border-color: #f0c674;
+    color: #fff;
+}
+
+.chroma-hue-reset:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 /* --- Palettes tab ------------------------------------------------------------ */
 
 .preset-visualizations {

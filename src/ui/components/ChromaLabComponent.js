@@ -61,6 +61,12 @@ export class ChromaLabComponent extends BaseComponent {
                     `).join('')}
                 </div>
                 <p class="chroma-tab-hint" id="chroma-tab-hint"></p>
+                <div class="chroma-hue-shift" title="Rotate every color around the wheel to steer the whole palette off a hue you don't want (e.g. the default's harsh red). Blacks and grays stay put.">
+                    <label for="chroma-hue-shift-slider">Hue shift</label>
+                    <input type="range" id="chroma-hue-shift-slider" class="chroma-hue-slider" min="0" max="359" step="1" value="0" aria-label="Global palette hue shift in degrees">
+                    <output id="chroma-hue-shift-value" class="chroma-hue-value">0°</output>
+                    <button type="button" id="chroma-hue-shift-reset" class="chroma-hue-reset" title="Reset hue shift to 0°">Reset</button>
+                </div>
                 <div id="chroma-batch-action-bar" class="hidden"></div>
                 <div id="chroma-preset-section" class="chroma-section"></div>
                 <div id="chroma-gradient-section" class="chroma-section hidden"></div>
@@ -89,6 +95,9 @@ export class ChromaLabComponent extends BaseComponent {
             symmetrySection: this.element.querySelector('#chroma-symmetry-section'),
             batchActionBar: this.element.querySelector('#chroma-batch-action-bar'),
             nativeColor: this.element.querySelector('.chroma-native-color'),
+            hueSlider: this.element.querySelector('#chroma-hue-shift-slider'),
+            hueValue: this.element.querySelector('#chroma-hue-shift-value'),
+            hueReset: this.element.querySelector('#chroma-hue-shift-reset'),
         };
         this._renderAllSections();
     }
@@ -469,7 +478,37 @@ export class ChromaLabComponent extends BaseComponent {
                 this._updateBatchActionBar();
             }
         });
+        // Global hue-shift slider: live-preview the canvas while dragging (no persist), commit on
+        // release. Achromatic colors are untouched by the rotation (see rotateHue), so blacks/grays
+        // stay put and only the chromatic palette rotates off the unwanted hue.
+        if (this.uiElements.hueSlider) {
+            this.uiElements.hueSlider.addEventListener('input', (e) => {
+                const deg = parseInt(e.target.value, 10) || 0;
+                if (this.uiElements.hueValue) this.uiElements.hueValue.textContent = `${deg}°`;
+                this.colorController.previewSettings({ hueShift: deg });
+            });
+            this.uiElements.hueSlider.addEventListener('change', (e) => {
+                const deg = parseInt(e.target.value, 10) || 0;
+                this.colorController.setHueShift(deg);
+                this.colorController.endPreview();
+            });
+        }
+        if (this.uiElements.hueReset) {
+            this.uiElements.hueReset.addEventListener('click', () => {
+                this.colorController.endPreview();
+                this.colorController.setHueShift(0);
+            });
+        }
+
         this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
+    }
+
+    /** Keep the hue-shift slider + readout in sync with the persisted setting. */
+    _syncHueShiftControl() {
+        const deg = this.colorController.getSettings().hueShift || 0;
+        if (this.uiElements.hueSlider) this.uiElements.hueSlider.value = String(deg);
+        if (this.uiElements.hueValue) this.uiElements.hueValue.textContent = `${deg}°`;
+        if (this.uiElements.hueReset) this.uiElements.hueReset.disabled = deg === 0;
     }
 
     // --- Pickers / batch tools ---------------------------------------------------
@@ -542,6 +581,7 @@ export class ChromaLabComponent extends BaseComponent {
 
     refresh = () => {
         const settings = this.colorController.getSettings();
+        this._syncHueShiftControl();
         if (settings.mode === 'neighbor_count' || settings.mode === 'symmetry') {
             this.groupMode = settings.mode;
         }

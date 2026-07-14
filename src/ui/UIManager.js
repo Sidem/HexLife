@@ -265,6 +265,21 @@ export class UIManager {
                 const toggleIcon = fabRightContainer.querySelector('#interaction-mode-toggle .icon');
                 if (toggleIcon) toggleIcon.innerHTML = mode === 'pan' ? ICONS.hand : ICONS.pencil;
             });
+
+            // Keep the FAB stack clear of the minimaps. The FABs are anchored to the canvas
+            // bottom-right, which otherwise overlaps the bottom minimap strip (tall/narrow layout)
+            // or the bottom-right minimap overlay (near-square layout). Raise the stack so its
+            // bottom sits just above the minimap grid, reusing the same layout rect the on-canvas
+            // guides consume (canvas backing store == CSS px, so these are CSS pixels).
+            const canvasEl = document.getElementById('hexGridCanvas');
+            const mainArea = document.getElementById('main-content-area');
+            const positionFabsAboveMinimap = (layout) => {
+                if (!this.isMobile() || !layout?.miniMap || !canvasEl || !mainArea) return;
+                const gridTop = canvasEl.offsetTop + layout.miniMap.gridContainerY;
+                const bottomOffset = Math.max(10, mainArea.clientHeight - gridTop + 12);
+                fabRightContainer.style.bottom = `${bottomOffset}px`;
+            };
+            EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, positionFabsAboveMinimap);
         }
 
     }

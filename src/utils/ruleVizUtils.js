@@ -51,6 +51,46 @@ function hsvToRgb(h, s, v) {
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+/**
+ * Converts an [r, g, b] color (0-255 channels) to HSV.
+ * @returns {number[]} [h, s, v] with h in [0,1), s/v in [0,1].
+ */
+function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+        switch (max) {
+            case r: h = ((g - b) / d) % 6; break;
+            case g: h = (b - r) / d + 2; break;
+            default: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+        if (h < 0) h += 1;
+    }
+    const s = max === 0 ? 0 : d / max;
+    return [h, s, max];
+}
+
+/**
+ * Rotates a color's hue by `degrees` around the color wheel, preserving saturation and value.
+ * Achromatic colors (grays, pure black/white — where saturation is 0) are returned unchanged, so
+ * black "off"/background cells and white structure stay put while only chromatic colors shift.
+ * This is the single primitive behind Chroma Lab's global hue-shift slider.
+ * @param {number[]} rgb - [r, g, b] in 0-255.
+ * @param {number} degrees - Hue rotation in degrees (any sign; wrapped).
+ * @returns {number[]} The rotated [r, g, b] in 0-255.
+ */
+export function rotateHue(rgb, degrees) {
+    if (!degrees) return rgb;
+    const [h, s, v] = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+    if (s === 0) return rgb; // achromatic: nothing to rotate
+    const nh = (((h + degrees / 360) % 1) + 1) % 1;
+    return hsvToRgb(nh, s, v);
+}
+
 export function getGradientColor(factor, gradient) {
     if (!gradient || gradient.length === 0) return [128, 128, 128];
     if (gradient.length === 1) return gradient[0];
@@ -71,7 +111,7 @@ export function generateColorLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2;
     const data = new Uint8Array(width * height * 4);
-    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors, flickerProofPresets } = colorSettings;
+    const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors, flickerProofPresets, hueShift } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
         for (let outputState = 0; outputState < height; outputState++) {
@@ -135,6 +175,8 @@ export function generateColorLUT(colorSettings, symmetryData) {
                 }
                 rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
             }
+
+            if (hueShift) rgb = rotateHue(rgb, hueShift);
 
             const dataIndex = (outputState * width + ruleIndex) * 4;
             data[dataIndex] = rgb[0];
@@ -293,7 +335,9 @@ export function getRuleIndexColor(ruleIndex, outputState, colorSettings, symmetr
         }
         rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
     }
-    
+
+    if (colorSettings.hueShift) rgb = rotateHue(rgb, colorSettings.hueShift);
+
     return `rgb(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])})`;
 }
 
@@ -369,7 +413,7 @@ export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
     const width = 128;
     const height = 2; // Row 0 for OFF, Row 1 for ON
     const data = new Uint8Array(width * height * 4);
-    const { mode, activePreset, customNeighborColors, customSymmetryColors, flickerProofPresets } = colorSettings;
+    const { mode, activePreset, customNeighborColors, customSymmetryColors, flickerProofPresets, hueShift } = colorSettings;
 
     for (let ruleIndex = 0; ruleIndex < width; ruleIndex++) {
         // We will calculate the color for both OFF (0) and ON (1) states for each rule index.
@@ -411,6 +455,8 @@ export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
                 // Here, we directly use the color defined for the specific output state.
                 rgb = hexToRgb(colors ? colors[outputState === 1 ? 'on' : 'off'] : '#808080');
             }
+
+            if (hueShift) rgb = rotateHue(rgb, hueShift);
 
             const dataIndex = (outputState * width + ruleIndex) * 4;
             data[dataIndex] = rgb[0];

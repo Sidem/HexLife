@@ -94,6 +94,20 @@ export class ColorController {
     }
 
     /**
+     * Global hue rotation applied across every coloring mode (Chroma Lab's hue-shift slider). The
+     * value is a degree offset in [0, 360); it's normalized here so the persisted setting stays in
+     * range. Rotating the whole palette lets users steer away from an unwanted dominant hue (e.g.
+     * the default's harsh red) without hand-editing individual colors.
+     * @param {number} degrees
+     */
+    setHueShift(degrees) {
+        const normalized = ((Math.round(Number(degrees) || 0) % 360) + 360) % 360;
+        if (this.settings.hueShift === normalized) return;
+        this.settings.hueShift = normalized;
+        this.#saveAndDispatch();
+    }
+
+    /**
      * Set the free-form custom gradient (Chroma Lab "Gradient" tab) and switch to gradient mode:
      * all 128 rules are painted along the `on` ramp (active cells) / `off` ramp (inactive cells).
      * @param {{on: string[], off: string[], autoOff?: boolean}} gradient - Hex color stop lists

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateThumbnailLUT } from '../src/utils/ruleVizUtils.js';
+import { generateThumbnailLUT, rotateHue, generateColorLUT } from '../src/utils/ruleVizUtils.js';
 
 // The baked-thumbnail LUT must be palette-independent and CVD-proof: pure grayscale (zero hue),
 // luminance rising monotonically with rule index within each band, and a hard gap between the OFF
@@ -39,5 +39,49 @@ describe('generateThumbnailLUT', () => {
         const maxOff = px(0, 127)[0];
         const minOn = px(1, 0)[0];
         expect(minOn).toBeGreaterThan(maxOff);
+    });
+});
+
+// The Chroma Lab hue-shift slider rotates every chromatic color around the wheel while leaving
+// achromatic pixels (blacks/grays/whites) untouched, so structure and black backgrounds are stable.
+describe('rotateHue', () => {
+    it('is a no-op at 0 degrees', () => {
+        expect(rotateHue([200, 50, 10], 0)).toEqual([200, 50, 10]);
+    });
+
+    it('leaves achromatic colors (saturation 0) unchanged', () => {
+        for (const gray of [[0, 0, 0], [128, 128, 128], [255, 255, 255]]) {
+            expect(rotateHue(gray, 120)).toEqual(gray);
+            expect(rotateHue(gray, 240)).toEqual(gray);
+        }
+    });
+
+    it('rotates primary hues by 120 degrees (red -> green -> blue)', () => {
+        expect(rotateHue([255, 0, 0], 120)).toEqual([0, 255, 0]);
+        expect(rotateHue([0, 255, 0], 120)).toEqual([0, 0, 255]);
+        expect(rotateHue([0, 0, 255], 120)).toEqual([255, 0, 0]);
+    });
+
+    it('wraps a full turn back to (near) the original', () => {
+        expect(rotateHue([255, 0, 0], 360)).toEqual([255, 0, 0]);
+    });
+});
+
+// The hueShift setting threads through the canvas LUT: chromatic outputs rotate, the flicker-proof
+// black overrides stay black.
+describe('generateColorLUT hueShift', () => {
+    const base = { mode: 'preset', activePreset: 'default', flickerProofPresets: true };
+    const px = (lut, outputState, ruleIndex) => {
+        const i = (outputState * 128 + ruleIndex) * 4;
+        return [lut[i], lut[i + 1], lut[i + 2]];
+    };
+
+    it('shifts chromatic ON cells but keeps the flicker-proof black cells black', () => {
+        const shifted = generateColorLUT({ ...base, hueShift: 90 }, null);
+        const unshifted = generateColorLUT({ ...base, hueShift: 0 }, null);
+        // rule 0 / ON is forced black by the flicker guard — must stay black under any shift.
+        expect(px(shifted, 1, 0)).toEqual([0, 0, 0]);
+        // a chromatic ON cell must actually change hue.
+        expect(px(shifted, 1, 40)).not.toEqual(px(unshifted, 1, 40));
     });
 });

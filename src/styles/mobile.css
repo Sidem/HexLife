@@ -1,5 +1,11 @@
 /* HexLife Explorer - Mobile UI Stylesheet */
 
+/* The mobile-only header row (world pill + gear) has no place in the desktop top
+   bar; collapse it there. The mobile media block below restores it as a flex row. */
+.mobile-top-row {
+    display: none;
+}
+
 /* Apply mobile styles only on smaller screens */
 @media screen and (max-width: 768px),
 screen and (pointer: coarse) and (hover: none) {
@@ -39,6 +45,17 @@ screen and (pointer: coarse) and (hover: none) {
         /* Top bar is the first item */
     }
 
+    /* Compact header row: world-paging pill on the left, "More" gear on the right.
+       Grouping them on one line removes the dead vertical space they left when each
+       sat on its own row in the column-stacked top bar. */
+    .mobile-top-row {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-height: 42px;
+        gap: 8px;
+    }
+
     /* --- Header gear (opens the full-screen More view) --- */
     .mobile-gear-button {
         display: flex;
@@ -67,17 +84,11 @@ screen and (pointer: coarse) and (hover: none) {
         display: flex;
         align-items: center;
         gap: 2px;
-        margin-left: auto;
         flex-shrink: 0;
         background-color: #2a2a2a;
         border: 1px solid #444;
         border-radius: 999px;
         padding: 2px;
-    }
-
-    /* When both the pill and gear show, only the pill pushes right. */
-    .mobile-world-pill + .mobile-gear-button {
-        margin-left: 4px;
     }
 
     .world-pill-btn {

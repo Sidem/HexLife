@@ -344,7 +344,9 @@ export function loadColorSettings() {
         },
         customNeighborColors: Config.DEFAULT_COLOR_SCHEMES.customNeighborColors,
         customSymmetryColors: Config.DEFAULT_COLOR_SCHEMES.customSymmetryColors,
-        flickerProofPresets: true
+        flickerProofPresets: true,
+        // Global hue rotation (degrees) applied to every palette at LUT-generation time.
+        hueShift: 0
     };
     const loaded = _getItem(KEYS.COLOR_SETTINGS);
     
