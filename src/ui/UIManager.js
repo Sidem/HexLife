@@ -17,6 +17,7 @@ import { LearningComponent } from './components/LearningComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 import { ExploreComponent } from './components/ExploreComponent.js';
 import { SettingsComponent } from './components/SettingsComponent.js';
+import { SnapshotsComponent } from './components/SnapshotsComponent.js';
 import { downloadFile } from '../utils/utils.js';
 import * as Config from '../core/config.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
@@ -116,7 +117,8 @@ export class UIManager {
             chromaLab: new ChromaLabComponent(appContext),
             explore: new ExploreComponent(appContext),
             settings: new SettingsComponent(appContext),
-            shortcuts: new KeyboardShortcutsComponent(appContext)
+            shortcuts: new KeyboardShortcutsComponent(appContext),
+            snapshots: new SnapshotsComponent(appContext)
         };
 
         

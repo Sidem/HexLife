@@ -3,7 +3,6 @@ import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { PatternsComponent } from './components/PatternsComponent.js';
 import * as PersistenceService from '../services/PersistenceService.js';
-import { parseStateFile } from '../utils/stateFile.js';
 import { ICONS } from './icons.js';
 
 // Short, plain-language labels shown beside each icon when the rail is expanded.
@@ -21,8 +20,7 @@ const TOOLBAR_BUTTON_LABELS = {
     exploreButton: 'Auto-Explore',
     analysisPanelButton: 'Analysis',
     rankPanelButton: 'Rule Usage',
-    saveStateButton: 'Save State',
-    loadStateButton: 'Load State',
+    snapshotsButton: 'Snapshots',
     exportPngButton: 'Screenshot',
     recordWebmButton: 'Record Video',
     shareButton: 'Share',
@@ -38,7 +36,7 @@ const TOOLBAR_GROUP_HEADERS = {
     controlsButton: 'Simulate',
     rulesetActionsButton: 'Rules',
     exploreButton: 'Discover',
-    saveStateButton: 'Capture',
+    snapshotsButton: 'Capture',
     colorPanelButton: 'Settings',
 };
 
@@ -53,8 +51,7 @@ const TOOLBAR_BUTTON_ICONS = {
     exploreButton: ICONS.compass,
     analysisPanelButton: ICONS.chartLine,
     rankPanelButton: ICONS.trophy,
-    saveStateButton: ICONS.save,
-    loadStateButton: ICONS.folderOpen,
+    snapshotsButton: ICONS.save,
     exportPngButton: ICONS.camera,
     recordWebmButton: ICONS.video,
     shareButton: ICONS.share,
@@ -104,11 +101,9 @@ export class Toolbar {
             shareLinkInput: document.getElementById('shareLinkInput'),
             shareIncludeStateCheckbox: document.getElementById('shareIncludeStateCheckbox'),
             copyShareLinkButton: document.getElementById('copyShareLinkButton'),
-            saveStateButton: document.getElementById('saveStateButton'),
-            loadStateButton: document.getElementById('loadStateButton'),
+            snapshotsButton: document.getElementById('snapshotsButton'),
             exportPngButton: document.getElementById('exportPngButton'),
             recordWebmButton: document.getElementById('recordWebmButton'),
-            fileInput: document.getElementById('fileInput'),
             editRuleButton: document.getElementById('editRuleButton'),
             setupPanelButton: document.getElementById('setupPanelButton'),
             exploreButton: document.getElementById('exploreButton'),
@@ -268,13 +263,9 @@ export class Toolbar {
             shortcutsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'shortcuts' }),
             helpButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'learning' }),
             shareButton: () => { EventBus.dispatch(EVENTS.COMMAND_TOGGLE_POPOUT, { popoutName: 'share' }); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); },
-            saveStateButton: () => EventBus.dispatch(EVENTS.COMMAND_SAVE_SELECTED_WORLD_STATE),
+            snapshotsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'snapshots' }),
             exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' }),
             recordWebmButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING),
-            loadStateButton: () => {
-                this.uiElements.fileInput.accept = ".txt,.json";
-                this.uiElements.fileInput.click();
-            },
             copyShareLinkButton: this._copyShareLink.bind(this)
         };
 
@@ -286,26 +277,6 @@ export class Toolbar {
     }
 
     _setupStateListeners() {
-        this.uiElements.fileInput.addEventListener('change', e => {
-            const file = e.target.files[0];
-            if (!file) { e.target.value = null; return; }
-            const reader = new FileReader();
-            reader.onload = re => {
-                try {
-                    const data = JSON.parse(re.target.result);
-                    // Shared validator: accepts both the v2 `stateB64` files we write today and the
-                    // legacy `state: number[]` ones. (The old inline check demanded `state`, so it
-                    // rejected our own saves.)
-                    const parsed = parseStateFile(data);
-                    if (parsed.error) throw new Error(parsed.error);
-                    EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), loadedData: data });
-                } catch (err) { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Error processing file: ${err.message}`, type: 'error' }); }
-                finally { e.target.value = null; }
-            };
-            reader.onerror = () => { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Error reading file.', type: 'error' }); e.target.value = null; };
-            reader.readAsText(file);
-        });
-
         // Toggling "include full world state" regenerates the link in place.
         this.uiElements.shareIncludeStateCheckbox?.addEventListener('change', () => {
             EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP);

@@ -33,6 +33,7 @@
 @import url('src/ui/components/SettingsComponent.css');
 @import url('src/ui/components/SaveRulesetModal.css');
 @import url('src/ui/components/SavePatternModal.css');
+@import url('src/ui/components/SavedStartsList.css');
 @import url('src/ui/components/InitialStateConfigModal.css');
 @import url('src/ui/components/CaptureStudioModal.css');
 @import url('src/ui/components/ActionsPopover.css');
@@ -44,6 +45,7 @@
 @import url('src/ui/components/WorldSetupComponent.css');
 @import url('src/ui/components/AnalysisComponent.css');
 @import url('src/ui/components/RuleRankPanel.css');
+@import url('src/ui/components/SnapshotsComponent.css');
 @import url('src/ui/components/Settings.css');
 @import url('src/ui/RulesetVisualizer.css');
 @import url('src/ui/components/ToolsBottomSheet.css');

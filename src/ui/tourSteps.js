@@ -464,9 +464,9 @@ export const getTours = (appContext) => {
     }];
 
     const saveLoad = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="save-state-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="snapshots-button"]',
         title: 'Tutorial: Save, Load & Share',
-        content: 'Preserve your discoveries and share them with others.',
+        content: 'Preserve your discoveries and share them with others. On desktop, saving and loading live in the <span class="onboarding-highlight-text">Snapshots</span> panel.',
         primaryAction: { text: 'Next' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'click' }
@@ -475,12 +475,12 @@ export const getTours = (appContext) => {
         title: 'Save World State',
         content: "This saves the <span class=\"onboarding-highlight-text\">complete state</span> of the currently selected world—including its ruleset, cell states, and tick count—to a JSON file on your device.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'none' }, mobile: { view: 'more' } }),
+        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'snapshots' }, mobile: { view: 'more' } }),
         advanceOn: { type: 'click' }
     }, {
         element: () => appContext.uiManager.isMobile() ? '[for="mobileFileInput"]' : '[data-tour-id="load-state-button"]',
         title: 'Load World State',
-        content: "This loads a previously saved JSON file, restoring a world to its exact saved state, allowing you to continue an experiment.",
+        content: "This loads a previously saved JSON file, restoring a world to its exact saved state, allowing you to continue an experiment. The same panel holds your <span class=\"onboarding-highlight-text\">saved starts</span> library.",
         primaryAction: { text: 'Next' },
         advanceOn: { type: 'click' }
     }, {

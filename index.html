@@ -227,8 +227,7 @@
                 <button id="analysisPanelButton" class="toolbar-button" title="[A]nalysis Panel" data-tour-id="analysis-panel-button">📈</button>
                 <button id="rankPanelButton" class="toolbar-button" title="Rule Rank Panel" data-tour-id="rank-panel-button">🏆</button>
                 <div class="toolbar-separator" role="separator"></div>
-                <button id="saveStateButton" class="toolbar-button" title="Save Selected World State" data-tour-id="save-state-button">💾</button>
-                <button id="loadStateButton" class="toolbar-button" title="Load World State" data-tour-id="load-state-button">📂</button>
+                <button id="snapshotsButton" class="toolbar-button" title="Snapshots (save, load &amp; saved starts)" data-tour-id="snapshots-button">💾</button>
                 <button id="exportPngButton" class="toolbar-button" title="Export PNG snapshot of selected world" data-tour-id="export-png-button">📷</button>
                 <button id="recordWebmButton" class="toolbar-button" title="Record WebM video of the canvas" data-tour-id="record-webm-button">🎥</button>
                 <button id="shareButton" class="toolbar-button" title="Share Setup" data-tour-id="share-button">🔗</button>
@@ -377,6 +376,13 @@
             <div class="panel-content-area">
             </div>
         </div>
+        <div id="snapshotsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="snapshotsPanelTitle" data-tour-id="snapshots-panel">
+            <button class="close-panel-button" title="Close Panel">&times;</button>
+            <h3 id="snapshotsPanelTitle">Snapshots<button class="button-help-trigger" data-tour-name="saveLoad" title="Help with this feature">[?]</button><span class="panel-subtitle">Save, load &amp; reuse world states</span></h3>
+            <div class="panel-content-area">
+            </div>
+        </div>
+
         <div id="settingsPanel" class="draggable-panel-base hidden" role="dialog" aria-labelledby="settingsPanelTitle" data-tour-id="settings-panel">
             <button class="close-panel-button" title="Close Panel">&times;</button>
             <h3 id="settingsPanelTitle">Settings<span class="panel-subtitle">Your preferences</span></h3>
@@ -403,7 +409,6 @@
         </div>
     </div> 
     
-    <input type="file" id="fileInput" accept=".txt,.json" style="display: none;" aria-label="Load file">
     <div id="mobile-views-container"></div>
     <div id="modal-container"></div>
     <div id="popover-container"></div>

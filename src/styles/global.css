@@ -71,10 +71,6 @@ body {
     background-color: #0078d4; border-color: #005a9e; color: white;
 }
 
-#fileInput { 
-    display: none; 
-}
-
 ::-webkit-scrollbar {
   width: 3px;
   height: 5px;

@@ -1,0 +1,96 @@
+.snapshots-component-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 320px;
+}
+
+.snapshots-component-content .snap-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.snapshots-component-content .snap-section + .snap-section {
+    border-top: 1px solid #444;
+    padding-top: 14px;
+}
+
+.snapshots-component-content h4 {
+    margin: 0;
+    font-size: 0.95em;
+    color: #eee;
+}
+
+.snapshots-component-content .info-text {
+    margin: 0;
+    font-size: 0.8em;
+}
+
+.snapshots-component-content .snap-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.snapshots-component-content .snap-actions .button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 130px;
+    padding: 7px 10px;
+    font-size: 0.85em;
+    justify-content: center;
+}
+
+.snapshots-component-content .snap-actions .button svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.snapshots-component-content .snap-list {
+    max-height: 300px;
+}
+
+/* Actions for the picked entry; hidden until a row is selected. */
+.snapshots-component-content .snap-apply {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background-color: rgba(0, 120, 212, 0.1);
+    border: 1px solid #2a93ee;
+    border-radius: 6px;
+}
+
+.snapshots-component-content .snap-apply.hidden {
+    display: none;
+}
+
+.snapshots-component-content .snap-apply-name {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.snapshots-component-content .snap-apply-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.snapshots-component-content .snap-apply-buttons .button {
+    flex: 1;
+    min-width: 120px;
+    padding: 6px 8px;
+    font-size: 0.8em;
+}
+
+.snapshots-component-content.mobile-context {
+    min-width: 0;
+}

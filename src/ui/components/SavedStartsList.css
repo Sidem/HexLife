@@ -1,0 +1,127 @@
+/* Saved-starts rows. Unscoped on purpose: shared by the World Setup modal's "Saved" tab and the
+   Snapshots panel, which must render an identical list. */
+
+.isc-saved-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+}
+
+.isc-saved-empty {
+    margin: 6px 2px;
+    font-size: 0.85em;
+}
+
+.isc-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    background-color: #262626;
+    border: 1px solid #444;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s;
+}
+
+.isc-entry:hover {
+    background-color: #303030;
+    border-color: #666;
+}
+
+.isc-entry.is-selected {
+    border-color: #2a93ee;
+    background-color: rgba(0, 120, 212, 0.18);
+}
+
+.isc-entry-thumb {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    background-color: #16181d;
+    border: 1px solid #444;
+    border-radius: 4px;
+    image-rendering: pixelated;
+    display: block;
+}
+
+.isc-entry-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.isc-entry-name {
+    font-size: 0.9em;
+    color: #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.isc-entry-meta {
+    font-size: 0.74em;
+    color: #9fa8c0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dims mismatch: usable, but visibly lossy (SavedStrategy resamples it). */
+.isc-entry-badge {
+    color: #f0c674;
+}
+
+.isc-entry-rename {
+    width: 100%;
+    padding: 3px 6px;
+    background-color: #1e1e1e;
+    border: 1px solid #2a93ee;
+    border-radius: 4px;
+    color: #eee;
+    font-size: 0.88em;
+}
+
+.isc-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.isc-entry-confirm-label {
+    font-size: 0.78em;
+    color: #e88;
+    margin-right: 2px;
+}
+
+.isc-entry-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    min-width: 26px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: #bbb;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.isc-entry-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.isc-entry-button svg {
+    width: 15px;
+    height: 15px;
+}
+
+.isc-entry-button.isc-entry-danger {
+    color: #ff8080;
+}
