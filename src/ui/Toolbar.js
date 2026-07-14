@@ -3,6 +3,7 @@ import { PopoutPanel } from './components/PopoutPanel.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { PatternsComponent } from './components/PatternsComponent.js';
 import * as PersistenceService from '../services/PersistenceService.js';
+import { parseStateFile } from '../utils/stateFile.js';
 import { ICONS } from './icons.js';
 
 // Short, plain-language labels shown beside each icon when the rail is expanded.
@@ -292,7 +293,11 @@ export class Toolbar {
             reader.onload = re => {
                 try {
                     const data = JSON.parse(re.target.result);
-                    if (!data?.rows || !data?.cols || !Array.isArray(data.state) || !data.rulesetHex) throw new Error("Invalid format or missing rulesetHex.");
+                    // Shared validator: accepts both the v2 `stateB64` files we write today and the
+                    // legacy `state: number[]` ones. (The old inline check demanded `state`, so it
+                    // rejected our own saves.)
+                    const parsed = parseStateFile(data);
+                    if (parsed.error) throw new Error(parsed.error);
                     EventBus.dispatch(EVENTS.COMMAND_LOAD_WORLD_STATE, { worldIndex: this.worldManager.getSelectedWorldIndex(), loadedData: data });
                 } catch (err) { EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Error processing file: ${err.message}`, type: 'error' }); }
                 finally { e.target.value = null; }
