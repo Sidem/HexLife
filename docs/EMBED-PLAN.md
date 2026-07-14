@@ -291,15 +291,54 @@ rather than `initSync` on inlined bytes. `fetch` handles a real URL (dev) *and* 
 URI (Vite lib build inlines it), so the same code path survives the Phase 3 build with no branch —
 and it sidesteps `instantiateStreaming`'s MIME check on data URIs.
 
-### Phase 2 — custom element + policies
+### Phase 2 — custom element + policies — ✅ DONE 2026-07-14
 
-`HexLifeElement`: attribute parsing/validation (bad ruleset ⇒ styled error state, never a
-throw), JS API, `hexlife-ready` event, IntersectionObserver, reduced-motion poster + play
-button, visibility pause, `max-dpr` + ResizeObserver, attribution link, disconnect cleanup,
-multi-instance registry + view-refresh-on-construction.
-**Accept:** demo page with 3+ instances (different palettes/speeds; one `paused`, one added
-dynamically after 2 s to exercise the detachment registry) all animate correctly; removing one
-frees it (no rAF leak — assert via handle); reduced-motion emulation shows posters.
+`src/embed/HexLifeElement.js` (the element), `src/embed/attrs.js` (pure attribute coercion),
+`src/embed/index.js` (the entry point: `customElements.define`, idempotent). `embed-demo.html`
+rebuilt as a 5-instance page. **The public API in "Attributes" / "JS API" above is now implemented
+as specified** — treat both as frozen from here (see "Versioning contract").
+
+Two design rules drive the element, and both are written into its header:
+1. **Never throw into the host page.** Bad/missing ruleset, no WebGL2, wasm init failure — each
+   lands in a styled error box in the shadow root, keeping the attribution link. Third parties
+   pasted a script tag; they didn't sign up for an exception in their console.
+2. **Never leak.** `disconnectedCallback` tears down in reverse: cancel rAF → disconnect the three
+   observers → remove the visibility listener → `renderer.destroy()` → `sim.free()` (which also
+   unregisters from the detachment registry).
+
+Playback is a single `_syncPlayback()` gate — every policy (the `paused` attribute, `play()`/
+`pause()`, IntersectionObserver, `document.visibilityState`, `prefers-reduced-motion`) just sets its
+own flag and calls it, so the rules can never disagree. The poster overlay is shown only when the
+element is *deliberately* stopped (paused / reduced-motion), **not** when it's merely scrolled
+offscreen — nobody is looking, and it resumes by itself.
+
+**Verified in the preview browser** (`/HexLife/embed-demo.html`, 5 instances):
+- **Determinism survives the multi-instance trap.** World D (rows 256) is injected at t=2 s,
+  growing wasm linear memory *after* A booted. A still reproduces Phase 1's pinned checksum
+  `231200078` at tick 100 via the element API (`reset` + `tick(100)`), reproducibly, and a different
+  seed genuinely differs. Also still correct after D is *removed* and freed.
+- Gate matrix: onscreen+visible+unpaused ⇒ running; `pause()` ⇒ stopped + poster; `play()` ⇒
+  running; offscreen ⇒ stopped, **no** poster; tab hidden ⇒ stopped; `paused` attribute ⇒ poster,
+  and clicking it plays.
+- Reduced motion (`matchMedia` stubbed, fresh element): does **not** autoplay even when fully
+  visible; shows the poster; plays on an explicit click.
+- Live attributes: `speed`, `palette`/`palette-on`/`palette-off`, `max-dpr`, `link` apply in place;
+  `rows` re-boots the sim+renderer (48 ⇒ 56 cols, as `deriveGridDimensions` says).
+- Disconnect: rAF id 0, `sim`/`renderer` nulled, neighbours unaffected.
+- Render: 285×285 backing store (DPR capped), 1870 distinct color buckets, `gl.getError() === 0`.
+- `hexlife-ready` fires exactly once per instance; **zero console errors**.
+
+**Gotcha found (a real bug, fixed): the element booted 3× on upgrade.** The custom-element upgrade
+order is `attributeChangedCallback` *once per attribute*, **then** `connectedCallback` — so parsing
+`<hexlife-world ruleset=… rows=… speed=…>` ran a full boot per attribute (a `World` allocation and a
+shader program each, all but the last discarded). Fixed with a `_hasConnected` gate: attribute
+changes are ignored until the first connect, which is safe because `_boot()` always re-reads every
+attribute. A second guard, `_generation`, voids an in-flight async wasm init if the element
+disconnects or re-boots mid-await.
+
+Also: the pure attribute coercers live in `attrs.js`, **not** beside the element, because
+`HexLifeElement.js` evaluates `class extends HTMLElement` at import time and node (vitest) has no
+`HTMLElement`. `tests/embedAttributes.test.js` pins them (11 tests).
 
 ### Phase 3 — build + deploy + demo page + iframe wrapper
 

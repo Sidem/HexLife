@@ -196,12 +196,16 @@ build pipeline, tests, docs — an agent can build and run locally.
 
 ## Phases
 
-### Phase 0 — scaffold + toolchain — ✅ MOSTLY DONE 2026-07-14
+### Phase 0 — scaffold + toolchain — ✅ DONE 2026-07-14
 
 App created (`hexlifeapp`), subreddit created (r/hexlife), CLI installed and authed, scaffold runs
-locally, **repo layout settled (in-repo at `devvit/`, see above)**, and the **stock template was
-playtested** (see below). **Remaining:** confirm the post actually *renders* (owner action — see
-below).
+locally, **repo layout settled (in-repo at `devvit/`, see above)**, the **stock template was
+playtested**, and the **post renders in r/hexlife** (owner-confirmed — see below). Nothing is
+blocking Phase 1.
+
+**#25's dependency is also satisfied as of 2026-07-14:** phases 0–2 of the embed are done, so
+`<hexlife-world>` exists and the webview can simply *use* it. Phase 1 below is now unblocked on both
+sides.
 
 #### Stock-template playtest, 2026-07-14 — upload/install ✅, render unconfirmed
 
@@ -220,10 +224,15 @@ below).
   last built). Fix: prepend Git Bash before invoking, e.g.
   `$env:PATH="C:\Program Files\Git\bin;"+$env:PATH` then
   `fnm exec --using=22.6.0 -- npx.cmd devvit playtest hexlife`.
-- **❓ Rendering is NOT yet proven.** Install ≠ render. Someone must create a post via the
-  subreddit menu item **"[hexlifeapp] New Post"** in r/hexlife and open it. **Owner action** — an
-  agent must not post to Reddit. Until that is green, treat wasm/WebGL-in-webview as unverified and
-  do not conclude Phase 1's go/no-go.
+- **✅ RENDERING CONFIRMED 2026-07-14 (owner).** A post was created in r/hexlife and it renders: the
+  stock template's counter app (a number, a Start button, and +/− buttons that increment and
+  decrement it). So the **whole chain — upload → install → create post → webview loads → JS runs →
+  DOM updates on interaction — is green.** Phase 0 is closed.
+
+  **What this does and does not prove.** It proves the platform loop and that scripted, interactive
+  DOM works in the webview. It does **not** prove wasm instantiation or a WebGL2 context, because the
+  counter template uses neither. Those remain Phase 1's entire job — do not treat this as the
+  go/no-go.
 
 ### Phase 1 — wasm/WebGL smoke test in a real post (the go/no-go)
 

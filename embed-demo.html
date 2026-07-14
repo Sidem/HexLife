@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HexLife Embed — Phase 1 dev page</title>
+    <title>HexLife Embed — Phase 2 dev page</title>
     <style>
         body {
             margin: 0;
@@ -14,77 +14,189 @@
         }
         h1 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
         p.sub { margin: 0 0 20px; color: #888e96; }
-        #stage { width: 480px; height: 480px; }
-        canvas { display: block; width: 100%; height: 100%; background: #1a1a1a; }
-        #stats { margin-top: 12px; font-family: ui-monospace, monospace; color: #9aa4ae; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+        }
+        .cell h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+        .cell p { margin: 0 0 8px; color: #888e96; font-size: 12px; }
+        hexlife-world { border-radius: 6px; }
+        #stats {
+            margin-top: 20px;
+            padding: 12px;
+            background: #1c1f24;
+            border-radius: 6px;
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            color: #9aa4ae;
+            white-space: pre;
+        }
         code { color: #e0b341; }
+        button {
+            font: inherit;
+            font-size: 12px;
+            background: #2a2f36;
+            color: #d7dadc;
+            border: 1px solid #3a4149;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+        button:hover { background: #343a42; }
+        #controls { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
-    <h1>HexLife embed runtime — EmbedSim + EmbedRenderer</h1>
+    <h1>HexLife embed — <code>&lt;hexlife-world&gt;</code> (Phase 2)</h1>
     <p class="sub">
-        Phase 1 dev page (#25). Hardcoded params, no custom element yet.
-        Debug handle: <code>window.__hexlifeEmbed</code>
+        Multi-instance dev page (#25). Debug handle: <code>window.__hexlifeEmbed</code>.
+        World D is injected after 2 s — constructing its 256-row World grows wasm linear memory,
+        which is exactly what detaches every other sim's views if the registry ever regresses.
     </p>
 
-    <div id="stage"><canvas id="canvas"></canvas></div>
+    <div class="grid" id="grid">
+        <div class="cell">
+            <h2>A — determinism reference</h2>
+            <p>seed 12345 · rows 64 · synthwave · 20 tps</p>
+            <hexlife-world id="a"
+                ruleset="D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6"
+                seed="12345" rows="64" density="0.5" speed="20"
+                palette="synthwave"></hexlife-world>
+        </div>
+
+        <div class="cell">
+            <h2>B — starts paused (poster)</h2>
+            <p>volcanic · <code>paused</code> · click to play</p>
+            <hexlife-world id="b"
+                ruleset="9A3C7E1F5B08D46293C1AE70F5B2D849"
+                seed="777" rows="80" speed="12"
+                palette="volcanic" paused></hexlife-world>
+        </div>
+
+        <div class="cell">
+            <h2>C — custom gradient, no link</h2>
+            <p><code>palette-on/off</code> · rows 96 · <code>link="off"</code></p>
+            <hexlife-world id="c"
+                ruleset="1F2E3D4C5B6A79880F1E2D3C4B5A6978"
+                seed="424242" rows="96" density="0.35" speed="30"
+                palette-on="#00ffa3,#f5ff00" palette-off="#04241a,#2b2c05"
+                link="off"></hexlife-world>
+        </div>
+
+        <div class="cell">
+            <h2>E — invalid ruleset (error state)</h2>
+            <p>proves a bad attribute styles, never throws</p>
+            <hexlife-world id="e" ruleset="not-a-ruleset" rows="64"></hexlife-world>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-add">Add world D now</button>
+        <button id="btn-remove">Remove world D (leak check)</button>
+        <button id="btn-verify">Re-verify A's checksum</button>
+    </div>
+
     <div id="stats">booting…</div>
 
     <script type="module">
-        import { EmbedSim, initEmbedWasm } from './src/embed/EmbedSim.js';
-        import { EmbedRenderer } from './src/embed/EmbedRenderer.js';
+        import './src/embed/index.js';
 
-        // Fixed params so the run is reproducible and can be cross-checked against the app.
-        const PARAMS = {
-            rulesetHex: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
-            rows: 64,
-            density: 0.5,
-            seed: 12345,
-            speed: 20,
-        };
-
-        const canvas = document.getElementById('canvas');
+        const grid = document.getElementById('grid');
         const statsEl = document.getElementById('stats');
 
-        await initEmbedWasm();
+        /** The one param set whose tick-100 checksum is pinned (Phase 1: 231200078). */
+        const REFERENCE = { seed: 12345, ticks: 100 };
 
-        const sim = new EmbedSim(PARAMS);
-        const renderer = new EmbedRenderer(canvas, {
-            cols: sim.cols,
-            rows: sim.rows,
-            palette: 'synthwave',
+        const readyLog = [];
+        document.addEventListener('hexlife-ready', (e) => {
+            readyLog.push(`${e.target.id}:${e.detail.cols}x${e.detail.rows}`);
+            render();
         });
-        renderer.resize(canvas.clientWidth, canvas.clientHeight);
 
-        let paused = false;
-        let last = performance.now();
+        const el = (id) => document.getElementById(id);
+        const worlds = () => [...document.querySelectorAll('hexlife-world')];
 
-        function frame(now) {
-            const dt = now - last;
-            last = now;
-            if (!paused) sim.advance(dt);
-            renderer.draw(sim);
-            statsEl.textContent =
-                `tick ${sim.tickCount}  ·  grid ${sim.cols}×${sim.rows} (${sim.numCells} cells)  ·  ` +
-                `active ${(sim.activeCount / sim.numCells * 100).toFixed(1)}%  ·  checksum ${sim.checksum()}`;
-            requestAnimationFrame(frame);
+        /** World D: added late on purpose — a 256-row World is a big allocation. */
+        function addD() {
+            if (el('d')) return el('d');
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = 'cell-d';
+            cell.innerHTML = `
+                <h2>D — added dynamically</h2>
+                <p>rows 256 · oceanic · grows wasm memory</p>
+                <hexlife-world id="d"
+                    ruleset="C0FFEE1234567890ABCDEF0123456789"
+                    seed="31337" rows="256" density="0.5" speed="15"
+                    palette="oceanic"></hexlife-world>`;
+            grid.append(cell);
+            return el('d');
         }
-        requestAnimationFrame(frame);
+        function removeD() {
+            const cell = document.getElementById('cell-d');
+            if (cell) cell.remove();
+            render();
+        }
+        setTimeout(addD, 2000);
 
-        // Mirrors the app's window.__hexlife convention so headless checks can drive this page.
+        el('btn-add').addEventListener('click', addD);
+        el('btn-remove').addEventListener('click', removeD);
+        el('btn-verify').addEventListener('click', () => {
+            const r = window.__hexlifeEmbed.runTicks(REFERENCE.ticks, REFERENCE.seed, 'a');
+            console.log('A re-verified:', r);
+            render();
+        });
+
+        function render() {
+            const lines = worlds().map(w =>
+                `${w.id}  ${w.error ? `ERROR: ${w.error}` : ''}`.padEnd(14) +
+                (w.error ? '' :
+                    `tick ${String(w.tickCount).padStart(5)}  ` +
+                    `grid ${w.sim ? `${w.sim.cols}×${w.sim.rows}` : '—'}  `.padEnd(14) +
+                    `playing ${w.playing ? 'yes' : 'no '}  ` +
+                    `checksum ${w.checksum}`)
+            );
+            statsEl.textContent = lines.join('\n') + `\n\nready events: ${readyLog.join(' ')}`;
+        }
+        setInterval(render, 250);
+
+        // Mirrors the app's window.__hexlife convention. NB the preview browser reports
+        // visibilityState 'hidden', so rAF never fires there and nothing self-animates — drive ticks
+        // through runTicks() instead of waiting on the loop.
         window.__hexlifeEmbed = {
-            sim,
-            renderer,
-            params: PARAMS,
-            pause: () => { paused = true; },
-            play: () => { paused = false; last = performance.now(); },
-            /** Reset and run exactly n ticks — the determinism cross-check entry point. */
-            runTicks(n, seed = PARAMS.seed) {
-                paused = true;
-                sim.reset(seed);
-                for (let i = 0; i < n; i++) sim.tick();
-                return { tickCount: sim.tickCount, checksum: sim.checksum(), activeCount: sim.activeCount };
+            worlds,
+            get: el,
+            addD,
+            removeD,
+            /** Reset to `seed` and run exactly n ticks — the determinism cross-check entry point. */
+            runTicks(n = REFERENCE.ticks, seed = REFERENCE.seed, id = 'a') {
+                const w = el(id);
+                if (!w || !w.sim) return null;
+                w.reset(seed);
+                w.tick(n);
+                return { id, tickCount: w.tickCount, checksum: w.checksum, activeCount: w.sim.activeCount };
             },
+            /** One-shot snapshot of every instance, for headless assertions. */
+            status() {
+                return worlds().map(w => ({
+                    id: w.id,
+                    error: w.error,
+                    booted: !!w.sim,
+                    playing: w.playing,
+                    tickCount: w.tickCount,
+                    checksum: w.checksum,
+                    cols: w.sim ? w.sim.cols : null,
+                    rows: w.sim ? w.sim.rows : null,
+                    canvasSize: w.sim ? [w.shadowRoot.querySelector('canvas').width,
+                        w.shadowRoot.querySelector('canvas').height] : null,
+                    overlayVisible: !w.shadowRoot.querySelector('.overlay').hidden,
+                    attribHref: w.shadowRoot.querySelector('.attrib').hidden
+                        ? null : w.shadowRoot.querySelector('.attrib').href,
+                }));
+            },
+            readyLog,
         };
     </script>
 </body>
