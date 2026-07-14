@@ -2,6 +2,9 @@ import { Panel } from './Panel.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 
+/** Breathing room kept between an auto-fitted panel and the viewport edges. */
+const VIEWPORT_MARGIN = 8;
+
 export class DraggablePanel extends Panel {
     constructor(panelElement, options = {}) {
         const contentContainer = panelElement.querySelector('.panel-content-area');
@@ -164,16 +167,42 @@ export class DraggablePanel extends Panel {
         };
     }
 
-    /** Re-applies the clamp to the panel's current position (after a load, show, or window resize). */
+    /**
+     * Shrinks a panel that is larger than the viewport back down to fit. Without this, an oversized
+     * panel hangs off the bottom/right with its resize grips off-screen — it could never be made
+     * smaller again. CSS min-width/min-height still win, so a panel never collapses below usability.
+     */
+    _clampSizeToViewport() {
+        if (this.options.resizable === false || !this.options.constrainToViewport) return false;
+        const el = this.panelElement;
+        const styles = window.getComputedStyle(el);
+        // The largest the panel may be and still fit, but never below its CSS minimum.
+        const maxWidth = Math.max(parseFloat(styles.minWidth) || 0, window.innerWidth - VIEWPORT_MARGIN);
+        const maxHeight = Math.max(parseFloat(styles.minHeight) || 0, window.innerHeight - VIEWPORT_MARGIN);
+        const tooWide = el.offsetWidth > maxWidth;
+        const tooTall = el.offsetHeight > maxHeight;
+        if (!tooWide && !tooTall) return false;
+
+        el.style.maxWidth = 'none';
+        el.style.maxHeight = 'none';
+        if (tooWide) el.style.width = `${Math.round(maxWidth)}px`;
+        if (tooTall) el.style.height = `${Math.round(maxHeight)}px`;
+        return true;
+    }
+
+    /** Re-fits the panel into the viewport (after a load, show, or window resize): size first, then position. */
     _clampIntoViewport() {
         if (this.isHidden() || this.panelElement.classList.contains('is-mobile-panel')) return;
+        const resized = this._clampSizeToViewport();
         const rect = this.panelElement.getBoundingClientRect();
         const { left, top } = this._clampPosition(rect.left, rect.top);
-        if (left === rect.left && top === rect.top) return;
-        this.panelElement.style.left = `${Math.round(left)}px`;
-        this.panelElement.style.top = `${Math.round(top)}px`;
-        this.panelElement.style.transform = 'none';
-        this._saveState();
+        const moved = left !== rect.left || top !== rect.top;
+        if (moved) {
+            this.panelElement.style.left = `${Math.round(left)}px`;
+            this.panelElement.style.top = `${Math.round(top)}px`;
+            this.panelElement.style.transform = 'none';
+        }
+        if (moved || resized) this._saveState();
     }
 
     _setDraggable(isDraggable) {
