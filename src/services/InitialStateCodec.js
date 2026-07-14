@@ -30,6 +30,9 @@ export const KNOWN_MODES = {
             'eccentricity', 'orientation', 'orientationVariation', 'distribution', 'gaussianStdDev',
         ],
     },
+    // Saved Starts: a captured grid replayed verbatim. The payload rides in `stateB64` (bit-packed,
+    // so an IC code for one is large but perfectly functional — the codec is payload-agnostic JSON).
+    saved: { params: ['id', 'name', 'rows', 'cols', 'stateB64', 'density'] },
 };
 
 const PREFIX = 'IC1.';

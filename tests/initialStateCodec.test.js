@@ -26,6 +26,17 @@ describe('InitialStateCodec', () => {
         expect(out.unknownMode).toBe(false);
     });
 
+    it('round-trips a saved start (a known mode, payload and all)', () => {
+        const saved = {
+            mode: 'saved',
+            params: { id: 'abc', name: 'ember-drift @ 1204', rows: 8, cols: 8, stateB64: 'q80B/w==', density: 0.31 },
+        };
+        const out = decode(encode(saved, 3));
+        expect(out.initialState).toEqual(saved);
+        expect(out.unknownMode).toBe(false);
+        expect(KNOWN_MODES.saved.params).toContain('stateB64');
+    });
+
     it('carries the IC1 version tag', () => {
         expect(encode(DENSITY, 1).startsWith('IC1.')).toBe(true);
     });

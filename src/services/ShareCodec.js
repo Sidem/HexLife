@@ -40,8 +40,11 @@ export class ShareCodec {
             return `${origin}${pathname}?${params.toString()}`;
         }
 
-        // Handle initial states - check if all are simple density mode for backward compatibility
-        const initialStates = worldSettings.map(ws => ws.initialState);
+        // Handle initial states - check if all are simple density mode for backward compatibility.
+        // Saved starts embed a whole bit-packed grid (kilobytes of base64), so they are downgraded to
+        // their capture-time density here: a share link carries the *statistical* start, not the exact
+        // cells. Sharing the exact grid is what the Saved Starts export file is for.
+        const initialStates = worldSettings.map(ws => ShareCodec._downgradeForUrl(ws.initialState));
         const allDensityMode = initialStates.every(state => state && state.mode === 'density');
 
         if (allDensityMode) {
@@ -92,6 +95,17 @@ export class ShareCodec {
         }
 
         return `${origin}${pathname}?${params.toString()}`;
+    }
+
+    /**
+     * URL-safe form of one world's initial state: a `saved` start becomes plain density (see encode).
+     * Every other mode passes through untouched.
+     * @param {{mode: string, params: object}|null|undefined} initialState
+     * @returns {{mode: string, params: object}|null|undefined}
+     */
+    static _downgradeForUrl(initialState) {
+        if (!initialState || initialState.mode !== 'saved') return initialState;
+        return { mode: 'density', params: { density: initialState.params?.density ?? 0.5 } };
     }
 
     /**

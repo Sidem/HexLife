@@ -54,6 +54,48 @@ describe('ShareCodec encode -> parse round-trip', () => {
         expect(out.camera).toEqual({ x: 100.5, y: 200.5, zoom: 1.75 });
     });
 
+    it('downgrades a saved start to its capture density (no giant URL)', () => {
+        const worldSettings = densityWorlds(Array(Config.NUM_WORLDS).fill(0.5));
+        // A big embedded payload — exactly what must NOT end up in the link.
+        const stateB64 = 'A'.repeat(4000);
+        worldSettings[3].initialState = {
+            mode: 'saved',
+            params: { id: 'x', name: 'ember-drift @ 12', rows: 8, cols: 8, stateB64, density: 0.375 },
+        };
+
+        const url = ShareCodec.encode({
+            worldSettings,
+            selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
+            camera: { x: center, y: center, zoom: 1.0 },
+            gridRows: Config.GRID_ROWS,
+            origin,
+            pathname,
+        });
+
+        expect(url).not.toContain(stateB64.slice(0, 64));
+        // Every world is density again, so the compact `d` form is used.
+        const params = new URL(url).searchParams;
+        expect(params.has('is')).toBe(false);
+        const out = parseUrl(url);
+        expect(out.densities[3]).toBeCloseTo(0.375, 3);
+        expect(out.densities[0]).toBeCloseTo(0.5, 3);
+    });
+
+    it('leaves the live world settings untouched when downgrading for a link', () => {
+        const worldSettings = densityWorlds(Array(Config.NUM_WORLDS).fill(0.5));
+        const saved = { mode: 'saved', params: { id: 'x', rows: 8, cols: 8, stateB64: 'AAAA', density: 0.2 } };
+        worldSettings[0].initialState = saved;
+        ShareCodec.encode({
+            worldSettings,
+            selectedWorldIndex: Config.DEFAULT_SELECTED_WORLD_INDEX,
+            camera: { x: center, y: center, zoom: 1.0 },
+            gridRows: Config.GRID_ROWS,
+            origin,
+            pathname,
+        });
+        expect(worldSettings[0].initialState).toEqual(saved);
+    });
+
     it('uses r_all for per-world rulesets', () => {
         const worldSettings = densityWorlds(Array(Config.NUM_WORLDS).fill(0.5));
         worldSettings[0].rulesetHex = 'F'.repeat(32);
