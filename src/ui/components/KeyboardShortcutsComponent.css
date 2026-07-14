@@ -7,6 +7,15 @@
 
 /* ===== Keyboard overlay (desktop / tablet) ===== */
 
+/* The keyboard is a fixed-width block, so the panel must shrink-wrap it instead of
+   inheriting the generic 35vw floor (which leaves dead space on wide screens). */
+@media screen and (min-width: 769px) {
+    #shortcutsPanel {
+        min-width: 0;
+        width: max-content;
+    }
+}
+
 .kb-board-view {
     display: flex;
     flex-direction: column;
