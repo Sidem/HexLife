@@ -1,123 +1,41 @@
-# HexLife Explorer — Play Layer Plan (2026-07-13)
+# HexLife Explorer — Play Layer Plan (2026-07-13, updated 2026-07-14)
 
 Gamification that **produces data**: every mechanic here doubles as a feedback channel (tags →
 searchable catalog, votes → scoring refit, codex → coverage map, daily → deterministic shared
-benchmarks). Guiding constraint: the play layer is an *opt-in presentation layer over the
-instrument* — no lab tool is ever gated behind progression, no XP bars, no cosmetic unlocks.
+benchmarks, predictions → calibration labels). Guiding constraint: the play layer is an *opt-in
+presentation layer over the instrument* — no lab tool is ever gated behind progression, no XP
+bars, no cosmetic unlocks, no fake scarcity or streak-loss guilt. Everything banks locally
+(localStorage via PersistenceService); nothing leaves the device unless the user copies a share
+link or exports a pack.
 
-Four items, in build order: **T (tagging) → S (swipe-to-judge) → C (codex) → D (daily hex)**.
-T is shared infrastructure; S fuses roadmap #7; C consumes T's vocabulary; D is standalone last.
-
----
-
-## T — Smoother cataloguing: canonical tags + suggestions *(C2 · I3)* — ✅ SHIPPED 2026-07-13
-
-Implemented as specced (T1–T4): `src/core/tags.js` (18-tag vocabulary), `src/core/analysis/
-tagSuggestions.js` (stats + embedding suggestions + merge), `EmbeddingService.embedTags`, and the
-`SaveRulesetModal` chip picker (canonical toggles + Suggested row + custom add), with the gallery
-save path passing `metrics`/`cyclic` through. Details in PATCHNOTES. The spec below is retained for
-reference.
-
-**Today:** schema-v2 library entries already carry `tags: string[]`
-(`LibraryController.normalizeRulesetEntry`), the library renders tag filter chips
-(`RulesetLibraryComponent` builds the union), and `SaveRulesetModal` takes a free-text
-comma-separated input. Free text means `glider`/`gliders`/`ship` fragmentation and most saves
-get no tags at all.
-
-### T1 — Canonical tag vocabulary
-
-- New pure module `src/core/tags.js`: ~16–20 curated tags, each
-  `{ id, label, description, promptText }`. Starting set (append-only, like the mnemonic word
-  arrays): `gliders`, `ships`, `spirals`, `oscillators`, `still-life`, `growth`, `decay`,
-  `chaos`, `waves`, `maze`, `mosaic`, `blobs`, `dots`, `symmetric`, `flicker`, `puffers`,
-  `replicators`, `edge-of-chaos`. `promptText` is a CLIP-friendly phrase ("a pattern of small
-  moving spaceship shapes"), used by T3.
-- Community-pack relevance: canonical ids make imported packs merge into the same filter chips
-  instead of forking the vocabulary. Free-form tags remain allowed (the field stays `string[]`).
-
-### T2 — Chip picker in the save flow
-
-- `SaveRulesetModal`: replace the bare text input with (a) toggle chips for canonical tags,
-  (b) a **Suggested** row (T3/T4, pre-highlighted, one tap to accept), (c) a small free-text
-  "add custom tag" affordance. Also add the same editor to the library card edit flow so old
-  entries can be back-tagged.
-- Explore-gallery save path (`RulesetDisplayFactory` card actions) passes suggestions through so
-  a gallery find arrives at the modal pre-tagged.
-
-### T3 — Embedding-based suggestions (when CLIP is enabled)
-
-- `EmbeddingService.embedText(promptText)` each canonical tag **once**, lazily, and cache in the
-  service (same never-throw contract; disabled/ERROR ⇒ skip silently to T4).
-- For a candidate: cosine similarity of the world's frame embedding (`embed(frame)` — already
-  computed for explore finds; for manual saves, embed the thumbnail-bake frame) against the tag
-  bank; top 3–4 above a floor become Suggested chips.
-- Pure ranking helper `suggestTagsFromEmbedding(embedding, tagBank)` under `src/core/analysis/`,
-  unit-tested with fixture vectors.
-
-### T4 — Stats-heuristic suggestions (always available, no CLIP)
-
-- Pure helper `suggestTagsFromStats(metrics)` mapping already-computed metrics to tags:
-  `isInCycle` → `oscillators`; high transport → `gliders`/`ships`; ratio→1 drift → `growth`;
-  high blockEntropy plateau → `chaos`; very low entropy + stable ratio → `still-life`/`mosaic`.
-  Thresholds as named constants; unit-tested against the interestingness fixture metrics.
-- Merge rule: embedding suggestions win when present; heuristics fill remaining slots; never
-  auto-apply — suggestions are one tap, not zero.
-
-**Acceptance:** saving a gallery find offers ≥1 sensible suggestion with CLIP off (fixture
-test), tag filter chips dedupe across public/personal/imported entries, no schema migration
-(field already exists).
+Status: **T (tags) and S (swipe-to-judge) SHIPPED 2026-07-13** — details in PATCHNOTES; shipped
+specs deleted from this doc (git history has them). Open: **C (codex) → D (daily hex)**, then
+the retention follow-ups **P1–P6** (roadmap #19–#24).
 
 ---
 
-## S — Swipe-to-judge *(C3 · I4 — fuses roadmap #7 HITL validation)*
+## T — Canonical tags + suggestions *(shipped 2026-07-13)*
 
-The Tinder-loop presentation of the already-planned human-in-the-loop interestingness rater.
-The game mechanic *is* the data collection: pairwise "which is more interesting?" votes bank
-locally and later drive an **opt-in** weight refit. This item replaces roadmap #7's standalone
-entry — the plan below is a superset.
+What later items rely on: `src/core/tags.js` (18-tag append-only canonical vocabulary,
+`promptText` per tag), `src/core/analysis/tagSuggestions.js`
+(`suggestTagsFromStats`/`suggestTagsFromEmbedding`/`mergeSuggestions`, pure),
+`EmbeddingService.embedTags` (lazy, cached, never-throw), `SaveRulesetModal` chip picker with
+Suggested row. **C's cell detail reuses this picker + suggestions.**
 
-### S1 — Vote bank (core, UI-independent)
+## S — Swipe-to-judge *(shipped 2026-07-13; one piece still open)*
 
-- `src/core/analysis/VoteBank.js`: append-only vote records
-  `{ ts, aHex, bHex, winner: 'a'|'b'|'skip', aMetrics, bMetrics, aScore, bScore, source }`
-  (metrics snapshot = per-component score breakdown both sides — the refit features).
-  Persistence key `INTERESTINGNESS_VOTES` (name already reserved in roadmap #7); cap the bank
-  (e.g. 2,000 votes, FIFO) so localStorage stays bounded.
-- Pair selection helper `nextPair(candidates, votedPairs)`: prefer pairs with **similar current
-  scores but different archive cells** (maximum information per vote), avoid repeats.
-  Candidates: session gallery finds + personal-library entries that have thumbnails.
-- Unit tests: bank round-trip, cap behavior, pair-selection preferences on fixtures.
+What later items rely on: `src/core/analysis/VoteBank.js` (append-only pairwise votes, key
+`INTERESTINGNESS_VOTES`, FIFO cap 2000, `extractFeatures`/`pairKey`/`nextPair`, `VOTE_RECORDED`
+event), `WeightRefit.js` (Bradley–Terry fit → opt-in Custom `exploreScoring` preset; stock
+presets never touched silently), desktop rater `ExploreRaterView.js` (⚖ in the gallery header).
 
-### S2 — Judging surfaces
-
-- **Mobile (primary):** a card-deck view in the Discover tab — two thumbnails stacked as a
-  versus card; tap the better one (or swipe toward it), swipe up to skip. Big targets, one
-  decision per screen, ~15-second sessions. Thumbnails come from the existing bake pipeline;
-  cards without thumbs are skipped.
-- **Desktop:** a "Rate finds" mode in the Explore panel gallery — same VoteBank, presented as a
-  side-by-side A/B with keyboard arrows (←/→ pick, ↓ skip).
-- Both fire `VOTE_RECORDED`; a small counter chip ("N votes banked") gives the collection loop
-  visible progress without inventing points.
-
-### S3 — Opt-in weight refit
-
-- Pure helper `src/core/analysis/WeightRefit.js`: Bradley–Terry / logistic fit over vote pairs
-  using the per-component score breakdowns as features; outputs a fitted weight vector +
-  goodness summary. Unit-tested on synthetic votes with known ground-truth weights.
-- Surface: Explore scoring section gains "Refit from my votes (N)" — shows before/after weights
-  side by side and emits an **`exploreScoring` custom preset** (per roadmap #7: `SCORE_CONFIG`
-  is never touched silently; applying the refit preset is an explicit user action, reversible by
-  reselecting a stock preset).
-- Guardrails: refuse refit below a minimum vote count (e.g. 50); label the preset "Personal
-  (fit from N votes, YYYY-MM-DD)".
-
-**Acceptance:** votes persist across reloads; refit on synthetic fixture recovers planted
-weights within tolerance; stock presets byte-identical before/after (scoring invariants from the
-explore arc hold); the deck never shows the same unordered pair twice in a session.
+**Still open (folds into P1):** the mobile card-deck home in the Discover tab — the #16 shell
+exists but the versus-deck surface was never built. Build it as the shared deck that hosts both
+judging (S) and prediction (P1) cards.
 
 ---
 
-## C — The Codex: discovery as collection *(C3 · I3)*
+## C — The Codex: discovery as collection *(C3 · I3 — roadmap #15, NEXT after #18)*
 
 A personal field journal over behavior space. `BehaviorArchive` already quantizes every
 confirmed explore find into a descriptor cell (`ratio|entropy|σ` bins — 10×10×σ grid,
@@ -160,7 +78,7 @@ on that grid: which niches has this user ever discovered?
 
 ---
 
-## D — Daily Hex: the deterministic daily *(C3 · I4)*
+## D — Daily Hex: the deterministic daily *(C3 · I4 — roadmap #17)*
 
 A Wordle-shaped daily challenge with **zero backend**: the date is the seed, determinism is the
 referee, a share link is the replay proof. Strongest retention mechanic for mobile; also a
@@ -217,17 +135,76 @@ requests anywhere in the feature.
 
 ---
 
-## Data & privacy note
+## P — Retention follow-ups (roadmap #19–#24, added 2026-07-14)
 
-Everything banks locally (localStorage via PersistenceService). Nothing leaves the device unless
-the user explicitly copies a share link or exports a pack — consistent with the existing
-community-pack posture (export is user-initiated JSON).
+Smaller riders on shipped infrastructure. Each states its data channel (the play-layer test:
+if it produces no data and gates no wonder, it doesn't belong). Sequence after D, informed by
+the #18 UX-audit verdict; write a short per-item plan section (expand the sketch below) before
+building.
+
+### P1 — Prediction mode: "call it before it runs" *(C2 · I4 — #19)*
+
+Show a rule + IC as a static first frame; the player predicts **extinct / stable / cycling /
+explosive** before the simulation runs, then watches the reveal. CA outcomes are famously
+counterintuitive — the reveal is the hook. Builds the *mobile card deck* S still owes (one deck
+component, two card types: judge-versus and predict-reveal). Ground truth is
+`computeWorldStatus` on the deterministic run; candidates drawn from gallery/library/seeded
+generation. **Data channel:** predicted-vs-actual labels (persistence key
+`PREDICTION_RESULTS`) = human-intuition calibration data; a personal accuracy curve is an
+honest, non-fake progression stat. Acceptance sketch: deck plays headlessly with seeded
+candidates; reveal always matches a fresh deterministic re-run; accuracy stat survives reload.
+
+### P2 — Challenge-a-friend links *(C2 · I4 — #20, rider on D)*
+
+Mint a challenge from **any** world state: current rule + IC + seed + an objective picked from
+the D1 template table + a budget, encoded as a ShareCodec extension (same posture as explore
+share links: old links must keep replaying byte-identically — new fields optional). Opening the
+link enters daily-style challenge mode with "beat N edits (par)". Zero backend — determinism is
+the referee. Turns every Daily share card into a two-way loop instead of a one-way brag.
+**Data channel:** none beyond D's — this is the viral/social multiplier. Mostly free once D2's
+runner exists.
+
+### P3 — Weekly Expedition: a quest over auto-explore *(C2 · I3 — #21)*
+
+Date-seeded like the daily but weekly: "this week's target niche" = a deterministic draw of an
+(empty-for-most-users) Codex cell, or a CLIP `promptText` via the shipped target mode. The
+player hunts it however they like — auto-explore, breeding, hand-editing — and the Codex
+records the catch. Gives auto-explore (a tool you *watch*) a goal you *pursue*, and cross-links
+the systems: daily brings you in, expedition keeps you exploring, Codex banks the result.
+**Data channel:** coverage of rare behavior-space cells. Needs C shipped; reuses D1's
+date-seeding helper.
+
+### P4 — Ruleset lineage / pedigree *(C2 · I3 — #22)*
+
+Record parentage on breed/mutate/clone (`{ parents: [hexA, hexB?], op, ts }` in library-entry
+metadata — schema stays additive) and render a small family tree in the library card detail.
+Naming + ancestry creates ownership ("my glider line, five generations deep") — the stickiest
+honest retention force available. **Data channel:** real provenance, also valuable in community
+packs (`LibraryPackCodec` passes it through sanitized). NB: the #3 `RulesetOrchestrator`
+extraction is the natural place to hang parentage capture — do #3 first or together.
+
+### P5 — Field Notes: milestone journal *(C1 · I2 — #23)*
+
+A quiet log of genuine firsts — "first confirmed cycle with period > 30", "first *rare*-tier
+niche", "solved 5 dailies under par" — rendered as dated journal entries with thumbnails, not
+badges/achievements (the no-XP rule holds: entries record what happened, never gate or reward).
+Reuses Codex rarity tiers + the toast system; persistence key `FIELD_NOTES`. **Data channel:**
+none (pure investment surface) — keep it C1-small accordingly.
+
+### P6 — PWA install + unplayed-daily badge *(C2 · I3 — #24, enabler)*
+
+The daily's retention ceiling is capped by whether anything ever *reminds* the user. Manifest +
+service worker (the app is fully client-side; offline is nearly free — mind the `/HexLife/`
+base path and the wasm asset in the precache), home-screen icon, and D4's "unplayed" badge dot.
+**No push notifications** — the icon on the home screen is the trigger. Verify the service
+worker never caches stale wasm across deploys (version the precache with the build hash).
+
+---
 
 ## Cross-feature dependencies
 
-- T before C (codex cell detail reuses the tag picker/suggestions) and before S only weakly
-  (deck cards show tag chips — cosmetic).
-- S is independent of mobile restructure M1 but its mobile deck *homes* in the Discover tab —
-  ship the desktop rater first if S lands before M1.
-- C and D both want M1's homes (Library / Discover) to exist; D also benefits from C+S being
-  live (a daily player flows into judging and cataloguing).
+- C before P3 (expedition targets Codex cells) and before P5 (rarity tiers).
+- D before P2 (challenge links reuse D1 templates + D2 runner) and before P6's badge.
+- P1 builds the shared mobile deck that also becomes S's judging home — one component.
+- P4 wants the #3 `RulesetOrchestrator` seam — pair them.
+- #18's audit verdict may re-home any of these surfaces — read it before building P-items.
