@@ -179,6 +179,10 @@ function _calculateAndCacheLayout() {
     const padding = Math.min(canvasWidth, canvasHeight) * 0.02;
     let selectedViewX, selectedViewY, selectedViewWidth, selectedViewHeight;
     let miniMapAreaX, miniMapAreaY, miniMapAreaWidth, miniMapAreaHeight;
+    // True only in the near-square regime, where the minimap docks as an overlay ON TOP of the
+    // selected view (the disjoint landscape/portrait regimes give the minimap its own area).
+    // Consumed by the mobile FAB stacks, which raise above the minimap only when it overlaps.
+    let isMinimapOverlay = false;
     const aspectRatio = canvasWidth / canvasHeight;
     if (aspectRatio >= Config.LAYOUT_LANDSCAPE_MIN_ASPECT) {
         // Wide: minimap column on the right, selected view absorbs the rest.
@@ -212,6 +216,7 @@ function _calculateAndCacheLayout() {
         selectedViewY = padding;
         selectedViewWidth = canvasWidth - padding * 2;
         selectedViewHeight = canvasHeight - padding * 2;
+        isMinimapOverlay = true;
         const overlaySide = Math.min(canvasWidth, canvasHeight) * Config.MINIMAP_OVERLAY_SIZE_FACTOR;
         miniMapAreaWidth = overlaySide;
         miniMapAreaHeight = overlaySide;
@@ -239,7 +244,8 @@ function _calculateAndCacheLayout() {
 
     layoutCache = {
         selectedView: { x: selectedViewX, y: selectedViewY, width: selectedViewWidth, height: selectedViewHeight },
-        miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing }
+        miniMap: { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing },
+        isMinimapOverlay
     };
 
     // Precompute clip-space quad vertices for everything renderMainScene draws.

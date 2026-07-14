@@ -33,6 +33,8 @@ import { CaptureStudioModal } from './components/CaptureStudioModal.js';
 import { ToastManager } from './ToastManager.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { ICONS } from './icons.js';
+import * as PersistenceService from '../services/PersistenceService.js';
+import { QUICK_ACTION_MAP, DEFAULT_FAB_SETTINGS, getEnabledQuickActionIds } from './mobileQuickActions.js';
 
 
 
@@ -266,22 +268,62 @@ export class UIManager {
                 if (toggleIcon) toggleIcon.innerHTML = mode === 'pan' ? ICONS.hand : ICONS.pencil;
             });
 
-            // Keep the FAB stack clear of the minimaps. The FABs are anchored to the canvas
-            // bottom-right, which otherwise overlaps the bottom minimap strip (tall/narrow layout)
-            // or the bottom-right minimap overlay (near-square layout). Raise the stack so its
-            // bottom sits just above the minimap grid, reusing the same layout rect the on-canvas
+            this._initMobileQuickActionFabs();
+
+            // Keep the FAB stacks clear of the minimap — but ONLY when the minimap actually
+            // overlaps the selected view (near-square regime, where it docks as a bottom-right
+            // overlay). In the landscape/portrait regimes the minimap has its own separate area,
+            // so the bottom-right/left corners are empty and the stacks should sit at their
+            // natural bottom position (in the empty band beside the centered minimap grid) rather
+            // than floating up into the world. Raise reuses the same layout rect the on-canvas
             // guides consume (canvas backing store == CSS px, so these are CSS pixels).
             const canvasEl = document.getElementById('hexGridCanvas');
             const mainArea = document.getElementById('main-content-area');
-            const positionFabsAboveMinimap = (layout) => {
-                if (!this.isMobile() || !layout?.miniMap || !canvasEl || !mainArea) return;
-                const gridTop = canvasEl.offsetTop + layout.miniMap.gridContainerY;
-                const bottomOffset = Math.max(10, mainArea.clientHeight - gridTop + 12);
-                fabRightContainer.style.bottom = `${bottomOffset}px`;
+            const fabLeftContainer = document.getElementById('mobile-fab-container-left');
+            const positionFabsForMinimap = (layout) => {
+                if (!this.isMobile() || !canvasEl || !mainArea) return;
+                let bottom = '';
+                if (layout?.isMinimapOverlay && layout?.miniMap) {
+                    const gridTop = canvasEl.offsetTop + layout.miniMap.gridContainerY;
+                    bottom = `${Math.max(10, mainArea.clientHeight - gridTop + 12)}px`;
+                }
+                // Empty string clears the inline override → falls back to the CSS bottom anchor.
+                fabRightContainer.style.bottom = bottom;
+                if (fabLeftContainer) fabLeftContainer.style.bottom = bottom;
             };
-            EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, positionFabsAboveMinimap);
+            EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, positionFabsForMinimap);
         }
 
+    }
+
+    /**
+     * Render the enabled quick-action FABs into the left on-canvas stack so quick evolving
+     * (Generate / Clone & Mutate / …) is one tap away without opening the Tools sheet. The
+     * enabled set + order is the same persisted `fabSettings` the ToolsBottomSheet "Customize"
+     * pane edits, so both surfaces stay in sync via COMMAND_UPDATE_FAB_UI.
+     */
+    _initMobileQuickActionFabs() {
+        const container = document.getElementById('mobile-fab-container-left');
+        if (!container) return;
+        const render = () => {
+            const fabSettings = PersistenceService.loadUISetting('fabSettings', DEFAULT_FAB_SETTINGS);
+            const ids = getEnabledQuickActionIds(fabSettings);
+            container.innerHTML = '';
+            ids.forEach(id => {
+                const action = QUICK_ACTION_MAP[id];
+                if (!action) return;
+                const button = document.createElement('button');
+                button.className = 'mobile-fab secondary-fab quick-action-fab';
+                button.type = 'button';
+                button.title = action.label;
+                button.setAttribute('aria-label', action.label);
+                button.innerHTML = `<span class="icon">${action.icon}</span>`;
+                button.addEventListener('click', () => EventBus.dispatch(action.command, action.payload));
+                container.appendChild(button);
+            });
+        };
+        render();
+        EventBus.subscribe(EVENTS.COMMAND_UPDATE_FAB_UI, render);
     }
 
     /**

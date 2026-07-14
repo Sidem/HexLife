@@ -298,4 +298,12 @@ screen and (pointer: coarse) and (hover: none) {
         background-color: #4a4a4a;
         border: 1px solid #666;
     }
+
+    /* Left-stack quick-action FABs (Generate / Clone & Mutate / …) — slightly smaller than the
+       control FABs so a stack of up to 3 stays compact in the empty band beside the minimap. */
+    .quick-action-fab {
+        width: 52px;
+        height: 52px;
+        font-size: 1.5em;
+    }
 }
