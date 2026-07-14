@@ -31,6 +31,7 @@ export class DraggablePanel extends Panel {
         }
         
         this._initDragging();
+        this._initResizing();
         if (this.options.persistence) {
             this._loadState();
         }
@@ -51,10 +52,96 @@ export class DraggablePanel extends Panel {
     }
 
     _initDragging() {
-        this.handleElement.style.cursor = 'move';
+        this.handleElement.classList.add('panel-drag-handle');
+        this.handleElement.title = 'Drag to move — double-click to reset size';
         this.boundOnMouseDown = this._onMouseDown.bind(this);
         this.boundOnTouchStart = this._onTouchStart.bind(this);
-        
+        this.handleElement.addEventListener('dblclick', (event) => {
+            if (event.target.closest('button, a')) return;
+            this._resetSize();
+        });
+    }
+
+    /**
+     * Adds the right / bottom / corner grips. Resizing writes an explicit px width+height on the
+     * panel (and drops the CSS max-* caps) so a panel can be shrunk for space or grown for content;
+     * min-width/min-height come from CSS, so each panel can raise the floor its content needs.
+     */
+    _initResizing() {
+        if (this.options.resizable === false) return;
+        this.boundResizeMove = this._onResizeMove.bind(this);
+        this.boundResizeEnd = this._onResizeEnd.bind(this);
+        this.resizeHandles = ['e', 's', 'se'].map(dir => {
+            const handle = document.createElement('div');
+            handle.className = `panel-resize-handle panel-resize-${dir}`;
+            handle.addEventListener('pointerdown', (event) => this._onResizeStart(event, dir));
+            this.panelElement.appendChild(handle);
+            return handle;
+        });
+    }
+
+    _onResizeStart(event, dir) {
+        if (event.button !== 0 || this.panelElement.classList.contains('is-mobile-panel')) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const rect = this.panelElement.getBoundingClientRect();
+        const styles = window.getComputedStyle(this.panelElement);
+        // Pin the panel where it is: growing a fixed element that was centred by a transform would
+        // otherwise make it drift.
+        this.panelElement.style.left = `${rect.left}px`;
+        this.panelElement.style.top = `${rect.top}px`;
+        this.panelElement.style.transform = 'none';
+        this.panelElement.style.maxWidth = 'none';
+        this.panelElement.style.maxHeight = 'none';
+        this.panelElement.classList.add('is-resizing');
+
+        this.resizeState = {
+            dir,
+            startX: event.clientX,
+            startY: event.clientY,
+            startWidth: rect.width,
+            startHeight: rect.height,
+            minWidth: parseFloat(styles.minWidth) || 240,
+            minHeight: parseFloat(styles.minHeight) || 120,
+            maxWidth: window.innerWidth - rect.left - 4,
+            maxHeight: window.innerHeight - rect.top - 4,
+        };
+        event.target.setPointerCapture?.(event.pointerId);
+        document.addEventListener('pointermove', this.boundResizeMove);
+        document.addEventListener('pointerup', this.boundResizeEnd);
+    }
+
+    _onResizeMove(event) {
+        const s = this.resizeState;
+        if (!s) return;
+        const clamp = (v, min, max) => Math.max(min, Math.min(v, Math.max(min, max)));
+        if (s.dir !== 's') {
+            const width = clamp(s.startWidth + (event.clientX - s.startX), s.minWidth, s.maxWidth);
+            this.panelElement.style.width = `${Math.round(width)}px`;
+        }
+        if (s.dir !== 'e') {
+            const height = clamp(s.startHeight + (event.clientY - s.startY), s.minHeight, s.maxHeight);
+            this.panelElement.style.height = `${Math.round(height)}px`;
+        }
+    }
+
+    _onResizeEnd() {
+        if (!this.resizeState) return;
+        this.resizeState = null;
+        this.panelElement.classList.remove('is-resizing');
+        document.removeEventListener('pointermove', this.boundResizeMove);
+        document.removeEventListener('pointerup', this.boundResizeEnd);
+        this._saveState();
+    }
+
+    /** Double-clicking the title bar drops any manual size and lets the panel fit its content again. */
+    _resetSize() {
+        this.panelElement.style.width = '';
+        this.panelElement.style.height = '';
+        this.panelElement.style.maxWidth = '';
+        this.panelElement.style.maxHeight = '';
+        this._saveState();
     }
 
     _setDraggable(isDraggable) {
@@ -78,8 +165,15 @@ export class DraggablePanel extends Panel {
             this.panelElement.classList.add('hidden');
         }
     
+        if (s.w && s.h) {
+            this.panelElement.style.width = s.w;
+            this.panelElement.style.height = s.h;
+            this.panelElement.style.maxWidth = 'none';
+            this.panelElement.style.maxHeight = 'none';
+        }
+
         const hasSavedPosition = s.x && s.x.endsWith('px') && s.y && s.y.endsWith('px');
-    
+
         if (hasSavedPosition) {
             this.panelElement.style.left = s.x;
             this.panelElement.style.top = s.y;
@@ -98,6 +192,8 @@ export class DraggablePanel extends Panel {
             isOpen: !this.isHidden(),
             x: this.panelElement.style.left,
             y: this.panelElement.style.top,
+            w: this.panelElement.style.width,
+            h: this.panelElement.style.height,
         });
     }
 
@@ -235,5 +331,7 @@ export class DraggablePanel extends Panel {
         document.removeEventListener('mouseup', this.boundDragMouseUp);
         document.removeEventListener('touchmove', this.boundDragTouchMove);
         document.removeEventListener('touchend', this.boundDragTouchEnd);
+        document.removeEventListener('pointermove', this.boundResizeMove);
+        document.removeEventListener('pointerup', this.boundResizeEnd);
     }
 }

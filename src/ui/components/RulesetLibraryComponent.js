@@ -41,11 +41,15 @@ export class RulesetLibraryComponent extends BaseComponent {
     }
 
     render() {
+        // The scope switch rides in the pane-tab row rather than owning a labelled line of its own:
+        // it sits next to the Load / Set buttons it governs and costs no vertical space.
         this.element.innerHTML = `
-            <div class="form-group ruleset-library-scope" id="ruleset-library-scope-mount"></div>
             <div class="ruleset-actions-header">
-                <button class="ruleset-actions-segment active" data-pane="library">Library</button>
-                <button class="ruleset-actions-segment" data-pane="direct">Direct</button>
+                <div class="ruleset-actions-segments">
+                    <button class="ruleset-actions-segment active" data-pane="library">Library</button>
+                    <button class="ruleset-actions-segment" data-pane="direct">Direct</button>
+                </div>
+                <div class="ruleset-library-scope" id="ruleset-library-scope-mount" title="Which worlds a loaded ruleset is applied to"></div>
             </div>
             <div class="ruleset-actions-content">
                 <div id="ruleset-library-library-pane" class="ruleset-pane"></div>
@@ -68,6 +72,12 @@ export class RulesetLibraryComponent extends BaseComponent {
 
         new SwitchComponent(this.element.querySelector('#ruleset-library-scope-mount'), {
             ...this.appContext.rulesetActionController.getGenScopeSwitchConfig(),
+            // No label row here — the item text carries the meaning on its own.
+            label: '',
+            items: [
+                { value: 'selected', text: 'This world' },
+                { value: 'all', text: 'All worlds' }
+            ],
             name: 'ruleset-library-scope',
             initialValue: this.appContext.rulesetActionController.getGenScope(),
         });

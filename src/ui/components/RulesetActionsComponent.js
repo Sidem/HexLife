@@ -77,7 +77,7 @@ export class RulesetActionsComponent extends BaseComponent {
                 <span class="ruleset-field-label">Density bias</span>
                 <div id="ruleset-actions-bias-slider-mount"></div>
             </div>
-            <div class="ruleset-field">
+            <div class="ruleset-field ruleset-field-inline">
                 <span class="ruleset-field-label">Apply to</span>
                 <div id="ruleset-actions-gen-scope-mount"></div>
             </div>
@@ -147,7 +147,7 @@ export class RulesetActionsComponent extends BaseComponent {
                 <span class="ruleset-field-label">Mutation method</span>
                 <div id="ruleset-actions-mutate-mode-mount"></div>
             </div>
-            <div class="ruleset-field">
+            <div class="ruleset-field ruleset-field-inline">
                 <span class="ruleset-field-label">Apply to</span>
                 <div id="ruleset-actions-mutate-scope-mount"></div>
             </div>

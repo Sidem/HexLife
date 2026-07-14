@@ -184,6 +184,12 @@ screen and (pointer: coarse) and (hover: none) {
         /* No dragging on mobile */
     }
 
+    .draggable-panel-base h3::before,
+    .draggable-panel-base .panel-resize-handle {
+        display: none;
+        /* No drag grip and no resizing on full-screen mobile panels */
+    }
+
     #worldSetupGrid {
         grid-template-columns: 1fr;
         /* Stack world configs vertically */

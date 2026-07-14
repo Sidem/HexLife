@@ -411,11 +411,16 @@ select:focus {
     }
 
     .draggable-panel-base h3 {
-        border-bottom: 1px solid var(--border-subtle);
+        background-color: var(--surface-1);
+        border-bottom: 1px solid var(--border);
         color: var(--text-primary);
         font-size: 0.85em;
         text-transform: uppercase;
         letter-spacing: 0.1em;
+    }
+
+    .draggable-panel-base h3:hover {
+        background-color: var(--surface-2);
     }
 }
 

@@ -35,6 +35,10 @@ export class PanelManager {
     }
 
     init() {
+        // AppContext and UIManager both call init(); without this guard every panel got a second
+        // presenter instance (duplicate drag/resize handles and doubled listeners).
+        if (this._initialized) return;
+        this._initialized = true;
         this.panelConfig.forEach((config, index) => {
             const panelElement = document.getElementById(config.elementId);
             if (panelElement) {
@@ -88,8 +92,9 @@ export class PanelManager {
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
             if (this.panels.ruleset && !this.panels.ruleset.isHidden()) {
+                // The panel can be restored open before its content component has mounted.
                 const editorRulesetInput = document.getElementById('ruleset-editor-input');
-                if (document.activeElement !== editorRulesetInput) {
+                if (editorRulesetInput && document.activeElement !== editorRulesetInput) {
                     editorRulesetInput.value = (hex === "Error" || hex === "N/A") ? "" : hex;
                 }
             }

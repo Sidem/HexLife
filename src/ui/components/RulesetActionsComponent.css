@@ -17,6 +17,29 @@
     flex-shrink: 0;
 }
 
+/* The Library panel puts its scope switch in this same row, so the tabs get their own group. */
+.ruleset-actions-header {
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.ruleset-actions-segments {
+    display: flex;
+    gap: 4px;
+    flex: 1 1 140px;
+    min-width: 0;
+}
+
+.ruleset-library-scope {
+    flex: 0 0 auto;
+}
+
+.ruleset-library-scope .switch-label {
+    padding: 6px 8px;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
 .ruleset-actions-segment {
     flex-grow: 1;
     padding: 8px 5px;
@@ -80,6 +103,18 @@
     font-size: 0.82em;
     font-weight: 500;
     color: var(--text-secondary);
+}
+
+/* Short controls (the scope switches) sit beside their caption instead of under it. */
+.ruleset-field.ruleset-field-inline {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ruleset-pane .ruleset-field-inline .switch-group {
+    width: auto;
 }
 
 /* Bias slider nested under the "Custom density bias" toggle */
@@ -646,6 +681,12 @@ button.srm-suggested-chip {
     #rulesetActionsPanel {
         width: 440px;
         min-width: 320px;
+    }
+
+    /* Library cards + the tabs/scope header need a bit more room before they get cramped. */
+    #rulesetLibraryPanel {
+        width: 480px;
+        min-width: 360px;
     }
 }
 

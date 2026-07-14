@@ -159,38 +159,40 @@ export function saveBrushSize(size) {
     _setItem(KEYS.BRUSH_SIZE, size);
 }
 
+/* Panels registered before the generic scheme keep their historical storage keys (listed in
+   KEYS); anything newer falls back to a derived key, so a new panel persists without a KEYS edit. */
+function _panelStateKey(panelKey) {
+    return KEYS[`${panelKey.toUpperCase()}_PANEL_STATE`] || `${LS_KEY_PREFIX}${panelKey}PanelState`;
+}
+
+const _px = (value) => (typeof value === 'string' && value.endsWith('px')) ? value : null;
+
 export function loadPanelState(panelKey) {
-    const keyToLoad = KEYS[`${panelKey.toUpperCase()}_PANEL_STATE`];
-    if (!keyToLoad) {
-        console.warn(`PersistenceService: Unknown panel key "${panelKey}" for loadPanelState.`);
-        return { isOpen: false, x: null, y: null };
-    }
-    const state = _getItem(keyToLoad);
+    const state = _getItem(_panelStateKey(panelKey));
     if (state && typeof state.isOpen === 'boolean') {
         return {
             isOpen: state.isOpen,
             x: typeof state.x === 'string' ? state.x : null,
             y: typeof state.y === 'string' ? state.y : null,
+            w: _px(state.w),
+            h: _px(state.h),
         };
     }
-    return { isOpen: false, x: null, y: null };
+    return { isOpen: false, x: null, y: null, w: null, h: null };
 }
 
 export function savePanelState(panelKey, state) {
-    const keyToSave = KEYS[`${panelKey.toUpperCase()}_PANEL_STATE`];
-     if (!keyToSave) {
-        console.warn(`PersistenceService: Unknown panel key "${panelKey}" for savePanelState.`);
+    if (!state || typeof state.isOpen !== 'boolean') {
+        console.warn(`PersistenceService: Invalid state provided for panel "${panelKey}".`);
         return;
     }
-    if (state && typeof state.isOpen === 'boolean') {
-        _setItem(keyToSave, {
-            isOpen: state.isOpen,
-            x: (typeof state.x === 'string' && state.x.endsWith('px')) ? state.x : null,
-            y: (typeof state.y === 'string' && state.y.endsWith('px')) ? state.y : null,
-        });
-    } else {
-        console.warn(`PersistenceService: Invalid state provided for panel "${panelKey}".`);
-    }
+    _setItem(_panelStateKey(panelKey), {
+        isOpen: state.isOpen,
+        x: _px(state.x),
+        y: _px(state.y),
+        w: _px(state.w),
+        h: _px(state.h),
+    });
 }
 
 export function loadUISetting(settingKey, defaultValue) {
