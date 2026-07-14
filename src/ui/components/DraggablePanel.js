@@ -39,6 +39,11 @@ export class DraggablePanel extends Panel {
             this._setDraggable(mode === 'desktop');
         });
 
+        // A shrinking viewport (or a panel that outgrew it) can otherwise strand the title bar
+        // off-screen, where there is nothing left to grab.
+        this.boundOnWindowResize = () => this._clampIntoViewport();
+        window.addEventListener('resize', this.boundOnWindowResize);
+
         // Any interaction with the panel surfaces it above its siblings.
         this.panelElement.addEventListener('pointerdown', () => {
             this.options.onFocus?.(this);
@@ -132,6 +137,7 @@ export class DraggablePanel extends Panel {
         this.panelElement.classList.remove('is-resizing');
         document.removeEventListener('pointermove', this.boundResizeMove);
         document.removeEventListener('pointerup', this.boundResizeEnd);
+        this._clampIntoViewport();
         this._saveState();
     }
 
@@ -141,6 +147,32 @@ export class DraggablePanel extends Panel {
         this.panelElement.style.height = '';
         this.panelElement.style.maxWidth = '';
         this.panelElement.style.maxHeight = '';
+        this._saveState();
+    }
+
+    /**
+     * Keeps the panel reachable: the top edge clamp is applied LAST, so a panel taller than the
+     * viewport overflows off the bottom (still draggable) rather than off the top (unreachable).
+     */
+    _clampPosition(left, top) {
+        if (!this.options.constrainToViewport) return { left, top };
+        const maxLeft = window.innerWidth - this.panelElement.offsetWidth;
+        const maxTop = window.innerHeight - this.panelElement.offsetHeight;
+        return {
+            left: Math.max(0, Math.min(left, Math.max(0, maxLeft))),
+            top: Math.max(0, Math.min(top, Math.max(0, maxTop))),
+        };
+    }
+
+    /** Re-applies the clamp to the panel's current position (after a load, show, or window resize). */
+    _clampIntoViewport() {
+        if (this.isHidden() || this.panelElement.classList.contains('is-mobile-panel')) return;
+        const rect = this.panelElement.getBoundingClientRect();
+        const { left, top } = this._clampPosition(rect.left, rect.top);
+        if (left === rect.left && top === rect.top) return;
+        this.panelElement.style.left = `${Math.round(left)}px`;
+        this.panelElement.style.top = `${Math.round(top)}px`;
+        this.panelElement.style.transform = 'none';
         this._saveState();
     }
 
@@ -250,6 +282,8 @@ export class DraggablePanel extends Panel {
             this._setDraggable(false);
         } else {
             this._setDraggable(true);
+            // A position saved under a larger window (or a since-grown panel) can land off-screen.
+            this._clampIntoViewport();
         }
 
         if (this.contentComponent && typeof this.contentComponent.refresh === 'function') {
@@ -284,40 +318,20 @@ export class DraggablePanel extends Panel {
     }
 
     _dragMouseMove(event) {
-        let newLeft = event.clientX - this.offsetX;
-        let newTop = event.clientY - this.offsetY;
-        if (this.options.constrainToViewport) {
-            const panelWidth = this.panelElement.offsetWidth;
-            const panelHeight = this.panelElement.offsetHeight;
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-            if (newLeft + panelWidth > viewportWidth) newLeft = viewportWidth - panelWidth;
-            if (newTop + panelHeight > viewportHeight) newTop = viewportHeight - panelHeight;
-        }
-        this.panelElement.style.left = `${newLeft}px`;
-        this.panelElement.style.top = `${newTop}px`;
+        this._moveTo(event.clientX - this.offsetX, event.clientY - this.offsetY);
     }
-    
+
     _dragTouchMove(event) {
         if (event.touches.length !== 1) return;
         event.preventDefault();
         const touch = event.touches[0];
-        let newLeft = touch.clientX - this.offsetX;
-        let newTop = touch.clientY - this.offsetY;
-        if (this.options.constrainToViewport) {
-            const panelWidth = this.panelElement.offsetWidth;
-            const panelHeight = this.panelElement.offsetHeight;
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-            if (newLeft + panelWidth > viewportWidth) newLeft = viewportWidth - panelWidth;
-            if (newTop + panelHeight > viewportHeight) newTop = viewportHeight - panelHeight;
-        }
-        this.panelElement.style.left = `${newLeft}px`;
-        this.panelElement.style.top = `${newTop}px`;
+        this._moveTo(touch.clientX - this.offsetX, touch.clientY - this.offsetY);
+    }
+
+    _moveTo(rawLeft, rawTop) {
+        const { left, top } = this._clampPosition(rawLeft, rawTop);
+        this.panelElement.style.left = `${left}px`;
+        this.panelElement.style.top = `${top}px`;
     }
 
     destroy() {
@@ -333,5 +347,6 @@ export class DraggablePanel extends Panel {
         document.removeEventListener('touchend', this.boundDragTouchEnd);
         document.removeEventListener('pointermove', this.boundResizeMove);
         document.removeEventListener('pointerup', this.boundResizeEnd);
+        window.removeEventListener('resize', this.boundOnWindowResize);
     }
 }
