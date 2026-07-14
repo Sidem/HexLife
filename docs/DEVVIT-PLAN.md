@@ -242,6 +242,62 @@ context, and it animates — **on desktop web AND in the iOS + Android Reddit ap
 **Accept:** a live hex world animating in a real Reddit post on all three surfaces. If wasm or
 WebGL2 fails on any surface, stop and reassess here — everything after this is wasted otherwise.
 
+#### Status 2026-07-14 — BUILT AND LOCALLY GREEN; awaiting the owner's playtest (the Reddit half)
+
+The webview payload is done and verified everywhere it *can* be verified without pushing to Reddit.
+What remains is exactly the part an agent must not do: `devvit playtest` / `upload` and creating the
+post. **Nothing here is proven about Reddit's webview yet** — that is the whole point of the run.
+
+**What was built**
+
+- `devvit/src/client/hexlife.ts` — mounts `<hexlife-world>` with hardcoded params (ruleset
+  `D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6`, seed 12345, **rows 64** — phone-GPU budget — speed 20,
+  `link="off"`). Imported by **both** entrypoints: `splash.ts` (the in-feed post view — the
+  acceptance criterion is a world animating *in the post*, so it must live there, not only in
+  expanded mode) and `game.ts` (expanded). `splash` keeps an **Expand** button.
+- **A diagnostics strip** under the canvas: `webgl2:ok · wasm:ok · ticks:N`. It exists because a
+  phone has no console: a blank post would tell us nothing, while `webgl2:NO` names the failure.
+  It is temporary — delete it in Phase 2.
+- `devvit/scripts/build-client.mjs` — replaces the bare `esbuild` CLI call in `build:client`.
+  **This is the crux of the phase.** The embed source uses two *Vite* import suffixes esbuild does
+  not understand: `…hexlife_wasm_bg.wasm?url` (EmbedSim) and `…*.glsl?raw` (EmbedRenderer). A tiny
+  plugin teaches esbuild both — `?url` → a base64 `data:application/wasm` URI (the wasm is **inlined**,
+  which is mandatory: a webview serves only `public/` and may not fetch a CDN), `?raw` → text.
+  Result: a self-contained `public/game.js` (76 KB) / `splash.js` (201 KB, +`@devvit/web`).
+  **No fork of the sim or renderer** — that was the entire reason the app lives in-repo.
+- `src/embed/EmbedSim.js` — `initEmbedWasm` now **decodes a base64 `data:` URI directly (`atob`)
+  instead of `fetch`ing it**. Fetching a data URI is subject to the host page's CSP `connect-src`,
+  and a Reddit webview's CSP is not ours to widen; `atob` is subject to nothing. Real URLs still go
+  through `fetch`, so the dev-server path is unchanged. This also hardens #25 Phase 3's lib build.
+- `.claude/launch.json` — a `devvit-webview` config (`vite devvit/public`, port 5190) that serves the
+  built webview as a plain static site, i.e. the way Devvit serves it.
+
+**Verified locally (the built esbuild bundle, in a browser — not a Vite dev graph)**
+
+- `game.html` and `splash.html` both: `webgl2:ok · wasm:ok`, tick count advancing, `world.error`
+  null, **zero console errors**.
+- Actually drawing: `gl.readPixels` over the canvas → **8308 distinct color buckets**,
+  `gl.getError() === 0` (read in the same task as the draw — after compositing the backbuffer is
+  undefined and reads back a single flat color, which is a *measurement* artifact, not a bug).
+- **Determinism survived the new wasm-loading path**: seed 12345 → checksum **231200078** at tick
+  100, the value pinned in #25 Phase 1; seed 999 differs.
+- Gates: devvit `npm test` (tsc --build + Biome + 4 unit tests + build) green; root `npm run lint`
+  0 errors, `typecheck` clean, **535/535** vitest (determinism goldens included).
+
+**The command the owner runs** (from `devvit/`, Git Bash on PATH or live-reload silently no-ops):
+
+```powershell
+$env:PATH="C:\Program Files\Git\bin;"+$env:PATH
+cd X:\Programming\Projects\HexLife\devvit
+fnm exec --using=22.6.0 -- npx.cmd devvit playtest hexlife
+```
+
+Then open the r/hexlife post on **desktop web, the iOS app, and the Android app** and read the
+strip on each. Three outcomes: `webgl2:NO` ⇒ WebGL2 is unavailable in that webview (reassess: a 2D
+fallback, or Reddit is not a surface for this). `wasm:…` stuck ⇒ wasm was blocked (CSP) — the
+go/no-go failed. `ticks:` frozen at a number ⇒ it booted but the rAF loop is throttled/paused in
+the webview (survivable; investigate the visibility/IntersectionObserver policy).
+
 ### Phase 2 — v1 "Live Specimen" post
 
 Devvit post type + menu action to create a post with chosen params; Redis param storage keyed by

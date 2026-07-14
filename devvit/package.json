@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:client -- --metafile=dist/client.meta.json --minify && npm run build:server -- --metafile=dist/server.meta.json --minify",
-    "build:client": "esbuild --bundle --log-level=warning --sourcemap=linked --target=es2023 --format=esm --outdir=public --platform=browser src/client/splash.ts src/client/game.ts",
+    "build:client": "node scripts/build-client.mjs",
     "build:server": "esbuild --bundle --log-level=warning --sourcemap=linked --target=es2023 --format=cjs --outdir=dist/server --platform=node src/server/index.ts",
     "clean": "rm -rf dist/ public/*.js*",
     "format": "npm run lint -- --fix",

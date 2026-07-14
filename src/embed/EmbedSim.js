@@ -47,14 +47,38 @@ let wasmExports = null;
 /** @type {Promise<any> | null} */
 let initPromise = null;
 
+/** Matches a base64 `data:` URI, however the bundler spelled the media type. */
+const DATA_URI_RE = /^data:[^,]*;base64,(.*)$/s;
+
+/**
+ * Resolve the wasm import into raw bytes.
+ *
+ * The import is a *URL*, and which kind depends on the bundler: a real path under the dev server /
+ * the app build, or an inlined base64 `data:` URI once Vite's lib build (#25 Phase 3) or Devvit's
+ * esbuild (#26) inlines the binary into the single output file. Both must work from one code path —
+ * the embed ships as one self-contained file and the Devvit webview may not fetch anything at all.
+ *
+ * A `data:` URI is decoded **here rather than handed to `fetch()`**: fetching a data URI is subject
+ * to the host page's CSP `connect-src`, and a Reddit webview's CSP is not ours to widen. `atob` is
+ * subject to nothing. (Feeding the URL straight to wasm-bindgen is also out: its default path uses
+ * `instantiateStreaming`, whose MIME check rejects data URIs.)
+ *
+ * @param {string} url
+ * @returns {Promise<ArrayBuffer|Uint8Array>}
+ */
+async function loadWasmBytes(url) {
+    const dataUri = DATA_URI_RE.exec(url);
+    if (dataUri) {
+        const binary = atob(dataUri[1]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+    }
+    return (await fetch(url)).arrayBuffer();
+}
+
 /**
  * Initialize the wasm engine (idempotent; concurrent callers share one promise).
- *
- * We fetch the bytes and hand them to `init()` rather than letting it fetch the URL itself,
- * because in the built `hexlife-embed.js` Vite inlines the wasm as a **base64 `data:` URI** and
- * wasm-bindgen's default path would try `instantiateStreaming`, whose MIME-type check rejects a
- * data URI. `fetch()` handles both a real URL (dev server) and a data URI (built bundle), so this
- * one path covers both without a build-time branch.
  *
  * @returns {Promise<any>} The wasm exports (notably `.memory`).
  */
@@ -62,7 +86,7 @@ export function initEmbedWasm() {
     if (wasmExports) return Promise.resolve(wasmExports);
     if (!initPromise) {
         initPromise = (async () => {
-            const bytes = await (await fetch(wasmUrl)).arrayBuffer();
+            const bytes = await loadWasmBytes(wasmUrl);
             wasmExports = await init({ module_or_path: bytes });
             return wasmExports;
         })();
