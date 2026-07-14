@@ -410,17 +410,31 @@ select:focus {
         box-shadow: var(--shadow-panel);
     }
 
+    /* Golden accent title bar — the grab handle is also the brand mark. Dark text on the light
+       gold; the subtitle and the close button (a sibling overlaying the bar) follow suit. */
     .draggable-panel-base h3 {
-        background-color: var(--surface-1);
-        border-bottom: 1px solid var(--border);
-        color: var(--text-primary);
+        background-color: var(--accent-dim);
+        border-bottom: 1px solid var(--accent-dim);
+        color: #1c1c1f;
         font-size: 0.85em;
         text-transform: uppercase;
         letter-spacing: 0.1em;
     }
 
     .draggable-panel-base h3:hover {
-        background-color: var(--surface-2);
+        background-color: var(--accent);
+    }
+
+    .draggable-panel-base h3 .panel-subtitle {
+        color: rgba(0, 0, 0, 0.62);
+    }
+
+    .draggable-panel-base > .close-panel-button {
+        color: rgba(0, 0, 0, 0.6);
+    }
+
+    .draggable-panel-base > .close-panel-button:hover {
+        color: #000;
     }
 }
 

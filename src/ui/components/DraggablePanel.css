@@ -33,8 +33,10 @@
         margin: 0;
         padding: 6px 34px 6px 8px;
         text-align: left;
-        background-color: rgba(255, 255, 255, 0.04);
-        border-bottom: 1px solid #444;
+        /* Colors (golden accent bar) live in theme.css, which loads after this file. */
+        background-color: var(--accent-dim, #d8b05b);
+        color: #1c1c1f;
+        border-bottom: 1px solid var(--accent-dim, #d8b05b);
         user-select: none;
         font-size: 1.05em;
         line-height: 1.3;
@@ -44,7 +46,7 @@
     }
 
     .draggable-panel-base h3:hover {
-        background-color: rgba(255, 255, 255, 0.09);
+        background-color: var(--accent, #f0c674);
     }
 
     .draggable-panel-base h3:active {

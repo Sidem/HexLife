@@ -22,7 +22,7 @@ export class PanelManager {
             { name: 'ruleset', elementId: 'rulesetEditorPanel', presenter: DraggablePanel, contentType: RulesetEditorComponent, triggerButtonId: 'editRuleButton', options: { handleSelector: 'h3' } },
             { name: 'worldsetup', elementId: 'worldSetupPanel', presenter: DraggablePanel, contentType: WorldSetupComponent, triggerButtonId: 'setupPanelButton', options: { handleSelector: 'h3' } },
             { name: 'analysis', elementId: 'analysisPanel', presenter: DraggablePanel, contentType: AnalysisComponent, triggerButtonId: 'analysisPanelButton', options: { handleSelector: 'h3' } },
-            { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, triggerButtonId: 'rankPanelButton', options: { handleSelector: 'h3' } },
+            { name: 'rulerank', elementId: 'ruleRankPanel', presenter: DraggablePanel, contentType: RuleRankComponent, options: { handleSelector: 'h3' } },
             { name: 'learning', elementId: 'learningPanel', presenter: DraggablePanel, contentType: LearningComponent, triggerButtonId: 'helpButton', options: { handleSelector: 'h3' } },
             { name: 'rulesetactions', elementId: 'rulesetActionsPanel', presenter: DraggablePanel, contentType: RulesetActionsComponent, triggerButtonId: 'rulesetActionsButton', options: { handleSelector: 'h3' } },
             { name: 'library', elementId: 'rulesetLibraryPanel', presenter: DraggablePanel, contentType: RulesetLibraryComponent, triggerButtonId: 'libraryButton', options: { handleSelector: 'h3' } },

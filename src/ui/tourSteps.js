@@ -6,7 +6,6 @@ import { RulesetLibraryComponent } from './components/RulesetLibraryComponent.js
 import { RulesetEditorComponent } from './components/RulesetEditorComponent.js';
 import { WorldSetupComponent } from './components/WorldSetupComponent.js';
 import { AnalysisComponent } from './components/AnalysisComponent.js';
-import { RuleRankComponent } from './components/RuleRankComponent.js';
 import { PatternsComponent } from './components/PatternsComponent.js';
 import { ExploreComponent } from './components/ExploreComponent.js';
 import { ChromaLabComponent } from './components/ChromaLabComponent.js';
@@ -293,15 +292,9 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'click' }
     }];
 
+    // No toolbar button any more — the panel is reached from the command palette, so the tour
+    // opens it itself instead of pointing at a rail icon.
     const rulerank = [{
-        element: '[data-tour-id="rank-panel-button"]',
-        title: 'Tutorial: Rule Usage Ranking',
-        content: "Which of the 128 rules are doing the real work? Open the <span class=\"onboarding-highlight-text\">Rule Rank</span> panel to find out.",
-        primaryAction: { text: 'Open Panel' },
-        condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulerank' } }),
-        onBeforeShow: resetUIState,
-        advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RuleRankComponent }
-    }, {
         element: '#activation-rank',
         title: 'Birth Rules',
         content: "This column ranks the rules that most often make cells <span class=\"onboarding-highlight-text\">become active</span>. They are the engines of growth in your universe.",
