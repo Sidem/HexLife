@@ -7,6 +7,7 @@ import { RulesetService } from './RulesetService.js';
 import { AutoExploreService } from './AutoExploreService.js';
 import { EmbeddingService, EMBEDDING_CONFIG, EMBEDDING_MODELS } from '../services/EmbeddingService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
+import { encodeWorldCode } from './WorldCodec.js';
 import { ThumbnailBakeService } from './ThumbnailBakeService.js';
 import { ExploreSessionCoordinator } from './ExploreSessionCoordinator.js';
 import { ScrubHistoryController } from './ScrubHistoryController.js';
@@ -1358,6 +1359,41 @@ export class WorldManager {
     getEntropySamplingState = () => {
         return { enabled: this.isEntropySamplingEnabled, rate: this.entropySampleRate };
     }
+
+    /**
+     * Freeze the selected world into a portable **world code** (`HXW1.…`, see {@link WorldCodec}) —
+     * the payload the Reddit/Devvit app turns into a post (#26 Phase 2).
+     *
+     * A share link is a *recipe* (ruleset + density + seed); this is the **dish**: the exact grid, the
+     * exact live cells as they are on screen right now, and the palette. Nothing about it is
+     * re-derived on the other side, so a post shows the world the author saw — not a statistically
+     * similar one — and no future change to the density generators can retroactively rewrite it.
+     *
+     * The current cells are the code's *initial* state: the post opens paused on them and evolves
+     * from there when the viewer hits play.
+     *
+     * The palette travels as the *settings* (mode, preset, custom maps, flicker flag, hue shift), not
+     * as a baked table: the embed recomputes the symmetry tables itself, so it can rebuild the exact
+     * same LUT from a few dozen compressible bytes instead of 768 near-random ones.
+     *
+     * @param {object} colorSettings ColorController.getSettings().
+     * @returns {Promise<string|null>} The code, or null if the world's cells aren't available yet.
+     */
+    exportWorldCode = async (colorSettings) => {
+        const idx = this.selectedWorldIndex;
+        const proxy = this.worlds[idx];
+        const cells = proxy?.latestStateArray;
+        if (!cells || cells.length !== Config.NUM_CELLS) return null;
+
+        return encodeWorldCode({
+            rows: Config.GRID_ROWS,
+            cols: Config.GRID_COLS,
+            rulesetHex: this._getRulesetHexForWorld(idx),
+            cells,
+            colorSettings,
+            speed: this.simulationController.getSpeed(),
+        });
+    };
 
     generateShareUrl({ includeWorldState = false } = {}) {
         return ShareCodec.encode({

@@ -15,17 +15,23 @@
   "menu": {
     "items": [
       {
-        "label": "[hexlifeapp] New Post",
-        "description": "Create a new hexlifeapp post.",
+        "label": "New HexLife post",
+        "description": "Create a post from a world code exported in HexLife Explorer.",
         "location": "subreddit",
         "endpoint": "/internal/on/menu/new-post"
       }
     ]
+  },
+  "forms": {
+    "newWorldPost": "/internal/on/form/new-post"
   },
   "triggers": {
     "onAppInstall": "/internal/on/app/install"
   },
   "scripts": {
     "dev": "npm run watch"
+  },
+  "dev": {
+    "subreddit": "hexlifeapp_dev"
   }
 }

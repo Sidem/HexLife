@@ -24,6 +24,7 @@
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
 import { clampInt, clampFloat, readSeed, readGradient } from './attrs.js';
+import { decodeWorldCode } from '../core/WorldCodec.js';
 
 /** Where the attribution link points. Deep-links the ruleset via ShareCodec's `r`/`g` params. */
 const APP_URL = 'https://sidem.github.io/HexLife/';
@@ -117,7 +118,7 @@ const PLAY_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" c
 
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
-        return ['ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
+        return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
             'palette-on', 'palette-off', 'paused', 'max-dpr', 'link'];
     }
 
@@ -157,6 +158,13 @@ export class HexLifeElement extends HTMLElement {
         this.renderer = null;
         /** @type {string|null} Non-null while the element is in its styled error state. */
         this.error = null;
+        /**
+         * The decoded `code` attribute (WorldCodec), or null when the element is driven by the
+         * individual attributes. Non-null means the world is fully specified by the code.
+         * @type {{rows: number, cols: number, rulesetHex: string, cells: Uint8Array, speed: number,
+         *   colorSettings: object|null, lut: Uint8Array|null}|null}
+         */
+        this._world = null;
 
         // --- playback gates. The loop runs only when ALL of these say yes. ---
         /** Author/user intent: `paused` attribute, or a `pause()` call. */
@@ -230,6 +238,15 @@ export class HexLifeElement extends HTMLElement {
             return;
         }
 
+        // A world code owns every world-defining attribute (see `_boot`): the only way to change one
+        // of them is a new code, and a new code means a new world. Both cases are a re-boot.
+        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr' && name !== 'link')) {
+            this._generation++;
+            this._teardown();
+            this._boot(this._generation);
+            return;
+        }
+
         switch (name) {
             case 'rows': {
                 // A different grid means a different World and different instance buffers.
@@ -265,7 +282,7 @@ export class HexLifeElement extends HTMLElement {
             case 'palette-on':
             case 'palette-off': {
                 const p = this._readParams();
-                this.renderer.setPalette(p.palette, p.customGradient);
+                this.renderer.setPalette({ palette: p.palette, customGradient: p.customGradient });
                 this._drawOnce();
                 break;
             }
@@ -341,7 +358,21 @@ export class HexLifeElement extends HTMLElement {
     async _boot(generation) {
         this._clearError();
 
-        const hex = this._readRuleset();
+        // A `code` attribute (WorldCodec) is a complete world — grid, ruleset, exact cells, exact
+        // colors, speed — so it *replaces* the individual attributes rather than merging with them.
+        // This is the Reddit post's payload; anything half-applied there would be a different world.
+        // Decoding is async (the payload is deflated), so it takes the same generation guard as the
+        // wasm init below: a disconnect mid-decode must not boot a world into a torn-down element.
+        const raw = (this.getAttribute('code') || '').trim();
+        const world = raw ? await decodeWorldCode(raw) : null;
+        if (generation !== this._generation) return;
+        if (raw && !world) {
+            this._fail('Invalid “code”.', 'Not a HexLife world code (or it was truncated in transit).');
+            return;
+        }
+        this._world = world;
+
+        const hex = world ? world.rulesetHex : this._readRuleset();
         if (typeof hex !== 'string') {
             this._fail(hex.message, hex.detail);
             return;
@@ -373,10 +404,12 @@ export class HexLifeElement extends HTMLElement {
         try {
             this.sim = new EmbedSim({
                 rulesetHex: hex,
-                rows: params.rows,
+                rows: world ? world.rows : params.rows,
+                cols: world ? world.cols : undefined,
                 density: params.density,
                 seed: params.seed,
-                speed: params.speed,
+                initialCells: world ? world.cells : null,
+                speed: world ? world.speed : params.speed,
             });
         } catch (e) {
             this._fail('Simulation failed to start.', String(e && e.message ? e.message : e));
@@ -389,6 +422,8 @@ export class HexLifeElement extends HTMLElement {
                 rows: this.sim.rows,
                 palette: params.palette,
                 customGradient: params.customGradient,
+                colorSettings: world ? world.colorSettings : null,
+                lut: world ? world.lut : null,
             });
         } catch (e) {
             // Almost always "no WebGL2". Per the plan there is no 2D fallback in v1 — say so plainly
@@ -545,11 +580,11 @@ export class HexLifeElement extends HTMLElement {
             this._attrib.hidden = true;
             return;
         }
-        const hex = this._readRuleset();
-        const params = this._readParams();
+        const hex = this._world ? this._world.rulesetHex : this._readRuleset();
+        const rows = this._world ? this._world.rows : this._readParams().rows;
         const url = new URL(APP_URL);
         if (typeof hex === 'string') url.searchParams.set('r', hex);
-        if (params.rows !== DEFAULTS.rows) url.searchParams.set('g', String(params.rows));
+        if (rows !== DEFAULTS.rows) url.searchParams.set('g', String(rows));
         this._attrib.href = url.toString();
         this._attrib.title = 'Open this ruleset in HexLife Explorer';
         this._attrib.hidden = false;

@@ -325,6 +325,8 @@ export const EVENTS = {
     COMMAND_TOGGLE_INTERACTION_MODE: 'command:toggleInteractionMode',
     /** @event Emitted with no payload to trigger the share functionality. */
     COMMAND_SHARE_SETUP: 'command:shareSetup',
+    /** @event Emitted with no payload: copy the selected world as a portable world code (WorldCodec) — grid + ruleset + exact cells + exact palette — for the Reddit/Devvit post. */
+    COMMAND_COPY_WORLD_CODE: 'command:copyWorldCode',
     /** @param {string} mode - The new interaction mode ('pan', 'draw', 'place'). */
     COMMAND_SET_INTERACTION_MODE: 'command:setInteractionMode',
     /** @param {boolean} shouldPause - The desired pause-while-drawing state. */

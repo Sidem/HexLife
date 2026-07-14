@@ -111,19 +111,32 @@ export class EmbedSim {
      * @param {object} opts
      * @param {string} opts.rulesetHex 32-char hex ruleset (same format as share links).
      * @param {number} [opts.rows=64] Grid rows; cols are derived (never passed in — see gridMath).
-     * @param {number} [opts.density=0.5] Initial fill density, 0–1.
+     * @param {number} [opts.cols] Explicit column count, overriding the derivation. **Only** for a
+     *   world code (WorldCodec), which carries the exact grid its cells were captured on: the cell
+     *   payload's length is the authority there, and a future change to `deriveGridDimensions` must
+     *   not silently reshape an old post's grid.
+     * @param {number} [opts.density=0.5] Initial fill density, 0–1. Ignored when `initialCells` is set.
      * @param {number|null} [opts.seed=null] mulberry32 seed. Null ⇒ nondeterministic (Math.random).
+     * @param {Uint8Array|null} [opts.initialCells=null] The exact tick-0 grid (`rows*cols` entries).
+     *   When present it replaces density+seed entirely — `reset()` replays these cells verbatim, which
+     *   is what makes a world code reproduce *this* world rather than a statistically similar one.
      * @param {number} [opts.speed=10] Target ticks/second.
      */
-    constructor({ rulesetHex, rows = 64, density = 0.5, seed = null, speed = 10 }) {
+    constructor({ rulesetHex, rows = 64, cols, density = 0.5, seed = null, initialCells = null, speed = 10 }) {
         if (!wasmExports) {
             throw new Error('EmbedSim: await initEmbedWasm() before constructing a sim.');
         }
 
         const dims = deriveGridDimensions(rows);
         this.rows = dims.rows;
-        this.cols = dims.cols;
+        this.cols = Number.isInteger(cols) && cols >= 2 ? cols : dims.cols;
         this.numCells = this.rows * this.cols;
+
+        if (initialCells && initialCells.length !== this.numCells) {
+            throw new Error(`EmbedSim: initialCells has ${initialCells.length} entries, expected ${this.numCells}.`);
+        }
+        /** @type {Uint8Array|null} A private copy: the caller's buffer is not ours to keep alive. */
+        this.initialCells = initialCells ? new Uint8Array(initialCells) : null;
         // The shape DensityStrategy expects — the same three fields the worker passes as its config.
         this.gridConfig = { GRID_COLS: this.cols, GRID_ROWS: this.rows, NUM_CELLS: this.numCells };
 
@@ -173,15 +186,19 @@ export class EmbedSim {
      * divergence here shows up as a different tick-100 checksum than the app's.
      *
      * @param {number|null} [seed] mulberry32 seed; falsy ⇒ `Math.random` (nondeterministic), which
-     *   is the same rule the worker applies.
+     *   is the same rule the worker applies. Ignored when the sim was given `initialCells`.
      */
     reset(seed = this.seed) {
         this.seed = seed;
         this.tickCount = 0;
         this._accumulator = 0;
 
-        const rng = seed ? mulberry32(seed) : Math.random;
-        densityStrategy.generate(this.state, { density: this.density }, rng, this.gridConfig);
+        if (this.initialCells) {
+            this.state.set(this.initialCells);
+        } else {
+            const rng = seed ? mulberry32(seed) : Math.random;
+            densityStrategy.generate(this.state, { density: this.density }, rng, this.gridConfig);
+        }
 
         this.ruleIndices.fill(RULE_INDEX_INITIAL);
         this.nextState.fill(0);

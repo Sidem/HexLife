@@ -407,6 +407,7 @@ export class UIManager {
             reader.readAsText(data.file);
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_COPY_WORLD_CODE, this._onCopyWorldCode.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
@@ -584,6 +585,47 @@ export class UIManager {
                     EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not copy link.', type: 'error' });
                 });
             }
+        }
+    }
+
+    /**
+     * Copy the selected world as a world code — the payload the Reddit post is built from (#26).
+     * Unlike the share link this carries the exact cells, so it is kilobytes and scales with the grid
+     * (it is deflated, so a sparse or structured world is far smaller than a 50%-random one). The
+     * toast reports the size, because size is what decides whether the paste is comfortable.
+     *
+     * The code is also written into a textarea in the Share popout: encoding is async, which can cost
+     * the click's transient user activation and make `clipboard.writeText` reject in some browsers.
+     * The textarea is the guaranteed path — select and Ctrl+C — and the clipboard call is the nicety.
+     */
+    async _onCopyWorldCode() {
+        const code = await this.appContext.worldManager.exportWorldCode(
+            this.appContext.colorController.getSettings(),
+        );
+        if (!code) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready yet.', type: 'error' });
+            return;
+        }
+
+        const output = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('worldCodeOutput'));
+        if (output) {
+            output.value = code;
+            document.getElementById('worldCodeGroup')?.classList.remove('hidden');
+            output.select();
+        }
+
+        const size = `${(code.length / 1024).toFixed(1)} KB`;
+        try {
+            await navigator.clipboard.writeText(code);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: `World code copied (${size}) — paste it into the Reddit post form.`,
+                type: 'success',
+            });
+        } catch (err) {
+            console.warn('Clipboard write blocked; the code is in the Share popout:', err);
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: `World code ready (${size}) — press Ctrl+C to copy it from the Share panel.`,
+            });
         }
     }
 

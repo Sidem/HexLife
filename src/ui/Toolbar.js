@@ -99,6 +99,7 @@ export class Toolbar {
             shareLinkInput: document.getElementById('shareLinkInput'),
             shareIncludeStateCheckbox: document.getElementById('shareIncludeStateCheckbox'),
             copyShareLinkButton: document.getElementById('copyShareLinkButton'),
+            copyWorldCodeButton: document.getElementById('copyWorldCodeButton'),
             snapshotsButton: document.getElementById('snapshotsButton'),
             exportPngButton: document.getElementById('exportPngButton'),
             recordWebmButton: document.getElementById('recordWebmButton'),
@@ -262,7 +263,8 @@ export class Toolbar {
             snapshotsButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'snapshots' }),
             exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' }),
             recordWebmButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING),
-            copyShareLinkButton: this._copyShareLink.bind(this)
+            copyShareLinkButton: this._copyShareLink.bind(this),
+            copyWorldCodeButton: () => EventBus.dispatch(EVENTS.COMMAND_COPY_WORLD_CODE)
         };
 
         for (const [elementId, action] of Object.entries(buttonToActionMap)) {

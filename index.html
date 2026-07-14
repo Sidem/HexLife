@@ -297,6 +297,17 @@
             <div class="form-group-buttons">
                 <button id="copyShareLinkButton" class="button">Copy to Clipboard</button>
             </div>
+            <h4>World Code</h4>
+            <div class="form-group">
+                <label for="copyWorldCodeButton">The exact world — grid, ruleset, cells and colors — as one code. This is what the Reddit post is built from.</label>
+            </div>
+            <div class="form-group-buttons">
+                <button id="copyWorldCodeButton" class="button" title="Copy the selected world as a portable world code">Copy World Code</button>
+            </div>
+            <div class="form-group hidden" id="worldCodeGroup">
+                <label for="worldCodeOutput">World code (select &amp; copy if the clipboard is blocked):</label>
+                <textarea id="worldCodeOutput" class="hex-input" rows="3" readonly></textarea>
+            </div>
         </div>
 
 

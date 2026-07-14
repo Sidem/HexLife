@@ -298,13 +298,62 @@ fallback, or Reddit is not a surface for this). `wasm:…` stuck ⇒ wasm was bl
 go/no-go failed. `ticks:` frozen at a number ⇒ it booted but the rAF loop is throttled/paused in
 the webview (survivable; investigate the visibility/IntersectionObserver policy).
 
-### Phase 2 — v1 "Live Specimen" post
+### Phase 2 — v1 "Live Specimen" post — BUILT, awaiting the owner's playtest
 
-Devvit post type + menu action to create a post with chosen params; Redis param storage keyed by
-post ID; typed init message to the webview; Reseed + Open-in-Explorer buttons; loading and error
-states; mobile sizing; reduced-motion/offscreen policies.
-**Accept:** moderator creates a post from a ruleset hex; it renders, reseeds, and deep-links back
-to the explorer with the ruleset applied; passes a real-phone check.
+**Design change from the original plan (owner's call, 2026-07-14): the post's world is NOT configured
+on Reddit.** Params-in-a-form was the wrong seam — a world is something you *look at* while you tune
+it, and Reddit is not where you can. Instead the explorer exports the world you are looking at as a
+single **world code**, and the Reddit form takes nothing but that code. Consequences:
+
+- The code is the *dish*, not the recipe: grid, ruleset, the **exact tick-0 cells**, the palette, and
+  speed. Nothing is re-derived on Reddit's side, so a post cannot drift from what its author saw.
+- **Posts open paused.** The element's poster overlay is the play button; a feed full of
+  self-starting animations is exactly what nobody asked for. Reseed is *gone* from v1 — reseeding a
+  code's exact cells is a contradiction; if a random-start post is wanted later it belongs on a
+  seed-based post type, not this one.
+
+**What was built**
+
+- `src/core/WorldCodec.js` — the `HXW1.<base64url>` codec (pure; header + 16-byte ruleset + palette +
+  bit-packed cells, the whole payload **deflate-raw compressed** via `CompressionStream`, which makes
+  encode/decode async). Unit-tested in `tests/worldCodec.test.js`, including that its cell packing
+  matches the save-file format's. `src/core/WorldCodec.d.ts` exists **only** so devvit's tsc can
+  import it across the repo boundary.
+- **The palette travels as *settings*, not as a baked table** (mode, preset key, custom color maps,
+  flicker-proof flag, hue shift — a few dozen highly compressible bytes instead of 768 near-random
+  ones). This is safe *because* `Symmetry.precomputeSymmetryGroups` is pure and cheap: the embed
+  recomputes the symmetry tables the symmetry-keyed palettes need rather than being handed them, so
+  `EmbedRenderer` now renders **every** app palette (`symmetryGradient` and `mode: 'symmetry'`
+  included — they used to be unsupported). A baked-LUT kind stays in the format as an escape hatch.
+- **Size scales with entropy, as it must.** Measured at the default 192×222 grid: 50% random → 7.5 KB
+  (deflate can't help — that's information theory), 20% → 5.8 KB, 5% → 3.1 KB, 1% → 1.4 KB, a drawn
+  or cleared grid → well under 1 KB. So a *structured* world posts fine at any grid size; only a
+  50%-random one is big, and for those a smaller grid is the answer (and the phone-friendly choice).
+- Explorer: `WorldManager.exportWorldCode(colorSettings)` → Share popout's **Copy World Code** button
+  + a command-palette entry (`COMMAND_COPY_WORLD_CODE` → `UIManager._onCopyWorldCode`).
+- Embed: `EmbedSim` takes `initialCells` (replays them verbatim instead of density+seed) and an
+  explicit `cols`; `EmbedRenderer` takes `colorSettings` (or a baked `lut`); `<hexlife-world
+  code="…">` decodes one and drives all of it.
+- Devvit: menu → **form** (`devvit.json` → `forms.newWorldPost` → `/internal/on/form/new-post`) →
+  `decodeWorldCode` validates the paste server-side → `reddit.submitCustomPost` → the code is stored
+  in Redis under `world:<t3>` → the webview GETs `/api/world` and mounts it **paused**. A post with
+  no code (the install trigger's) falls back to the built-in demo specimen. The Phase 1 diagnostics
+  strip is gone; the status line now shows only loading/error text.
+
+**Verified locally** — root: lint 0 errors, typecheck clean, **545/545** vitest, clean `npm run build`
+(wasm rebuilt from source). devvit: tsc, Biome, **6** unit tests, both bundles build. In the browser
+(`?headless=1`): a code exported from the app decodes back to byte-identical cells, and its color
+settings rebuild the app's LUT **byte-for-byte on a `symmetry`-mode palette with 28 custom color
+pairs** — the case that used to be unrenderable in the embed. Mounted in `<hexlife-world code>` it
+boots with the same grid/ruleset/cells, **playing:false, ticks:0, overlay shown**, and plays on
+clicking the overlay (GL error 0, 977 distinct colors on screen).
+
+**Not proven:** anything on Reddit. `devvit playtest` + creating a post from a real code is the
+owner's step (see Phase 1's command) — including whether Reddit's paragraph field takes a
+multi-kilobyte paste.
+
+**Accept:** moderator pastes a code from the explorer; the post renders that exact world, paused;
+pressing play runs it; passes a real-phone check.
 
 ### Phase 3 — polish + publish
 

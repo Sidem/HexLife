@@ -1,5 +1,5 @@
 /**
- * Shared webview bootstrap for the HexLife Devvit post (#26 Phase 1 — the wasm/WebGL2 go/no-go).
+ * Shared webview bootstrap for the HexLife Devvit post (#26 Phase 2 — the "Live Specimen" post).
  *
  * Both entrypoints (`splash.html`, the in-feed post view; `game.html`, the expanded view) mount the
  * *same* `<hexlife-world>` element from `src/embed/` — the #25 embed runtime, imported by relative
@@ -7,70 +7,72 @@
  * a fork here would mean maintaining two engines and would break the byte-identity contract that is
  * the whole product claim.
  *
- * Params are hardcoded for Phase 1. Redis-backed per-post params are Phase 2.
+ * **The post's world is a world code** (`HXW1.…`), authored in the explorer and pasted into the
+ * create-post form; the server hands it to us from Redis. It carries the grid, the ruleset, the exact
+ * starting cells and the exact color table, so nothing here is configurable and nothing is re-derived
+ * — this webview renders precisely the world its author was looking at.
  *
- * ## Why the diagnostics strip exists
- *
- * The go/no-go question is whether **wasm instantiates** and **WebGL2 acquires a context** inside a
- * Reddit webview — on desktop AND in the iOS/Android apps. On a phone there is no console and no
- * devtools, so a failure has to be *legible on the surface itself*. The strip renders the answer as
- * text: WebGL2 probe, wasm/ready state, live tick count. A blank post tells us nothing; "webgl2: no"
- * tells us exactly where we died. It comes back out in Phase 2.
+ * **It starts paused, on purpose.** A feed is full of posts; one that starts moving the moment it
+ * scrolls into view is an animation you did not ask for. The element's poster overlay (its play
+ * button) is the affordance: the viewer opts in, and only then does anything tick.
  */
 
 // The embed's entry module registers <hexlife-world> as a side effect (customElements.define).
 import '../../../src/embed/index.js'
+import {fetchWorldCode} from './fetch.ts'
 
-/** Hardcoded Phase 1 specimen (same ruleset the embed demo page leads with). */
-const RULESET = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6'
-const SEED = 12345
-/** Mobile-first grid: a phone GPU is the constraint, not a desktop one. */
-const ROWS = 64
-const SPEED = 20
+/**
+ * The fallback specimen, for a post created without a code (the app-install demo post). Plain
+ * attributes, no code — a random seeded world rather than a broken one.
+ */
+const DEMO = {
+  ruleset: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
+  seed: '12345',
+  rows: '64',
+  speed: '20',
+}
 
 /** The bits of `<hexlife-world>`'s public API this page reads. */
 type HexWorld = HTMLElement & {
   readonly tickCount: number
   readonly playing: boolean
   readonly error?: string | null
+  play(): void
 }
 
-/** Does this webview give us a WebGL2 context at all? Probed on a throwaway canvas. */
-function probeWebgl2(): boolean {
-  try {
-    return !!document.createElement('canvas').getContext('webgl2')
-  } catch {
-    return false
-  }
-}
+/**
+ * @param mount Where the world goes.
+ * @param status A one-line surface for boot/failure text. There is no console on a phone, so a
+ *   failure has to be legible on the post itself; on success it goes away entirely.
+ */
+export async function mountHexLife(
+  mount: HTMLElement,
+  status: HTMLElement,
+): Promise<void> {
+  status.textContent = 'Loading…'
 
-export function mountHexLife(mount: HTMLElement, status: HTMLElement): void {
-  const webgl2 = probeWebgl2()
+  const code = await fetchWorldCode()
 
   const world = document.createElement('hexlife-world') as HexWorld
-  world.setAttribute('ruleset', RULESET)
-  world.setAttribute('seed', `${SEED}`)
-  world.setAttribute('rows', `${ROWS}`)
-  world.setAttribute('speed', `${SPEED}`)
-  // No attribution link in v1: a post is not a third-party page, and an outbound <a> inside a
-  // webview is a nav we haven't cleared with Devvit yet. Deep-linking is Phase 2's job.
-  world.setAttribute('link', 'off')
+  if (code) world.setAttribute('code', code)
+  else for (const [k, v] of Object.entries(DEMO)) world.setAttribute(k, v)
 
-  let ready = false
-  world.addEventListener('hexlife-ready', () => {
-    ready = true
-  })
+  // Paused ⇒ the element shows its play overlay and ticks nothing until the viewer presses it.
+  world.setAttribute('paused', '')
+  // No attribution link inside a post: an outbound <a> in a webview is a navigation we have not
+  // cleared with Devvit, and the post is not a third-party page that owes us a credit.
+  world.setAttribute('link', 'off')
 
   mount.append(world)
 
-  // Poll rather than hook the loop: tickCount advancing is the single strongest signal that wasm is
-  // running AND the renderer is being driven. If it sticks at 0, we know it never got off the line.
-  const render = (): void => {
-    const err = world.error
-    status.textContent = err
-      ? `webgl2:${webgl2 ? 'ok' : 'NO'} · error: ${err}`
-      : `webgl2:${webgl2 ? 'ok' : 'NO'} · wasm:${ready ? 'ok' : '…'} · ticks:${world.tickCount}`
+  // The element renders its own error state in-place (bad code, no WebGL2); mirror it to the status
+  // line so the failure is visible even if the canvas area is clipped in the feed.
+  const settle = (): void => {
+    status.textContent = world.error ?? ''
+    status.hidden = !world.error
   }
-  render()
-  setInterval(render, 500)
+  world.addEventListener('hexlife-ready', settle)
+  // A failed boot dispatches nothing, so poll briefly for the error state rather than hanging on
+  // "Loading…" forever.
+  setTimeout(settle, 2000)
 }

@@ -29,3 +29,6 @@ if (typeof customElements !== 'undefined' && !customElements.get(TAG_NAME)) {
 export { HexLifeElement };
 export { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 export { EmbedRenderer } from './EmbedRenderer.js';
+// A `code` attribute carries a whole world (grid + ruleset + exact cells + exact colors). Consumers
+// that need to validate one before mounting it — the Devvit post form does, server-side — want these.
+export { decodeWorldCode, encodeWorldCode, isWorldCode } from '../core/WorldCodec.js';

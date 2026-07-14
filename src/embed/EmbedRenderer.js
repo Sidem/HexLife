@@ -19,6 +19,7 @@
 import * as WebGLUtils from '../rendering/webglUtils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { PRESET_PALETTES } from '../core/colorPalettes.js';
+import { precomputeSymmetryGroups } from '../core/Symmetry.js';
 
 // eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
@@ -37,11 +38,13 @@ const HEX_HEIGHT = Math.sqrt(3) * HEX_SIZE;
 const BACKGROUND_COLOR = [0.1, 0.1, 0.1, 1.0];
 
 /**
- * `symmetryGradient` is the one preset whose LUT needs the app's precomputed symmetry tables
- * (`Symmetry.js` group data, threaded in from WorldManager). The embed has no such data, so the
- * preset is unsupported in v1 and falls back to `default` rather than dereferencing null.
+ * The symmetry tables `generateColorLUT` needs for the symmetry-keyed palettes (the
+ * `symmetryGradient` preset and `mode: 'symmetry'`). The app threads these in from WorldManager;
+ * the embed just recomputes them — `precomputeSymmetryGroups` is pure, ~100 lines, and runs over 64
+ * bitmasks, so *transmitting* them (or refusing the palettes that need them, as v1 of this file did)
+ * was never worth it. Computed once at module load and shared by every instance.
  */
-const UNSUPPORTED_PRESETS = new Set(['symmetryGradient']);
+const SYMMETRY_DATA = precomputeSymmetryGroups();
 
 /**
  * Pixel center of a cell, flat-top odd-q layout (odd columns shifted down half a row).
@@ -97,9 +100,16 @@ export class EmbedRenderer {
      * @param {number} opts.rows
      * @param {string} [opts.palette='default'] Key into PRESET_PALETTES.
      * @param {{on: string[], off: string[]}|null} [opts.customGradient=null] Overrides `palette`.
+     * @param {object|null} [opts.colorSettings=null] A full ColorController settings object — every
+     *   mode, custom map, flicker-proof flag and hue shift the app supports. This is the world-code
+     *   path (WorldCodec) and it takes precedence over everything above: the same
+     *   `generateColorLUT` the app renders with produces the same table here, symmetry modes
+     *   included (see SYMMETRY_DATA).
+     * @param {Uint8Array|null} [opts.lut=null] A pre-baked 128×2 RGBA LUT (1024 bytes) — the escape
+     *   hatch for a caller that has a table but no settings. Beaten by `colorSettings`.
      * @throws {Error} If WebGL2 is unavailable — the caller renders a fallback note instead.
      */
-    constructor(canvas, { cols, rows, palette = 'default', customGradient = null }) {
+    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
         this.canvas = canvas;
         this.cols = cols;
         this.rows = rows;
@@ -131,7 +141,7 @@ export class EmbedRenderer {
         };
 
         this._setupGeometry();
-        this._setupLUT(palette, customGradient);
+        this._setupLUT({ palette, customGradient, colorSettings, lut });
 
         // Set once — these never change for an embed (no hover, fixed camera).
         gl.useProgram(this.program);
@@ -204,12 +214,12 @@ export class EmbedRenderer {
         gl.bufferData(gl.ARRAY_BUFFER, offsets, gl.STATIC_DRAW);
     }
 
-    _setupLUT(palette, customGradient) {
+    _setupLUT(opts) {
         const gl = this.gl;
         this.lutTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.lutTexture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 128, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-            this._buildLUT(palette, customGradient));
+            this._buildLUT(opts));
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -218,32 +228,42 @@ export class EmbedRenderer {
     }
 
     /**
-     * @returns {Uint8Array} The 128×2 RGBA LUT. `symmetryData` is null because the embed supports no
-     *   preset that needs it (see UNSUPPORTED_PRESETS).
+     * Resolve whichever palette form the caller supplied into the 128×2 RGBA table the shader samples.
+     * Precedence: a decoded world's `colorSettings`, then a baked `lut`, then the element's
+     * `palette-on/off` gradient attributes, then the `palette` preset name.
+     * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
+     *   lut?: Uint8Array|null}} opts
+     * @returns {Uint8Array}
      */
-    _buildLUT(palette, customGradient) {
+    _buildLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
+        if (colorSettings) return generateColorLUT(colorSettings, SYMMETRY_DATA);
+        if (lut && lut.length === 128 * 2 * 4) return lut;
         if (customGradient) {
-            return generateColorLUT({ mode: 'gradient', customGradient, hueShift: 0 }, null);
+            return generateColorLUT({ mode: 'gradient', customGradient, hueShift: 0 }, SYMMETRY_DATA);
         }
         let activePreset = palette;
-        if (UNSUPPORTED_PRESETS.has(activePreset) || !PRESET_PALETTES[activePreset]) {
+        if (!PRESET_PALETTES[activePreset]) {
             if (activePreset !== 'default') {
-                console.warn(`<hexlife-world>: unknown or unsupported palette "${palette}", using "default".`);
+                console.warn(`<hexlife-world>: unknown palette "${palette}", using "default".`);
             }
             activePreset = 'default';
         }
         return generateColorLUT(
             { mode: 'preset', activePreset, flickerProofPresets: false, hueShift: 0 },
-            null,
+            SYMMETRY_DATA,
         );
     }
 
-    /** Swap the palette on a live renderer (no sim disruption — the LUT is a pure recolor). */
-    setPalette(palette, customGradient = null) {
+    /**
+     * Swap the palette on a live renderer (no sim disruption — the LUT is a pure recolor).
+     * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
+     *   lut?: Uint8Array|null}} opts
+     */
+    setPalette(opts) {
         const gl = this.gl;
         gl.bindTexture(gl.TEXTURE_2D, this.lutTexture);
         gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RGBA, gl.UNSIGNED_BYTE,
-            this._buildLUT(palette, customGradient));
+            this._buildLUT(opts));
         gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
