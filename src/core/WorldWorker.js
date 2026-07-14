@@ -5,6 +5,7 @@ import { Throttler } from '../utils/throttler.js';
 import { StateHistoryRing } from './StateHistoryRing.js';
 import { DensityStrategy } from './initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from './initialStateStrategies/ClusterStrategy.js';
+import { SavedStrategy } from './initialStateStrategies/SavedStrategy.js';
 
 let _wasm_module;
 let wasm_world;
@@ -98,7 +99,8 @@ const EVAL_DISRUPTIVE_COMMANDS = new Set([
 
 const strategies = {
     density: new DensityStrategy(),
-    clusters: new ClusterStrategy()
+    clusters: new ClusterStrategy(),
+    saved: new SavedStrategy()
 };
 
 function mulberry32(a) {

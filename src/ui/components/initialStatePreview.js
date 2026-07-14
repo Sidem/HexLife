@@ -8,11 +8,15 @@
 // CSS size with `image-rendering: pixelated` so it scales up crisply.
 import { DensityStrategy } from '../../core/initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from '../../core/initialStateStrategies/ClusterStrategy.js';
+import { SavedStrategy } from '../../core/initialStateStrategies/SavedStrategy.js';
 import * as Config from '../../core/config.js';
 
 const strategies = {
     density: new DensityStrategy(),
     clusters: new ClusterStrategy(),
+    // Saved starts resample from their captured dims to whatever grid they're drawn on, so the
+    // down-scaled preview grid below is just another resample target — no special preview path.
+    saved: new SavedStrategy(),
 };
 
 // Same PRNG the worker uses, so a given (config, seed) previews like a real reset would look.
