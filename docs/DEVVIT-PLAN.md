@@ -70,8 +70,9 @@ Scope this session to **v1**. It is the whole technical risk; v2/v3 are content 
 
 - **App slug: `hexlifeapp`** (in `devvit.json` → `name`). **Permanent** — this is the Reddit app
   directory identity. (`hexlife` was presumably taken or lost to the captcha retries.)
-- **Location: `X:\Programming\Projects\HexLifeDevvit\hexlifeapp`** — OUTSIDE the HexLife repo, and
-  it has **its own `.git`**. See "Repo layout decision" below — this needs resolving before code.
+- **Location: `HexLife/devvit/`** — in-repo, as of 2026-07-14. See "Repo layout" below. (It was
+  scaffolded outside the repo at `X:\Programming\Projects\HexLifeDevvit\hexlifeapp`; that copy is a
+  now-redundant fallback.)
 - Test subreddit **r/hexlife** created (owner moderates, <200 subs ✓). `devvit whoami` →
   `u/SciStone_`. Runs locally with `npm run dev`.
 - **Captcha war story:** app creation kept failing the "humanity check" on the owner's PC with
@@ -108,24 +109,43 @@ hexlifeapp/
 - There IS a server half (Redis via `src/server/db.ts`). v1 barely needs it (store post params);
   it's already wired for the v2 Daily.
 
-### Repo layout decision — SETTLE THIS BEFORE WRITING CODE (needs owner sign-off)
+### Repo layout — ✅ SETTLED 2026-07-14: option 1, the app lives in-repo at `devvit/`
 
 The webview **cannot fetch our embed bundle from a CDN** — Devvit webview assets must be bundled and
-served from `public/`. So the Devvit app needs `src/embed/` (#25) *in its build graph*. Two options:
+served from `public/`. So the Devvit app needs `src/embed/` (#25) *in its build graph*. The
+alternative (separate repo + a sync script copying the built embed artifact in) was rejected: it
+institutionalizes drift and a stale-copy failure mode. Option 1 is the whole reason #25 Phase 0
+extracted pure modules. **Do not fork the sim/renderer.**
 
-1. **RECOMMENDED — move the scaffold into the HexLife repo** as `devvit/` (drop its inner `.git`;
-   keep its own `package.json`/toolchain; add it to ESLint's ignores). Then `src/client/game.ts`
-   imports the embed runtime by relative path, esbuild bundles it, and there is ONE source of truth
-   for the sim + renderer. Widget and Reddit app can never drift.
-2. Keep it a separate repo and copy the built embed artifact in via a sync script. Simpler to set
-   up, but it institutionalizes drift and a stale-copy failure mode.
+**What was done:** the scaffold was copied from `X:\Programming\Projects\HexLifeDevvit\hexlifeapp`
+to `HexLife/devvit/`. Its inner `.git` was dropped (it had **zero commits and no remote** — nothing
+was lost) along with its `.github/` (dependabot + a CI workflow that would be inert in a
+subdirectory — GitHub only reads workflows from the *root* `.github/workflows`). Everything else is
+the stock template, byte for byte. The original directory is still there as a fallback and can be
+deleted once playtest is green from the new location.
 
-Option 1 is the whole reason #25 Phase 0 extracted pure modules. **Do not fork the sim/renderer.**
+Boundaries that keep the two toolchains from perturbing each other:
+
+- `devvit/` keeps its **own** `package.json` / `node_modules` / TypeScript + esbuild + Biome. The
+  root never builds or lints it; it lints itself (`npm run lint` inside `devvit/`).
+- **Root ESLint ignores `devvit/**`** (eslint.config.js) — otherwise `eslint .` picks up the
+  bundled esbuild output in `devvit/public/*.js`. This was the *only* root guard needed: vitest is
+  scoped to `tests/**/*.test.js` and root `tsconfig.json` to `src/**/*.js`, so neither sweeps it.
+- Git ignores devvit's build output via the scaffold's **nested `.gitignore`** (`/node_modules/`,
+  `/dist/`, `/public/*.js*`) — nested ignores work, no root change needed. 25 source files tracked.
+- **Node:** root stays on **20.17.0** (the known-good wasm build). `devvit/` runs on **22.6.0**,
+  installed via `fnm install 22.6.0` (its `.nvmrc` pins it). fnm's *default* is still 20 — nothing
+  about the system Node changed. `fnm use` inside `devvit/`, or non-interactively:
+  `fnm exec --using=22.6.0 -- npm.cmd <script>` (note **`npm.cmd`** — `fnm exec -- npm` fails with
+  "program not found" on Windows because npm is a `.cmd` shim).
+- **Verified from the new location:** `npm run build` (esbuild client + server) succeeds; the root's
+  `npm run lint` / `typecheck` / `test:run` are unchanged.
 
 - The webview is **the #25 embed runtime with a different shell**: import `EmbedSim` +
   `EmbedRenderer` (or just use `<hexlife-world>` directly — simplest, and it exercises the same
-  public API third parties get). Build it with a `vite.devvit.config.js` that outputs into
-  `devvit/webroot/`.
+  public API third parties get). It is bundled by **devvit's own esbuild** (`build:client`, which
+  already bundles `src/client/game.ts`) via a relative import across the repo — there is no separate
+  Vite config for this, and no copied artifact.
 - **Devvit ↔ webview messaging** is `postMessage`-based (typed both ways; see `devvit-corridor`'s
   messaging module for the pattern). v1 needs it only for: Devvit → webview (initial params) and
   webview → Devvit ("open explorer" URL nav, Reseed if the seed should persist to Redis).
@@ -179,8 +199,8 @@ build pipeline, tests, docs — an agent can build and run locally.
 ### Phase 0 — scaffold + toolchain — ✅ MOSTLY DONE 2026-07-14
 
 App created (`hexlifeapp`), subreddit created (r/hexlife), CLI installed and authed, scaffold runs
-locally. **Remaining:** (a) settle the repo-layout decision above; (b) `devvit playtest` the STOCK
-template on r/hexlife — unmodified, before any HexLife code — to prove the whole
+locally, **repo layout settled (in-repo at `devvit/`, see above)**. **Remaining:** `devvit playtest`
+the STOCK template on r/hexlife — unmodified, before any HexLife code — to prove the whole
 auth→upload→render loop works end-to-end. Do this first; it is 10 minutes and it isolates platform
 problems from our problems. **Requires owner approval to run** (it pushes code to Reddit).
 
