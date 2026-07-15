@@ -1,100 +1,242 @@
 /**
- * Shared webview bootstrap for the HexLife Devvit post (#26 Phase 2 — the "Live Specimen" post).
+ * Shared webview bootstrap for HexLife Live Specimen posts (#26).
  *
- * Both entrypoints (`splash.html`, the in-feed post view; `game.html`, the expanded view) mount the
- * *same* `<hexlife-world>` element from `src/embed/` — the #25 embed runtime, imported by relative
- * path so Devvit's esbuild bundles it from source. There is no second sim and no second renderer:
- * a fork here would mean maintaining two engines and would break the byte-identity contract that is
- * the whole product claim.
+ * Both entrypoints mount the same `<hexlife-world>` from `src/embed/` — no second engine.
+ * World codes (`HXW1.…`) are the post payload; transport chrome + identity + Explorer deep-link
+ * live outside the element.
  *
- * **The post's world is a world code** (`HXW1.…`), authored in the explorer and pasted into the
- * create-post form; the server hands it to us from Redis. It carries the grid, the ruleset, the exact
- * starting cells and the exact color table, so nothing here is configurable and nothing is re-derived
- * — this webview renders precisely the world its author was looking at.
- *
- * **It starts paused, on purpose.** A feed is full of posts; one that starts moving the moment it
- * scrolls into view is an animation you did not ask for. The element's poster overlay (its play
- * button) is the affordance: the viewer opts in, and only then does anything tick.
- *
- * Transport chrome (play/pause, restart, speed) lives *outside* the element so both entrypoints share
- * one control strip; the in-element corner reset is hidden via `::part(reset)`.
+ * **Autoplay policy:** start running when scrolled into view *only* if the palette is
+ * flicker-proof (`isFlickerProofPalette`). Otherwise always paused until the viewer presses play.
+ * Reduced-motion is still honored by the element (poster until explicit play).
  */
 
-// The embed's entry module registers <hexlife-world> as a side effect (customElements.define).
+import {navigateTo} from '@devvit/web/client'
 import '../../../src/embed/index.js'
+import {rulesetName} from '../../../src/core/rulesetName.js'
+import {
+  decodeWorldCode,
+  explorerUrlForRuleset,
+  isFlickerProofPalette,
+} from '../../../src/core/WorldCodec.js'
 import {fetchWorldCode} from './fetch.ts'
 
+/** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
+export type ChromeMode = 'feed' | 'lab'
+
 /**
- * The fallback specimen, for a post created without a code (the app-install demo post). Plain
- * attributes, no code — a random seeded world rather than a broken one.
+ * Fallback specimen for install-demo posts with no Redis code. Attribute-driven, no palette
+ * settings → not flicker-proof → always starts paused.
  */
 const DEMO = {
   ruleset: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
   seed: '12345',
   rows: '64',
   speed: '20',
-}
+} as const
 
-/** The bits of `<hexlife-world>`'s public API this page reads. */
+const DEFAULT_EMBED_ROWS = 64
+
+/** Bits of `<hexlife-world>` this page reads. */
 type HexWorld = HTMLElement & {
   readonly tickCount: number
   readonly playing: boolean
   readonly userPaused: boolean
   readonly error?: string | null
-  /** The live sim, once booted — read to seed the speed slider with the code's speed. */
-  readonly sim?: {speed: number} | null
+  readonly sim?: {speed: number; rows: number; cols: number} | null
   play(): void
   pause(): void
   reset(): void
 }
 
+type WorldMeta = {
+  rulesetHex: string
+  rows: number
+  cols: number | null
+  speed: number | null
+  flickerSafe: boolean
+}
+
 /**
  * @param mount Where the world goes.
- * @param status A one-line surface for boot/failure text. There is no console on a phone, so a
- *   failure has to be legible on the post itself; on success it goes away entirely.
+ * @param status Boot/failure line (hidden on success).
+ * @param opts.mode `feed` = quiet in-post chrome; `lab` = full transport + Explorer CTA.
  */
 export async function mountHexLife(
   mount: HTMLElement,
   status: HTMLElement,
+  opts: {mode: ChromeMode} = {mode: 'lab'},
 ): Promise<void> {
   status.textContent = 'Loading…'
+  status.hidden = false
 
   const code = await fetchWorldCode()
+  const meta = await resolveMeta(code)
 
   const world = document.createElement('hexlife-world') as HexWorld
   if (code) world.setAttribute('code', code)
   else for (const [k, v] of Object.entries(DEMO)) world.setAttribute(k, v)
 
-  // Paused ⇒ the element shows its play overlay and ticks nothing until the viewer presses it.
-  world.setAttribute('paused', '')
-  // No attribution link inside a post: an outbound <a> in a webview is a navigation we have not
-  // cleared with Devvit, and the post is not a third-party page that owes us a credit.
+  // Always-paused when not flicker-safe. Flicker-safe: no `paused` → element autoplays when
+  // on-screen (IntersectionObserver) and stops when scrolled away.
+  if (!meta.flickerSafe) world.setAttribute('paused', '')
+
+  // No in-element attribution — we own the Explorer CTA outside the element.
   world.setAttribute('link', 'off')
 
   mount.append(world)
 
+  paintIdentity(meta)
+  wireExplorerLink(meta)
+  wireCopyHex(meta.rulesetHex)
   wireTransport(world)
+  applyChromeMode(opts.mode)
 
-  // The element renders its own error state in-place (bad code, no WebGL2); mirror it to the status
-  // line so the failure is visible even if the canvas area is clipped in the feed.
   const settle = (): void => {
     const speedInput = document.getElementById(
       'speed',
     ) as HTMLInputElement | null
-    // Seed the slider from the code's speed once the sim exists, so the control starts where the post
-    // actually runs rather than at the markup default.
     if (speedInput && world.sim) speedInput.value = String(world.sim.speed)
+
+    // Prefer live sim dims once booted (demo path has no cols until then).
+    if (world.sim) {
+      paintIdentity({
+        ...meta,
+        rows: world.sim.rows,
+        cols: world.sim.cols,
+      })
+    }
+
     syncPlayPauseLabel(world)
     status.textContent = world.error ?? ''
     status.hidden = !world.error
   }
   world.addEventListener('hexlife-ready', settle)
-  // A failed boot dispatches nothing, so poll briefly for the error state rather than hanging on
-  // "Loading…" forever.
   setTimeout(settle, 2000)
 }
 
-/** Play/pause + restart + speed — shared by splash and game entrypoints. */
+async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
+  if (!code) {
+    return {
+      rulesetHex: DEMO.ruleset,
+      rows: Number(DEMO.rows),
+      cols: null,
+      speed: Number(DEMO.speed),
+      flickerSafe: false,
+    }
+  }
+  const world = await decodeWorldCode(code)
+  if (!world) {
+    return {
+      rulesetHex: DEMO.ruleset,
+      rows: DEFAULT_EMBED_ROWS,
+      cols: null,
+      speed: null,
+      flickerSafe: false,
+    }
+  }
+  return {
+    rulesetHex: world.rulesetHex,
+    rows: world.rows,
+    cols: world.cols,
+    speed: world.speed,
+    flickerSafe: isFlickerProofPalette(world.colorSettings, world.lut),
+  }
+}
+
+function paintIdentity(meta: WorldMeta): void {
+  const root = document.getElementById('identity')
+  if (!root) return
+
+  const nameEl = document.getElementById('specimen-name')
+  const hexEl = document.getElementById('specimen-hex')
+  const metaEl = document.getElementById('specimen-meta')
+
+  const name = rulesetName(meta.rulesetHex)
+  if (nameEl) nameEl.textContent = name
+
+  if (hexEl) {
+    const short =
+      meta.rulesetHex.length >= 8
+        ? `${meta.rulesetHex.slice(0, 8)}…`
+        : meta.rulesetHex
+    hexEl.textContent = short
+    hexEl.setAttribute('title', meta.rulesetHex)
+    hexEl.dataset.hex = meta.rulesetHex
+  }
+
+  if (metaEl) {
+    const grid =
+      meta.cols != null ? `${meta.rows}×${meta.cols}` : `${meta.rows} rows`
+    metaEl.textContent = grid
+  }
+
+  root.hidden = false
+}
+
+function wireExplorerLink(meta: WorldMeta): void {
+  const href = explorerUrlForRuleset(meta.rulesetHex, {rows: meta.rows})
+  for (const id of ['open-explorer', 'open-explorer-quiet'] as const) {
+    const a = document.getElementById(id) as HTMLAnchorElement | null
+    if (!a) continue
+    a.href = href
+    a.title =
+      'Open this ruleset in HexLife Explorer (full lab — fresh start with the same rule)'
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    // Reddit webviews swallow plain <a> navigations (right-click "open in new tab" still works
+    // because it bypasses the click handler). Use Devvit's navigateTo effect so left-click works.
+    a.addEventListener('click', ev => {
+      ev.preventDefault()
+      navigateTo(href)
+    })
+  }
+}
+
+function wireCopyHex(rulesetHex: string): void {
+  const btn = document.getElementById('copy-hex') as HTMLButtonElement | null
+  if (!btn) return
+  btn.addEventListener('click', () => {
+    void copyText(rulesetHex).then(ok => {
+      const prev = btn.textContent
+      btn.textContent = ok ? 'Copied' : 'Copy failed'
+      setTimeout(() => {
+        btn.textContent = prev
+      }, 1200)
+    })
+  })
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.append(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    ta.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
+function applyChromeMode(mode: ChromeMode): void {
+  document.body.dataset.chrome = mode
+  // Feed: hide speed row label clutter — CSS also gates .lab-only / .feed-only
+}
+
+/** Play/pause + restart + speed — shared by splash and game. */
 function wireTransport(world: HexWorld): void {
   const speedInput = document.getElementById('speed') as HTMLInputElement | null
   const playPauseBtn = document.getElementById(
@@ -105,7 +247,6 @@ function wireTransport(world: HexWorld): void {
   ) as HTMLButtonElement | null
 
   if (speedInput) {
-    // `speed` is a playback rate, not part of the tick sequence, so the element applies it live.
     speedInput.addEventListener('input', () =>
       world.setAttribute('speed', speedInput.value),
     )
@@ -113,7 +254,6 @@ function wireTransport(world: HexWorld): void {
 
   if (playPauseBtn) {
     playPauseBtn.addEventListener('click', () => {
-      // Prefer the element's user-paused flag over `playing` (which is also false when offscreen).
       if (world.userPaused || !world.playing) {
         world.removeAttribute('paused')
         world.play()
@@ -128,15 +268,12 @@ function wireTransport(world: HexWorld): void {
   if (restartBtn) {
     restartBtn.addEventListener('click', () => {
       world.reset()
-      // Stay in whatever play state we were in — restart rewinds, it doesn't force pause.
       if (!world.playing && !world.userPaused) world.play()
       syncPlayPauseLabel(world)
     })
   }
 
-  // Keep the button glyph honest when the user presses the in-element poster overlay instead.
   world.addEventListener('hexlife-ready', () => syncPlayPauseLabel(world))
-  // The element doesn't emit a play/pause event; poll cheaply while mounted.
   setInterval(() => syncPlayPauseLabel(world), 400)
 }
 

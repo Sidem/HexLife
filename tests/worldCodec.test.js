@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { encodeWorldCode, decodeWorldCode, isWorldCode } from '../src/core/WorldCodec.js';
+import {
+    encodeWorldCode,
+    decodeWorldCode,
+    isWorldCode,
+    isFlickerProofPalette,
+    explorerUrlForRuleset,
+} from '../src/core/WorldCodec.js';
 import { packCells } from '../src/utils/utils.js';
 import { generateColorLUT } from '../src/utils/ruleVizUtils.js';
 import { precomputeSymmetryGroups } from '../src/core/Symmetry.js';
@@ -177,5 +183,73 @@ describe('WorldCodec', () => {
     it('tolerates surrounding whitespace from a paste', async () => {
         const code = await encodeWorldCode(makeWorld(16));
         expect((await decodeWorldCode(`\n  ${code}  \n`)).rulesetHex).toBe(RULESET);
+    });
+
+    describe('isFlickerProofPalette (Devvit autoplay gate)', () => {
+        it('requires flickerProofPresets on preset modes', () => {
+            expect(isFlickerProofPalette({ mode: 'preset', activePreset: 'default' })).toBe(false);
+            expect(isFlickerProofPalette({
+                mode: 'preset', activePreset: 'default', flickerProofPresets: true,
+            })).toBe(true);
+        });
+
+        it('rejects gradient and baked LUTs', () => {
+            expect(isFlickerProofPalette({
+                mode: 'gradient', customGradient: { on: ['#f00'], off: ['#000'] },
+            })).toBe(false);
+            expect(isFlickerProofPalette(null, new Uint8Array(1024))).toBe(false);
+            expect(isFlickerProofPalette(null)).toBe(false);
+        });
+
+        it('accepts neighbor/symmetry maps only when birth/death colors match', () => {
+            expect(isFlickerProofPalette({
+                mode: 'neighbor_count',
+                customNeighborColors: {
+                    '0-0': { on: '#000000', off: '#111' },
+                    '1-6': { on: '#fff', off: '#000000' },
+                },
+            })).toBe(true);
+            expect(isFlickerProofPalette({
+                mode: 'neighbor_count',
+                customNeighborColors: {
+                    '0-0': { on: '#ffffff', off: '#111' },
+                    '1-6': { on: '#fff', off: '#333333' },
+                },
+            })).toBe(false);
+            expect(isFlickerProofPalette({
+                mode: 'symmetry',
+                customSymmetryColors: {
+                    '0-0': { on: '#abc', off: '#000' },
+                    '1-63': { on: '#fff', off: '#ABC' },
+                },
+            })).toBe(true);
+        });
+
+        it('survives round-trip: flag only present when true in the code', async () => {
+            const withFlag = await decodeWorldCode(await encodeWorldCode({
+                ...makeWorld(16),
+                colorSettings: { mode: 'preset', activePreset: 'default', flickerProofPresets: true },
+            }));
+            const without = await decodeWorldCode(await encodeWorldCode({
+                ...makeWorld(16),
+                colorSettings: { mode: 'preset', activePreset: 'default' },
+            }));
+            expect(isFlickerProofPalette(withFlag.colorSettings)).toBe(true);
+            expect(isFlickerProofPalette(without.colorSettings)).toBe(false);
+        });
+    });
+
+    describe('explorerUrlForRuleset', () => {
+        it('builds a ShareCodec r= deep-link', () => {
+            const url = explorerUrlForRuleset(RULESET);
+            expect(url).toBe(`https://sidem.github.io/HexLife/?r=${RULESET}`);
+        });
+
+        it('adds g= when rows differ from the embed default', () => {
+            expect(explorerUrlForRuleset(RULESET, { rows: 192 }))
+                .toBe(`https://sidem.github.io/HexLife/?r=${RULESET}&g=192`);
+            expect(explorerUrlForRuleset(RULESET, { rows: 64 }))
+                .toBe(`https://sidem.github.io/HexLife/?r=${RULESET}`);
+        });
     });
 });

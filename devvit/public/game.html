@@ -9,54 +9,73 @@
     <title>HexLife</title>
     <link rel="modulepreload" href="game.js">
     <style>
+    :root {
+      --bg: #0c0e10;
+      --panel: rgba(22, 26, 32, 0.92);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #e8eaed;
+      --muted: #9aa3ad;
+      --accent: #6cb6ff;
+      --accent-dim: rgba(108, 182, 255, 0.18);
+      --danger-soft: #f0b429;
+      --radius: 12px;
+      --tap: 44px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-t: env(safe-area-inset-top, 0px);
+    }
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
       width: 100dvw;
       height: 100dvh;
       overflow: hidden;
       display: grid;
-      grid-template-rows: 1fr auto auto;
-      place-items: center;
-      background: #101214;
-      color: #c8ccd0;
+      grid-template-rows: auto 1fr auto;
+      background: var(--bg);
+      color: var(--text);
       font:
-        12px / 1.4 ui-monospace,
-        monospace;
+        13px / 1.35 system-ui,
+        -apple-system,
+        'Segoe UI',
+        Roboto,
+        sans-serif;
+      padding-top: var(--safe-t);
+      padding-bottom: var(--safe-b);
     }
-    #controls {
+    #identity {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       gap: 8px;
-      padding: 4px 10px;
-      width: 100%;
-      box-sizing: border-box;
-      justify-content: center;
-      flex-wrap: wrap;
+      padding: 10px 14px 6px;
+      min-width: 0;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(12, 14, 16, 0.85);
     }
-    #controls label {
-      opacity: 0.75;
+    #identity[hidden] {
+      display: none;
     }
-    #controls button {
-      margin: 0;
-      padding: 4px 10px;
-      min-width: 2.4em;
-      border: 1px solid #3a4046;
-      border-radius: 999px;
-      background: #1a1e22;
-      color: #e6e9ec;
-      font: inherit;
-      cursor: pointer;
+    #specimen-name {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
-    #controls button:hover {
-      background: #242a30;
+    #specimen-hex {
+      font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+      font-size: 11px;
+      color: var(--muted);
+      flex-shrink: 0;
     }
-    #controls button:active {
-      background: #2e353c;
-    }
-    #speed {
-      width: min(45%, 180px);
-      accent-color: #6cb6ff;
-      cursor: pointer;
+    #specimen-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+      flex-shrink: 0;
     }
     #world {
       display: grid;
@@ -64,44 +83,148 @@
       width: 100%;
       height: 100%;
       min-height: 0;
+      padding: 4px;
     }
-    /* Square, and never taller than the viewport row it sits in. */
     #world hexlife-world {
       width: min(100%, 100cqmin);
       max-width: min(100vw, 100dvh);
       max-height: 100%;
-      /* External chrome owns Restart — hide the in-element corner button. */
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
     }
     #world hexlife-world::part(reset) {
       display: none;
     }
+    #chrome {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 12px calc(10px + var(--safe-b));
+      background: var(--panel);
+      border-top: 1px solid var(--panel-border);
+      backdrop-filter: blur(12px);
+    }
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    #controls button,
+    #copy-hex {
+      margin: 0;
+      min-height: var(--tap);
+      min-width: var(--tap);
+      padding: 0 14px;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      background: #151a20;
+      color: var(--text);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #controls button:hover,
+    #copy-hex:hover {
+      border-color: rgba(108, 182, 255, 0.35);
+      background: #1c222a;
+    }
+    #controls button:active {
+      background: #242b34;
+    }
+    #controls label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    #speed {
+      width: min(45%, 180px);
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    a.explorer-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: var(--tap);
+      padding: 0 18px;
+      border-radius: 999px;
+      color: #0c0e10;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--accent);
+      border: 1px solid transparent;
+      flex: 1 1 auto;
+      max-width: 280px;
+    }
+    a.explorer-link:hover {
+      filter: brightness(1.08);
+    }
+    body[data-chrome='feed'] .lab-only {
+      display: none;
+    }
+    body[data-chrome='lab'] .feed-only {
+      display: none;
+    }
     #status {
-      padding: 4px 8px;
-      opacity: 0.75;
+      text-align: center;
+      padding: 0 8px 2px;
+      font-size: 12px;
+      color: var(--danger-soft);
     }
     #status[hidden] {
       display: none;
     }
+    #status:empty {
+      display: none;
+    }
     </style>
   </head>
-  <body>
+  <body data-chrome="lab">
+    <header id="identity" hidden>
+      <span id="specimen-name">HexLife</span>
+      <span id="specimen-hex"></span>
+      <span id="specimen-meta"></span>
+    </header>
     <main id="world"></main>
-    <div id="controls">
-      <button
-        id="play-pause"
-        type="button"
-        aria-label="Play"
-        title="Play / Pause"
-      >
-        ▶
-      </button>
-      <button id="restart" type="button" aria-label="Restart" title="Restart">
-        ↺
-      </button>
-      <label for="speed">Speed</label>
-      <input id="speed" type="range" min="1" max="120" step="1" value="20">
+    <div id="chrome">
+      <div id="controls">
+        <button
+          id="play-pause"
+          type="button"
+          aria-label="Play"
+          title="Play / Pause"
+        >
+          ▶
+        </button>
+        <button id="restart" type="button" aria-label="Restart" title="Restart">
+          ↺
+        </button>
+        <label for="speed">Speed</label>
+        <input id="speed" type="range" min="1" max="120" step="1" value="20">
+        <button id="copy-hex" type="button" title="Copy full ruleset hex">
+          Copy hex
+        </button>
+      </div>
+      <div class="actions">
+        <a
+          id="open-explorer"
+          class="explorer-link"
+          href="https://sidem.github.io/HexLife/"
+          >Open full lab ↗</a
+        >
+      </div>
+      <div id="status">Loading…</div>
     </div>
-    <div id="status">Loading…</div>
     <script src="game.js" type="module"></script>
   </body>
 </html>

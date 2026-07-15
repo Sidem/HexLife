@@ -16,6 +16,9 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
   **⋯ → New HexLife post**, paste the code, and set a title.
 - **In-post controls** — play / pause, restart, speed slider; scroll-wheel zoom (desktop) and
   pinch zoom (mobile). Posts start **paused** so the feed doesn’t auto-animate.
+- **Open in Explorer** — deep-link to the full lab with the post’s ruleset loaded (`?r=<ruleset>`).
+- **Autoplay** — starts when scrolled into view only if the palette is flicker-proof; otherwise
+  paused until you press play.
 - **No external network calls** — the simulation engine (Rust → WebAssembly) and WebGL renderer
   are bundled in the webview. Redis only stores the world code per post ID.
 

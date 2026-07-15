@@ -418,3 +418,65 @@ export async function decodeWorldCode(code) {
 export function isWorldCode(code) {
     return typeof code === 'string' && code.trim().startsWith(PREFIX);
 }
+
+/**
+ * Whether a world-code palette is safe to **autoplay** in a feed without birth/death strobing.
+ *
+ * Matches the explorer's "Prevent birth/death flash" guard (`flickerProofPresets`) for preset
+ * modes, and the Chroma Lab deflicker check for neighbor/symmetry custom maps. Baked LUTs and
+ * gradient modes have no reliable guard → not autoplay-safe. Conservative when unknown.
+ *
+ * @param {object|null|undefined} colorSettings Decoded world-code settings (or null).
+ * @param {Uint8Array|null|undefined} [lut] Baked LUT when settings are absent.
+ * @returns {boolean}
+ */
+export function isFlickerProofPalette(colorSettings, lut = null) {
+    if (lut && !colorSettings) return false;
+    if (!colorSettings || typeof colorSettings !== 'object') return false;
+
+    const mode = /** @type {any} */ (colorSettings).mode || 'preset';
+
+    // Preset path: generateColorLUT only zeros birth/death when this flag is true.
+    if (mode === 'preset') {
+        return /** @type {any} */ (colorSettings).flickerProofPresets === true;
+    }
+
+    // Gradient has no birth/death override in the LUT builder.
+    if (mode === 'gradient') return false;
+
+    if (mode === 'neighbor_count') {
+        const map = /** @type {any} */ (colorSettings).customNeighborColors || {};
+        const birth = String(map['0-0']?.on ?? '#ffffff').toLowerCase();
+        const death = String(map['1-6']?.off ?? '#333333').toLowerCase();
+        return birth === death;
+    }
+
+    if (mode === 'symmetry') {
+        const map = /** @type {any} */ (colorSettings).customSymmetryColors || {};
+        const birth = String(map['0-0']?.on ?? '#ffffff').toLowerCase();
+        const death = String(map['1-63']?.off ?? '#333333').toLowerCase();
+        return birth === death;
+    }
+
+    return false;
+}
+
+/**
+ * Build an Explorer deep-link that loads the given ruleset (ShareCodec `r` param).
+ * Optional grid rows ride as `g` when non-default for embeds (64).
+ *
+ * @param {string} rulesetHex
+ * @param {{ rows?: number, origin?: string }} [opts]
+ * @returns {string}
+ */
+export function explorerUrlForRuleset(rulesetHex, opts = {}) {
+    const origin = opts.origin || 'https://sidem.github.io/HexLife/';
+    const url = new URL(origin.endsWith('/') ? origin : `${origin}/`);
+    if (typeof rulesetHex === 'string' && /^[0-9a-fA-F]{32}$/.test(rulesetHex)) {
+        url.searchParams.set('r', rulesetHex.toUpperCase());
+    }
+    if (typeof opts.rows === 'number' && opts.rows > 0 && opts.rows !== 64) {
+        url.searchParams.set('g', String(opts.rows));
+    }
+    return url.toString();
+}

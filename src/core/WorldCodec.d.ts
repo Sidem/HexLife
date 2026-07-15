@@ -57,8 +57,24 @@ export function decodeWorldCode(code: string): Promise<DecodedWorld | null>
 /** Cheap synchronous shape check: does this string even claim to be a world code? */
 export function isWorldCode(code: string): boolean
 
+/**
+ * Whether a world-code palette is safe to autoplay (no birth/death strobing).
+ * Conservative when unknown (baked LUT, gradient, missing settings).
+ */
+export function isFlickerProofPalette(
+  colorSettings: object | null | undefined,
+  lut?: Uint8Array | null,
+): boolean
+
+/** Explorer deep-link with ShareCodec `r` (and optional `g` rows). */
+export function explorerUrlForRuleset(
+  rulesetHex: string,
+  opts?: {rows?: number; origin?: string},
+): string
+
 export const PALETTE_SETTINGS: 0
 export const PALETTE_LUT: 1
 
 export const CELLS_PACKED: 0
 export const CELLS_GENERATOR: 1
+
