@@ -14,6 +14,11 @@ export async function dbSetWorldCode(t3: T3, code: string): Promise<void> {
   await redis.set(worldKey(t3), code)
 }
 
+/** Drop the world code when a post is deleted (Devvit content-deletion policy). */
+export async function dbDeleteWorldCode(t3: T3): Promise<void> {
+  await redis.del(worldKey(t3))
+}
+
 function worldKey(t3: T3): string {
   return `world:${t3}`
 }

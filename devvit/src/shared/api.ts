@@ -18,8 +18,13 @@ export const Endpoint = {
   OnAppInstall: 'internal/on/app/install',
   OnMenuNewPost: 'internal/on/menu/new-post',
   OnFormNewPost: 'internal/on/form/new-post',
-  /** Text posts whose body is a pure world code (from explorer "Post to r/hexlife") → Live Specimen. */
+  /**
+   * Best-effort: pure-HXW1 text posts → Live Specimen. Not the primary create path (that is the
+   * menu form); kept for accidental text dumps of a world code.
+   */
   OnPostSubmit: 'internal/on/post/submit',
+  /** Clear Redis when a Live Specimen post is deleted. */
+  OnPostDelete: 'internal/on/post/delete',
 } as const
 
 export const EndpointMethod = {
@@ -28,6 +33,7 @@ export const EndpointMethod = {
   [Endpoint.OnMenuNewPost]: 'POST',
   [Endpoint.OnFormNewPost]: 'POST',
   [Endpoint.OnPostSubmit]: 'POST',
+  [Endpoint.OnPostDelete]: 'POST',
 } as const satisfies {[endpoint: string]: 'GET' | 'POST'}
 
 /** Must match the form name registered in devvit.json → `forms`. */

@@ -619,13 +619,17 @@ export class UIManager {
     }
 
     /**
-     * Open Reddit's r/hexlife submit form with the current world, so a logged-in user can post in
-     * one click. A pure world-code body is upgraded by the Devvit app (`onPostSubmit`) into a Live
-     * Specimen custom post; longer codes that won't fit a URL are copied and the form opens with a
-     * short paste instruction instead.
+     * Copy the world code and open r/hexlife so the user can create a **Live Specimen** via the
+     * installed HexLife app's menu form (⋯ → New HexLife post).
      *
-     * There is no browser API for creating Devvit custom posts from github.io — Reddit login cookies
-     * only apply on reddit.com — so the submit form *is* the direct path.
+     * Why not a one-click custom post from github.io?
+     * - Devvit custom posts can only be created by the app (`submitCustomPost`), from a menu/form/
+     *   trigger running *inside* Reddit — there is no public "create interactive post" URL.
+     * - `/r/hexlife/submit` only opens a normal text/link/image composer, never the app form.
+     * - Publishing the app does **not** unlock an external create-post deep link; it only lets
+     *   other subreddits install the app and lifts the &lt;200-sub unpublished install cap.
+     * - A best-effort `onPostSubmit` converter exists for pure-HXW1 text posts, but the supported
+     *   path is the menu form (title + code fields), not the generic submit screen.
      */
     async _onPostToReddit() {
         const code = await this._exportWorldCodeToSharePanel();
@@ -633,40 +637,29 @@ export class UIManager {
 
         const titleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('redditPostTitle'));
         const title = (titleInput?.value || '').trim() || 'HexLife';
+        const size = `${(code.length / 1024).toFixed(1)} KB`;
 
-        // Reddit URL length is browser-limited; stay conservative so the submit page actually opens.
-        const MAX_URL_CODE = 1500;
-        const params = new URLSearchParams();
-        params.set('title', title.slice(0, 300));
-
-        let toast;
-        if (code.length <= MAX_URL_CODE) {
-            // Body is ONLY the world code so the Devvit onPostSubmit converter can recognize it.
-            params.set('text', code);
-            toast = 'Opening Reddit — hit Post to publish this Live Specimen to r/hexlife.';
-        } else {
-            try {
-                await navigator.clipboard.writeText(code);
-                params.set(
-                    'text',
-                    'Paste the HexLife world code here (it was copied to your clipboard).\n\nHXW1.',
-                );
-                toast = `World code copied (${(code.length / 1024).toFixed(1)} KB) — paste it into the Reddit text box, then Post.`;
-            } catch {
-                toast = 'World code is in the Share panel — paste it into Reddit’s text box, then Post.';
-            }
+        try {
+            await navigator.clipboard.writeText(code);
+        } catch (err) {
+            console.warn('Clipboard write blocked; the code is in the Share popout:', err);
         }
 
-        const url = `https://www.reddit.com/r/hexlife/submit?${params.toString()}`;
+        // Open the subreddit (not /submit) — the Live Specimen form is the app menu item, not
+        // Reddit's built-in composer.
+        const url = 'https://www.reddit.com/r/hexlife/';
         const opened = window.open(url, '_blank', 'noopener,noreferrer');
         if (!opened) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                message: 'Pop-up blocked — allow pop-ups for this site, or copy the world code and submit on r/hexlife manually.',
+                message: `World code ready (${size}) — open r/hexlife, then ⋯ → New HexLife post and paste it. Title suggestion: “${title.slice(0, 80)}”`,
                 type: 'error',
             });
             return;
         }
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: toast, type: 'success' });
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: `Code copied (${size}). On r/hexlife: ⋯ → New HexLife post → paste code. Title: “${title.slice(0, 60)}”`,
+            type: 'success',
+        });
     }
 
     /**

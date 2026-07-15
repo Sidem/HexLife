@@ -18,7 +18,7 @@ import {
   NEW_POST_FORM,
   type NewPostFormValues,
 } from '../shared/api.ts'
-import {dbGetWorldCode, dbSetWorldCode} from './db.ts'
+import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
 
 type AnyRsp = GetWorldRsp | UiResponse | TriggerResponse | ErrorRsp
 
@@ -65,6 +65,9 @@ async function route(
       case Endpoint.OnPostSubmit:
         rsp = await routePostSubmit(reqMsg)
         break
+      case Endpoint.OnPostDelete:
+        rsp = await routePostDelete(reqMsg)
+        break
       default:
         endpoint satisfies never
         rsp = {error: 'not found', status: 404}
@@ -83,9 +86,8 @@ async function routeGetWorld(): Promise<GetWorldRsp> {
 }
 
 /**
- * The moderator picked "New HexLife post" — show the form. Post params are NOT configured on Reddit:
- * a world is authored in the explorer (where you can actually see it) and exported there as one
- * code, which is the only thing this form takes.
+ * User picked "New HexLife post" (subreddit menu; available to all users). Post params are NOT
+ * configured on Reddit: a world is authored in the explorer and exported as one world code.
  */
 function routeMenuNewPost(): UiResponse {
   return {
@@ -94,8 +96,8 @@ function routeMenuNewPost(): UiResponse {
       form: {
         title: 'New HexLife post',
         description:
-          'In HexLife Explorer, open Share → "Copy World Code" (or the command palette → "Copy world code"), then paste it here. The code carries the exact grid, ruleset, starting cells and colors of the world you were looking at.',
-        acceptLabel: 'Create post',
+          'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.',
+        acceptLabel: 'Create Live Specimen',
         fields: [
           {
             type: 'paragraph',
@@ -132,7 +134,14 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   }
 
   const title = (values.title ?? '').trim() || 'HexLife'
-  const post = await reddit.submitCustomPost({title})
+  const post = await reddit.submitCustomPost({
+    title,
+    // Shown when the interactive webview cannot load (old clients, errors). Required-ish for
+    // review polish; never contains the full code (too long / not human-readable).
+    textFallback: {
+      text: `HexLife Live Specimen — open this post on a modern Reddit client to play the simulation.\n\nRuleset: ${world.rulesetHex}\nGrid: ${world.rows}×${world.cols}`,
+    },
+  })
   await dbSetWorldCode(post.id, code)
 
   return {
@@ -146,18 +155,19 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
 
 /** The install trigger's demo post carries no code; the webview falls back to its built-in world. */
 async function routeAppInstall(): Promise<TriggerResponse> {
-  await reddit.submitCustomPost({title: 'HexLife'})
+  await reddit.submitCustomPost({
+    title: 'HexLife',
+    textFallback: {
+      text: 'HexLife — a live hexagonal cellular automaton. Open this post on a modern Reddit client to play.',
+    },
+  })
   return {}
 }
 
 /**
- * Explorer "Post to r/hexlife" opens Reddit's normal submit form with the world code as the body.
- * When such a text post lands, upgrade it into a Live Specimen custom post (same title, code in
- * Redis) and remove the text post so the subreddit isn't left with a raw code dump.
- *
- * Only pure world-code bodies convert — anything else is left alone. Failures are logged and
- * swallowed: a trigger must not 500-loop the platform, and the user's text post remains as a
- * fallback if conversion can't run.
+ * Best-effort converter: if someone posts a *pure* world-code text body, upgrade it to a Live
+ * Specimen. Primary create path remains the subreddit menu form — Reddit's `/submit` page cannot
+ * open that form, and this trigger is intentionally conservative (only pure HXW1 bodies).
  */
 async function routePostSubmit(
   reqMsg: IncomingMessage,
@@ -186,7 +196,12 @@ async function routePostSubmit(
 
   try {
     const title = (post.title ?? '').trim() || 'HexLife'
-    const custom = await reddit.submitCustomPost({title})
+    const custom = await reddit.submitCustomPost({
+      title,
+      textFallback: {
+        text: `HexLife Live Specimen — ruleset ${world.rulesetHex} (${world.rows}×${world.cols}).`,
+      },
+    })
     await dbSetWorldCode(custom.id, code)
 
     // Best-effort cleanup of the intermediate text post. The Reddit client surface varies by
@@ -222,6 +237,22 @@ async function routePostSubmit(
     console.error(`onPostSubmit: failed to upgrade ${postId}:`, err)
   }
 
+  return {}
+}
+
+/** Honor post deletion: drop the world code from Redis so we don't retain deleted content. */
+async function routePostDelete(
+  reqMsg: IncomingMessage,
+): Promise<TriggerResponse> {
+  const body = await readJson<{post?: {id?: string}}>(reqMsg)
+  const postId = body?.post?.id
+  if (postId) {
+    try {
+      await dbDeleteWorldCode(postId as import('@devvit/web/shared').T3)
+    } catch (err) {
+      console.warn(`onPostDelete: failed to clear world for ${postId}:`, err)
+    }
+  }
   return {}
 }
 

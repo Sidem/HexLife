@@ -99,7 +99,7 @@ export class CommandPalette {
             { title: 'Record / stop video', category: 'Capture', icon: ICONS.video, run: dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING) },
             { title: 'Share setup link', category: 'Capture', icon: ICONS.share, run: () => { this._openPopout('share'); EventBus.dispatch(EVENTS.COMMAND_SHARE_SETUP); } },
             { title: 'Copy world code', subtitle: 'Exact grid, ruleset, cells & colors — the Reddit post payload', category: 'Capture', icon: ICONS.share, run: dispatch(EVENTS.COMMAND_COPY_WORLD_CODE) },
-            { title: 'Post to r/hexlife', subtitle: 'Open Reddit submit with this world (must be logged in)', category: 'Capture', icon: ICONS.share, run: dispatch(EVENTS.COMMAND_POST_TO_REDDIT) },
+            { title: 'Copy code & open r/hexlife', subtitle: 'Then ⋯ → New HexLife post on the subreddit', category: 'Capture', icon: ICONS.share, run: dispatch(EVENTS.COMMAND_POST_TO_REDDIT) },
             { title: 'Colors (Chroma Lab)', category: 'Capture', icon: ICONS.palette, run: () => this._openPanel('chromalab') },
             { title: 'Settings / preferences', category: 'Capture', icon: ICONS.cog, run: () => this._openPanel('settings') },
             { title: 'Keyboard shortcuts', category: 'Capture', icon: ICONS.keyboard, run: () => this._openPanel('shortcuts') },

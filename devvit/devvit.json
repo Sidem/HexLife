@@ -16,8 +16,9 @@
     "items": [
       {
         "label": "New HexLife post",
-        "description": "Create a post from a world code exported in HexLife Explorer.",
+        "description": "Create a Live Specimen from a world code exported in HexLife Explorer.",
         "location": "subreddit",
+        "forUserType": "user",
         "endpoint": "/internal/on/menu/new-post"
       }
     ]
@@ -27,7 +28,8 @@
   },
   "triggers": {
     "onAppInstall": "/internal/on/app/install",
-    "onPostSubmit": "/internal/on/post/submit"
+    "onPostSubmit": "/internal/on/post/submit",
+    "onPostDelete": "/internal/on/post/delete"
   },
   "scripts": {
     "dev": "npm run watch"
