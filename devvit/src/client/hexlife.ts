@@ -37,6 +37,8 @@ type HexWorld = HTMLElement & {
   readonly tickCount: number
   readonly playing: boolean
   readonly error?: string | null
+  /** The live sim, once booted — read to seed the speed slider with the code's speed. */
+  readonly sim?: {speed: number} | null
   play(): void
 }
 
@@ -65,9 +67,21 @@ export async function mountHexLife(
 
   mount.append(world)
 
+  // Live speed control. `speed` is a playback rate, not part of the tick sequence, so the element
+  // applies attribute changes to the running sim without a re-boot.
+  const speedInput = document.getElementById('speed') as HTMLInputElement | null
+  if (speedInput) {
+    speedInput.addEventListener('input', () =>
+      world.setAttribute('speed', speedInput.value),
+    )
+  }
+
   // The element renders its own error state in-place (bad code, no WebGL2); mirror it to the status
   // line so the failure is visible even if the canvas area is clipped in the feed.
   const settle = (): void => {
+    // Seed the slider from the code's speed once the sim exists, so the control starts where the post
+    // actually runs rather than at the markup default.
+    if (speedInput && world.sim) speedInput.value = String(world.sim.speed)
     status.textContent = world.error ?? ''
     status.hidden = !world.error
   }

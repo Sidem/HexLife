@@ -12,13 +12,30 @@
       height: 100dvh;
       overflow: hidden;
       display: grid;
-      grid-template-rows: 1fr auto auto;
+      grid-template-rows: 1fr auto auto auto;
       place-items: center;
       background: #101214;
       color: #c8ccd0;
       font:
         12px / 1.4 ui-monospace,
         monospace;
+    }
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      width: 100%;
+      box-sizing: border-box;
+      justify-content: center;
+    }
+    #controls label {
+      opacity: 0.75;
+    }
+    #speed {
+      width: min(60%, 220px);
+      accent-color: #6cb6ff;
+      cursor: pointer;
     }
     #world {
       display: grid;
@@ -52,6 +69,10 @@
   </head>
   <body>
     <main id="world"></main>
+    <div id="controls">
+      <label for="speed">Speed</label>
+      <input id="speed" type="range" min="1" max="120" step="1" value="20">
+    </div>
     <button id="expand-btn" type="button">Expand</button>
     <div id="status">Loading…</div>
     <script src="splash.js" type="module"></script>

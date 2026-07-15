@@ -279,8 +279,9 @@ export class HexLifeElement extends HTMLElement {
         }
 
         // A world code owns every world-defining attribute (see `_boot`): the only way to change one
-        // of them is a new code, and a new code means a new world. Both cases are a re-boot.
-        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr' && name !== 'link')) {
+        // of them is a new code, and a new code means a new world. Both cases are a re-boot. `speed`
+        // is exempt — it's a playback rate, not part of the tick sequence, so it applies live.
+        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr' && name !== 'link' && name !== 'speed')) {
             this._generation++;
             this._teardown();
             this._boot(this._generation);
