@@ -14,7 +14,9 @@ export const DEFAULT_BRUSH_SIZE = 2;
 export const MAX_BRUSH_SIZE = 40;
 
 // Keep in lockstep with src/core/neighbor-dirs.json (odd_r / even_r).
+/** @type {ReadonlyArray<ReadonlyArray<number>>} */
 const ODD_R = [[-1, 1], [-1, 0], [0, -1], [1, 0], [1, 1], [0, 1]];
+/** @type {ReadonlyArray<ReadonlyArray<number>>} */
 const EVEN_R = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [0, 1]];
 
 /**
@@ -36,11 +38,22 @@ export function clampBrushSize(n) {
  * @returns {Array<{col: number, row: number}>}
  */
 export function getHexLine(x1, y1, x2, y2) {
+    /**
+     * @param {number} r
+     * @param {number} q
+     * @returns {{x: number, y: number, z: number}}
+     */
     const toCube = (r, q) => {
         const x = q - (r - (r & 1)) / 2;
         const z = r;
         return { x, z, y: -x - z };
     };
+    /**
+     * @param {number} x
+     * @param {number} _y
+     * @param {number} z
+     * @returns {{col: number, row: number}}
+     */
     const fromCube = (x, _y, z) => ({ col: x + (z - (z & 1)) / 2, row: z });
 
     const p1 = toCube(y1, x1);
@@ -48,6 +61,7 @@ export function getHexLine(x1, y1, x2, y2) {
     const dist = Math.max(Math.abs(p1.x - p2.x), Math.abs(p1.y - p2.y), Math.abs(p1.z - p2.z));
     if (dist === 0) return [{ col: x1, row: y1 }];
 
+    /** @type {Array<{col: number, row: number}>} */
     const points = [];
     for (let i = 0; i <= dist; i++) {
         const t = i / dist;
@@ -86,7 +100,9 @@ export function collectBrushCells(startCol, startRow, maxDistance, cols, rows, o
     if (startCol < 0 || startRow < 0 || startCol >= cols || startRow >= rows) return;
 
     const numCells = cols * rows;
+    /** @type {Array<[number, number, number]>} */
     const queue = [];
+    /** @type {Map<number, number>} */
     const visited = new Map();
     let head = 0;
 
@@ -96,11 +112,16 @@ export function collectBrushCells(startCol, startRow, maxDistance, cols, rows, o
     outSet.add(startIndex);
 
     while (head < queue.length) {
-        const [cc, cr, cd] = queue[head++];
+        const item = queue[head++];
+        const cc = item[0];
+        const cr = item[1];
+        const cd = item[2];
         if (cd >= maxDistance) continue;
 
         const dirs = (cc % 2 !== 0) ? ODD_R : EVEN_R;
-        for (const [dx, dy] of dirs) {
+        for (const pair of dirs) {
+            const dx = pair[0];
+            const dy = pair[1];
             const nc = cc + dx;
             const nr = cr + dy;
             const wc = ((nc % cols) + cols) % cols;
