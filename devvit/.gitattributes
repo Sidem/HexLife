@@ -1,0 +1,3 @@
+# Devvit Biome requires LF. Without this, Windows checkouts get CRLF and
+# `npm test` fails with 7 "Formatter would have printed" errors.
+* text=auto eol=lf

@@ -1,11 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "css": {"formatter": {"enabled": true, "quoteStyle": "single"}},
   "files": {"includes": ["**", "!dist/", "!public/*.js*"]},
   "formatter": {
     "bracketSpacing": false,
     "enabled": true,
-    "indentStyle": "space"
+    "indentStyle": "space",
+    "lineEnding": "lf"
   },
   "html": {"formatter": {"enabled": true}},
   "javascript": {
