@@ -355,6 +355,28 @@ multi-kilobyte paste.
 **Accept:** moderator pastes a code from the explorer; the post renders that exact world, paused;
 pressing play runs it; passes a real-phone check.
 
+#### Phase 2 follow-ups, 2026-07-15 (owner request) — generator codes, transparent poster, reset button
+
+Three refinements to the live post, all verified in the built embed (browser, not just Reddit):
+
+- **A pristine random-fill/clumps world ships its recipe, not one frozen draw.** `WorldCodec` gained a
+  second cells-kind (header byte 11): `0` = bit-packed cells (unchanged), `1` = a `{mode, params}`
+  generator descriptor. `WorldManager.exportWorldCode` emits a generator code when the selected world
+  is at **tick 0** on a `density`/`clusters` initial state, and exact cells otherwise (an evolved or
+  drawn world has no recipe). `EmbedSim` runs the SAME `DensityStrategy`/`ClusterStrategy` the worker
+  does, so a generator post **re-rolls a fresh arrangement on every start** (nondeterministic — the post
+  carries no seed). Upshot: a 192×222 random-fill code is ~170 chars instead of multiple KB. Round-trip
+  + re-roll + exact-cells-still-deterministic all covered in `tests/worldCodec.test.js` and a live
+  `<hexlife-world>` check.
+- **The poster overlay is now a whisper of a scrim** (`rgba(16,18,20,0.12)`), so the viewer sees the
+  initial state through the play button before pressing it.
+- **A small, half-transparent reset button** (bottom-left, opacity 0.45) appears once the world is
+  running; it calls the element's `reset()` — a re-roll for a generator world, a rewind for an
+  exact-cells one. Both the overlay and reset button live in `HexLifeElement`, so every `<hexlife-world>`
+  embed (#25) gets them too.
+
+Still the owner's step: `devvit playtest`, and confirming a generator code posts + re-rolls on a phone.
+
 ### Phase 3 — polish + publish
 
 App listing (icon, description, screenshots), Devvit rules compliance pass, demo post on the

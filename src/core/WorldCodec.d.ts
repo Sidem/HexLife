@@ -7,6 +7,13 @@
  * `allowJs`. Keep it in step with the JSDoc next door; `tests/worldCodec.test.js` pins the behavior.
  */
 
+export type GeneratorDescriptor = {
+  /** The initial-state generator mode: `'density'` (random fill) or `'clusters'` (clumps). */
+  mode: string
+  /** Generator parameters (e.g. `{density}` or the cluster params). */
+  params: object
+}
+
 export type DecodedWorld = {
   /** Grid rows. */
   rows: number
@@ -14,8 +21,10 @@ export type DecodedWorld = {
   cols: number
   /** 32-char uppercase hex. */
   rulesetHex: string
-  /** `rows * cols` entries, one byte per cell (0 or 1) — the exact tick-0 state. */
-  cells: Uint8Array
+  /** `rows * cols` entries, one byte per cell (0 or 1) — the exact tick-0 state. Null iff `generator` is set. */
+  cells: Uint8Array | null
+  /** A recipe to reseed the state on every start. Null iff `cells` is set. */
+  generator: GeneratorDescriptor | null
   /** Ticks per second. */
   speed: number
   /** Color settings to feed `generateColorLUT`. Null iff `lut` is set. */
@@ -28,7 +37,10 @@ export type WorldCodeInput = {
   rows: number
   cols: number
   rulesetHex: string
-  cells: Uint8Array | number[]
+  /** The exact tick-0 grid. Required unless `generator` is given. */
+  cells?: Uint8Array | number[]
+  /** A `{mode, params}` generator that replaces `cells` — the embed reseeds from it on every start. */
+  generator?: GeneratorDescriptor
   /** Preferred palette form: compact, and the decoder rebuilds the identical LUT. */
   colorSettings?: object
   /** Fallback palette form: a baked 128×2 **RGBA** LUT (1024 bytes). */
@@ -47,3 +59,6 @@ export function isWorldCode(code: string): boolean
 
 export const PALETTE_SETTINGS: 0
 export const PALETTE_LUT: 1
+
+export const CELLS_PACKED: 0
+export const CELLS_GENERATOR: 1

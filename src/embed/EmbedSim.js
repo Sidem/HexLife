@@ -25,6 +25,7 @@ import { mulberry32 } from '../core/rng.js';
 import { hexToRuleset } from '../core/rulesetHex.js';
 import { deriveGridDimensions } from '../core/gridMath.js';
 import { DensityStrategy } from '../core/initialStateStrategies/DensityStrategy.js';
+import { ClusterStrategy } from '../core/initialStateStrategies/ClusterStrategy.js';
 
 /** Rule-index sentinel meaning "initial state, no rule has fired here yet" (see fragment.glsl). */
 const RULE_INDEX_INITIAL = 255;
@@ -37,6 +38,16 @@ const RULE_INDEX_INITIAL = 255;
 const MAX_TICKS_PER_FRAME = 4;
 
 const densityStrategy = new DensityStrategy();
+
+/**
+ * The initial-state generators a world code can carry (WorldCodec `generator.mode`). These are the
+ * SAME strategy classes the worker runs, so a generator-driven post reseeds exactly as the app would.
+ * Both are pure (no `config.js`), which is why the embed can import them.
+ */
+const generatorStrategies = {
+    density: densityStrategy,
+    clusters: new ClusterStrategy(),
+};
 
 // --- wasm singleton ----------------------------------------------------------
 // wasm-bindgen keeps ONE module-level instance, so every EmbedSim on the page shares one wasm
@@ -120,9 +131,12 @@ export class EmbedSim {
      * @param {Uint8Array|null} [opts.initialCells=null] The exact tick-0 grid (`rows*cols` entries).
      *   When present it replaces density+seed entirely — `reset()` replays these cells verbatim, which
      *   is what makes a world code reproduce *this* world rather than a statistically similar one.
+     * @param {{mode: string, params: object}|null} [opts.generator=null] A `{mode, params}` initial-state
+     *   generator (`'density'` / `'clusters'`) from a world code. When present (and `initialCells` is
+     *   not), `reset()` produces a *fresh* state from it each time — so the in-post reset button varies.
      * @param {number} [opts.speed=10] Target ticks/second.
      */
-    constructor({ rulesetHex, rows = 64, cols, density = 0.5, seed = null, initialCells = null, speed = 10 }) {
+    constructor({ rulesetHex, rows = 64, cols, density = 0.5, seed = null, initialCells = null, generator = null, speed = 10 }) {
         if (!wasmExports) {
             throw new Error('EmbedSim: await initEmbedWasm() before constructing a sim.');
         }
@@ -137,6 +151,14 @@ export class EmbedSim {
         }
         /** @type {Uint8Array|null} A private copy: the caller's buffer is not ours to keep alive. */
         this.initialCells = initialCells ? new Uint8Array(initialCells) : null;
+        /**
+         * @type {{strategy: object, params: object}|null} A resolved initial-state generator, or null.
+         *   Ignored when `initialCells` is set (an exact grid always wins). An unknown mode falls back
+         *   to density, matching the worker's RESET_WORLD handling.
+         */
+        this.generator = (!this.initialCells && generator && generator.mode)
+            ? { strategy: generatorStrategies[generator.mode] || densityStrategy, params: generator.params || {} }
+            : null;
         // The shape DensityStrategy expects — the same three fields the worker passes as its config.
         this.gridConfig = { GRID_COLS: this.cols, GRID_ROWS: this.rows, NUM_CELLS: this.numCells };
 
@@ -195,6 +217,11 @@ export class EmbedSim {
 
         if (this.initialCells) {
             this.state.set(this.initialCells);
+        } else if (this.generator) {
+            // A world-code generator: reseed from its params. A falsy seed (the usual case — a post
+            // carries no seed) means Math.random, so every reset yields a fresh arrangement.
+            const rng = seed ? mulberry32(seed) : Math.random;
+            this.generator.strategy.generate(this.state, this.generator.params, rng, this.gridConfig);
         } else {
             const rng = seed ? mulberry32(seed) : Math.random;
             densityStrategy.generate(this.state, { density: this.density }, rng, this.gridConfig);

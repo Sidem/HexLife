@@ -69,14 +69,39 @@ canvas {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(16, 18, 20, 0.55);
+    /* Only a whisper of a scrim: the whole point of the poster frame is to let the viewer SEE the
+       initial state before pressing play, so the world must read clearly through the button. */
+    background: rgba(16, 18, 20, 0.12);
     border: 0;
     padding: 0;
     cursor: pointer;
     color: #fff;
 }
-.overlay svg { width: 22%; max-width: 88px; opacity: 0.9; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.6)); }
+.overlay svg { width: 22%; max-width: 88px; opacity: 0.85; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7)); }
+.overlay:hover { background: rgba(16, 18, 20, 0.22); }
 .overlay:hover svg { opacity: 1; }
+.reset {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(16, 18, 20, 0.35);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+}
+.reset:hover { opacity: 1; background: rgba(16, 18, 20, 0.6); color: #fff; }
+.reset svg { width: 60%; height: 60%; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
 .attrib {
     position: absolute;
     right: 6px;
@@ -116,6 +141,9 @@ canvas {
 /** Inline play triangle for the poster overlay (no external asset, no font dependency). */
 const PLAY_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="rgba(0,0,0,0.45)" stroke="currentColor" stroke-width="2.5"/><path d="M26 20l20 12-20 12z" fill="currentColor"/></svg>';
 
+/** Inline reload glyph for the corner reset button. */
+const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" fill="currentColor"/></svg>';
+
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
@@ -139,6 +167,18 @@ export class HexLifeElement extends HTMLElement {
         this._overlay.hidden = true;
         this._overlay.addEventListener('click', () => this.play());
 
+        // A small, faint corner button to restart the world once it is running. For a generator-driven
+        // world code (random fill / clumps) this re-rolls a fresh arrangement; for an exact-cells world
+        // it rewinds to tick 0. Only shown while the world is running (see `_syncPlayback`).
+        this._resetBtn = document.createElement('button');
+        this._resetBtn.className = 'reset';
+        this._resetBtn.type = 'button';
+        this._resetBtn.setAttribute('aria-label', 'Restart simulation');
+        this._resetBtn.title = 'Restart';
+        this._resetBtn.innerHTML = RESET_ICON;
+        this._resetBtn.hidden = true;
+        this._resetBtn.addEventListener('click', () => this.reset());
+
         this._attrib = document.createElement('a');
         this._attrib.className = 'attrib';
         this._attrib.target = '_blank';
@@ -150,7 +190,7 @@ export class HexLifeElement extends HTMLElement {
         this._errorBox.className = 'error';
         this._errorBox.hidden = true;
 
-        root.append(style, this._canvas, this._overlay, this._attrib, this._errorBox);
+        root.append(style, this._canvas, this._overlay, this._resetBtn, this._attrib, this._errorBox);
 
         /** @type {EmbedSim|null} */
         this.sim = null;
@@ -409,6 +449,7 @@ export class HexLifeElement extends HTMLElement {
                 density: params.density,
                 seed: params.seed,
                 initialCells: world ? world.cells : null,
+                generator: world ? world.generator : null,
                 speed: world ? world.speed : params.speed,
             });
         } catch (e) {
@@ -478,6 +519,7 @@ export class HexLifeElement extends HTMLElement {
         if (this.sim) { this.sim.free(); this.sim = null; }
 
         this._overlay.hidden = true;
+        this._resetBtn.hidden = true;
     }
 
     // --- attributes -----------------------------------------------------------
@@ -535,6 +577,9 @@ export class HexLifeElement extends HTMLElement {
         // author paused it or reduced-motion suppressed it, but NOT when we merely scrolled it out
         // of view or the tab is hidden (nobody is looking, and it resumes by itself).
         this._overlay.hidden = wants;
+        // Reset is the mirror image: offer it only once the world is running (the overlay is gone),
+        // never over the poster frame where it would compete with the play button.
+        this._resetBtn.hidden = !wants;
 
         if (canRun) this._startLoop();
         else this._stopLoop();

@@ -100,6 +100,37 @@ describe('WorldCodec', () => {
         expect(Array.from((await decodeWorldCode(randomCode)).cells)).toEqual(Array.from(random.cells));
     });
 
+    it('round-trips a generator descriptor instead of cells', async () => {
+        // A random-fill / clumps specimen ships its recipe, not one frozen draw. `cells` is dropped;
+        // `generator` comes back verbatim so the embed can reseed a fresh state each start.
+        const { rows, cols } = makeWorld(32);
+        for (const generator of [
+            { mode: 'density', params: { density: 0.42 } },
+            { mode: 'clusters', params: { count: 5, density: 0.7, diameter: 20, eccentricity: 0.3 } },
+        ]) {
+            const code = await encodeWorldCode({ rows, cols, rulesetHex: RULESET, generator, colorSettings: COLOR_SETTINGS, speed: 30 });
+            expect(isWorldCode(code)).toBe(true);
+            const back = await decodeWorldCode(code);
+            expect(back.cells).toBeNull();
+            expect(back.generator).toEqual(generator);
+            expect(back.rows).toBe(rows);
+            expect(back.cols).toBe(cols);
+            expect(back.speed).toBe(30);
+        }
+    });
+
+    it('a packed-cells code decodes with a null generator', async () => {
+        const back = await decodeWorldCode(await encodeWorldCode(makeWorld(16)));
+        expect(back.generator).toBeNull();
+        expect(back.cells).not.toBeNull();
+    });
+
+    it('refuses a generator with an unknown mode', async () => {
+        const { rows, cols } = makeWorld(16);
+        const bad = { rows, cols, rulesetHex: RULESET, colorSettings: COLOR_SETTINGS, generator: { mode: 'spiral', params: {} } };
+        expect(await encodeWorldCode(bad)).toBeNull();
+    });
+
     it('is agnostic to grid size', async () => {
         for (const rows of [16, 96, 192]) {
             const world = makeWorld(rows);

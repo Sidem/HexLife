@@ -1372,6 +1372,13 @@ export class WorldManager {
      * The current cells are the code's *initial* state: the post opens paused on them and evolves
      * from there when the viewer hits play.
      *
+     * **One exception — a pristine random-fill/clumps world ships its recipe, not its cells.** If the
+     * selected world is sitting on its freshly generated initial state (tick 0) and that state came
+     * from the `density` ("random fill") or `clusters` ("clumps") generator, the code carries the
+     * generator's params instead of one frozen draw. The post then re-rolls a new arrangement on every
+     * start — including the in-post reset button — which is the whole point of a random specimen. An
+     * evolved or hand-drawn world has no such recipe, so it freezes its exact cells as before.
+     *
      * The palette travels as the *settings* (mode, preset, custom maps, flicker flag, hue shift), not
      * as a baked table: the embed recomputes the symmetry tables itself, so it can rebuild the exact
      * same LUT from a few dozen compressible bytes instead of 768 near-random ones.
@@ -1385,14 +1392,27 @@ export class WorldManager {
         const cells = proxy?.latestStateArray;
         if (!cells || cells.length !== Config.NUM_CELLS) return null;
 
-        return encodeWorldCode({
+        const base = {
             rows: Config.GRID_ROWS,
             cols: Config.GRID_COLS,
             rulesetHex: this._getRulesetHexForWorld(idx),
-            cells,
             colorSettings,
             speed: this.simulationController.getSpeed(),
-        });
+        };
+
+        const initialState = this.worldSettings[idx]?.initialState;
+        const isGeneratorMode = initialState
+            && (initialState.mode === 'density' || initialState.mode === 'clusters');
+        // Only when the world hasn't evolved past its generated initial state — otherwise the cells on
+        // screen are a specific frame, not a representative of the recipe.
+        if (isGeneratorMode && proxy.getLatestStats().tick === 0) {
+            return encodeWorldCode({
+                ...base,
+                generator: { mode: initialState.mode, params: initialState.params },
+            });
+        }
+
+        return encodeWorldCode({ ...base, cells });
     };
 
     generateShareUrl({ includeWorldState = false } = {}) {

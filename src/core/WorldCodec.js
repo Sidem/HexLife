@@ -20,11 +20,20 @@
  *     6       2     cols        (u16 LE)
  *     8       2     speed       (u16 LE, ticks/second)
  *     10      1     palette kind (0 = settings descriptor, 1 = baked RGB LUT)
- *     11      1     reserved (0)
+ *     11      1     cells kind   (0 = bit-packed cells, 1 = generator descriptor)
  *     12      16    ruleset (128 rule bits — the same bytes the 32-char hex spells)
  *     28      2     palette length (u16 LE)
  *     30      N     palette (UTF-8 JSON color settings, or 768 bytes of RGB LUT)
- *     30+N    ⌈rows·cols/8⌉  cells, bit-packed (bit `i & 7` of byte `i >> 3`)
+ *     30+N    …     cells region — one of:
+ *                     cells kind 0: ⌈rows·cols/8⌉ bytes, bit-packed (bit `i & 7` of byte `i >> 3`)
+ *                     cells kind 1: UTF-8 JSON `{mode, params}` (runs to the end of the payload)
+ *
+ * **Why a generator descriptor.** A *drawn* or evolved world has to travel as its exact cells — it is
+ * one specific arrangement. But a "random fill" or "clumps" specimen is not one arrangement; it is a
+ * recipe (`density`, or the cluster params) that produces a *fresh* one every time. Freezing one draw
+ * of it would throw away exactly what makes it interesting. So when the explorer exports a world that
+ * is sitting on a pristine random-fill/clumps initial state, it ships the generator instead of the
+ * cells, and the embed regenerates from it on every start — including the in-post reset button.
  *
  * **Why the palette is a descriptor, not a table.** The resolved LUT is 768 bytes of near-random
  * gradient data; the settings that *generate* it (mode, preset key, custom color maps, flicker-proof
@@ -57,6 +66,12 @@ const FLAG_DEFLATE = 1;
 
 export const PALETTE_SETTINGS = 0;
 export const PALETTE_LUT = 1;
+
+export const CELLS_PACKED = 0;
+export const CELLS_GENERATOR = 1;
+
+/** The initial-state generators the embed can reproduce — the app's `initialState.mode` strings. */
+const GENERATOR_MODES = new Set(['density', 'clusters']);
 
 const HEADER_BYTES = 30;
 const RULESET_BYTES = 16;
@@ -193,14 +208,31 @@ function paletteDescriptor(colorSettings) {
 }
 
 /**
+ * Sanitize a generator descriptor: keep only a known `mode` and its `params`.
+ * @param {{mode?: string, params?: object}} generator `{mode, params}` — the app's
+ *   `worldSettings[i].initialState`.
+ * @returns {{mode: string, params: object}|null} Null if the mode isn't one the embed can reproduce.
+ */
+function generatorDescriptor(generator) {
+    const mode = generator && generator.mode;
+    if (typeof mode !== 'string' || !GENERATOR_MODES.has(mode)) return null;
+    const params = generator.params && typeof generator.params === 'object' ? generator.params : {};
+    return { mode, params };
+}
+
+/**
  * Encode one world into a `HXW1.` code.
  *
  * @param {object} world
  * @param {number} world.rows
  * @param {number} world.cols
  * @param {string} world.rulesetHex 32-char hex.
- * @param {Uint8Array|number[]} world.cells `rows * cols` entries; truthy = alive. This is the state
- *   the post starts from — the embed replays it verbatim rather than reseeding from a density.
+ * @param {Uint8Array|number[]} [world.cells] `rows * cols` entries; truthy = alive. This is the state
+ *   the post starts from — the embed replays it verbatim rather than reseeding from a density. Required
+ *   unless `generator` is given.
+ * @param {{mode?: string, params?: object}|null} [world.generator] A `{mode, params}` initial-state
+ *   generator (`'density'` / `'clusters'`). When present it *replaces* `cells`: the code carries the
+ *   recipe, and the embed generates a fresh state from it on every start (a random-fill/clumps world).
  * @param {object} [world.colorSettings] ColorController.getSettings(). The preferred palette form:
  *   compact, and the decoder rebuilds the exact same LUT (symmetry tables included).
  * @param {Uint8Array} [world.lut] A baked 128×2 **RGBA** LUT (1024 bytes) — used only when
@@ -208,11 +240,10 @@ function paletteDescriptor(colorSettings) {
  * @param {number} [world.speed=40] Ticks/second the post runs at once the viewer hits play.
  * @returns {Promise<string|null>} The code, or null if the inputs don't describe a world.
  */
-export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSettings, lut, speed = 40 }) {
+export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSettings, lut, speed = 40, generator = null }) {
     const numCells = rows * cols;
     if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2
         || rows > 65535 || cols > 65535) return null;
-    if (!cells || cells.length !== numCells) return null;
 
     const ruleset = hexToBytes(rulesetHex);
     if (!ruleset) return null;
@@ -236,8 +267,23 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
     }
     if (palette.length > 65535) return null;
 
-    const packed = packCells(cells);
-    const payload = new Uint8Array(HEADER_BYTES + palette.length + packed.length);
+    // The cells region is either the bit-packed grid or, for a random-fill/clumps specimen, the
+    // generator that reproduces it. A generator overrides `cells` entirely (see the header note).
+    /** @type {Uint8Array} */
+    let cellsRegion;
+    let cellsKind;
+    if (generator) {
+        const desc = generatorDescriptor(generator);
+        if (!desc) return null;
+        cellsKind = CELLS_GENERATOR;
+        cellsRegion = new TextEncoder().encode(JSON.stringify(desc));
+    } else {
+        if (!cells || cells.length !== numCells) return null;
+        cellsKind = CELLS_PACKED;
+        cellsRegion = packCells(cells);
+    }
+
+    const payload = new Uint8Array(HEADER_BYTES + palette.length + cellsRegion.length);
     const view = new DataView(payload.buffer);
 
     for (let i = 0; i < MAGIC.length; i++) payload[i] = MAGIC.charCodeAt(i);
@@ -246,10 +292,11 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
     view.setUint16(6, cols, true);
     view.setUint16(8, Math.min(MAX_SPEED, Math.max(0, Math.round(speed) || 0)), true);
     payload[10] = paletteKind;
+    payload[11] = cellsKind;
     payload.set(ruleset, RULESET_OFFSET);
     view.setUint16(28, palette.length, true);
     payload.set(palette, HEADER_BYTES);
-    payload.set(packed, HEADER_BYTES + palette.length);
+    payload.set(cellsRegion, HEADER_BYTES + palette.length);
 
     const deflated = await deflate(payload);
     // Keep whichever is smaller. Deflate can *grow* incompressible data by a few bytes, and a
@@ -271,9 +318,11 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
  * post form, the webview, `<hexlife-world code=…>`) wants a "no" it can render, not an exception.
  *
  * @param {string} code
- * @returns {Promise<{rows: number, cols: number, rulesetHex: string, cells: Uint8Array, speed: number,
- *   colorSettings: object|null, lut: Uint8Array|null}|null>} Exactly one of `colorSettings` (feed it
- *   to `generateColorLUT`) and `lut` (a ready 1024-byte RGBA table) is non-null.
+ * @returns {Promise<{rows: number, cols: number, rulesetHex: string, cells: Uint8Array|null,
+ *   generator: {mode: string, params: object}|null, speed: number, colorSettings: object|null,
+ *   lut: Uint8Array|null}|null>} Exactly one of `cells` (the exact tick-0 grid) and `generator` (a
+ *   recipe to reseed it) is non-null. Exactly one of `colorSettings` (feed it to `generateColorLUT`)
+ *   and `lut` (a ready 1024-byte RGBA table) is non-null.
  */
 export async function decodeWorldCode(code) {
     if (typeof code !== 'string') return null;
@@ -301,13 +350,15 @@ export async function decodeWorldCode(code) {
     const cols = view.getUint16(6, true);
     const speed = view.getUint16(8, true);
     const paletteKind = bytes[10];
+    const cellsKind = bytes[11];
     const paletteLen = view.getUint16(28, true);
     const numCells = rows * cols;
     if (rows < 2 || cols < 2 || numCells === 0) return null;
 
     const cellsOffset = HEADER_BYTES + paletteLen;
-    // A truncated or corrupted paste lands here (an inflate of garbage usually fails first).
-    if (bytes.length !== cellsOffset + Math.ceil(numCells / 8)) return null;
+    // The palette region must at least be fully present; the cells region is length-checked per kind
+    // below. A truncated or corrupted paste lands in one of these (an inflate of garbage fails first).
+    if (bytes.length < cellsOffset) return null;
 
     const rulesetHex = bytesToHex(bytes.subarray(RULESET_OFFSET, RULESET_OFFSET + RULESET_BYTES));
     const paletteBytes = bytes.subarray(HEADER_BYTES, cellsOffset);
@@ -336,9 +387,27 @@ export async function decodeWorldCode(code) {
         return null;   // A palette kind from a future version: refuse rather than mis-render.
     }
 
-    const cells = unpackCells(bytes.subarray(cellsOffset), numCells);
+    /** @type {Uint8Array|null} */
+    let cells = null;
+    /** @type {{mode: string, params: object}|null} */
+    let generator = null;
+    if (cellsKind === CELLS_PACKED) {
+        if (bytes.length !== cellsOffset + Math.ceil(numCells / 8)) return null;
+        cells = unpackCells(bytes.subarray(cellsOffset), numCells);
+    } else if (cellsKind === CELLS_GENERATOR) {
+        if (bytes.length <= cellsOffset) return null;
+        try {
+            generator = JSON.parse(new TextDecoder().decode(bytes.subarray(cellsOffset)));
+        } catch {
+            return null;
+        }
+        if (!generator || typeof generator !== 'object' || typeof generator.mode !== 'string') return null;
+        if (!generator.params || typeof generator.params !== 'object') generator.params = {};
+    } else {
+        return null;   // A cells kind from a future version: refuse rather than mis-render.
+    }
 
-    return { rows, cols, rulesetHex, cells, speed, colorSettings, lut };
+    return { rows, cols, rulesetHex, cells, generator, speed, colorSettings, lut };
 }
 
 /**
