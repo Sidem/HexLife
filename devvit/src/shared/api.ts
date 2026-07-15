@@ -18,6 +18,8 @@ export const Endpoint = {
   OnAppInstall: 'internal/on/app/install',
   OnMenuNewPost: 'internal/on/menu/new-post',
   OnFormNewPost: 'internal/on/form/new-post',
+  /** Text posts whose body is a pure world code (from explorer "Post to r/hexlife") → Live Specimen. */
+  OnPostSubmit: 'internal/on/post/submit',
 } as const
 
 export const EndpointMethod = {
@@ -25,6 +27,7 @@ export const EndpointMethod = {
   [Endpoint.OnAppInstall]: 'POST',
   [Endpoint.OnMenuNewPost]: 'POST',
   [Endpoint.OnFormNewPost]: 'POST',
+  [Endpoint.OnPostSubmit]: 'POST',
 } as const satisfies {[endpoint: string]: 'GET' | 'POST'}
 
 /** Must match the form name registered in devvit.json → `forms`. */

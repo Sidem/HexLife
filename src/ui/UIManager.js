@@ -408,6 +408,7 @@ export class UIManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_SHARE_SETUP, this._onShareSetup.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_COPY_WORLD_CODE, this._onCopyWorldCode.bind(this));
+        EventBus.subscribe(EVENTS.COMMAND_POST_TO_REDDIT, this._onPostToReddit.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_PANEL, this._handleTogglePanel.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_TOGGLE_POPOUT, this._handleTogglePopout.bind(this));
         EventBus.subscribe(EVENTS.COMMAND_SHOW_MOBILE_VIEW, this._showMobileViewInternal.bind(this));
@@ -599,20 +600,8 @@ export class UIManager {
      * The textarea is the guaranteed path — select and Ctrl+C — and the clipboard call is the nicety.
      */
     async _onCopyWorldCode() {
-        const code = await this.appContext.worldManager.exportWorldCode(
-            this.appContext.colorController.getSettings(),
-        );
-        if (!code) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready yet.', type: 'error' });
-            return;
-        }
-
-        const output = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('worldCodeOutput'));
-        if (output) {
-            output.value = code;
-            document.getElementById('worldCodeGroup')?.classList.remove('hidden');
-            output.select();
-        }
+        const code = await this._exportWorldCodeToSharePanel();
+        if (!code) return;
 
         const size = `${(code.length / 1024).toFixed(1)} KB`;
         try {
@@ -627,6 +616,79 @@ export class UIManager {
                 message: `World code ready (${size}) — press Ctrl+C to copy it from the Share panel.`,
             });
         }
+    }
+
+    /**
+     * Open Reddit's r/hexlife submit form with the current world, so a logged-in user can post in
+     * one click. A pure world-code body is upgraded by the Devvit app (`onPostSubmit`) into a Live
+     * Specimen custom post; longer codes that won't fit a URL are copied and the form opens with a
+     * short paste instruction instead.
+     *
+     * There is no browser API for creating Devvit custom posts from github.io — Reddit login cookies
+     * only apply on reddit.com — so the submit form *is* the direct path.
+     */
+    async _onPostToReddit() {
+        const code = await this._exportWorldCodeToSharePanel();
+        if (!code) return;
+
+        const titleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('redditPostTitle'));
+        const title = (titleInput?.value || '').trim() || 'HexLife';
+
+        // Reddit URL length is browser-limited; stay conservative so the submit page actually opens.
+        const MAX_URL_CODE = 1500;
+        const params = new URLSearchParams();
+        params.set('title', title.slice(0, 300));
+
+        let toast;
+        if (code.length <= MAX_URL_CODE) {
+            // Body is ONLY the world code so the Devvit onPostSubmit converter can recognize it.
+            params.set('text', code);
+            toast = 'Opening Reddit — hit Post to publish this Live Specimen to r/hexlife.';
+        } else {
+            try {
+                await navigator.clipboard.writeText(code);
+                params.set(
+                    'text',
+                    'Paste the HexLife world code here (it was copied to your clipboard).\n\nHXW1.',
+                );
+                toast = `World code copied (${(code.length / 1024).toFixed(1)} KB) — paste it into the Reddit text box, then Post.`;
+            } catch {
+                toast = 'World code is in the Share panel — paste it into Reddit’s text box, then Post.';
+            }
+        }
+
+        const url = `https://www.reddit.com/r/hexlife/submit?${params.toString()}`;
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: 'Pop-up blocked — allow pop-ups for this site, or copy the world code and submit on r/hexlife manually.',
+                type: 'error',
+            });
+            return;
+        }
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: toast, type: 'success' });
+    }
+
+    /**
+     * Encode the selected world and mirror it into the Share popout textarea.
+     * @returns {Promise<string|null>}
+     * @private
+     */
+    async _exportWorldCodeToSharePanel() {
+        const code = await this.appContext.worldManager.exportWorldCode(
+            this.appContext.colorController.getSettings(),
+        );
+        if (!code) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'World state is not ready yet.', type: 'error' });
+            return null;
+        }
+        const output = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('worldCodeOutput'));
+        if (output) {
+            output.value = code;
+            document.getElementById('worldCodeGroup')?.classList.remove('hidden');
+            output.select();
+        }
+        return code;
     }
 
     /**

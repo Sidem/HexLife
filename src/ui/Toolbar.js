@@ -100,6 +100,8 @@ export class Toolbar {
             shareIncludeStateCheckbox: document.getElementById('shareIncludeStateCheckbox'),
             copyShareLinkButton: document.getElementById('copyShareLinkButton'),
             copyWorldCodeButton: document.getElementById('copyWorldCodeButton'),
+            postToRedditButton: document.getElementById('postToRedditButton'),
+            redditPostTitle: document.getElementById('redditPostTitle'),
             snapshotsButton: document.getElementById('snapshotsButton'),
             exportPngButton: document.getElementById('exportPngButton'),
             recordWebmButton: document.getElementById('recordWebmButton'),
@@ -264,7 +266,8 @@ export class Toolbar {
             exportPngButton: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_CAPTURE_STUDIO, { tab: 'screenshot' }),
             recordWebmButton: () => EventBus.dispatch(EVENTS.COMMAND_TOGGLE_WORLD_RECORDING),
             copyShareLinkButton: this._copyShareLink.bind(this),
-            copyWorldCodeButton: () => EventBus.dispatch(EVENTS.COMMAND_COPY_WORLD_CODE)
+            copyWorldCodeButton: () => EventBus.dispatch(EVENTS.COMMAND_COPY_WORLD_CODE),
+            postToRedditButton: () => EventBus.dispatch(EVENTS.COMMAND_POST_TO_REDDIT),
         };
 
         for (const [elementId, action] of Object.entries(buttonToActionMap)) {

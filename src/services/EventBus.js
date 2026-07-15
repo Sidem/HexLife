@@ -327,6 +327,8 @@ export const EVENTS = {
     COMMAND_SHARE_SETUP: 'command:shareSetup',
     /** @event Emitted with no payload: copy the selected world as a portable world code (WorldCodec) — grid + ruleset + exact cells + exact palette — for the Reddit/Devvit post. */
     COMMAND_COPY_WORLD_CODE: 'command:copyWorldCode',
+    /** @event Emitted with no payload: open the r/hexlife Reddit submit form with the selected world code (and optional title from #redditPostTitle). */
+    COMMAND_POST_TO_REDDIT: 'command:postToReddit',
     /** @param {string} mode - The new interaction mode ('pan', 'draw', 'place'). */
     COMMAND_SET_INTERACTION_MODE: 'command:setInteractionMode',
     /** @param {boolean} shouldPause - The desired pause-while-drawing state. */

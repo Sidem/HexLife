@@ -26,7 +26,8 @@
     "newWorldPost": "/internal/on/form/new-post"
   },
   "triggers": {
-    "onAppInstall": "/internal/on/app/install"
+    "onAppInstall": "/internal/on/app/install",
+    "onPostSubmit": "/internal/on/post/submit"
   },
   "scripts": {
     "dev": "npm run watch"

@@ -22,6 +22,9 @@ import {dbGetWorldCode, dbSetWorldCode} from './db.ts'
 
 type AnyRsp = GetWorldRsp | UiResponse | TriggerResponse | ErrorRsp
 
+/** A text post body that is *only* a world code (optional surrounding whitespace). */
+const PURE_WORLD_CODE_RE = /^\s*(HXW1\.[A-Za-z0-9_-]+)\s*$/
+
 export async function onReq(
   reqMsg: IncomingMessage,
   rspMsg: ServerResponse,
@@ -58,6 +61,9 @@ async function route(
         break
       case Endpoint.OnAppInstall:
         rsp = await routeAppInstall()
+        break
+      case Endpoint.OnPostSubmit:
+        rsp = await routePostSubmit(reqMsg)
         break
       default:
         endpoint satisfies never
@@ -141,6 +147,81 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
 /** The install trigger's demo post carries no code; the webview falls back to its built-in world. */
 async function routeAppInstall(): Promise<TriggerResponse> {
   await reddit.submitCustomPost({title: 'HexLife'})
+  return {}
+}
+
+/**
+ * Explorer "Post to r/hexlife" opens Reddit's normal submit form with the world code as the body.
+ * When such a text post lands, upgrade it into a Live Specimen custom post (same title, code in
+ * Redis) and remove the text post so the subreddit isn't left with a raw code dump.
+ *
+ * Only pure world-code bodies convert — anything else is left alone. Failures are logged and
+ * swallowed: a trigger must not 500-loop the platform, and the user's text post remains as a
+ * fallback if conversion can't run.
+ */
+async function routePostSubmit(
+  reqMsg: IncomingMessage,
+): Promise<TriggerResponse> {
+  const body = await readJson<{
+    post?: {id?: string; title?: string; body?: string; selftext?: string}
+  }>(reqMsg)
+
+  const post = body?.post
+  if (!post?.id) return {}
+
+  // Devvit payloads have used both `body` and `selftext` across versions — accept either.
+  const text = (post.body ?? post.selftext ?? '').trim()
+  const match = PURE_WORLD_CODE_RE.exec(text)
+  const code = match?.[1]
+  if (!code) return {}
+
+  const postId = post.id
+  const world = await decodeWorldCode(code)
+  if (!world) {
+    console.warn(
+      `onPostSubmit: body looked like a world code but failed to decode (${postId})`,
+    )
+    return {}
+  }
+
+  try {
+    const title = (post.title ?? '').trim() || 'HexLife'
+    const custom = await reddit.submitCustomPost({title})
+    await dbSetWorldCode(custom.id, code)
+
+    // Best-effort cleanup of the intermediate text post. The Reddit client surface varies by
+    // @devvit/web version — probe for getPostById without an `any` cast. Permission failures are
+    // non-fatal: the Live Specimen already exists.
+    try {
+      type PostHandle = {
+        delete?: () => Promise<unknown>
+        remove?: (spam?: boolean) => Promise<unknown>
+      }
+      type RedditWithPosts = {
+        getPostById?: (id: string) => Promise<PostHandle | undefined>
+      }
+      const api = reddit as unknown as RedditWithPosts
+      const p = api.getPostById ? await api.getPostById(postId) : undefined
+      if (p?.delete) await p.delete()
+      else if (p?.remove) await p.remove(false)
+      else
+        console.warn(
+          `onPostSubmit: no delete/remove API for ${postId}; left text post in place`,
+        )
+    } catch (cleanupErr) {
+      console.warn(
+        `onPostSubmit: created ${custom.id} but could not remove ${postId}:`,
+        cleanupErr,
+      )
+    }
+
+    console.log(
+      `onPostSubmit: upgraded ${postId} → ${custom.id} (${world.rows}×${world.cols}, ${world.rulesetHex})`,
+    )
+  } catch (err) {
+    console.error(`onPostSubmit: failed to upgrade ${postId}:`, err)
+  }
+
   return {}
 }
 

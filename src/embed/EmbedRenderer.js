@@ -143,7 +143,7 @@ export class EmbedRenderer {
         this._setupGeometry();
         this._setupLUT({ palette, customGradient, colorSettings, lut });
 
-        // Set once — these never change for an embed (no hover, fixed camera).
+        // Hover factors are fixed (embed has no hover). Zoom/pan are live — see setView().
         gl.useProgram(this.program);
         gl.uniform1f(this.uniforms.hoverFilledDarkenFactor, 0.66);
         gl.uniform1f(this.uniforms.hoverInactiveLightenFactor, 1.5);
@@ -152,6 +152,14 @@ export class EmbedRenderer {
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         this._hexSize = 0;
+        /** Fitted grid center in world coords (zoom=1, no pan). */
+        this._center = { x: 0, y: 0 };
+        /** Last CSS size used by resize — needed to convert pan offsets (CSS px) → world. */
+        this._cssWidth = 1;
+        this._cssHeight = 1;
+        this._viewZoom = 1;
+        this._viewPanX = 0;
+        this._viewPanY = 0;
     }
 
     _setupGeometry() {
@@ -278,7 +286,13 @@ export class EmbedRenderer {
         const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
         const w = Math.max(1, Math.round(cssWidth * dpr));
         const h = Math.max(1, Math.round(cssHeight * dpr));
-        if (this.canvas.width === w && this.canvas.height === h) return;
+        this._cssWidth = Math.max(1, cssWidth);
+        this._cssHeight = Math.max(1, cssHeight);
+        if (this.canvas.width === w && this.canvas.height === h) {
+            // Still re-apply the view — pan is in CSS pixels and the mapping depends on size.
+            this._uploadView();
+            return;
+        }
 
         this.canvas.width = w;
         this.canvas.height = h;
@@ -292,7 +306,40 @@ export class EmbedRenderer {
         gl.useProgram(this.program);
         gl.uniform2f(this.uniforms.resolution, w, h);
         gl.uniform1f(this.uniforms.hexSize, this._hexSize);
-        gl.uniform2f(this.uniforms.pan, this._center.x, this._center.y);
+        this._uploadView();
+    }
+
+    /**
+     * Live camera. `zoom` is multiplicative around the fitted centre (1 = whole grid fits).
+     * `panX`/`panY` are CSS-pixel offsets of the view (positive = content moves right/down).
+     * @param {number} zoom
+     * @param {number} [panX=0]
+     * @param {number} [panY=0]
+     */
+    setView(zoom, panX = 0, panY = 0) {
+        this._viewZoom = zoom;
+        this._viewPanX = panX;
+        this._viewPanY = panY;
+        this._uploadView();
+    }
+
+    /**
+     * Map the CSS-pixel pan + zoom onto the shader uniforms. The vertex shader does
+     * `(pos - u_pan) * u_zoom + resolution/2`, so u_pan is in *world* units. A CSS-pixel pan of
+     * `p` at the current zoom corresponds to a world shift of `p * (backing/css) / zoom`.
+     */
+    _uploadView() {
+        if (!this.gl || !this._center) return;
+        const gl = this.gl;
+        const dprX = this.canvas.width / this._cssWidth;
+        const dprY = this.canvas.height / this._cssHeight;
+        const z = this._viewZoom || 1;
+        // Subtract so a positive CSS pan (drag content right) matches user expectation.
+        const worldPanX = this._center.x - (this._viewPanX * dprX) / z;
+        const worldPanY = this._center.y - (this._viewPanY * dprY) / z;
+        gl.useProgram(this.program);
+        gl.uniform1f(this.uniforms.zoom, z);
+        gl.uniform2f(this.uniforms.pan, worldPanX, worldPanY);
     }
 
     /**

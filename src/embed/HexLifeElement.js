@@ -162,6 +162,7 @@ export class HexLifeElement extends HTMLElement {
         this._overlay = document.createElement('button');
         this._overlay.className = 'overlay';
         this._overlay.type = 'button';
+        this._overlay.setAttribute('part', 'overlay');
         this._overlay.setAttribute('aria-label', 'Play simulation');
         this._overlay.innerHTML = PLAY_ICON;
         this._overlay.hidden = true;
@@ -170,9 +171,11 @@ export class HexLifeElement extends HTMLElement {
         // A small, faint corner button to restart the world once it is running. For a generator-driven
         // world code (random fill / clumps) this re-rolls a fresh arrangement; for an exact-cells world
         // it rewinds to tick 0. Only shown while the world is running (see `_syncPlayback`).
+        // Exposed as `::part(reset)` so a host (e.g. Devvit chrome) can hide it when it owns Restart.
         this._resetBtn = document.createElement('button');
         this._resetBtn.className = 'reset';
         this._resetBtn.type = 'button';
+        this._resetBtn.setAttribute('part', 'reset');
         this._resetBtn.setAttribute('aria-label', 'Restart simulation');
         this._resetBtn.title = 'Restart';
         this._resetBtn.innerHTML = RESET_ICON;
@@ -220,6 +223,21 @@ export class HexLifeElement extends HTMLElement {
 
         this._rafId = 0;
         this._lastFrameTime = 0;
+
+        // Camera (wheel zoom + pinch). Relative to the fitted "show whole grid" view: zoom 1 + pan 0
+        // is the default fit. Stored on the element so a resize can re-apply without losing the view.
+        this._viewZoom = 1;
+        this._viewPanX = 0;
+        this._viewPanY = 0;
+        /** @type {Map<number, {x: number, y: number}>} active touch points for pinch */
+        this._pinchTouches = new Map();
+        this._pinchStartDist = 0;
+        this._pinchStartZoom = 1;
+        this._onWheel = this._onWheel.bind(this);
+        this._onTouchStart = this._onTouchStart.bind(this);
+        this._onTouchMove = this._onTouchMove.bind(this);
+        this._onTouchEnd = this._onTouchEnd.bind(this);
+
         /**
          * Upgrade order is: `attributeChangedCallback` once per attribute, *then*
          * `connectedCallback`. Without this gate, parsing `<hexlife-world ruleset=… rows=… speed=…>`
@@ -348,13 +366,18 @@ export class HexLifeElement extends HTMLElement {
     play() {
         this._playRequested = true;
         this._userPaused = false;
-        this._syncPlayback();
+        // Keep the attribute in sync so hosts reading `hasAttribute('paused')` stay honest
+        // (Devvit transport chrome, tests, etc.). removeAttribute re-enters
+        // attributeChangedCallback, which re-derives `_userPaused` as false — same end state.
+        if (this.hasAttribute('paused')) this.removeAttribute('paused');
+        else this._syncPlayback();
     }
 
     /** Pause. The current generation stays on screen. */
     pause() {
         this._userPaused = true;
-        this._syncPlayback();
+        if (!this.hasAttribute('paused')) this.setAttribute('paused', '');
+        else this._syncPlayback();
     }
 
     /**
@@ -389,6 +412,9 @@ export class HexLifeElement extends HTMLElement {
 
     /** @returns {boolean} Whether the animation loop is currently running. */
     get playing() { return this._rafId !== 0; }
+
+    /** @returns {boolean} True when the user has paused (attribute or `pause()`), ignoring viewport gates. */
+    get userPaused() { return this._userPaused; }
 
     // --- boot / teardown ------------------------------------------------------
 
@@ -490,6 +516,15 @@ export class HexLifeElement extends HTMLElement {
         }, { threshold: 0 });
         this._intersectionObserver.observe(this);
 
+        // Zoom: wheel on desktop, pinch on touch. Passive:false on wheel so we can preventDefault
+        // (otherwise the host page / Reddit webview scrolls away). Touch listeners are non-passive
+        // only while two fingers are down — single-finger scroll still works for the feed.
+        this._canvas.addEventListener('wheel', this._onWheel, { passive: false });
+        this._canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
+        this._canvas.addEventListener('touchmove', this._onTouchMove, { passive: false });
+        this._canvas.addEventListener('touchend', this._onTouchEnd, { passive: true });
+        this._canvas.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
+
         this._resize();
         this._updateAttribution();
         this._drawOnce();
@@ -513,6 +548,12 @@ export class HexLifeElement extends HTMLElement {
         this._motionQuery = null;
         this._onMotionChange = null;
         document.removeEventListener('visibilitychange', this._onVisibilityChange);
+        this._canvas.removeEventListener('wheel', this._onWheel);
+        this._canvas.removeEventListener('touchstart', this._onTouchStart);
+        this._canvas.removeEventListener('touchmove', this._onTouchMove);
+        this._canvas.removeEventListener('touchend', this._onTouchEnd);
+        this._canvas.removeEventListener('touchcancel', this._onTouchEnd);
+        this._pinchTouches.clear();
 
         if (this.renderer) { this.renderer.destroy(); this.renderer = null; }
         // Frees the wasm World and unregisters from the view-refresh registry. Skipping this would
@@ -521,6 +562,9 @@ export class HexLifeElement extends HTMLElement {
 
         this._overlay.hidden = true;
         this._resetBtn.hidden = true;
+        this._viewZoom = 1;
+        this._viewPanX = 0;
+        this._viewPanY = 0;
     }
 
     // --- attributes -----------------------------------------------------------
@@ -617,6 +661,102 @@ export class HexLifeElement extends HTMLElement {
         if (!this.renderer) return;
         const rect = this.getBoundingClientRect();
         this.renderer.resize(rect.width || 1, rect.height || 1, this._readParams().maxDpr);
+        this._applyView();
+    }
+
+    // --- camera (zoom) --------------------------------------------------------
+
+    /**
+     * Apply the current view zoom/pan to the renderer. Zoom is multiplicative around the fitted
+     * center; pan is in CSS-pixel deltas of the canvas (converted to world space by the renderer).
+     */
+    _applyView() {
+        if (!this.renderer) return;
+        this.renderer.setView(this._viewZoom, this._viewPanX, this._viewPanY);
+    }
+
+    /**
+     * Zoom by a multiplicative factor, optionally around a canvas-local point (CSS pixels from the
+     * canvas top-left). Keeps that point stable under the cursor/finger so wheel zoom feels anchored.
+     * @param {number} factor
+     * @param {number} [localX]
+     * @param {number} [localY]
+     */
+    _zoomBy(factor, localX, localY) {
+        if (!this.renderer || !Number.isFinite(factor) || factor <= 0) return;
+        const prev = this._viewZoom;
+        const next = Math.min(8, Math.max(0.5, prev * factor));
+        if (next === prev) return;
+
+        // Anchor: shift pan so the world point under (localX, localY) stays put. Without an anchor
+        // (pinch midpoint missing), zoom about the canvas centre.
+        const rect = this._canvas.getBoundingClientRect();
+        const ax = localX ?? rect.width / 2;
+        const ay = localY ?? rect.height / 2;
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        // Pan is stored in CSS pixels of offset from centre; scale it with zoom so the anchor holds.
+        const scale = next / prev;
+        this._viewPanX = ax - cx - (ax - cx - this._viewPanX) * scale;
+        this._viewPanY = ay - cy - (ay - cy - this._viewPanY) * scale;
+        this._viewZoom = next;
+        this._applyView();
+        if (!this.playing) this._drawOnce();
+    }
+
+    _onWheel(e) {
+        // Only zoom when the pointer is over us; preventDefault so the Reddit feed doesn't scroll.
+        e.preventDefault();
+        const rect = this._canvas.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const localY = e.clientY - rect.top;
+        // deltaY > 0 = scroll down = zoom out. Use an exponential so trackpads and mice both feel ok.
+        const factor = Math.exp(-e.deltaY * 0.0015);
+        this._zoomBy(factor, localX, localY);
+    }
+
+    _onTouchStart(e) {
+        for (const t of e.changedTouches) {
+            this._pinchTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+        }
+        if (this._pinchTouches.size === 2) {
+            const pts = [...this._pinchTouches.values()];
+            const dx = pts[0].x - pts[1].x;
+            const dy = pts[0].y - pts[1].y;
+            this._pinchStartDist = Math.hypot(dx, dy) || 1;
+            this._pinchStartZoom = this._viewZoom;
+        }
+    }
+
+    _onTouchMove(e) {
+        for (const t of e.changedTouches) {
+            if (this._pinchTouches.has(t.identifier)) {
+                this._pinchTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+            }
+        }
+        if (this._pinchTouches.size !== 2) return;
+        // Two-finger gesture owns the touch — stop the feed from scrolling underneath.
+        e.preventDefault();
+        const pts = [...this._pinchTouches.values()];
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const factor = dist / this._pinchStartDist;
+        const target = Math.min(8, Math.max(0.5, this._pinchStartZoom * factor));
+        // Set absolute zoom from the pinch start rather than stacking relative factors (avoids drift).
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        const rect = this._canvas.getBoundingClientRect();
+        const ratio = target / this._viewZoom;
+        if (ratio === 1) return;
+        this._zoomBy(ratio, midX - rect.left, midY - rect.top);
+    }
+
+    _onTouchEnd(e) {
+        for (const t of e.changedTouches) this._pinchTouches.delete(t.identifier);
+        if (this._pinchTouches.size < 2) {
+            this._pinchStartDist = 0;
+        }
     }
 
     // --- chrome ---------------------------------------------------------------

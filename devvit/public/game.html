@@ -31,12 +31,30 @@
       width: 100%;
       box-sizing: border-box;
       justify-content: center;
+      flex-wrap: wrap;
     }
     #controls label {
       opacity: 0.75;
     }
+    #controls button {
+      margin: 0;
+      padding: 4px 10px;
+      min-width: 2.4em;
+      border: 1px solid #3a4046;
+      border-radius: 999px;
+      background: #1a1e22;
+      color: #e6e9ec;
+      font: inherit;
+      cursor: pointer;
+    }
+    #controls button:hover {
+      background: #242a30;
+    }
+    #controls button:active {
+      background: #2e353c;
+    }
     #speed {
-      width: min(60%, 220px);
+      width: min(45%, 180px);
       accent-color: #6cb6ff;
       cursor: pointer;
     }
@@ -52,6 +70,10 @@
       width: min(100%, 100cqmin);
       max-width: min(100vw, 100dvh);
       max-height: 100%;
+      /* External chrome owns Restart — hide the in-element corner button. */
+    }
+    #world hexlife-world::part(reset) {
+      display: none;
     }
     #status {
       padding: 4px 8px;
@@ -65,6 +87,17 @@
   <body>
     <main id="world"></main>
     <div id="controls">
+      <button
+        id="play-pause"
+        type="button"
+        aria-label="Play"
+        title="Play / Pause"
+      >
+        ▶
+      </button>
+      <button id="restart" type="button" aria-label="Restart" title="Restart">
+        ↺
+      </button>
       <label for="speed">Speed</label>
       <input id="speed" type="range" min="1" max="120" step="1" value="20">
     </div>

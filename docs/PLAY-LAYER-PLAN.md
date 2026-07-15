@@ -8,30 +8,12 @@ bars, no cosmetic unlocks, no fake scarcity or streak-loss guilt. Everything ban
 (localStorage via PersistenceService); nothing leaves the device unless the user copies a share
 link or exports a pack.
 
-Status: **T (tags) and S (swipe-to-judge) SHIPPED 2026-07-13** — details in PATCHNOTES; shipped
-specs deleted from this doc (git history has them). Open: **C (codex) → D (daily hex)**, then
-the retention follow-ups **P1–P6** (roadmap #19–#24).
+Status: **T (tags) + S (swipe-to-judge desktop) shipped 2026-07-13** — details in PATCHNOTES /
+git history. Open: **C (codex) → D (daily hex)**, then retention **P1–P6** (roadmap #19–#24).
 
----
-
-## T — Canonical tags + suggestions *(shipped 2026-07-13)*
-
-What later items rely on: `src/core/tags.js` (18-tag append-only canonical vocabulary,
-`promptText` per tag), `src/core/analysis/tagSuggestions.js`
-(`suggestTagsFromStats`/`suggestTagsFromEmbedding`/`mergeSuggestions`, pure),
-`EmbeddingService.embedTags` (lazy, cached, never-throw), `SaveRulesetModal` chip picker with
-Suggested row. **C's cell detail reuses this picker + suggestions.**
-
-## S — Swipe-to-judge *(shipped 2026-07-13; one piece still open)*
-
-What later items rely on: `src/core/analysis/VoteBank.js` (append-only pairwise votes, key
-`INTERESTINGNESS_VOTES`, FIFO cap 2000, `extractFeatures`/`pairKey`/`nextPair`, `VOTE_RECORDED`
-event), `WeightRefit.js` (Bradley–Terry fit → opt-in Custom `exploreScoring` preset; stock
-presets never touched silently), desktop rater `ExploreRaterView.js` (⚖ in the gallery header).
-
-**Still open (folds into P1):** the mobile card-deck home in the Discover tab — the #16 shell
-exists but the versus-deck surface was never built. Build it as the shared deck that hosts both
-judging (S) and prediction (P1) cards.
+**Shipped seams later items reuse:** `src/core/tags.js` + `tagSuggestions.js` + chip picker (T);
+`VoteBank` / `WeightRefit` / desktop `ExploreRaterView` (S). **Still open from S (folds into P1):**
+mobile versus-deck home in the Discover tab.
 
 ---
 

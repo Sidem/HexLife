@@ -308,6 +308,17 @@
                 <label for="worldCodeOutput">World code (select &amp; copy if the clipboard is blocked):</label>
                 <textarea id="worldCodeOutput" class="hex-input" rows="3" readonly></textarea>
             </div>
+            <h4>Post to r/hexlife</h4>
+            <div class="form-group">
+                <label for="redditPostTitle">If you are logged into Reddit, this opens the r/hexlife submit form with the world code ready. Submit once to share a Live Specimen (the HexLife app upgrades pure world-code text posts).</label>
+            </div>
+            <div class="form-group">
+                <label for="redditPostTitle">Title</label>
+                <input type="text" id="redditPostTitle" class="hex-input" maxlength="300" placeholder="HexLife">
+            </div>
+            <div class="form-group-buttons">
+                <button id="postToRedditButton" class="button" title="Open Reddit submit for r/hexlife with this world">Post to r/hexlife</button>
+            </div>
         </div>
 
 
