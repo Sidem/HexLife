@@ -6,7 +6,8 @@
 /**
  * `EmbedSim` — the single-world simulation runtime behind `<hexlife-world>` (#25) and the Reddit
  * Devvit post (#26). It is the app's `WorldWorker` with everything the embed doesn't need removed:
- * no worker, no stats/entropy, no history ring, no cycle detection, no brushes.
+ * no worker, no stats/entropy, no history ring, no cycle detection. Brush invert is available
+ * for interactive hosts (Devvit Live Specimen draw).
  *
  * **What it must NOT do is more important than what it does.** The embed's whole selling point is
  * that identical `(ruleset, seed, density, rows)` reproduces a *byte-identical* tick sequence with
@@ -26,6 +27,7 @@ import { hexToRuleset } from '../core/rulesetHex.js';
 import { deriveGridDimensions } from '../core/gridMath.js';
 import { DensityStrategy } from '../core/initialStateStrategies/DensityStrategy.js';
 import { ClusterStrategy } from '../core/initialStateStrategies/ClusterStrategy.js';
+import { collectBrushCells, getHexLine } from '../core/hexBrush.js';
 
 /** Rule-index sentinel meaning "initial state, no rule has fired here yet" (see fragment.glsl). */
 const RULE_INDEX_INITIAL = 255;
@@ -283,6 +285,47 @@ export class EmbedSim {
      */
     checksum() {
         return this.world.checksum_state();
+    }
+
+    /**
+     * Invert cells under a brush stroke (same semantics as the app's invert brush).
+     * Cells already in `strokeAffected` are skipped so re-entering a painted cell mid-stroke
+     * does not flip twice. Mutates `strokeAffected` by adding newly painted indices.
+     *
+     * @param {number} col0
+     * @param {number} row0
+     * @param {number} col1
+     * @param {number} row1
+     * @param {number} brushSize Neighborhood radius (0 = single cell).
+     * @param {Set<number>} strokeAffected Per-stroke "already painted" set.
+     * @returns {boolean} Whether any cell changed.
+     */
+    invertBrushLine(col0, row0, col1, row1, brushSize, strokeAffected) {
+        if (!this.state || !this.ruleIndices) return false;
+        const line = getHexLine(col0, row0, col1, row1);
+        const neighborhood = new Set();
+        const toFlip = [];
+        for (const { col, row } of line) {
+            collectBrushCells(col, row, brushSize, this.cols, this.rows, neighborhood);
+            for (const idx of neighborhood) {
+                if (strokeAffected.has(idx)) continue;
+                strokeAffected.add(idx);
+                toFlip.push(idx);
+            }
+        }
+        if (toFlip.length === 0) return false;
+        let changed = false;
+        for (const idx of toFlip) {
+            if (idx < 0 || idx >= this.numCells) continue;
+            const prev = this.state[idx];
+            const next = prev ? 0 : 1;
+            if (next === prev) continue;
+            this.state[idx] = next;
+            this.ruleIndices[idx] = RULE_INDEX_INITIAL;
+            this.activeCount += next ? 1 : -1;
+            changed = true;
+        }
+        return changed;
     }
 
     /** Release the wasm World and unregister. Must be called on element disconnect, or it leaks. */

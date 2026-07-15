@@ -59,8 +59,24 @@ describe('WorldCodec', () => {
         expect(back.cols).toBe(world.cols);
         expect(back.rulesetHex).toBe(RULESET);
         expect(back.speed).toBe(20);
+        expect(back.brushSize).toBe(2); // default when not provided
         expect(Array.from(back.cells)).toEqual(Array.from(world.cells));
         expect(back.lut).toBeNull();
+    });
+
+    it('round-trips an explicit brush size', async () => {
+        const world = { ...makeWorld(16), brushSize: 5 };
+        const back = await decodeWorldCode(await encodeWorldCode(world));
+        expect(back.brushSize).toBe(5);
+    });
+
+    it('clamps brush size to 0–40', async () => {
+        expect((await decodeWorldCode(await encodeWorldCode({
+            ...makeWorld(16), brushSize: 99,
+        }))).brushSize).toBe(40);
+        expect((await decodeWorldCode(await encodeWorldCode({
+            ...makeWorld(16), brushSize: -3,
+        }))).brushSize).toBe(0);
     });
 
     it('reproduces the app\'s exact LUT from the transmitted color settings', async () => {

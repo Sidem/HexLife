@@ -1398,6 +1398,7 @@ export class WorldManager {
             rulesetHex: this._getRulesetHexForWorld(idx),
             colorSettings,
             speed: this.simulationController.getSpeed(),
+            brushSize: this.brushController?.getBrushSize?.() ?? Config.DEFAULT_NEIGHBORHOOD_SIZE,
         };
 
         const initialState = this.worldSettings[idx]?.initialState;

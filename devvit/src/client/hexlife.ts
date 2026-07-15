@@ -82,6 +82,8 @@ export async function mountHexLife(
 
   // No in-element attribution — we own the Explorer CTA outside the element.
   world.setAttribute('link', 'off')
+  // Click/drag invert-draw (pause while painting). Brush size comes from the world code (default 2).
+  world.setAttribute('draw', '')
 
   mount.append(world)
 

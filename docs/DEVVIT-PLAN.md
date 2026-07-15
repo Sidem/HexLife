@@ -12,6 +12,7 @@
 | Create-path honesty (menu form + explorer helper) | ✅ Done |
 | **Phase 3 — publish** | Ready for owner `devvit publish` |
 | **Phase 3.5 — UX (A+B + autoplay policy)** | ✅ Deep-link, identity chrome, flicker-safe autoplay |
+| **Draw + brush in world code** | ✅ Invert paint on drag; brush size in HXW1 v2 (legacy → 2) |
 | Phase 3.5 C — further visual polish | Optional follow-up |
 | Phase 4 — Daily Hex on Reddit | Later (depends on explorer #17) |
 

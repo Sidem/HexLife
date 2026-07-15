@@ -12,21 +12,24 @@
  *
  *     flags bit 0: the payload is deflate-raw compressed.
  *
- *     payload:
+ *     payload (version 2 — current encode):
  *     offset  size  field
  *     0       3     magic 'HXW'
- *     3       1     version (1)
+ *     3       1     version (2)
  *     4       2     rows        (u16 LE)
  *     6       2     cols        (u16 LE)
  *     8       2     speed       (u16 LE, ticks/second)
  *     10      1     palette kind (0 = settings descriptor, 1 = baked RGB LUT)
  *     11      1     cells kind   (0 = bit-packed cells, 1 = generator descriptor)
  *     12      16    ruleset (128 rule bits — the same bytes the 32-char hex spells)
- *     28      2     palette length (u16 LE)
- *     30      N     palette (UTF-8 JSON color settings, or 768 bytes of RGB LUT)
- *     30+N    …     cells region — one of:
- *                     cells kind 0: ⌈rows·cols/8⌉ bytes, bit-packed (bit `i & 7` of byte `i >> 3`)
- *                     cells kind 1: UTF-8 JSON `{mode, params}` (runs to the end of the payload)
+ *     28      1     brush size  (u8, 0–40; explorer neighborhood radius)
+ *     29      1     reserved    (0)
+ *     30      2     palette length (u16 LE)
+ *     32      N     palette …
+ *     32+N    …     cells region
+ *
+ *     Version 1 (legacy decode only): no brush field — palette length sits at offset 28,
+ *     header is 30 bytes, brush defaults to 2.
  *
  * **Why a generator descriptor.** A *drawn* or evolved world has to travel as its exact cells — it is
  * one specific arrangement. But a "random fill" or "clumps" specimen is not one arrangement; it is a
@@ -58,8 +61,13 @@
  * can bundle it into both the webview client and the Node server without dragging in `config.js`.
  */
 
+import { clampBrushSize, DEFAULT_BRUSH_SIZE } from './hexBrush.js';
+
 const MAGIC = 'HXW';
-const VERSION = 1;
+/** Current encode version (includes brush size). */
+const VERSION = 2;
+/** Legacy codes without a brush field. */
+const VERSION_LEGACY = 1;
 const PREFIX = 'HXW1.';
 
 const FLAG_DEFLATE = 1;
@@ -73,13 +81,16 @@ export const CELLS_GENERATOR = 1;
 /** The initial-state generators the embed can reproduce — the app's `initialState.mode` strings. */
 const GENERATOR_MODES = new Set(['density', 'clusters']);
 
-const HEADER_BYTES = 30;
+const HEADER_BYTES_V1 = 30;
+const HEADER_BYTES_V2 = 32;
 const RULESET_BYTES = 16;
 const RULESET_OFFSET = 12;
 const LUT_RGB_BYTES = 128 * 2 * 3;
 const LUT_RGBA_BYTES = 128 * 2 * 4;
 
 const MAX_SPEED = 65535;
+
+export { DEFAULT_BRUSH_SIZE };
 
 /** @param {string} b64 */
 const toBase64Url = (b64) => b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -238,9 +249,13 @@ function generatorDescriptor(generator) {
  * @param {Uint8Array} [world.lut] A baked 128×2 **RGBA** LUT (1024 bytes) — used only when
  *   `colorSettings` is absent. Alpha is dropped (a LUT's is 255 everywhere) and restored on decode.
  * @param {number} [world.speed=40] Ticks/second the post runs at once the viewer hits play.
+ * @param {number} [world.brushSize=2] Explorer brush / neighborhood radius (0–40).
  * @returns {Promise<string|null>} The code, or null if the inputs don't describe a world.
  */
-export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSettings, lut, speed = 40, generator = null }) {
+export async function encodeWorldCode({
+    rows, cols, rulesetHex, cells, colorSettings, lut, speed = 40, generator = null,
+    brushSize = DEFAULT_BRUSH_SIZE,
+}) {
     const numCells = rows * cols;
     if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 2 || cols < 2
         || rows > 65535 || cols > 65535) return null;
@@ -283,7 +298,8 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
         cellsRegion = packCells(cells);
     }
 
-    const payload = new Uint8Array(HEADER_BYTES + palette.length + cellsRegion.length);
+    const headerBytes = HEADER_BYTES_V2;
+    const payload = new Uint8Array(headerBytes + palette.length + cellsRegion.length);
     const view = new DataView(payload.buffer);
 
     for (let i = 0; i < MAGIC.length; i++) payload[i] = MAGIC.charCodeAt(i);
@@ -294,9 +310,11 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
     payload[10] = paletteKind;
     payload[11] = cellsKind;
     payload.set(ruleset, RULESET_OFFSET);
-    view.setUint16(28, palette.length, true);
-    payload.set(palette, HEADER_BYTES);
-    payload.set(cellsRegion, HEADER_BYTES + palette.length);
+    payload[28] = clampBrushSize(brushSize);
+    payload[29] = 0;
+    view.setUint16(30, palette.length, true);
+    payload.set(palette, headerBytes);
+    payload.set(cellsRegion, headerBytes + palette.length);
 
     const deflated = await deflate(payload);
     // Keep whichever is smaller. Deflate can *grow* incompressible data by a few bytes, and a
@@ -319,10 +337,10 @@ export async function encodeWorldCode({ rows, cols, rulesetHex, cells, colorSett
  *
  * @param {string} code
  * @returns {Promise<{rows: number, cols: number, rulesetHex: string, cells: Uint8Array|null,
- *   generator: {mode: string, params: object}|null, speed: number, colorSettings: object|null,
- *   lut: Uint8Array|null}|null>} Exactly one of `cells` (the exact tick-0 grid) and `generator` (a
- *   recipe to reseed it) is non-null. Exactly one of `colorSettings` (feed it to `generateColorLUT`)
- *   and `lut` (a ready 1024-byte RGBA table) is non-null.
+ *   generator: {mode: string, params: object}|null, speed: number, brushSize: number,
+ *   colorSettings: object|null, lut: Uint8Array|null}|null>} Exactly one of `cells` and
+ *   `generator` is non-null. Exactly one of `colorSettings` and `lut` is non-null.
+ *   `brushSize` is always set (legacy v1 codes → {@link DEFAULT_BRUSH_SIZE}).
  */
 export async function decodeWorldCode(code) {
     if (typeof code !== 'string') return null;
@@ -341,9 +359,11 @@ export async function decodeWorldCode(code) {
     const flags = outer[0];
     const body = outer.subarray(1);
     const bytes = (flags & FLAG_DEFLATE) ? await inflate(body) : body;
-    if (!bytes || bytes.length < HEADER_BYTES) return null;
+    if (!bytes || bytes.length < HEADER_BYTES_V1) return null;
 
-    if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) !== MAGIC || bytes[3] !== VERSION) return null;
+    if (String.fromCharCode(bytes[0], bytes[1], bytes[2]) !== MAGIC) return null;
+    const version = bytes[3];
+    if (version !== VERSION && version !== VERSION_LEGACY) return null;
 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const rows = view.getUint16(4, true);
@@ -351,17 +371,33 @@ export async function decodeWorldCode(code) {
     const speed = view.getUint16(8, true);
     const paletteKind = bytes[10];
     const cellsKind = bytes[11];
-    const paletteLen = view.getUint16(28, true);
     const numCells = rows * cols;
     if (rows < 2 || cols < 2 || numCells === 0) return null;
 
-    const cellsOffset = HEADER_BYTES + paletteLen;
+    /** @type {number} */
+    let headerBytes;
+    /** @type {number} */
+    let brushSize;
+    /** @type {number} */
+    let paletteLen;
+    if (version === VERSION_LEGACY) {
+        headerBytes = HEADER_BYTES_V1;
+        brushSize = DEFAULT_BRUSH_SIZE;
+        paletteLen = view.getUint16(28, true);
+    } else {
+        headerBytes = HEADER_BYTES_V2;
+        if (bytes.length < headerBytes) return null;
+        brushSize = clampBrushSize(bytes[28]);
+        paletteLen = view.getUint16(30, true);
+    }
+
+    const cellsOffset = headerBytes + paletteLen;
     // The palette region must at least be fully present; the cells region is length-checked per kind
     // below. A truncated or corrupted paste lands in one of these (an inflate of garbage fails first).
     if (bytes.length < cellsOffset) return null;
 
     const rulesetHex = bytesToHex(bytes.subarray(RULESET_OFFSET, RULESET_OFFSET + RULESET_BYTES));
-    const paletteBytes = bytes.subarray(HEADER_BYTES, cellsOffset);
+    const paletteBytes = bytes.subarray(headerBytes, cellsOffset);
 
     /** @type {object|null} */
     let colorSettings = null;
@@ -407,7 +443,7 @@ export async function decodeWorldCode(code) {
         return null;   // A cells kind from a future version: refuse rather than mis-render.
     }
 
-    return { rows, cols, rulesetHex, cells, generator, speed, colorSettings, lut };
+    return { rows, cols, rulesetHex, cells, generator, speed, brushSize, colorSettings, lut };
 }
 
 /**

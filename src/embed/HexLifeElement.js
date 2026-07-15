@@ -25,6 +25,7 @@ import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
 import { clampInt, clampFloat, readSeed, readGradient } from './attrs.js';
 import { decodeWorldCode } from '../core/WorldCodec.js';
+import { clampBrushSize, DEFAULT_BRUSH_SIZE } from '../core/hexBrush.js';
 
 /** Where the attribution link points. Deep-links the ruleset via ShareCodec's `r`/`g` params. */
 const APP_URL = 'https://sidem.github.io/HexLife/';
@@ -147,7 +148,7 @@ const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
-            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link'];
+            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw'];
     }
 
     constructor() {
@@ -237,6 +238,18 @@ export class HexLifeElement extends HTMLElement {
         this._onTouchStart = this._onTouchStart.bind(this);
         this._onTouchMove = this._onTouchMove.bind(this);
         this._onTouchEnd = this._onTouchEnd.bind(this);
+        this._onPointerDown = this._onPointerDown.bind(this);
+        this._onPointerMove = this._onPointerMove.bind(this);
+        this._onPointerUp = this._onPointerUp.bind(this);
+
+        /** Brush radius from world code (or default 2). */
+        this._brushSize = DEFAULT_BRUSH_SIZE;
+        /** Invert-draw stroke state (when `draw` attribute is set). */
+        this._drawing = false;
+        this._drawPointerId = null;
+        this._strokeAffected = new Set();
+        this._lastDrawCoords = null;
+        this._resumeAfterStroke = false;
 
         /**
          * Upgrade order is: `attributeChangedCallback` once per attribute, *then*
@@ -299,7 +312,8 @@ export class HexLifeElement extends HTMLElement {
         // A world code owns every world-defining attribute (see `_boot`): the only way to change one
         // of them is a new code, and a new code means a new world. Both cases are a re-boot. `speed`
         // is exempt — it's a playback rate, not part of the tick sequence, so it applies live.
-        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr' && name !== 'link' && name !== 'speed')) {
+        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr'
+            && name !== 'link' && name !== 'speed' && name !== 'draw')) {
             this._generation++;
             this._teardown();
             this._boot(this._generation);
@@ -356,6 +370,17 @@ export class HexLifeElement extends HTMLElement {
                 break;
             case 'link':
                 this._updateAttribution();
+                break;
+            case 'draw':
+                if (this.hasAttribute('draw')) {
+                    this._canvas.style.touchAction = 'none';
+                    this._canvas.style.cursor = 'crosshair';
+                } else {
+                    this._endDrawStroke(false);
+                    this._canvas.style.touchAction = '';
+                    this._canvas.style.cursor = '';
+                }
+                this._syncPlayback();
                 break;
         }
     }
@@ -416,6 +441,16 @@ export class HexLifeElement extends HTMLElement {
     /** @returns {boolean} True when the user has paused (attribute or `pause()`), ignoring viewport gates. */
     get userPaused() { return this._userPaused; }
 
+    /** @returns {number} Brush / neighborhood radius used for draw strokes. */
+    get brushSize() { return this._brushSize; }
+
+    /**
+     * @param {number} size
+     */
+    setBrushSize(size) {
+        this._brushSize = clampBrushSize(size);
+    }
+
     // --- boot / teardown ------------------------------------------------------
 
     /**
@@ -438,6 +473,9 @@ export class HexLifeElement extends HTMLElement {
             return;
         }
         this._world = world;
+        this._brushSize = world
+            ? clampBrushSize(world.brushSize)
+            : DEFAULT_BRUSH_SIZE;
 
         const hex = world ? world.rulesetHex : this._readRuleset();
         if (typeof hex !== 'string') {
@@ -449,6 +487,7 @@ export class HexLifeElement extends HTMLElement {
         this._userPaused = this.hasAttribute('paused');
         this._playRequested = false;
         this._docVisible = document.visibilityState !== 'hidden';
+        this._endDrawStroke(false);
 
         this._motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         this._reducedMotion = this._motionQuery.matches;
@@ -518,12 +557,14 @@ export class HexLifeElement extends HTMLElement {
 
         // Zoom: wheel on desktop, pinch on touch. Passive:false on wheel so we can preventDefault
         // (otherwise the host page / Reddit webview scrolls away). Touch listeners are non-passive
-        // only while two fingers are down — single-finger scroll still works for the feed.
+        // only while two fingers are down — single-finger scroll still works for the feed
+        // (unless `draw` is on, in which case pointer events own single-finger paint).
         this._canvas.addEventListener('wheel', this._onWheel, { passive: false });
         this._canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
         this._canvas.addEventListener('touchmove', this._onTouchMove, { passive: false });
         this._canvas.addEventListener('touchend', this._onTouchEnd, { passive: true });
         this._canvas.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
+        this._bindDrawListeners(true);
 
         this._resize();
         this._updateAttribution();
@@ -533,12 +574,19 @@ export class HexLifeElement extends HTMLElement {
         this.dispatchEvent(new CustomEvent('hexlife-ready', {
             bubbles: true,
             composed: true,
-            detail: { rows: this.sim.rows, cols: this.sim.cols, numCells: this.sim.numCells },
+            detail: {
+                rows: this.sim.rows,
+                cols: this.sim.cols,
+                numCells: this.sim.numCells,
+                brushSize: this._brushSize,
+            },
         }));
     }
 
     _teardown() {
         this._stopLoop();
+        this._endDrawStroke(false);
+        this._bindDrawListeners(false);
 
         if (this._resizeObserver) { this._resizeObserver.disconnect(); this._resizeObserver = null; }
         if (this._intersectionObserver) { this._intersectionObserver.disconnect(); this._intersectionObserver = null; }
@@ -615,19 +663,114 @@ export class HexLifeElement extends HTMLElement {
         // Reduced motion means: never autoplay. The poster frame + a play button is the escape
         // hatch, and pressing it is the user asking for motion, which we honor.
         const motionAllowed = !this._reducedMotion || this._playRequested;
-        const wants = !this._userPaused && motionAllowed;
+        // Drawing also holds the loop (pause-while-drawing), same as the explorer.
+        const wants = !this._userPaused && motionAllowed && !this._drawing;
         const canRun = wants && this._onScreen && this._docVisible;
 
-        // The overlay advertises "this is stopped and you can start it" — which is true when the
-        // author paused it or reduced-motion suppressed it, but NOT when we merely scrolled it out
-        // of view or the tab is hidden (nobody is looking, and it resumes by itself).
-        this._overlay.hidden = wants;
+        // When `draw` is enabled the host usually owns play chrome (Devvit transport bar); keep the
+        // poster off so pointer events reach the canvas for painting.
+        const drawMode = this.hasAttribute('draw');
+        this._overlay.hidden = wants || drawMode;
         // Reset is the mirror image: offer it only once the world is running (the overlay is gone),
         // never over the poster frame where it would compete with the play button.
-        this._resetBtn.hidden = !wants;
+        this._resetBtn.hidden = !wants || drawMode;
 
         if (canRun) this._startLoop();
         else this._stopLoop();
+    }
+
+    // --- draw (invert brush) --------------------------------------------------
+
+    _bindDrawListeners(on) {
+        const method = on ? 'addEventListener' : 'removeEventListener';
+        this._canvas[method]('pointerdown', this._onPointerDown);
+        this._canvas[method]('pointermove', this._onPointerMove);
+        this._canvas[method]('pointerup', this._onPointerUp);
+        this._canvas[method]('pointercancel', this._onPointerUp);
+        this._canvas[method]('lostpointercapture', this._onPointerUp);
+        if (on && this.hasAttribute('draw')) {
+            this._canvas.style.touchAction = 'none';
+            this._canvas.style.cursor = 'crosshair';
+        } else if (!on) {
+            this._canvas.style.touchAction = '';
+            this._canvas.style.cursor = '';
+        }
+    }
+
+    _onPointerDown(e) {
+        if (!this.hasAttribute('draw') || !this.sim || !this.renderer || this.error) return;
+        // Multi-touch pinch owns the gesture — don't paint under a second finger.
+        if (this._pinchTouches.size >= 2) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+        const rect = this._canvas.getBoundingClientRect();
+        const hit = this.renderer.hitTest(e.clientX - rect.left, e.clientY - rect.top);
+        if (!hit) return;
+
+        e.preventDefault();
+        this._drawing = true;
+        this._drawPointerId = e.pointerId;
+        this._strokeAffected = new Set();
+        this._lastDrawCoords = hit;
+        // Pause while drawing; remember whether we should resume after the stroke.
+        this._resumeAfterStroke = !this._userPaused && this.playing;
+        if (!this._userPaused) {
+            // Soft pause without flipping the paused attribute (so play/pause chrome stays honest).
+            this._syncPlayback();
+        }
+        try { this._canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+
+        if (this.sim.invertBrushLine(hit.col, hit.row, hit.col, hit.row, this._brushSize, this._strokeAffected)) {
+            this._drawOnce();
+        }
+    }
+
+    _onPointerMove(e) {
+        if (!this._drawing || e.pointerId !== this._drawPointerId) return;
+        if (this._pinchTouches.size >= 2) {
+            this._endDrawStroke(true);
+            return;
+        }
+        e.preventDefault();
+        if (!this.sim || !this.renderer) return;
+        const rect = this._canvas.getBoundingClientRect();
+        const hit = this.renderer.hitTest(e.clientX - rect.left, e.clientY - rect.top);
+        if (!hit || !this._lastDrawCoords) return;
+        if (hit.col === this._lastDrawCoords.col && hit.row === this._lastDrawCoords.row) return;
+
+        if (this.sim.invertBrushLine(
+            this._lastDrawCoords.col, this._lastDrawCoords.row,
+            hit.col, hit.row,
+            this._brushSize, this._strokeAffected,
+        )) {
+            this._drawOnce();
+        }
+        this._lastDrawCoords = hit;
+    }
+
+    _onPointerUp(e) {
+        if (!this._drawing) return;
+        if (e && this._drawPointerId != null && e.pointerId !== this._drawPointerId) return;
+        this._endDrawStroke(true);
+    }
+
+    /**
+     * @param {boolean} maybeResume Whether to restore playback if the stroke interrupted it.
+     */
+    _endDrawStroke(maybeResume) {
+        if (!this._drawing && !this._resumeAfterStroke) {
+            this._drawPointerId = null;
+            this._lastDrawCoords = null;
+            return;
+        }
+        const shouldResume = maybeResume && this._resumeAfterStroke && !this._userPaused;
+        this._drawing = false;
+        this._drawPointerId = null;
+        this._lastDrawCoords = null;
+        this._strokeAffected = new Set();
+        this._resumeAfterStroke = false;
+        if (shouldResume) this._syncPlayback();
+        else this._syncPlayback();
     }
 
     _startLoop() {

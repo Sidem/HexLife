@@ -27,6 +27,11 @@ export type DecodedWorld = {
   generator: GeneratorDescriptor | null
   /** Ticks per second. */
   speed: number
+  /**
+   * Brush / neighborhood radius (0–40). Always set; legacy v1 codes decode as
+   * {@link DEFAULT_BRUSH_SIZE} (2).
+   */
+  brushSize: number
   /** Color settings to feed `generateColorLUT`. Null iff `lut` is set. */
   colorSettings: object | null
   /** A ready 128×2 RGBA LUT (1024 bytes). Null iff `colorSettings` is set. */
@@ -46,7 +51,11 @@ export type WorldCodeInput = {
   /** Fallback palette form: a baked 128×2 **RGBA** LUT (1024 bytes). */
   lut?: Uint8Array
   speed?: number
+  /** Brush / neighborhood radius (0–40). Defaults to 2. */
+  brushSize?: number
 }
+
+export const DEFAULT_BRUSH_SIZE: 2
 
 /** Encode a world into a `HXW1.` code, or null if the inputs don't describe a world. */
 export function encodeWorldCode(world: WorldCodeInput): Promise<string | null>

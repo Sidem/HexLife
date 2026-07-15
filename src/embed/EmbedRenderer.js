@@ -343,6 +343,58 @@ export class EmbedRenderer {
     }
 
     /**
+     * Map a CSS-pixel point on the canvas to a grid cell (odd-q flat-top, matching the shader).
+     * Returns null if the pointer is outside the canvas or the camera isn't ready.
+     * @param {number} cssX clientX relative to canvas left (CSS px)
+     * @param {number} cssY clientY relative to canvas top (CSS px)
+     * @returns {{col: number, row: number}|null}
+     */
+    hitTest(cssX, cssY) {
+        if (!this._hexSize || !this._center || !this._cssWidth || !this._cssHeight) return null;
+        const dprX = this.canvas.width / this._cssWidth;
+        const dprY = this.canvas.height / this._cssHeight;
+        const z = this._viewZoom || 1;
+        // Inverse of the vertex transform: (pos - pan) * zoom + res/2  (in backing-store px).
+        const sx = cssX * dprX;
+        const sy = cssY * dprY;
+        const worldPanX = this._center.x - (this._viewPanX * dprX) / z;
+        const worldPanY = this._center.y - (this._viewPanY * dprY) / z;
+        const worldX = (sx - this.canvas.width / 2) / z + worldPanX;
+        const worldY = (sy - this.canvas.height / 2) / z + worldPanY;
+
+        const hexSize = this._hexSize;
+        const horizSpacing = (2 * hexSize * 3) / 4;
+        const vertSpacing = Math.sqrt(3) * hexSize;
+
+        // Approximate col from x, then row accounting for odd-column stagger.
+        let col = Math.round(worldX / horizSpacing);
+        col = Math.max(0, Math.min(this.cols - 1, col));
+        const yOffset = col % 2 !== 0 ? vertSpacing / 2 : 0;
+        let row = Math.round((worldY - yOffset) / vertSpacing);
+        row = Math.max(0, Math.min(this.rows - 1, row));
+
+        // Refine among the approximate cell and its neighbors (hex centers aren't on a square lattice).
+        let best = null;
+        let bestDist = Infinity;
+        for (let dc = -1; dc <= 1; dc++) {
+            for (let dr = -1; dr <= 1; dr++) {
+                const c = col + dc;
+                const r = row + dr;
+                if (c < 0 || r < 0 || c >= this.cols || r >= this.rows) continue;
+                const p = gridToPixel(c, r, hexSize);
+                const d = (p.x - worldX) ** 2 + (p.y - worldY) ** 2;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = { col: c, row: r };
+                }
+            }
+        }
+        // Reject hits far outside any hex (roughly beyond one hex radius²).
+        if (!best || bestDist > (hexSize * 1.15) ** 2) return null;
+        return best;
+    }
+
+    /**
      * Draw the sim's current generation. One instanced call over every cell.
      * @param {import('./EmbedSim.js').EmbedSim} sim
      */
