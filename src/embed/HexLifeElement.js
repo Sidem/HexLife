@@ -678,6 +678,10 @@ export class HexLifeElement extends HTMLElement {
     /**
      * Zoom by a multiplicative factor, optionally around a canvas-local point (CSS pixels from the
      * canvas top-left). Keeps that point stable under the cursor/finger so wheel zoom feels anchored.
+     *
+     * Floor is 1 (= the initial fitted "whole world" view). Zooming out past that would letterbox
+     * the grid inside empty canvas — not allowed. At the floor, pan is cleared so the world is
+     * always centred and fills the view.
      * @param {number} factor
      * @param {number} [localX]
      * @param {number} [localY]
@@ -685,21 +689,38 @@ export class HexLifeElement extends HTMLElement {
     _zoomBy(factor, localX, localY) {
         if (!this.renderer || !Number.isFinite(factor) || factor <= 0) return;
         const prev = this._viewZoom;
-        const next = Math.min(8, Math.max(0.5, prev * factor));
-        if (next === prev) return;
+        // Min 1 = initial fit (100%); max 8 = close detail.
+        const next = Math.min(8, Math.max(1, prev * factor));
+        if (next === prev) {
+            // Still at the floor while trying to zoom out further — force a clean fit.
+            if (next === 1 && (this._viewPanX !== 0 || this._viewPanY !== 0)) {
+                this._viewPanX = 0;
+                this._viewPanY = 0;
+                this._applyView();
+                if (!this.playing) this._drawOnce();
+            }
+            return;
+        }
 
-        // Anchor: shift pan so the world point under (localX, localY) stays put. Without an anchor
-        // (pinch midpoint missing), zoom about the canvas centre.
-        const rect = this._canvas.getBoundingClientRect();
-        const ax = localX ?? rect.width / 2;
-        const ay = localY ?? rect.height / 2;
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
-        // Pan is stored in CSS pixels of offset from centre; scale it with zoom so the anchor holds.
-        const scale = next / prev;
-        this._viewPanX = ax - cx - (ax - cx - this._viewPanX) * scale;
-        this._viewPanY = ay - cy - (ay - cy - this._viewPanY) * scale;
-        this._viewZoom = next;
+        if (next === 1) {
+            // Fully zoomed out: cover the view, no offset.
+            this._viewZoom = 1;
+            this._viewPanX = 0;
+            this._viewPanY = 0;
+        } else {
+            // Anchor: shift pan so the world point under (localX, localY) stays put. Without an
+            // anchor (pinch midpoint missing), zoom about the canvas centre.
+            const rect = this._canvas.getBoundingClientRect();
+            const ax = localX ?? rect.width / 2;
+            const ay = localY ?? rect.height / 2;
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            // Pan is stored in CSS pixels of offset from centre; scale it with zoom so the anchor holds.
+            const scale = next / prev;
+            this._viewPanX = ax - cx - (ax - cx - this._viewPanX) * scale;
+            this._viewPanY = ay - cy - (ay - cy - this._viewPanY) * scale;
+            this._viewZoom = next;
+        }
         this._applyView();
         if (!this.playing) this._drawOnce();
     }
@@ -742,12 +763,18 @@ export class HexLifeElement extends HTMLElement {
         const dy = pts[0].y - pts[1].y;
         const dist = Math.hypot(dx, dy) || 1;
         const factor = dist / this._pinchStartDist;
-        const target = Math.min(8, Math.max(0.5, this._pinchStartZoom * factor));
+        // Same floor as wheel zoom: never smaller than the initial fitted view.
+        const target = Math.min(8, Math.max(1, this._pinchStartZoom * factor));
         // Set absolute zoom from the pinch start rather than stacking relative factors (avoids drift).
         const midX = (pts[0].x + pts[1].x) / 2;
         const midY = (pts[0].y + pts[1].y) / 2;
         const rect = this._canvas.getBoundingClientRect();
         const ratio = target / this._viewZoom;
+        if (ratio === 1 && target === 1) {
+            // Pinch fully open — still call _zoomBy so pan snaps back to the fit.
+            this._zoomBy(1, midX - rect.left, midY - rect.top);
+            return;
+        }
         if (ratio === 1) return;
         this._zoomBy(ratio, midX - rect.left, midY - rect.top);
     }
