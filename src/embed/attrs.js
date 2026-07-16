@@ -3,7 +3,7 @@
 /**
  * Attribute coercion for `<hexlife-world>` (#25 Phase 2).
  *
- * These four functions are the entire trust boundary between a stranger's HTML and the sim, and the
+ * These functions are the entire trust boundary between a stranger's HTML and the sim, and the
  * rule they encode is the element's first law: **an embed never throws into the host page.** Every
  * unparseable value falls back to a sane default and every out-of-range value clamps, so the worst a
  * typo can do is produce a boring world — not a red error in someone's blog console.
@@ -71,4 +71,23 @@ export function readGradient(on, off) {
     if (onColors.length === 0) return null;
     const offColors = parse(off);
     return { on: onColors, off: offColors.length ? offColors : ['#111111'] };
+}
+
+/**
+ * Should a wheel event zoom the embed, or belong to the page it sits on?
+ *
+ * `wheel-zoom="ctrl"` is for embeds inside a scrollable feed: swallowing the wheel there traps a
+ * reader who only meant to scroll past. Ctrl/meta+wheel still zooms — and because a trackpad pinch
+ * is delivered as ctrl+wheel in Chromium and Firefox, pinch-to-zoom keeps working untouched.
+ *
+ * Anything other than `"ctrl"` (absent, `"free"`, a typo) means free zooming: the default is the
+ * pre-existing behavior, so an unrecognized value can't silently disable an embed's zoom.
+ *
+ * @param {string|null} mode The `wheel-zoom` attribute.
+ * @param {{ctrlKey?: boolean, metaKey?: boolean}} e The wheel event (only its modifiers are read).
+ * @returns {boolean} True if the embed should zoom (and preventDefault).
+ */
+export function wheelZoomAllowed(mode, e) {
+    if (String(mode).trim() !== 'ctrl') return true;
+    return Boolean(e && (e.ctrlKey || e.metaKey));
 }

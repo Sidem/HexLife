@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampInt, clampFloat, readSeed, readGradient } from '../src/embed/attrs.js';
+import { clampInt, clampFloat, readSeed, readGradient, wheelZoomAllowed } from '../src/embed/attrs.js';
 
 /**
  * Attribute coercion for `<hexlife-world>` (#25 Phase 2).
@@ -84,5 +84,33 @@ describe('readGradient', () => {
 
     it('defaults the off-gradient so a one-sided override still looks deliberate', () => {
         expect(readGradient('#fff', null)).toEqual({ on: ['#fff'], off: ['#111111'] });
+    });
+});
+
+describe('wheelZoomAllowed', () => {
+    const plain = { ctrlKey: false, metaKey: false };
+
+    it('zooms freely by default, so the existing embed API keeps its behavior', () => {
+        expect(wheelZoomAllowed(null, plain)).toBe(true);
+        expect(wheelZoomAllowed('free', plain)).toBe(true);
+    });
+
+    it('lets a plain wheel through to the page in ctrl mode', () => {
+        // The Devvit feed case: returning false means no preventDefault, so the post scrolls past
+        // instead of eating the reader's wheel.
+        expect(wheelZoomAllowed('ctrl', plain)).toBe(false);
+    });
+
+    it('still zooms on ctrl/meta in ctrl mode — this is also trackpad pinch', () => {
+        // Chromium and Firefox deliver a trackpad pinch as ctrl+wheel, so this one branch is what
+        // keeps pinch-to-zoom alive on desktop.
+        expect(wheelZoomAllowed('ctrl', { ctrlKey: true, metaKey: false })).toBe(true);
+        expect(wheelZoomAllowed('ctrl', { ctrlKey: false, metaKey: true })).toBe(true);
+    });
+
+    it('treats an unrecognized value as free rather than silently killing zoom', () => {
+        expect(wheelZoomAllowed('CTRL', plain)).toBe(true);   // case-sensitive on purpose
+        expect(wheelZoomAllowed('banana', plain)).toBe(true);
+        expect(wheelZoomAllowed('', plain)).toBe(true);
     });
 });

@@ -25,10 +25,31 @@ world code), native GPU resolution.
 ## Public API (frozen — extend carefully)
 
 **Attributes:** `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` ·
-`code` (`HXW1.…`, wins over attrs) · `paused` · `max-dpr` · `link` (`on`/`off`).
+`code` (`HXW1.…`, wins over attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
+`draw` (invert-paint on drag; pauses while drawing) ·
+`wheel-zoom` (`free` default | `ctrl`).
 
-**JS:** `play()` / `pause()` / `reset(seed?)` / `tick(n)` · readonly `tickCount` / `checksum` /
-`playing` / `sim` · event `hexlife-ready`.
+`wheel-zoom="ctrl"` zooms only with ctrl/meta held; a plain wheel falls through **unprevented** so
+the host page scrolls. For embeds in a feed, where scrolling past is the common case and a swallowed
+wheel traps the reader. Trackpad pinch is delivered as ctrl+wheel (Chromium/Firefox), so
+pinch-to-zoom is unaffected. Applies live — no re-boot. Unrecognized values mean `free`, so a typo
+can never silently disable zoom.
+
+**JS:** `play()` / `pause()` / `reset(seed?)` / `tick(n)` / `setBrushSize(n)` · readonly `tickCount` /
+`checksum` / `playing` / `userPaused` / `brushSize` / `sim`.
+
+**Events** (all `bubbles` + `composed`):
+
+| Event | Detail | Fires |
+|---|---|---|
+| `hexlife-ready` | `{rows, cols, numCells, brushSize}` | Once per successful boot |
+| `hexlife-playstate` | `{playing, userPaused}` | Whenever the tuple changes (deduped) |
+| `hexlife-error` | `{message, detail}` | On entering the styled error state |
+
+`hexlife-playstate` exists because playback has five invisible gates (attribute, API call, viewport,
+tab visibility, reduced motion); without it a host must poll a getter on a timer to keep a
+play/pause label honest. It fires *before* `hexlife-ready` on boot (the boot's `_syncPlayback`
+precedes the ready dispatch), so attach listeners before connecting the element.
 
 **Policies:** IntersectionObserver pause, `visibilityState`, `prefers-reduced-motion` poster, never
 throw into host, full teardown on disconnect, multi-instance wasm view-refresh registry.

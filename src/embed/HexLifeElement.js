@@ -23,7 +23,7 @@
 
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
-import { clampInt, clampFloat, readSeed, readGradient } from './attrs.js';
+import { clampInt, clampFloat, readSeed, readGradient, wheelZoomAllowed } from './attrs.js';
 import { decodeWorldCode } from '../core/WorldCodec.js';
 import { clampBrushSize, DEFAULT_BRUSH_SIZE } from '../core/hexBrush.js';
 
@@ -148,7 +148,7 @@ const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
-            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw'];
+            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw', 'wheel-zoom'];
     }
 
     constructor() {
@@ -221,6 +221,11 @@ export class HexLifeElement extends HTMLElement {
         this._reducedMotion = false;
         /** Set by an explicit `play()` (or a poster click), which overrides reduced motion. */
         this._playRequested = false;
+        /**
+         * Last `{playing, userPaused}` announced via `hexlife-playstate`, so repeat syncs stay quiet.
+         * @type {{playing: boolean, userPaused: boolean}|null}
+         */
+        this._lastPlayState = null;
 
         this._rafId = 0;
         this._lastFrameTime = 0;
@@ -311,9 +316,11 @@ export class HexLifeElement extends HTMLElement {
 
         // A world code owns every world-defining attribute (see `_boot`): the only way to change one
         // of them is a new code, and a new code means a new world. Both cases are a re-boot. `speed`
-        // is exempt — it's a playback rate, not part of the tick sequence, so it applies live.
+        // is exempt — it's a playback rate, not part of the tick sequence, so it applies live. So is
+        // `wheel-zoom`, which only gates an input handler (`_onWheel` reads it fresh on every event).
         if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr'
-            && name !== 'link' && name !== 'speed' && name !== 'draw')) {
+            && name !== 'link' && name !== 'speed' && name !== 'draw'
+            && name !== 'wheel-zoom')) {
             this._generation++;
             this._teardown();
             this._boot(this._generation);
@@ -381,6 +388,9 @@ export class HexLifeElement extends HTMLElement {
                     this._canvas.style.cursor = '';
                 }
                 this._syncPlayback();
+                break;
+            case 'wheel-zoom':
+                // Nothing to apply: `_onWheel` reads the attribute on every event.
                 break;
         }
     }
@@ -613,6 +623,9 @@ export class HexLifeElement extends HTMLElement {
         this._viewZoom = 1;
         this._viewPanX = 0;
         this._viewPanY = 0;
+        // Forget the announced state: the next boot must report its own starting point, even if it
+        // happens to match whatever the torn-down world was doing.
+        this._lastPlayState = null;
     }
 
     // --- attributes -----------------------------------------------------------
@@ -677,6 +690,30 @@ export class HexLifeElement extends HTMLElement {
 
         if (canRun) this._startLoop();
         else this._stopLoop();
+
+        // After the loop has actually started/stopped, so `playing` is the truth and not a forecast.
+        this._emitPlayState();
+    }
+
+    /**
+     * Announce `{playing, userPaused}` whenever it changes.
+     *
+     * Playback has five gates (attribute, API call, viewport, tab visibility, reduced motion) and
+     * none of them are visible from outside the element, so a host wanting an honest play/pause
+     * label otherwise has to poll a getter on a timer. Deduped against the last emitted tuple:
+     * `_syncPlayback` runs on every scroll and visibility flip, and most of those change nothing.
+     */
+    _emitPlayState() {
+        const playing = this.playing;
+        const userPaused = this._userPaused;
+        const last = this._lastPlayState;
+        if (last && last.playing === playing && last.userPaused === userPaused) return;
+        this._lastPlayState = { playing, userPaused };
+        this.dispatchEvent(new CustomEvent('hexlife-playstate', {
+            bubbles: true,
+            composed: true,
+            detail: { playing, userPaused },
+        }));
     }
 
     // --- draw (invert brush) --------------------------------------------------
@@ -869,7 +906,10 @@ export class HexLifeElement extends HTMLElement {
     }
 
     _onWheel(e) {
-        // Only zoom when the pointer is over us; preventDefault so the Reddit feed doesn't scroll.
+        // Fall through *without* preventDefault when the wheel isn't ours, so the page scrolls
+        // normally (see `wheelZoomAllowed`).
+        if (!wheelZoomAllowed(this.getAttribute('wheel-zoom'), e)) return;
+        // Zoom is ours: preventDefault so the host page doesn't scroll away under the cursor.
         e.preventDefault();
         const rect = this._canvas.getBoundingClientRect();
         const localX = e.clientX - rect.left;
@@ -959,6 +999,14 @@ export class HexLifeElement extends HTMLElement {
         this._errorBox.hidden = false;
         this._updateAttribution();
         console.warn(`<hexlife-world>: ${message} ${detail || ''}`);
+        // Rule 1 (see the header) says we never throw into the host page — but a host that renders
+        // its own chrome around us still needs to know we gave up, rather than showing a transport
+        // bar for a world that will never run.
+        this.dispatchEvent(new CustomEvent('hexlife-error', {
+            bubbles: true,
+            composed: true,
+            detail: { message, detail: detail || '' },
+        }));
     }
 
     _clearError() {
