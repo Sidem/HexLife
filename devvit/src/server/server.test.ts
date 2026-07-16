@@ -238,6 +238,55 @@ test('a blank title is named after the ruleset', async () => {
   assert.match(submitted[0]?.title ?? '', /^\w+ \w+ — live HexLife specimen$/)
 })
 
+/** POST a code to the in-post create endpoint. */
+async function createPost(values: {code?: string; title?: string}): Promise<{
+  status: number
+  body: {url?: string; error?: string}
+}> {
+  const rsp = await fetch(`${serverURL}/${Endpoint.CreatePost}`, {
+    body: JSON.stringify(values),
+    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+  })
+  return {status: rsp.status, body: (await rsp.json()) as {url?: string}}
+}
+
+test('api/post creates a specimen and returns its url', async () => {
+  const code = await worldCode()
+  const {status, body} = await createPost({code, title: 'From inside'})
+
+  assert.equal(status, 200)
+  assert.equal(body.url, 'https://reddit.com/r/hexlife/t3_new1')
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0]?.title, 'From inside')
+  // Same guarantees as the menu path — this is that callback without the UI envelope.
+  assert.equal(submitted[0]?.runAs, 'USER')
+  assert.equal(submitted[0]?.styles?.backgroundColor, '#0C0E10FF')
+  assert.equal(submitted[0]?.postData?.code, code)
+  assert.equal(redisValues.get('world:t3_new1'), code)
+})
+
+test('api/post rejects an invalid code without creating anything', async () => {
+  const {status, body} = await createPost({code: 'HXW1.nope', title: 't'})
+  assert.equal(status, 400)
+  assert.match(body.error ?? '', /not a valid world code/)
+  assert.equal(submitted.length, 0)
+  assert.equal(redisValues.size, 0)
+})
+
+test('api/post names a blank title after the ruleset', async () => {
+  const code = await worldCode()
+  const {status} = await createPost({code, title: ''})
+  assert.equal(status, 200)
+  assert.match(submitted[0]?.title ?? '', /^\w+ \w+ — live HexLife specimen$/)
+})
+
+test('api/post rejects a GET', async () => {
+  const rsp = await fetch(`${serverURL}/${Endpoint.CreatePost}`)
+  assert.equal(rsp.status, 404)
+  assert.equal(submitted.length, 0)
+})
+
 test('install demo post is app-authored and styled', async () => {
   const rsp = await fetch(`${serverURL}/${Endpoint.OnAppInstall}`, {
     method: 'POST',

@@ -12,17 +12,24 @@ import type {
 import {rulesetName} from '../../../src/core/rulesetName.js'
 import {decodeWorldCode} from '../../../src/core/WorldCodec.js'
 import {
+  type CreatePostRsp,
   Endpoint,
   EndpointMethod,
   type ErrorRsp,
   type GetWorldRsp,
+  NEW_POST_COPY,
   NEW_POST_FORM,
   type NewPostFormValues,
   type WorldPostData,
 } from '../shared/api.ts'
 import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
 
-type AnyRsp = GetWorldRsp | UiResponse | TriggerResponse | ErrorRsp
+type AnyRsp =
+  | GetWorldRsp
+  | CreatePostRsp
+  | UiResponse
+  | TriggerResponse
+  | ErrorRsp
 
 /** What a successfully decoded `HXW1.` code describes. */
 type DecodedWorld = NonNullable<Awaited<ReturnType<typeof decodeWorldCode>>>
@@ -41,13 +48,6 @@ const POST_STYLES = {
 
 /** Platform caps postData at 2 KB; stop well short so platform-added keys can't push us over. */
 const POST_DATA_MAX_BYTES = 1800
-
-/** Instructions shown above the form's fields (repeated when a paste is rejected). */
-const FORM_DESCRIPTION =
-  'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.'
-
-const INVALID_CODE_MSG =
-  'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.'
 
 export async function onReq(
   reqMsg: IncomingMessage,
@@ -76,6 +76,9 @@ async function route(
     switch (endpoint) {
       case Endpoint.GetWorld:
         rsp = await routeGetWorld()
+        break
+      case Endpoint.CreatePost:
+        rsp = await routeCreatePost(reqMsg)
         break
       case Endpoint.OnMenuNewPost:
         rsp = routeMenuNewPost()
@@ -130,25 +133,25 @@ function newPostForm(
     showForm: {
       name: NEW_POST_FORM,
       form: {
-        title: 'New HexLife post',
+        title: NEW_POST_COPY.title,
         description: error
-          ? `⚠ ${error}\n\n${FORM_DESCRIPTION}`
-          : FORM_DESCRIPTION,
-        acceptLabel: 'Create Live Specimen',
+          ? `⚠ ${error}\n\n${NEW_POST_COPY.description}`
+          : NEW_POST_COPY.description,
+        acceptLabel: NEW_POST_COPY.acceptLabel,
         fields: [
           {
             type: 'paragraph',
             name: 'code',
-            label: 'World code',
-            helpText: 'Starts with HXW1. — paste the whole thing.',
+            label: NEW_POST_COPY.codeLabel,
+            helpText: NEW_POST_COPY.codeHelp,
             defaultValue: values.code,
             required: true,
           },
           {
             type: 'string',
             name: 'title',
-            label: 'Post title',
-            helpText: 'Leave blank to name the post after its ruleset.',
+            label: NEW_POST_COPY.titleLabel,
+            helpText: NEW_POST_COPY.titleHelp,
             defaultValue: values.title,
             required: false,
           },
@@ -219,7 +222,7 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   const code = (values.code ?? '').trim()
 
   const world = await decodeWorldCode(code)
-  if (!world) return newPostForm(values, INVALID_CODE_MSG)
+  if (!world) return newPostForm(values, NEW_POST_COPY.invalid)
 
   const post = await createSpecimenPost(
     world,
@@ -235,6 +238,30 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
     },
     navigateTo: post.url,
   }
+}
+
+/**
+ * "Create your own" from inside a post: same act as the menu form, reached without leaving the
+ * post. The client collects the values via its own `showForm` (a client-side effect can't call the
+ * server's form callback), so this route is the menu form's callback minus the UI envelope.
+ */
+async function routeCreatePost(
+  reqMsg: IncomingMessage,
+): Promise<CreatePostRsp | ErrorRsp> {
+  const values = await readJson<NewPostFormValues>(reqMsg)
+  const code = (values?.code ?? '').trim()
+
+  const world = await decodeWorldCode(code)
+  if (!world) return {error: NEW_POST_COPY.invalid, status: 400}
+
+  const post = await createSpecimenPost(
+    world,
+    code,
+    specimenTitle(values?.title, world),
+    // A viewer pressed a button: their post, their karma.
+    'USER',
+  )
+  return {url: post.url}
 }
 
 /** The install trigger's demo post carries no code; the webview falls back to its built-in world. */

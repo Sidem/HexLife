@@ -13,14 +13,20 @@
  * renders with no `api/world` round-trip at all. Older posts and the install demo still fetch.
  */
 
-import {context, navigateTo} from '@devvit/web/client'
+import {context, navigateTo, showForm} from '@devvit/web/client'
 import '../../../src/embed/index.js'
 import {rulesetName} from '../../../src/core/rulesetName.js'
 import {
   decodeWorldCode,
   explorerUrlForRuleset,
 } from '../../../src/core/WorldCodec.js'
-import type {WorldPostData} from '../shared/api.ts'
+import {
+  type CreatePostRsp,
+  Endpoint,
+  type ErrorRsp,
+  NEW_POST_COPY,
+  type WorldPostData,
+} from '../shared/api.ts'
 import {fetchWorldCode} from './fetch.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
@@ -107,6 +113,8 @@ export async function mountHexLife(
   wireExplorerLink(meta)
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
+  // Lab only — the feed card stays lean (the button isn't in splash.html at all).
+  wireCreateOwn(status)
 
   const settle = (): void => {
     const speedInput = document.getElementById(
@@ -272,6 +280,78 @@ function wireCopyHex(rulesetHex: string): void {
       }, 1200)
     })
   })
+}
+
+/**
+ * "Create your own": the viewer pastes a world code from the explorer and gets their own Live
+ * Specimen, without leaving the post to hunt for the subreddit menu.
+ *
+ * `showForm` is a client effect, so it can't reach the server's registered form callback — the
+ * values come back here and go to `api/post`, which is that callback minus the UI envelope.
+ * `showForm`/`navigateTo` only do anything inside Reddit; locally the button wires up and no-ops.
+ */
+function wireCreateOwn(status: HTMLElement): void {
+  const btn = document.getElementById('create-own') as HTMLButtonElement | null
+  if (!btn) return
+  btn.addEventListener('click', () => void createOwn(btn, status))
+}
+
+async function createOwn(
+  btn: HTMLButtonElement,
+  status: HTMLElement,
+): Promise<void> {
+  const rsp = await showForm({
+    title: NEW_POST_COPY.title,
+    description: NEW_POST_COPY.description,
+    acceptLabel: NEW_POST_COPY.acceptLabel,
+    fields: [
+      {
+        type: 'paragraph',
+        name: 'code',
+        label: NEW_POST_COPY.codeLabel,
+        helpText: NEW_POST_COPY.codeHelp,
+        required: true,
+      },
+      {
+        type: 'string',
+        name: 'title',
+        label: NEW_POST_COPY.titleLabel,
+        helpText: NEW_POST_COPY.titleHelp,
+        required: false,
+      },
+    ],
+  } as const)
+  if (rsp.action !== 'SUBMITTED') return
+
+  const prev = btn.textContent
+  btn.disabled = true
+  btn.textContent = 'Creating…'
+  try {
+    const http = await fetch(Endpoint.CreatePost, {
+      body: JSON.stringify({
+        code: rsp.values.code ?? '',
+        title: rsp.values.title ?? '',
+      }),
+      headers: {'Content-Type': 'application/json'},
+      method: 'POST',
+    })
+    const body = (await http.json()) as CreatePostRsp | ErrorRsp
+    if (!http.ok || 'error' in body) {
+      setStatus(
+        status,
+        'error' in body ? body.error : NEW_POST_COPY.invalid,
+        'error',
+      )
+      return
+    }
+    navigateTo(body.url)
+  } catch (err) {
+    setStatus(status, 'Could not create the post. Try again.', 'error')
+    console.error(err)
+  } finally {
+    btn.disabled = false
+    btn.textContent = prev
+  }
 }
 
 async function copyText(text: string): Promise<boolean> {

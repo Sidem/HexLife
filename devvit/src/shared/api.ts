@@ -27,9 +27,32 @@ export type WorldPostData = {
   code?: string
 }
 
+/** Response from {@link Endpoint.CreatePost}: where the new specimen lives. */
+export type CreatePostRsp = {url: string}
+
+/**
+ * Copy shared by the two create paths — the subreddit menu form (server-rendered) and the in-post
+ * "Create your own" form (client `showForm`). Same act, so they must not describe themselves
+ * differently depending on which door the user came through.
+ */
+export const NEW_POST_COPY = {
+  title: 'New HexLife post',
+  description:
+    'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.',
+  acceptLabel: 'Create Live Specimen',
+  codeLabel: 'World code',
+  codeHelp: 'Starts with HXW1. — paste the whole thing.',
+  titleLabel: 'Post title',
+  titleHelp: 'Leave blank to name the post after its ruleset.',
+  invalid:
+    'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.',
+} as const
+
 export type Endpoint = (typeof Endpoint)[keyof typeof Endpoint]
 export const Endpoint = {
   GetWorld: 'api/world',
+  /** Create a Live Specimen from inside a post (the in-post "Create your own" button). */
+  CreatePost: 'api/post',
   OnAppInstall: 'internal/on/app/install',
   OnMenuNewPost: 'internal/on/menu/new-post',
   OnFormNewPost: 'internal/on/form/new-post',
@@ -44,6 +67,7 @@ export const Endpoint = {
 
 export const EndpointMethod = {
   [Endpoint.GetWorld]: 'GET',
+  [Endpoint.CreatePost]: 'POST',
   [Endpoint.OnAppInstall]: 'POST',
   [Endpoint.OnMenuNewPost]: 'POST',
   [Endpoint.OnFormNewPost]: 'POST',

@@ -192,7 +192,8 @@ body[data-chrome='lab'] #chrome {
 
 #controls button,
 #expand-btn,
-#copy-hex {
+#copy-hex,
+#create-own {
   margin: 0;
   min-height: var(--tap);
   min-width: var(--tap);
@@ -209,14 +210,21 @@ body[data-chrome='lab'] #chrome {
 
 #controls button:hover,
 #expand-btn:hover,
-#copy-hex:hover {
+#copy-hex:hover,
+#create-own:hover {
   border-color: rgba(108, 182, 255, 0.35);
   background: #1c222a;
 }
 
 #controls button:active,
-#expand-btn:active {
+#expand-btn:active,
+#create-own:active {
   background: #242b34;
+}
+
+#create-own:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 #controls label {
