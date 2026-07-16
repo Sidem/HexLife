@@ -8,15 +8,19 @@
  * **Start policy:** always `paused` until the viewer presses play. Large grids in-feed can lag
  * phones that only scroll past; explicit play keeps the feed cheap. Reduced-motion is still
  * honored by the element (poster until explicit play).
+ *
+ * **Boot:** posts created since Phase 3.6 carry their world in `postData`, so the common path
+ * renders with no `api/world` round-trip at all. Older posts and the install demo still fetch.
  */
 
-import {navigateTo} from '@devvit/web/client'
+import {context, navigateTo} from '@devvit/web/client'
 import '../../../src/embed/index.js'
 import {rulesetName} from '../../../src/core/rulesetName.js'
 import {
   decodeWorldCode,
   explorerUrlForRuleset,
 } from '../../../src/core/WorldCodec.js'
+import type {WorldPostData} from '../shared/api.ts'
 import {fetchWorldCode} from './fetch.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
@@ -44,6 +48,9 @@ type HexWorld = HTMLElement & {
   reset(): void
 }
 
+/** `hexlife-error` detail (see docs/EMBED-PLAN.md). */
+type HexErrorDetail = {message: string; detail: string}
+
 type WorldMeta = {
   rulesetHex: string
   rows: number
@@ -61,10 +68,23 @@ export async function mountHexLife(
   status: HTMLElement,
   opts: {mode: ChromeMode} = {mode: 'lab'},
 ): Promise<void> {
-  status.textContent = 'Loading…'
-  status.hidden = false
+  setStatus(status, 'Loading…', 'loading')
+  applyChromeMode(opts.mode)
 
-  const code = await fetchWorldCode()
+  // Identity is known from postData before any network call — paint it now so the card reads as a
+  // named specimen while the world itself is still resolving.
+  const post = readPostData()
+  if (post) {
+    paintIdentity({
+      rulesetHex: post.rulesetHex,
+      rows: post.rows,
+      cols: post.cols,
+      speed: null,
+    })
+  }
+
+  // The fast path: the code rode along in postData, so there is nothing to fetch.
+  const code = post?.code ?? (await fetchWorldCode())
   const meta = await resolveMeta(code)
 
   const world = document.createElement('hexlife-world') as HexWorld
@@ -76,16 +96,17 @@ export async function mountHexLife(
 
   // No in-element attribution — we own the Explorer CTA outside the element.
   world.setAttribute('link', 'off')
-  // Click/drag invert-draw (pause while painting). Brush size comes from the world code (default 2).
-  world.setAttribute('draw', '')
-
-  mount.append(world)
+  // Never hijack the wheel: in the feed a scroll means "move on", and on desktop the expanded view
+  // sits in a scrollable page too. Ctrl/meta+wheel (and trackpad pinch) still zoom.
+  world.setAttribute('wheel-zoom', 'ctrl')
+  // Draw is a lab affordance only. In the feed, leaving `draw` off is what restores the element's
+  // poster play overlay, so the viewer's first tap runs the world instead of silently painting on it.
+  if (opts.mode === 'lab') world.setAttribute('draw', '')
 
   paintIdentity(meta)
   wireExplorerLink(meta)
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
-  applyChromeMode(opts.mode)
 
   const settle = (): void => {
     const speedInput = document.getElementById(
@@ -103,11 +124,65 @@ export async function mountHexLife(
     }
 
     syncPlayPauseLabel(world)
-    status.textContent = world.error ?? ''
-    status.hidden = !world.error
+    if (world.error) setStatus(status, world.error, 'error')
+    else setStatus(status, '')
   }
+
+  // Listeners go on before the element is connected: connecting is what starts the boot, and the
+  // boot emits hexlife-playstate before hexlife-ready.
   world.addEventListener('hexlife-ready', settle)
+  world.addEventListener('hexlife-error', ev => {
+    const {message, detail} = (ev as CustomEvent<HexErrorDetail>).detail ?? {}
+    setStatus(status, message ?? 'Simulation failed to load.', 'error')
+    if (detail) console.error(`<hexlife-world>: ${message} ${detail}`)
+  })
+
+  mount.append(world)
+
+  // Last-resort settle: the element reports success (hexlife-ready) and failure (hexlife-error), so
+  // this only covers a boot that somehow announces neither.
   setTimeout(settle, 2000)
+}
+
+/**
+ * The boot payload attached at post creation (WP1), or undefined for posts created before it
+ * existed, the install demo, and any local harness.
+ *
+ * Everything is re-checked rather than trusted: `postData` is arbitrary JSON that an *older* version
+ * of this app wrote, and a bad read here would break the post rather than just slow it down.
+ */
+function readPostData(): WorldPostData | undefined {
+  // `context` is `globalThis.devvit?.context` — undefined outside Reddit, despite its non-optional
+  // type. Reading `.postData` off it directly would throw in the local vite harness.
+  const ctx = context as {postData?: unknown} | undefined
+  const raw = ctx?.postData as Partial<WorldPostData> | undefined
+  if (
+    !raw ||
+    typeof raw.rulesetHex !== 'string' ||
+    typeof raw.rows !== 'number' ||
+    typeof raw.cols !== 'number'
+  ) {
+    return undefined
+  }
+  return {
+    rulesetHex: raw.rulesetHex,
+    rows: raw.rows,
+    cols: raw.cols,
+    // Absent whenever the code was too big to ride along; we fall back to fetching it.
+    code: typeof raw.code === 'string' ? raw.code : undefined,
+  }
+}
+
+/** The one place the status line is written, so `data-state` can't drift from the text. */
+function setStatus(
+  status: HTMLElement,
+  text: string,
+  state?: 'loading' | 'error',
+): void {
+  status.textContent = text
+  status.hidden = !text
+  if (state) status.dataset.state = state
+  else delete status.dataset.state
 }
 
 async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
@@ -266,8 +341,10 @@ function wireTransport(world: HexWorld): void {
     })
   }
 
+  // The element announces every play-state change (including ones we didn't cause: scrolled
+  // offscreen, tab hidden, a stroke pausing the world), so the label tracks it without a timer.
+  world.addEventListener('hexlife-playstate', () => syncPlayPauseLabel(world))
   world.addEventListener('hexlife-ready', () => syncPlayPauseLabel(world))
-  setInterval(() => syncPlayPauseLabel(world), 400)
 }
 
 function syncPlayPauseLabel(world: HexWorld): void {
