@@ -18,8 +18,7 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
   pinch zoom (mobile). Click/drag to **draw** (invert brush, pause while drawing). Brush size
   comes from the explorer export (default 2 for older codes).
 - **Open in Explorer** — deep-link to the full lab with the post’s ruleset loaded (`?r=<ruleset>`).
-- **Autoplay** — starts when scrolled into view only if the palette is flicker-proof; otherwise
-  paused until you press play.
+- **Starts paused** — play is explicit so large grids don’t lag phones scrolling past in the feed.
 - **No external network calls** — the simulation engine (Rust → WebAssembly) and WebGL renderer
   are bundled in the webview. Redis only stores the world code per post ID.
 

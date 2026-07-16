@@ -5,9 +5,9 @@
  * World codes (`HXW1.…`) are the post payload; transport chrome + identity + Explorer deep-link
  * live outside the element.
  *
- * **Autoplay policy:** start running when scrolled into view *only* if the palette is
- * flicker-proof (`isFlickerProofPalette`). Otherwise always paused until the viewer presses play.
- * Reduced-motion is still honored by the element (poster until explicit play).
+ * **Start policy:** always `paused` until the viewer presses play. Large grids in-feed can lag
+ * phones that only scroll past; explicit play keeps the feed cheap. Reduced-motion is still
+ * honored by the element (poster until explicit play).
  */
 
 import {navigateTo} from '@devvit/web/client'
@@ -16,17 +16,13 @@ import {rulesetName} from '../../../src/core/rulesetName.js'
 import {
   decodeWorldCode,
   explorerUrlForRuleset,
-  isFlickerProofPalette,
 } from '../../../src/core/WorldCodec.js'
 import {fetchWorldCode} from './fetch.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
 export type ChromeMode = 'feed' | 'lab'
 
-/**
- * Fallback specimen for install-demo posts with no Redis code. Attribute-driven, no palette
- * settings → not flicker-proof → always starts paused.
- */
+/** Fallback specimen for install-demo posts with no Redis code. */
 const DEMO = {
   ruleset: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
   seed: '12345',
@@ -53,7 +49,6 @@ type WorldMeta = {
   rows: number
   cols: number | null
   speed: number | null
-  flickerSafe: boolean
 }
 
 /**
@@ -76,9 +71,8 @@ export async function mountHexLife(
   if (code) world.setAttribute('code', code)
   else for (const [k, v] of Object.entries(DEMO)) world.setAttribute(k, v)
 
-  // Always-paused when not flicker-safe. Flicker-safe: no `paused` → element autoplays when
-  // on-screen (IntersectionObserver) and stops when scrolled away.
-  if (!meta.flickerSafe) world.setAttribute('paused', '')
+  // Always start paused — avoid ticking large worlds for feed scroll-by on phones.
+  world.setAttribute('paused', '')
 
   // No in-element attribution — we own the Explorer CTA outside the element.
   world.setAttribute('link', 'off')
@@ -123,7 +117,6 @@ async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
       rows: Number(DEMO.rows),
       cols: null,
       speed: Number(DEMO.speed),
-      flickerSafe: false,
     }
   }
   const world = await decodeWorldCode(code)
@@ -133,7 +126,6 @@ async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
       rows: DEFAULT_EMBED_ROWS,
       cols: null,
       speed: null,
-      flickerSafe: false,
     }
   }
   return {
@@ -141,7 +133,6 @@ async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
     rows: world.rows,
     cols: world.cols,
     speed: world.speed,
-    flickerSafe: isFlickerProofPalette(world.colorSettings, world.lut),
   }
 }
 
