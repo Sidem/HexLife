@@ -9,6 +9,7 @@ import type {
 // The SAME codec the explorer exports with and the webview renders from — imported straight from the
 // HexLife source tree (this is why the Devvit app lives in-repo). Validating here means a bad paste
 // fails at the form, with a message, instead of becoming a permanently broken post.
+import {rulesetName} from '../../../src/core/rulesetName.js'
 import {decodeWorldCode} from '../../../src/core/WorldCodec.js'
 import {
   Endpoint,
@@ -17,13 +18,36 @@ import {
   type GetWorldRsp,
   NEW_POST_FORM,
   type NewPostFormValues,
+  type WorldPostData,
 } from '../shared/api.ts'
 import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
 
 type AnyRsp = GetWorldRsp | UiResponse | TriggerResponse | ErrorRsp
 
+/** What a successfully decoded `HXW1.` code describes. */
+type DecodedWorld = NonNullable<Awaited<ReturnType<typeof decodeWorldCode>>>
+
 /** A text post body that is *only* a world code (optional surrounding whitespace). */
 const PURE_WORLD_CODE_RE = /^\s*(HXW1\.[A-Za-z0-9_-]+)\s*$/
+
+/**
+ * Painted by Reddit *before* the iframe loads. Matches the webview's own background so the card
+ * doesn't flash white on light-mode clients while the wasm engine boots.
+ */
+const POST_STYLES = {
+  backgroundColor: '#0C0E10FF',
+  backgroundColorDark: '#0C0E10FF',
+} as const
+
+/** Platform caps postData at 2 KB; stop well short so platform-added keys can't push us over. */
+const POST_DATA_MAX_BYTES = 1800
+
+/** Instructions shown above the form's fields (repeated when a paste is rejected). */
+const FORM_DESCRIPTION =
+  'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.'
+
+const INVALID_CODE_MSG =
+  'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.'
 
 export async function onReq(
   reqMsg: IncomingMessage,
@@ -90,13 +114,26 @@ async function routeGetWorld(): Promise<GetWorldRsp> {
  * configured on Reddit: a world is authored in the explorer and exported as one world code.
  */
 function routeMenuNewPost(): UiResponse {
+  return newPostForm()
+}
+
+/**
+ * The create form. Re-shown with the submitted values when a paste fails to decode: a world code is
+ * long and hand-pasted, so discarding it on error (the old toast-only response) meant re-copying
+ * from the explorer to fix a truncated selection.
+ */
+function newPostForm(
+  values: {code?: string; title?: string} = {},
+  error?: string,
+): UiResponse {
   return {
     showForm: {
       name: NEW_POST_FORM,
       form: {
         title: 'New HexLife post',
-        description:
-          'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.',
+        description: error
+          ? `⚠ ${error}\n\n${FORM_DESCRIPTION}`
+          : FORM_DESCRIPTION,
         acceptLabel: 'Create Live Specimen',
         fields: [
           {
@@ -104,13 +141,15 @@ function routeMenuNewPost(): UiResponse {
             name: 'code',
             label: 'World code',
             helpText: 'Starts with HXW1. — paste the whole thing.',
+            defaultValue: values.code,
             required: true,
           },
           {
             type: 'string',
             name: 'title',
             label: 'Post title',
-            defaultValue: 'HexLife',
+            helpText: 'Leave blank to name the post after its ruleset.',
+            defaultValue: values.title,
             required: false,
           },
         ],
@@ -119,23 +158,51 @@ function routeMenuNewPost(): UiResponse {
   }
 }
 
-/** The form came back: validate the code, create the post, and pin the code to the new post's ID. */
-async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
-  const values = await readFormValues(reqMsg)
-  const code = (values.code ?? '').trim()
-
-  const world = await decodeWorldCode(code)
-  if (!world) {
-    return {
-      showToast: {
-        text: 'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.',
-      },
-    }
+/**
+ * A post's boot payload. `code` rides along only when the whole thing stays under the cap — the
+ * webview treats postData as an accelerator and falls back to `api/world` (Redis) without it.
+ */
+function buildPostData(world: DecodedWorld, code: string): WorldPostData {
+  const meta: WorldPostData = {
+    rulesetHex: world.rulesetHex,
+    rows: world.rows,
+    cols: world.cols,
   }
+  const withCode: WorldPostData = {...meta, code}
+  return Buffer.byteLength(JSON.stringify(withCode)) <= POST_DATA_MAX_BYTES
+    ? withCode
+    : meta
+}
 
-  const title = (values.title ?? '').trim() || 'HexLife'
+/** Blank title → name the post after its ruleset ("Cobalt Lattice — live HexLife specimen"). */
+function specimenTitle(raw: string | undefined, world: DecodedWorld): string {
+  return (
+    (raw ?? '').trim() ||
+    `${rulesetName(world.rulesetHex)} — live HexLife specimen`
+  )
+}
+
+/**
+ * Create a Live Specimen post and pin its code to the new post's ID.
+ *
+ * `runAs: 'USER'` makes menu-created specimens belong to their creator (karma, post history)
+ * instead of the app account. It requires `userGeneratedContent` (the SDK throws without it) and
+ * `permissions.reddit.asUser: ["SUBMIT_POST"]` in devvit.json. App-authored callers (install demo,
+ * onPostSubmit) pass `runAs: 'APP'` — there is no user to attribute those to.
+ */
+async function createSpecimenPost(
+  world: DecodedWorld,
+  code: string,
+  title: string,
+  runAs: 'USER' | 'APP',
+): Promise<{id: import('@devvit/web/shared').T3; url: string}> {
   const post = await reddit.submitCustomPost({
     title,
+    styles: POST_STYLES,
+    postData: buildPostData(world, code),
+    ...(runAs === 'USER'
+      ? {runAs, userGeneratedContent: {text: code}}
+      : {runAs}),
     // Shown when the interactive webview cannot load (old clients, errors). Required-ish for
     // review polish; never contains the full code (too long / not human-readable).
     textFallback: {
@@ -143,6 +210,23 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
     },
   })
   await dbSetWorldCode(post.id, code)
+  return {id: post.id, url: post.url}
+}
+
+/** The form came back: validate the code, create the post, and pin the code to the new post's ID. */
+async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
+  const values = await readFormValues(reqMsg)
+  const code = (values.code ?? '').trim()
+
+  const world = await decodeWorldCode(code)
+  if (!world) return newPostForm(values, INVALID_CODE_MSG)
+
+  const post = await createSpecimenPost(
+    world,
+    code,
+    specimenTitle(values.title, world),
+    'USER',
+  )
 
   return {
     showToast: {
@@ -155,8 +239,12 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
 
 /** The install trigger's demo post carries no code; the webview falls back to its built-in world. */
 async function routeAppInstall(): Promise<TriggerResponse> {
+  // No code → no postData worth sending (the webview's built-in demo needs no boot payload), but
+  // the background styles still matter: this post flashes white in the feed like any other.
   await reddit.submitCustomPost({
     title: 'HexLife',
+    runAs: 'APP',
+    styles: POST_STYLES,
     textFallback: {
       text: 'HexLife — a live hexagonal cellular automaton. Open this post on a modern Reddit client to play.',
     },
@@ -195,38 +283,27 @@ async function routePostSubmit(
   }
 
   try {
-    const title = (post.title ?? '').trim() || 'HexLife'
-    const custom = await reddit.submitCustomPost({
-      title,
-      textFallback: {
-        text: `HexLife Live Specimen — ruleset ${world.rulesetHex} (${world.rows}×${world.cols}).`,
-      },
-    })
-    await dbSetWorldCode(custom.id, code)
+    const custom = await createSpecimenPost(
+      world,
+      code,
+      specimenTitle(post.title, world),
+      'APP',
+    )
 
-    // Best-effort cleanup of the intermediate text post. The Reddit client surface varies by
-    // @devvit/web version — probe for getPostById without an `any` cast. Permission failures are
-    // non-fatal: the Live Specimen already exists.
+    // Point the author at their specimen rather than deleting their post. Deleting someone's
+    // submission to "upgrade" it destroys content they wrote and any replies it already has; a
+    // comment is additive and leaves the choice to them. Failures here are non-fatal — the
+    // specimen already exists.
     try {
-      type PostHandle = {
-        delete?: () => Promise<unknown>
-        remove?: (spam?: boolean) => Promise<unknown>
-      }
-      type RedditWithPosts = {
-        getPostById?: (id: string) => Promise<PostHandle | undefined>
-      }
-      const api = reddit as unknown as RedditWithPosts
-      const p = api.getPostById ? await api.getPostById(postId) : undefined
-      if (p?.delete) await p.delete()
-      else if (p?.remove) await p.remove(false)
-      else
-        console.warn(
-          `onPostSubmit: no delete/remove API for ${postId}; left text post in place`,
-        )
-    } catch (cleanupErr) {
+      await reddit.submitComment({
+        id: postId as import('@devvit/web/shared').T3,
+        text: `That's a HexLife world code — here it is running as a Live Specimen: ${custom.url}`,
+        runAs: 'APP',
+      })
+    } catch (commentErr) {
       console.warn(
-        `onPostSubmit: created ${custom.id} but could not remove ${postId}:`,
-        cleanupErr,
+        `onPostSubmit: created ${custom.id} but could not comment on ${postId}:`,
+        commentErr,
       )
     }
 

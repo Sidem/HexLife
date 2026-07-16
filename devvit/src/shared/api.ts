@@ -12,6 +12,21 @@ export type GetWorldRsp = {code?: string}
 /** Values the "new HexLife post" form submits. `code` is the export from the explorer. */
 export type NewPostFormValues = {code?: string; title?: string}
 
+/**
+ * Boot payload attached to every post we create (`submitCustomPost({postData})`). The webview reads
+ * it from `context.postData` and skips the `api/world` round-trip when `code` is present.
+ *
+ * Redis stays the source of truth: `code` is only included when the serialized payload fits under
+ * the platform's 2 KB cap, so big worlds simply fall back to fetching. The ruleset meta always fits
+ * and lets the client paint identity chrome before any network call resolves.
+ */
+export type WorldPostData = {
+  rulesetHex: string
+  rows: number
+  cols: number
+  code?: string
+}
+
 export type Endpoint = (typeof Endpoint)[keyof typeof Endpoint]
 export const Endpoint = {
   GetWorld: 'api/world',
