@@ -1,0 +1,311 @@
+/*
+ * Shared webview chrome for both entrypoints (#26 Phase 3.6 WP4).
+ *
+ * `splash.html` (in-feed card) and `game.html` (expanded lab) render the same structure with the
+ * same controls; only density and emphasis differ. They used to carry ~190 lines of near-identical
+ * CSS each, which had already drifted apart in ways nobody chose (button backgrounds, paddings).
+ *
+ * Everything lives here, keyed off `body[data-chrome='feed'|'lab']`. That attribute is hardcoded in
+ * each HTML file (and re-asserted by `applyChromeMode`), so mode styling is correct before any JS
+ * runs — no flash of the wrong chrome.
+ *
+ * Devvit serves `public/` as-is, so this is a plain stylesheet with no build step. `npm run clean`
+ * only removes `public/*.js*`, so this hand-written file is safe here beside the HTML.
+ */
+
+:root {
+  --bg: #0c0e10;
+  --panel: rgba(22, 26, 32, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: #e8eaed;
+  --muted: #9aa3ad;
+  --accent: #6cb6ff;
+  --accent-dim: rgba(108, 182, 255, 0.18);
+  --danger-soft: #f0b429;
+  --radius: 12px;
+  --tap: 44px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+
+  /* Buttons sit on the world gradient in the feed but on a solid panel in the lab, so each mode
+     needs its own fill to stay legible. A token keeps that a deliberate choice rather than the
+     accidental fork the two files had grown. */
+  --btn-bg: var(--panel);
+}
+
+body[data-chrome='lab'] {
+  --btn-bg: #151a20;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 100dvw;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    13px / 1.35 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  padding-top: var(--safe-t);
+  padding-bottom: var(--safe-b);
+}
+
+/* --- mode gating ---------------------------------------------------------- */
+
+body[data-chrome='feed'] .lab-only {
+  display: none;
+}
+
+body[data-chrome='lab'] .feed-only {
+  display: none;
+}
+
+/* --- identity ------------------------------------------------------------- */
+
+/* `body` is a 3-row grid (identity / world / chrome), so the subtitle rides inside the header on a
+   wrapped line rather than becoming a fourth child and stealing the world's `1fr`. */
+#identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px 4px;
+}
+
+#identity[hidden] {
+  display: none;
+}
+
+/* The lab has room to seat the header as its own bar; the feed card does not. */
+body[data-chrome='lab'] #identity {
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(12, 14, 16, 0.85);
+}
+
+#specimen-name {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+body[data-chrome='lab'] #specimen-name {
+  font-size: 15px;
+}
+
+#specimen-hex {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+#specimen-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* One line telling a feed reader what they're looking at and what to do about it. */
+#specimen-sub {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* --- world ---------------------------------------------------------------- */
+
+#world {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0 4px;
+}
+
+body[data-chrome='lab'] #world {
+  padding: 4px;
+}
+
+#world hexlife-world {
+  width: min(100%, 100cqmin);
+  max-width: min(100vw, 100dvh);
+  max-height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+body[data-chrome='lab'] #world hexlife-world {
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Host chrome owns Restart, so the element's own corner button would be a second one. */
+#world hexlife-world::part(reset) {
+  display: none;
+}
+
+/* --- chrome bar ----------------------------------------------------------- */
+
+#chrome {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  /* Feed: float the controls over the world rather than spending card height on a bar. */
+  background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+
+body[data-chrome='lab'] #chrome {
+  gap: 8px;
+  padding: 8px 12px calc(10px + var(--safe-b));
+  background: var(--panel);
+  border-top: 1px solid var(--panel-border);
+  backdrop-filter: blur(12px);
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#controls button,
+#expand-btn,
+#copy-hex {
+  margin: 0;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#controls button:hover,
+#expand-btn:hover,
+#copy-hex:hover {
+  border-color: rgba(108, 182, 255, 0.35);
+  background: #1c222a;
+}
+
+#controls button:active,
+#expand-btn:active {
+  background: #242b34;
+}
+
+#controls label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#speed {
+  width: min(45%, 180px);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#expand-btn {
+  flex: 1 1 auto;
+  max-width: 200px;
+}
+
+/* Drawing is invisible until you try it; the lab is where it's worth a line of explanation. */
+#draw-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* --- explorer link -------------------------------------------------------- */
+
+/* In the lab this is the primary way out; in the feed it's a quiet aside next to "Full screen". */
+a.explorer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--accent-dim);
+  border: 1px solid transparent;
+}
+
+a.explorer-link:hover {
+  border-color: rgba(108, 182, 255, 0.4);
+}
+
+body[data-chrome='lab'] a.explorer-link {
+  min-height: var(--tap);
+  padding: 0 18px;
+  color: #0c0e10;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--accent);
+  flex: 1 1 auto;
+  max-width: 280px;
+}
+
+body[data-chrome='lab'] a.explorer-link:hover {
+  border-color: transparent;
+  filter: brightness(1.08);
+}
+
+/* --- status --------------------------------------------------------------- */
+
+#status {
+  text-align: center;
+  padding: 0 8px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* "Loading…" is not a problem; only a real failure earns the alarm color. */
+#status[data-state='error'] {
+  color: var(--danger-soft);
+}
+
+#status[hidden] {
+  display: none;
+}
+
+#status:empty {
+  display: none;
+}

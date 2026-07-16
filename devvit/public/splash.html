@@ -5,193 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HexLife</title>
     <link rel="modulepreload" href="splash.js">
-    <style>
-    :root {
-      --bg: #0c0e10;
-      --panel: rgba(22, 26, 32, 0.92);
-      --panel-border: rgba(255, 255, 255, 0.08);
-      --text: #e8eaed;
-      --muted: #9aa3ad;
-      --accent: #6cb6ff;
-      --accent-dim: rgba(108, 182, 255, 0.18);
-      --danger-soft: #f0b429;
-      --radius: 12px;
-      --tap: 44px;
-      --safe-b: env(safe-area-inset-bottom, 0px);
-      --safe-t: env(safe-area-inset-top, 0px);
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0;
-      width: 100dvw;
-      height: 100dvh;
-      overflow: hidden;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      background: var(--bg);
-      color: var(--text);
-      font:
-        13px / 1.35 system-ui,
-        -apple-system,
-        'Segoe UI',
-        Roboto,
-        sans-serif;
-      padding-top: var(--safe-t);
-      padding-bottom: var(--safe-b);
-    }
-    #identity {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      padding: 8px 12px 4px;
-      min-width: 0;
-    }
-    #identity[hidden] {
-      display: none;
-    }
-    #specimen-name {
-      font-weight: 600;
-      font-size: 14px;
-      letter-spacing: 0.01em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 0;
-    }
-    #specimen-hex {
-      font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-      font-size: 11px;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
-    #specimen-meta {
-      font-size: 11px;
-      color: var(--muted);
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-    #world {
-      display: grid;
-      place-items: center;
-      width: 100%;
-      height: 100%;
-      min-height: 0;
-      padding: 0 4px;
-    }
-    #world hexlife-world {
-      width: min(100%, 100cqmin);
-      max-width: min(100vw, 100dvh);
-      max-height: 100%;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    #world hexlife-world::part(reset) {
-      display: none;
-    }
-    #chrome {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 6px 10px 10px;
-      background: linear-gradient(to top, var(--bg) 60%, transparent);
-    }
-    #controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    #controls button,
-    #expand-btn,
-    #copy-hex {
-      margin: 0;
-      min-height: var(--tap);
-      min-width: var(--tap);
-      padding: 0 14px;
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
-      background: var(--panel);
-      color: var(--text);
-      font: inherit;
-      font-weight: 500;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #controls button:hover,
-    #expand-btn:hover,
-    #copy-hex:hover {
-      border-color: rgba(108, 182, 255, 0.35);
-      background: #1c222a;
-    }
-    #controls button:active,
-    #expand-btn:active {
-      background: #242b34;
-    }
-    #controls label {
-      color: var(--muted);
-      font-size: 12px;
-    }
-    #speed {
-      width: min(40%, 160px);
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    #expand-btn {
-      flex: 1 1 auto;
-      max-width: 200px;
-    }
-    a.explorer-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 36px;
-      padding: 0 12px;
-      border-radius: 999px;
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 12px;
-      font-weight: 500;
-      background: var(--accent-dim);
-      border: 1px solid transparent;
-    }
-    a.explorer-link:hover {
-      border-color: rgba(108, 182, 255, 0.4);
-    }
-    /* Feed: hide lab-density chrome (speed, copy, primary explorer). */
-    body[data-chrome='feed'] .lab-only {
-      display: none;
-    }
-    body[data-chrome='lab'] .feed-only {
-      display: none;
-    }
-    #status {
-      text-align: center;
-      padding: 0 8px 4px;
-      font-size: 12px;
-      color: var(--danger-soft);
-    }
-    #status[hidden] {
-      display: none;
-    }
-    #status:empty {
-      display: none;
-    }
-    </style>
+    <link rel="stylesheet" href="chrome.css">
   </head>
   <body data-chrome="feed">
     <header id="identity" hidden>
       <span id="specimen-name">HexLife</span>
-      <span id="specimen-hex"></span>
+      <span id="specimen-hex" class="lab-only"></span>
       <span id="specimen-meta"></span>
+      <p id="specimen-sub" class="feed-only">
+        a living hexagonal world — press ▶ to run
+      </p>
     </header>
     <main id="world"></main>
     <div id="chrome">
@@ -207,8 +30,16 @@
         <button id="restart" type="button" aria-label="Restart" title="Restart">
           ↺
         </button>
-        <label for="speed">Speed</label>
-        <input id="speed" type="range" min="1" max="120" step="1" value="20">
+        <label class="lab-only" for="speed">Speed</label>
+        <input
+          id="speed"
+          class="lab-only"
+          type="range"
+          min="1"
+          max="120"
+          step="1"
+          value="20"
+        >
         <button
           class="lab-only"
           id="copy-hex"
@@ -224,7 +55,7 @@
         </button>
         <a
           id="open-explorer-quiet"
-          class="explorer-link feed-only"
+          class="explorer-link lab-only"
           href="https://sidem.github.io/HexLife/"
           >Open in Explorer</a
         >
