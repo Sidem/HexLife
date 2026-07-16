@@ -10,7 +10,10 @@ import type {
 // HexLife source tree (this is why the Devvit app lives in-repo). Validating here means a bad paste
 // fails at the form, with a message, instead of becoming a permanently broken post.
 import {rulesetName} from '../../../src/core/rulesetName.js'
-import {decodeWorldCode} from '../../../src/core/WorldCodec.js'
+import {
+  decodeWorldCode,
+  explorerUrlForRuleset,
+} from '../../../src/core/WorldCodec.js'
 import {
   type CreatePostRsp,
   Endpoint,
@@ -206,14 +209,28 @@ async function createSpecimenPost(
     ...(runAs === 'USER'
       ? {runAs, userGeneratedContent: {text: code}}
       : {runAs}),
-    // Shown when the interactive webview cannot load (old clients, errors). Required-ish for
-    // review polish; never contains the full code (too long / not human-readable).
-    textFallback: {
-      text: `HexLife Live Specimen — open this post on a modern Reddit client to play the simulation.\n\nRuleset: ${world.rulesetHex}\nGrid: ${world.rows}×${world.cols}`,
-    },
+    textFallback: {text: specimenTextFallback(world)},
   })
   await dbSetWorldCode(post.id, code)
   return {id: post.id, url: post.url}
+}
+
+/**
+ * Shown where the interactive webview can't load — old.reddit, crawlers, ancient clients. It never
+ * carries the world code (too long, not human-readable), so without a link it's a dead end that
+ * names a ruleset the reader has no way to see. The Explorer deep-link is the escape hatch: same
+ * ruleset, fresh start (a recipe, not the dish — the exact cells only exist in the post).
+ */
+function specimenTextFallback(world: DecodedWorld): string {
+  const url = explorerUrlForRuleset(world.rulesetHex, {rows: world.rows})
+  return [
+    'HexLife Live Specimen — open this post on a modern Reddit client to play the simulation.',
+    '',
+    `Ruleset: ${rulesetName(world.rulesetHex)} (${world.rulesetHex})`,
+    `Grid: ${world.rows}×${world.cols}`,
+    '',
+    `Run this ruleset in HexLife Explorer: ${url}`,
+  ].join('\n')
 }
 
 /** The form came back: validate the code, create the post, and pin the code to the new post's ID. */

@@ -13,7 +13,7 @@
 | **Phase 3 — publish** | **Ready for owner `devvit playtest` → `devvit publish`** (3.6 landed) |
 | **Phase 3.5 — UX (A+B + start-paused)** | ✅ Deep-link, identity chrome; always start paused |
 | **Draw + brush in world code** | ✅ Invert paint on drag; brush size in HXW1 v2 (legacy → 2) |
-| **Phase 3.6 — feed UX + create-path overhaul** | ✅ WP1–WP5 shipped 2026-07-16; WP6 stretch not started |
+| **Phase 3.6 — feed UX + create-path overhaul** | ✅ WP1–WP5 shipped 2026-07-16; WP6 stretch 1 of 4 |
 | Phase 4 — Daily Hex on Reddit | Later (depends on explorer #17) |
 
 ### What Phase 3.6 landed (2026-07-16)
@@ -25,7 +25,7 @@
 | WP3 — client boot/transport | ✅ | postData fast path, **no `draw` in feed** (poster returns), events replace `setInterval`, `wheel-zoom="ctrl"`, `data-state` |
 | WP4 — chrome | ✅ | `public/chrome.css`; splash 242→73, game 231→54 lines; lean feed + subtitle; draw hint; status colors split |
 | WP5 — in-post create | ✅ | `POST api/post` + `showForm` button (lab only), shared `NEW_POST_COPY` |
-| WP6 — stretch | ⬜ Not started | See below |
+| WP6 — stretch | 🟡 1 of 4 | `textFallback` deep-link done; other 3 deliberately skipped (see below) |
 
 Commits: `2421680` (WP1), `d747b73` (WP2), `64c19a2` (WP3), `5073a62` (WP4), `bc36417` (WP5).
 
@@ -146,17 +146,25 @@ work remains below.
   `--experimental-strip-types` dies. Prepend the install dir instead:
   `$env:PATH = "$env:APPDATA\fnm\node-versions\v22.6.0\installation;C:\Program Files\Git\bin;" + $env:PATH`
 
-### WP6 — Stretch (open; WP1–5 are green)
+### WP6 — Stretch (1 of 4 done)
 
-1. **Lazy element boot on first intersection** (pre-boot IntersectionObserver in
-   `connectedCallback`; `_boot` on first `isIntersecting`; dark placeholder until then). Saves a
-   WebGL context + wasm init per scrolled-past post. Element change on the frozen API — do it
-   carefully or skip.
-2. `shareImageUrl` (+ `heightPixels` tuning) in `styles` — off-Reddit shares currently show
-   Reddit's generic placeholder. Needs a hosted image URL; investigate what Devvit accepts.
-3. `textFallback` gains the Explorer deep-link URL (`explorerUrlForRuleset`) for old.reddit users.
-4. Verify which form-envelope shape 0.13.8 actually sends (playtest logs) and delete the dead
-   branch in `readFormValues`.
+3. ✅ **`textFallback` Explorer deep-link** — done 2026-07-16. `specimenTextFallback()` in
+   `server.ts` now emits ruleset name + hex, grid, and `explorerUrlForRuleset(...)`. old.reddit
+   otherwise got a dead end naming a ruleset it gave no way to see. Still never embeds the code.
+
+Deliberately **not** done — each needs something this session couldn't get:
+
+1. **Lazy element boot on first intersection** — would save a WebGL context + wasm init per
+   scrolled-past post, but it is a behavior change to the **frozen** `src/embed/` API (every
+   existing embed's boot timing moves), and the local preview pane reports
+   `visibilityState: 'hidden'` with no real scrolling, so an IntersectionObserver gate can't be
+   verified here. Wants its own session with a real feed to test against.
+2. **`shareImageUrl` (+ `heightPixels`)** — needs a *hosted* image URL. Unresolved: what Devvit
+   accepts, and where a per-ruleset image would be generated/hosted (the thumbnail-bake path in the
+   library redesign may be reusable). Research task, not a code task.
+4. **Dead `readFormValues` branch** — the plan itself says this needs playtest logs to see which
+   envelope shape 0.13.8 actually sends. Guessing and deleting the wrong branch silently breaks the
+   create path, so leave both until the logs exist.
 
 ### Acceptance — met and verified locally 2026-07-16
 

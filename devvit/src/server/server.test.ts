@@ -26,6 +26,7 @@ type SubmitOpts = {
   styles?: {backgroundColor?: string; backgroundColorDark?: string}
   postData?: WorldPostData
   userGeneratedContent?: {text?: string}
+  textFallback?: {text?: string}
 }
 let submitted: SubmitOpts[] = []
 let comments: {id?: string; text?: string}[] = []
@@ -285,6 +286,21 @@ test('api/post rejects a GET', async () => {
   const rsp = await fetch(`${serverURL}/${Endpoint.CreatePost}`)
   assert.equal(rsp.status, 404)
   assert.equal(submitted.length, 0)
+})
+
+test('textFallback carries an Explorer deep-link for clients that cannot render the webview', async () => {
+  const code = await worldCode()
+  await submitForm({code, title: 't'})
+
+  const text = submitted[0]?.textFallback?.text ?? ''
+  // old.reddit sees only this text; without the link it names a ruleset with no way to see it.
+  assert.match(
+    text,
+    /sidem\.github\.io\/HexLife\/\?r=D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6/,
+  )
+  assert.match(text, /16×18/)
+  // The code itself must never land here — too long, and not human-readable.
+  assert.ok(!text.includes(code), 'textFallback must not embed the world code')
 })
 
 test('install demo post is app-authored and styled', async () => {
