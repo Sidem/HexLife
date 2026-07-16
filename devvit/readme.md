@@ -14,9 +14,17 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 - **Create from the explorer** — design a world at [sidem.github.io/HexLife](https://sidem.github.io/HexLife/),
   export a **world code** (`HXW1.…`), then on a subreddit with this app installed use
   **⋯ → New HexLife post**, paste the code, and set a title.
-- **In-post controls** — play / pause, restart, speed slider; scroll-wheel zoom (desktop) and
-  pinch zoom (mobile). Click/drag to **draw** (invert brush, pause while drawing). Brush size
-  comes from the explorer export (default 2 for older codes).
+- **Tap to play** — in the feed, the specimen shows a play button over its starting state; the
+  first tap runs it.
+- **In-post controls** — play / pause and restart in the feed; the expanded view adds a speed
+  slider, the full ruleset hex, and click/drag **drawing** (invert brush, pauses while you draw —
+  brush size comes from the explorer export, default 2 for older codes).
+- **Zoom without hijacking the feed** — **ctrl/⌘ + scroll wheel** zooms on desktop (a plain scroll
+  moves the page, as it should); trackpad pinch and touch pinch zoom directly.
+- **Create your own from inside a post** — the expanded view has **Create your own**: paste a world
+  code and your specimen is posted without leaving Reddit.
+- **Posted as you** — specimens you create are authored by *your* account, not the app's, so they
+  appear in your post history and earn your karma.
 - **Open in Explorer** — deep-link to the full lab with the post’s ruleset loaded (`?r=<ruleset>`).
 - **Starts paused** — play is explicit so large grids don’t lag phones scrolling past in the feed.
 - **No external network calls** — the simulation engine (Rust → WebAssembly) and WebGL renderer
@@ -32,20 +40,27 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 
 1. Open [HexLife Explorer](https://sidem.github.io/HexLife/) and set up a world you like.
 2. **Share → Copy World Code** (or **Copy code & open r/hexlife**).
-3. On the subreddit where HexLife is installed: **subreddit menu (⋯) → New HexLife post**.
-4. Paste the world code, optionally edit the title, create the post.
+3. Paste it into either create path:
+   - **From an existing post** — expand any HexLife post → **Create your own**.
+   - **From the subreddit** — **subreddit menu (⋯) → New HexLife post**.
+4. Optionally edit the title (leave it blank to name the post after its ruleset), then create.
 5. Open the post → tap play on the specimen.
 
-**Note:** Reddit’s normal “create text post” screen is *not* the Live Specimen form. Only the
-app menu (**New HexLife post**) creates an interactive post. There is no deep link from outside
-Reddit into that form — that is a platform limitation, not a missing feature of this app.
+Either way the post is authored by your account. If a code doesn’t paste cleanly, the form comes
+back with what you typed still in it — world codes are long and easy to truncate.
+
+**Note:** Reddit’s normal “create text post” screen is *not* the Live Specimen form. There is no
+deep link from outside Reddit into it — that is a platform limitation, not a missing feature of
+this app. If you do post a bare world code as text, the app replies with a link to a Live Specimen
+of it rather than touching your post.
 
 ## How to install (moderators)
 
 1. Install **hexlifeapp** from the Reddit Apps tools for your community (after the app is
    published/approved, any mod can install; before that only the developer on small test subs).
 2. Keep the sub under any install limits Reddit applies for unpublished apps (&lt; 200 subscribers).
-3. Tell members the create path: explorer → world code → **⋯ → New HexLife post**.
+3. Tell members the create path: explorer → world code → **⋯ → New HexLife post**, or
+   **Create your own** inside any existing HexLife post.
 
 No extra configuration is required. On install, a demo post may appear automatically.
 
@@ -54,6 +69,12 @@ No extra configuration is required. On install, a demo post may appear automatic
 - Stores **world codes** in Redis keyed by post ID (`world:<t3>`). A world code is the grid,
   ruleset, cells, and color settings of the simulation — not Reddit account passwords or private
   messages.
+- **Posts on your behalf, only when you ask.** Creating a specimen submits the post as your account
+  (`permissions.reddit.asUser: ["SUBMIT_POST"]`), which is why it earns your karma. This happens
+  only in response to you submitting the create form — never in the background. The app-install
+  demo post and the reply to a bare world-code text post are made by the app account.
+- Each post also carries its own world code in Reddit's `postData` so it can render without a
+  round-trip. Same data as Redis, no extra collection.
 - On **post delete**, the stored code for that post is removed.
 - Does **not** call external HTTP APIs, collect emails, or track users across sites.
 - The in-post webview does **not** link out to third-party apps (attribution link is off).
