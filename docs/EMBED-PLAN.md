@@ -27,7 +27,25 @@ world code), native GPU resolution.
 **Attributes:** `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` ·
 `code` (`HXW1.…`, wins over attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
 `draw` (invert-paint on drag; pauses while drawing) ·
-`wheel-zoom` (`free` default | `ctrl`).
+`wheel-zoom` (`free` default | `ctrl`) ·
+`preview` (poster burst tick count).
+
+`preview` *(additive, 3.7)* — the paused poster runs a short burst of generations (~4/sec) when the
+element **arrives on screen**, then rewinds to tick 0. Value = tick count, clamped 1–60;
+unparseable → 12; absent → off. For feeds, where a still dark grid reads as a broken image at
+scroll speed.
+
+It is decoration, not playback, and that distinction is the contract: it never touches the rAF loop,
+so `playing` stays `false` and **no `hexlife-playstate` fires**. It runs only while the poster is up
+(`userPaused`, no `draw`, no explicit `play()`), only when `_docVisible`, and never under
+`prefers-reduced-motion: reduce`. Anything the user does cancels it instantly — `play()` and a draw
+stroke cancel *without* rewinding (their state is the one that matters now); scrolling away, a
+hidden tab, or removing the attribute rewind to the authored poster. An exact-cells world replays
+its cells on rewind; a generator world re-rolls, which is that world's own contract.
+
+"Arrives" means scrolled into view **or** already in view at the element's first intersection
+report — the latter is what makes it work for hosts that defer mounting until the element is
+visible (see DEVVIT-PLAN 3.7 WP7).
 
 `wheel-zoom="ctrl"` zooms only with ctrl/meta held; a plain wheel falls through **unprevented** so
 the host page scrolls. For embeds in a feed, where scrolling past is the common case and a swallowed
@@ -105,11 +123,9 @@ same deep-link pattern Devvit Phase 3.5 should reuse outside the element.
 ### Planned additive API (Devvit Phase 3.7 — spec in `docs/DEVVIT-PLAN.md`)
 
 - ✅ `worldCode()` — landed 3.7 WP4; see Public API above.
-- `preview` attribute — capped tick burst on intersection while the poster shows, then reset to
-  tick 0. Never flips `playing`, never emits `hexlife-playstate`; reduced-motion suppresses it.
-- CSS-only pulse on the poster play overlay (reduced-motion gated).
-
-Move these into the Public API section above when they land.
+- ✅ `preview` attribute — landed 3.7 WP5; see Public API above.
+- ✅ CSS-only pulse on the poster play overlay (reduced-motion gated) — landed 3.7 WP5. Internal to
+  the element's shadow `STYLES`; no API surface.
 
 ### Phase 4 — CI determinism
 

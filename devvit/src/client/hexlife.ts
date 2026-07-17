@@ -175,6 +175,10 @@ async function mountWorld(
   // Draw is a lab affordance only. In the feed, leaving `draw` off is what restores the element's
   // poster play overlay, so the viewer's first tap runs the world instead of silently painting on it.
   if (opts.mode === 'lab') world.setAttribute('draw', '')
+  // Feed only: let the poster breathe a few generations as the card scrolls into view. A CA's
+  // appeal is motion, and a still grid at scroll speed is indistinguishable from a broken image.
+  // The lab needs no such theatrics — you are already looking at it, with a play button right there.
+  else world.setAttribute('preview', '12')
 
   paintIdentity(meta)
   wireExplorerLink(meta)

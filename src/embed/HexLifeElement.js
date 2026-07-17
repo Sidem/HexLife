@@ -47,6 +47,16 @@ const ROWS_MAX = 512;   // Lower than the app's 2048 on purpose: an embed is a d
 const MAX_DPR_MIN = 1;
 const MAX_DPR_MAX = 4;
 
+/**
+ * `preview` — how many generations the poster "breathes" through when it comes into view. Small on
+ * purpose: this is a hint that the thing is alive, not a free showing of the whole simulation.
+ */
+const PREVIEW_MIN = 1;
+const PREVIEW_MAX = 60;
+const PREVIEW_DEFAULT = 12;
+/** ~4 ticks/sec — slow enough to read as deliberate rather than as the world having started. */
+const PREVIEW_TICK_MS = 250;
+
 const RULESET_RE = /^[0-9a-fA-F]{32}$/;
 
 const STYLES = `
@@ -81,6 +91,18 @@ canvas {
 .overlay svg { width: 22%; max-width: 88px; opacity: 0.85; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.7)); }
 .overlay:hover { background: rgba(16, 18, 20, 0.22); }
 .overlay:hover svg { opacity: 1; }
+/* A paused poster in a feed is a dark square that reads as a broken image at scroll speed. A slow
+   pulse costs nothing (no sim, no GPU work beyond a composited transform) and says "this runs".
+   Reduced motion gets the still poster it asked for. */
+@media (prefers-reduced-motion: no-preference) {
+    .overlay svg { animation: hexlife-pulse 2.5s ease-in-out infinite; }
+    /* Hovering is already an answer to "is this interactive?" — stop competing with the cursor. */
+    .overlay:hover svg { animation: none; }
+}
+@keyframes hexlife-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
+}
 .reset {
     position: absolute;
     left: 8px;
@@ -148,7 +170,8 @@ const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
-            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw', 'wheel-zoom'];
+            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw', 'wheel-zoom',
+            'preview'];
     }
 
     constructor() {
@@ -230,6 +253,26 @@ export class HexLifeElement extends HTMLElement {
         this._rafId = 0;
         this._lastFrameTime = 0;
 
+        // --- poster preview burst (`preview` attribute) ---
+        /**
+         * setTimeout id of the in-flight burst step, or 0. Deliberately NOT `_rafId`: the burst is
+         * poster decoration, so `playing` must stay false and no `hexlife-playstate` may fire.
+         */
+        this._previewTimer = 0;
+        /** Is a burst in flight (including the final beat before it rewinds)? */
+        this._previewActive = false;
+        /** Ticks left to run in the current burst. */
+        this._previewLeft = 0;
+        /** Ticks this burst has actually run — gates the rewind (see `_cancelPreviewBurst`). */
+        this._previewTicked = 0;
+        /**
+         * Has the IntersectionObserver reported anything yet? `_onScreen` optimistically starts
+         * true, so without this the *first* report of "visible" looks like no change at all and an
+         * element that boots in view would never breathe. See `_onIntersect`.
+         */
+        this._onScreenKnown = false;
+        this._previewStep = this._previewStep.bind(this);
+
         // Camera (wheel zoom + pinch). Relative to the fitted "show whole grid" view: zoom 1 + pan 0
         // is the default fit. Stored on the element so a resize can re-apply without losing the view.
         this._viewZoom = 1;
@@ -273,6 +316,9 @@ export class HexLifeElement extends HTMLElement {
 
         this._onVisibilityChange = () => {
             this._docVisible = document.visibilityState !== 'hidden';
+            // A hidden tab throttles timers, so a burst there would land as a jerky lurch on
+            // return. Hand the poster back and let the next arrival start a clean one.
+            if (!this._docVisible) this._cancelPreviewBurst(true);
             this._syncPlayback();
         };
         this._frame = this._frame.bind(this);
@@ -317,10 +363,11 @@ export class HexLifeElement extends HTMLElement {
         // A world code owns every world-defining attribute (see `_boot`): the only way to change one
         // of them is a new code, and a new code means a new world. Both cases are a re-boot. `speed`
         // is exempt — it's a playback rate, not part of the tick sequence, so it applies live. So is
-        // `wheel-zoom`, which only gates an input handler (`_onWheel` reads it fresh on every event).
+        // `wheel-zoom`, which only gates an input handler (`_onWheel` reads it fresh on every event),
+        // and `preview`, which is poster decoration and is read fresh at the start of every burst.
         if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr'
             && name !== 'link' && name !== 'speed' && name !== 'draw'
-            && name !== 'wheel-zoom')) {
+            && name !== 'wheel-zoom' && name !== 'preview')) {
             this._generation++;
             this._teardown();
             this._boot(this._generation);
@@ -378,8 +425,16 @@ export class HexLifeElement extends HTMLElement {
             case 'link':
                 this._updateAttribution();
                 break;
+            case 'preview':
+                // Removing it stops the decoration and hands back the authored poster; adding it
+                // arms the next arrival. Never bursts on the spot — a burst is a reaction to being
+                // seen, not to being configured.
+                if (!this.hasAttribute('preview')) this._cancelPreviewBurst(true);
+                break;
             case 'draw':
                 if (this.hasAttribute('draw')) {
+                    // Pointer events are about to mean "paint": the poster, and its burst, are done.
+                    this._cancelPreviewBurst(true);
                     this._canvas.style.touchAction = 'none';
                     this._canvas.style.cursor = 'crosshair';
                 } else {
@@ -399,6 +454,9 @@ export class HexLifeElement extends HTMLElement {
 
     /** Start (or resume) the simulation. An explicit call also overrides `prefers-reduced-motion`. */
     play() {
+        // The viewer asked for the real thing; the poster's decoration steps aside without
+        // rewinding, so what they were watching simply keeps going.
+        this._cancelPreviewBurst(false);
         this._playRequested = true;
         this._userPaused = false;
         // Keep the attribute in sync so hosts reading `hasAttribute('paused')` stay honest
@@ -593,10 +651,9 @@ export class HexLifeElement extends HTMLElement {
 
         // Pause when scrolled away: a feed may hold several of these, and an offscreen world is
         // pure waste. `0` threshold = "any pixel visible".
-        this._intersectionObserver = new IntersectionObserver((entries) => {
-            this._onScreen = entries[entries.length - 1].isIntersecting;
-            this._syncPlayback();
-        }, { threshold: 0 });
+        this._onScreenKnown = false;
+        this._intersectionObserver = new IntersectionObserver(
+            (entries) => this._onIntersect(entries), { threshold: 0 });
         this._intersectionObserver.observe(this);
 
         // Zoom: wheel on desktop, pinch on touch. Passive:false on wheel so we can preventDefault
@@ -629,6 +686,8 @@ export class HexLifeElement extends HTMLElement {
 
     _teardown() {
         this._stopLoop();
+        // No restore: the sim is about to be freed, and a reset on the way out is pure work.
+        this._cancelPreviewBurst(false);
         this._endDrawStroke(false);
         this._bindDrawListeners(false);
 
@@ -750,6 +809,105 @@ export class HexLifeElement extends HTMLElement {
         }));
     }
 
+    // --- poster preview burst -------------------------------------------------
+    // A cellular automaton's whole appeal is motion, and a paused poster in a feed is a dark grid
+    // that reads as a broken image at scroll speed. When `preview` is set, the poster runs a few
+    // generations as it comes into view and then rewinds to the authored state.
+    //
+    // Three rules keep this decoration rather than playback:
+    //   1. It never touches `_rafId`, so `playing` stays false and no `hexlife-playstate` fires.
+    //   2. It only ever runs while the poster is up (paused, not drawable, no explicit play).
+    //   3. Anything the *user* does wins instantly — see `_cancelPreviewBurst`.
+
+    /** @returns {number} Ticks to burst, or 0 when the attribute is absent (the feature is opt-in). */
+    _readPreviewTicks() {
+        if (!this.hasAttribute('preview')) return 0;
+        return clampInt(this.getAttribute('preview'), PREVIEW_MIN, PREVIEW_MAX, PREVIEW_DEFAULT);
+    }
+
+    /**
+     * Is the poster frame what's on screen right now? Only then is there something to animate:
+     * a drawable world hands pointer events to paint, and a world the viewer asked to play is
+     * already moving.
+     */
+    _posterShowing() {
+        return this._userPaused && !this.hasAttribute('draw') && !this._playRequested;
+    }
+
+    /** Start a burst if every gate agrees. Idempotent — a burst in flight is left alone. */
+    _maybePreviewBurst() {
+        if (this._previewActive) return;
+        if (!this.sim || !this.renderer || this.error) return;
+        if (!this._docVisible || this._reducedMotion) return;
+        if (!this._posterShowing()) return;
+        const ticks = this._readPreviewTicks();
+        if (!ticks) return;
+        this._previewActive = true;
+        this._previewLeft = ticks;
+        this._previewTicked = 0;
+        this._previewTimer = setTimeout(this._previewStep, PREVIEW_TICK_MS);
+    }
+
+    _previewStep() {
+        this._previewTimer = 0;
+        // Re-check every gate each step: a burst spans seconds, and the viewer can pause, play,
+        // start drawing, or scroll away in the middle of one.
+        if (!this.sim || this.error || !this._posterShowing() || !this._docVisible) {
+            this._previewActive = false;
+            return;
+        }
+        if (this._previewLeft > 0) {
+            this.sim.tick();
+            this._drawOnce();
+            this._previewLeft--;
+            this._previewTicked++;
+            // Note the beat is scheduled even after the last tick. Rewinding in the same step that
+            // draws the final generation would put it on screen for zero milliseconds — the burst
+            // would show one fewer generation than it was asked for, and snap back mid-motion.
+            this._previewTimer = setTimeout(this._previewStep, PREVIEW_TICK_MS);
+            return;
+        }
+        // That beat has now passed: rewind to the state the author actually posted. An exact-cells
+        // world replays its cells; a generator world re-rolls, which is that world's own contract.
+        this._previewActive = false;
+        this.reset();
+    }
+
+    /**
+     * @param {boolean} restore Rewind to tick 0. True when we're handing the poster back (scrolled
+     *   away, tab hidden, `preview` removed) — the authored state is what should be sitting there
+     *   next time. **False** when the user took over (play, a draw stroke): resetting under them
+     *   would yank the world out from beneath the thing they just did, and for a generator world
+     *   it would swap in cells they never saw.
+     */
+    _cancelPreviewBurst(restore) {
+        if (!this._previewActive) return;
+        if (this._previewTimer) clearTimeout(this._previewTimer);
+        this._previewTimer = 0;
+        this._previewLeft = 0;
+        this._previewActive = false;
+        // Only if it actually moved something: on a generator world `reset()` re-rolls the cells,
+        // so restoring a burst that never ticked would change the poster nobody had touched.
+        const ticked = this._previewTicked > 0;
+        this._previewTicked = 0;
+        if (restore && ticked && this.sim && !this.error) this.reset();
+    }
+
+    /** IntersectionObserver callback: the viewport gate, and what triggers a poster burst. */
+    _onIntersect(entries) {
+        const wasOnScreen = this._onScreen;
+        const first = !this._onScreenKnown;
+        this._onScreenKnown = true;
+        this._onScreen = entries[entries.length - 1].isIntersecting;
+        this._syncPlayback();
+
+        // "Arrived" = scrolled into view, or was already in view the first time we heard. The
+        // second case matters more than it looks: a host that defers mounting until the element is
+        // on screen (the Devvit feed does) would otherwise never see a single burst.
+        if (this._onScreen && (first || !wasOnScreen)) this._maybePreviewBurst();
+        else if (!this._onScreen) this._cancelPreviewBurst(true);
+    }
+
     // --- draw (invert brush) --------------------------------------------------
 
     _bindDrawListeners(on) {
@@ -779,6 +937,9 @@ export class HexLifeElement extends HTMLElement {
         if (!hit) return;
 
         e.preventDefault();
+        // They're painting on what they can see. Cancel without restoring: rewinding the cells out
+        // from under a stroke already in progress would be the rudest possible moment for it.
+        this._cancelPreviewBurst(false);
         this._drawing = true;
         this._drawPointerId = e.pointerId;
         this._strokeAffected = new Set();

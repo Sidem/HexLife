@@ -91,7 +91,7 @@ export interface HexLifeElementEventMap {
  * `<hexlife-world>` — see `docs/EMBED-PLAN.md` § Public API for the attributes:
  * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` · `code`
  * (`HXW1.…`, wins over the individual attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
- * `draw` · `wheel-zoom` (`free` | `ctrl`).
+ * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60).
  */
 export declare class HexLifeElement extends HTMLElement {
     /** The live sim, or null before boot / after teardown / in the error state. */
