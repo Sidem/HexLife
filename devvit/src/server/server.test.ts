@@ -170,12 +170,24 @@ test('form submit rejects a code that is not one, keeping what was typed', async
   assert.equal(redisValues.size, 0)
 
   const fields = body.showForm?.form.fields ?? []
-  assert.match(body.showForm?.form.description ?? '', /not a valid world code/)
+  // It had the prefix, so the message is about a code that would not decode...
+  assert.match(body.showForm?.form.description ?? '', /didn’t decode/)
   assert.equal(
     fields.find(f => f.name === 'code')?.defaultValue,
     'HXW1.truncated',
   )
   assert.equal(fields.find(f => f.name === 'title')?.defaultValue, 'nope')
+})
+
+test('a paste that is not a code at all says so, rather than "would not decode"', async () => {
+  // ...whereas this is a different mistake — the user pasted the wrong thing entirely — and
+  // telling them their code is truncated would send them hunting for a code they never copied.
+  const body = await submitForm({code: 'https://example.com/whoops'})
+  assert.match(
+    body.showForm?.form.description ?? '',
+    /doesn’t start with HXW1\./,
+  )
+  assert.equal(submitted.length, 0)
 })
 
 test('form submit creates the post as the user, with styles and postData', async () => {
@@ -280,7 +292,7 @@ test('api/post creates a specimen and returns its url', async () => {
 test('api/post rejects an invalid code without creating anything', async () => {
   const {status, body} = await createPost({code: 'HXW1.nope', title: 't'})
   assert.equal(status, 400)
-  assert.match(body.error ?? '', /not a valid world code/)
+  assert.match(body.error ?? '', /didn’t decode/)
   assert.equal(submitted.length, 0)
   assert.equal(redisValues.size, 0)
 })

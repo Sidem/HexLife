@@ -20,6 +20,7 @@ import {
   EndpointMethod,
   type ErrorRsp,
   type GetWorldRsp,
+  invalidCodeMessage,
   NEW_POST_COPY,
   NEW_POST_FORM,
   type NewPostFormValues,
@@ -225,7 +226,7 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   const code = (values.code ?? '').trim()
 
   const world = await decodeWorldCode(code)
-  if (!world) return newPostForm(values, NEW_POST_COPY.invalid)
+  if (!world) return newPostForm(values, invalidCodeMessage(code))
 
   const post = await createSpecimenPost(
     world,
@@ -255,7 +256,7 @@ async function routeCreatePost(
   const code = (values?.code ?? '').trim()
 
   const world = await decodeWorldCode(code)
-  if (!world) return {error: NEW_POST_COPY.invalid, status: 400}
+  if (!world) return {error: invalidCodeMessage(code), status: 400}
 
   const post = await createSpecimenPost(
     world,

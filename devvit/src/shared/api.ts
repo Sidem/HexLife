@@ -44,9 +44,31 @@ export const NEW_POST_COPY = {
   codeHelp: 'Starts with HXW1. — paste the whole thing.',
   titleLabel: 'Post title',
   titleHelp: 'Leave blank to name the post after its ruleset.',
+  /**
+   * The paste *looked* like a code (right prefix) but would not decode. Naming the two things
+   * that actually cause this beats "that is not a valid world code", which told a user who just
+   * pasted something starting with HXW1. only that we disagreed.
+   */
   invalid:
-    'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.',
+    'That world code didn’t decode. Usually the paste was cut short, or extra text came along with it — a code is one unbroken line starting with HXW1. and nothing after it. Copy it again from HexLife Explorer (Share → Copy World Code).',
+  /** No `HXW1.` prefix at all — a different mistake, and worth saying so. */
+  notACode:
+    'That doesn’t start with HXW1., so it isn’t a world code. In HexLife Explorer, open Share → "Copy World Code" and paste the whole line.',
 } as const
+
+/** The prefix every world code carries (see src/core/WorldCodec.js). */
+export const WORLD_CODE_PREFIX = 'HXW1.'
+
+/**
+ * Which "that didn't work" to show. The two failures are genuinely different mistakes — a
+ * truncated code and a paste of the wrong thing entirely — and a decoder that says the same
+ * sentence to both makes the user guess which one they made.
+ */
+export function invalidCodeMessage(code: string): string {
+  return code.trim().startsWith(WORLD_CODE_PREFIX)
+    ? NEW_POST_COPY.invalid
+    : NEW_POST_COPY.notACode
+}
 
 /**
  * The fields both create paths collect, in the order they're shown.

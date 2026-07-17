@@ -122,12 +122,15 @@ body[data-chrome='lab'] #specimen-name {
   flex-shrink: 0;
 }
 
-/* One line telling a feed reader what they're looking at and what to do about it. */
+/* One line telling a feed reader what they're looking at and what to do about it — the only copy
+   on the card aimed at someone who has never seen a HexLife post. It was the least legible text
+   there (11px, muted); at that size the one sentence carrying the card's whole pitch was the
+   easiest thing to skip. Kept to one line. */
 #specimen-sub {
   flex-basis: 100%;
   margin: 0;
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 13px;
+  color: color-mix(in srgb, var(--text) 85%, transparent);
 }
 
 /* --- world ---------------------------------------------------------------- */
@@ -250,6 +253,22 @@ body[data-chrome='lab'] #chrome {
 #expand-btn {
   flex: 1 1 auto;
   max-width: 200px;
+}
+
+/* The feed's create affordance. A viewer who wants to make one of these shouldn't have to expand
+   the post first to find out they can — but the card's job is to play, so this reads as text next
+   to the primary pill rather than competing with it. Still a full 44px tap target. */
+#create-own.quiet {
+  padding: 0 10px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+#create-own.quiet:hover {
+  border-color: transparent;
+  background: none;
+  color: var(--text);
 }
 
 /* Drawing is invisible until you try it; the lab is where it's worth a line of explanation. */
