@@ -53,7 +53,7 @@ describe('buildPostKit', () => {
         expect(kit).toContain('Tags: Gliders');
         expect(kit).toContain('Explorer: https://sidem.github.io/HexLife/?r=ABC');
         expect(kit).toContain('IC: IC · 12% fill');
-        expect(kit).toContain('first line');
+        expect(kit).toContain('Leave the title field blank');
     });
 
     it('rejects non-HXW1 codes', () => {
