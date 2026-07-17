@@ -11,6 +11,9 @@
  *
  * **Boot:** posts created since Phase 3.6 carry their world in `postData`, so the common path
  * renders with no `api/world` round-trip at all. Older posts and the install demo still fetch.
+ *
+ * **When the world can't be resolved** the card says so and offers Retry, rather than quietly
+ * running the built-in demo under someone else's post title — see {@link WorldCodeResult}.
  */
 
 import {context, navigateTo, showForm} from '@devvit/web/client'
@@ -63,6 +66,21 @@ const DEMO = {
 
 const DEFAULT_EMBED_ROWS = 64
 
+/** Shown when we can't tell what world this post is — never alongside a mounted world. */
+const FETCH_FAILED_MSG = 'Couldn’t load this specimen.'
+
+/**
+ * `?demo=1` — mount the built-in demo even when `api/world` fails.
+ *
+ * Strictly a local-harness affordance. There is no Devvit server in the vite harness, so every
+ * boot there hits `{ok: false}` and would otherwise show the error state, leaving nothing to test
+ * the element against. Inside Reddit the fetch either works or the viewer deserves the truth, so
+ * nothing sets this flag in production.
+ */
+function demoFallbackAllowed(): boolean {
+  return new URLSearchParams(location.search).has('demo')
+}
+
 type WorldMeta = {
   rulesetHex: string
   rows: number
@@ -80,23 +98,62 @@ export async function mountHexLife(
   status: HTMLElement,
   opts: {mode: ChromeMode} = {mode: 'lab'},
 ): Promise<void> {
-  setStatus(status, 'Loading…', 'loading')
   applyChromeMode(opts.mode)
+  // Wired once, here rather than in `boot`: a retry re-runs the boot, and re-wiring a button that
+  // survived the failure would leave it with two handlers.
+  wireCreateOwn(status)
+  const retryBtn = el<HTMLButtonElement>('retry')
 
-  // Identity is known from postData before any network call — paint it now so the card reads as a
-  // named specimen while the world itself is still resolving.
-  const post = readPostData()
-  if (post) {
-    paintIdentity({
-      rulesetHex: post.rulesetHex,
-      rows: post.rows,
-      cols: post.cols,
-      speed: null,
-    })
+  /**
+   * Resolve the world and mount it. Safe to re-run *only* because it bails before wiring anything
+   * when it fails, and never runs again once it has succeeded.
+   */
+  const boot = async (): Promise<void> => {
+    setStatus(status, 'Loading…', 'loading')
+    if (retryBtn) retryBtn.hidden = true
+
+    // Identity is known from postData before any network call — paint it now so the card reads as
+    // a named specimen while the world itself is still resolving.
+    const post = readPostData()
+    if (post) {
+      paintIdentity({
+        rulesetHex: post.rulesetHex,
+        rows: post.rows,
+        cols: post.cols,
+        speed: null,
+      })
+    }
+
+    // The fast path: the code rode along in postData, so there is nothing to fetch.
+    let code = post?.code
+    if (code === undefined) {
+      const rsp = await fetchWorldCode()
+      if (rsp.ok) {
+        // `{ok: true, code: undefined}` is the install demo: the post really has no world, and
+        // the built-in specimen is the right answer to that.
+        code = rsp.code
+      } else if (!demoFallbackAllowed()) {
+        // We don't know what this post is. Say so and offer a way out — showing the demo here
+        // would put a stranger's title on our world and tell the viewer nothing went wrong.
+        setStatus(status, FETCH_FAILED_MSG, 'error')
+        if (retryBtn) retryBtn.hidden = false
+        return
+      }
+    }
+    await mountWorld(mount, status, code, opts)
   }
 
-  // The fast path: the code rode along in postData, so there is nothing to fetch.
-  const code = post?.code ?? (await fetchWorldCode())
+  retryBtn?.addEventListener('click', () => void boot())
+  await boot()
+}
+
+/** Build, wire, and connect the element. Called once per page — only after the world is known. */
+async function mountWorld(
+  mount: HTMLElement,
+  status: HTMLElement,
+  code: string | undefined,
+  opts: {mode: ChromeMode},
+): Promise<void> {
   const meta = await resolveMeta(code)
 
   const world = document.createElement('hexlife-world')
@@ -119,8 +176,6 @@ export async function mountHexLife(
   wireExplorerLink(meta)
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
-  // Lab only — the feed card stays lean (the button isn't in splash.html at all).
-  wireCreateOwn(status)
 
   const settle = (): void => {
     const speedInput = el<HTMLInputElement>('speed')

@@ -193,7 +193,8 @@ body[data-chrome='lab'] #chrome {
 #controls button,
 #expand-btn,
 #copy-hex,
-#create-own {
+#create-own,
+#retry {
   margin: 0;
   min-height: var(--tap);
   min-width: var(--tap);
@@ -211,7 +212,8 @@ body[data-chrome='lab'] #chrome {
 #controls button:hover,
 #expand-btn:hover,
 #copy-hex:hover,
-#create-own:hover {
+#create-own:hover,
+#retry:hover {
   border-color: rgba(108, 182, 255, 0.35);
   background: #1c222a;
 }
@@ -308,6 +310,17 @@ body[data-chrome='lab'] a.explorer-link:hover {
 /* "Loading…" is not a problem; only a real failure earns the alarm color. */
 #status[data-state='error'] {
   color: var(--danger-soft);
+}
+
+/* Only shown when the world could not be fetched — a dead end otherwise, since nothing else on the
+   card can recover from it. Hidden by the `hidden` attribute the rest of the time. */
+#retry {
+  align-self: center;
+  padding: 0 20px;
+}
+
+#retry[hidden] {
+  display: none;
 }
 
 #status[hidden] {
