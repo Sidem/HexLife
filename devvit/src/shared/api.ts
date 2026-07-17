@@ -38,22 +38,24 @@ export type CreatePostRsp = {url: string}
 export const NEW_POST_COPY = {
   title: 'New HexLife post',
   description:
-    'In HexLife Explorer (sidem.github.io/HexLife), open Share → "Copy World Code", then paste it below. The code is the exact world you were looking at — grid, ruleset, cells, and colors.',
+    'In HexLife Explorer (sidem.github.io/HexLife), use Share → "Copy post kit & open r/hexlife" (or Copy World Code). Paste the world code below — if you paste a whole post kit, we take the HXW1. line automatically. Put the Title line into the title field.',
   acceptLabel: 'Create Live Specimen',
   codeLabel: 'World code',
-  codeHelp: 'Starts with HXW1. — paste the whole thing.',
+  codeHelp:
+    'Paste the HXW1.… line (or a full Explorer post kit — only the HXW1. line is used).',
   titleLabel: 'Post title',
-  titleHelp: 'Leave blank to name the post after its ruleset.',
+  titleHelp:
+    'From the post kit’s Title: line, or leave blank to name the post after its ruleset.',
   /**
    * The paste *looked* like a code (right prefix) but would not decode. Naming the two things
    * that actually cause this beats "that is not a valid world code", which told a user who just
    * pasted something starting with HXW1. only that we disagreed.
    */
   invalid:
-    'That world code didn’t decode. Usually the paste was cut short, or extra text came along with it — a code is one unbroken line starting with HXW1. and nothing after it. Copy it again from HexLife Explorer (Share → Copy World Code).',
-  /** No `HXW1.` prefix at all — a different mistake, and worth saying so. */
+    'That world code didn’t decode. Usually the paste was cut short, or extra text came along with it — a code is one unbroken line starting with HXW1. and nothing after it. Copy it again from HexLife Explorer (Share → Copy World Code, or the HXW1. line from a post kit).',
+  /** No `HXW1.` token at all — a different mistake, and worth saying so. */
   notACode:
-    'That doesn’t start with HXW1., so it isn’t a world code. In HexLife Explorer, open Share → "Copy World Code" and paste the whole line.',
+    'No HXW1. world code found in that paste. In HexLife Explorer, use Share → Copy World Code, or paste a post kit that includes an HXW1. line.',
 
   /**
    * "Post my remix" — the same act as the paste path, reached without ever leaving the post. The
@@ -73,12 +75,35 @@ export const NEW_POST_COPY = {
 export const WORLD_CODE_PREFIX = 'HXW1.'
 
 /**
+ * Match a world code token anywhere in a paste (Explorer post kits put meta around the HXW1. line).
+ * Base64url alphabet only — same charset encodeWorldCode emits.
+ */
+const WORLD_CODE_TOKEN_RE = /HXW1\.[A-Za-z0-9_-]+/
+
+/**
+ * Pull a world code out of a form paste. Accepts a pure `HXW1.…` line **or** a multi-line Explorer
+ * post kit (title/tags/description + the code). Returns null when no token is present.
+ *
+ * Prefer a pure single-line body when the whole paste is just the code; otherwise take the first
+ * HXW1. token so "paste the whole kit" still creates a Live Specimen.
+ */
+export function extractWorldCodeFromPaste(text: string): string | null {
+  if (typeof text !== 'string') return null
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  const pure = /^\s*(HXW1\.[A-Za-z0-9_-]+)\s*$/.exec(trimmed)
+  if (pure) return pure[1] ?? null
+  const embedded = WORLD_CODE_TOKEN_RE.exec(trimmed)
+  return embedded ? embedded[0] : null
+}
+
+/**
  * Which "that didn't work" to show. The two failures are genuinely different mistakes — a
  * truncated code and a paste of the wrong thing entirely — and a decoder that says the same
  * sentence to both makes the user guess which one they made.
  */
 export function invalidCodeMessage(code: string): string {
-  return code.trim().startsWith(WORLD_CODE_PREFIX)
+  return extractWorldCodeFromPaste(code)
     ? NEW_POST_COPY.invalid
     : NEW_POST_COPY.notACode
 }

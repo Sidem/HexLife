@@ -38,7 +38,7 @@ describe('buildPostTitle', () => {
 describe('buildPostKit', () => {
     const code = 'HXW1.deadbeef';
 
-    it('includes title, description, tags, explorer, IC, and world code', () => {
+    it('includes title, description, tags, explorer, IC, and world code first', () => {
         const kit = buildPostKit({
             title: 'Spiral Weaver · Gliders',
             description: 'A tidy little glider gun.',
@@ -47,13 +47,13 @@ describe('buildPostKit', () => {
             icLabel: 'IC · 12% fill',
             worldCode: code,
         });
+        expect(kit.startsWith(code)).toBe(true);
         expect(kit).toContain('Title: Spiral Weaver · Gliders');
         expect(kit).toContain('A tidy little glider gun.');
         expect(kit).toContain('Tags: Gliders');
         expect(kit).toContain('Explorer: https://sidem.github.io/HexLife/?r=ABC');
         expect(kit).toContain('IC: IC · 12% fill');
-        expect(kit).toContain('paste ONLY this line');
-        expect(kit.trimEnd().endsWith(code)).toBe(true);
+        expect(kit).toContain('first line');
     });
 
     it('rejects non-HXW1 codes', () => {

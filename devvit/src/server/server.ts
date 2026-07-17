@@ -19,6 +19,7 @@ import {
   Endpoint,
   EndpointMethod,
   type ErrorRsp,
+  extractWorldCodeFromPaste,
   type GetWorldRsp,
   invalidCodeMessage,
   NEW_POST_COPY,
@@ -223,10 +224,12 @@ function specimenTextFallback(world: DecodedWorld): string {
 /** The form came back: validate the code, create the post, and pin the code to the new post's ID. */
 async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   const values = await readFormValues(reqMsg)
-  const code = (values.code ?? '').trim()
+  const raw = (values.code ?? '').trim()
+  // Explorer post kits wrap meta around the code — accept a pure line or extract HXW1. from a kit.
+  const code = extractWorldCodeFromPaste(raw) ?? raw
 
   const world = await decodeWorldCode(code)
-  if (!world) return newPostForm(values, invalidCodeMessage(code))
+  if (!world) return newPostForm(values, invalidCodeMessage(raw))
 
   const post = await createSpecimenPost(
     world,
@@ -253,10 +256,11 @@ async function routeCreatePost(
   reqMsg: IncomingMessage,
 ): Promise<CreatePostRsp | ErrorRsp> {
   const values = await readJson<NewPostFormValues>(reqMsg)
-  const code = (values?.code ?? '').trim()
+  const raw = (values?.code ?? '').trim()
+  const code = extractWorldCodeFromPaste(raw) ?? raw
 
   const world = await decodeWorldCode(code)
-  if (!world) return {error: invalidCodeMessage(code), status: 400}
+  if (!world) return {error: invalidCodeMessage(raw), status: 400}
 
   const post = await createSpecimenPost(
     world,
@@ -299,6 +303,8 @@ async function routePostSubmit(
   if (!post?.id) return {}
 
   // Devvit payloads have used both `body` and `selftext` across versions — accept either.
+  // Pure HXW1 bodies only for this trigger (not a full post kit — that would auto-convert
+  // accidental text posts too aggressively). The menu form uses extractWorldCodeFromPaste.
   const text = (post.body ?? post.selftext ?? '').trim()
   const match = PURE_WORLD_CODE_RE.exec(text)
   const code = match?.[1]

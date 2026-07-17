@@ -185,9 +185,30 @@ test('a paste that is not a code at all says so, rather than "would not decode"'
   const body = await submitForm({code: 'https://example.com/whoops'})
   assert.match(
     body.showForm?.form.description ?? '',
-    /doesn’t start with HXW1\./,
+    /No HXW1\. world code found/,
   )
   assert.equal(submitted.length, 0)
+})
+
+test('form submit extracts HXW1 from an Explorer post kit paste', async () => {
+  const code = await worldCode()
+  const kit = [
+    '── HexLife post kit ──',
+    'Title: Kit World',
+    '',
+    'A nice description.',
+    '',
+    'Tags: Gliders',
+    '',
+    '── World code ──',
+    code,
+  ].join('\n')
+
+  const body = await submitForm({code: kit, title: 'Kit World'})
+
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0]?.userGeneratedContent?.text, code)
+  assert.equal(body.navigateTo, 'https://reddit.com/r/hexlife/t3_new1')
 })
 
 test('form submit creates the post as the user, with styles and postData', async () => {

@@ -96,8 +96,13 @@ export function buildPostKit({
     if (typeof worldCode !== 'string' || !worldCode.startsWith('HXW1.')) {
         throw new Error('buildPostKit requires a HXW1. world code');
     }
+    // World code first: if someone pastes the whole kit into the form before the sub
+    // extracts HXW1 tokens, a pure-first-line paste path is still one Select→line away.
+    // Prefer pasting *only* this first line into the code field; Title: goes in the title field.
     const lines = [
-        '── HexLife post kit ──',
+        worldCode.trim(),
+        '',
+        '── HexLife post kit (meta — not the code field) ──',
         `Title: ${(title || 'HexLife').trim() || 'HexLife'}`,
         '',
     ];
@@ -117,8 +122,8 @@ export function buildPostKit({
     }
     lines.push(
         '',
-        '── World code (paste ONLY this line into New HexLife post) ──',
-        worldCode.trim(),
+        'Tip: paste the first line (HXW1.…) into New HexLife post’s code field;',
+        'paste the Title: line into the title field (or leave title blank).',
     );
     return lines.join('\n');
 }
@@ -229,12 +234,12 @@ export function redditHandoffToast({ size, title, popupBlocked = false }) {
     const shortTitle = (title || 'HexLife').slice(0, 60);
     if (popupBlocked) {
         return {
-            message: `Post kit ready (${size}) — open ${REDDIT_SUB_NAME}, then ⋯ → New HexLife post. Paste only the HXW1. line. Title: “${shortTitle}”`,
+            message: `Post kit ready (${size}) — open ${REDDIT_SUB_NAME}, ⋯ → New HexLife post. Paste the first line (HXW1.…) into the code field. Title: “${shortTitle}”`,
             type: 'error',
         };
     }
     return {
-        message: `Post kit copied (${size}). On ${REDDIT_SUB_NAME}: ⋯ → New HexLife post → paste only the HXW1. line. Title: “${shortTitle}”`,
+        message: `Post kit copied (${size}). On ${REDDIT_SUB_NAME}: ⋯ → New HexLife post → paste the first line (HXW1.…) into the code field. Title: “${shortTitle}”`,
         type: 'success',
     };
 }
