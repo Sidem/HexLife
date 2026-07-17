@@ -120,13 +120,6 @@ same deep-link pattern Devvit Phase 3.5 should reuse outside the element.
 - Pages at `embed/v1/`; `embed/v1/frame/?…` iframe wrapper  
 - Polished demo (script-tag + iframe snippets)
 
-### Planned additive API (Devvit Phase 3.7 — spec in `docs/DEVVIT-PLAN.md`)
-
-- ✅ `worldCode()` — landed 3.7 WP4; see Public API above.
-- ✅ `preview` attribute — landed 3.7 WP5; see Public API above.
-- ✅ CSS-only pulse on the poster play overlay (reduced-motion gated) — landed 3.7 WP5. Internal to
-  the element's shadow `STYLES`; no API surface.
-
 ### Phase 4 — CI determinism
 
 Automate app-vs-embed checksum at tick 100.

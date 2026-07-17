@@ -4,18 +4,49 @@
 
 ---
 
-## Status (2026-07-16)
+## Status (2026-07-17)
 
 | Phase | Status |
 |---|---|
 | 0–2c (Live Specimen + transport/zoom + create paths) | ✅ Built; playtest green on r/hexlife |
 | Create-path honesty (menu form + explorer helper) | ✅ Done |
-| **Phase 3 — publish** | **Ready for owner `devvit playtest` → `devvit publish`** (3.6 landed) |
+| **Phase 3 — publish** | **Ready for owner `devvit playtest` → `devvit publish`** (3.6 + 3.7 landed) |
 | **Phase 3.5 — UX (A+B + start-paused)** | ✅ Deep-link, identity chrome; always start paused |
 | **Draw + brush in world code** | ✅ Invert paint on drag; brush size in HXW1 v2 (legacy → 2) |
 | **Phase 3.6 — feed UX + create-path overhaul** | ✅ WP1–WP5 shipped 2026-07-16; WP6 stretch 1 of 4 |
-| **Phase 3.7 — post-publish UX & efficiency arc** | 📋 Planned 2026-07-17 (spec below) — remix-in-post, live poster, honest errors, bundle diet |
+| **Phase 3.7 — post-publish UX & efficiency arc** | ✅ **WP1–WP7 all shipped 2026-07-17** |
 | Phase 4 — Daily Hex on Reddit | Later (depends on explorer #17) |
+
+### What Phase 3.7 landed (2026-07-17)
+
+| WP | Status | Notes |
+|---|---|---|
+| WP1 — maintainability | ✅ | `newPostFields()` shared by both create paths; `src/embed/hexlife-world.d.ts` (replaces the unchecked hand-mirrored type); `el(id)` warns on a missing id; `route()` strips `?…` |
+| WP2 — honest fetch failure | ✅ | Discriminated `{ok}` result; error + Retry instead of a silent demo under someone else's title; `?demo=1` for the local harness |
+| WP3 — feed & lab polish | ✅ | Subtitle 13px; “Expand”; quiet feed “Create your own”; zoom in the draw hint; invalid-code copy names the real failure modes |
+| **WP4 — “Post my remix”** | ✅ | `worldCode()` + `snapshotCells()` + `getLut()` (additive; EMBED-PLAN updated); `#post-remix` primary; title-only form → existing `api/post` |
+| WP5 — poster liveliness | ✅ | CSS pulse + additive `preview` attribute; feed sets `preview="12"`. Decoration, not playback: no `playing`, no `hexlife-playstate` |
+| WP6 — bundle diet | ✅ | **2237.2 KB → 234.6 KB uploaded (−89.5%)**; code-split, publish sourcemaps dropped, portable `clean`; wasm-as-file behind `INLINE_WASM=0` (playtest-gated) |
+| WP7 — lazy boot | ✅ | Host-side IO gate + CSS placeholder; boots anyway if the observer never reports (playtest-gated measurement) |
+
+Commits: `a969f5b` (WP1), `70da772` (WP2), `964209a` (WP3), `82ae2a4` (WP4), `b121f39` (WP5),
+`c5398a0` (WP6), `b7303fb` (WP7). The spec each was built from is in `0e4e196`.
+
+**Three findings from 3.7 worth not rediscovering:**
+
+1. **The preview pane's `visibilityState: 'hidden'` kills IntersectionObserver too**, not just rAF —
+   IO only delivers on a rendering opportunity. A mount measuring 1280×1134 at top 0 (geometrically
+   in view) never got a single callback in 2.5 s. Any IO-gated behavior is unverifiable there; drive
+   it through the element's internals (`el._docVisible = true;
+   el._onIntersect([{isIntersecting: true}])`). It also throttles `setTimeout` to ~1/sec, which
+   makes any timed burst look broken.
+2. **A viewport gate must fail toward showing the thing.** `<hexlife-world>`'s own IO assumes
+   on-screen until told otherwise, so a silent observer costs nothing. WP7's first draft inverted
+   that, and a silent observer meant a permanently blank card. It now makes the observer prove it
+   works (any report, including “not intersecting”), or bypasses it after 1500 ms.
+3. **`npm run clean` never worked on Windows** (`rm` isn't on `cmd.exe`'s PATH), which also killed
+   `npm run publish` at step one — and since Devvit uploads `public/` **whole**, the stale
+   sourcemaps it left behind were shipping. Now `scripts/clean.mjs`.
 
 ### What Phase 3.6 landed (2026-07-16)
 
@@ -188,6 +219,8 @@ playback or screenshots:
 
 `devvit playtest` on r/hexlife, then `devvit publish`:
 
+**From 3.6:**
+
 - **`runAs: 'USER'` at runtime** — the config parses, but only the platform can confirm it grants
   the `SUBMIT_POST` asUser scope. If it rejects: drop `runAs`/`userGeneratedContent` from
   `createSpecimenPost` and the permission from devvit.json — everything else is independent of it.
@@ -195,6 +228,30 @@ playback or screenshots:
   log. Locally there is no Devvit server and `context` is undefined, so only the fetch fallback runs
   (the 404s in the local console are that fallback, and are expected).
 - Feed tap-to-play on a real phone; create-from-post (`showForm`/`navigateTo` no-op off-Reddit).
+
+**New in 3.7:**
+
+- **WP7 — does Devvit boot offscreen webviews at all?** This is the measurement the whole WP hangs
+  on. Both mount paths log `hexlife: mounting (<why>) at +<n>ms after script start`. In a real feed,
+  scroll a HexLife post into view and read the console: `scrolled into view` with a large `+n` means
+  the deferral works and offscreen posts are genuinely skipping the wasm compile and WebGL context.
+  `observer never reported` means the observer is not delivering in the webview and the 1500 ms
+  safety net booted it — the card still works, but the WP is buying nothing and can be reverted.
+  Confirm too that a scrolled-past post creates no WebGL context / wasm instance.
+- **WP6 — wasm as a file (`INLINE_WASM=0`).** Off by default; **do not publish it enabled until a
+  playtest confirms it.** The open question is only whether the webview's CSP permits a same-origin
+  `fetch` of `hexlife_wasm_bg.wasm`. To test: `INLINE_WASM=0 npm run build:client`, playtest, and
+  check the network log for the `.wasm` and the console for a CSP violation. If it loads, enabling
+  it by default saves ~45 KB and buys streaming compilation; if it doesn't, flip the flag back and
+  nothing else changes (`loadWasmBytes` handles both forms).
+- **WP5 — does the feed poster actually read as alive?** The burst and the pulse are verified
+  mechanically (tick counts, no `hexlife-playstate`, reduced-motion gating), but "does this stop
+  looking like a broken image while scrolling" is a judgement only a real feed on a real phone can
+  make. If 12 ticks is too subtle or too busy, it is one number in `splash.ts`.
+- **WP3/WP4 — the two create paths from a real post.** The feed's new quiet "Create your own" and
+  the lab's "Post my remix" both wire up and no-op locally (`showForm` only acts inside Reddit).
+  Worth confirming end-to-end that a remix posts, and that the posted world is *exactly* what was on
+  screen — including anything drawn on it.
 
 ### Verify (future sessions)
 
@@ -204,233 +261,36 @@ playback or screenshots:
 
 ---
 
-## Phase 3.7 — Post-publish UX & efficiency arc (planned 2026-07-17)
+## Phase 3.7 — Post-publish UX & efficiency arc
 
-Origin: deep evaluation session 2026-07-17 (architecture/maintainability/efficiency/UX review of
-the shipped 3.6 build). Verdict in brief: engineering foundation is sound; the gaps are product-side
-— the feed card is a static dark square that doesn't sell itself, and creating a post still requires
-a copy-paste round-trip through the explorer even though everything needed to create *from inside a
-post* is already on board.
+**Shipped 2026-07-17 (WP1–WP7).** See the status table at the top of this doc for what each landed,
+and the per-WP commits for detail. The full spec is in git history — commit `0e4e196`, and this
+doc before `b7303fb` — per the repo's "shipped plan docs collapse; history lives in git"
+convention.
 
-**Relationship to publish:** none of this blocks the owner `devvit playtest` → `devvit publish` of
-the 3.6 build, and that can happen before, during, or after this arc. WP6 (wasm-as-file) and WP7
-(lazy boot) must be playtest-verified before they ride in a *published* version; everything else is
-verifiable locally.
+The goal was: close the create loop from inside a post (a remix, with no copy-paste round-trip
+through the explorer), make the feed card sell itself instead of reading as a broken image at scroll
+speed, stop the card quietly lying when it cannot load its world, and cut what every post pays to
+render. All met.
 
-**Ground rules (inherited from 3.6, still binding):**
+**Ground rules (still binding for anything touching this app)**
 
-- `src/embed/` public API is **frozen — additive only**. WP4 and WP5 add to it; update
-  `docs/EMBED-PLAN.md` § Public API in the same session the addition lands.
+- `src/embed/` public API is **frozen — additive changes only**. Update `docs/EMBED-PLAN.md`
+  § Public API in the same commit as any addition.
 - Do not fork `src/embed/`; the Devvit client keeps importing it directly.
-- `devvit/` runs Node 22.6. `fnm use` fails silently → prepend the install dir:
+- `devvit/` runs Node 22.6; root stays Node 20. Use PowerShell, not the Bash tool.
+- `fnm use` fails here (no shell-profile hook) and silently leaves you on Node 20, where
+  `--experimental-strip-types` dies. Prepend the install dir instead:
   `$env:PATH = "$env:APPDATA\fnm\node-versions\v22.6.0\installation;C:\Program Files\Git\bin;" + $env:PATH`
-- Use PowerShell, not the Bash tool. Root stays Node 20.
 - Local verification = the `devvit-webview` launch config (vite on 5190) + DOM/attribute/`tick()`
-  assertions; that pane reports `visibilityState: 'hidden'`, so never assert on live playback.
-- Root `npm run test:run` + full `npm run lint` after the last edit; `devvit/` `npm test`.
-
-**Recommended order:** WP1 → WP2 → WP3 → WP4 → WP5 → WP6 → WP7. WP1–3 are small and de-risk the
-rest; WP4 is the headline; WP6/WP7 are behind-the-scenes and playtest-gated. If context runs short,
-split after WP4 — WP5–7 are independent of each other.
-
-### WP1 — Maintainability batch (small, do first)
-
-1. **Shared form fields.** The two-field array (`code` paragraph + `title` string) is hand-built in
-   both `devvit/src/client/hexlife.ts` (`createOwn`) and `devvit/src/server/server.ts`
-   (`newPostForm`). Move a `NEW_POST_FIELDS` builder into `devvit/src/shared/api.ts` (takes optional
-   `defaultValue`s, returns the array) and consume it from both. Labels already come from
-   `NEW_POST_COPY`; this closes the structural half of the drift.
-2. **`.d.ts` for `<hexlife-world>`.** The `HexWorld` type in `hexlife.ts` hand-mirrors the element's
-   JS API with nothing checking it. Add `src/embed/hexlife-world.d.ts` declaring the element class
-   (attributes as documented in EMBED-PLAN § Public API; methods `play/pause/reset/tick/
-   setBrushSize` + WP4's `worldCode`; readonly `tickCount/checksum/playing/userPaused/brushSize/
-   sim/error`; the three events). Import it from `hexlife.ts` and delete the local mirror. Keep it
-   in `src/embed/` so embed API changes and their type live in one commit.
-3. **`requireEl` helper.** Every `getElementById` wire-up silently no-ops on a missing ID (an HTML
-   typo fails invisibly). Add a tiny `el<T>(id): T | null` that `console.warn`s on miss, and use it
-   in `hexlife.ts`.
-4. **Route robustness.** `route()` matches `reqMsg.url?.slice(1)` verbatim — a query string turns
-   into a 404. Strip `?…` before matching.
-
-**Acceptance:** `devvit npm test` green; no behavior change in the local webview; the `.d.ts` is
-consumed (no `HexWorld` type remains in `hexlife.ts`).
-
-### WP2 — Honest fetch failure (feed trust)
-
-Today `fetchWorldCode()` returns `undefined` for both "no code stored" (install demo — correct to
-fall back) and "the call failed" (wrong: the viewer silently gets the DEMO world under someone
-else's post title).
-
-- `devvit/src/client/fetch.ts`: return a discriminated result — `{ok: true, code?: string}` on any
-  2xx, `{ok: false}` on network error / non-OK.
-- `devvit/src/client/hexlife.ts`: on `{ok: false}` **with no postData code**, do not mount the demo.
-  Show `setStatus(status, 'Couldn't load this specimen.', 'error')` plus a retry affordance
-  (simplest: a `Retry` button in `#chrome` shown only in this state, which re-runs the fetch+mount
-  path). The demo fallback remains only for `{ok: true, code: undefined}` (install demo) and the
-  local harness (where the fetch 404s are expected — keep the harness working: `context` is
-  undefined there, so gate the hard-error path on... nothing platform-specific; the local harness
-  hits `{ok:false}` and will now show the error + retry instead of the demo. That is acceptable —
-  drive local verification with an explicit `code` or postData fixture instead, or keep a
-  `?demo=1` query opt-in for the harness if the demo is still wanted locally).
-
-**Acceptance:** local webview with the API stubbed to 500 shows error status + retry, not the demo;
-stubbed to `{code: undefined}` shows the demo; retry after restoring the stub mounts the world.
-Unit-test `fetch.ts`'s discrimination if practical (it's fetch-global; a thin injectable is fine).
-
-### WP3 — Feed & lab polish batch (copy, labels, hints)
-
-All in `devvit/public/*.html` + `chrome.css` + `NEW_POST_COPY`:
-
-1. **Subtitle legibility** (`#specimen-sub`, splash): it is the one line explaining the post to a
-   first-timer and currently the least legible text on the card (11px muted). Bump to ≥13px and
-   raise contrast (e.g. `var(--text)` at 0.85 opacity). Keep it one line.
-2. **"Full screen" → "Expand"** (`#expand-btn`, splash): the expanded view adds capabilities (draw,
-   speed, create), it isn't just bigger. "Expand" matches Reddit convention. Keep the
-   `requestExpandedMode` wiring unchanged.
-3. **Feed create affordance:** add a quiet `Create your own` button to `splash.html`'s `.actions`
-   (text-weight styling, not the primary pill — the feed stays lean). `wireCreateOwn` already runs
-   unconditionally in `mountHexLife`, so adding the `#create-own` button to splash wires it for
-   free; `showForm` works from any webview client. Verify the form → `api/post` path from the feed
-   card in playtest.
-4. **Zoom discoverability:** extend `#draw-hint` (lab) to
-   `✏ drag to paint · pinch or ctrl+scroll to zoom` — one line, same element.
-5. **Invalid-code copy:** `NEW_POST_COPY.invalid` should name the two real failure modes: truncated
-   paste and extra text around the code (the server's `PURE_WORLD_CODE_RE` can distinguish "no
-   HXW1 prefix at all" from "decode failed" if a sharper message is cheap — optional).
-
-**Acceptance:** DOM assertions in the local webview (labels, hint text, feed `#create-own`
-present + handler attached); chrome.css still the only stylesheet; no `.lab-only`/`.feed-only`
-regressions (feed hides speed/hex/explorer links exactly as before).
-
-### WP4 — "Post my remix" (the headline: create without leaving Reddit)
-
-The lab already lets a viewer draw on the world, but their edit is ephemeral — the only postable
-thing is a code pasted from the explorer. Close the loop: snapshot the *current* sim state as a
-world code and post it, no explorer round-trip, no paste.
-
-**Embed side (additive API — update EMBED-PLAN § Public API):**
-
-1. `EmbedSim.snapshotCells()` — returns `new Uint8Array(this.state)` (null if freed). One line plus
-   the view-detachment caveat does not apply (no allocation in wasm).
-2. `EmbedRenderer`: retain the baked LUT bytes from `_buildLUT` on the instance (`this.lutBytes`)
-   and expose `getLut()`. This is the palette fallback for attribute-driven worlds.
-3. `HexLifeElement.worldCode()` — async; returns the current world as an `HXW1.` code, or `null`
-   when there is nothing to encode (error state / not booted). Assembly:
-   - `rows/cols/rulesetHex/speed` from `this.sim`; `cells` from `snapshotCells()`;
-     `brushSize` from `this._brushSize`.
-   - Palette precedence: `this._world?.colorSettings` → `this._world?.lut` →
-     `this.renderer.getLut()`. (Matches the decode precedence; the renderer fallback covers
-     attribute-driven demo worlds.)
-   - **Never** encode a `generator` — a remix is the exact dish on screen, not a recipe.
-   - Uses `encodeWorldCode` from `../core/WorldCodec.js` (already in the embed's import graph via
-     `decodeWorldCode`).
-
-**Devvit side:**
-
-4. `game.html`: add `#post-remix` as the **primary** button in `.actions`; "Create your own"
-   (paste path) stays for explorer users, demoted to secondary styling.
-5. `hexlife.ts`: on click → `world.pause()` (what you see is what posts) → `await
-   world.worldCode()` → `showForm` with a **title-only** field (the code is machine data; don't
-   show the blob). Form copy (add to `NEW_POST_COPY`): title `Post my remix`, description
-   `Posts this world exactly as it looks right now — including anything you've drawn.`, accept
-   `Post it`. Then POST to the existing `api/post` with `{code, title}` — the server route,
-   validation, `runAs: 'USER'`, and Redis write all reuse unchanged. Extract the shared
-   submit-and-navigate tail of `createOwn` into a helper both buttons call.
-6. `readme.md`: document the remix path as the easiest create path.
-
-**Acceptance (local webview, lab mode):**
-
-- `el.tick(5)` → `const c = await el.worldCode()` → `decodeWorldCode(c)` round-trips: same
-  rows/cols/rulesetHex, cells equal to `el.sim.state`, brushSize preserved, no `generator`.
-- Same round-trip after simulating a draw (call `el.sim.invertBrushLine(…)` directly, then
-  `worldCode()` — the flipped cells are in the code).
-- Attribute-driven demo world (no `code` attr) still produces a valid code via the renderer-LUT
-  fallback.
-- `#post-remix` present, 44px target, handler attached, no throw locally (showForm no-ops
-  off-Reddit). Server tests: one new case posting a code through `api/post` built by
-  `encodeWorldCode` from snapshot-shaped inputs (existing test helper already does this).
-- EMBED-PLAN § Public API updated (method + "additive, 3.7" note).
-
-### WP5 — Feed poster liveliness
-
-A CA's appeal is motion; the poster is a static dark grid indistinguishable from a broken image at
-scroll speed. Two layers, cheapest first:
-
-1. **Pulsing play affordance (embed CSS only):** in `HexLifeElement`'s `STYLES`, animate the
-   `.overlay svg` with a slow scale/opacity pulse (~2.5s ease-in-out infinite), wrapped in
-   `@media (prefers-reduced-motion: no-preference)`. Zero sim cost, ships everywhere the poster
-   shows.
-2. **"Breathing" poster (additive `preview` attribute):** when `preview` is set (value = burst tick
-   count, clamp 1–60, unparseable → 12) and the poster is showing (userPaused, no `draw`, not
-   playRequested), then on each offscreen→onscreen transition (`_onScreen` false→true) while
-   `_docVisible` and not `_reducedMotion`: run the burst at ~4 ticks/sec (a small
-   `setTimeout`/rAF stepper calling `sim.tick()` + `_drawOnce()`), then `sim.reset(…)` back to
-   tick 0 so the authored poster state returns (exact-cells worlds replay `initialCells`;
-   generator worlds re-roll, which is their contract). Cancel the burst immediately on `play()`,
-   draw-stroke start, disconnect, or attribute removal. The burst must **not** flip `playing` or
-   emit `hexlife-playstate` — it is poster decoration, not playback.
-3. Devvit: `splash.html`'s mount sets `preview="12"` (feed only; the lab needs no poster
-   theatrics).
-
-**Acceptance:** local webview — with `preview` set, forcing the intersection path (call the
-element's internals or scroll the harness) advances `tickCount` and returns it to 0 afterwards;
-`hexlife-playstate` fires nothing during the burst; with `prefers-reduced-motion: reduce`
-emulated, no burst. EMBED-PLAN § Public API gains the attribute. Real-feed feel check rides the
-next playtest.
-
-### WP6 — Bundle diet (code-split, sourcemaps, wasm experiment)
-
-Today `splash.js` and `game.js` are each ~440 KB, ~95% identical (full embed runtime + base64
-wasm), and expanding a post re-downloads everything the feed just loaded. Sourcemaps (~880 KB
-each) also sit in `public/` and ship with every upload.
-
-1. **Code-split:** in `devvit/scripts/build-client.mjs` set `splitting: true` (already ESM). The
-   shared chunk lands in `public/` beside the entries; `npm run clean`'s `public/*.js*` glob still
-   catches it. Confirm both pages load in the local webview (chunks import relatively).
-2. **Sourcemaps out of publish:** when `--minify` is passed (the publish build), set
-   `sourcemap: false`; keep `linked` for watch/dev builds.
-3. **Wasm-as-file experiment (playtest-gated):** the base64 inline costs ~33% size and forfeits
-   streaming compilation. Try: build plugin emits the `?url` import as a real file copied to
-   `public/hexlife_wasm_bg.wasm` (esbuild `loader: 'file'` with the right `publicPath`, or a
-   manual copy step) — `loadWasmBytes` already handles non-data URLs via `fetch`. **Keep the
-   inline path switchable** (env flag in build-client.mjs, e.g. `INLINE_WASM=1`) because only a
-   playtest can prove the webview's CSP allows the same-origin fetch; if it doesn't, flip the flag
-   back and lose nothing.
-
-**Acceptance:** both entries boot in the local webview post-split; combined `public/*.js` size
-drops materially (record before/after in PATCHNOTES); `npm test` (which runs the build) green.
-Wasm-as-file: local webview boots with the fetched file; **do not publish it enabled until a
-playtest confirms** — note it in "Still needs the owner".
-
-### WP7 — Lazy boot on intersection (host-side; playtest-gated)
-
-3.6 deferred this as an embed behavior change; it doesn't have to be one. **Host-side version, no
-frozen-API impact:** `splash.ts` wraps `mountHexLife` in an IntersectionObserver on `#world`
-(threshold 0, rootMargin ~'25%') and only mounts on first intersection. Until then, a CSS-only
-placeholder (chrome.css: dark panel + centered play glyph on `#world:empty::before`, feed mode
-only) keeps the card from looking blank. Every scrolled-past post then skips the 440 KB parse,
-wasm compile, and WebGL context entirely.
-
-- **Measure first in playtest:** log a timestamp at script start vs. IO-fire to learn whether
-  Devvit even boots offscreen webviews (if it doesn't, this WP is a cheap no-op safety net —
-  still worth keeping).
-- Local webview: the mount is in-viewport, so the IO fires immediately — acceptance is simply "no
-  regression" locally; the win is only observable in a real feed.
-
-**Acceptance:** local webview boots identically (IO fires at once); placeholder visible if the IO
-is artificially delayed; playtest confirms context/wasm are not created for offscreen posts (or
-documents that Devvit already defers webview loads).
+  assertions. That pane reports `visibilityState: 'hidden'`: never assert on live playback, and see
+  finding 1 above — it also suppresses IntersectionObserver entirely and throttles timers.
+- `devvit/` `npm test`; root `npm run test:run` + full `npm run lint` after the last edit.
 
 ### Deliberately still out of scope
 
 `shareImageUrl` (research task — needs answers on hosting, see 3.6 WP6-2), the dead
 `readFormValues` branch (needs playtest logs), speed presets, palette accent, Daily Hex on Reddit.
-
-### Session-end checklist for the implementing session
-
-PATCHNOTES entry (with bundle before/after from WP6); update the Phase 3.7 row in this doc's
-status table per-WP; update EMBED-PLAN § Public API for WP4 + WP5; update ROADMAP #26 line; note
-anything newly playtest-gated under "Still needs the owner" below.
 
 ---
 
