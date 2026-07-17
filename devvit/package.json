@@ -8,7 +8,7 @@
     "build": "npm run build:client -- --metafile=dist/client.meta.json --minify && npm run build:server -- --metafile=dist/server.meta.json --minify",
     "build:client": "node scripts/build-client.mjs",
     "build:server": "esbuild --bundle --log-level=warning --sourcemap=linked --target=es2023 --format=cjs --outdir=dist/server --platform=node src/server/index.ts",
-    "clean": "rm -rf dist/ public/*.js*",
+    "clean": "node scripts/clean.mjs",
     "format": "npm run lint -- --fix",
     "lint": "biome check --error-on-warnings",
     "playtest": "devvit playtest",

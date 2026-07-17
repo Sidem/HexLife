@@ -107,3 +107,14 @@ npm test
 npm run playtest   # or: npx devvit playtest hexlife
 npx devvit publish # submit a version for Reddit review (owner only)
 ```
+
+The webview bundles are code-split: `splash.js` and `game.js` are thin entries over one shared
+chunk holding the embed runtime, so expanding a post reuses what the feed card already fetched.
+Sourcemaps are emitted for dev/watch builds only — `--minify` (the publish build) drops them, since
+`public/` uploads whole.
+
+`INLINE_WASM=0 npm run build:client` emits the engine as a real `public/hexlife_wasm_bg.wasm`
+instead of a base64 `data:` URI, which is ~33% smaller and allows streaming compilation. **It is
+not the default and must not be published until a playtest confirms it**: whether the webview's CSP
+permits a same-origin `fetch` of the asset is not knowable from here. `loadWasmBytes` handles both
+forms, so the flag is the only thing that changes.
