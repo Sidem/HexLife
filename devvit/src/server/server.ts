@@ -26,6 +26,8 @@ import {
   NEW_POST_FORM,
   type NewPostFormValues,
   newPostFields,
+  type PostKitFields,
+  parsePostKit,
   type WorldPostData,
 } from '../shared/api.ts'
 import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
@@ -168,13 +170,24 @@ function buildPostData(world: DecodedWorld, code: string): WorldPostData {
     : meta
 }
 
-/** Blank title → name the post after its ruleset ("Cobalt Lattice — live HexLife specimen"). */
-function specimenTitle(raw: string | undefined, world: DecodedWorld): string {
+/**
+ * Post title priority: form field → kit `Title:` line → ruleset mnemonic.
+ * ("Cobalt Lattice — live HexLife specimen" is the last-resort default.)
+ */
+function specimenTitle(
+  formTitle: string | undefined,
+  world: DecodedWorld,
+  kitTitle?: string | null,
+): string {
   return (
-    (raw ?? '').trim() ||
+    (formTitle ?? '').trim() ||
+    (kitTitle ?? '').trim() ||
     `${rulesetName(world.rulesetHex)} — live HexLife specimen`
   )
 }
+
+/** Optional kit enrichment (description / tags) attached to a Live Specimen. */
+type SpecimenMeta = Pick<PostKitFields, 'description' | 'tags'>
 
 /**
  * Create a Live Specimen post and pin its code to the new post's ID.
@@ -183,12 +196,17 @@ function specimenTitle(raw: string | undefined, world: DecodedWorld): string {
  * instead of the app account. It requires `userGeneratedContent` (the SDK throws without it) and
  * `permissions.reddit.asUser: ["SUBMIT_POST"]` in devvit.json. App-authored callers (install demo,
  * onPostSubmit) pass `runAs: 'APP'` — there is no user to attribute those to.
+ *
+ * When `meta` has a description and/or tags (from an Explorer post kit), they ride into
+ * `textFallback` (old.reddit / crawlers) and a first comment so modern clients see them too.
+ * Custom posts have no free-form body field we control beyond title + webview.
  */
 async function createSpecimenPost(
   world: DecodedWorld,
   code: string,
   title: string,
   runAs: 'USER' | 'APP',
+  meta: SpecimenMeta = {description: null, tags: []},
 ): Promise<{id: import('@devvit/web/shared').T3; url: string}> {
   const post = await reddit.submitCustomPost({
     title,
@@ -197,9 +215,26 @@ async function createSpecimenPost(
     ...(runAs === 'USER'
       ? {runAs, userGeneratedContent: {text: code}}
       : {runAs}),
-    textFallback: {text: specimenTextFallback(world)},
+    textFallback: {text: specimenTextFallback(world, meta)},
   })
   await dbSetWorldCode(post.id, code)
+
+  const blurb = specimenEnrichmentComment(meta)
+  if (blurb) {
+    try {
+      await reddit.submitComment({
+        id: post.id,
+        text: blurb,
+        // APP: we only hold asUser SUBMIT_POST; a comment-as-user would need another scope.
+        runAs: 'APP',
+      })
+    } catch (commentErr) {
+      console.warn(
+        `createSpecimenPost: created ${post.id} but could not add kit meta comment:`,
+        commentErr,
+      )
+    }
+  }
   return {id: post.id, url: post.url}
 }
 
@@ -208,25 +243,49 @@ async function createSpecimenPost(
  * carries the world code (too long, not human-readable), so without a link it's a dead end that
  * names a ruleset the reader has no way to see. The Explorer deep-link is the escape hatch: same
  * ruleset, fresh start (a recipe, not the dish — the exact cells only exist in the post).
+ *
+ * Kit description/tags are appended when present so a paste from Explorer still documents itself.
  */
-function specimenTextFallback(world: DecodedWorld): string {
+function specimenTextFallback(
+  world: DecodedWorld,
+  meta: SpecimenMeta = {description: null, tags: []},
+): string {
   const url = explorerUrlForRuleset(world.rulesetHex, {rows: world.rows})
-  return [
+  const lines = [
     'HexLife Live Specimen — open this post on a modern Reddit client to play the simulation.',
     '',
     `Ruleset: ${rulesetName(world.rulesetHex)} (${world.rulesetHex})`,
     `Grid: ${world.rows}×${world.cols}`,
-    '',
-    `Run this ruleset in HexLife Explorer: ${url}`,
-  ].join('\n')
+  ]
+  if (meta.description?.trim()) {
+    lines.push('', meta.description.trim())
+  }
+  if (meta.tags.length > 0) {
+    lines.push('', `Tags: ${meta.tags.join(', ')}`)
+  }
+  lines.push('', `Run this ruleset in HexLife Explorer: ${url}`)
+  return lines.join('\n')
+}
+
+/** First-comment body for kit description/tags; null when there's nothing to say. */
+function specimenEnrichmentComment(
+  meta: SpecimenMeta = {description: null, tags: []},
+): string | null {
+  const parts: string[] = []
+  if (meta.description?.trim()) parts.push(meta.description.trim())
+  if (meta.tags.length > 0) {
+    parts.push(`**Tags:** ${meta.tags.join(' · ')}`)
+  }
+  return parts.length > 0 ? parts.join('\n\n') : null
 }
 
 /** The form came back: validate the code, create the post, and pin the code to the new post's ID. */
 async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   const values = await readFormValues(reqMsg)
   const raw = (values.code ?? '').trim()
+  const kit = parsePostKit(raw)
   // Explorer post kits wrap meta around the code — accept a pure line or extract HXW1. from a kit.
-  const code = extractWorldCodeFromPaste(raw) ?? raw
+  const code = kit.code ?? extractWorldCodeFromPaste(raw) ?? raw
 
   const world = await decodeWorldCode(code)
   if (!world) return newPostForm(values, invalidCodeMessage(raw))
@@ -234,8 +293,9 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
   const post = await createSpecimenPost(
     world,
     code,
-    specimenTitle(values.title, world),
+    specimenTitle(values.title, world, kit.title),
     'USER',
+    {description: kit.description, tags: kit.tags},
   )
 
   return {
@@ -257,7 +317,8 @@ async function routeCreatePost(
 ): Promise<CreatePostRsp | ErrorRsp> {
   const values = await readJson<NewPostFormValues>(reqMsg)
   const raw = (values?.code ?? '').trim()
-  const code = extractWorldCodeFromPaste(raw) ?? raw
+  const kit = parsePostKit(raw)
+  const code = kit.code ?? extractWorldCodeFromPaste(raw) ?? raw
 
   const world = await decodeWorldCode(code)
   if (!world) return {error: invalidCodeMessage(raw), status: 400}
@@ -265,9 +326,10 @@ async function routeCreatePost(
   const post = await createSpecimenPost(
     world,
     code,
-    specimenTitle(values?.title, world),
+    specimenTitle(values?.title, world, kit.title),
     // A viewer pressed a button: their post, their karma.
     'USER',
+    {description: kit.description, tags: kit.tags},
   )
   return {url: post.url}
 }

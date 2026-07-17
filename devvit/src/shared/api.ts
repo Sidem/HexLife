@@ -38,14 +38,14 @@ export type CreatePostRsp = {url: string}
 export const NEW_POST_COPY = {
   title: 'New HexLife post',
   description:
-    'In HexLife Explorer (sidem.github.io/HexLife), use Share → "Copy post kit & open r/hexlife" (or Copy World Code). Paste the world code below — if you paste a whole post kit, we take the HXW1. line automatically. Put the Title line into the title field.',
+    'In HexLife Explorer (sidem.github.io/HexLife), use Share → "Copy post kit & open r/hexlife" (or Copy World Code). Paste a world code or a full post kit below. From a kit we take the HXW1. line, and — if you leave Title blank — the kit’s Title, description, and Tags enrich the post.',
   acceptLabel: 'Create Live Specimen',
-  codeLabel: 'World code',
+  codeLabel: 'World code / post kit',
   codeHelp:
-    'Paste the HXW1.… line (or a full Explorer post kit — only the HXW1. line is used).',
+    'Paste HXW1.… or a full Explorer post kit (code + Title / description / Tags).',
   titleLabel: 'Post title',
   titleHelp:
-    'From the post kit’s Title: line, or leave blank to name the post after its ruleset.',
+    'Optional. Leave blank to use the kit’s Title: line (or the ruleset name if there is no kit title).',
   /**
    * The paste *looked* like a code (right prefix) but would not decode. Naming the two things
    * that actually cause this beats "that is not a valid world code", which told a user who just
@@ -95,6 +95,86 @@ export function extractWorldCodeFromPaste(text: string): string | null {
   if (pure) return pure[1] ?? null
   const embedded = WORLD_CODE_TOKEN_RE.exec(trimmed)
   return embedded ? embedded[0] : null
+}
+
+/**
+ * Meta scraped from an Explorer post kit paste (title / description / tags / code). Pure lines that
+ * are only a world code yield `code` and empty meta. Never throws.
+ */
+export type PostKitFields = {
+  code: string | null
+  /** From a `Title: …` line, if present. */
+  title: string | null
+  /** Free-text block under Title, before Tags/Explorer/IC. */
+  description: string | null
+  /** From a `Tags: a, b` line (split on comma / middle-dot / pipe). */
+  tags: string[]
+}
+
+/** Lines that end the description block in a kit. */
+const KIT_META_LINE_RE = /^(Tags|Explorer|IC|Tip)\s*:/i
+const KIT_SEPARATOR_RE = /^[─\-═]{2,}/
+
+/**
+ * Parse an Explorer post kit (or a bare world code) into structured fields.
+ * The form title field still wins when the user typed one; callers merge with
+ * `formTitle.trim() || kit.title`.
+ */
+export function parsePostKit(text: string): PostKitFields {
+  if (typeof text !== 'string' || !text.trim()) {
+    return {code: null, title: null, description: null, tags: []}
+  }
+  const code = extractWorldCodeFromPaste(text)
+  const titleM = /^Title:\s*(.+)\s*$/im.exec(text)
+  const title = titleM?.[1]?.trim() || null
+
+  const tagsM = /^Tags:\s*(.+)\s*$/im.exec(text)
+  const tags = tagsM?.[1]
+    ? tagsM[1]
+        .split(/[,·|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+    : []
+
+  return {
+    code,
+    title,
+    description: extractKitDescription(text),
+    tags,
+  }
+}
+
+/**
+ * Description = non-empty lines after `Title: …` until Tags/Explorer/IC/Tip, a box-drawing
+ * separator, or another HXW1. token. Pure code pastes have no Title line → null.
+ */
+function extractKitDescription(text: string): string | null {
+  const lines = text.replace(/\r\n/g, '\n').split('\n')
+  let i = 0
+  while (i < lines.length && !/^Title:\s*/i.test(lines[i] ?? '')) i++
+  if (i >= lines.length) return null
+  i += 1
+  while (i < lines.length && !(lines[i] ?? '').trim()) i++
+
+  const descLines: string[] = []
+  while (i < lines.length) {
+    const line = lines[i] ?? ''
+    const trimmed = line.trim()
+    if (
+      KIT_META_LINE_RE.test(line) ||
+      KIT_SEPARATOR_RE.test(trimmed) ||
+      WORLD_CODE_TOKEN_RE.test(trimmed)
+    ) {
+      break
+    }
+    descLines.push(line)
+    i += 1
+  }
+  while (descLines.length > 0 && !descLines[descLines.length - 1]?.trim()) {
+    descLines.pop()
+  }
+  const desc = descLines.join('\n').trim()
+  return desc || null
 }
 
 /**

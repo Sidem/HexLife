@@ -211,6 +211,57 @@ test('form submit extracts HXW1 from an Explorer post kit paste', async () => {
   assert.equal(body.navigateTo, 'https://reddit.com/r/hexlife/t3_new1')
 })
 
+test('blank form title + post kit → kit title, description/tags in fallback and a comment', async () => {
+  const code = await worldCode()
+  // Matches the Explorer kit shape: code first, then Title / description / Tags.
+  const kit = [
+    code,
+    '',
+    '── HexLife post kit (meta — not the code field) ──',
+    'Title: Spiral Weaver · Gliders',
+    '',
+    'A tidy little glider gun.',
+    '',
+    'Tags: Gliders, Spirals',
+    'Explorer: https://sidem.github.io/HexLife/?r=ABC',
+    'IC: IC · 12% fill',
+  ].join('\n')
+
+  // Empty title field — kit Title: must win over the ruleset-name default.
+  const body = await submitForm({code: kit, title: ''})
+
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0]?.title, 'Spiral Weaver · Gliders')
+  assert.equal(submitted[0]?.userGeneratedContent?.text, code)
+  assert.match(
+    submitted[0]?.textFallback?.text ?? '',
+    /A tidy little glider gun/,
+  )
+  assert.match(submitted[0]?.textFallback?.text ?? '', /Tags: Gliders, Spirals/)
+
+  // Enrichment comment so modern clients (custom-post cards hide textFallback) still see meta.
+  assert.equal(comments.length, 1)
+  assert.match(comments[0]?.text ?? '', /A tidy little glider gun/)
+  assert.match(comments[0]?.text ?? '', /Tags:.*Gliders/)
+  assert.equal(body.navigateTo, 'https://reddit.com/r/hexlife/t3_new1')
+})
+
+test('form title still overrides kit Title', async () => {
+  const code = await worldCode()
+  const kit = [
+    code,
+    '',
+    'Title: From Kit',
+    '',
+    'Desc from kit.',
+    '',
+    'Tags: Chaos',
+  ].join('\n')
+  await submitForm({code: kit, title: '  Manual Title  '})
+  assert.equal(submitted[0]?.title, 'Manual Title')
+  assert.match(submitted[0]?.textFallback?.text ?? '', /Desc from kit/)
+})
+
 test('form submit creates the post as the user, with styles and postData', async () => {
   const code = await worldCode()
   const body = await submitForm({code, title: 'My world'})

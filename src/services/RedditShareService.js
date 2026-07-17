@@ -122,8 +122,8 @@ export function buildPostKit({
     }
     lines.push(
         '',
-        'Tip: paste the first line (HXW1.…) into New HexLife post’s code field;',
-        'paste the Title: line into the title field (or leave title blank).',
+        'Tip: paste this whole kit (or just the HXW1. line) into New HexLife post.',
+        'Leave the title field blank to use Title / description / Tags from this kit.',
     );
     return lines.join('\n');
 }
@@ -239,7 +239,7 @@ export function redditHandoffToast({ size, title, popupBlocked = false }) {
         };
     }
     return {
-        message: `Post kit copied (${size}). On ${REDDIT_SUB_NAME}: ⋯ → New HexLife post → paste the first line (HXW1.…) into the code field. Title: “${shortTitle}”`,
+        message: `Post kit copied (${size}). On ${REDDIT_SUB_NAME}: ⋯ → New HexLife post → paste the kit (or HXW1. line). Leave title blank to use “${shortTitle}” + description/tags from the kit.`,
         type: 'success',
     };
 }
