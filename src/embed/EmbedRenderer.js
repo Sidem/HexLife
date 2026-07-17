@@ -236,14 +236,30 @@ export class EmbedRenderer {
     }
 
     /**
-     * Resolve whichever palette form the caller supplied into the 128×2 RGBA table the shader samples.
+     * Build the LUT and remember it. Every path that uploads a LUT goes through here (initial
+     * setup and every live `setPalette`), so `lutBytes` is always the table currently on screen.
+     *
+     * Retained because an attribute-driven world has no other record of its colors: the palette
+     * only exists as a preset name or a gradient pair until it is resolved into this table, and
+     * `worldCode()` has to write real colors into the code. See {@link getLut}.
+     * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
+     *   lut?: Uint8Array|null}} opts
+     * @returns {Uint8Array}
+     */
+    _buildLUT(opts) {
+        this.lutBytes = this._resolveLUT(opts);
+        return this.lutBytes;
+    }
+
+    /**
+     * The 128×2 RGBA table the shader samples, from whichever palette form the caller supplied.
      * Precedence: a decoded world's `colorSettings`, then a baked `lut`, then the element's
      * `palette-on/off` gradient attributes, then the `palette` preset name.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
      *   lut?: Uint8Array|null}} opts
      * @returns {Uint8Array}
      */
-    _buildLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
+    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
         if (colorSettings) return generateColorLUT(colorSettings, SYMMETRY_DATA);
         if (lut && lut.length === 128 * 2 * 4) return lut;
         if (customGradient) {
@@ -260,6 +276,15 @@ export class EmbedRenderer {
             { mode: 'preset', activePreset, flickerProofPresets: false, hueShift: 0 },
             SYMMETRY_DATA,
         );
+    }
+
+    /**
+     * The 128×2 RGBA LUT currently on screen (1024 bytes) — the colors as resolved, whatever form
+     * they were specified in. Treat as read-only; it is the renderer's own record.
+     * @returns {Uint8Array|null} Null only before the first LUT upload.
+     */
+    getLut() {
+        return this.lutBytes || null;
     }
 
     /**

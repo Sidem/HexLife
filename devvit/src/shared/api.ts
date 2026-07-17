@@ -54,6 +54,19 @@ export const NEW_POST_COPY = {
   /** No `HXW1.` prefix at all — a different mistake, and worth saying so. */
   notACode:
     'That doesn’t start with HXW1., so it isn’t a world code. In HexLife Explorer, open Share → "Copy World Code" and paste the whole line.',
+
+  /**
+   * "Post my remix" — the same act as the paste path, reached without ever leaving the post. The
+   * viewer isn't handling a code here (the element snapshots it), so this form asks for a title
+   * and nothing else. Say plainly that their drawing comes along: that is the whole point, and a
+   * surprise either way would be a bad one.
+   */
+  remixTitle: 'Post my remix',
+  remixDescription:
+    'Posts this world exactly as it looks right now — including anything you’ve drawn.',
+  remixAcceptLabel: 'Post it',
+  /** The element had no world to encode — a boot failure, so there is nothing on screen to post. */
+  remixNothingToPost: 'Nothing to post — this world hasn’t loaded.',
 } as const
 
 /** The prefix every world code carries (see src/core/WorldCodec.js). */
@@ -98,6 +111,26 @@ export function newPostFields(defaults: {code?: string; title?: string} = {}) {
       defaultValue: defaults.code,
       required: true,
     },
+    {
+      type: 'string',
+      name: 'title',
+      label: NEW_POST_COPY.titleLabel,
+      helpText: NEW_POST_COPY.titleHelp,
+      defaultValue: defaults.title,
+      required: false,
+    },
+  ] as const
+}
+
+/**
+ * The remix form's fields: a title, and that is all.
+ *
+ * There is deliberately no `code` field. The code is machine data the element produced by
+ * snapshotting itself — showing a viewer a 1.5 KB base64 blob to confirm would be asking them to
+ * proofread something they never wrote.
+ */
+export function remixPostFields(defaults: {title?: string} = {}) {
+  return [
     {
       type: 'string',
       name: 'title',

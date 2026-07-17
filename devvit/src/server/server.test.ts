@@ -289,6 +289,35 @@ test('api/post creates a specimen and returns its url', async () => {
   assert.equal(redisValues.get('world:t3_new1'), code)
 })
 
+test('api/post accepts a remix — a code built from a live snapshot', async () => {
+  // What HexLifeElement.worldCode() produces: the exact cells on screen, no generator, and the
+  // palette as a baked LUT (an attribute-driven world has no colorSettings to carry). The route
+  // must not care where the code came from — a remix is the same act as a paste.
+  const rows = 16
+  const cols = 18
+  let seed = 7
+  const code = await encodeWorldCode({
+    rows,
+    cols,
+    rulesetHex: 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6',
+    cells: Uint8Array.from({length: rows * cols}, () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return (seed >>> 16) & 1
+    }),
+    lut: new Uint8Array(128 * 2 * 4).fill(200),
+    speed: 20,
+    brushSize: 3,
+  })
+  assert.ok(code)
+
+  const {status, body} = await createPost({code, title: 'My remix'})
+  assert.equal(status, 200)
+  assert.equal(body.url, 'https://reddit.com/r/hexlife/t3_new1')
+  assert.equal(submitted[0]?.title, 'My remix')
+  assert.equal(submitted[0]?.runAs, 'USER')
+  assert.equal(redisValues.get('world:t3_new1'), code)
+})
+
 test('api/post rejects an invalid code without creating anything', async () => {
   const {status, body} = await createPost({code: 'HXW1.nope', title: 't'})
   assert.equal(status, 400)

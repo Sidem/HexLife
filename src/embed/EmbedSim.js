@@ -328,6 +328,21 @@ export class EmbedSim {
         return changed;
     }
 
+    /**
+     * A private copy of the current generation's cells.
+     *
+     * `state` is a *view* into wasm linear memory, so handing it to a caller hands them something
+     * that can detach under them (any `new World(...)` on the page may grow the memory — see the
+     * registry note above) and that keeps changing as the world ticks. A snapshot is neither: it is
+     * the cells as they are right now, safe to hold. This is what makes "post exactly what is on
+     * screen" possible.
+     *
+     * @returns {Uint8Array|null} Copy of the cells, or null once the sim has been freed.
+     */
+    snapshotCells() {
+        return this.state ? new Uint8Array(this.state) : null;
+    }
+
     /** Release the wasm World and unregister. Must be called on element disconnect, or it leaks. */
     free() {
         if (!this.world) return;

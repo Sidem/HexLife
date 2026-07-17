@@ -35,8 +35,24 @@ wheel traps the reader. Trackpad pinch is delivered as ctrl+wheel (Chromium/Fire
 pinch-to-zoom is unaffected. Applies live — no re-boot. Unrecognized values mean `free`, so a typo
 can never silently disable zoom.
 
-**JS:** `play()` / `pause()` / `reset(seed?)` / `tick(n)` / `setBrushSize(n)` · readonly `tickCount` /
-`checksum` / `playing` / `userPaused` / `brushSize` / `sim`.
+**JS:** `play()` / `pause()` / `reset(seed?)` / `tick(n)` / `setBrushSize(n)` / `worldCode()` ·
+readonly `tickCount` / `checksum` / `playing` / `userPaused` / `brushSize` / `sim`.
+
+`worldCode()` *(additive, 3.7)* — async; the world as it stands **right now**, encoded as an
+`HXW1.` code, or `null` when there is nothing to encode (error state, or not booted). The cells are
+whatever is on screen, painted ones included. It **never** encodes a `generator`, even when the
+world was booted from a code that had one: a generator is a recipe that re-rolls a different state
+on every reset, and this is meant to reproduce *this* world. Palette precedence mirrors the
+decoder's — `colorSettings`, then a baked `lut`, then the renderer's resolved LUT (which is what
+covers an attribute-driven world, whose colors exist only as a preset name until drawn).
+
+Built on two additive internals, both public on their objects: `EmbedSim.snapshotCells()` (a private
+copy — `sim.state` is a view into wasm memory that detaches on any `World` alloc and changes every
+tick) and `EmbedRenderer.getLut()` (the 128×2 RGBA table currently on screen; retained on every
+`_buildLUT`, so it tracks live `setPalette` calls too).
+
+**Types:** `src/embed/hexlife-world.d.ts` declares the element class (and augments
+`HTMLElementTagNameMap`). It is the compiler-checkable copy of this section — keep them in step.
 
 **Events** (all `bubbles` + `composed`):
 
@@ -85,6 +101,15 @@ same deep-link pattern Devvit Phase 3.5 should reuse outside the element.
 - `vite.embed.config.js` + `build:embed`; size budget ≤ 100 KB gz  
 - Pages at `embed/v1/`; `embed/v1/frame/?…` iframe wrapper  
 - Polished demo (script-tag + iframe snippets)
+
+### Planned additive API (Devvit Phase 3.7 — spec in `docs/DEVVIT-PLAN.md`)
+
+- ✅ `worldCode()` — landed 3.7 WP4; see Public API above.
+- `preview` attribute — capped tick burst on intersection while the poster shows, then reset to
+  tick 0. Never flips `playing`, never emits `hexlife-playstate`; reduced-motion suppresses it.
+- CSS-only pulse on the poster play overlay (reduced-motion gated).
+
+Move these into the Public API section above when they land.
 
 ### Phase 4 — CI determinism
 

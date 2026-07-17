@@ -11,6 +11,8 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 
 - **Live Specimen posts** — each post shows one world (ruleset + grid + starting cells + colors)
   as a playable simulation, not a GIF or video.
+- **Post your remix** — draw on any specimen, then hit **Post my remix**: your version is posted
+  exactly as it looks on screen. No copying, no pasting, no leaving Reddit.
 - **Create from the explorer** — design a world at [sidem.github.io/HexLife](https://sidem.github.io/HexLife/),
   export a **world code** (`HXW1.…`), then on a subreddit with this app installed use
   **⋯ → New HexLife post**, paste the code, and set a title.
@@ -38,6 +40,15 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 
 ## How to use (members)
 
+**The easy way — remix a post you're already looking at:**
+
+1. Expand any HexLife post.
+2. Play with it: drag on the world to paint, let it run, pause where it looks good.
+3. **Post my remix** → give it a title → done. What you see is exactly what gets posted, drawing
+   and all.
+
+**From the explorer** — for a world you build from scratch:
+
 1. Open [HexLife Explorer](https://sidem.github.io/HexLife/) and set up a world you like.
 2. **Share → Copy World Code** (or **Copy code & open r/hexlife**).
 3. Paste it into either create path:
@@ -46,7 +57,7 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 4. Optionally edit the title (leave it blank to name the post after its ruleset), then create.
 5. Open the post → tap play on the specimen.
 
-Either way the post is authored by your account. If a code doesn’t paste cleanly, the form comes
+Every path authors the post as your account. If a code doesn’t paste cleanly, the form comes
 back with what you typed still in it — world codes are long and easy to truncate.
 
 **Note:** Reddit’s normal “create text post” screen is *not* the Live Specimen form. There is no

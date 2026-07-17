@@ -33,6 +33,7 @@ import {
   type ErrorRsp,
   NEW_POST_COPY,
   newPostFields,
+  remixPostFields,
   type WorldPostData,
 } from '../shared/api.ts'
 import {fetchWorldCode} from './fetch.ts'
@@ -137,6 +138,9 @@ export async function mountHexLife(
         // would put a stranger's title on our world and tell the viewer nothing went wrong.
         setStatus(status, FETCH_FAILED_MSG, 'error')
         if (retryBtn) retryBtn.hidden = false
+        // No world means play/pause/restart/remix have nothing to act on. They are only wired in
+        // `mountWorld`, so leaving them on screen would offer buttons that silently do nothing.
+        document.body.dataset.boot = 'error'
         return
       }
     }
@@ -176,6 +180,9 @@ async function mountWorld(
   wireExplorerLink(meta)
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
+  wirePostRemix(world, status)
+  // Transport and remix only mean anything with a world behind them; this is what un-hides them.
+  document.body.dataset.boot = 'ok'
 
   const settle = (): void => {
     const speedInput = el<HTMLInputElement>('speed')
@@ -369,16 +376,66 @@ async function createOwn(
     fields: [...newPostFields()],
   })
   if (rsp.action !== 'SUBMITTED') return
+  await submitNewPost(
+    {code: rsp.values.code ?? '', title: rsp.values.title ?? ''},
+    btn,
+    status,
+  )
+}
 
+/**
+ * "Post my remix": snapshot the world as it looks *right now* and post that. No explorer, no
+ * copy, no paste — the loop the lab always implied but never closed, since a viewer's drawing was
+ * ephemeral and the only postable thing was a code from somewhere else.
+ */
+function wirePostRemix(world: HexLifeElement, status: HTMLElement): void {
+  // Not `el()`: splash.html has no remix button — the feed card never mounts a drawable world.
+  const btn = document.getElementById('post-remix') as HTMLButtonElement | null
+  if (!btn) return
+  btn.addEventListener('click', () => void postRemix(world, btn, status))
+}
+
+async function postRemix(
+  world: HexLifeElement,
+  btn: HTMLButtonElement,
+  status: HTMLElement,
+): Promise<void> {
+  // What you see is what posts: a world that keeps ticking between the tap and the confirm would
+  // post a generation the viewer never chose.
+  world.pause()
+
+  const code = await world.worldCode()
+  if (!code) {
+    setStatus(status, NEW_POST_COPY.remixNothingToPost, 'error')
+    return
+  }
+
+  const rsp = await showForm({
+    title: NEW_POST_COPY.remixTitle,
+    description: NEW_POST_COPY.remixDescription,
+    acceptLabel: NEW_POST_COPY.remixAcceptLabel,
+    fields: [...remixPostFields()],
+  })
+  if (rsp.action !== 'SUBMITTED') return
+  await submitNewPost({code, title: rsp.values.title ?? ''}, btn, status)
+}
+
+/**
+ * The tail both create paths share: hand a code to `api/post` and go to the new post. The two
+ * differ only in where the code came from (a paste vs. a snapshot), so everything after the form
+ * — validation, `runAs: 'USER'`, the Redis write — is one path on the server and one here.
+ */
+async function submitNewPost(
+  values: {code: string; title: string},
+  btn: HTMLButtonElement,
+  status: HTMLElement,
+): Promise<void> {
   const prev = btn.textContent
   btn.disabled = true
   btn.textContent = 'Creating…'
   try {
     const http = await fetch(Endpoint.CreatePost, {
-      body: JSON.stringify({
-        code: rsp.values.code ?? '',
-        title: rsp.values.title ?? '',
-      }),
+      body: JSON.stringify(values),
       headers: {'Content-Type': 'application/json'},
       method: 'POST',
     })

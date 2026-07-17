@@ -39,6 +39,11 @@ export interface HexLifeSim {
     /** Rolling hash of the current state — the determinism cross-check hook. */
     checksum(): number;
     /**
+     * A private copy of the current cells, safe to hold across allocating wasm calls (which detach
+     * the `state` view) and across ticks. Null once the sim is freed.
+     */
+    snapshotCells(): Uint8Array | null;
+    /**
      * Invert cells under a brush stroke. `strokeAffected` is the per-stroke "already painted" set
      * and is mutated. @returns Whether any cell changed.
      */
@@ -111,6 +116,14 @@ export declare class HexLifeElement extends HTMLElement {
     tick(n?: number): number;
     /** Set the brush / neighborhood radius used for draw strokes (clamped). */
     setBrushSize(size: number): void;
+    /**
+     * The world as it stands right now — exact cells, painted ones included — as an `HXW1.` code,
+     * or null when there is nothing to encode (error state, or not booted).
+     *
+     * Never encodes a generator: a remix is the dish, not the recipe, so decoding this reproduces
+     * exactly the world on screen rather than re-rolling a new one.
+     */
+    worldCode(): Promise<string | null>;
 
     /** Generations elapsed since the last reset. */
     readonly tickCount: number;

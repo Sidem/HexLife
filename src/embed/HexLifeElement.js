@@ -24,7 +24,7 @@
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
 import { clampInt, clampFloat, readSeed, readGradient, wheelZoomAllowed } from './attrs.js';
-import { decodeWorldCode } from '../core/WorldCodec.js';
+import { decodeWorldCode, encodeWorldCode } from '../core/WorldCodec.js';
 import { clampBrushSize, DEFAULT_BRUSH_SIZE } from '../core/hexBrush.js';
 
 /** Where the attribution link points. Deep-links the ruleset via ShareCodec's `r`/`g` params. */
@@ -437,6 +437,40 @@ export class HexLifeElement extends HTMLElement {
         for (let i = 0; i < Math.max(0, Math.floor(n)); i++) this.sim.tick();
         this._drawOnce();
         return this.sim.tickCount;
+    }
+
+    /**
+     * Encode the world as it stands *right now* into an `HXW1.` world code.
+     *
+     * This is the "post my remix" primitive: whatever is on screen — including cells the viewer
+     * painted and however many generations it has run — becomes something another runtime can
+     * reproduce exactly.
+     *
+     * **Never encodes a `generator`**, even when this world was booted from a code that had one.
+     * A generator is a recipe (random fill, clumps) that re-rolls a *different* state on every
+     * reset; a remix is the dish. Encoding the recipe here would hand someone a code that has
+     * never once produced the world they were looking at.
+     *
+     * @returns {Promise<string|null>} The code, or null when there is nothing to encode (the
+     *   element is in its error state, or has not booted yet).
+     */
+    async worldCode() {
+        if (!this.sim || this.error) return null;
+        const cells = this.sim.snapshotCells();
+        if (!cells) return null;
+        return encodeWorldCode({
+            rows: this.sim.rows,
+            cols: this.sim.cols,
+            rulesetHex: this.sim.rulesetHex,
+            cells,
+            // Palette precedence mirrors the decoder's: a decoded world's own settings win, then
+            // its baked LUT, then — for an attribute-driven world, which has no code to carry
+            // either — whatever the renderer actually resolved and drew.
+            colorSettings: this._world ? this._world.colorSettings : null,
+            lut: (this._world && this._world.lut) || (this.renderer && this.renderer.getLut()),
+            speed: this.sim.speed,
+            brushSize: this._brushSize,
+        });
     }
 
     /** @returns {number} Generations elapsed since the last reset. */
