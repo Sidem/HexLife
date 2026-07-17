@@ -166,6 +166,26 @@ body[data-chrome='lab'] #world hexlife-world {
   display: none;
 }
 
+/* The feed card defers mounting its world until it scrolls into view (see splash.ts), which would
+   otherwise leave a hole where the specimen goes. This stands in: same size, same dark panel, same
+   centered glyph as the element's own poster, so the real thing replacing it isn't a jolt.
+   CSS-only — a placeholder that cost JS to show would defeat the point of not running any.
+
+   Not in the error state: there the world is never coming, and a play glyph over "Couldn't load
+   this specimen." would promise something the card cannot do. */
+body[data-chrome='feed']:not([data-boot='error']) #world:empty::before {
+  content: '▶';
+  display: grid;
+  place-items: center;
+  width: min(100%, 100cqmin);
+  max-width: min(100vw, 100dvh);
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 32px;
+}
+
 /* --- chrome bar ----------------------------------------------------------- */
 
 #chrome {
