@@ -433,6 +433,16 @@ button.tag-chip.tag-filter.active {
     margin-top: 2px;
 }
 
+.library-card .description.is-empty {
+    font-style: italic;
+    color: #888;
+}
+
+.library-card .description .description-hint {
+    color: #6fd0ff;
+    font-style: normal;
+}
+
 .library-card-tags {
     display: flex;
     flex-wrap: wrap;

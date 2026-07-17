@@ -36,6 +36,17 @@ import { CommandPalette } from './components/CommandPalette.js';
 import { ICONS } from './icons.js';
 import * as PersistenceService from '../services/PersistenceService.js';
 import { QUICK_ACTION_MAP, DEFAULT_FAB_SETTINGS, getEnabledQuickActionIds } from './mobileQuickActions.js';
+import {
+    REDDIT_SUB_URL,
+    buildPostTitle,
+    buildPostKit,
+    formatCodeSize,
+    redditHandoffToast,
+    postKitFromLibraryEntry,
+    encodeWorldCodeFromLibraryEntry,
+} from '../services/RedditShareService.js';
+import { rulesetName } from '../utils/utils.js';
+import { explorerUrlForRuleset } from '../core/WorldCodec.js';
 
 
 
@@ -561,6 +572,7 @@ export class UIManager {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Could not generate a share link for the current setup.', type: 'error' });
             return;
         }
+        this._prefillRedditTitleFromSelection();
         if (this.isMobile() && navigator.share) {
             navigator.share({
                 title: 'HexLife Explorer Setup',
@@ -587,6 +599,64 @@ export class UIManager {
                 });
             }
         }
+    }
+
+    /**
+     * Prefill the Share popout title from a personal-library match or the ruleset mnemonic when empty.
+     * @private
+     */
+    _prefillRedditTitleFromSelection() {
+        const titleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('redditPostTitle'));
+        if (!titleInput || titleInput.value.trim()) return;
+
+        const idx = this.appContext.worldManager.getSelectedWorldIndex?.()
+            ?? this.appContext.worldManager.selectedWorldIndex;
+        const hex = this.appContext.worldManager._getRulesetHexForWorld?.(idx)
+            || this.appContext.worldManager.getWorldSettingsForUI?.()?.[idx]?.rulesetHex
+            || null;
+        if (!hex) return;
+
+        const match = this.appContext.libraryController?.getUserLibrary?.()
+            ?.find((r) => r.hex?.toUpperCase?.() === hex.toUpperCase());
+        titleInput.value = match
+            ? buildPostTitle({ name: match.name, tags: match.tags })
+            : buildPostTitle({ name: rulesetName(hex) });
+    }
+
+    /**
+     * Metadata for the currently selected world when building a Reddit post kit.
+     * @returns {{ name: string, description: string, tags: string[], explorerUrl: string, icLabel: string }}
+     * @private
+     */
+    _redditMetaForSelectedWorld() {
+        const idx = this.appContext.worldManager.getSelectedWorldIndex?.()
+            ?? this.appContext.worldManager.selectedWorldIndex;
+        const hex = this.appContext.worldManager._getRulesetHexForWorld?.(idx)
+            || this.appContext.worldManager.getWorldSettingsForUI?.()?.[idx]?.rulesetHex
+            || '';
+        const match = hex
+            ? this.appContext.libraryController?.getUserLibrary?.()
+                ?.find((r) => r.hex?.toUpperCase?.() === hex.toUpperCase())
+            : null;
+        const settings = this.appContext.worldManager.worldSettings?.[idx];
+        const initialState = settings?.initialState;
+        let icLabel = '';
+        if (initialState?.mode === 'clusters') icLabel = 'IC · clumps';
+        else if (initialState?.mode === 'density') {
+            const d = initialState?.params?.density;
+            icLabel = Number.isFinite(d) ? `IC · ${Math.round(d * 100)}% fill` : 'IC · random fill';
+        } else if (initialState?.mode) {
+            icLabel = `IC · ${initialState.mode}`;
+        }
+        const tags = Array.isArray(match?.tags) ? match.tags : [];
+        const name = match?.name || (hex ? rulesetName(hex) : 'HexLife');
+        return {
+            name,
+            description: match?.description || '',
+            tags,
+            explorerUrl: hex ? explorerUrlForRuleset(hex, { rows: Config.GRID_ROWS }) : '',
+            icLabel,
+        };
     }
 
     /**
@@ -619,8 +689,8 @@ export class UIManager {
     }
 
     /**
-     * Copy the world code and open r/hexlife so the user can create a **Live Specimen** via the
-     * installed HexLife app's menu form (⋯ → New HexLife post).
+     * Copy a Reddit **post kit** (title, description, tags, world code) and open r/hexlife so the
+     * user can create a **Live Specimen** via ⋯ → New HexLife post.
      *
      * Why not a one-click custom post from github.io?
      * - Devvit custom posts can only be created by the app (`submitCustomPost`), from a menu/form/
@@ -635,31 +705,92 @@ export class UIManager {
         const code = await this._exportWorldCodeToSharePanel();
         if (!code) return;
 
+        this._prefillRedditTitleFromSelection();
         const titleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('redditPostTitle'));
-        const title = (titleInput?.value || '').trim() || 'HexLife';
-        const size = `${(code.length / 1024).toFixed(1)} KB`;
+        const meta = this._redditMetaForSelectedWorld();
+        const title = (titleInput?.value || '').trim() || buildPostTitle({ name: meta.name, tags: meta.tags });
+        if (titleInput && !titleInput.value.trim()) titleInput.value = title;
+
+        const kit = buildPostKit({
+            title,
+            description: meta.description,
+            tags: meta.tags,
+            explorerUrl: meta.explorerUrl,
+            icLabel: meta.icLabel,
+            worldCode: code,
+        });
+        const size = formatCodeSize(code);
 
         try {
-            await navigator.clipboard.writeText(code);
+            await navigator.clipboard.writeText(kit);
         } catch (err) {
             console.warn('Clipboard write blocked; the code is in the Share popout:', err);
         }
 
         // Open the subreddit (not /submit) — the Live Specimen form is the app menu item, not
         // Reddit's built-in composer.
-        const url = 'https://www.reddit.com/r/hexlife/';
-        const opened = window.open(url, '_blank', 'noopener,noreferrer');
-        if (!opened) {
+        const opened = window.open(REDDIT_SUB_URL, '_blank', 'noopener,noreferrer');
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, redditHandoffToast({
+            size,
+            title,
+            popupBlocked: !opened,
+        }));
+    }
+
+    /**
+     * Share a personal-library entry to r/hexlife: encode specimen from ruleset + IC, copy post kit.
+     * @param {object} entry User library ruleset entry
+     */
+    async shareLibraryEntryToReddit(entry) {
+        if (!entry?.hex) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Nothing to share.', type: 'error' });
+            return;
+        }
+        const colorSettings = this.appContext.colorController?.getSettings?.();
+        if (!colorSettings) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Color settings not ready.', type: 'error' });
+            return;
+        }
+
+        const encoded = await encodeWorldCodeFromLibraryEntry(entry, {
+            rows: Config.GRID_ROWS,
+            cols: Config.GRID_COLS,
+            colorSettings,
+            speed: this.appContext.worldManager.simulationController?.getSpeed?.() ?? Config.DEFAULT_SPEED,
+            brushSize: this.appContext.worldManager.brushController?.getBrushSize?.()
+                ?? Config.DEFAULT_NEIGHBORHOOD_SIZE,
+        });
+        if (!encoded?.code) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                message: `World code ready (${size}) — open r/hexlife, then ⋯ → New HexLife post and paste it. Title suggestion: “${title.slice(0, 80)}”`,
+                message: 'Could not build a world code for this ruleset.',
                 type: 'error',
             });
             return;
         }
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-            message: `Code copied (${size}). On r/hexlife: ⋯ → New HexLife post → paste code. Title: “${title.slice(0, 60)}”`,
-            type: 'success',
-        });
+
+        const { title, kit } = postKitFromLibraryEntry(entry, encoded.code, { rows: Config.GRID_ROWS });
+        const size = formatCodeSize(encoded.code);
+
+        const output = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('worldCodeOutput'));
+        if (output) {
+            output.value = encoded.code;
+            document.getElementById('worldCodeGroup')?.classList.remove('hidden');
+        }
+        const titleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('redditPostTitle'));
+        if (titleInput) titleInput.value = title;
+
+        try {
+            await navigator.clipboard.writeText(kit);
+        } catch (err) {
+            console.warn('Clipboard write blocked; world code is in the Share panel if open:', err);
+        }
+
+        const opened = window.open(REDDIT_SUB_URL, '_blank', 'noopener,noreferrer');
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, redditHandoffToast({
+            size,
+            title,
+            popupBlocked: !opened,
+        }));
     }
 
     /**

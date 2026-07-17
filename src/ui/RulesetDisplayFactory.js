@@ -83,7 +83,17 @@ export class RulesetDisplayFactory {
 
         const actions = [`<button class="button" data-action="${isPersonal ? 'load-personal' : 'load-rule'}">Load</button>`];
         if (hasIC) actions.push(`<button class="button button-subtle" data-action="load-with-ic" title="Load this ruleset with its paired initial state">Load + IC</button>`);
-        if (isPersonal) actions.push(`<button class="button-icon" data-action="manage-personal" title="More options">${'⋯'}</button>`);
+        if (isPersonal) {
+            actions.push(`<button class="button button-subtle" data-action="share-reddit" title="Copy a post kit (name, description, tags, world code) and open r/hexlife">Share on Reddit</button>`);
+            actions.push(`<button class="button-icon" data-action="manage-personal" title="More options">${'⋯'}</button>`);
+        }
+
+        const descText = (ruleData.description || '').trim();
+        const descHtml = descText
+            ? this._escape(descText)
+            : (isPersonal
+                ? 'No description — <span class="description-hint">Edit</span> to add one'
+                : 'No description.');
 
         item.innerHTML = `
             <div class="library-card-thumb">${hero}${icBadge}</div>
@@ -91,7 +101,7 @@ export class RulesetDisplayFactory {
                 <div class="library-card-title">
                     <span class="name">${this._escape(ruleData.name || '')}</span>
                 </div>
-                <div class="description">${this._escape(ruleData.description || 'No description.')}</div>
+                <div class="description${descText ? '' : ' is-empty'}">${descHtml}</div>
                 ${tagChips}
             </div>
             <div class="library-card-actions">${actions.join('')}</div>

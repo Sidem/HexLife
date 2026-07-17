@@ -8,7 +8,7 @@
 
 Design rulesets, draw life into the grid, and watch complex behavior emerge across nine worlds at once.
 
-[**▶ Try the Live Demo**](https://sidem.github.io/HexLife/)
+[**▶ Try the Live Demo**](https://sidem.github.io/HexLife/) · [**r/hexlife**](https://www.reddit.com/r/hexlife/) · [GitHub](https://github.com/Sidem/HexLife)
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Rust](https://img.shields.io/badge/Rust-WebAssembly-orange?logo=rust&logoColor=white)
@@ -136,6 +136,18 @@ Per-IC scores are combined with a soft-max (favoring each world's best IC) plus 
 </details>
 
 ## 🤝 Sharing & Contributing Rulesets
+
+### Community — [r/hexlife](https://www.reddit.com/r/hexlife/)
+
+Share **Live Specimens** (playable hexagonal worlds in the Reddit feed) on [r/hexlife](https://www.reddit.com/r/hexlife/):
+
+1. In **HexLife Explorer**, open **Share** (or a personal library entry → **Share on Reddit**).
+2. Use **Copy post kit & open r/hexlife** — the kit includes title, description, tags, and a world code.
+3. On the subreddit: community menu **⋯ → New HexLife post** → paste **only** the `HXW1.…` line into the form (and the suggested title into the title field).
+
+A Live Specimen is a Devvit custom post; Reddit has no public URL that opens that form from outside the site, so this two-step handoff is intentional. The full lab is always [sidem.github.io/HexLife](https://sidem.github.io/HexLife/).
+
+### Portable packs
 
 Your discoveries don't have to stay on one device. Both the **Ruleset Library** and the **Auto-Explore gallery** can export a portable **pack file** (`hexlife-pack`, versioned JSON) and import one back:
 

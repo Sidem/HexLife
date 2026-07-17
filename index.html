@@ -207,6 +207,17 @@
                         GitHub
                     </a>
                 </li>
+                <li>
+                    <a href="https://www.reddit.com/r/hexlife/" target="_blank" rel="noopener">
+                        <span class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M6.167 8a.831.831 0 0 0-.83.83c0 .459.372.84.83.831a.831.831 0 0 0 0-1.661m1.843 3.647c.315 0 1.403-.038 1.976-.611a.232.232 0 0 0 0-.306.213.213 0 0 0-.306 0c-.353.363-1.126.487-1.67.487-.545 0-1.308-.124-1.671-.487a.213.213 0 0 0-.306 0 .232.232 0 0 0 0 .306c.564.563 1.652.61 1.977.61zm.992-2.807c0 .45.377.84.84.84s.84-.39.84-.84a.847.847 0 0 0-.84-.84c-.463 0-.84.39-.84.84"/>
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.828-1.165c-.315 0-.602.124-.812.325-.801-.522-1.879-.87-3.073-.913l.522-2.45 1.604.34a.83.83 0 1 0 .083-.381l-1.792-.378a.22.22 0 0 0-.251.157l-.586 2.745c-1.23.037-2.34.39-3.16.922a1.156 1.156 0 0 0-.798-.327A1.168 1.168 0 0 0 2.83 7.99c0 .497.308.927.75 1.111-.03.164-.05.331-.05.5 0 1.606 1.875 2.911 4.185 2.911s4.185-1.305 4.185-2.911c0-.16-.017-.317-.048-.464.428-.188.727-.611.727-1.1 0-.647-.525-1.165-1.172-1.165"/>
+                            </svg>
+                        </span>
+                        Community · r/hexlife
+                    </a>
+                </li>
             </ul>
         </div>
 
@@ -310,14 +321,19 @@
             </div>
             <h4>Post to r/hexlife</h4>
             <div class="form-group">
-                <label for="redditPostTitle">Copies the world code and opens r/hexlife. On Reddit: subreddit menu (⋯) → <strong>New HexLife post</strong> → paste the code and title. (A Live Specimen is a Devvit custom post — Reddit has no URL that opens that form from outside the site.)</label>
+                <p class="info-text" id="redditPostHelp">
+                    Copies a <strong>post kit</strong> (title, description, tags, world code) and opens
+                    <a href="https://www.reddit.com/r/hexlife/" target="_blank" rel="noopener">r/hexlife</a>.
+                    There: community <strong>⋯ → New HexLife post</strong> → paste <em>only</em> the
+                    <code>HXW1.</code> line into the form, and the Title line into the title field.
+                </p>
             </div>
             <div class="form-group">
                 <label for="redditPostTitle">Suggested title</label>
                 <input type="text" id="redditPostTitle" class="hex-input" maxlength="300" placeholder="HexLife">
             </div>
             <div class="form-group-buttons">
-                <button id="postToRedditButton" class="button" title="Copy world code and open r/hexlife">Copy code &amp; open r/hexlife</button>
+                <button id="postToRedditButton" class="button" title="Copy post kit and open r/hexlife">Copy post kit &amp; open r/hexlife</button>
             </div>
         </div>
 

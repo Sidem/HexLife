@@ -33,6 +33,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="learning" title="Learning Hub" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.graduationCap} Learning Hub</button>
         <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
+        <a href="https://www.reddit.com/r/hexlife/" target="_blank" rel="noopener" class="button">Community · r/hexlife</a>
     </div>
 `;
         this.mountPoint.appendChild(this.element);

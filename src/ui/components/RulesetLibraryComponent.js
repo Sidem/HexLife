@@ -371,6 +371,23 @@ export class RulesetLibraryComponent extends BaseComponent {
                 return;
             }
 
+            if (target.closest('[data-action="share-reddit"]')) {
+                const id = card?.dataset.id;
+                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id)
+                    || this._findCardEntry(card);
+                if (!rule) return;
+                const ui = this.appContext.uiManager;
+                if (ui?.shareLibraryEntryToReddit) {
+                    ui.shareLibraryEntryToReddit(rule);
+                } else {
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                        message: 'Share is not available yet.',
+                        type: 'error',
+                    });
+                }
+                return;
+            }
+
             if (target.closest('[data-action="manage-personal"]')) {
                 const manageButton = target.closest('[data-action="manage-personal"]');
                 const id = card?.dataset.id;
@@ -379,11 +396,18 @@ export class RulesetLibraryComponent extends BaseComponent {
 
                 const popoverActions = [
                     {
-                        label: 'Rename',
+                        label: 'Share on Reddit',
+                        callback: () => {
+                            const ui = this.appContext.uiManager;
+                            if (ui?.shareLibraryEntryToReddit) ui.shareLibraryEntryToReddit(rule);
+                        },
+                    },
+                    {
+                        label: 'Edit',
                         callback: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule)
                     },
                     {
-                        label: 'Share',
+                        label: 'Copy share link',
                         callback: () => {
                             const url = new URL(window.location.href);
                             url.search = `?r=${rule.hex}`;
