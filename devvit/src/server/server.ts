@@ -23,6 +23,7 @@ import {
   NEW_POST_COPY,
   NEW_POST_FORM,
   type NewPostFormValues,
+  newPostFields,
   type WorldPostData,
 } from '../shared/api.ts'
 import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
@@ -69,7 +70,9 @@ async function route(
   reqMsg: IncomingMessage,
   rspMsg: ServerResponse,
 ): Promise<void> {
-  const endpoint = reqMsg.url?.slice(1) as Endpoint
+  // Match on the path alone: a query string is not part of the route, and matching the raw URL
+  // verbatim turned `api/world?x=1` into a 404 for no reason a caller could see.
+  const endpoint = reqMsg.url?.slice(1).split('?')[0] as Endpoint
   const method = EndpointMethod[endpoint]
 
   let rsp: AnyRsp
@@ -141,24 +144,7 @@ function newPostForm(
           ? `⚠ ${error}\n\n${NEW_POST_COPY.description}`
           : NEW_POST_COPY.description,
         acceptLabel: NEW_POST_COPY.acceptLabel,
-        fields: [
-          {
-            type: 'paragraph',
-            name: 'code',
-            label: NEW_POST_COPY.codeLabel,
-            helpText: NEW_POST_COPY.codeHelp,
-            defaultValue: values.code,
-            required: true,
-          },
-          {
-            type: 'string',
-            name: 'title',
-            label: NEW_POST_COPY.titleLabel,
-            helpText: NEW_POST_COPY.titleHelp,
-            defaultValue: values.title,
-            required: false,
-          },
-        ],
+        fields: [...newPostFields(values)],
       },
     },
   }

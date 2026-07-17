@@ -20,17 +20,38 @@ import {
   decodeWorldCode,
   explorerUrlForRuleset,
 } from '../../../src/core/WorldCodec.js'
+// Types only — the element itself is registered by the side-effecting `index.js` import above.
+// This is the embed's own declaration of its public API, so a drift between what the element does
+// and what this page expects of it is a compile error rather than a runtime surprise.
+import type {HexLifeElement} from '../../../src/embed/hexlife-world.d.ts'
 import {
   type CreatePostRsp,
   Endpoint,
   type ErrorRsp,
   NEW_POST_COPY,
+  newPostFields,
   type WorldPostData,
 } from '../shared/api.ts'
 import {fetchWorldCode} from './fetch.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
 export type ChromeMode = 'feed' | 'lab'
+
+/**
+ * `getElementById` + a complaint. Every wire-up here is optional by design (the feed card and the
+ * lab share this code but not their markup), which means a *typo* in an id is indistinguishable
+ * from "this page doesn't have that control" — it just silently does nothing. Warning costs one
+ * line and turns that into something the local webview surfaces.
+ *
+ * Only for controls *both* pages carry. Where absence is a deliberate design choice (the quiet
+ * Explorer link is feed-only), use `document.getElementById` directly — a warning that fires on
+ * every correct boot teaches everyone to ignore warnings.
+ */
+function el<T extends HTMLElement>(id: string): T | null {
+  const found = document.getElementById(id) as T | null
+  if (!found) console.warn(`hexlife: no #${id} on this page`)
+  return found
+}
 
 /** Fallback specimen for install-demo posts with no Redis code. */
 const DEMO = {
@@ -41,21 +62,6 @@ const DEMO = {
 } as const
 
 const DEFAULT_EMBED_ROWS = 64
-
-/** Bits of `<hexlife-world>` this page reads. */
-type HexWorld = HTMLElement & {
-  readonly tickCount: number
-  readonly playing: boolean
-  readonly userPaused: boolean
-  readonly error?: string | null
-  readonly sim?: {speed: number; rows: number; cols: number} | null
-  play(): void
-  pause(): void
-  reset(): void
-}
-
-/** `hexlife-error` detail (see docs/EMBED-PLAN.md). */
-type HexErrorDetail = {message: string; detail: string}
 
 type WorldMeta = {
   rulesetHex: string
@@ -93,7 +99,7 @@ export async function mountHexLife(
   const code = post?.code ?? (await fetchWorldCode())
   const meta = await resolveMeta(code)
 
-  const world = document.createElement('hexlife-world') as HexWorld
+  const world = document.createElement('hexlife-world')
   if (code) world.setAttribute('code', code)
   else for (const [k, v] of Object.entries(DEMO)) world.setAttribute(k, v)
 
@@ -117,9 +123,7 @@ export async function mountHexLife(
   wireCreateOwn(status)
 
   const settle = (): void => {
-    const speedInput = document.getElementById(
-      'speed',
-    ) as HTMLInputElement | null
+    const speedInput = el<HTMLInputElement>('speed')
     if (speedInput && world.sim) speedInput.value = String(world.sim.speed)
 
     // Prefer live sim dims once booted (demo path has no cols until then).
@@ -140,7 +144,7 @@ export async function mountHexLife(
   // boot emits hexlife-playstate before hexlife-ready.
   world.addEventListener('hexlife-ready', settle)
   world.addEventListener('hexlife-error', ev => {
-    const {message, detail} = (ev as CustomEvent<HexErrorDetail>).detail ?? {}
+    const {message, detail} = ev.detail ?? {}
     setStatus(status, message ?? 'Simulation failed to load.', 'error')
     if (detail) console.error(`<hexlife-world>: ${message} ${detail}`)
   })
@@ -220,12 +224,12 @@ async function resolveMeta(code: string | undefined): Promise<WorldMeta> {
 }
 
 function paintIdentity(meta: WorldMeta): void {
-  const root = document.getElementById('identity')
+  const root = el('identity')
   if (!root) return
 
-  const nameEl = document.getElementById('specimen-name')
-  const hexEl = document.getElementById('specimen-hex')
-  const metaEl = document.getElementById('specimen-meta')
+  const nameEl = el('specimen-name')
+  const hexEl = el('specimen-hex')
+  const metaEl = el('specimen-meta')
 
   const name = rulesetName(meta.rulesetHex)
   if (nameEl) nameEl.textContent = name
@@ -251,6 +255,8 @@ function paintIdentity(meta: WorldMeta): void {
 
 function wireExplorerLink(meta: WorldMeta): void {
   const href = explorerUrlForRuleset(meta.rulesetHex, {rows: meta.rows})
+  // Not `el()`: the quiet variant is feed-only and the loud one lab-only in practice, so a miss
+  // here is the design, not a typo.
   for (const id of ['open-explorer', 'open-explorer-quiet'] as const) {
     const a = document.getElementById(id) as HTMLAnchorElement | null
     if (!a) continue
@@ -269,7 +275,7 @@ function wireExplorerLink(meta: WorldMeta): void {
 }
 
 function wireCopyHex(rulesetHex: string): void {
-  const btn = document.getElementById('copy-hex') as HTMLButtonElement | null
+  const btn = el<HTMLButtonElement>('copy-hex')
   if (!btn) return
   btn.addEventListener('click', () => {
     void copyText(rulesetHex).then(ok => {
@@ -291,6 +297,7 @@ function wireCopyHex(rulesetHex: string): void {
  * `showForm`/`navigateTo` only do anything inside Reddit; locally the button wires up and no-ops.
  */
 function wireCreateOwn(status: HTMLElement): void {
+  // Not `el()`: splash.html deliberately omits this button (the feed card stays lean).
   const btn = document.getElementById('create-own') as HTMLButtonElement | null
   if (!btn) return
   btn.addEventListener('click', () => void createOwn(btn, status))
@@ -304,23 +311,8 @@ async function createOwn(
     title: NEW_POST_COPY.title,
     description: NEW_POST_COPY.description,
     acceptLabel: NEW_POST_COPY.acceptLabel,
-    fields: [
-      {
-        type: 'paragraph',
-        name: 'code',
-        label: NEW_POST_COPY.codeLabel,
-        helpText: NEW_POST_COPY.codeHelp,
-        required: true,
-      },
-      {
-        type: 'string',
-        name: 'title',
-        label: NEW_POST_COPY.titleLabel,
-        helpText: NEW_POST_COPY.titleHelp,
-        required: false,
-      },
-    ],
-  } as const)
+    fields: [...newPostFields()],
+  })
   if (rsp.action !== 'SUBMITTED') return
 
   const prev = btn.textContent
@@ -385,14 +377,10 @@ function applyChromeMode(mode: ChromeMode): void {
 }
 
 /** Play/pause + restart + speed — shared by splash and game. */
-function wireTransport(world: HexWorld): void {
-  const speedInput = document.getElementById('speed') as HTMLInputElement | null
-  const playPauseBtn = document.getElementById(
-    'play-pause',
-  ) as HTMLButtonElement | null
-  const restartBtn = document.getElementById(
-    'restart',
-  ) as HTMLButtonElement | null
+function wireTransport(world: HexLifeElement): void {
+  const speedInput = el<HTMLInputElement>('speed')
+  const playPauseBtn = el<HTMLButtonElement>('play-pause')
+  const restartBtn = el<HTMLButtonElement>('restart')
 
   if (speedInput) {
     speedInput.addEventListener('input', () =>
@@ -427,8 +415,8 @@ function wireTransport(world: HexWorld): void {
   world.addEventListener('hexlife-ready', () => syncPlayPauseLabel(world))
 }
 
-function syncPlayPauseLabel(world: HexWorld): void {
-  const btn = document.getElementById('play-pause') as HTMLButtonElement | null
+function syncPlayPauseLabel(world: HexLifeElement): void {
+  const btn = el<HTMLButtonElement>('play-pause')
   if (!btn) return
   const showPlay = world.userPaused || !world.playing
   btn.textContent = showPlay ? '▶' : '❚❚'

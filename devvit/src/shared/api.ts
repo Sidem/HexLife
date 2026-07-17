@@ -48,6 +48,45 @@ export const NEW_POST_COPY = {
     'That is not a valid world code. Copy it again from HexLife Explorer (Share → Copy World Code) and paste the whole thing.',
 } as const
 
+/**
+ * The fields both create paths collect, in the order they're shown.
+ *
+ * The two paths render this form through different machinery — the menu path returns a
+ * `showForm` UiResponse from the server, the in-post path calls the client's `showForm` effect —
+ * so the *array* was hand-built in both places and had already started to drift. {@link
+ * NEW_POST_COPY} closed the wording half of that; this closes the structural half.
+ *
+ * `as const` keeps the field names and `required` flags as literals. Note this does *not* buy
+ * typed form values: `showForm`'s `FormToFormValues` only walks a **mutable** tuple, so a readonly
+ * one (which is what any `as const` field list is) silently lands in its `{[key: string]: any}`
+ * fallback. That was already true of the inline `as const` arrays this replaced — `rsp.values.code`
+ * has always been `any`, which is why both callers null-coalesce it and the server re-validates
+ * every code with `decodeWorldCode` rather than trusting the envelope.
+ *
+ * @param defaults Pre-filled values — the menu form re-shows itself with the submitted values
+ *   when a paste fails to decode, rather than making the user re-copy a long code.
+ */
+export function newPostFields(defaults: {code?: string; title?: string} = {}) {
+  return [
+    {
+      type: 'paragraph',
+      name: 'code',
+      label: NEW_POST_COPY.codeLabel,
+      helpText: NEW_POST_COPY.codeHelp,
+      defaultValue: defaults.code,
+      required: true,
+    },
+    {
+      type: 'string',
+      name: 'title',
+      label: NEW_POST_COPY.titleLabel,
+      helpText: NEW_POST_COPY.titleHelp,
+      defaultValue: defaults.title,
+      required: false,
+    },
+  ] as const
+}
+
 export type Endpoint = (typeof Endpoint)[keyof typeof Endpoint]
 export const Endpoint = {
   GetWorld: 'api/world',

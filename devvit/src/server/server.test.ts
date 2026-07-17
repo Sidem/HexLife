@@ -135,6 +135,16 @@ test('get world: the code stored for this post', async () => {
   assert.deepEqual<GetWorldRsp>(await rsp.json(), {code})
 })
 
+test('a query string does not 404 the route', async () => {
+  const code = await worldCode()
+  redisValues.set('world:t3_123', code)
+  // The route is the path; `?…` is not part of it. Matching the raw URL verbatim turned any
+  // cache-buster a client (or the platform) appended into a 404.
+  const rsp = await fetch(`${serverURL}/${Endpoint.GetWorld}?cb=123`)
+  assert.equal(rsp.status, 200)
+  assert.deepEqual<GetWorldRsp>(await rsp.json(), {code})
+})
+
 test('menu action shows the world-code form', async () => {
   const rsp = await fetch(`${serverURL}/${Endpoint.OnMenuNewPost}`, {
     method: 'POST',
