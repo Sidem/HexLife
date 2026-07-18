@@ -29,9 +29,19 @@ import {
   newPostFields,
   type PostKitFields,
   parsePostKit,
+  STATS_FORM,
   type WorldPostData,
 } from '../shared/api.ts'
+import {parseTrackReq} from '../shared/telemetry.ts'
 import {dbDeleteWorldCode, dbGetWorldCode, dbSetWorldCode} from './db.ts'
+import {
+  buildMetricsReport,
+  buildPostReport,
+  buildSessionTrails,
+  dbDeletePostMetrics,
+  dbSetPostMeta,
+  dbTrack,
+} from './metrics.ts'
 
 type AnyRsp =
   | GetWorldRsp
@@ -39,6 +49,8 @@ type AnyRsp =
   | UiResponse
   | TriggerResponse
   | ErrorRsp
+  /** `api/track` and the stats form callback: an empty acknowledgement. */
+  | Record<string, never>
 
 /** What a successfully decoded `HXW1.` code describes. */
 type DecodedWorld = NonNullable<Awaited<ReturnType<typeof decodeWorldCode>>>
@@ -91,11 +103,21 @@ async function route(
       case Endpoint.CreatePost:
         rsp = await routeCreatePost(reqMsg)
         break
+      case Endpoint.Track:
+        rsp = await routeTrack(reqMsg)
+        break
       case Endpoint.OnMenuNewPost:
         rsp = routeMenuNewPost()
         break
+      case Endpoint.OnMenuStats:
+        rsp = await routeMenuStats()
+        break
       case Endpoint.OnFormNewPost:
         rsp = await routeFormNewPost(reqMsg)
+        break
+      case Endpoint.OnFormStats:
+        // Read-only report; nothing comes back from it.
+        rsp = {}
         break
       case Endpoint.OnAppInstall:
         rsp = await routeAppInstall()
@@ -121,6 +143,86 @@ async function routeGetWorld(): Promise<GetWorldRsp> {
   const t3 = context.postId
   if (!t3) throw Error('no t3')
   return {code: await dbGetWorldCode(t3)}
+}
+
+/**
+ * Anonymous usage counters from the webview (see shared/telemetry.ts).
+ *
+ * Answers 200 to everything, including junk. There is no useful error for a fire-and-forget beacon
+ * — the client is already not listening, and a 4xx would only teach a misbehaving client to retry.
+ * Malformed bodies are dropped silently; that is the whole error handling.
+ *
+ * The post attribution comes from `context.postId`, never the body: a client that could name the
+ * post it is reporting on could poison another post's numbers.
+ */
+async function routeTrack(
+  reqMsg: IncomingMessage,
+): Promise<Record<string, never>> {
+  try {
+    const req = parseTrackReq(await readJson<unknown>(reqMsg))
+    if (req) {
+      await dbTrack({
+        sessionId: req.sessionId,
+        surface: req.surface,
+        events: req.events,
+        postId: context.postId,
+        nowMs: Date.now(),
+      })
+    }
+  } catch (err) {
+    console.warn('api/track: dropped batch:', err)
+  }
+  return {}
+}
+
+/**
+ * Moderator-only "HexLife usage stats". Renders the report into a form, because a form field is
+ * the only surface Devvit offers for showing a moderator more than a toast's worth of text.
+ *
+ * Moderator gating is declared in devvit.json (`forUserType: "moderator"`), which is what actually
+ * keeps this off the menu for ordinary members.
+ */
+async function routeMenuStats(): Promise<UiResponse> {
+  const now = Date.now()
+  const [report, posts, trails] = await Promise.all([
+    buildMetricsReport(now, 7),
+    buildPostReport(now, 7, 12),
+    buildSessionTrails(now, 12),
+  ])
+  return {
+    showForm: {
+      name: STATS_FORM,
+      form: {
+        title: 'HexLife usage',
+        description:
+          'Anonymous, aggregate counters from this app’s own storage. No user is identified — sessions are random per-visit ids that are not retained.',
+        acceptLabel: 'Done',
+        fields: [
+          {
+            type: 'paragraph',
+            name: 'report',
+            label: 'Funnel',
+            defaultValue: report,
+            lineHeight: 20,
+          },
+          {
+            type: 'paragraph',
+            name: 'posts',
+            label: 'Which worlds land',
+            defaultValue: posts,
+            lineHeight: 20,
+          },
+          {
+            type: 'paragraph',
+            name: 'trails',
+            label: 'Recent sessions',
+            defaultValue: trails,
+            lineHeight: 14,
+          },
+        ],
+      },
+    },
+  }
 }
 
 /**
@@ -223,6 +325,23 @@ async function createSpecimenPost(
   })
   await dbSetWorldCode(post.id, code)
 
+  // What this specimen *is*, so engagement can later be sliced by ruleset / palette / speed. All of
+  // it comes from the code the author posted — a property of the artwork, never of a viewer.
+  const desc = describeRuleset(world.rulesetHex)
+  await dbSetPostMeta(
+    post.id,
+    {
+      rulesetHex: world.rulesetHex,
+      name: rulesetName(world.rulesetHex),
+      notation: desc?.notation ?? '',
+      rows: world.rows,
+      cols: world.cols,
+      speed: world.speed,
+      palette: paletteLabel(world),
+    },
+    Date.now(),
+  )
+
   try {
     await reddit.submitComment({
       id: post.id,
@@ -237,6 +356,26 @@ async function createSpecimenPost(
     )
   }
   return {id: post.id, url: post.url}
+}
+
+/**
+ * A readable palette name for the analytics rollup.
+ *
+ * The codec carries a palette one of two ways: a settings descriptor (`{mode, activePreset, …}`)
+ * or, for the escape-hatch kind, a baked LUT with no name attached at all. Both are reported
+ * honestly — a baked LUT becomes `custom-lut` rather than being guessed at or silently grouped in
+ * with a preset it may look nothing like.
+ */
+function paletteLabel(world: DecodedWorld): string {
+  const settings = world.colorSettings as
+    | {mode?: unknown; activePreset?: unknown}
+    | null
+    | undefined
+  if (!settings) return world.lut ? 'custom-lut' : 'unknown'
+  const preset =
+    typeof settings.activePreset === 'string' ? settings.activePreset : ''
+  const mode = typeof settings.mode === 'string' ? settings.mode : ''
+  return preset || mode || 'custom'
 }
 
 /**
@@ -449,8 +588,12 @@ async function routePostDelete(
   const body = await readJson<{post?: {id?: string}}>(reqMsg)
   const postId = body?.post?.id
   if (postId) {
+    const t3 = postId as import('@devvit/web/shared').T3
     try {
-      await dbDeleteWorldCode(postId as import('@devvit/web/shared').T3)
+      await dbDeleteWorldCode(t3)
+      // The post's counters go with it. They are not user data, but retaining analytics about
+      // content the author deleted is not something to do by omission.
+      await dbDeletePostMetrics(t3, Date.now())
     } catch (err) {
       console.warn(`onPostDelete: failed to clear world for ${postId}:`, err)
     }

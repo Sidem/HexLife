@@ -1,5 +1,6 @@
 import {requestExpandedMode} from '@devvit/web/client'
 import {mountHexLife} from './hexlife.ts'
+import {flushTelemetry, track} from './telemetry.ts'
 
 const mount = document.getElementById('world') as HTMLElement
 const status = document.getElementById('status') as HTMLElement
@@ -77,4 +78,10 @@ function mountWhenSeen(): void {
 mountWhenSeen()
 
 const expandBtn = document.getElementById('expand-btn') as HTMLButtonElement
-expandBtn.addEventListener('click', ev => requestExpandedMode(ev, 'game'))
+expandBtn.addEventListener('click', ev => {
+  // The feed funnel's whole point. Flushed on the spot because the expanded view may replace this
+  // document outright, and a queued `expand` would be lost exactly when it converted.
+  track('expand')
+  flushTelemetry()
+  requestExpandedMode(ev, 'game')
+})

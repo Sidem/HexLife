@@ -37,7 +37,8 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
   the Ruleset card’s link adds `&edit=1`, which opens the lab with the ruleset editor already up.
 - **Starts paused** — play is explicit so large grids don’t lag phones scrolling past in the feed.
 - **No external network calls** — the simulation engine (Rust → WebAssembly) and WebGL renderer
-  are bundled in the webview. Redis only stores the world code per post ID.
+  are bundled in the webview. Redis stores the world code per post ID, plus anonymous counts of how
+  the controls get used (no identity, nothing on your device — see **Privacy & data**).
 
 ## Who it’s for
 
@@ -82,6 +83,39 @@ No extra configuration is required. On install, a demo post may appear automatic
 
 ## Privacy & data
 
+**Short version:** the app stores the worlds people post, and counts how its own controls get used.
+It does not know who you are, does not store anything on your device, and never sends anything to
+anyone but Reddit.
+
+### Anonymous usage counts
+
+The app counts interactions with its own controls — play, draw, open lab, post a remix — so the
+interface can be improved by evidence rather than guesswork. This is worth being precise about:
+
+- **No identity, ever.** No username, user ID, IP address, device or browser fingerprint, or
+  anything derived from them is collected, stored, or transmitted. The app never asks Reddit who is
+  looking at a post, and there is no field anywhere in the data where the answer could go.
+- **Nothing is stored on your device.** No cookies, no `localStorage`, no `sessionStorage`. Each
+  view generates a random number that exists only in memory, only while the page is open, and is
+  gone when it closes. Two views by the same person are indistinguishable from two views by
+  different people — including to us.
+- **A closed list of events.** Only the fixed set of named interactions in
+  [`src/shared/telemetry.ts`](src/shared/telemetry.ts) is recorded — never free text, never mouse
+  coordinates, never anything you type or draw. Anything not on that list is discarded server-side.
+- **Time is bucketed,** not measured: "stayed longer than 30 seconds", not a precise duration.
+- **It stays on Reddit.** Counts are written to this app's own Reddit-hosted Redis. There is no
+  third-party analytics service, no external endpoint, and no data sharing or sale of any kind.
+- **Moderators see totals.** The **⋯ → HexLife usage stats** menu item shows aggregate counts to
+  the community's moderators. Per-visit detail is withheld entirely on days with fewer than 10
+  visits, so a single visit can never be matched to the person who made it.
+- **It expires.** Per-visit records are deleted after 7 days, per-post counts after 30, and daily
+  totals after 90. Deleting a post deletes its counts.
+
+If you would rather not be counted at all, blocking the app's `api/track` request (or any content
+blocker that stops background requests) disables it. Nothing else about the post changes.
+
+### Everything else
+
 - Stores **world codes** in Redis keyed by post ID (`world:<t3>`). A world code is the grid,
   ruleset, cells, and color settings of the simulation — not Reddit account passwords or private
   messages.
@@ -92,8 +126,11 @@ No extra configuration is required. On install, a demo post may appear automatic
 - Each post also carries its own world code in Reddit's `postData` so it can render without a
   round-trip. Same data as Redis, no extra collection.
 - On **post delete**, the stored code for that post is removed.
-- Does **not** call external HTTP APIs, collect emails, or track users across sites.
-- The in-post webview does **not** link out to third-party apps (attribution link is off).
+- Does **not** call external HTTP APIs, collect emails, or track users across sites or across
+  visits. The app declares no `http.domains`, so it is technically incapable of reaching any server
+  other than Reddit's.
+- The in-post webview does **not** link out to third-party apps (attribution link is off). Links to
+  HexLife Explorer are ordinary outbound links you choose to click, and carry only the ruleset.
 
 ## Support
 

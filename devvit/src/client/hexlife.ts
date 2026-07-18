@@ -37,8 +37,10 @@ import {
   remixPostFields,
   type WorldPostData,
 } from '../shared/api.ts'
+import {speedBucket} from '../shared/telemetry.ts'
 import {fetchWorldCode} from './fetch.ts'
 import {paintRuleCard} from './ruleCard.ts'
+import {flushTelemetry, initTelemetry, track} from './telemetry.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
 export type ChromeMode = 'feed' | 'lab'
@@ -68,6 +70,9 @@ const DEMO = {
 } as const
 
 const DEFAULT_EMBED_ROWS = 64
+
+/** How long the speed slider must sit still before we count where it landed. */
+const SPEED_SETTLE_MS = 800
 
 /** Shown when we can't tell what world this post is — never alongside a mounted world. */
 const FETCH_FAILED_MSG = 'Couldn’t load this specimen.'
@@ -102,6 +107,8 @@ export async function mountHexLife(
   opts: {mode: ChromeMode} = {mode: 'lab'},
 ): Promise<void> {
   applyChromeMode(opts.mode)
+  // Before the first event can fire, and before the dwell clock should start.
+  initTelemetry(opts.mode)
   // Wired once, here rather than in `boot`: a retry re-runs the boot, and re-wiring a button that
   // survived the failure would leave it with two handlers.
   wireCreateOwn(status)
@@ -139,6 +146,7 @@ export async function mountHexLife(
         // We don't know what this post is. Say so and offer a way out — showing the demo here
         // would put a stranger's title on our world and tell the viewer nothing went wrong.
         setStatus(status, FETCH_FAILED_MSG, 'error')
+        track('boot_error', {once: true})
         if (retryBtn) retryBtn.hidden = false
         // No world means play/pause/restart/remix have nothing to act on. They are only wired in
         // `mountWorld`, so leaving them on screen would offer buttons that silently do nothing.
@@ -149,7 +157,10 @@ export async function mountHexLife(
     await mountWorld(mount, status, code, opts)
   }
 
-  retryBtn?.addEventListener('click', () => void boot())
+  retryBtn?.addEventListener('click', () => {
+    track('retry')
+    void boot()
+  })
   await boot()
 }
 
@@ -188,6 +199,12 @@ async function mountWorld(
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
   wirePostRemix(world, status)
+  // Drawing has no element event of its own, and a pointer landing on a drawable world is what
+  // painting *is*. Feed cards aren't drawable (no `draw` attribute), so this stays lab-only or it
+  // would count every scroll-stopping tap as a stroke.
+  if (opts.mode === 'lab') {
+    world.addEventListener('pointerdown', () => track('draw', {once: true}))
+  }
   // Transport and remix only mean anything with a world behind them; this is what un-hides them.
   document.body.dataset.boot = 'ok'
 
@@ -206,7 +223,12 @@ async function mountWorld(
 
     syncPlayPauseLabel(world)
     if (world.error) setStatus(status, world.error, 'error')
-    else setStatus(status, '')
+    else {
+      setStatus(status, '')
+      // The denominator: a world that actually reached the viewer. `once` because settle runs on
+      // hexlife-ready *and* on the 2s safety timer.
+      track('boot', {once: true})
+    }
   }
 
   // Listeners go on before the element is connected: connecting is what starts the boot, and the
@@ -215,6 +237,7 @@ async function mountWorld(
   world.addEventListener('hexlife-error', ev => {
     const {message, detail} = ev.detail ?? {}
     setStatus(status, message ?? 'Simulation failed to load.', 'error')
+    track('boot_error', {once: true})
     if (detail) console.error(`<hexlife-world>: ${message} ${detail}`)
   })
 
@@ -347,6 +370,7 @@ function wireExplorerLink(meta: WorldMeta): void {
     // because it bypasses the click handler). Use Devvit's navigateTo effect so left-click works.
     a.addEventListener('click', ev => {
       ev.preventDefault()
+      track('explorer_open')
       navigateTo(href)
     })
   }
@@ -382,6 +406,7 @@ function wireRuleCard(meta: WorldMeta): void {
     // Same webview quirk as wireExplorerLink: plain <a> left-clicks are swallowed by Reddit.
     link.addEventListener('click', ev => {
       ev.preventDefault()
+      track('rulecard_explorer')
       navigateTo(href)
     })
   }
@@ -390,6 +415,7 @@ function wireRuleCard(meta: WorldMeta): void {
     card.hidden = true
   }
   btn.addEventListener('click', () => {
+    track('ruleset_open')
     card.hidden = false
   })
   document.getElementById('rule-card-close')?.addEventListener('click', close)
@@ -406,6 +432,7 @@ function wireCopyHex(rulesetHex: string): void {
   const btn = el<HTMLButtonElement>('copy-hex')
   if (!btn) return
   btn.addEventListener('click', () => {
+    track('copy_hex')
     void copyText(rulesetHex).then(ok => {
       const prev = btn.textContent
       btn.textContent = ok ? 'Copied' : 'Copy failed'
@@ -440,6 +467,7 @@ async function createOwn(
   btn: HTMLButtonElement,
   status: HTMLElement,
 ): Promise<void> {
+  track('create_start')
   // Consent first, on the trusted click — after `await showForm` the gesture is spent on some
   // clients and a late canRunAsUser either no-ops or never prompts.
   if (!(await ensureUserPostPermission(event, status))) return
@@ -449,11 +477,15 @@ async function createOwn(
     acceptLabel: NEW_POST_COPY.acceptLabel,
     fields: [...newPostFields()],
   })
-  if (rsp.action !== 'SUBMITTED') return
+  if (rsp.action !== 'SUBMITTED') {
+    track('create_cancel')
+    return
+  }
   await submitNewPost(
     {code: rsp.values.code ?? '', title: rsp.values.title ?? ''},
     btn,
     status,
+    'create',
   )
 }
 
@@ -475,6 +507,7 @@ async function postRemix(
   btn: HTMLButtonElement,
   status: HTMLElement,
 ): Promise<void> {
+  track('remix_start')
   // Consent first, on the trusted click — after `await showForm` the gesture is spent on some
   // clients and a late canRunAsUser either no-ops or never prompts.
   if (!(await ensureUserPostPermission(event, status))) return
@@ -486,6 +519,7 @@ async function postRemix(
   const code = await world.worldCode()
   if (!code) {
     setStatus(status, NEW_POST_COPY.remixNothingToPost, 'error')
+    track('remix_failed')
     return
   }
 
@@ -495,8 +529,16 @@ async function postRemix(
     acceptLabel: NEW_POST_COPY.remixAcceptLabel,
     fields: [...remixPostFields()],
   })
-  if (rsp.action !== 'SUBMITTED') return
-  await submitNewPost({code, title: rsp.values.title ?? ''}, btn, status)
+  if (rsp.action !== 'SUBMITTED') {
+    track('remix_cancel')
+    return
+  }
+  await submitNewPost(
+    {code, title: rsp.values.title ?? ''},
+    btn,
+    status,
+    'remix',
+  )
 }
 
 /**
@@ -540,6 +582,8 @@ async function submitNewPost(
   values: {code: string; title: string},
   btn: HTMLButtonElement,
   status: HTMLElement,
+  /** Which door this came through — the two have very different completion rates. */
+  origin: 'remix' | 'create' = 'create',
 ): Promise<void> {
   const prev = btn.textContent
   btn.disabled = true
@@ -557,11 +601,16 @@ async function submitNewPost(
         'error' in body ? body.error : NEW_POST_COPY.invalid,
         'error',
       )
+      track(origin === 'remix' ? 'remix_failed' : 'create_failed')
       return
     }
+    track(origin === 'remix' ? 'remix_posted' : 'create_posted')
+    // We are about to leave; don't let the conversion sit in a queue that navigation discards.
+    flushTelemetry()
     navigateTo(body.url)
   } catch (err) {
     setStatus(status, 'Could not create the post. Try again.', 'error')
+    track(origin === 'remix' ? 'remix_failed' : 'create_failed')
     console.error(err)
   } finally {
     btn.disabled = false
@@ -606,9 +655,22 @@ function wireTransport(world: HexLifeElement): void {
   const restartBtn = el<HTMLButtonElement>('restart')
 
   if (speedInput) {
-    speedInput.addEventListener('input', () =>
-      world.setAttribute('speed', speedInput.value),
-    )
+    // Debounced so a drag reports where it *landed*, not the forty values it swept through. Without
+    // this the buckets would say more about how far the handle travelled than about what anyone
+    // chose to watch.
+    let settle: ReturnType<typeof setTimeout> | undefined
+    speedInput.addEventListener('input', () => {
+      world.setAttribute('speed', speedInput.value)
+      // `once`: a drag is one decision. This marks "touched the slider"; the bucket below says
+      // where they ended up.
+      track('speed', {once: true})
+
+      if (settle !== undefined) clearTimeout(settle)
+      settle = setTimeout(() => {
+        const value = Number(speedInput.value)
+        if (Number.isFinite(value)) track(speedBucket(value))
+      }, SPEED_SETTLE_MS)
+    })
   }
 
   if (playPauseBtn) {
@@ -626,16 +688,41 @@ function wireTransport(world: HexLifeElement): void {
 
   if (restartBtn) {
     restartBtn.addEventListener('click', () => {
+      track('restart')
       world.reset()
       if (!world.playing && !world.userPaused) world.play()
       syncPlayPauseLabel(world)
     })
   }
 
-  // The element announces every play-state change (including ones we didn't cause: scrolled
-  // offscreen, tab hidden, a stroke pausing the world), so the label tracks it without a timer.
-  world.addEventListener('hexlife-playstate', () => syncPlayPauseLabel(world))
-  world.addEventListener('hexlife-ready', () => syncPlayPauseLabel(world))
+  /**
+   * Play/pause counted from the **element's** state, not from our button's click handler.
+   *
+   * The button is not how most people start a world. In the feed the element shows its own poster
+   * play overlay, and that is what a viewer taps — so instrumenting only `#play-pause` measured a
+   * control the feed barely uses, and the first real run of this reported `pressed play 0 (0%)`
+   * against 42% engaged and 33% expanded. The number was wrong, not the users.
+   *
+   * `userPaused` is the right signal because it is *intent*: the element documents it as "the user
+   * has paused, ignoring the viewport/visibility gates". Counting `playing` instead would fire on
+   * every scroll-offscreen auto-pause and every tab switch, and the feed would look wildly more
+   * engaged than it is. We count only the edges, so a burst of gate changes reports nothing.
+   */
+  let lastUserPaused: boolean | undefined
+  world.addEventListener('hexlife-playstate', ev => {
+    const paused = ev.detail?.userPaused ?? world.userPaused
+    if (lastUserPaused !== undefined && lastUserPaused !== paused) {
+      track(paused ? 'pause' : 'play')
+    }
+    lastUserPaused = paused
+    syncPlayPauseLabel(world)
+  })
+  world.addEventListener('hexlife-ready', () => {
+    // Baseline once the element exists. Until this is set the listener above only records state,
+    // so the initial paused→paused settle can't be mistaken for the viewer pressing something.
+    lastUserPaused ??= world.userPaused
+    syncPlayPauseLabel(world)
+  })
 }
 
 function syncPlayPauseLabel(world: HexLifeElement): void {

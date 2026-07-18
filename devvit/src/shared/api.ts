@@ -260,9 +260,18 @@ export const Endpoint = {
   GetWorld: 'api/world',
   /** Create a Live Specimen from a pasted code (lab "Create your own" / menu form). */
   CreatePost: 'api/post',
+  /** Anonymous usage counters from the webview (see shared/telemetry.ts). */
+  Track: 'api/track',
   OnAppInstall: 'internal/on/app/install',
   OnMenuNewPost: 'internal/on/menu/new-post',
+  /** Moderator-only: show the usage report (see server/metrics.ts). */
+  OnMenuStats: 'internal/on/menu/stats',
   OnFormNewPost: 'internal/on/form/new-post',
+  /**
+   * The stats form's callback. It does nothing — the form is a read-only viewport onto a text
+   * report — but Devvit resolves `showForm` by registered name, so the name needs a home.
+   */
+  OnFormStats: 'internal/on/form/stats',
   /**
    * Best-effort: pure-HXW1 text posts → Live Specimen. Not the primary create path (that is the
    * menu form); kept for accidental text dumps of a world code.
@@ -275,12 +284,18 @@ export const Endpoint = {
 export const EndpointMethod = {
   [Endpoint.GetWorld]: 'GET',
   [Endpoint.CreatePost]: 'POST',
+  [Endpoint.Track]: 'POST',
   [Endpoint.OnAppInstall]: 'POST',
   [Endpoint.OnMenuNewPost]: 'POST',
+  [Endpoint.OnMenuStats]: 'POST',
   [Endpoint.OnFormNewPost]: 'POST',
+  [Endpoint.OnFormStats]: 'POST',
   [Endpoint.OnPostSubmit]: 'POST',
   [Endpoint.OnPostDelete]: 'POST',
 } as const satisfies {[endpoint: string]: 'GET' | 'POST'}
 
 /** Must match the form name registered in devvit.json → `forms`. */
 export const NEW_POST_FORM = 'newWorldPost'
+
+/** Ditto, for the moderator-only usage report. */
+export const STATS_FORM = 'hexlifeStats'

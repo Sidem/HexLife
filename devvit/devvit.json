@@ -27,11 +27,19 @@
         "location": "subreddit",
         "forUserType": "user",
         "endpoint": "/internal/on/menu/new-post"
+      },
+      {
+        "label": "HexLife usage stats",
+        "description": "Anonymous, aggregate usage counters for this subreddit's HexLife posts.",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/on/menu/stats"
       }
     ]
   },
   "forms": {
-    "newWorldPost": "/internal/on/form/new-post"
+    "newWorldPost": "/internal/on/form/new-post",
+    "hexlifeStats": "/internal/on/form/stats"
   },
   "triggers": {
     "onAppInstall": "/internal/on/app/install",
