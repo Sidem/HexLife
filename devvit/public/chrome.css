@@ -115,6 +115,26 @@ body[data-chrome='lab'] #specimen-name {
   flex-shrink: 0;
 }
 
+/* The B/S notation badge — the literal answer to "what ruleset is this?", visible in the feed
+   where the question gets asked. Empty (and collapsed) for raw rules with no notation. */
+#specimen-rule {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 6px;
+  padding: 1px 6px;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+
+#specimen-rule:empty {
+  display: none;
+}
+
 #specimen-meta {
   font-size: 11px;
   color: var(--muted);
@@ -299,9 +319,9 @@ body[data-chrome='lab'] #chrome {
   max-width: 200px;
 }
 
-/* The feed's create affordance. A viewer who wants to make one of these shouldn't have to expand
-   the post first to find out they can — but the card's job is to play, so this reads as text next
-   to the primary pill rather than competing with it. Still a full 44px tap target. */
+/* Lab-only secondary create path (paste a world code). Quiet so it doesn't compete with
+   "Post my remix". Still a full 44px tap target. Not shown in the feed — paste-a-code is a
+   power-user path, not onboarding. */
 #create-own.quiet {
   padding: 0 10px;
   border-color: transparent;
@@ -380,8 +400,8 @@ body[data-chrome='lab'] a.explorer-link {
 }
 
 /* A boot that failed has no world, and transport/remix are only wired once one exists. Showing
-   them anyway would be a row of buttons that quietly do nothing. "Create your own" survives: it
-   needs no world, and it is the one thing still worth offering here. */
+   them anyway would be a row of buttons that quietly do nothing. Lab's paste-code "Create your
+   own" survives: it needs no world. Feed has no create button — only Retry. */
 body[data-boot='error'] #controls,
 body[data-boot='error'] #post-remix,
 body[data-boot='error'] #draw-hint {
@@ -394,4 +414,184 @@ body[data-boot='error'] #draw-hint {
 
 #status:empty {
   display: none;
+}
+
+/* --- ruleset card (lab only) ---------------------------------------------- */
+
+/* Read-only "what ruleset is this?" viewer over the lab. Deliberately not the editor: chips and
+   a fingerprint scale down to phones in a way the Explorer's 128-cell grid cannot. */
+#rule-card {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(6, 8, 10, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+#rule-card[hidden] {
+  display: none;
+}
+
+.rule-card-panel {
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 32px - var(--safe-t) - var(--safe-b));
+  overflow-y: auto;
+  padding: 14px 16px calc(14px + var(--safe-b));
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+}
+
+.rule-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rule-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#rule-card-close {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+#rule-card-notation {
+  margin: 4px 0 0;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 14px;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+#rule-card-notation:empty {
+  display: none;
+}
+
+#rule-card-summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+#rule-card-viz {
+  margin-top: 10px;
+}
+
+.rc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.rc-caption {
+  flex: 0 0 52px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rc-chip {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+}
+
+.rc-chip svg {
+  width: 40px;
+  height: 40px;
+}
+
+.rc-chip-label {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.rc-never {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Shared cell states for flower chips and the raw fingerprint. */
+#rule-card-viz .rc-on {
+  fill: var(--accent);
+}
+
+#rule-card-viz .rc-off {
+  fill: #232a33;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+#rule-card-viz > svg {
+  width: 100%;
+  max-width: 288px;
+  display: block;
+  margin: 0 auto;
+}
+
+.rc-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rule-card-hex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+#rule-card-hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.rule-card-hex-row #copy-hex {
+  flex-shrink: 0;
+  min-height: 36px;
+  min-width: auto;
+  padding: 0 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#rule-card-explorer {
+  margin-top: 12px;
+  width: 100%;
 }

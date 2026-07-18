@@ -50,7 +50,11 @@ export class Application {
                     setTimeout(() => {
                         loadingIndicator.style.display = 'none';
                         // The unified 'core' tour adapts its steps to mobile/desktop itself.
-                        this.appContext.onboardingManager.startTour('core');
+                        // Deep-link sessions (`?edit=1`) suppress the auto-start: the tour's
+                        // first step resets the UI, which would close the panel the link opened.
+                        if (!this.appContext.suppressAutoTour) {
+                            this.appContext.onboardingManager.startTour('core');
+                        }
                         // First-run canvas-interaction hint — only when the tour isn't
                         // taking over the screen (the tour itself teaches these gestures).
                         this.#maybeShowCanvasHint();

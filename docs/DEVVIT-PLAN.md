@@ -82,16 +82,17 @@ are how the two files drifted apart in the first place.
 
 | Path | Works? | Notes |
 |---|---|---|
-| **⋯ → New HexLife post** (app menu form) | ✅ Supported | Deliberate Live Specimen path from the subreddit |
-| **“Create your own” inside a post** (3.6 WP5) | ✅ Supported | `showForm` → `POST api/post`; no hunting for the menu |
-| Explorer “Copy code & open r/hexlife” | ✅ Helper | Copies `HXW1.…`, opens sub — user still uses one of the two forms |
+| **Open lab → Post my remix** | ✅ Primary | Snapshot + title form; no explorer, no paste — the onboarding path |
+| **⋯ → New HexLife post** (app menu form) | ✅ Supported | Paste path for explorer exports |
+| **Lab “Create your own”** (paste form) | ✅ Power-user | Expanded view only; feed no longer shows this (paste ≠ onboarding) |
+| Explorer “Copy code & open r/hexlife” | ✅ Helper | Copies `HXW1.…`, opens sub — user still uses menu or lab paste form |
 | `/r/hexlife/submit` text composer | ❌ Not a custom post | No external URL opens a Devvit form |
 | Pure-HXW1 text post → `onPostSubmit` | ⚠️ Best-effort | Creates a specimen and **comments a link** on the original (3.6 WP1 — no longer deletes it) |
 
 Publishing lifts install limits and runs Reddit review; it does **not** add one-click create from outside Reddit.
 
-**Members need:** post permission · app installed on the sub · **⋯ → New HexLife post** *or* any
-existing HexLife post's **Create your own**. Both post as the member (`runAs: 'USER'`).
+**Members need:** post permission · app installed on the sub · **Post my remix** (lab) *or*
+**⋯ → New HexLife post** (paste). Both post as the member (`runAs: 'USER'`).
 
 ---
 
@@ -100,9 +101,16 @@ existing HexLife post's **Create your own**. Both post as the member (`runAs: 'U
 Live Specimen: world code in Redis → `<hexlife-world code>` paused, with external transport
 (play/pause/restart/speed) + zoom. No external fetch. Demo post on install if no code.
 
-Chrome as of 3.6: identity row (ruleset name + grid), a feed subtitle, play/pause + restart, and
-"Full screen"; the expanded lab adds speed, the ruleset hex, drawing, "Open full lab", and
-"Create your own". Both entrypoints share `public/chrome.css`.
+Chrome: identity row (ruleset name + notation badge + grid), feed subtitle, play/pause + restart,
+and **Open lab**; the lab adds speed, a **Ruleset** card (read-only: notation, Born/Survive orbit
+diagrams or 128-bit fingerprint, hex + copy, `edit=1` Explorer deep link — see
+`src/core/rulesetDescriptor.js`), drawing, **Post my remix**, "Open full lab", and a quiet
+paste-code **Create your own**. Feed deliberately omits paste-code create. Both entrypoints share
+`public/chrome.css`.
+
+**"What ruleset is this?"** (2026-07-18): every created specimen gets a first comment identifying
+its ruleset (name, `B2/S35` / `B2o3p/S2` notation when expressible, hex, `edit=1` Explorer link
+that opens the editor in the fitting mode). Needs owner `devvit upload` + playtest like the rest.
 
 ---
 

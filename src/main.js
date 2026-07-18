@@ -8,6 +8,7 @@ import { UIManager } from './ui/UIManager.js';
 import { Application } from './core/Application.js';
 import { SettingsLoader } from './services/SettingsLoader.js';
 import * as PersistenceService from './services/PersistenceService.js';
+import { describeRuleset } from './core/rulesetDescriptor.js';
 import rulesetLibrary from './core/library/rulesets.json';
 import patternLibrary from './core/library/patterns.json';
 import { APP_VERSION } from './version.js';
@@ -98,6 +99,19 @@ async function initialize() {
     Config.setGridDimensions(gridRows);
     console.log(`Grid size: ${Config.GRID_ROWS} rows x ${Config.GRID_COLS} cols (${Config.NUM_CELLS} cells).`);
 
+    // `?edit=1` (Devvit "what ruleset is this?" deep link): pre-seed the editor mode that fits the
+    // linked rule *before* the UI constructs the editor, so it opens already showing the rule in
+    // its natural representation. Like `gridRows` above, a URL that asks for it wins and persists.
+    if (sharedSettings.fromUrl && sharedSettings.openRulesetEditor && sharedSettings.rulesetHex) {
+        const desc = describeRuleset(sharedSettings.rulesetHex);
+        if (desc) {
+            const mode = desc.type === 'n-count' ? 'neighborCount'
+                : desc.type === 'r-sym' ? 'rotationalSymmetry'
+                : 'detailed'; // raw: only the 128-cell grid tells the truth (mobile still downgrades)
+            PersistenceService.saveUISetting('rulesetEditorMode', mode);
+        }
+    }
+
     const libraryData = { rulesets: rulesetLibrary, patterns: patternLibrary };
     
     updateLoadingStatus("Spooling up simulation workers...");
@@ -132,6 +146,20 @@ async function initialize() {
     const app = new Application(appContext);
     if (window.__headless) window.__hexlife = appContext; // headless-only debug handle for in-browser verification
     app.run();
+
+    // Second half of `?edit=1`: open the editor where this device shows it — draggable panel on
+    // desktop, Build ▸ Editor view on mobile (COMMAND_TOGGLE_PANEL deliberately no-ops there).
+    // `suppressAutoTour` (read by Application's loading-complete hook) keeps the first-visit core
+    // tour from auto-starting this session — its opening step resets the UI, which would close the
+    // editor this link promised. The tour is not marked completed; a normal visit still offers it.
+    if (sharedSettings.fromUrl && sharedSettings.openRulesetEditor) {
+        appContext.suppressAutoTour = true;
+        if (uiManager.isMobile()) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'build', segment: 'editor' });
+        } else {
+            EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PANEL, { panelName: 'ruleset', show: true });
+        }
+    }
 
     // DEV-only: library IC curation tool. Opened with `?curate=1`; lazily imported so it never ships
     // in a normal session's hot path. Waits for the workers (the bake engine borrows a live world).

@@ -75,10 +75,13 @@ export function isFlickerProofPalette(
   lut?: Uint8Array | null,
 ): boolean
 
-/** Explorer deep-link with ShareCodec `r` (and optional `g` rows). */
+/**
+ * Explorer deep-link with ShareCodec `r` (and optional `g` rows). `edit: true` adds `edit=1`,
+ * which opens the ruleset editor on boot in the mode that fits the rule.
+ */
 export function explorerUrlForRuleset(
   rulesetHex: string,
-  opts?: {rows?: number; origin?: string},
+  opts?: {rows?: number; origin?: string; edit?: boolean},
 ): string
 
 export const PALETTE_SETTINGS: 0

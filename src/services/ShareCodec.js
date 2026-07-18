@@ -216,6 +216,13 @@ export class ShareCodec {
             }
         }
 
+        // `edit=1` — open the ruleset editor on boot (Devvit "what ruleset is this?" deep link,
+        // see explorerUrlForRuleset). Only meaningful alongside `r`; main.js picks the editor
+        // mode that fits the rule via describeRuleset.
+        if (params.has('edit') && sharedSettings.rulesetHex) {
+            sharedSettings.openRulesetEditor = true;
+        }
+
         // Auto-explore search replay descriptor (see encodeSearch): xs = base seed, xc = explore
         // config subset. The starting ruleset rides in the standard `r` param, parsed above.
         if (params.has('xs')) {

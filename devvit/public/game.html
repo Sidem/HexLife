@@ -13,6 +13,7 @@
   <body data-chrome="lab">
     <header id="identity" hidden>
       <span id="specimen-name">HexLife</span>
+      <span id="specimen-rule" title=""></span>
       <span id="specimen-hex"></span>
       <span id="specimen-meta"></span>
     </header>
@@ -32,8 +33,8 @@
         </button>
         <label for="speed">Speed</label>
         <input id="speed" type="range" min="1" max="120" step="1" value="20">
-        <button id="copy-hex" type="button" title="Copy full ruleset hex">
-          Copy hex
+        <button id="show-ruleset" type="button" title="What ruleset is this?">
+          Ruleset
         </button>
       </div>
       <p id="draw-hint" class="lab-only">
@@ -55,6 +56,31 @@
       </div>
       <div id="status">Loading…</div>
       <button id="retry" type="button" hidden>Retry</button>
+    </div>
+    <div id="rule-card" hidden>
+      <div class="rule-card-panel">
+        <div class="rule-card-head">
+          <h2 id="rule-card-title">Ruleset</h2>
+          <button id="rule-card-close" type="button" aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <p id="rule-card-notation"></p>
+        <p id="rule-card-summary"></p>
+        <div id="rule-card-viz"></div>
+        <p class="rule-card-hex-row">
+          <code id="rule-card-hex"></code>
+          <button id="copy-hex" type="button" title="Copy full ruleset hex">
+            Copy hex
+          </button>
+        </p>
+        <a
+          id="rule-card-explorer"
+          class="explorer-link"
+          href="https://sidem.github.io/HexLife/"
+          >Open in the Explorer’s editor ↗</a
+        >
+      </div>
     </div>
     <script src="game.js" type="module"></script>
   </body>

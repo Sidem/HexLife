@@ -22,6 +22,14 @@ describe('ShareCodec.parseParams', () => {
     it('returns {} for empty params', () => {
         expect(ShareCodec.parseParams(new URLSearchParams(''))).toEqual({});
     });
+
+    it('parses edit=1 as openRulesetEditor, but only alongside a valid r', () => {
+        const hex = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6';
+        expect(ShareCodec.parseParams(new URLSearchParams(`r=${hex}&edit=1`)).openRulesetEditor).toBe(true);
+        // Without a ruleset there is nothing to edit — the flag must not survive alone.
+        expect(ShareCodec.parseParams(new URLSearchParams('edit=1')).openRulesetEditor).toBeUndefined();
+        expect(ShareCodec.parseParams(new URLSearchParams('r=nothex&edit=1')).openRulesetEditor).toBeUndefined();
+    });
 });
 
 describe('ShareCodec encode -> parse round-trip', () => {

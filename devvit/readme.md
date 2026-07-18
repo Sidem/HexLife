@@ -19,15 +19,22 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 - **Tap to play** — in the feed, the specimen shows a play button over its starting state; the
   first tap runs it.
 - **In-post controls** — play / pause and restart in the feed; the expanded view adds a speed
-  slider, the full ruleset hex, and click/drag **drawing** (invert brush, pauses while you draw —
+  slider, a **Ruleset** card, and click/drag **drawing** (invert brush, pauses while you draw —
   brush size comes from the explorer export, default 2 for older codes).
+- **"What ruleset is this?"** — answered everywhere it gets asked: every specimen is created with
+  a first comment naming its ruleset (with `B2/S35`-style notation when the rule reduces to
+  neighbor counts, orbit notation like `B2o3p/S2` for rotationally symmetric rules), the card
+  shows the notation next to the specimen name, and the expanded view's **Ruleset** button opens
+  a read-only card — birth/survival diagrams, the full hex with copy, and a deep link that opens
+  the Explorer's ruleset editor in the mode that fits the rule.
 - **Zoom without hijacking the feed** — **ctrl/⌘ + scroll wheel** zooms on desktop (a plain scroll
   moves the page, as it should); trackpad pinch and touch pinch zoom directly.
-- **Create your own from inside a post** — the expanded view has **Create your own**: paste a world
-  code and your specimen is posted without leaving Reddit.
+- **Paste a code (advanced)** — the expanded view still has **Create your own** for pasting a
+  world code from the explorer; the subreddit menu **⋯ → New HexLife post** does the same.
 - **Posted as you** — specimens you create are authored by *your* account, not the app's, so they
   appear in your post history and earn your karma.
-- **Open in Explorer** — deep-link to the full lab with the post’s ruleset loaded (`?r=<ruleset>`).
+- **Open in Explorer** — deep-link to the full lab with the post’s ruleset loaded (`?r=<ruleset>`);
+  the Ruleset card’s link adds `&edit=1`, which opens the lab with the ruleset editor already up.
 - **Starts paused** — play is explicit so large grids don’t lag phones scrolling past in the feed.
 - **No external network calls** — the simulation engine (Rust → WebAssembly) and WebGL renderer
   are bundled in the webview. Redis only stores the world code per post ID.
@@ -42,7 +49,7 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 
 **The easy way — remix a post you're already looking at:**
 
-1. Expand any HexLife post.
+1. Open any HexLife post and press **Open lab**.
 2. Play with it: drag on the world to paint, let it run, pause where it looks good.
 3. **Post my remix** → give it a title → done. What you see is exactly what gets posted, drawing
    and all.
@@ -51,11 +58,9 @@ Homepage / full lab: [HexLife Explorer](https://sidem.github.io/HexLife/)
 
 1. Open [HexLife Explorer](https://sidem.github.io/HexLife/) and set up a world you like.
 2. **Share → Copy World Code** (or **Copy code & open r/hexlife**).
-3. Paste it into either create path:
-   - **From an existing post** — expand any HexLife post → **Create your own**.
-   - **From the subreddit** — **subreddit menu (⋯) → New HexLife post**.
-4. Optionally edit the title (leave it blank to name the post after its ruleset), then create.
-5. Open the post → tap play on the specimen.
+3. On the subreddit: **⋯ → New HexLife post** (or **Open lab** → **Create your own**),
+   paste the code, optionally edit the title, and create.
+4. Open the post → tap play on the specimen.
 
 Every path authors the post as your account. If a code doesn’t paste cleanly, the form comes
 back with what you typed still in it — world codes are long and easy to truncate.
@@ -70,8 +75,8 @@ of it rather than touching your post.
 1. Install **hexlifeapp** from the Reddit Apps tools for your community (after the app is
    published/approved, any mod can install; before that only the developer on small test subs).
 2. Keep the sub under any install limits Reddit applies for unpublished apps (&lt; 200 subscribers).
-3. Tell members the create path: explorer → world code → **⋯ → New HexLife post**, or
-   **Create your own** inside any existing HexLife post.
+3. Tell members the easy path: **Open lab** → draw → **Post my remix**. Advanced:
+   explorer → world code → **⋯ → New HexLife post**.
 
 No extra configuration is required. On install, a demo post may appear automatically.
 

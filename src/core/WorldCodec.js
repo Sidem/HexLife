@@ -500,9 +500,11 @@ export function isFlickerProofPalette(colorSettings, lut = null) {
 /**
  * Build an Explorer deep-link that loads the given ruleset (ShareCodec `r` param).
  * Optional grid rows ride as `g` when non-default for embeds (64).
+ * `edit: true` adds `edit=1`, which makes the Explorer open the ruleset editor on boot in the
+ * mode that fits the rule (see AppInitializer) — the "what ruleset is this?" deep link.
  *
  * @param {string} rulesetHex
- * @param {{ rows?: number, origin?: string }} [opts]
+ * @param {{ rows?: number, origin?: string, edit?: boolean }} [opts]
  * @returns {string}
  */
 export function explorerUrlForRuleset(rulesetHex, opts = {}) {
@@ -514,5 +516,6 @@ export function explorerUrlForRuleset(rulesetHex, opts = {}) {
     if (typeof opts.rows === 'number' && opts.rows > 0 && opts.rows !== 64) {
         url.searchParams.set('g', String(opts.rows));
     }
+    if (opts.edit) url.searchParams.set('edit', '1');
     return url.toString();
 }

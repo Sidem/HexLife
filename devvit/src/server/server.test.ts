@@ -239,11 +239,53 @@ test('blank form title + post kit → kit title, description/tags in fallback an
   )
   assert.match(submitted[0]?.textFallback?.text ?? '', /Tags: Gliders, Spirals/)
 
-  // Enrichment comment so modern clients (custom-post cards hide textFallback) still see meta.
+  // Enrichment comment so modern clients (custom-post cards hide textFallback) still see meta —
+  // one comment carrying both the kit meta and the standing ruleset identity block.
   assert.equal(comments.length, 1)
   assert.match(comments[0]?.text ?? '', /A tidy little glider gun/)
   assert.match(comments[0]?.text ?? '', /Tags:.*Gliders/)
+  assert.match(comments[0]?.text ?? '', /\*\*Ruleset:\*\*/)
   assert.equal(body.navigateTo, 'https://reddit.com/r/hexlife/t3_new1')
+})
+
+test('every specimen gets a ruleset identity comment ("what ruleset is this?")', async () => {
+  const code = await worldCode()
+  await submitForm({code, title: 't'})
+
+  assert.equal(comments.length, 1)
+  assert.equal(comments[0]?.id, 't3_new1')
+  const text = comments[0]?.text ?? ''
+  // Name + full hex + an Explorer deep link that opens the ruleset editor.
+  assert.match(text, /\*\*Ruleset:\*\* \w+ \w+/)
+  assert.match(text, /`D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6`/)
+  assert.match(
+    text,
+    /sidem\.github\.io\/HexLife\/\?r=D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6&g=16&edit=1/,
+  )
+})
+
+test('identity comment carries B/S notation when the rule reduces to neighbor counts', async () => {
+  // A genuine outer-totalistic rule: birth on 2 neighbors, survival on 3 or 5. This hex is
+  // `rulesetToHex` of that table (verified by tests/rulesetDescriptor.test.js to read B2/S35).
+  const b2s35 = '16686880688080000116166916696996'
+  const rows = 16
+  const cols = 18
+  const code = await encodeWorldCode({
+    rows,
+    cols,
+    rulesetHex: b2s35,
+    cells: new Uint8Array(rows * cols).fill(1),
+    colorSettings: {mode: 'preset', activePreset: 'default'},
+    speed: 20,
+  })
+  assert.ok(code)
+
+  await submitForm({code, title: 't'})
+  const text = comments[0]?.text ?? ''
+  assert.match(text, /`B2\/S35`/)
+  assert.match(text, /Neighbor-count rule/)
+  // The notation also reaches old.reddit via textFallback.
+  assert.match(submitted[0]?.textFallback?.text ?? '', /B2\/S35/)
 })
 
 test('form title still overrides kit Title', async () => {
@@ -450,11 +492,14 @@ test('onPostSubmit comments on the text post instead of deleting it', async () =
   assert.equal(submitted[0]?.runAs, 'APP')
   assert.equal(redisValues.get('world:t3_new1'), code)
 
-  // ...and the author's original post survives, with a pointer to the specimen.
-  assert.equal(comments.length, 1)
-  assert.equal(comments[0]?.id, 't3_orig')
+  // ...and the author's original post survives, with a pointer to the specimen. Two comments
+  // total: the specimen's own ruleset identity comment, then the pointer on the original post.
+  assert.equal(comments.length, 2)
+  const identity = comments.find(c => c.id === 't3_new1')
+  assert.match(identity?.text ?? '', /\*\*Ruleset:\*\*/)
+  const pointer = comments.find(c => c.id === 't3_orig')
   assert.match(
-    comments[0]?.text ?? '',
+    pointer?.text ?? '',
     /https:\/\/reddit\.com\/r\/hexlife\/t3_new1/,
   )
 })

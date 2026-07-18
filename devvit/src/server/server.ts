@@ -9,6 +9,7 @@ import type {
 // The SAME codec the explorer exports with and the webview renders from — imported straight from the
 // HexLife source tree (this is why the Devvit app lives in-repo). Validating here means a bad paste
 // fails at the form, with a message, instead of becoming a permanently broken post.
+import {describeRuleset} from '../../../src/core/rulesetDescriptor.js'
 import {rulesetName} from '../../../src/core/rulesetName.js'
 import {
   decodeWorldCode,
@@ -197,9 +198,12 @@ type SpecimenMeta = Pick<PostKitFields, 'description' | 'tags'>
  * `permissions.reddit.asUser: ["SUBMIT_POST"]` in devvit.json. App-authored callers (install demo,
  * onPostSubmit) pass `runAs: 'APP'` — there is no user to attribute those to.
  *
- * When `meta` has a description and/or tags (from an Explorer post kit), they ride into
- * `textFallback` (old.reddit / crawlers) and a first comment so modern clients see them too.
- * Custom posts have no free-form body field we control beyond title + webview.
+ * Every specimen gets a first comment identifying its ruleset (name, B/S-style notation when one
+ * exists, hex, Explorer deep link) — "what ruleset is this?" is the most common question under
+ * these posts, and the comment answers it where it gets asked, for viewers who never expand the
+ * webview. Kit description/tags (from an Explorer post kit) ride in the same comment and in
+ * `textFallback` (old.reddit / crawlers). Custom posts have no free-form body field we control
+ * beyond title + webview.
  */
 async function createSpecimenPost(
   world: DecodedWorld,
@@ -219,21 +223,18 @@ async function createSpecimenPost(
   })
   await dbSetWorldCode(post.id, code)
 
-  const blurb = specimenEnrichmentComment(meta)
-  if (blurb) {
-    try {
-      await reddit.submitComment({
-        id: post.id,
-        text: blurb,
-        // APP: we only hold asUser SUBMIT_POST; a comment-as-user would need another scope.
-        runAs: 'APP',
-      })
-    } catch (commentErr) {
-      console.warn(
-        `createSpecimenPost: created ${post.id} but could not add kit meta comment:`,
-        commentErr,
-      )
-    }
+  try {
+    await reddit.submitComment({
+      id: post.id,
+      text: specimenIdentityComment(world, meta),
+      // APP: we only hold asUser SUBMIT_POST; a comment-as-user would need another scope.
+      runAs: 'APP',
+    })
+  } catch (commentErr) {
+    console.warn(
+      `createSpecimenPost: created ${post.id} but could not add ruleset comment:`,
+      commentErr,
+    )
   }
   return {id: post.id, url: post.url}
 }
@@ -251,10 +252,11 @@ function specimenTextFallback(
   meta: SpecimenMeta = {description: null, tags: []},
 ): string {
   const url = explorerUrlForRuleset(world.rulesetHex, {rows: world.rows})
+  const notation = describeRuleset(world.rulesetHex)?.notation
   const lines = [
     'HexLife Live Specimen — open this post on a modern Reddit client to play the simulation.',
     '',
-    `Ruleset: ${rulesetName(world.rulesetHex)} (${world.rulesetHex})`,
+    `Ruleset: ${rulesetName(world.rulesetHex)}${notation ? ` — ${notation}` : ''} (${world.rulesetHex})`,
     `Grid: ${world.rows}×${world.cols}`,
   ]
   if (meta.description?.trim()) {
@@ -267,16 +269,36 @@ function specimenTextFallback(
   return lines.join('\n')
 }
 
-/** First-comment body for kit description/tags; null when there's nothing to say. */
-function specimenEnrichmentComment(
+/**
+ * First-comment body: kit description/tags (author's words first) followed by the ruleset
+ * identity block. The identity block always exists — it is the standing answer to "what ruleset
+ * is this?", posted where that question gets asked. Notation comes from {@link describeRuleset}:
+ * `B2/S35` for neighbor-count rules, orbit-suffixed `B2o3p/S2` for rotationally symmetric ones,
+ * and none for raw 128-entry rules (the hex is the rule; the summary says so).
+ */
+function specimenIdentityComment(
+  world: DecodedWorld,
   meta: SpecimenMeta = {description: null, tags: []},
-): string | null {
+): string {
   const parts: string[] = []
   if (meta.description?.trim()) parts.push(meta.description.trim())
   if (meta.tags.length > 0) {
     parts.push(`**Tags:** ${meta.tags.join(' · ')}`)
   }
-  return parts.length > 0 ? parts.join('\n\n') : null
+
+  const desc = describeRuleset(world.rulesetHex)
+  const notation = desc?.notation ? ` — \`${desc.notation}\`` : ''
+  const identity = [`**Ruleset:** ${rulesetName(world.rulesetHex)}${notation}`]
+  if (desc) identity.push(desc.summary)
+  identity.push(
+    `Hex: \`${world.rulesetHex}\` — paste into the Explorer's ruleset editor, or`,
+    `▶ [run & inspect this ruleset in HexLife Explorer](${explorerUrlForRuleset(
+      world.rulesetHex,
+      {rows: world.rows, edit: true},
+    )})`,
+  )
+  parts.push(identity.join('\n\n'))
+  return parts.join('\n\n')
 }
 
 /** The form came back: validate the code, create the post, and pin the code to the new post's ID. */
@@ -308,9 +330,13 @@ async function routeFormNewPost(reqMsg: IncomingMessage): Promise<UiResponse> {
 }
 
 /**
- * "Create your own" from inside a post: same act as the menu form, reached without leaving the
- * post. The client collects the values via its own `showForm` (a client-side effect can't call the
- * server's form callback), so this route is the menu form's callback minus the UI envelope.
+ * Paste-code / remix create (lab "Create your own" + "Post my remix"). The client collects values
+ * via its own `showForm` (a client-side effect can't call the server's form callback), so this
+ * route is the menu form's callback minus the UI envelope.
+ *
+ * Authorship: `runAs: 'USER'` is necessary but not sufficient for webview-originated creates —
+ * the client must also call `canRunAsUser` on the click before fetching here, or Reddit attributes
+ * the post to the app account. The menu form path does not need that call (native form consent).
  */
 async function routeCreatePost(
   reqMsg: IncomingMessage,

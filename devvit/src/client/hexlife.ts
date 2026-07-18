@@ -16,8 +16,9 @@
  * running the built-in demo under someone else's post title — see {@link WorldCodeResult}.
  */
 
-import {context, navigateTo, showForm} from '@devvit/web/client'
+import {canRunAsUser, context, navigateTo, showForm} from '@devvit/web/client'
 import '../../../src/embed/index.js'
+import {describeRuleset} from '../../../src/core/rulesetDescriptor.js'
 import {rulesetName} from '../../../src/core/rulesetName.js'
 import {
   decodeWorldCode,
@@ -37,6 +38,7 @@ import {
   type WorldPostData,
 } from '../shared/api.ts'
 import {fetchWorldCode} from './fetch.ts'
+import {paintRuleCard} from './ruleCard.ts'
 
 /** Feed (splash) vs expanded lab (game) — same sim, different chrome density. */
 export type ChromeMode = 'feed' | 'lab'
@@ -182,6 +184,7 @@ async function mountWorld(
 
   paintIdentity(meta)
   wireExplorerLink(meta)
+  wireRuleCard(meta)
   wireCopyHex(meta.rulesetHex)
   wireTransport(world)
   wirePostRemix(world, status)
@@ -300,6 +303,15 @@ function paintIdentity(meta: WorldMeta): void {
   const name = rulesetName(meta.rulesetHex)
   if (nameEl) nameEl.textContent = name
 
+  // The notation badge — B/S for neighbor-count rules, orbit-suffixed for r-sym ones. Raw rules
+  // get nothing here (CSS collapses the empty span): a 32-char hex is not a badge.
+  const ruleEl = el('specimen-rule')
+  if (ruleEl) {
+    const desc = describeRuleset(meta.rulesetHex)
+    ruleEl.textContent = desc?.notation ?? ''
+    ruleEl.title = desc?.summary ?? ''
+  }
+
   if (hexEl) {
     const short =
       meta.rulesetHex.length >= 8
@@ -340,6 +352,56 @@ function wireExplorerLink(meta: WorldMeta): void {
   }
 }
 
+/**
+ * Lab-only "Ruleset" button → read-only rule card (see ruleCard.ts). The most-asked question
+ * under these posts is "what ruleset is this?" — this answers it in-post, without sending the
+ * viewer into the Explorer's editor (whose 128-cell grid is a poor fit for phones).
+ */
+function wireRuleCard(meta: WorldMeta): void {
+  // Not `el()`: the feed card has no ruleset button by design — its chrome stays minimal.
+  const btn = document.getElementById(
+    'show-ruleset',
+  ) as HTMLButtonElement | null
+  const card = document.getElementById('rule-card')
+  if (!btn || !card) return
+
+  paintRuleCard(meta.rulesetHex, rulesetName(meta.rulesetHex))
+
+  // The card's CTA opens the Explorer with the editor already up, in the mode fitting the rule.
+  const link = document.getElementById(
+    'rule-card-explorer',
+  ) as HTMLAnchorElement | null
+  if (link) {
+    const href = explorerUrlForRuleset(meta.rulesetHex, {
+      rows: meta.rows,
+      edit: true,
+    })
+    link.href = href
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    // Same webview quirk as wireExplorerLink: plain <a> left-clicks are swallowed by Reddit.
+    link.addEventListener('click', ev => {
+      ev.preventDefault()
+      navigateTo(href)
+    })
+  }
+
+  const close = (): void => {
+    card.hidden = true
+  }
+  btn.addEventListener('click', () => {
+    card.hidden = false
+  })
+  document.getElementById('rule-card-close')?.addEventListener('click', close)
+  // Backdrop click closes; clicks inside the panel bubble up from children of .rule-card-panel.
+  card.addEventListener('click', ev => {
+    if (ev.target === card) close()
+  })
+  document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && !card.hidden) close()
+  })
+}
+
 function wireCopyHex(rulesetHex: string): void {
   const btn = el<HTMLButtonElement>('copy-hex')
   if (!btn) return
@@ -355,24 +417,32 @@ function wireCopyHex(rulesetHex: string): void {
 }
 
 /**
- * "Create your own": the viewer pastes a world code from the explorer and gets their own Live
- * Specimen, without leaving the post to hunt for the subreddit menu.
+ * Lab-only "Create your own": paste a world code from the explorer (power-user path). The feed
+ * deliberately omits this — paste-a-code is not onboarding; the feed leads people to **Open lab**
+ * → draw → **Post my remix** instead.
  *
  * `showForm` is a client effect, so it can't reach the server's registered form callback — the
  * values come back here and go to `api/post`, which is that callback minus the UI envelope.
+ * Unlike the menu form (native Reddit UI → form callback, consent built in), this path is a
+ * webview fetch, so it must call {@link ensureUserPostPermission} first or the post lands as
+ * the app account.
  * `showForm`/`navigateTo` only do anything inside Reddit; locally the button wires up and no-ops.
  */
 function wireCreateOwn(status: HTMLElement): void {
-  // Not `el()`: splash.html deliberately omits this button (the feed card stays lean).
+  // Not `el()`: feed has no create-own by design; only the lab page mounts this button.
   const btn = document.getElementById('create-own') as HTMLButtonElement | null
   if (!btn) return
-  btn.addEventListener('click', () => void createOwn(btn, status))
+  btn.addEventListener('click', ev => void createOwn(ev, btn, status))
 }
 
 async function createOwn(
+  event: Event,
   btn: HTMLButtonElement,
   status: HTMLElement,
 ): Promise<void> {
+  // Consent first, on the trusted click — after `await showForm` the gesture is spent on some
+  // clients and a late canRunAsUser either no-ops or never prompts.
+  if (!(await ensureUserPostPermission(event, status))) return
   const rsp = await showForm({
     title: NEW_POST_COPY.title,
     description: NEW_POST_COPY.description,
@@ -396,14 +466,19 @@ function wirePostRemix(world: HexLifeElement, status: HTMLElement): void {
   // Not `el()`: splash.html has no remix button — the feed card never mounts a drawable world.
   const btn = document.getElementById('post-remix') as HTMLButtonElement | null
   if (!btn) return
-  btn.addEventListener('click', () => void postRemix(world, btn, status))
+  btn.addEventListener('click', ev => void postRemix(ev, world, btn, status))
 }
 
 async function postRemix(
+  event: Event,
   world: HexLifeElement,
   btn: HTMLButtonElement,
   status: HTMLElement,
 ): Promise<void> {
+  // Consent first, on the trusted click — after `await showForm` the gesture is spent on some
+  // clients and a late canRunAsUser either no-ops or never prompts.
+  if (!(await ensureUserPostPermission(event, status))) return
+
   // What you see is what posts: a world that keeps ticking between the tap and the confirm would
   // post a generation the viewer never chose.
   world.pause()
@@ -425,9 +500,41 @@ async function postRemix(
 }
 
 /**
+ * Client-side consent for webview → `api/post` → `runAs: 'USER'`.
+ *
+ * The menu "New HexLife post" form never needs this: Reddit collects permission when the form
+ * callback runs. In-post create uses `fetch`, and without {@link canRunAsUser} the platform
+ * attributes the specimen to u/hexlifeapp even though the server passes `runAs: 'USER'`.
+ *
+ * Outside Reddit (local harness) the bridge is absent — treat as allowed so the rest of the
+ * path still no-ops cleanly on `navigateTo`.
+ */
+async function ensureUserPostPermission(
+  event: Event,
+  status: HTMLElement,
+): Promise<boolean> {
+  try {
+    const allowed = await canRunAsUser(event)
+    if (!allowed) {
+      setStatus(status, NEW_POST_COPY.userPostPermissionDenied, 'error')
+      return false
+    }
+    return true
+  } catch (err) {
+    // No bridge / untrusted synthetic event — local harness and unit shells.
+    console.warn(
+      'canRunAsUser unavailable; proceeding without consent gate',
+      err,
+    )
+    return true
+  }
+}
+
+/**
  * The tail both create paths share: hand a code to `api/post` and go to the new post. The two
  * differ only in where the code came from (a paste vs. a snapshot), so everything after the form
  * — validation, `runAs: 'USER'`, the Redis write — is one path on the server and one here.
+ * Callers must already have {@link ensureUserPostPermission} for webview-originated creates.
  */
 async function submitNewPost(
   values: {code: string; title: string},

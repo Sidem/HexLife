@@ -31,9 +31,10 @@ export type WorldPostData = {
 export type CreatePostRsp = {url: string}
 
 /**
- * Copy shared by the two create paths — the subreddit menu form (server-rendered) and the in-post
- * "Create your own" form (client `showForm`). Same act, so they must not describe themselves
- * differently depending on which door the user came through.
+ * Copy shared by the paste-code create paths — the subreddit menu form (server-rendered) and the
+ * lab-only "Create your own" form (client `showForm`). Same act, so they must not describe
+ * themselves differently depending on which door the user came through. (Feed no longer offers
+ * this; onboarding is Open lab → Post my remix.)
  */
 export const NEW_POST_COPY = {
   title: 'New HexLife post',
@@ -69,6 +70,13 @@ export const NEW_POST_COPY = {
   remixAcceptLabel: 'Post it',
   /** The element had no world to encode — a boot failure, so there is nothing on screen to post. */
   remixNothingToPost: 'Nothing to post — this world hasn’t loaded.',
+  /**
+   * Webview create paths must call `canRunAsUser` before `api/post`. If the viewer declines
+   * (or later revokes) the asUser scopes, `runAs: 'USER'` would fall back to the app account —
+   * refuse rather than post as u/hexlifeapp.
+   */
+  userPostPermissionDenied:
+    'Reddit needs permission to post as you. Allow it when prompted, then try again.',
 } as const
 
 /** The prefix every world code carries (see src/core/WorldCodec.js). */
@@ -250,7 +258,7 @@ export function remixPostFields(defaults: {title?: string} = {}) {
 export type Endpoint = (typeof Endpoint)[keyof typeof Endpoint]
 export const Endpoint = {
   GetWorld: 'api/world',
-  /** Create a Live Specimen from inside a post (the in-post "Create your own" button). */
+  /** Create a Live Specimen from a pasted code (lab "Create your own" / menu form). */
   CreatePost: 'api/post',
   OnAppInstall: 'internal/on/app/install',
   OnMenuNewPost: 'internal/on/menu/new-post',
