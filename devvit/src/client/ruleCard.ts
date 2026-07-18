@@ -36,11 +36,11 @@ const DIRS: readonly [number, number][] = [
   [0, 1], // S
 ]
 
-/** Pointy-top hexagon path centered on (cx, cy). */
+/** Flat-top hexagon path centered on (cx, cy) — matches the world's cell orientation. */
 function hexPoints(cx: number, cy: number, r: number): string {
   const pts: string[] = []
   for (let k = 0; k < 6; k++) {
-    const a = ((k * 60 - 90) * Math.PI) / 180
+    const a = (k * 60 * Math.PI) / 180
     pts.push(
       `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`,
     )
