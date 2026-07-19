@@ -31,6 +31,13 @@ import { clampBrushSize, DEFAULT_BRUSH_SIZE } from '../core/hexBrush.js';
 const APP_URL = 'https://sidem.github.io/HexLife/';
 
 /**
+ * How long after a stroke begins a second finger still counts as "this was a pinch, not a drawing".
+ * Sized from the gap between the two fingers of a real pinch landing (tens of milliseconds, plus
+ * headroom); anything slower is treated as a deliberate stroke and is never rewound.
+ */
+const ACCIDENTAL_STROKE_MS = 220;
+
+/**
  * Attribute defaults and bounds. `speed` mirrors the app's `Config.DEFAULT_SPEED` (40) so a copied
  * embed runs at the rate the user saw — the value is duplicated rather than imported because
  * `config.js` has an import-time side effect the embed must not pull in (see EmbedSim's header).
@@ -282,6 +289,14 @@ export class HexLifeElement extends HTMLElement {
         this._pinchTouches = new Map();
         this._pinchStartDist = 0;
         this._pinchStartZoom = 1;
+        /** Midpoint of the two pinch fingers on the previous move — drives two-finger pan. */
+        this._pinchLastMid = null;
+        /**
+         * Set the moment a second finger touches down, cleared only when *every* finger has lifted.
+         * Two-finger gestures own navigation outright: without the latch, lifting one finger
+         * mid-pinch would drop straight back into painting under the finger still on the glass.
+         */
+        this._gestureLock = false;
         this._onWheel = this._onWheel.bind(this);
         this._onTouchStart = this._onTouchStart.bind(this);
         this._onTouchMove = this._onTouchMove.bind(this);
@@ -298,6 +313,8 @@ export class HexLifeElement extends HTMLElement {
         this._strokeAffected = new Set();
         this._lastDrawCoords = null;
         this._resumeAfterStroke = false;
+        /** When the current stroke started, so a pinch onset can tell "a slip" from "real drawing". */
+        this._strokeStartTime = 0;
 
         /**
          * Upgrade order is: `attributeChangedCallback` once per attribute, *then*
@@ -928,8 +945,17 @@ export class HexLifeElement extends HTMLElement {
 
     _onPointerDown(e) {
         if (!this.hasAttribute('draw') || !this.sim || !this.renderer || this.error) return;
-        // Multi-touch pinch owns the gesture — don't paint under a second finger.
-        if (this._pinchTouches.size >= 2) return;
+        // Multi-touch pinch owns the gesture — don't paint under a second finger, and stay out of
+        // the way for the rest of it (see `_gestureLock`).
+        if (this._pinchTouches.size >= 2 || this._gestureLock) return;
+        // A second concurrent pointer *is* the pinch starting. `pointerdown` fires before the
+        // matching `touchstart`, so `_pinchTouches` is still size 1 here — this is the earliest
+        // point at which a pinch is knowable, and the only one early enough to undo the dab the
+        // first finger just painted.
+        if (this._drawing && e.pointerId !== this._drawPointerId) {
+            this._beginTouchGesture();
+            return;
+        }
         if (e.pointerType === 'mouse' && e.button !== 0) return;
 
         const rect = this._canvas.getBoundingClientRect();
@@ -943,6 +969,7 @@ export class HexLifeElement extends HTMLElement {
         this._drawing = true;
         this._drawPointerId = e.pointerId;
         this._strokeAffected = new Set();
+        this._strokeStartTime = performance.now();
         this._lastDrawCoords = hit;
         // Pause while drawing; remember whether we should resume after the stroke.
         this._resumeAfterStroke = !this._userPaused && this.playing;
@@ -959,8 +986,8 @@ export class HexLifeElement extends HTMLElement {
 
     _onPointerMove(e) {
         if (!this._drawing || e.pointerId !== this._drawPointerId) return;
-        if (this._pinchTouches.size >= 2) {
-            this._endDrawStroke(true);
+        if (this._pinchTouches.size >= 2 || this._gestureLock) {
+            this._beginTouchGesture();
             return;
         }
         e.preventDefault();
@@ -984,6 +1011,34 @@ export class HexLifeElement extends HTMLElement {
         if (!this._drawing) return;
         if (e && this._drawPointerId != null && e.pointerId !== this._drawPointerId) return;
         this._endDrawStroke(true);
+    }
+
+    /**
+     * Hand the touch over to navigation (pinch-zoom + two-finger pan): latch the gesture lock and
+     * end any stroke in flight, rewinding it when it is young enough to have been an accident.
+     */
+    _beginTouchGesture() {
+        this._gestureLock = true;
+        if (this._drawing && this._strokeIsAccidental()) this._revertStroke();
+        this._endDrawStroke(true);
+    }
+
+    /**
+     * Was the in-flight stroke plausibly just the leading edge of a pinch?
+     *
+     * The two fingers of a pinch land within roughly a tenth of a second of each other, so anything
+     * inside the window is a slip and gets rewound. Past it the viewer was genuinely drawing, and
+     * un-drawing their work because they then reached for a zoom would be far worse than leaving it.
+     */
+    _strokeIsAccidental() {
+        return performance.now() - this._strokeStartTime < ACCIDENTAL_STROKE_MS;
+    }
+
+    /** Undo the current stroke by re-inverting exactly the cells it flipped. */
+    _revertStroke() {
+        if (!this.sim || this._strokeAffected.size === 0) return;
+        if (this.sim.invertCells(this._strokeAffected)) this._drawOnce();
+        this._strokeAffected = new Set();
     }
 
     /**
@@ -1118,12 +1173,16 @@ export class HexLifeElement extends HTMLElement {
         for (const t of e.changedTouches) {
             this._pinchTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
         }
-        if (this._pinchTouches.size === 2) {
+        if (this._pinchTouches.size >= 2) {
             const pts = [...this._pinchTouches.values()];
             const dx = pts[0].x - pts[1].x;
             const dy = pts[0].y - pts[1].y;
             this._pinchStartDist = Math.hypot(dx, dy) || 1;
             this._pinchStartZoom = this._viewZoom;
+            this._pinchLastMid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+            // Belt and braces: `pointerdown` for the second finger normally gets here first, but a
+            // host that swallows pointer events would leave the stroke running without this.
+            this._beginTouchGesture();
         }
     }
 
@@ -1148,20 +1207,50 @@ export class HexLifeElement extends HTMLElement {
         const midY = (pts[0].y + pts[1].y) / 2;
         const rect = this._canvas.getBoundingClientRect();
         const ratio = target / this._viewZoom;
-        if (ratio === 1 && target === 1) {
-            // Pinch fully open — still call _zoomBy so pan snaps back to the fit.
-            this._zoomBy(1, midX - rect.left, midY - rect.top);
-            return;
+        // Zoom first, anchored at the midpoint so the world stays pinned under the fingers, then
+        // translate by however far that midpoint travelled. The two compose into the one gesture
+        // people expect from a map: spread to zoom, slide to pan, in any mixture.
+        if (ratio !== 1 || target === 1) {
+            this._zoomBy(ratio, midX - rect.left, midY - rect.top);
         }
-        if (ratio === 1) return;
-        this._zoomBy(ratio, midX - rect.left, midY - rect.top);
+        if (this._pinchLastMid) {
+            this._panBy(midX - this._pinchLastMid.x, midY - this._pinchLastMid.y);
+        }
+        this._pinchLastMid = { x: midX, y: midY };
+    }
+
+    /**
+     * Translate the view by a CSS-pixel delta (positive = content follows the finger right/down).
+     *
+     * Clamped to the same bound the anchored zoom maths already preserves — `(zoom - 1) * half` per
+     * axis — so the grid can never be dragged off into empty canvas, and at the zoom floor pan is
+     * pinned to 0 (the fitted view is centred by definition).
+     * @param {number} dx
+     * @param {number} dy
+     */
+    _panBy(dx, dy) {
+        if (!this.renderer || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+        const rect = this._canvas.getBoundingClientRect();
+        const maxX = ((this._viewZoom - 1) * rect.width) / 2;
+        const maxY = ((this._viewZoom - 1) * rect.height) / 2;
+        const nextX = Math.min(maxX, Math.max(-maxX, this._viewPanX + dx));
+        const nextY = Math.min(maxY, Math.max(-maxY, this._viewPanY + dy));
+        if (nextX === this._viewPanX && nextY === this._viewPanY) return;
+        this._viewPanX = nextX;
+        this._viewPanY = nextY;
+        this._applyView();
+        if (!this.playing) this._drawOnce();
     }
 
     _onTouchEnd(e) {
         for (const t of e.changedTouches) this._pinchTouches.delete(t.identifier);
         if (this._pinchTouches.size < 2) {
             this._pinchStartDist = 0;
+            this._pinchLastMid = null;
         }
+        // Only a fully empty glass releases the lock — one finger left over from a pinch must not
+        // start painting a line across everything the viewer was just navigating around.
+        if (this._pinchTouches.size === 0) this._gestureLock = false;
     }
 
     // --- chrome ---------------------------------------------------------------

@@ -329,6 +329,31 @@ export class EmbedSim {
     }
 
     /**
+     * Invert an arbitrary set of cell indices, with no per-stroke bookkeeping.
+     *
+     * This is the exact inverse of `invertBrushLine` over the same set (inversion is self-inverse,
+     * and a stroke set holds each index at most once), which is what makes "undo the marks a pinch
+     * left behind" possible without snapshotting the whole grid.
+     *
+     * @param {Iterable<number>} indices
+     * @returns {boolean} Whether any cell changed.
+     */
+    invertCells(indices) {
+        if (!this.state || !this.ruleIndices) return false;
+        let changed = false;
+        for (const idx of indices) {
+            if (idx < 0 || idx >= this.numCells) continue;
+            const prev = this.state[idx];
+            const next = prev ? 0 : 1;
+            this.state[idx] = next;
+            this.ruleIndices[idx] = RULE_INDEX_INITIAL;
+            this.activeCount += next ? 1 : -1;
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
      * A private copy of the current generation's cells.
      *
      * `state` is a *view* into wasm linear memory, so handing it to a caller hands them something
