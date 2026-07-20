@@ -112,7 +112,8 @@ export class LibraryController {
 
     /**
      * Returns a copy of the user's personal pattern library.
-     * @returns {Array<{id: string, name: string, cells: Array<[number, number]>, createdAt: string}>}
+     * @returns {Array<{id: string, name: string, cells: Array<[number, number]>, createdAt: string,
+     *   rulesetHex?: string|null, tags?: string[]}>}
      */
     getUserPatterns() {
         return [...this.userPatterns];
@@ -120,7 +121,10 @@ export class LibraryController {
 
     /**
      * Adds (or updates, if `id` matches) a pattern in the user's personal pattern library.
-     * @param {{name: string, cells: Array<[number, number]>, id?: string}} patternData
+     * `rulesetHex` links the pattern to the ruleset it was captured under (null/absent = unlinked);
+     * `tags` shares the ruleset library's vocabulary (core/tags.js).
+     * @param {{name: string, cells: Array<[number, number]>, id?: string,
+     *   rulesetHex?: string|null, tags?: string[]}} patternData
      */
     saveUserPattern(patternData) {
         const existingIndex = patternData.id ? this.userPatterns.findIndex(p => p.id === patternData.id) : -1;

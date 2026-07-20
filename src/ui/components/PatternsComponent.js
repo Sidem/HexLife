@@ -2,6 +2,7 @@ import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { ICONS } from '../icons.js';
 import { patternToHexSVG } from '../../utils/utils.js';
+import { tagLabel } from '../../core/tags.js';
 
 /**
  * The Patterns menu: copy/paste a region of cells, capture a region to the
@@ -63,7 +64,14 @@ export class PatternsComponent extends BaseComponent {
             if (!item) return;
             const id = item.dataset.patternId;
             const libraryController = this.appContext.libraryController;
-            if (e.target.closest('[data-action="place-pattern"]')) {
+            if (e.target.closest('[data-action="load-pattern-ruleset"]')) {
+                const pattern = libraryController.getUserPatterns().find(p => p.id === id);
+                if (pattern?.rulesetHex) {
+                    const { name } = libraryController.getDisplayName(pattern.rulesetHex);
+                    libraryController.loadRuleset(pattern.rulesetHex);
+                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: `Loaded ruleset "${name}" — the pattern's home turf.`, type: 'success' });
+                }
+            } else if (e.target.closest('[data-action="place-pattern"]')) {
                 libraryController.placeUserPattern(id);
                 EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
             } else if (e.target.closest('[data-action="delete-pattern"]')) {
@@ -82,6 +90,9 @@ export class PatternsComponent extends BaseComponent {
 
         this._renderPatternsList();
         this._subscribeToEvent(EVENTS.USER_PATTERNS_CHANGED, this._renderPatternsList);
+        // Ruleset chips resolve their display name from the libraries at render time, so a later
+        // save/rename of the linked ruleset should refresh the list too.
+        this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._renderPatternsList);
     }
 
     _renderPatternsList() {
@@ -94,13 +105,33 @@ export class PatternsComponent extends BaseComponent {
         this.patternsList.innerHTML = patterns.map(p => `
             <div class="pattern-list-item" data-pattern-id="${p.id}">
                 <span class="pattern-list-thumb">${this._renderThumb(p)}</span>
-                <span class="pattern-list-name" title="${this._escape(p.name)}">${this._escape(p.name)}</span>
+                <div class="pattern-list-body">
+                    <span class="pattern-list-name" title="${this._escape(p.name)}">${this._escape(p.name)}</span>
+                    ${this._renderMeta(p)}
+                </div>
                 <div class="pattern-list-actions">
                     <button class="button-icon" data-action="place-pattern" title="Place this pattern">${ICONS.target}</button>
                     <button class="button-icon" data-action="delete-pattern" title="Delete this pattern">${ICONS.trash}</button>
                 </div>
             </div>
         `).join('');
+    }
+
+    /**
+     * Chip row under the name: the linked source ruleset (click to load it) and the pattern's tags.
+     * Empty string when the pattern has neither, keeping legacy entries on a single line.
+     */
+    _renderMeta(pattern) {
+        const chips = [];
+        if (typeof pattern.rulesetHex === 'string' && pattern.rulesetHex.length === 32) {
+            const { name } = this.appContext.libraryController.getDisplayName(pattern.rulesetHex);
+            chips.push(`<button class="tag-chip pattern-ruleset-chip" data-action="load-pattern-ruleset"
+                title="Captured under ruleset &quot;${this._escape(name)}&quot; — click to load it">${this._escape(name)}</button>`);
+        }
+        for (const tag of Array.isArray(pattern.tags) ? pattern.tags : []) {
+            chips.push(`<span class="tag-chip">${this._escape(tagLabel(tag))}</span>`);
+        }
+        return chips.length ? `<div class="pattern-list-meta">${chips.join('')}</div>` : '';
     }
 
     /** Renders a small hexagon thumbnail for a saved pattern. */

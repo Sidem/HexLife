@@ -323,12 +323,45 @@
     fill: #3cb44b;
 }
 
-.pattern-list-name {
+.pattern-list-body {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pattern-list-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.9em;
+}
+
+.pattern-list-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+
+.pattern-list-meta .tag-chip {
+    font-size: 0.68em;
+    padding: 1px 6px;
+}
+
+button.pattern-ruleset-chip {
+    cursor: pointer;
+    border-color: #6fa8dc;
+    color: #9cc6f5;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: background-color 0.15s;
+}
+
+button.pattern-ruleset-chip:hover {
+    background-color: #4a4a4a;
 }
 
 .pattern-list-actions {

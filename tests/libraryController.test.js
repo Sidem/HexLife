@@ -114,6 +114,46 @@ describe('LibraryController.saveUserRuleset (schema v2)', () => {
     });
 });
 
+describe('LibraryController.saveUserPattern (ruleset link + tags)', () => {
+    function makeLc() {
+        const lc = new LibraryController();
+        lc.userPatterns = [];
+        lc.libraryData = { rulesets: [], patterns: [] };
+        return lc;
+    }
+
+    it('stores the linked source ruleset and tags on a new pattern', () => {
+        const lc = makeLc();
+        lc.saveUserPattern({
+            name: 'Glider', cells: [[0, 0], [1, 0]], originParity: 1,
+            rulesetHex: HEX_A, tags: ['gliders', 'my-tag'],
+        });
+        const saved = lc.getUserPatterns()[0];
+        expect(saved.rulesetHex).toBe(HEX_A);
+        expect(saved.tags).toEqual(['gliders', 'my-tag']);
+        expect(saved.id).toBeTruthy();
+        expect(saved.createdAt).toBeTruthy();
+    });
+
+    it('an unlinked save stores rulesetHex null, and an id-match update can relink', () => {
+        const lc = makeLc();
+        lc.userPatterns = [{ id: 'p1', name: 'Old', cells: [[0, 0]], createdAt: 't', rulesetHex: null, tags: [] }];
+        lc.saveUserPattern({ id: 'p1', name: 'Old', cells: [[0, 0]], rulesetHex: HEX_B, tags: ['ships'] });
+        expect(lc.getUserPatterns()).toHaveLength(1);
+        const saved = lc.getUserPatterns()[0];
+        expect(saved.rulesetHex).toBe(HEX_B);
+        expect(saved.tags).toEqual(['ships']);
+    });
+
+    it('legacy patterns without the new fields survive a round-trip untouched', () => {
+        const lc = makeLc();
+        lc.userPatterns = [{ id: 'p0', name: 'Legacy', cells: [[0, 0]], createdAt: 't' }];
+        const saved = lc.getUserPatterns()[0];
+        expect(saved.rulesetHex).toBeUndefined();
+        expect(saved.tags).toBeUndefined();
+    });
+});
+
 describe('LibraryController pack export / import', () => {
     function makeLc(user = []) {
         const lc = new LibraryController();

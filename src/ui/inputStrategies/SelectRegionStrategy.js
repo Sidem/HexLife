@@ -125,7 +125,10 @@ export class SelectRegionStrategy extends BaseInputStrategy {
         if (this.mode === 'copy') {
             EventBus.dispatch(EVENTS.COMMAND_SET_PATTERN_CLIPBOARD, { cells, originParity });
         } else {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, { cells, originParity });
+            // Snapshot the source world's ruleset at capture time so the save modal can offer to
+            // associate the pattern with the ruleset it was actually observed working in.
+            const sourceRulesetHex = this.manager.worldManager?.getCurrentRulesetHex?.() ?? null;
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_PATTERN_MODAL, { cells, originParity, sourceRulesetHex });
         }
         this.manager.setStrategy(this.manager.previousStrategyName || 'pan');
     }
