@@ -343,6 +343,8 @@ const SIDE_EVENTS: readonly [label: string, event: string][] = [
   ['pasted-code create', 'create_posted'],
   ['boot failed', 'boot_error'],
   ['pressed retry', 'retry'],
+  ['no WebGL2 (blocked)', 'gpu_blocked'],
+  ['software-rendered', 'gpu_slow'],
 ]
 
 /**

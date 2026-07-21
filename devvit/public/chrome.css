@@ -60,6 +60,23 @@ body {
   padding-bottom: var(--safe-b);
 }
 
+/* Placed explicitly, not by auto-flow, because `#identity` starts `hidden` and a `display: none`
+   header is not a grid item at all. Under auto-flow that silently shifts everything up a row: the
+   world takes `auto` and *#chrome* inherits the `1fr`, so the control bar stretches to fill the
+   viewport with a third of a screen of empty panel. Visible in any state that never paints the
+   identity — a boot with no `postData`, a failed fetch, the GPU help card. */
+#identity {
+  grid-row: 1;
+}
+
+#world {
+  grid-row: 2;
+}
+
+#chrome {
+  grid-row: 3;
+}
+
 /* --- mode gating ---------------------------------------------------------- */
 
 body[data-chrome='feed'] .lab-only {
@@ -414,6 +431,123 @@ body[data-boot='error'] #draw-hint {
 
 #status:empty {
   display: none;
+}
+
+/* --- GPU acceleration help ------------------------------------------------
+   Built by src/utils/gpuSupport.js, shared with the Explorer's loading screen. Two placements:
+   in #world instead of a world we can't draw, and folded inside .gpu-notice when we can draw it
+   but only in software. Same markup, so one block of styles serves both. */
+
+.gpu-help {
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+#world .gpu-help {
+  /* #world is `place-items: center` — a scrollable block of prose has to opt out of that or it
+     centers itself into an unreachable overflow on a short phone viewport. */
+  align-self: stretch;
+  justify-self: stretch;
+  overflow-y: auto;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 4px;
+}
+
+.gpu-help-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gpu-help-lede {
+  margin: 0 0 10px;
+}
+
+.gpu-help-note {
+  margin: 0 0 10px;
+  color: var(--accent);
+}
+
+.gpu-help-block {
+  margin-bottom: 10px;
+}
+
+.gpu-help-browser {
+  margin: 0 0 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger-soft);
+}
+
+.gpu-help-steps {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.gpu-help-steps li {
+  margin-bottom: 2px;
+}
+
+.gpu-help-more summary {
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.gpu-help-caveats {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.gpu-help-foot {
+  margin: 12px 0 0;
+  color: var(--text);
+}
+
+/* The software-rendering aside. Collapsed to one line by default: the specimen is what the viewer
+   came for, and a permanent banner about their graphics settings would outshout it. */
+.gpu-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 8px 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  font-size: 12px;
+}
+
+.gpu-notice details {
+  flex: 1;
+  min-width: 0;
+}
+
+.gpu-notice summary {
+  cursor: pointer;
+  color: var(--danger-soft);
+}
+
+.gpu-notice .gpu-help {
+  margin-top: 8px;
+  max-height: 40dvh;
+  overflow-y: auto;
+}
+
+.gpu-notice-dismiss {
+  flex: none;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
 }
 
 /* --- ruleset card (lab only) ---------------------------------------------- */

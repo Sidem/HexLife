@@ -29,6 +29,14 @@ export const TELEMETRY_EVENTS = [
   'boot_error',
   /** They pressed Retry after a boot_error — i.e. the error card did its job. */
   'retry',
+  /**
+   * The device can't do WebGL2 at all, so we showed the "turn on hardware acceleration" card
+   * instead of a world. Counted because it is otherwise invisible: these sessions never fire
+   * `boot`, so without this they simply vanish from the funnel rather than explaining themselves.
+   */
+  'gpu_blocked',
+  /** WebGL2 present but software-rendered — the world ran, slowly, with a warning. */
+  'gpu_slow',
 
   /** First meaningful interaction of any kind. `boot - engaged` is the bounce count. */
   'engaged',

@@ -43,6 +43,58 @@
     transition: color 0.3s;
 }
 
+/* ---- GPU acceleration help (see src/utils/gpuSupport.js) ----
+   Shown in place of the loader when we refuse to start. The honeycomb goes away: an animation that
+   keeps promising a load that is never coming reads as a hang, not as an explanation. */
+/* `justify-content`, not `align-items`: the indicator is a *column* flex, so align-items is the
+   horizontal axis and setting it to flex-start shoves the whole panel against the left edge of a
+   desktop viewport. Top-aligning a block taller than the screen is a main-axis concern. */
+#loading-indicator.gpu-blocked { overflow-y: auto; justify-content: flex-start; padding: 24px 16px; }
+#loading-indicator.gpu-blocked .loader-grid { display: none; }
+#loading-indicator.gpu-blocked #loading-title { margin-top: 0; }
+
+.gpu-help {
+    max-width: 560px;
+    margin-top: 18px;
+    text-align: left;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: #b6bcc4;
+}
+
+.gpu-help-title {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e06c5a;
+}
+
+.gpu-help-lede { margin: 0 0 12px; }
+.gpu-help-note { margin: 0 0 12px; color: #8c8f99; }
+.gpu-help-block { margin-bottom: 12px; }
+
+.gpu-help-browser {
+    margin: 0 0 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #e0b341;
+}
+
+.gpu-help-steps { margin: 0; padding-left: 20px; }
+.gpu-help-steps li { margin-bottom: 3px; }
+
+.gpu-help-more summary { cursor: pointer; color: #8c8f99; margin-bottom: 8px; }
+
+.gpu-help-caveats {
+    margin: 14px 0 0;
+    padding-left: 20px;
+    color: #8c8f99;
+    font-size: 0.72rem;
+}
+
+.gpu-help-caveats li { margin-bottom: 3px; }
+.gpu-help-foot { margin: 14px 0 0; color: #e0e0e0; }
+
 /* ---- Honeycomb loader: 9 hexes = the app's 3x3 worlds ---- */
 .loader-grid {
     position: relative;

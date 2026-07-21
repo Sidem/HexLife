@@ -9,6 +9,7 @@ import { Application } from './core/Application.js';
 import { SettingsLoader } from './services/SettingsLoader.js';
 import * as PersistenceService from './services/PersistenceService.js';
 import { describeRuleset } from './core/rulesetDescriptor.js';
+import { createGpuHelpPanel, detectGraphicsPath } from './utils/gpuSupport.js';
 import rulesetLibrary from './core/library/rulesets.json';
 import patternLibrary from './core/library/patterns.json';
 import { APP_VERSION } from './version.js';
@@ -27,37 +28,26 @@ function updateLoadingStatus(message) {
     }
 }
 
-function detectGraphicsPath() {
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl2');
-  if (!gl) {
-    return { status: 'no-webgl2', hint: 'WebGL2 unavailable (could be disabled, blocked, or software-only).' };
-  }
-
-  const ext = gl.getExtension('WEBGL_debug_renderer_info');
-  // Generic strings always exist; detailed strings need the extension.
-  const vendor = gl.getParameter(gl.VENDOR) || 'unknown';
-  const renderer = gl.getParameter(gl.RENDERER) || 'unknown';
-
-  let unmaskedVendor = null, unmaskedRenderer = null;
-  if (ext) {
-    unmaskedVendor   = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
-    unmaskedRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-  }
-
-  const info = (unmaskedVendor || vendor) + ' / ' + (unmaskedRenderer || renderer);
-
-  // Common software renderers you might see:
-  const looksSoftware = /swiftshader|llvmpipe|software/i.test(info);
-
-  return {
-    status: looksSoftware ? 'software' : 'likely-hardware',
-    vendor,
-    renderer,
-    unmaskedVendor,
-    unmaskedRenderer,
-    note: ext ? 'Used WEBGL_debug_renderer_info.' : 'Renderer info is masked; result is less certain.'
-  };
+/**
+ * Replace the loading screen's spinner text with the "how to turn acceleration on" panel.
+ *
+ * The old copy was one sentence telling people to change a setting it did not name, in a menu it
+ * did not locate — which for most readers is indistinguishable from "it's broken". Detection has
+ * always been right here; only the answer was missing.
+ */
+function showGpuHelp(detection) {
+    updateLoadingStatus('');
+    const host = document.getElementById('loading-status')?.parentElement;
+    if (!host) return;
+    document.getElementById('loading-indicator')?.classList.add('gpu-blocked');
+    // "Loading HexLife Explorer..." over an explanation of why it will never load is its own small
+    // lie — nothing is in progress here.
+    const title = document.getElementById('loading-title');
+    if (title) title.textContent = 'HexLife Explorer';
+    host.append(createGpuHelpPanel({
+        status: detection.status === 'no-webgl2' ? 'no-webgl2' : 'software',
+        reloadHint: 'Then reload this page.',
+    }));
 }
 
 async function initialize() {
@@ -73,9 +63,8 @@ async function initialize() {
     updateLoadingStatus("Checking GPU acceleration...");
     const detection = detectGraphicsPath();
     if (detection.status === 'no-webgl2' || detection.status === 'software') {
-        const message = "Error: This application requires GPU hardware acceleration. Please enable it in your browser settings and restart the browser.";
-        updateLoadingStatus(message);
         console.error("GPU acceleration not detected:", detection);
+        showGpuHelp(detection);
         return;
     }
     console.log("GPU detection:", detection);
