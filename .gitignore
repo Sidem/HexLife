@@ -1,23 +1,44 @@
-combine_files.py
-.tmp*
-move.py
+# ─── Dependencies & build output ──────────────────────────────────────────────
 /node_modules
 /dist
-.DS_Store
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-/.claude
-.env
-.env.*
+/.vite
+/coverage
 
-# Rust / wasm-pack
+# Rust / wasm-pack. The compiled engine in src/core/wasm-engine/ IS committed
+# (so `npm run dev` needs no Rust toolchain) — these are the intermediates.
 /hexlife-wasm/pkg
 /hexlife-wasm/target
 **/Cargo.lock
 
-# IDE / Editor specific
+# ─── Devvit app (devvit/) ─────────────────────────────────────────────────────
+# devvit/ is a separate build target with its own toolchain and its own
+# .gitignore (node_modules/, dist/, the esbuild bundles in public/*.js).
+# Listed here are only the artifacts that can land outside that directory.
+*.tsbuildinfo
+.devvit/
+
+# ─── Local-only notes ─────────────────────────────────────────────────────────
+# Working context and in-flight planning, not part of the published project.
+# docs/ keeps only what a reader of the repo needs (SUBREDDIT-PLAYBOOK, media).
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+ROADMAP.md
+PATCHNOTES.md
+CLAUDE-CODE-CHEATSHEET.pdf
+/.claude
+docs/*-PLAN.md
+
+# Local dev helper, not part of the app (Vite serves the app; see `npm run dev`).
+server.py
+
+# ─── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.*
+
+# ─── Scratch / OS / editor / logs ─────────────────────────────────────────────
+.tmp*
+.DS_Store
 .idea
 .vscode
 *.suo
@@ -25,13 +46,8 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-# Log files
 *.log
-
-GEMINI.md
-CLAUDE.md
-AGENTS.md
-PATCHNOTES.md
-ROADMAP.md
-CLAUDE-CODE-CHEATSHEET.pdf
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

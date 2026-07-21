@@ -106,6 +106,29 @@ A decoupled, performance-first design:
 
 </details>
 
+<details>
+<summary>Repository layout — two apps, one engine</summary>
+
+<br>
+
+| Path | What it is |
+| :--- | :--- |
+| `src/`, `hexlife-wasm/`, `index.html` | **HexLife Explorer** — the app above. Vite + ESLint + Vitest. |
+| `src/embed/` | The embeddable `<hexlife-world>` element, and the **host boundary** other apps import. |
+| `devvit/` | **Live Specimens on Reddit** — a [Devvit](https://developers.reddit.com/) app with its own toolchain (TypeScript + esbuild + Biome, Node 22.6+) and its own `npm test`. See [`devvit/readme.md`](devvit/readme.md). |
+
+The Reddit app is bundled from this source tree rather than from a published package, so a post
+and the Explorer run **one** engine with one codec and one determinism contract. To keep that from
+becoming an invisible web of dependencies, `devvit/` may import from `src/embed/` and nowhere else
+in `src/` — `src/embed/api.js` (DOM-free helpers, typed by `api.d.ts`) and `src/embed/index.js`
+(the browser entry that registers the element). [`tests/devvitBoundary.test.js`](tests/devvitBoundary.test.js)
+enforces it.
+
+Root `npm run lint` / `test` / `typecheck` cover the Explorer only; `devvit/` is checked by its own
+`npm test`. Both run in CI.
+
+</details>
+
 ## 🧭 Auto-Explore (Experimental)
 
 > ⚠️ **Alpha — untested and under active development.** This automated search is a work in progress; treat its finds as exploratory and expect rough edges.

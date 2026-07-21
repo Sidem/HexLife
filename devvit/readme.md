@@ -139,8 +139,23 @@ blocker that stops background requests) disables it. Nothing else about the post
 
 ## Developer notes
 
-Source lives in the HexLife monorepo under `devvit/`. The webview imports the shared
-`<hexlife-world>` embed (`src/embed/`) — one simulation engine for the explorer, embeds, and Reddit.
+Source lives in the HexLife monorepo under `devvit/`. This is a **separate app with its own
+toolchain** — TypeScript + esbuild + Biome, Node 22.6+, its own `package.json`, `tsconfig`s and
+tests. The root project's `npm run lint` / `test` / `typecheck` deliberately do not cover it
+(root ESLint ignores `devvit/**`, root Vitest only collects `tests/**`); `npm test` in *this*
+directory is the gate, and CI runs both.
+
+What the two apps share is the engine, and only through a declared surface:
+
+| | |
+| :--- | :--- |
+| **`src/embed/api.js`** | Host boundary — ruleset descriptor, mnemonic names, world codec, GPU detection. DOM-free, so the Node server bundles it safely. Types in `api.d.ts` (this app builds with `allowJs: false`). |
+| **`src/embed/index.js`** | Browser entry — importing it registers `<hexlife-world>`. Client only; it pulls in the sim and the GL renderer. |
+
+**`devvit/` imports from `src/embed/` and nowhere else in `src/`.** One engine, one codec, one
+determinism contract for the explorer, embeds and Reddit — and a rename in the main app can't
+silently break the Reddit app. `tests/devvitBoundary.test.js` (root suite) fails the build if
+anything reaches past it; the fix is to re-export the symbol from `api.js`, not to widen the check.
 
 ```bash
 # Node 22.6+

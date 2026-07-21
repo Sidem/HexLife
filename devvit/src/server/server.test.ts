@@ -3,7 +3,7 @@ import {createServer} from 'node:http'
 import type {AddressInfo, Server} from 'node:net'
 import {after, before, beforeEach, test} from 'node:test'
 import {type Context, reddit, redis, runWithContext} from '@devvit/web/server'
-import {encodeWorldCode} from '../../../src/core/WorldCodec.js'
+import {encodeWorldCode} from '../../../src/embed/api.js'
 import {
   Endpoint,
   type ErrorRsp,

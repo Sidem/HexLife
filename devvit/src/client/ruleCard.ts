@@ -12,7 +12,7 @@ import {
   describeRuleset,
   ORBIT_LABELS,
   type RulesetDescription,
-} from '../../../src/core/rulesetDescriptor.js'
+} from '../../../src/embed/api.js'
 
 /** Label → the 6-bit mask drawn on its chip. Bare digits use the count's canonical first orbit. */
 const LABEL_MASKS: ReadonlyMap<string, number> = (() => {

@@ -9,12 +9,16 @@ import type {
 // The SAME codec the explorer exports with and the webview renders from — imported straight from the
 // HexLife source tree (this is why the Devvit app lives in-repo). Validating here means a bad paste
 // fails at the form, with a message, instead of becoming a permanently broken post.
-import {describeRuleset} from '../../../src/core/rulesetDescriptor.js'
-import {rulesetName} from '../../../src/core/rulesetName.js'
+//
+// `src/embed/api.js` is the host boundary and is DOM-free by contract, which is what makes it safe
+// to bundle into this Node server; `src/embed/index.js` (the browser entry) is not, and must never
+// be imported here — it registers a custom element and drags in the sim and the GL renderer.
 import {
   decodeWorldCode,
+  describeRuleset,
   explorerUrlForRuleset,
-} from '../../../src/core/WorldCodec.js'
+  rulesetName,
+} from '../../../src/embed/api.js'
 import {
   type CreatePostRsp,
   Endpoint,

@@ -18,16 +18,21 @@
 
 import {canRunAsUser, context, navigateTo, showForm} from '@devvit/web/client'
 import '../../../src/embed/index.js'
-import {describeRuleset} from '../../../src/core/rulesetDescriptor.js'
-import {rulesetName} from '../../../src/core/rulesetName.js'
+// Everything this app borrows from the HexLife source tree comes through `src/embed/api.js` — the
+// declared host boundary (`tests/devvitBoundary.test.js` fails the build if anything reaches past
+// it). `HexLifeElement` is the embed's own declaration of the element registered by the
+// side-effecting import above, so drift between what the element does and what this page expects
+// of it is a compile error rather than a runtime surprise.
 import {
+  createGpuHelpPanel,
   decodeWorldCode,
+  describeRuleset,
+  detectGraphicsPath,
   explorerUrlForRuleset,
-} from '../../../src/core/WorldCodec.js'
-// Types only — the element itself is registered by the side-effecting `index.js` import above.
-// This is the embed's own declaration of its public API, so a drift between what the element does
-// and what this page expects of it is a compile error rather than a runtime surprise.
-import type {HexLifeElement} from '../../../src/embed/hexlife-world.d.ts'
+  type GraphicsStatus,
+  type HexLifeElement,
+  rulesetName,
+} from '../../../src/embed/api.js'
 import {
   type CreatePostRsp,
   Endpoint,
@@ -109,6 +114,17 @@ export async function mountHexLife(
   applyChromeMode(opts.mode)
   // Before the first event can fire, and before the dwell clock should start.
   initTelemetry(opts.mode)
+
+  // Before anything else: a device that can't draw WebGL2 will never render this post, and the
+  // element's own failure message ("This browser can't run WebGL2.") is true but useless. Bail
+  // here with instructions instead of fetching a world nothing can show.
+  const gpu = detectGraphicsPath()
+  if (gpu.status === 'no-webgl2') {
+    console.warn('hexlife: no WebGL2 —', gpu.info)
+    showGpuHelp(mount, status, 'no-webgl2')
+    track('gpu_blocked', {once: true})
+    return
+  }
   // Wired once, here rather than in `boot`: a retry re-runs the boot, and re-wiring a button that
   // survived the failure would leave it with two handlers.
   wireCreateOwn(status)
@@ -154,7 +170,7 @@ export async function mountHexLife(
         return
       }
     }
-    await mountWorld(mount, status, code, opts)
+    await mountWorld(mount, status, code, opts, gpu.status)
   }
 
   retryBtn?.addEventListener('click', () => {
@@ -170,6 +186,7 @@ async function mountWorld(
   status: HTMLElement,
   code: string | undefined,
   opts: {mode: ChromeMode},
+  gpuStatus: GraphicsStatus,
 ): Promise<void> {
   const meta = await resolveMeta(code)
 
@@ -207,6 +224,14 @@ async function mountWorld(
   }
   // Transport and remix only mean anything with a world behind them; this is what un-hides them.
   document.body.dataset.boot = 'ok'
+
+  // Software rendering: the world *will* run, just badly. Say so rather than letting a 3fps
+  // specimen read as a broken post — but never withhold the world over it (see gpuSupport.js on
+  // why blocking on a masked renderer string is the more expensive mistake in a feed).
+  if (gpuStatus === 'software') {
+    showSoftwareNotice()
+    track('gpu_slow', {once: true})
+  }
 
   const settle = (): void => {
     const speedInput = el<HTMLInputElement>('speed')
@@ -246,6 +271,72 @@ async function mountWorld(
   // Last-resort settle: the element reports success (hexlife-ready) and failure (hexlife-error), so
   // this only covers a boot that somehow announces neither.
   setTimeout(settle, 2000)
+}
+
+/**
+ * Fatal GPU state: the help panel *replaces* the world, and the transport bar never appears.
+ *
+ * Reuses `data-boot="error"` because that is exactly what this is — a boot that failed — and the
+ * stylesheet already hides the controls, the remix button and the feed's play-glyph placeholder
+ * for it. `#retry` stays hidden: unlike a failed fetch, retrying changes nothing until the viewer
+ * has actually gone and changed a browser setting, and a button that is guaranteed to fail is
+ * worse than no button.
+ */
+function showGpuHelp(
+  mount: HTMLElement,
+  status: HTMLElement,
+  kind: 'no-webgl2' | 'software',
+): void {
+  mount.replaceChildren(
+    createGpuHelpPanel({
+      status: kind,
+      // Not "reload the page" — inside a Reddit webview there is no address bar to reload from.
+      reloadHint: 'Then reopen this post.',
+      extraNote:
+        'In the Reddit app? Opening this post in your phone’s own browser often works too.',
+    }),
+  )
+  setStatus(status, '')
+  document.body.dataset.boot = 'error'
+}
+
+/**
+ * Software rendering: one collapsed line above the chrome, expandable into the same help panel.
+ *
+ * Collapsed by default and dismissible because this is an *aside* on someone else's post — the
+ * specimen is what the viewer came for, and a permanent banner about their graphics settings would
+ * be the loudest thing on a feed card.
+ */
+function showSoftwareNotice(): void {
+  const chrome = document.getElementById('chrome')
+  if (!chrome) return
+
+  const box = document.createElement('div')
+  box.className = 'gpu-notice'
+
+  const details = document.createElement('details')
+  const summary = document.createElement('summary')
+  summary.textContent = 'Running slowly — GPU acceleration is off'
+  details.append(summary)
+  details.append(
+    createGpuHelpPanel({
+      status: 'software',
+      reloadHint: 'Then reopen this post.',
+      extraNote:
+        'In the Reddit app? Opening this post in your phone’s own browser often works too.',
+    }),
+  )
+  box.append(details)
+
+  const dismiss = document.createElement('button')
+  dismiss.type = 'button'
+  dismiss.className = 'gpu-notice-dismiss'
+  dismiss.setAttribute('aria-label', 'Dismiss')
+  dismiss.textContent = '✕'
+  dismiss.addEventListener('click', () => box.remove())
+  box.append(dismiss)
+
+  chrome.prepend(box)
 }
 
 /**

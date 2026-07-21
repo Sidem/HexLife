@@ -48,6 +48,32 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path hexlife-wasm/Cargo.toml
 
+  # The Reddit (Devvit) app is a separate build target with its own toolchain, so it gets its own
+  # gate rather than riding on the root one: Node 22.6 (the root stays on 20 for wasm), and
+  # `npm test` there means tsc --build + Biome + node:test + both esbuild bundles.
+  #
+  # Deliberately NOT a dependency of build-and-deploy. It bundles the same engine from `src/`, so a
+  # breaking change here is worth knowing about immediately — but it ships to Reddit on its own
+  # schedule via `devvit publish`, and it must not be able to block the Explorer's Pages deploy.
+  devvit-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: devvit/.nvmrc
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: devvit
+
+      - name: Type-check, lint, test, build
+        run: npm test
+        working-directory: devvit
+
   build-and-deploy:
     needs: quality-gate
     runs-on: ubuntu-latest
