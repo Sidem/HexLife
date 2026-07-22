@@ -11,6 +11,15 @@
     gap: 8px;
 }
 
+/* A closed <details> hides its children through a UA `display: none` rule, and UA rules lose to
+   *any* author `display` on those children — which is how `.tool-group { display: flex }` left the
+   shipped Scoring disclosure rendering all nine sliders while looking collapsed. Restate the hiding
+   as an author rule specific enough to outrank the component's own layout, ids included. */
+.explore-component-content details:not([open]) > *:not(summary),
+.explore-component-content details:not([open]) #explore-scoring-mount {
+    display: none;
+}
+
 .explore-component-content .tool-group h5 {
     margin: 0;
     font-size: 1em;
@@ -76,6 +85,73 @@
 .explore-run-buttons .button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+}
+
+/* #29 re-tier: idle Discover offers exactly one action. Pause / Stop / Stop & Keep are disabled
+   until a run exists, so showing them cold is three dead controls at newcomer eye level. */
+.explore-primary-action {
+    flex: 1 1 100%;
+    font-weight: 600;
+    padding: 9px 12px;
+}
+
+.explore-component-content:not(.is-running) .explore-run-secondary {
+    display: none;
+}
+
+/* --- Advanced tier (#29): everything expert lives behind this disclosure --- */
+.explore-advanced > summary,
+.explore-advanced-summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.explore-advanced > summary::-webkit-details-marker {
+    display: none;
+}
+
+.explore-advanced > summary h5 {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+}
+
+.explore-advanced > summary h5::before {
+    content: '\25B8';
+    font-size: 0.8em;
+    color: var(--text-muted, #87878f);
+    transition: transform 0.15s ease;
+}
+
+.explore-advanced[open] > summary h5::before {
+    transform: rotate(90deg);
+}
+
+/* Collapsing must hide controls, not state: the chip carries search mode + scoring preset. */
+.explore-advanced-chip {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--text-muted, #87878f);
+    border: 1px solid var(--border-subtle, #444);
+    border-radius: 999px;
+    padding: 1px 8px;
+    white-space: nowrap;
+}
+
+.explore-advanced-blurb {
+    margin: 6px 0 0;
+    font-size: 0.8em;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+/* An empty gallery makes Rate / Export / Clear toast-only controls — hide until there are finds. */
+.explore-gallery-group.is-empty .explore-gallery-actions [data-action="rate-finds"],
+.explore-gallery-group.is-empty .explore-gallery-actions [data-action="export-gallery"],
+.explore-gallery-group.is-empty .explore-gallery-actions [data-action="clear-gallery"] {
+    display: none;
 }
 
 /* --- Settings (dim while running) --- */
@@ -685,6 +761,12 @@
     background-color: var(--accent-soft, rgba(240, 198, 116, 0.14));
     color: var(--accent, #f0c674);
     border-radius: var(--radius-sm, 6px);
+}
+
+/* Same trap as the disclosures: this rule outranks the UA `[hidden] { display: none }`, so the
+   empty rater mount rendered as an 18px bordered strip under the gallery header at rest. */
+.explore-rater[hidden] {
+    display: none;
 }
 
 .explore-rater {

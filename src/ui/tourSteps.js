@@ -401,9 +401,15 @@ export const getTours = (appContext) => {
     }, {
         element: '#explore-settings',
         title: 'Tune the Search',
-        content: "Control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
+        content: "Behind <span class=\"onboarding-highlight-text\">Advanced</span> you control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
         primaryAction: { text: 'Next' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
+        onBeforeShow: () => {
+            showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } });
+            // #29 put Search Settings inside the "Advanced" disclosure, collapsed by default on
+            // mobile. A target that resolves but never becomes visible auto-skips with only a
+            // console.warn, so open it before spotlighting.
+            appContext.uiManager?.getSharedComponent?.(ExploreComponent)?.openAdvanced();
+        },
         advanceOn: { type: 'click' }
     }, {
         element: '.explore-gallery-group',

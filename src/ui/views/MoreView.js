@@ -30,8 +30,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="patterns" title="Patterns" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.shapes} Patterns</button>
         <button class="button" data-action="analyze" title="Full Analysis" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.chartBars} Full Analysis</button>
         <button class="button" data-action="settings" title="Settings &amp; preferences" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.cog} Settings</button>
-        <button class="button" data-action="learning" title="Learning Hub" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.graduationCap} Learning Hub</button>
-        <button class="button" data-action="help" data-tour-id="mobile-help-button">Help / Tour</button>
+        <button class="button" data-action="learning" data-tour-id="mobile-help-button" title="Tutorials, tours and help — replay the orientation any time" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.graduationCap} Learning Hub · Tours &amp; Help</button>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
         <a href="https://www.reddit.com/r/hexlife/" target="_blank" rel="noopener" class="button">Community · r/hexlife</a>
     </div>
@@ -83,10 +82,6 @@ export class MoreView extends BaseComponent {
 
         this._addDOMListener(this.element.querySelector('[data-action="settings"]'), 'click', () => {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'settings' });
-        });
-
-        this._addDOMListener(this.element.querySelector('[data-action="help"]'), 'click', () => {
-            this.appContext.onboardingManager && this.appContext.onboardingManager.startTour('core', true);
         });
 
         this._addDOMListener(this.element.querySelector('[data-action="save-ruleset-mobile"]'), 'click', () => {

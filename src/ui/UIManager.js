@@ -382,12 +382,23 @@ export class UIManager {
      * @param {Function} componentType constructor of the shared component
      * @param {HTMLElement} container
      */
+    /**
+     * The single live instance of a shared component, by constructor. Shared components are
+     * singletons moved between the desktop panel and the mobile view, so callers that need to
+     * drive one (tour steps, keyboard shortcuts) must go through this rather than the DOM.
+     * @param {Function} componentType
+     * @returns {object|undefined}
+     */
+    getSharedComponent(componentType) {
+        return Object.values(this.sharedComponents ?? {}).find(
+            component => component.constructor === componentType
+        );
+    }
+
     mountSharedComponentInto(componentType, container) {
         if (!componentType || !container) return;
 
-        const componentToPlace = Object.values(this.sharedComponents).find(
-            component => component.constructor === componentType
-        );
+        const componentToPlace = this.getSharedComponent(componentType);
         if (!componentToPlace) return;
 
         container.innerHTML = '';

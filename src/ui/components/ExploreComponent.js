@@ -39,6 +39,11 @@ const SETTING_KEYS = {
     maxGenerations: 'exploreMaxGenerations',
     scoring: 'exploreScoring',
     scoringOpen: 'exploreScoringOpen',
+    // #29 re-tier: the "Advanced" disclosure remembers its state per surface. Mobile Discover is a
+    // newcomer tab and opens collapsed; the desktop Auto-Explore panel is reached by an explicit
+    // rail icon, so it keeps the expert layout and opens expanded.
+    advancedOpenMobile: 'exploreAdvancedOpenMobile',
+    advancedOpenDesktop: 'exploreAdvancedOpenDesktop',
     embeddingModel: 'embeddingModelId',
     targetPrompt: 'exploreTargetPrompt',
     targetBank: 'exploreTargetBankThreshold',
@@ -90,6 +95,9 @@ export class ExploreComponent extends BaseComponent {
     }
 
     refresh() {
+        // The component is a single shared instance moved between the desktop panel and the mobile
+        // Discover tab, so the Advanced tier has to be re-read on every mount (#29).
+        this._setAdvancedOpen(this._loadAdvancedOpen());
         this._syncFromStatus();
         this._renderGallery();
     }
@@ -156,6 +164,7 @@ export class ExploreComponent extends BaseComponent {
         const embeddingEnabled = !!status.embeddingEnabled;
         const embeddingStatus = status.embeddingStatus || 'disabled';
         const scoringOpen = !!PersistenceService.loadUISetting(SETTING_KEYS.scoringOpen, false);
+        const advancedOpen = this._loadAdvancedOpen();
         const activeModelId = this.worldManager.embeddingService?.getModelId?.()
             || PersistenceService.loadUISetting(SETTING_KEYS.embeddingModel, EMBEDDING_MODELS[0].id);
         const targetPrompt = sanitizeTargetPrompt(PersistenceService.loadUISetting(SETTING_KEYS.targetPrompt, ''));
@@ -165,13 +174,13 @@ export class ExploreComponent extends BaseComponent {
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
-                <p class="explore-blurb">Searches all 9 worlds for "interesting" rulesets near the edge of chaos. Each generation: candidates are <strong>screened</strong> cheaply across an initial-condition suite, promising ones are <strong>confirmed</strong> with a long burst, and survivors are <strong>banked</strong> in the gallery — the best two breed the next generation. The Scoring section below decides what "interesting" means.</p>
+                <p class="explore-blurb">Let the Explorer hunt for you. It runs candidate rulesets across all nine worlds and keeps the ones that look alive — finds collect in the gallery below.</p>
             </div>
             <div class="tool-group">
                 ${this._pendingBaseSeed != null ? `
                 <div class="explore-shared-banner" id="explore-shared-banner">
                     <span class="inline-icon">${ICONS.share}</span>
-                    <span>Shared search loaded (seed ${this._pendingBaseSeed}) — press <strong>Start</strong> to replay it exactly.</span>
+                    <span>Shared search loaded (seed ${this._pendingBaseSeed}) — press <strong>Find me something interesting</strong> to replay it exactly.</span>
                 </div>` : ''}
                 <div class="explore-status" id="explore-status">
                     <span class="explore-status-state" data-field="state">Idle</span>
@@ -179,12 +188,17 @@ export class ExploreComponent extends BaseComponent {
                     <button class="button-icon explore-share-search" data-action="copy-search-link" title="Copy a link that replays this search exactly (same seed, same finds)" aria-label="Copy search link">${ICONS.share}</button>
                 </div>
                 <div class="form-group-buttons explore-run-buttons">
-                    <button class="button action-button" data-action="start"><span class="inline-icon">${ICONS.compass}</span> Start</button>
-                    <button class="button" data-action="pause" disabled title="Pause/resume the search at the next generation boundary">Pause</button>
-                    <button class="button" data-action="stop" disabled>Stop</button>
-                    <button class="button" data-action="adopt" disabled title="Stop and keep the current champion ruleset in the selected world">Stop &amp; Keep</button>
+                    <button class="button action-button explore-primary-action" data-action="start" title="Search all nine worlds for interesting rulesets"><span class="inline-icon">${ICONS.compass}</span> <span data-field="start-label">Find me something interesting</span></button>
+                    <button class="button explore-run-secondary" data-action="pause" disabled title="Pause/resume the search at the next generation boundary">Pause</button>
+                    <button class="button explore-run-secondary" data-action="stop" disabled>Stop</button>
+                    <button class="button explore-run-secondary" data-action="adopt" disabled title="Stop and keep the current champion ruleset in the selected world">Stop &amp; Keep</button>
                 </div>
             </div>
+            <details class="tool-group explore-advanced" id="explore-advanced" ${advancedOpen ? 'open' : ''}>
+                <summary class="explore-advanced-summary">
+                    <h5>Advanced <span class="explore-advanced-chip" data-field="advanced-chip"></span></h5>
+                </summary>
+                <p class="explore-advanced-blurb">Each generation: candidates are <strong>screened</strong> cheaply across an initial-condition suite, promising ones are <strong>confirmed</strong> with a long burst, and survivors are <strong>banked</strong> in the gallery — the best two breed the next generation. Scoring decides what "interesting" means.</p>
             <div class="tool-group explore-settings" id="explore-settings">
                 <h5>Search Settings</h5>
                 <div class="form-group" id="explore-mutation-rate-mount"></div>
@@ -250,6 +264,7 @@ export class ExploreComponent extends BaseComponent {
                 </summary>
                 <div id="explore-scoring-mount"></div>
             </details>
+            </details><!-- /#explore-advanced: Search Settings + Scoring are its children -->
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
@@ -268,6 +283,8 @@ export class ExploreComponent extends BaseComponent {
 
         this.statusEl = this.element.querySelector('#explore-status');
         this.settingsEl = this.element.querySelector('#explore-settings');
+        this.advancedGroup = this.element.querySelector('#explore-advanced');
+        this.galleryGroup = this.element.querySelector('.explore-gallery-group');
         this.galleryList = this.element.querySelector('#explore-gallery-list');
         this.raterMount = this.element.querySelector('#explore-rater-mount');
         this.runButtons = {
@@ -288,6 +305,7 @@ export class ExploreComponent extends BaseComponent {
         this.targetHintEl = this.element.querySelector('[data-field="target-hint"]');
         this.scoringGroup = this.element.querySelector('#explore-scoring-group');
         this._updateModeChip();
+        this._updateAdvancedChip();
 
         // Scoring panel (v3.1): user-customizable objective. The summary chip mirrors the active
         // preset; explainer curve markers follow the current best find's measured raw metrics.
@@ -296,6 +314,7 @@ export class ExploreComponent extends BaseComponent {
             voteBank: this.voteBank,
         });
         this._updatePresetChip(this.scoringPanel.getPresetKey());
+        this._updateAdvancedChip();
 
         this.sliders.rate = new SliderComponent(this.element.querySelector('#explore-mutation-rate-mount'), {
             id: 'explore-mutation-rate',
@@ -421,6 +440,20 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
+        const advancedSummary = this.advancedGroup?.querySelector('summary');
+        if (advancedSummary) {
+            // Persist the *user's* choice per surface, so opening the expert block on desktop does
+            // not un-tier mobile Discover. Deliberately not the `toggle` event: that also fires for
+            // the parser setting `open` and for programmatic opens (mount, tour, error rescue), and
+            // it fires asynchronously — a startup render could land on the wrong surface's key.
+            // `click` covers keyboard activation too (summary synthesizes one) and runs *before* the
+            // default action, so the state being chosen is `!open`.
+            this._addDOMListener(advancedSummary, 'click', () => {
+                const key = this._isMobileSurface() ? SETTING_KEYS.advancedOpenMobile : SETTING_KEYS.advancedOpenDesktop;
+                PersistenceService.saveUISetting(key, !this.advancedGroup.open);
+            });
+        }
+
         this._addDOMListener(this.galleryList, 'click', (e) => this._onGalleryClick(e));
 
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
@@ -480,6 +513,42 @@ export class ExploreComponent extends BaseComponent {
     _updatePresetChip(presetKey) {
         const chip = this.element.querySelector('[data-field="preset-chip"]');
         if (chip) chip.textContent = presetKey === 'custom' ? 'Custom' : (SCORING_PRESETS[presetKey]?.label || '');
+        this._updateAdvancedChip();
+    }
+
+    /** True on the mobile Discover tab, false in the desktop Auto-Explore panel (#29 tiering). */
+    _isMobileSurface() {
+        return !!this.appContext?.uiManager?.isMobile?.();
+    }
+
+    /** Persisted open-state of the Advanced disclosure — collapsed by default on mobile only. */
+    _loadAdvancedOpen() {
+        const mobile = this._isMobileSurface();
+        const key = mobile ? SETTING_KEYS.advancedOpenMobile : SETTING_KEYS.advancedOpenDesktop;
+        return !!PersistenceService.loadUISetting(key, !mobile);
+    }
+
+    /**
+     * #29: collapsing Advanced must not hide *state*, only controls — the summary chip carries the
+     * two settings that change what a run does (search mode and scoring preset) up to the summary.
+     */
+    _updateAdvancedChip() {
+        const chip = this.element.querySelector('[data-field="advanced-chip"]');
+        if (!chip) return;
+        const mode = this.element.querySelector('[data-field="mode-chip"]')?.textContent || '';
+        const preset = this.element.querySelector('[data-field="preset-chip"]')?.textContent || '';
+        chip.textContent = [mode, preset].filter(Boolean).join(' · ');
+    }
+
+    /** Open/close Advanced. Programmatic changes are not a user preference, so they never persist. */
+    _setAdvancedOpen(open) {
+        if (this.advancedGroup) this.advancedGroup.open = open;
+    }
+
+    /** Open the Advanced disclosure (and optionally Scoring inside it) — used by tours and errors. */
+    openAdvanced({ scoring = false } = {}) {
+        this._setAdvancedOpen(true);
+        if (scoring && this.scoringGroup) this.scoringGroup.open = true;
     }
 
     /** Coerce any inbound population value (UI select, persisted, or share link) to an int in range. */
@@ -516,6 +585,7 @@ export class ExploreComponent extends BaseComponent {
                 ? 'Steers evolution toward frames that match your prompt. Leave empty for open-ended novelty.'
                 : 'Enable “Perceptual novelty (CLIP)” above to search by prompt.';
         }
+        this._updateAdvancedChip();
     }
 
     _readICLabels() {
@@ -527,6 +597,7 @@ export class ExploreComponent extends BaseComponent {
     _startExploration() {
         const icLabels = this._readICLabels();
         if (icLabels.length === 0) {
+            this.openAdvanced();
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Select at least one initial condition to explore.', type: 'error' });
             return;
         }
@@ -536,6 +607,9 @@ export class ExploreComponent extends BaseComponent {
         const embeddingsOn = !!this.embeddingToggle?.checked;
         const effectiveKeys = embeddingsOn ? WEIGHT_KEYS : WEIGHT_KEYS.filter((k) => k !== 'openEndedness');
         if (effectiveKeys.every((k) => (scoring.weights[k] || 0) === 0)) {
+            // The sliders that caused this may be collapsed behind Advanced — reveal them, or the
+            // toast points at controls the user cannot see.
+            this.openAdvanced({ scoring: true });
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
                 message: embeddingsOn
                     ? 'All scoring weights are 0 — nothing would ever be banked. Raise at least one weight.'
@@ -698,13 +772,16 @@ export class ExploreComponent extends BaseComponent {
         const entries = this.service.getGalleryEntries();
         const countEl = this.element.querySelector('[data-field="count"]');
         if (countEl) countEl.textContent = `(${entries.length})`;
+        // Rate / export / clear act on finds that do not exist yet — with an empty gallery they are
+        // three controls whose only outcome is a toast (#29). Import stays: it is how you get finds.
+        this.galleryGroup?.classList.toggle('is-empty', entries.length === 0);
 
         if (entries.length === 0) {
             this.galleryList.innerHTML = `
                 <div class="panel-empty-state">
                     <div class="panel-empty-state-icon">${ICONS.compass}</div>
                     <p class="panel-empty-state-title">No finds yet</p>
-                    <p class="panel-empty-state-desc">Press <strong>Start</strong> above to auto-search all nine worlds. The most interesting rulesets it discovers collect here, best-first.</p>
+                    <p class="panel-empty-state-desc">Press <strong>Find me something interesting</strong> above to auto-search all nine worlds. The most interesting rulesets it discovers collect here, best-first.</p>
                 </div>`;
             return;
         }
