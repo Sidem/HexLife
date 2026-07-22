@@ -101,7 +101,7 @@ scorer orders correctly) and `marginMean` over labeled entries, and
   learning "symmetric = good" instead of reading the dynamics. Hence `r_sym` *negatives* exist, and
   the test reports within-class accuracy (`free` 0.583, `r_sym` 0.389) next to the overall number.
   Gap: the library has no boring `n_count`/`totalistic` rules, so those classes are positives-only.
-- Each entry carries its `constraintClass` (roadmap #38's classifier: strictest of
+- Each entry carries its `constraintClass` from `classifyRulesetConstraint()` (strictest of
   `totalistic ⊂ n_count ⊂ r_sym ⊂ free`); the test recomputes it from the hex as a hand-edit guard.
 
 ## Capture procedure
@@ -125,19 +125,8 @@ gates the statistical pipeline; the embedding stages get synthetic unit tests in
 ```js
 await (async () => {
   const wm = window.__hexlife.worldManager;
-  const { describeRuleset } = await import('/HexLife/src/core/rulesetDescriptor.js');
+  const { classifyRulesetConstraint } = await import('/HexLife/src/core/rulesetDescriptor.js');
   const lib = await (await fetch('/HexLife/src/core/library/rulesets.json')).json();
-
-  // Roadmap #38's strictest-class check, inlined (mirrors tests/interestingnessBenchmark.test.js).
-  const constraintClass = (hex) => {
-    const d = describeRuleset(hex);
-    if (!d) return 'invalid';
-    if (d.type === 'raw') return 'free';
-    if (d.type === 'r-sym') return 'r_sym';
-    const b = new Set(d.birth.map(Number)); const s = new Set(d.survival.map(Number));
-    for (let k = 1; k <= 6; k++) if (b.has(k) !== s.has(k - 1)) return 'n_count';
-    return 'totalistic';
-  };
 
   // Positives: curated-library indices. Negatives: hex + IC + seed, verified by eye (see above).
   const POS_LIB = [2, 3, 15, 23, 25, 34, 8, 9, 10, 14, 27, 29, 11, 13, 19, 20];
@@ -171,7 +160,7 @@ await (async () => {
   for (const e of panel) {
     const metrics = await capture(e, 160);
     const confirmMetrics = await capture(e, 600);
-    entries.push({ ...e, constraintClass: constraintClass(e.hex), metrics, confirmMetrics });
+    entries.push({ ...e, constraintClass: classifyRulesetConstraint(e.hex), metrics, confirmMetrics });
   }
   return {
     _meta: {

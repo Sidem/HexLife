@@ -312,7 +312,8 @@
 }
 
 /* Tag filter chip row. */
-.library-tag-filters {
+.library-tag-filters,
+.library-constraint-filters {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
@@ -320,9 +321,47 @@
     flex-shrink: 0;
 }
 
-.library-tag-filters.hidden {
+.library-tag-filters.hidden,
+.library-constraint-filters.hidden {
     display: none;
 }
+
+/* Constraint-class chips carry their class colour so the filter row and the card badges read as
+   the same vocabulary; the count sits dimmer than the label. Selecting one fills it in. */
+.library-constraint-filters {
+    margin-bottom: 6px;
+}
+
+button.tag-chip.constraint-filter {
+    cursor: pointer;
+    background-color: transparent;
+    border-color: currentColor;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+button.tag-chip.constraint-filter .constraint-filter-count {
+    opacity: 0.65;
+    font-variant-numeric: tabular-nums;
+}
+
+button.tag-chip.constraint-filter.constraint-totalistic { color: #f0c05a; }
+button.tag-chip.constraint-filter.constraint-n_count { color: #8fd694; }
+button.tag-chip.constraint-filter.constraint-r_sym { color: #7fc4ff; }
+button.tag-chip.constraint-filter.constraint-free { color: #a0a0a8; }
+
+button.tag-chip.constraint-filter:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Selected: the class colour fills the chip and the text goes dark against it. */
+button.tag-chip.constraint-filter.active {
+    color: #1c1c1c;
+}
+
+button.tag-chip.constraint-filter.constraint-totalistic.active { background-color: #f0c05a; border-color: #f0c05a; }
+button.tag-chip.constraint-filter.constraint-n_count.active { background-color: #8fd694; border-color: #8fd694; }
+button.tag-chip.constraint-filter.constraint-r_sym.active { background-color: #7fc4ff; border-color: #7fc4ff; }
+button.tag-chip.constraint-filter.constraint-free.active { background-color: #a0a0a8; border-color: #a0a0a8; }
 
 .tag-chip {
     display: inline-block;
@@ -420,10 +459,55 @@ button.tag-chip.tag-filter.active {
     min-width: 0;
 }
 
+.library-card-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+}
+
 .library-card-title .name {
     font-size: 1.0em;
     font-weight: bold;
     color: #f0f0f0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Structural constraint class (roadmap #38): a derived fact about the rule table, so it reads as a
+   quiet outlined marker rather than a tag chip. Hue tracks strictness — warm for the tightly
+   constrained classes, neutral grey for unconstrained — and the badge never shrinks below its text. */
+.constraint-badge {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.68em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.constraint-badge.constraint-totalistic {
+    color: #f0c05a;
+    background-color: rgba(240, 192, 90, 0.12);
+}
+
+.constraint-badge.constraint-n_count {
+    color: #8fd694;
+    background-color: rgba(143, 214, 148, 0.12);
+}
+
+.constraint-badge.constraint-r_sym {
+    color: #7fc4ff;
+    background-color: rgba(127, 196, 255, 0.12);
+}
+
+.constraint-badge.constraint-free {
+    color: #a0a0a8;
+    background-color: rgba(160, 160, 168, 0.1);
 }
 
 .library-card .description {

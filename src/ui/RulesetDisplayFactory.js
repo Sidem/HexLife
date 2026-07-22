@@ -1,5 +1,6 @@
 import { rulesetVisualizer } from '../utils/rulesetVisualizer.js';
 import { formatHexCode } from '../utils/utils.js';
+import { classifyRulesetConstraint, CONSTRAINT_CLASS_META } from '../core/rulesetDescriptor.js';
 
 /**
  * Short, human-friendly label for a paired initial condition, shown as the "IC" badge on a library
@@ -16,6 +17,20 @@ export function icBadgeLabel(initialState) {
         return 'IC · random fill';
     }
     return mode ? `IC · ${mode}` : 'IC';
+}
+
+/**
+ * Badge descriptor for a ruleset's structural constraint class (roadmap #38) — the strictest of
+ * `totalistic ⊂ n_count ⊂ r_sym ⊂ free` its rule table satisfies. Derived from the hex on every
+ * render, never stored: it is a fact about the table, not metadata someone can get wrong.
+ * @param {string} hex 32-char ruleset hex.
+ * @returns {{cls: string, label: string, title: string}|null} null for an unparseable hex.
+ */
+export function constraintBadge(hex) {
+    const cls = classifyRulesetConstraint(hex);
+    if (!cls) return null;
+    const meta = CONSTRAINT_CLASS_META[cls];
+    return { cls, label: meta.label, title: `${meta.label} ruleset — ${meta.description}` };
 }
 
 export class RulesetDisplayFactory {
@@ -80,6 +95,12 @@ export class RulesetDisplayFactory {
         const tagChips = tags.length
             ? `<div class="library-card-tags">${tags.map(t => `<span class="tag-chip">${this._escape(t)}</span>`).join('')}</div>`
             : '';
+        // Structural class sits in the title row, not among the tag chips: tags are claims about
+        // what a rule *does* (and are editable), this is a derived fact about the table itself.
+        const badge = constraintBadge(ruleData.hex);
+        const constraintChip = badge
+            ? `<span class="constraint-badge constraint-${badge.cls}" title="${this._escapeAttr(badge.title)}">${this._escape(badge.label)}</span>`
+            : '';
 
         const actions = [`<button class="button" data-action="${isPersonal ? 'load-personal' : 'load-rule'}">Load</button>`];
         if (hasIC) actions.push(`<button class="button button-subtle" data-action="load-with-ic" title="Load this ruleset with its paired initial state">Load + IC</button>`);
@@ -100,6 +121,7 @@ export class RulesetDisplayFactory {
             <div class="library-card-body">
                 <div class="library-card-title">
                     <span class="name">${this._escape(ruleData.name || '')}</span>
+                    ${constraintChip}
                 </div>
                 <div class="description${descText ? '' : ' is-empty'}">${descHtml}</div>
                 ${tagChips}

@@ -4,6 +4,7 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
 import { ICONS } from '../icons.js';
 import { rulesetName, downloadFile } from '../../utils/utils.js';
+import { classifyRulesetConstraint, CONSTRAINT_CLASSES, CONSTRAINT_CLASS_META } from '../../core/rulesetDescriptor.js';
 import * as InitialStateCodec from '../../services/InitialStateCodec.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { decodePack, toPublicLibraryEntry } from '../../services/LibraryPackCodec.js';
@@ -22,7 +23,7 @@ export class RulesetLibraryComponent extends BaseComponent {
 
         this.libraryData = options.libraryData;
         // Cross-list filter/sort state (applies to both Public and Personal lists).
-        this.filterState = { query: '', tag: null, sort: 'recent' };
+        this.filterState = { query: '', tag: null, constraint: null, sort: 'recent' };
         // Handle for the in-flight lazy thumbnail backfill so we can cancel it on re-render/destroy.
         this._backfillHandle = null;
         // Keys of entries we've already tried to bake this pane-lifetime (success OR fail), so a save /
@@ -99,6 +100,7 @@ export class RulesetLibraryComponent extends BaseComponent {
                 <button class="button-icon library-pack-btn" data-action="import-pack" title="Import rulesets from a pack file" aria-label="Import rulesets from a pack file">${ICONS.upload}</button>
                 <input type="file" class="library-import-input" accept="application/json,.json" hidden aria-hidden="true" />
             </div>
+            <div class="library-constraint-filters" id="ruleset-library-constraint-filters"></div>
             <div class="library-tag-filters" id="ruleset-library-tag-filters"></div>
             <div class="library-filter-tabs">
                 <button class="sub-tab-button active" data-library-filter="public">Public</button>
@@ -108,6 +110,7 @@ export class RulesetLibraryComponent extends BaseComponent {
             <div id="ruleset-library-personal-content" class="library-list hidden"></div>
         `;
 
+        this._renderConstraintFilters();
         this._renderTagFilters();
         this._renderPublicLibrary();
         this._renderPersonalLibrary();
@@ -116,20 +119,31 @@ export class RulesetLibraryComponent extends BaseComponent {
 
     /**
      * Apply the live search query + active tag filter + sort to a list of entries. Search matches
-     * name, description, derived mnemonic and tags (case-insensitive); sort is recent (default order)
-     * or name. Pure-ish: returns a new array, doesn't mutate the source.
+     * name, description, derived mnemonic, tags and the derived constraint class (case-insensitive);
+     * sort is recent (default order) or name. Pure-ish: returns a new array, doesn't mutate the source.
      */
     _applyFilter(entries) {
-        const { query, tag, sort } = this.filterState;
+        const { query, tag, constraint, sort } = this.filterState;
         const q = query.trim().toLowerCase();
         let out = entries.filter(rule => {
             if (tag && !(Array.isArray(rule.tags) && rule.tags.includes(tag))) return false;
+            // Constraint filter is HIERARCHY-AWARE (unlike the badge, which names only the strictest
+            // class): "R-sym" means "is rotationally symmetric", so it includes the n_count and
+            // totalistic rules that also satisfy it. Anything else would make "show me the symmetric
+            // rules" hide the most symmetric ones in the library.
+            if (constraint && !this._satisfiesConstraint(rule.hex, constraint)) return false;
             if (!q) return true;
+            // The constraint class is searchable but deliberately NOT a tag chip: it's derived from
+            // the rule table, so it must never be stored on (or filtered as) entry metadata. Both the
+            // badge wording ("N-count") and the raw class id ("n_count") match, since either is a
+            // reasonable thing to type.
+            const cls = classifyRulesetConstraint(rule.hex);
             const hay = [
                 rule.name || '',
                 rule.description || '',
                 rulesetName(rule.hex),
                 ...(Array.isArray(rule.tags) ? rule.tags : []),
+                ...(cls ? [cls, CONSTRAINT_CLASS_META[cls].label] : []),
             ].join(' ').toLowerCase();
             return hay.includes(q);
         });
@@ -137,6 +151,16 @@ export class RulesetLibraryComponent extends BaseComponent {
             out = [...out].sort((a, b) => (a.name || rulesetName(a.hex)).localeCompare(b.name || rulesetName(b.hex)));
         }
         return out;
+    }
+
+    /**
+     * Whether `hex` satisfies constraint class `cls` — i.e. its own class is at least as strict.
+     * CONSTRAINT_CLASSES is ordered strictest-first, so "at least as strict" is an index compare.
+     */
+    _satisfiesConstraint(hex, cls) {
+        const own = classifyRulesetConstraint(hex);
+        if (!own) return false;
+        return CONSTRAINT_CLASSES.indexOf(own) <= CONSTRAINT_CLASSES.indexOf(cls);
     }
 
     /** Build the union of all tags across public + personal entries as toggleable filter chips. */
@@ -152,6 +176,35 @@ export class RulesetLibraryComponent extends BaseComponent {
         mount.innerHTML = tags.map(t =>
             `<button class="tag-chip tag-filter${this.filterState.tag === t ? ' active' : ''}" data-tag-filter="${this._escapeAttr(t)}">${this._escape(t)}</button>`
         ).join('');
+    }
+
+    /**
+     * Constraint-class filter chips. Their own row, above the tag chips: the class is DERIVED from
+     * the rule table, never stored, so it must not look like (or mix with) the editable tag
+     * vocabulary. Each chip shows how many entries satisfy it, and a class nobody satisfies is
+     * omitted rather than offered as a dead end.
+     */
+    _renderConstraintFilters() {
+        const mount = this.element.querySelector('#ruleset-library-constraint-filters');
+        if (!mount) return;
+        const all = [
+            ...(this.libraryData?.rulesets || []),
+            ...this.appContext.libraryController.getUserLibrary(),
+        ];
+        const chips = CONSTRAINT_CLASSES
+            .map(cls => ({ cls, n: all.filter(r => this._satisfiesConstraint(r.hex, cls)).length }))
+            // Drop chips that cannot narrow anything: none matching, or — because the filter is
+            // hierarchy-aware — every ruleset matching (`Free` always does, since every rule is at
+            // least free). A chip that returns the unfiltered list is noise, not an option.
+            .filter(({ n }) => n > 0 && n < all.length)
+            .map(({ cls, n }) => {
+                const meta = CONSTRAINT_CLASS_META[cls];
+                const active = this.filterState.constraint === cls;
+                const title = `${meta.description} Includes any stricter class (${n} ruleset${n === 1 ? '' : 's'}).`;
+                return `<button class="tag-chip constraint-filter constraint-${cls}${active ? ' active' : ''}" data-constraint-filter="${cls}" title="${this._escapeAttr(title)}" aria-pressed="${active}">${this._escape(meta.label)} <span class="constraint-filter-count">${n}</span></button>`;
+            });
+        mount.classList.toggle('hidden', chips.length === 0);
+        mount.innerHTML = chips.join('');
     }
 
     _renderPublicLibrary() {
@@ -316,6 +369,17 @@ export class RulesetLibraryComponent extends BaseComponent {
             if (packBtn) {
                 if (packBtn.dataset.action === 'export-pack') this._exportPack();
                 else libraryPane.querySelector('.library-import-input')?.click();
+                return;
+            }
+
+            // Constraint-class filter chip toggle (clicking the active one clears it).
+            const constraintChip = target.closest('[data-constraint-filter]');
+            if (constraintChip) {
+                const cls = constraintChip.dataset.constraintFilter;
+                this.filterState.constraint = this.filterState.constraint === cls ? null : cls;
+                this._renderConstraintFilters();
+                this._renderPublicLibrary();
+                this._renderPersonalLibrary();
                 return;
             }
 

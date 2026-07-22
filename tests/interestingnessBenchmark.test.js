@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { scoreSingleIC, applyConfirmation } from '../src/core/analysis/InterestingnessScore.js';
-import { describeRuleset } from '../src/core/rulesetDescriptor.js';
+import { classifyRulesetConstraint } from '../src/core/rulesetDescriptor.js';
 import benchmark from './fixtures/interestingnessBenchmark.json';
 
 /**
@@ -27,30 +27,11 @@ import benchmark from './fixtures/interestingnessBenchmark.json';
  * Panel provenance + regeneration: tests/fixtures/README.md. Never hand-edit the JSON.
  */
 
-// --- Constraint class (roadmap #38's classifier, inlined until it lands) ---------------------
-// Strictest structural constraint the rule satisfies. The panel is stratified by it because
+// The panel is stratified by constraint class (`classifyRulesetConstraint`, roadmap #38) because
 // symmetric rulesets have much better odds of being interesting: an unstratified panel would let a
 // scorer (or Stage 4's reward model) score well by learning "symmetric = good" instead of reading
 // the dynamics. Hence r_sym-class NEGATIVES exist in the panel and within-class accuracy is
 // reported alongside the overall number.
-/**
- * @param {string} hex 32-char ruleset hex.
- * @returns {'totalistic'|'n_count'|'r_sym'|'free'|'invalid'}
- */
-function constraintClass(hex) {
-    const d = describeRuleset(hex);
-    if (!d) return 'invalid';
-    if (d.type === 'raw') return 'free';
-    if (d.type === 'r-sym') return 'r_sym';
-    // n-count: fully totalistic iff the output depends only on (centre + neighbour count), i.e. the
-    // birth entry for count k must agree with the survival entry for count k−1 (same cell sum).
-    const birth = new Set(d.birth.map(Number));
-    const survival = new Set(d.survival.map(Number));
-    for (let k = 1; k <= 6; k++) {
-        if (birth.has(k) !== survival.has(k - 1)) return 'n_count';
-    }
-    return 'totalistic';
-}
 
 // --- Scoring the panel -----------------------------------------------------------------------
 
@@ -184,7 +165,7 @@ describe('interestingness benchmark — panel integrity', () => {
 
     it('the recorded constraint class matches the class derived from the hex (hand-edit guard)', () => {
         for (const e of benchmark.entries) {
-            expect(`${e.id}:${e.constraintClass}`).toBe(`${e.id}:${constraintClass(e.hex)}`);
+            expect(`${e.id}:${e.constraintClass}`).toBe(`${e.id}:${classifyRulesetConstraint(e.hex)}`);
         }
     });
 
