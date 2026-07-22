@@ -29,10 +29,16 @@ export function computeWorldStatus(stats) {
  * Plain-language status word for the selected world's top-bar chip. Unlike
  * computeWorldStatus (which returns null for an evolving world), this always names a
  * state — including the active case — so the chip is never blank for a live world.
+ *
+ * `isPaused` gates ONLY the non-terminal case. The terminal words describe the world
+ * itself ("Died out" / "Full" / "Cycling ↻N") and stay true with the clock stopped, but
+ * "Active" is a claim about motion — asserting it at tick 0 contradicts the app's own
+ * onboarding ("Time is currently frozen"), so a paused non-terminal world reads "Paused".
  * @param {{ratio?:number, isInCycle?:boolean, cycleLength?:number}|null|undefined} stats
+ * @param {boolean} [isPaused=false] Whether the simulation clock is stopped.
  * @returns {{type:string, word:string, title:string}}
  */
-export function computeStatusWord(stats) {
+export function computeStatusWord(stats, isPaused = false) {
     if (!stats || stats.ratio === undefined) {
         return { type: 'unknown', word: '—', title: 'No data yet' };
     }
@@ -43,6 +49,9 @@ export function computeStatusWord(stats) {
             case 'saturated': return { type: 'saturated', word: 'Full', title: terminal.title };
             case 'cycling': return { type: 'cycling', word: `Cycling ${terminal.label}`, title: terminal.title };
         }
+    }
+    if (isPaused) {
+        return { type: 'paused', word: 'Paused', title: 'Time is frozen — press Play to run the simulation' };
     }
     return { type: 'active', word: 'Active', title: 'Evolving — cells are changing each tick' };
 }

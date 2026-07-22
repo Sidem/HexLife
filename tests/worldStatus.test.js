@@ -47,4 +47,26 @@ describe('computeStatusWord', () => {
         expect(computeStatusWord({ ratio: 0.5, isInCycle: false }))
             .toMatchObject({ type: 'active', word: 'Active' });
     });
+
+    it('defaults to the running reading when no pause state is supplied', () => {
+        expect(computeStatusWord({ ratio: 0.5, isInCycle: false }).word).toBe('Active');
+    });
+
+    it('reads "Paused" instead of "Active" while the clock is stopped', () => {
+        const paused = computeStatusWord({ ratio: 0.5, isInCycle: false }, true);
+        expect(paused).toMatchObject({ type: 'paused', word: 'Paused' });
+        // The title is the specific claim the audit caught being false at tick 0.
+        expect(paused.title).not.toMatch(/changing each tick/);
+    });
+
+    it('keeps terminal words while paused — they describe the world, not the clock', () => {
+        expect(computeStatusWord({ ratio: 0 }, true)).toMatchObject({ type: 'extinct', word: 'Died out' });
+        expect(computeStatusWord({ ratio: 1 }, true)).toMatchObject({ type: 'saturated', word: 'Full' });
+        expect(computeStatusWord({ ratio: 0.5, isInCycle: true, cycleLength: 12 }, true))
+            .toMatchObject({ type: 'cycling', word: 'Cycling ↻12' });
+    });
+
+    it('still reports unknown while paused', () => {
+        expect(computeStatusWord(null, true).type).toBe('unknown');
+    });
 });

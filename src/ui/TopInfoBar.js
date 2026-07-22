@@ -163,6 +163,9 @@ export class TopInfoBar {
         EventBus.subscribe(EVENTS.HISTORY_CHANGED, () => this.updateUndoRedoButtons());
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (stats) => this.updateStatsDisplay(stats));
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.updateStatsDisplay(this.worldManager.getSelectedWorldStats()));
+        // The status chip depends on pause state, and WORLD_STATS_UPDATED stops arriving while
+        // paused — so re-render off the pause event too, or the chip would keep the stale word.
+        EventBus.subscribe(EVENTS.SIMULATION_PAUSED, () => this.updateStatsDisplay(this.worldManager.getSelectedWorldStats()));
         EventBus.subscribe(EVENTS.BRUSH_SIZE_CHANGED, (size) => this.updateBrushSizeDisplay(size));
         EventBus.subscribe(EVENTS.PERFORMANCE_METRICS_UPDATED, (data) => this.updatePerformanceDisplay(data.fps, data.tps, data.targetTps));
         EventBus.subscribe(EVENTS.COMMAND_SET_SHOW_PERFORMANCE, (shouldShow) => this.applyShowPerformance(shouldShow));
@@ -287,10 +290,10 @@ export class TopInfoBar {
             this.uiElements.statRatioBar.style.width = `${ratioPct !== null ? Math.max(0, Math.min(100, ratioPct)) : 0}%`;
         }
 
-        // Plain-language state chip ("Active" / "Died out" / "Full" / "Cycling ↻N") for
+        // Plain-language state chip ("Active" / "Paused" / "Died out" / "Full" / "Cycling ↻N") for
         // the selected world — surfaces the same classification the minimap badges use.
         if (this.uiElements.statStatus) {
-            const status = computeStatusWord(stats);
+            const status = computeStatusWord(stats, this.appContext.simulationController.getIsPaused());
             const el = this.uiElements.statStatus;
             if (el.textContent !== status.word) el.textContent = status.word;
             el.className = `status-chip status-${status.type}`;

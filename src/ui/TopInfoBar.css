@@ -218,6 +218,14 @@
     color: #b6f0c4;
 }
 
+/* Paused is a resting state, not an alarm — read it as neutral/dim so a running world's
+   green "Active" stays the eye-catching one. */
+.status-chip.status-paused {
+    background-color: rgba(120, 120, 135, 0.22);
+    border-color: rgba(170, 170, 190, 0.45);
+    color: #cfcfe0;
+}
+
 .status-chip.status-extinct {
     background-color: rgba(60, 60, 70, 0.85);
     border-color: rgba(255, 255, 255, 0.18);
