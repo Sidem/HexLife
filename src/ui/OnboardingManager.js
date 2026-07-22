@@ -67,7 +67,18 @@ export class OnboardingManager {
         this._setupEventListeners();
     }
 
-    /** Creates the four dim panels + glow ring once, inside the overlay. */
+    /**
+     * Creates the four dim panels inside the overlay, plus the glow ring.
+     *
+     * The ring is deliberately **not** a child of the overlay. The overlay is a
+     * z-index:2000 stacking context, and `_renderStep` escalates the target's own
+     * panel to 2002 so it is not dimmed — which meant the ring rendered *behind*
+     * the very panel it was pointing into, and the glow simply vanished. Same for
+     * any target inside a mobile view / modal / bottom sheet stacked above 2000.
+     * Parented to `<body>` with its own z-index (just under the tooltip), the ring
+     * escapes that context. It is `position: fixed` and `pointer-events: none`, so
+     * reparenting changes nothing about how it is positioned or how clicks land.
+     */
     _buildSpotlight() {
         this.ui.overlay.innerHTML = '';
         this.dim = {};
@@ -81,9 +92,10 @@ export class OnboardingManager {
             this.ui.overlay.appendChild(el);
             this.dim[side] = el;
         });
+        document.querySelectorAll('.ob-ring').forEach(el => el.remove());
         this.ring = document.createElement('div');
         this.ring.className = 'ob-ring';
-        this.ui.overlay.appendChild(this.ring);
+        document.body.appendChild(this.ring);
     }
 
     _setupEventListeners() {

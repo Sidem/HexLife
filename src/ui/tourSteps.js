@@ -20,9 +20,10 @@ import { ChromaLabComponent } from './components/ChromaLabComponent.js';
 export const getTours = (appContext) => {
 
     // Stable hex of the "Spontaneous Gliders" library ruleset (src/core/library/
-    // rulesets.json). The library item carries it on `.library-item-actions[data-hex]`,
-    // so this selector survives reordering of the public library.
-    const GLIDERS_LOAD_BTN = '#ruleset-library-public-content .library-item-actions[data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
+    // rulesets.json). `RulesetDisplayFactory` puts the hex on the card itself
+    // (`.library-card[data-hex]`), so this selector survives reordering of the
+    // public library. Guarded by tests/tourSelectors.test.js.
+    const GLIDERS_LOAD_BTN = '#ruleset-library-public-content .library-card[data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
 
     /**
      * A helper function to ensure a consistent state before starting any tour.
@@ -179,9 +180,11 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Good to Know' },
         advanceOn: { type: 'click' }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="learning"]' : '#helpButton',
+        element: () => appContext.uiManager.isMobile() ? '#mobileGearButton' : '#helpButton',
         title: 'Your Lab Assistant',
-        content: "Excellent. For every other tool, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon for a specific guide. Use this main <span class=\"onboarding-highlight-text\">Help/Learn button</span> to restart this orientation at any time. Good luck, Researcher.",
+        content: () => "Excellent. For every other tool, look for the <span class=\"onboarding-highlight-text\">[?]</span> help icon for a specific guide. " + (appContext.uiManager.isMobile()
+            ? "This <span class=\"onboarding-highlight-text\">gear</span> opens the <span class=\"onboarding-highlight-text\">More</span> menu, where <span class=\"onboarding-highlight-text\">Learning Hub</span> restarts this orientation at any time."
+            : "Use this main <span class=\"onboarding-highlight-text\">Help/Learn button</span> to restart this orientation at any time.") + " Good luck, Researcher.",
         primaryAction: { text: 'Begin My Research' },
         advanceOn: { type: 'click' }
     }];
@@ -212,7 +215,7 @@ export const getTours = (appContext) => {
     }];
 
     const ruleset_actions = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Tutorial: Ruleset Actions',
         content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
         primaryAction: { text: 'Open Panel' },
@@ -236,7 +239,7 @@ export const getTours = (appContext) => {
     }];
 
     const ruleset_library = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Tutorial: Ruleset Library',
         content: "Load pre-discovered rulesets from the curated <span class=\"onboarding-highlight-text\">Library</span>, your own saved rules, or paste a ruleset's hex code <span class=\"onboarding-highlight-text\">Directly</span>.",
         primaryAction: { text: 'Open Library' },
@@ -267,7 +270,7 @@ export const getTours = (appContext) => {
     }];
 
     const editor = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="editor"]' : '[data-tour-id="edit-rule-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="edit-rule-button"]',
         title: 'Tutorial: The Ruleset Editor',
         content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
         primaryAction: { text: 'Open Editor' },
@@ -275,7 +278,10 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetEditorComponent }
     }, {
-        element: () => (appContext.uiManager.isMobile() ? '#editor-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
+        // Mobile hosts the editor inside the Build view (segment 'editor'), so the
+        // container is `#build-mobile-view` — `UIManager` ids views `${view}-mobile-view`
+        // and there is no standalone 'editor' view.
+        element: () => (appContext.uiManager.isMobile() ? '#build-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
         title: 'Toggling Outcomes',
         content: "The visualization shows a center cell and its six neighbors. The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule</span> to flip its output state.",
         primaryAction: { text: 'Click any Rule' },
@@ -290,7 +296,7 @@ export const getTours = (appContext) => {
     }];
     
     const worldsetup = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="worlds"]' : '[data-tour-id="setup-panel-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="setup-panel-button"]',
         title: 'Tutorial: World Setup',
         content: "Each of the nine universes can be configured independently. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel to manage them.",
         primaryAction: { text: 'Open Panel' },
@@ -312,12 +318,12 @@ export const getTours = (appContext) => {
     }];
 
     const analysis = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="analyze"]' : '[data-tour-id="analysis-panel-button"]',
+        element: () => appContext.uiManager.isMobile() ? '#more-view [data-action="analyze"]' : '[data-tour-id="analysis-panel-button"]',
         title: 'Tutorial: Analysis Tools',
-        content: "Beyond watching patterns, you can measure them. Open the <span class=\"onboarding-highlight-text\">Analysis</span> panel to see live metrics for the selected world.",
+        content: "Beyond watching patterns, you can measure them. Open the <span class=\"onboarding-highlight-text\">Analysis</span> panel to see live metrics for the selected world. <br><br>On mobile it's <span class=\"onboarding-highlight-text\">Full Analysis</span>, in the <span class=\"onboarding-highlight-text\">More</span> menu (the gear icon).",
         primaryAction: { text: 'Open Panel' },
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'analysis' }, mobile: { view: 'analyze' } }),
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => { resetUIState(); showView({ mobile: { view: 'more' } }); },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === AnalysisComponent }
     }, {
         element: '.plugins-mount-area',
@@ -347,12 +353,12 @@ export const getTours = (appContext) => {
     }];
 
     const patterns = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="patterns-button"]',
+        element: () => appContext.uiManager.isMobile() ? '#more-view [data-action="patterns"]' : '[data-tour-id="patterns-button"]',
         title: 'Tutorial: Patterns',
-        content: "Copy and paste regions of cells, or capture a shape into your personal <span class=\"onboarding-highlight-text\">pattern library</span> and stamp it onto any world. <br><br>On mobile, find Patterns under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        content: "Copy and paste regions of cells, or capture a shape into your personal <span class=\"onboarding-highlight-text\">pattern library</span> and stamp it onto any world. <br><br>On mobile, Patterns lives in the <span class=\"onboarding-highlight-text\">More</span> menu (the gear icon) &mdash; opened for you here.",
         primaryAction: { text: 'Open Patterns' },
         condition: () => !isViewOpen({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => { resetUIState(); showView({ mobile: { view: 'more' } }); },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === PatternsComponent }
     }, {
         element: '#patterns-copy-button',
@@ -378,9 +384,9 @@ export const getTours = (appContext) => {
     }];
 
     const explore = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="explore-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="discover"]' : '[data-tour-id="explore-button"]',
         title: 'Tutorial: Auto-Explore',
-        content: "Let the Explorer hunt for you. Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span> near the edge of chaos, scoring and breeding the best automatically. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        content: "Let the Explorer hunt for you. Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span> near the edge of chaos, scoring and breeding the best automatically. <br><br>On mobile, it's the <span class=\"onboarding-highlight-text\">Discover</span> tab.",
         primaryAction: { text: 'Open Auto-Explore' },
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         onBeforeShow: resetUIState,
@@ -493,9 +499,9 @@ export const getTours = (appContext) => {
     }];
 
     const saveLoad = [{
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="snapshots-button"]',
+        element: () => appContext.uiManager.isMobile() ? '#mobileGearButton' : '[data-tour-id="snapshots-button"]',
         title: 'Tutorial: Save, Load & Share',
-        content: 'Preserve your discoveries and share them with others. On desktop, saving and loading live in the <span class="onboarding-highlight-text">Snapshots</span> panel.',
+        content: 'Preserve your discoveries and share them with others. On desktop, saving and loading live in the <span class="onboarding-highlight-text">Snapshots</span> panel; on mobile they are in the <span class="onboarding-highlight-text">More</span> menu behind this gear icon.',
         primaryAction: { text: 'Next' },
         onBeforeShow: resetUIState,
         advanceOn: { type: 'click' }
@@ -528,9 +534,9 @@ export const getTours = (appContext) => {
         onBeforeShow: resetUIState,
         advanceOn: { type: 'click' }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Step 1: Get a Baseline',
-        content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span> to load a known ruleset. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        content: "Every experiment needs a starting point. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span> to load a known ruleset. <br><br>On mobile, it's the <span class=\"onboarding-highlight-text\">Library</span> tab.",
         //primaryAction: { text: 'Open Ruleset Library' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
@@ -562,7 +568,7 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
         delayAfter: 2000
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="worlds"]' : '[data-tour-id="setup-panel-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="setup-panel-button"]',
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
         //primaryAction: { text: 'Open World Setup' },
@@ -596,7 +602,7 @@ export const getTours = (appContext) => {
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="rules"]' : '[data-tour-id="ruleset-actions-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Step 10: Prepare for Mutation',
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
         //primaryAction: { text: 'Open Ruleset Actions' },
@@ -680,9 +686,9 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Save It!' },
         advanceOn: { type: 'event', eventName: EVENTS.USER_RULESET_SAVED }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="more"]' : '[data-tour-id="library-button"]',
+        element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Step 3: Visit Your Library',
-        content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span>. <br><br>On mobile, find it under the <span class=\"onboarding-highlight-text\">More</span> tab.",
+        content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span>. <br><br>On mobile, it's the <span class=\"onboarding-highlight-text\">Library</span> tab.",
         primaryAction: { text: 'Open Library' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
@@ -699,7 +705,7 @@ export const getTours = (appContext) => {
         },
         advanceOn: { type: 'click', target: 'element' }
     }, {
-        element: '.library-item.personal [data-action="manage-personal"]',
+        element: '.library-card.personal [data-action="manage-personal"]',
         title: 'Step 5: Manage & Share',
         content: "From here, you can <span class=\"onboarding-highlight-text\">Load</span> your ruleset back into the simulator, or use the <span class=\"onboarding-highlight-text\">'...' menu</span> to Rename, Delete, or Share it.",
         primaryAction: { text: 'Mission Complete!' },

@@ -22,12 +22,17 @@
     pointer-events: auto;
 }
 
-/* Glow ring drawn around the spotlight hole; never intercepts pointer events. */
+/* Glow ring drawn around the spotlight hole; never intercepts pointer events.
+   Lives on <body>, not inside #onboarding-overlay: the overlay is a z-index:2000
+   stacking context and the highlighted panel is escalated to 2002, so a ring
+   nested in the overlay was painted behind that panel and disappeared. Sits just
+   under the tooltip (6001) so it can never cover the step's own text. */
 .ob-ring {
     position: fixed;
     display: none;
     border-radius: 6px;
     pointer-events: none;
+    z-index: 6000;
     animation: ob-ring-pulse 2s infinite ease-in-out;
 }
 
