@@ -22,7 +22,26 @@ import { makePredictionRound, randomRoundSeed } from '../../core/analysis/predic
  * Simulation is borrowed, not owned: {@link ThumbnailBakeService.bakePredictionRound} runs the round
  * on a scratch (non-selected) world and restores it afterwards, so the deck never disturbs what the
  * user is looking at, and the answer comes from the same evaluation burst the rest of the app scores.
+ *
+ * **Currently switched off — see {@link PREDICTION_MODE_ENABLED}.**
  */
+
+/**
+ * Master switch for the Prediction deck (#19). **Off since 2026-07-22**: the feature works
+ * mechanically — rounds deal, grade and bank correctly — but the *game* doesn't yet. Owner verdict
+ * after playing it: not good enough to put in front of a newcomer.
+ *
+ * It is a flag rather than a revert because nothing here is wrong, only unfinished, and the parts
+ * downstream work already depends on are all still live and tested: `classifyOutcome()` (the app's
+ * outcome vocabulary, wanted by #17's result grid and #23), `makePredictionRound()` (seed-minted
+ * worlds, which is most of #20) and `ThumbnailBakeService.bakePredictionRound()` (the before/after
+ * capture). Deleting the deck would take the only caller of all three with it.
+ *
+ * Flipping this back to `true` restores the surface exactly as it shipped; the placement contract it
+ * has to satisfy is still pinned by `tests/exploreDisclosure.test.js`. What to fix first is recorded
+ * in `docs/PLAY-LAYER-PLAN.md` §P1.
+ */
+export const PREDICTION_MODE_ENABLED = false;
 
 /** Round states, in the order one round passes through them. */
 const PHASE = { LOADING: 'loading', ASKING: 'asking', REVEALED: 'revealed', UNAVAILABLE: 'unavailable' };

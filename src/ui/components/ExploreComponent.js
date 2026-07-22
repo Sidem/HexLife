@@ -13,7 +13,7 @@ import { constraintBadge } from '../RulesetDisplayFactory.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
 import { ExploreRaterView } from './ExploreRaterView.js';
-import { PredictionDeck } from './PredictionDeck.js';
+import { PredictionDeck, PREDICTION_MODE_ENABLED } from './PredictionDeck.js';
 import { VoteBank } from '../../core/analysis/VoteBank.js';
 import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
 import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
@@ -110,9 +110,13 @@ export class ExploreComponent extends BaseComponent {
      * at startup (UIManager's shared-singleton table) and dealing a card borrows a scratch world for
      * a 600-tick burst, which must not happen behind a panel nobody has opened. Once built it lives
      * with the component and travels with it between Discover and the desktop panel.
+     *
+     * Gated on `PREDICTION_MODE_ENABLED`, which is currently **false** — the deck is switched off
+     * rather than reverted (rationale on the flag). Off means never constructed: an empty mount div
+     * renders nothing and no round is ever baked.
      */
     _mountPredictionDeck() {
-        if (this.predictionDeck) return;
+        if (!PREDICTION_MODE_ENABLED || this.predictionDeck) return;
         const mount = this.element.querySelector('#explore-prediction-mount');
         if (!mount) return;
         this.predictionDeck = new PredictionDeck(mount, { worldManager: this.worldManager });
@@ -214,7 +218,11 @@ export class ExploreComponent extends BaseComponent {
                  disclosure — the first thing a visitor meets on Discover is a question they can
                  answer, not the search's expert controls. Mounted lazily (see _mountPredictionDeck):
                  dealing a card borrows a scratch world, which must not happen on a surface the user
-                 never opened. -->
+                 never opened. CURRENTLY INERT — PREDICTION_MODE_ENABLED is false, so this div stays
+                 empty and renders nothing. The div is kept so the placement contract above the
+                 disclosure survives re-enabling; tests/exploreDisclosure.test.js pins both.
+                 NB no backticks in this comment: it lives inside a template literal, where one
+                 would close the string and take the whole render template with it. -->
             <div id="explore-prediction-mount"></div>
             <details class="tool-group explore-advanced" id="explore-advanced" ${advancedOpen ? 'open' : ''}>
                 <summary class="explore-advanced-summary">

@@ -1,6 +1,15 @@
 /* Prediction mode (#19) — the newcomer-tier deck on Discover. Scoped under `.prediction-deck` so it
    composes with `.tool-group` in the Explore surfaces without reaching into them. */
 
+/* The deck is currently switched off (PREDICTION_MODE_ENABLED), so its mount renders as an empty
+   div. A zero-height flex child still consumes one of `.explore-component-content`'s 14px gaps, so
+   an "invisible" feature would leave a visible hole above Advanced. `:empty` collapses it — and
+   keeps doing the right thing when the deck is switched back on, since a mount with a card in it is
+   no longer empty. */
+#explore-prediction-mount:empty {
+    display: none;
+}
+
 .prediction-deck {
     display: flex;
     flex-direction: column;
