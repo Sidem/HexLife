@@ -1451,11 +1451,12 @@ export class WorldManager {
 
     _initCameraStates(sharedCameraSettings) {
         const gridCenter = getGridCenterWorld();
+        const zoom = this._getFirstRunZoom();
         for (let i = 0; i < Config.NUM_WORLDS; i++) {
             const defaultCamera = {
                 x: gridCenter.x,
                 y: gridCenter.y,
-                zoom: 1.0
+                zoom
             };
 
             if (sharedCameraSettings && i === this.selectedWorldIndex) {
@@ -1464,6 +1465,36 @@ export class WorldManager {
                 this.cameraStates.push(defaultCamera);
             }
         }
+    }
+
+    /**
+     * Opening zoom for a first-time visitor (roadmap #34 / UX audit fix 7 — "first legibility").
+     * At zoom 1 the default grid draws ~6.7px hex rows, so a half-filled world reads as monochrome
+     * static and the named gliders of the default ruleset are invisible; `legibleFirstRunZoom`
+     * scales that up to where cells are individually visible. One-shot: the flag is written the
+     * first time this runs, so a returning visitor (or a reload) opens at plain 1.0 and the camera
+     * is theirs from then on. Share links carry their own camera and are untouched.
+     * @returns {number}
+     */
+    _getFirstRunZoom() {
+        if (PersistenceService.loadUISetting('seenFirstRunView', false)) return 1.0;
+        PersistenceService.saveUISetting('seenFirstRunView', true);
+        return Config.legibleFirstRunZoom(Config.GRID_ROWS, Config.RENDER_TEXTURE_SIZE);
+    }
+
+    /**
+     * Return the selected world's camera to the whole-grid framing (the "Reset view" affordance —
+     * roadmap #31). Announced on the bus because the camera object is mutated in place, so nothing
+     * else can observe the change.
+     */
+    resetSelectedCamera = () => {
+        const camera = this.cameraStates[this.selectedWorldIndex];
+        if (!camera) return;
+        const gridCenter = getGridCenterWorld();
+        camera.x = gridCenter.x;
+        camera.y = gridCenter.y;
+        camera.zoom = 1.0;
+        EventBus.dispatch(EVENTS.CAMERA_CHANGED, { zoom: camera.zoom, worldIndex: this.selectedWorldIndex });
     }
 
     getCurrentCameraState = () => {

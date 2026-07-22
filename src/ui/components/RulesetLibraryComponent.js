@@ -24,6 +24,11 @@ export class RulesetLibraryComponent extends BaseComponent {
         this.libraryData = options.libraryData;
         // Cross-list filter/sort state (applies to both Public and Personal lists).
         this.filterState = { query: '', tag: null, constraint: null, sort: 'recent' };
+        // What "Load" means for an entry that carries a paired initial condition (roadmap #30).
+        // This used to be a second button on every such card; it is one list-level choice now,
+        // sitting with the scope switch that already governs every load from this list. Default on:
+        // the card's thumbnail is baked from that IC, so loading it is what the user just looked at.
+        this.pairedStart = PersistenceService.loadUISetting('libraryPairedStart', true);
         // Handle for the in-flight lazy thumbnail backfill so we can cancel it on re-render/destroy.
         this._backfillHandle = null;
         // Keys of entries we've already tried to bake this pane-lifetime (success OR fail), so a save /
@@ -96,6 +101,7 @@ export class RulesetLibraryComponent extends BaseComponent {
                     <option value="recent">Recent</option>
                     <option value="name">Name A–Z</option>
                 </select>
+                <button type="button" class="library-paired-toggle${this.pairedStart ? ' active' : ''}" data-action="toggle-paired-start" aria-pressed="${this.pairedStart}" title="When on, loading an entry that has a paired starting condition also re-seeds the world with it — the state its preview was made from. Off loads the rule alone and leaves your cells as they are.">Paired start</button>
                 <button class="button-icon library-pack-btn" data-action="export-pack" title="Export your rulesets as a shareable pack file" aria-label="Export rulesets to a pack file">${ICONS.download}</button>
                 <button class="button-icon library-pack-btn" data-action="import-pack" title="Import rulesets from a pack file" aria-label="Import rulesets from a pack file">${ICONS.upload}</button>
                 <input type="file" class="library-import-input" accept="application/json,.json" hidden aria-hidden="true" />
@@ -362,7 +368,6 @@ export class RulesetLibraryComponent extends BaseComponent {
         libraryPane.addEventListener('click', e => {
             const target = e.target;
             const action = target.dataset.action;
-            const rulesetActionController = this.appContext.rulesetActionController;
 
             // Pack export/import toolbar buttons (resolve past the inner SVG).
             const packBtn = target.closest('.library-pack-btn');
@@ -407,48 +412,20 @@ export class RulesetLibraryComponent extends BaseComponent {
                 return;
             }
 
+            // "Paired start" — what a Load click means for entries that carry an IC (#30).
+            const pairedToggle = target.closest('[data-action="toggle-paired-start"]');
+            if (pairedToggle) {
+                this.pairedStart = !this.pairedStart;
+                PersistenceService.saveUISetting('libraryPairedStart', this.pairedStart);
+                pairedToggle.classList.toggle('active', this.pairedStart);
+                pairedToggle.setAttribute('aria-pressed', String(this.pairedStart));
+                return;
+            }
+
             const card = target.closest('.library-card');
 
             if (action === 'load-rule' || action === 'load-personal') {
-                this.appContext.libraryController.loadRuleset(
-                    card.dataset.hex,
-                    rulesetActionController.getGenScope(),
-                    rulesetActionController.getGenAutoReset()
-                );
-                return;
-            }
-
-            // Load the ruleset together with its paired initial condition + seed — reuses the
-            // proven explore-find apply path (commits ruleset, clones the IC, seed-resets the world).
-            if (action === 'load-with-ic') {
-                const rule = this._findCardEntry(card);
-                if (!rule?.initialState) return;
-                EventBus.dispatch(EVENTS.COMMAND_APPLY_EXPLORE_FIND, {
-                    find: {
-                        hex: rule.hex,
-                        initialState: rule.initialState,
-                        seed: rule.seed,
-                        mnemonic: rule.name || rulesetName(rule.hex),
-                        icLabel: rule.initialState.mode,
-                    },
-                });
-                return;
-            }
-
-            if (target.closest('[data-action="share-reddit"]')) {
-                const id = card?.dataset.id;
-                const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id)
-                    || this._findCardEntry(card);
-                if (!rule) return;
-                const ui = this.appContext.uiManager;
-                if (ui?.shareLibraryEntryToReddit) {
-                    ui.shareLibraryEntryToReddit(rule);
-                } else {
-                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                        message: 'Share is not available yet.',
-                        type: 'error',
-                    });
-                }
+                this._loadCard(card);
                 return;
             }
 
@@ -458,7 +435,18 @@ export class RulesetLibraryComponent extends BaseComponent {
                 const rule = this.appContext.libraryController.getUserLibrary().find(r => r.id === id);
                 if (!rule) return;
 
-                const popoverActions = [
+                const popoverActions = [];
+
+                // The other half of the "Paired start" choice, for this one entry — so collapsing
+                // the double load button (#30) removes a control, not a capability.
+                if (rule.initialState) {
+                    popoverActions.push({
+                        label: this.pairedStart ? 'Load rule only' : 'Load with paired start',
+                        callback: () => this._loadCard(card, { withPairedStart: !this.pairedStart }),
+                    });
+                }
+
+                popoverActions.push(
                     {
                         label: 'Share on Reddit',
                         callback: () => {
@@ -480,7 +468,7 @@ export class RulesetLibraryComponent extends BaseComponent {
                             });
                         }
                     },
-                ];
+                );
 
                 // Copy the paired initial condition as a portable IC code (only when one exists).
                 if (rule.initialState) {
@@ -532,6 +520,33 @@ export class RulesetLibraryComponent extends BaseComponent {
         });
 
         this._subscribeToEvent(EVENTS.USER_LIBRARY_CHANGED, this._onUserLibraryChanged);
+    }
+
+    /**
+     * Load a card's ruleset. With "Paired start" on (and the entry actually carrying an IC) this is
+     * the full dish — ruleset + its initial condition + seed — via the proven explore-find apply
+     * path; otherwise it is the rule alone, applied to whatever cells are on screen.
+     * @param {HTMLElement|null} card
+     * @param {{withPairedStart?: boolean}} [opts] Override the list-level toggle for this one load.
+     */
+    _loadCard(card, opts = {}) {
+        if (!card) return;
+        const rule = this._findCardEntry(card);
+        const withPaired = opts.withPairedStart ?? this.pairedStart;
+        if (withPaired && rule?.initialState) {
+            EventBus.dispatch(EVENTS.COMMAND_APPLY_EXPLORE_FIND, {
+                find: {
+                    hex: rule.hex,
+                    initialState: rule.initialState,
+                    seed: rule.seed,
+                    mnemonic: rule.name || rulesetName(rule.hex),
+                    icLabel: rule.initialState.mode,
+                },
+            });
+            return;
+        }
+        const rac = this.appContext.rulesetActionController;
+        this.appContext.libraryController.loadRuleset(card.dataset.hex, rac.getGenScope(), rac.getGenAutoReset());
     }
 
     /** Resolve a card element back to its source entry (personal by id, else public/personal by hex). */

@@ -218,6 +218,10 @@ export class InputManager {
             camera.y = worldY * (1 - ratio) + camera.y * ratio;
             camera.zoom = newZoom;
             this.clampCameraPan();
+            EventBus.dispatch(EVENTS.CAMERA_CHANGED, {
+                zoom: newZoom,
+                worldIndex: this.worldManager.getSelectedWorldIndex(),
+            });
         }
     }
     

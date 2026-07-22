@@ -102,10 +102,16 @@ export class RulesetDisplayFactory {
             ? `<span class="constraint-badge constraint-${badge.cls}" title="${this._escapeAttr(badge.title)}">${this._escape(badge.label)}</span>`
             : '';
 
-        const actions = [`<button class="button" data-action="${isPersonal ? 'load-personal' : 'load-rule'}">Load</button>`];
-        if (hasIC) actions.push(`<button class="button button-subtle" data-action="load-with-ic" title="Load this ruleset with its paired initial state">Load + IC</button>`);
+        // ONE load control per card (roadmap #30 / UX audit fix 3). "Load" and "Load + IC" used to
+        // sit side by side on every card that had a paired start — ~2 controls × every entry, which
+        // is how the Library tab reached 104 controls. Which of the two a click means is now a
+        // single list-level choice ("Paired start", RulesetLibraryComponent), not a per-card fork.
+        // Share on Reddit likewise loses its inline button: it was always *also* in the ⋯ menu.
+        const loadTitle = hasIC
+            ? 'Load this ruleset — with the starting cells it was previewed from while “Paired start” is on'
+            : 'Load this ruleset';
+        const actions = [`<button class="button" data-action="${isPersonal ? 'load-personal' : 'load-rule'}" title="${this._escapeAttr(loadTitle)}">Load</button>`];
         if (isPersonal) {
-            actions.push(`<button class="button button-subtle" data-action="share-reddit" title="Copy a post kit (name, description, tags, world code) and open r/hexlife">Share on Reddit</button>`);
             actions.push(`<button class="button-icon" data-action="manage-personal" title="More options">${'⋯'}</button>`);
         }
 

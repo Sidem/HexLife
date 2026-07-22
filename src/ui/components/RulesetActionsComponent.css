@@ -277,9 +277,11 @@
     background-color: #5a5a5a;
 }
 
-/* Search / sort toolbar above the Public/Personal lists. */
+/* Search / sort toolbar above the Public/Personal lists. Wraps: the paired-start toggle joined it
+   in #30 and at 375px the row no longer fits on one line. */
 .library-toolbar {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
     flex-shrink: 0;
@@ -309,6 +311,37 @@
     border-radius: 4px;
     font-size: 0.85em;
     cursor: pointer;
+}
+
+/* "Paired start": one list-level switch replacing the per-card Load / Load + IC pair (#30). Reads
+   as a pressed/unpressed control rather than a filter chip — it changes what Load *does*, it does
+   not narrow the list. */
+.library-paired-toggle {
+    padding: 7px 10px;
+    background-color: #2a2a2a;
+    color: #999;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 0.85em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.library-paired-toggle::before {
+    content: '◍ ';
+    opacity: 0.7;
+}
+
+.library-paired-toggle:hover {
+    border-color: #6fd0ff;
+    color: #ccc;
+}
+
+.library-paired-toggle.active {
+    background-color: rgba(0, 120, 212, 0.18);
+    border-color: #0078d4;
+    color: #6fd0ff;
 }
 
 /* Tag filter chip row. */

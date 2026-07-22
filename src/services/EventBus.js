@@ -199,6 +199,8 @@ export const EVENTS = {
     LAYOUT_CALCULATED: 'system:layoutCalculated',
     /** @param {{selectedView: object, miniMap: object}} layout - Updated layout information for UI components. */
     LAYOUT_UPDATED: 'renderer:layoutUpdated',
+    /** @param {{zoom: number, worldIndex: number}} data - The selected world's camera zoom changed. Camera state is mutated in place (the renderer reads it every frame), so this is the only way a UI surface can observe it — it drives the on-canvas view chip that advertises panning (#31). Pans don't fire it: the chip shows zoom, not position. */
+    CAMERA_CHANGED: 'renderer:cameraChanged',
 
     
     /** @param {boolean} isPaused - The desired pause state. */

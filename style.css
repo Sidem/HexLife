@@ -39,6 +39,7 @@
 @import url('src/ui/components/ActionsPopover.css');
 @import url('src/styles/Toast.css');
 @import url('src/ui/CanvasHint.css');
+@import url('src/ui/ViewControls.css');
 
 /* 5. Feature-Specific Panel Components */
 @import url('src/ui/components/RulesetEditor.css');

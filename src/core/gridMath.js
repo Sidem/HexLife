@@ -24,6 +24,41 @@ export const GRID_SIZE_PRESETS = {
 export const DEFAULT_GRID_SIZE_KEY = 'medium';
 
 /**
+ * Smallest on-screen hex pitch (in render-texture pixels) at which a grid reads as *cells* rather
+ * than as monochrome static. Below roughly this, a half-filled world is texture, not structure —
+ * the "first legibility" defect the UX audit recorded (roadmap #34, audit fix 7).
+ */
+export const LEGIBLE_HEX_PITCH_PX = 14;
+
+/** Never open a first-time visitor deeper than this, however small the render texture is. */
+export const MAX_FIRST_RUN_ZOOM = 4;
+
+/**
+ * Camera zoom a *first-time* visitor should open at, so the opening frame shows structure.
+ *
+ * At zoom 1 the whole grid fills the render texture, so one row of hexes is `textureSize / rows`
+ * pixels tall — about 6.7px on the default 192-row grid, which is below the size at which a human
+ * can see individual cells interact. Scaling that pitch up to {@link LEGIBLE_HEX_PITCH_PX} is what
+ * turns the cold-start frame from static into gliders. Derived from the grid rather than hardcoded
+ * so every grid-size preset opens at a comparable apparent cell size.
+ *
+ * Never below 1 (zoom-out past the grid is meaningless) and never above
+ * {@link MAX_FIRST_RUN_ZOOM} (a deep opening zoom hides the world instead of explaining it).
+ *
+ * @param {number} rows Grid rows.
+ * @param {number} textureSize Render-texture size in px (`Config.RENDER_TEXTURE_SIZE`).
+ * @param {number} [minHexPitchPx] Target pitch; defaults to {@link LEGIBLE_HEX_PITCH_PX}.
+ * @returns {number} A camera zoom factor in [1, MAX_FIRST_RUN_ZOOM].
+ */
+export function legibleFirstRunZoom(rows, textureSize, minHexPitchPx = LEGIBLE_HEX_PITCH_PX) {
+    if (!(rows > 0) || !(textureSize > 0)) return 1;
+    const pitchAtZoom1 = textureSize / rows;
+    const zoom = minHexPitchPx / pitchAtZoom1;
+    if (!Number.isFinite(zoom)) return 1;
+    return Math.max(1, Math.min(MAX_FIRST_RUN_ZOOM, zoom));
+}
+
+/**
  * Derives a seamless, ratio-preserving grid from a desired row count.
  * @param {number} rows Desired number of rows.
  * @returns {{rows: number, cols: number}} Sanitized rows and an even column count (cols ≈ rows·2/√3).

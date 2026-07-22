@@ -1,0 +1,68 @@
+/* On-canvas view chip (#31): names the pan gesture and offers a way back out of a zoom.
+   Anchored by JS to the top-left corner of the selected view, so it sits over the world it
+   describes in every layout regime. Only rendered while zoomed in — at zoom 1 there is nothing
+   to pan and nothing to reset, so it costs no resting control. */
+.view-controls {
+    position: absolute;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 24px);
+    padding: 4px 6px 4px 9px;
+    border-radius: var(--radius-lg, 10px);
+    background-color: rgba(29, 29, 32, 0.9);
+    border: 1px solid var(--border, #4a4a4a);
+    box-shadow: var(--shadow-popout, 0 6px 20px rgba(0, 0, 0, 0.45));
+    color: var(--text-secondary, #c8c8d0);
+    font-size: 0.78rem;
+    line-height: 1.2;
+    user-select: none;
+    backdrop-filter: blur(10px);
+}
+
+/* Author rule, not a bare [hidden]/UA default: every other `display` here would outrank that
+   (see AGENTS.md — the Scoring disclosure shipped "collapsed" while rendering nine sliders). */
+.view-controls.hidden {
+    display: none;
+}
+
+.view-controls-zoom {
+    color: var(--text-primary, #f0f0f0);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.view-controls-hint {
+    color: var(--text-muted, #9a9aa2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.view-controls-reset {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border: 1px solid var(--border, #4a4a4a);
+    border-radius: var(--radius-sm, 6px);
+    background-color: transparent;
+    color: var(--text-primary, #f0f0f0);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.view-controls-reset:hover {
+    background-color: var(--surface-3, #4a4a4a);
+    border-color: var(--accent-border, #f0c674);
+}
+
+/* At 375px the gesture hint costs more room than it earns — the mobile Pan/Draw FAB already
+   teaches the gesture, so keep only the zoom readout and the escape hatch. */
+@media screen and (max-width: 768px),
+screen and (pointer: coarse) and (hover: none) {
+    .view-controls-hint {
+        display: none;
+    }
+}

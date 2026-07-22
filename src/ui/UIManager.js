@@ -29,6 +29,7 @@ import { ConfirmationDialog } from './components/ConfirmationDialog.js';
 import { RulesetDisplayFactory } from './RulesetDisplayFactory.js';
 import { MinimapOverlays } from './MinimapOverlays.js';
 import { ScrubBar } from './ScrubBar.js';
+import { ViewControls } from './ViewControls.js';
 import { InitialStateConfigModal } from './components/InitialStateConfigModal.js';
 import { CaptureStudioModal } from './components/CaptureStudioModal.js';
 import { ToastManager } from './ToastManager.js';
@@ -145,7 +146,10 @@ export class UIManager {
         
         const minimapOverlays = new MinimapOverlays(appContext);
         const scrubBar = new ScrubBar(appContext);
-        this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays, scrubBar);
+        // Contextual pan/zoom affordance (#31). Constructed after updateMode() so its first render
+        // already knows which gesture hint to show.
+        const viewControls = new ViewControls(appContext);
+        this.managedComponents.push(topInfoBar, toolbar, keyboardManager, minimapOverlays, scrubBar, viewControls);
 
         
         this.initMobileUI();

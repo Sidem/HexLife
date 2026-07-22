@@ -23,6 +23,23 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Added
+
+- **A visible way to pan and to get back out of a zoom.** While the selected view is zoomed in, an
+  on-canvas chip shows the zoom level, names the gesture (`Ctrl-drag` or middle-drag on desktop),
+  and offers **Reset view**. At 1× there is nothing to pan, so it stays out of the way.
+- **"Paired start"** in the Ruleset Library — one switch deciding whether loading an entry also
+  re-seeds the world with the starting cells its preview was made from.
+
+### Changed
+
+- **The app opens on structure, not static.** A first-time visitor now starts zoomed to where
+  individual cells are legible, derived from the grid size so every grid preset opens at a
+  comparable apparent cell size. Returning visitors keep their own camera.
+- **Library cards carry one load button instead of two.** "Load" and "Load + IC" collapsed into a
+  single **Load** governed by the new Paired start switch; the opposite load is still available
+  per-entry from a saved ruleset's ⋯ menu. Roughly halves the controls in the Library tab.
+
 ## [1.0.0] — 2026-07-22
 
 First tagged release. The project has been live and evolving for some time; this marks the point at

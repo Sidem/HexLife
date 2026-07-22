@@ -1,5 +1,5 @@
 import neighborDirs from './neighbor-dirs.json';
-import { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions } from './gridMath.js';
+import { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions, legibleFirstRunZoom } from './gridMath.js';
 
 // --- Grid dimensions ---------------------------------------------------------
 // The grid size is configurable at startup (persisted setting / share-URL `g` param). Dimensions
@@ -10,7 +10,7 @@ import { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions } from '
 // The derivation math + presets live in `gridMath.js` (pure, side-effect free) so the embeddable
 // widget can share them without importing this module's live globals and import-time side effect.
 // Re-exported here so `Config.*` call sites are unchanged.
-export { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions };
+export { GRID_SIZE_PRESETS, DEFAULT_GRID_SIZE_KEY, deriveGridDimensions, legibleFirstRunZoom };
 
 // These are intentionally mutable (`let`) and read live via the `Config.*` namespace everywhere.
 // Call setGridDimensions() once, before WorldManager / the renderer are constructed.
