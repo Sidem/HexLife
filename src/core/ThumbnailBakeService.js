@@ -80,7 +80,14 @@ export class ThumbnailBakeService {
      * guard. Capturing the restore ruleset once (not per-bake off stale proxy stats) is what keeps the
      * world from being left on a leftover baked ruleset. Jobs with no `initialState` fall back to the
      * selected world's current IC, so unpaired library entries still get a preview. Never throws.
-     * @param {(bake: (job: {hex: string, initialState?: object, seed?: number|null, ticks?: number}) => Promise<string|null>) => Promise<any>} body
+     *
+     * `body` also receives the borrowed world as `ctx` — `{proxy, index}`, or `{proxy: null, index: -1}`
+     * on the no-op path. Bodies that only need "apply a recipe and capture the result" should stay on
+     * `bake`; `ctx` exists for the ones that need to capture at a point `bake` doesn't offer (#19's
+     * Prediction round captures the frame BEFORE the burst as well as after it) and it comes with the
+     * obligation to leave the world's cells alone beyond what the surrounding snapshot/restore covers.
+     * @param {(bake: (job: {hex: string, initialState?: object, seed?: number|null, ticks?: number}) => Promise<string|null>,
+     *   ctx: {proxy: import('./WorldProxy.js').WorldProxy|null, index: number}) => Promise<any>} body
      * @returns {Promise<any>}
      */
     _withScratchBakeWorld = (body) => {
@@ -91,24 +98,25 @@ export class ThumbnailBakeService {
         // No scratch world (Auto-Explore running, or no other enabled world): run body with a no-op bake
         // so callers still resolve (all thumbs null) without snapshot/guard/restore side effects.
         const noopBake = async () => null;
-        if (this.wm.autoExploreService?.isRunning()) return body(noopBake);
+        const noCtx = { proxy: null, index: -1 };
+        if (this.wm.autoExploreService?.isRunning()) return body(noopBake, noCtx);
 
         const idx = this._pickScratchWorldIndex();
         const proxy = idx >= 0 ? this.wm.worlds[idx] : null;
-        if (!proxy) return body(noopBake);
+        if (!proxy) return body(noopBake, noCtx);
 
         // Snapshot the exact pre-bake state ONCE for a single non-destructive restore. The ruleset comes
         // from worldSettings (the stable main-thread source of truth), NOT live proxy stats — which lag
         // the worker's echoes and would otherwise capture a previous bake's transient ruleset.
         const savedCells = proxy.latestStateArray ? new Uint8Array(proxy.latestStateArray) : null;
-        if (!savedCells || savedCells.length !== Config.NUM_CELLS) return body(noopBake);
+        if (!savedCells || savedCells.length !== Config.NUM_CELLS) return body(noopBake, noCtx);
         const savedTick = proxy.getLatestStats().tick || 0;
         const savedHex = this.wm.worldSettings[idx]?.rulesetHex;
         let savedRulesetArray;
         try {
             savedRulesetArray = hexToRuleset(savedHex);
         } catch {
-            return body(noopBake);
+            return body(noopBake, noCtx);
         }
 
         this.bakingWorldIndex = idx;
@@ -144,7 +152,7 @@ export class ThumbnailBakeService {
         };
 
         try {
-            return await body(bake);
+            return await body(bake, { proxy, index: idx });
         } finally {
             // Restore the exact pre-bake cells/tick/ruleset ONCE (LOAD_STATE rewrites the worker buffers),
             // then release the guard so the world's real STATE_UPDATE echoes flow to the UI again.
@@ -173,6 +181,73 @@ export class ThumbnailBakeService {
      * @returns {Promise<string|null>}
      */
     bakeThumbnail = async (job) => this._withScratchBakeWorld((bake) => bake(job));
+
+    /**
+     * Wait until the scratch world's reset has actually landed on the main thread, so a capture taken
+     * "before the burst" shows the initial condition rather than whatever the world was displaying a
+     * frame ago. `resetWorld` is fire-and-forget; the worker answers with a STATE_UPDATE that replaces
+     * `latestStateArray` with a NEW typed array (WorldProxy transfers the old buffers back), so
+     * watching that reference change is an exact signal. Bounded: gives up after `maxFrames` rAFs and
+     * lets the caller capture anyway (a stale frame is a worse card, not a broken one).
+     * @param {import('./WorldProxy.js').WorldProxy} proxy
+     * @param {Uint8Array|null} priorRef The `latestStateArray` observed *before* the reset was sent.
+     * @param {number} [maxFrames]
+     * @returns {Promise<void>}
+     */
+    _awaitStateSwap = (proxy, priorRef, maxFrames = 40) => new Promise((resolve) => {
+        let frames = 0;
+        const poll = () => {
+            if (proxy.latestStateArray !== priorRef || ++frames >= maxFrames) { resolve(); return; }
+            requestAnimationFrame(poll);
+        };
+        requestAnimationFrame(poll);
+    });
+
+    /**
+     * Run one Prediction-mode round (#19) on the scratch world: show the player the world's FIRST
+     * frame, then run it and show what it became.
+     *
+     * Same borrow-and-restore contract as {@link bakeThumbnail} — the user's selected view is never
+     * disturbed — but with two captures instead of one, bracketing the burst, plus the burst's raw
+     * metrics so the caller can classify the outcome ({@link module:core/analysis/outcomeClass}). The
+     * two thumbnails use the same fixed monochrome LUT as library previews, so a round looks the same
+     * regardless of the player's Chroma Lab palette and "before" and "after" are directly comparable.
+     *
+     * Resolves `null` on any failure (no scratch world, Auto-Explore running, bad hex, capture
+     * unavailable) — a round the app simply doesn't offer is better than a round with a blank card.
+     * @param {{hex: string, initialState: object, seed?: number|null, ticks?: number}} job
+     * @returns {Promise<{before: string|null, after: string|null, metrics: object}|null>}
+     */
+    bakePredictionRound = async ({ hex, initialState, seed = null, ticks = EXPLORE_CONFIG.confirmTicks } = {}) =>
+        this._withScratchBakeWorld(async (bake, ctx) => {
+            const proxy = ctx?.proxy;
+            if (!proxy || !hex || !initialState) return null;
+            let rulesetArray;
+            try {
+                rulesetArray = hexToRuleset(hex);
+            } catch {
+                return null;
+            }
+            try {
+                const priorRef = proxy.latestStateArray;
+                proxy.setRuleset(rulesetArray.buffer.slice(0));
+                proxy.resetWorld(initialState, Number.isFinite(seed) ? seed : 0);
+                await this._awaitStateSwap(proxy, priorRef);
+                const before = await this._captureBakedThumbnail(ctx.index);
+
+                const metrics = await proxy.runEvaluation({
+                    ticks,
+                    sampleEvery: EXPLORE_CONFIG.sampleEvery,
+                    warmupTicks: EXPLORE_CONFIG.warmupTicks,
+                    probe: { enabled: false, probeTicks: EXPLORE_CONFIG.probeTicks },
+                });
+                if (!metrics || metrics.cancelled) return null;
+                const after = await this._captureBakedThumbnail(ctx.index);
+                return { before, after, metrics };
+            } catch {
+                return null;
+            }
+        });
 
     /**
      * Bake thumbnails for a list of (hex, initialState, seed) jobs one at a time (sequential so the

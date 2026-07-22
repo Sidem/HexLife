@@ -27,7 +27,11 @@ const KEYS = {
     PUBLIC_THUMB_CACHE: `${LS_KEY_PREFIX}publicThumbCache`,
     INTERESTINGNESS_VOTES: `${LS_KEY_PREFIX}interestingnessVotes`,
     SAVED_STATES: `${LS_KEY_PREFIX}savedStates`,
+    PREDICTION_RESULTS: `${LS_KEY_PREFIX}predictionResults`,
 };
+
+/** FIFO cap on banked prediction rounds — the labels are the asset, not the transcript. */
+const PREDICTION_RESULTS_MAX = 500;
 
 function _getItem(key) {
     try {
@@ -420,6 +424,41 @@ export function saveSavedStates(entries) {
         return true;
     } catch (e) {
         console.error('Error saving the saved-starts library to localStorage:', e);
+        return false;
+    }
+}
+
+// Prediction mode (PLAY-LAYER-PLAN §P1, roadmap #19): one record per graded round —
+// `{roundSeed, hex, icLabel, predicted, actual, correct, at}`. Two jobs, in this order of importance:
+//   1. The *labels*. Every round is a human saying "this ruleset does X" about a real world, which is
+//      training data the statistical objective cannot generate for itself (roadmap #37 Stage 4 wants
+//      exactly this shape of judgement). That is why the ruleset hex and the round seed are stored and
+//      not just a running tally — a record without its world is not a label.
+//   2. The player's own streak/accuracy readout, which is display-only and never gates anything.
+// Append-only with a FIFO cap; a malformed blob loads as empty rather than poisoning the deck.
+export function loadPredictionResults() {
+    const rows = _getItem(KEYS.PREDICTION_RESULTS);
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(r =>
+        r && typeof r === 'object' &&
+        typeof r.hex === 'string' &&
+        typeof r.predicted === 'string' &&
+        typeof r.actual === 'string'
+    );
+}
+
+/**
+ * Persist the prediction-round log (trimmed to the newest {@link PREDICTION_RESULTS_MAX}).
+ * @param {object[]} rows
+ * @returns {boolean} False when the write failed (e.g. localStorage quota).
+ */
+export function savePredictionResults(rows) {
+    const list = Array.isArray(rows) ? rows.slice(-PREDICTION_RESULTS_MAX) : [];
+    try {
+        localStorage.setItem(KEYS.PREDICTION_RESULTS, JSON.stringify(list));
+        return true;
+    } catch (e) {
+        console.error('Error saving prediction results to localStorage:', e);
         return false;
     }
 }

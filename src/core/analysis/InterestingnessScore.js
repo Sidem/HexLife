@@ -50,9 +50,11 @@
 
 /**
  * @typedef {object} EmbeddingStats
- * @property {number} openEndedness  Raw trajectory novelty (mean consecutive cosine distance) of a
- *   find's frame embeddings in a foundation-model (CLIP) space (v3.0 ASAL perceptual term). Present
- *   ONLY when the optional, default-off embedding objective is enabled AND a model produced ≥2 usable
+ * @property {number} openEndedness  Raw **historical** novelty of a find's frame embeddings in a
+ *   foundation-model (CLIP) space: the mean cosine distance from each frame to the nearest state the
+ *   trajectory had already visited (v3.0 ASAL perceptual term; v3.3 replaced the consecutive-frame
+ *   *velocity* that used to fill this field, because velocity is maximized by noise). Present ONLY
+ *   when the optional, default-off embedding objective is enabled AND a model produced ≥2 usable
  *   frame embeddings; absent otherwise (statistical objective ⇒ term dropped + renormalized, so the
  *   score is unchanged from the embedding-off pipeline).
  */
@@ -188,6 +190,18 @@ export const SCORE_CONFIG = {
     // their exact relative proportions — fixtures lacking it still rank gliders > churn unchanged).
     // It complements the statistical terms with a human-perception-aligned signal rather than
     // replacing them; it sits downstream of the v2.4 confirmation filter like every other graded term.
+    //
+    // v3.3 (#37 Stage 1 — fix the SIGN of the perceptual term): no weight changed; what changed is the
+    // statistic feeding `openEndedness`. v3.0 fed it `trajectoryNovelty` (mean distance between
+    // CONSECUTIVE frame embeddings) on the reading "the look keeps evolving". That is perceptual
+    // *velocity*, and velocity is maximized by noise: a dense churn steps a long way every frame while
+    // never arriving anywhere it has not been, and a period-2 oscillator scores near the ceiling. So
+    // the objective's ONE human-perception-aligned term was voting for exactly the chaos #37 exists to
+    // de-rank. It is now `historicalNovelty` — the mean distance from each frame to the nearest
+    // ALREADY-VISITED state (EmbeddingNovelty.js) — which is what ASAL's open-endedness actually means
+    // and is anti-chaos by construction. `openEndednessHalfSat` dropped 0.08 → 0.05 to match the
+    // smaller scale (historical ≤ consecutive, always). Weights are untouched, so an embeddings-off
+    // score is byte-identical and every existing fixture ordering is preserved.
     weights: {
         criticality: 0.16,
         entropyBand: 0.07,
@@ -236,12 +250,19 @@ export const SCORE_CONFIG = {
     transportHalfSat: 0.1,
 
     // --- Open-endedness term (v3.0 ASAL perceptual novelty; half-saturation reward) ---
-    /** embedding.openEndedness (mean consecutive cosine distance of a find's frame embeddings, in
-     *  [0,2]) at which the term reaches 0.5. A still/settled pattern barely moves in CLIP space
-     *  (≈0); an evolving/travelling one steps into visually-new territory each frame. A low half-sat
-     *  keeps the term discriminating, since consecutive frames of even an active CA stay fairly
-     *  similar in a vision-model embedding. */
-    openEndednessHalfSat: 0.08,
+    /** embedding.openEndedness at which the term reaches 0.5. **v3.3 (#37 Stage 1) changed what this
+     *  measures**: it is now `historicalNovelty` — the mean cosine distance from each frame to the
+     *  NEAREST already-visited frame — not `trajectoryNovelty`'s mean *consecutive* distance. A
+     *  still/settled pattern sits at ≈0 either way, but a churn or a period-2 oscillator (which
+     *  travels fast while revisiting the same looks) now also sits near 0 instead of near the
+     *  ceiling; only a trajectory that keeps arriving somewhere perceptually new scores.
+     *  Retuned 0.08 → 0.05 because the new statistic is provably ≤ the old one (a minimum over all
+     *  earlier frames is ≤ the distance to the immediately-previous frame), so the old half-sat
+     *  under-rewards it across the board. 0.05 is a principled starting point, NOT a measured one —
+     *  calibrating it against a known-glider/known-churn pair (halfSat ≈ their geometric mean) needs
+     *  a run with the optional CLIP objective enabled; `EmbeddingEntry.trajectorySpeed` is banked
+     *  next to `openEndedness` so that comparison can be read off a real explore run. */
+    openEndednessHalfSat: 0.05,
 
     // --- Uniform-chaos penalty (v3.1): a MULTIPLICATIVE factor on the combined score, not a tenth
     // weighted term. Rationale (measured on tests/fixtures/exploreEvalFixtures.json): homogeneous
@@ -415,11 +436,15 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const hasTransport = tp != null && Number.isFinite(tp);
     const transport = hasTransport ? tp / (tp + cfg.transportHalfSat) : 0;
 
-    // --- Open-endedness / perceptual novelty (foundation-model trajectory novelty). v3.0 (ASAL). ---
-    // The mean cosine distance between consecutive frame embeddings in a CLIP-style space: a DIRECT,
-    // human-perception-aligned signal for "the look keeps evolving". Present only when the optional
-    // embedding objective is enabled and a model produced a usable trajectory; absent otherwise →
-    // dropped + renormalized below, so the embedding-off score is unchanged. Half-saturation reward.
+    // --- Open-endedness / perceptual novelty (foundation-model historical novelty). v3.0/v3.3. ---
+    // The mean cosine distance from each frame embedding to the NEAREST already-visited one in a
+    // CLIP-style space: a DIRECT, human-perception-aligned signal for "the look keeps becoming
+    // something it has not been yet". v3.3 (#37 Stage 1) replaced the consecutive-frame distance that
+    // filled this input from v3.0: that measured perceptual *velocity*, which noise maximizes, so the
+    // one perception-aligned term in the objective was voting pro-chaos. Present only when the
+    // optional embedding objective is enabled and a model produced a usable trajectory; absent
+    // otherwise → dropped + renormalized below, so the embedding-off score is unchanged.
+    // Half-saturation reward.
     const oe = metrics.embedding ? metrics.embedding.openEndedness : undefined;
     const hasOpenEndedness = oe != null && Number.isFinite(oe);
     const openEndedness = hasOpenEndedness ? oe / (oe + cfg.openEndednessHalfSat) : 0;

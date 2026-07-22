@@ -104,12 +104,12 @@ export const COMPONENT_META = [
     },
     {
         key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed',
-        hint: 'Perceptual (CLIP) trajectory novelty — how much the LOOK keeps evolving.',
-        description: 'Frames of the find are embedded with a vision model (CLIP); this term rewards the mean step distance between consecutive frames in that perceptual space — "the look keeps becoming something new". Only measured when the perceptual objective is enabled.',
-        zeroMeans: 'Perceptual change is ignored (also effectively 0 when embeddings are off).',
-        maxMeans: 'Chase visually ever-evolving worlds (needs the CLIP objective enabled).',
+        hint: 'Perceptual (CLIP) novelty — how often the LOOK reaches a state it has not been in.',
+        description: 'Frames of the find are embedded with a vision model (CLIP); this term rewards how far each frame lands from the nearest look the world has ALREADY passed through. Revisiting old states — including noise that just looks like more noise, or an oscillator flipping between two frames — does not count, no matter how fast it moves. Only measured when the perceptual objective is enabled.',
+        zeroMeans: 'Perceptual novelty is ignored (also effectively 0 when embeddings are off).',
+        maxMeans: 'Chase worlds that keep reaching genuinely new looks (needs the CLIP objective enabled).',
         shape: 'halfsat', shapeParams: { halfSat: SCORE_CONFIG.openEndednessHalfSat },
-        domain: [0, SCORE_CONFIG.openEndednessHalfSat * 4], axisLabel: 'frame-to-frame cosine distance', rawKey: 'openEndedness',
+        domain: [0, SCORE_CONFIG.openEndednessHalfSat * 4], axisLabel: 'distance to nearest earlier frame', rawKey: 'openEndedness',
     },
 ];
 

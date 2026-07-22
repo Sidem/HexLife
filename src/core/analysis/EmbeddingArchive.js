@@ -47,7 +47,11 @@ export const EMBEDDING_ARCHIVE_CONFIG = {
  * @property {string} [mnemonic]     Human-friendly ruleset name.
  * @property {number} score          Confirmed interestingness ([0,1]).
  * @property {string} cellKey        Random-projection sign-hash cell key (filled by tryInsert).
- * @property {number} [openEndedness] The find's raw trajectory novelty (for inspection).
+ * @property {number} [openEndedness] The find's raw historical novelty — mean distance to the nearest
+ *   already-visited perceptual state (the scored input since v3.3). For inspection.
+ * @property {number} [trajectorySpeed] The find's raw perceptual velocity — mean distance between
+ *   consecutive frames. NOT scored (v3.3 replaced it); kept so the two can be compared on real finds
+ *   when calibrating `SCORE_CONFIG.openEndednessHalfSat`.
  * @property {number} [generation]   Generation the entry was found in.
  */
 

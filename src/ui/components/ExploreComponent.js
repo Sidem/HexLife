@@ -13,6 +13,7 @@ import { constraintBadge } from '../RulesetDisplayFactory.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
 import { ExploreRaterView } from './ExploreRaterView.js';
+import { PredictionDeck } from './PredictionDeck.js';
 import { VoteBank } from '../../core/analysis/VoteBank.js';
 import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
 import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
@@ -98,8 +99,23 @@ export class ExploreComponent extends BaseComponent {
         // The component is a single shared instance moved between the desktop panel and the mobile
         // Discover tab, so the Advanced tier has to be re-read on every mount (#29).
         this._setAdvancedOpen(this._loadAdvancedOpen());
+        this._mountPredictionDeck();
         this._syncFromStatus();
         this._renderGallery();
+    }
+
+    /**
+     * Create the Prediction deck (#19) the first time this component is actually mounted on a
+     * surface. It is deliberately NOT built in the constructor: the component is constructed eagerly
+     * at startup (UIManager's shared-singleton table) and dealing a card borrows a scratch world for
+     * a 600-tick burst, which must not happen behind a panel nobody has opened. Once built it lives
+     * with the component and travels with it between Discover and the desktop panel.
+     */
+    _mountPredictionDeck() {
+        if (this.predictionDeck) return;
+        const mount = this.element.querySelector('#explore-prediction-mount');
+        if (!mount) return;
+        this.predictionDeck = new PredictionDeck(mount, { worldManager: this.worldManager });
     }
 
     /**
@@ -194,6 +210,12 @@ export class ExploreComponent extends BaseComponent {
                     <button class="button explore-run-secondary" data-action="adopt" disabled title="Stop and keep the current champion ruleset in the selected world">Stop &amp; Keep</button>
                 </div>
             </div>
+            <!-- #19 Prediction mode. Newcomer tier, so by the #29 rule it lives ABOVE the Advanced
+                 disclosure — the first thing a visitor meets on Discover is a question they can
+                 answer, not the search's expert controls. Mounted lazily (see _mountPredictionDeck):
+                 dealing a card borrows a scratch world, which must not happen on a surface the user
+                 never opened. -->
+            <div id="explore-prediction-mount"></div>
             <details class="tool-group explore-advanced" id="explore-advanced" ${advancedOpen ? 'open' : ''}>
                 <summary class="explore-advanced-summary">
                     <h5>Advanced <span class="explore-advanced-chip" data-field="advanced-chip"></span></h5>

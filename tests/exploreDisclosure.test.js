@@ -62,6 +62,16 @@ describe('Advanced disclosure structure (#29)', () => {
         expect(closes.length, 'expected Scoring and Advanced to both close before the gallery').toBe(2);
     });
 
+    it('mounts the Prediction deck (#19) ABOVE the disclosure, in the newcomer tier', () => {
+        // #29 set the rule every later Discover surface inherits: newcomer-facing content goes above
+        // `<details id="explore-advanced">`, expert content inside it. Prediction mode is the
+        // newcomer entry point, so a refactor that tucks it in with the nine-term objective is a
+        // regression of the tier — and one nothing else would catch.
+        const deck = JS.indexOf('id="explore-prediction-mount"');
+        expect(deck, 'the prediction mount vanished from the render template').toBeGreaterThan(-1);
+        expect(deck).toBeLessThan(advancedOpen);
+    });
+
     it('keeps one primary action, with the run controls that need a run behind it', () => {
         expect(JS).toContain('explore-primary-action');
         expect((JS.match(/explore-run-secondary/g) || []).length).toBe(3);

@@ -9,7 +9,14 @@
  * territory over time, rather than freezing (ordered) or thrashing in place (noise). HexLife embeds a
  * short trajectory of a find's rendered frames (a CLIP/MobileCLIP image embedding per frame, produced
  * off-thread by {@link module:services/EmbeddingService}) and reduces that trajectory to a single
- * open-endedness scalar with {@link trajectoryNovelty}.
+ * open-endedness scalar with {@link historicalNovelty}.
+ *
+ * Two reductions live here and the difference between them is the whole point (#37 Stage 1):
+ * {@link trajectoryNovelty} measures perceptual **velocity** (mean distance between *consecutive*
+ * frames) and {@link historicalNovelty} measures perceptual **novelty** (mean distance from each
+ * frame to the nearest state already visited). Velocity is maximized by noise — churn moves fast
+ * forever without ever arriving anywhere new — which is exactly the pro-chaos bias #37 exists to
+ * remove. Novelty scores a period-2 oscillator at ~0 while velocity scores it near its ceiling.
  *
  * This module is PURE: no workers, no model, no globals — just typed-array math over embedding
  * vectors. It is fully unit-testable with tiny synthetic vectors and never imports the (optional,
@@ -121,12 +128,15 @@ export function meanVector(vectors) {
  * distance between *consecutive* frame embeddings — how fast the perceptual representation keeps
  * changing as the automaton runs.
  *
- * A still life or a settled fixed point barely moves in embedding space (≈0); a glider/spaceship soup
- * or an ever-evolving structure keeps stepping into visually-new territory (higher). Unusable
- * (near-zero) embeddings are skipped, and a step is only counted between two usable consecutive
- * embeddings. Returns 0 for fewer than two usable embeddings (no degradation: the caller drops the
- * term and renormalizes — see InterestingnessScore). The raw mean distance is returned (in [0, 2]);
- * the score module applies the half-saturation reward, mirroring the transport/spatial terms.
+ * This is perceptual **velocity**, not novelty: it is maximized by a trajectory that never stops
+ * moving, including one that thrashes between two looks forever. It is kept as a raw stat (and as the
+ * upper bound `historicalNovelty` is measured against), but it is NOT the scored term — see
+ * {@link historicalNovelty} and the module header for why.
+ *
+ * Unusable (near-zero) embeddings are skipped, and a step is only counted between two usable
+ * consecutive embeddings. Returns 0 for fewer than two usable embeddings (no degradation: the caller
+ * drops the term and renormalizes — see InterestingnessScore). The raw mean distance is returned (in
+ * [0, 2]); the score module applies the half-saturation reward, mirroring the transport/spatial terms.
  *
  * @param {Vec[]} embeddings  Per-frame embeddings, in temporal order.
  * @param {typeof NOVELTY_CONFIG} [config]
@@ -147,4 +157,56 @@ export function trajectoryNovelty(embeddings, config = NOVELTY_CONFIG) {
         prev = u;
     }
     return steps > 0 ? sum / steps : 0;
+}
+
+/**
+ * Reduce a trajectory of frame embeddings to a single **open-endedness** scalar the way ASAL actually
+ * defines it: for each frame, the cosine distance to the *nearest perceptual state already visited*,
+ * averaged over every frame that has at least one predecessor. This is the scored `openEndedness`
+ * input since v3.3 (#37 Stage 1).
+ *
+ * Why not {@link trajectoryNovelty} (mean *consecutive* distance): that measures how fast the look
+ * changes, and noise changes fastest. A dense churn steps a long way every frame while revisiting the
+ * same perceptual neighbourhood forever, and a period-2 oscillator scores near the ceiling — so the
+ * one perception-aligned term in the objective was rewarding exactly the chaos #37 exists to
+ * de-rank. Distance-to-nearest-visited-state instead asks "did this frame arrive somewhere new?":
+ *   - frozen / still life        → 0 (every frame is its own predecessor's twin)
+ *   - period-2 oscillator A,B,A… → ≈0 (from frame 3 on, an identical state is already in the history)
+ *   - thrash inside a subspace   → low (the history covers the subspace after a few frames)
+ *   - developing structure       → high (each frame is genuinely unlike anything seen so far)
+ *
+ * By construction `historicalNovelty ≤ trajectoryNovelty` — the minimum over all earlier frames is at
+ * most the distance to the immediately-previous one — so the term's scale is strictly smaller and
+ * `SCORE_CONFIG.openEndednessHalfSat` is tuned lower to match.
+ *
+ * Unusable (near-zero) embeddings are skipped. Unlike the consecutive reduction they do NOT break a
+ * chain: the history set simply does not grow, and the next usable frame is still compared against
+ * everything before the gap. Returns 0 for fewer than two usable embeddings (the caller drops the
+ * term and renormalizes). O(n²) over trajectory length (n ≈ 8–16 frames) — negligible.
+ *
+ * @param {Vec[]} embeddings  Per-frame embeddings, in temporal order.
+ * @param {typeof NOVELTY_CONFIG} [config]
+ * @returns {number} Mean distance-to-nearest-earlier-frame (raw, ≥ 0), or 0 if not computable.
+ */
+export function historicalNovelty(embeddings, config = NOVELTY_CONFIG) {
+    if (!Array.isArray(embeddings) || embeddings.length < 2) return 0;
+    /** @type {Float32Array[]} */
+    const history = [];
+    let sum = 0;
+    let counted = 0;
+    for (const e of embeddings) {
+        const u = l2normalize(e, config.minNorm);
+        if (!u) continue; // unusable frame: contributes nothing and does not enter the history
+        if (history.length > 0) {
+            let best = Infinity;
+            for (const h of history) {
+                const d = 1 - dot(h, u); // both unit-length ⇒ dot is the cosine similarity
+                if (d < best) best = d;
+            }
+            sum += best;
+            counted++;
+        }
+        history.push(u);
+    }
+    return counted > 0 ? sum / counted : 0;
 }

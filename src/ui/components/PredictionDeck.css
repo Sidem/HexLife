@@ -1,0 +1,198 @@
+/* Prediction mode (#19) — the newcomer-tier deck on Discover. Scoped under `.prediction-deck` so it
+   composes with `.tool-group` in the Explore surfaces without reaching into them. */
+
+.prediction-deck {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.prediction-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-subtle, #444);
+    padding-bottom: 4px;
+}
+
+.prediction-head h5 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 1em;
+    color: var(--accent, #f0c674);
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.prediction-head h5 svg {
+    width: 1em;
+    height: 1em;
+    flex: none;
+}
+
+.prediction-tally {
+    font-size: 0.78em;
+    color: var(--text-muted, #87878f);
+    white-space: nowrap;
+}
+
+.prediction-blurb {
+    margin: 0;
+    font-size: 0.8em;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+.prediction-recipe {
+    font-size: 0.75em;
+    opacity: 0.85;
+}
+
+/* --- The card ------------------------------------------------------------------------------- */
+
+.prediction-card {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    background: var(--bg-sunken, #16161a);
+    border: 1px solid var(--border-subtle, #444);
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 120px;
+}
+
+.prediction-card-pair {
+    gap: 6px;
+    padding: 6px;
+}
+
+.prediction-frame-wrap {
+    margin: 0;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.prediction-frame-wrap figcaption {
+    font-size: 0.7em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted, #87878f);
+}
+
+.prediction-frame {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+    object-fit: contain;
+    image-rendering: auto;
+}
+
+.prediction-frame-missing {
+    aspect-ratio: 1 / 1;
+    background: repeating-linear-gradient(45deg, #1d1d22, #1d1d22 6px, #232329 6px, #232329 12px);
+}
+
+.prediction-frame-caption {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b9b9c2);
+    background: rgba(0, 0, 0, 0.55);
+}
+
+/* The loading card holds the deck's height steady so answering doesn't make the panel jump. */
+.prediction-card-loading {
+    aspect-ratio: 1 / 1;
+    background: linear-gradient(100deg, #16161a 30%, #202027 50%, #16161a 70%) 0 0 / 300% 100%;
+    animation: prediction-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes prediction-shimmer {
+    from { background-position: 100% 0; }
+    to   { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .prediction-card-loading { animation: none; }
+}
+
+/* --- Choices -------------------------------------------------------------------------------- */
+
+.prediction-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.prediction-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    text-align: left;
+    padding: 8px 10px;
+    line-height: 1.25;
+    white-space: normal;
+    height: auto;
+}
+
+.prediction-choice-label {
+    font-weight: 600;
+}
+
+.prediction-choice-hint {
+    font-size: 0.72em;
+    color: var(--text-muted, #87878f);
+}
+
+/* --- Reveal --------------------------------------------------------------------------------- */
+
+/* Deliberately NOT flex: the verdict is one sentence with an inline icon and an <em>, and a flex
+   container would make every text run between those elements its own gapped flex item ("you said |
+   Loops | ."). Inline layout is what a sentence needs. */
+.prediction-verdict {
+    margin: 0;
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.prediction-verdict svg {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.15em;
+    margin-right: 3px;
+}
+
+.prediction-verdict.is-correct { color: var(--success, #8ec07c); }
+.prediction-verdict.is-wrong   { color: var(--text-secondary, #b9b9c2); }
+
+.prediction-verdict em {
+    font-style: normal;
+    color: var(--text-muted, #87878f);
+}
+
+.prediction-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.prediction-actions .button { flex: 1 1 0; }
+
+/* One decision per screen: on a phone the four choices stack so each is a full-width tap target. */
+@media (max-width: 420px) {
+    .prediction-choices { grid-template-columns: 1fr; }
+}

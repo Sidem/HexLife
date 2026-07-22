@@ -6,7 +6,7 @@ import { sanitizeScoring, buildScoreConfig, isDefaultScoring } from './analysis/
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
 import { encodePack } from '../services/LibraryPackCodec.js';
-import { trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
+import { historicalNovelty, trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
 // Population builder (mutants + crossover children) must derive from the run's base seed, or a
 // shared search link couldn't replay the identical generation sequence.
 import { mulberry32 } from './rng.js';
@@ -628,6 +628,7 @@ export class AutoExploreService {
                             mnemonic: entry.mnemonic,
                             score: entry.score,
                             openEndedness: embedding.openEndedness,
+                            trajectorySpeed: embedding.trajectorySpeed,
                             generation: this.generation,
                             vector: embVector,
                         });
@@ -748,16 +749,23 @@ export class AutoExploreService {
      * Capture a short trajectory of rendered frames of the just-confirmed world and reduce it to a
      * perceptual open-endedness signal (v3.0, ASAL). Starts from the confirmation burst's final state,
      * then advances the world in small sub-bursts, capturing one frame between each, and embeds every
-     * frame with the (off-thread) foundation model. Returns `{ openEndedness, vector }` — the trajectory
-     * novelty and the mean embedding (the perceptual archive key) — or null on any failure / abort /
-     * fewer than two usable embeddings (the caller then degrades gracefully). In supervised target mode
+     * frame with the (off-thread) foundation model. Returns `{ openEndedness, trajectorySpeed, vector }`
+     * — the historical novelty (v3.3, the scored signal), the raw consecutive-frame velocity (kept for
+     * inspection/calibration only) and the mean embedding (the perceptual archive key) — or null on any
+     * failure / abort / fewer than two usable embeddings (the caller then degrades gracefully).
+     *
+     * v3.3 (#37 Stage 1): `openEndedness` is {@link historicalNovelty}, NOT {@link trajectoryNovelty}.
+     * Velocity is maximized by churn — the term was pulling auto-explore toward the very chaos it was
+     * meant to counterbalance. Both are computed so the pair can be compared on real finds (the
+     * `trajectorySpeed`/`openEndedness` ratio is what `openEndednessHalfSat` is calibrated against);
+     * only the former is scored. In supervised target mode
      * (v3.2) it also returns `targetSimilarity`: the mean cosine similarity of the trajectory's frame
      * embeddings to the run's target-prompt vector (mean is robust to one noisy frame). Raw cosine is
      * stored — CLIP's image-text similarity range (~[0.1, 0.35]) is NOT renormalized, only relative
      * order matters for selection.
      * @param {number} worldIndex
      * @param {number} token
-     * @returns {Promise<{openEndedness: number, vector: Float32Array, targetSimilarity?: number}|null>}
+     * @returns {Promise<{openEndedness: number, trajectorySpeed: number, vector: Float32Array, targetSimilarity?: number}|null>}
      */
     async _captureEmbedding(worldIndex, token) {
         if (!this.embeddingEnabled || !this.frameProvider || !this.embeddingProvider) return null;
@@ -796,7 +804,11 @@ export class AutoExploreService {
 
         const vector = meanVector(embeds);
         if (!vector) return null;
-        const result = { openEndedness: trajectoryNovelty(embeds), vector };
+        const result = {
+            openEndedness: historicalNovelty(embeds),
+            trajectorySpeed: trajectoryNovelty(embeds),
+            vector,
+        };
         // Supervised target search (v3.2): score each frame against the prompt vector and average.
         if (this._targetVector && this._targetVector.length) {
             let sum = 0;
@@ -965,7 +977,7 @@ export class AutoExploreService {
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
      * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
-     * @param {{openEndedness: number, vector: Float32Array, targetSimilarity?: number}|null} [embedding]
+     * @param {{openEndedness: number, trajectorySpeed?: number, vector: Float32Array, targetSimilarity?: number}|null} [embedding]
      *   Perceptual trajectory result (v3.0); when present, its open-endedness term is overlaid onto the
      *   (screen-derived) component breakdown so the gallery bar reflects the perceptual signal the
      *   confirmation measured, and its `targetSimilarity` (v3.2) is stored for the target-match chip.
