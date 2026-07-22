@@ -19,6 +19,8 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
  *    so smooth-scroll, layout shifts and resizes never desync the highlight.
  *  - Full Back / Next / counter navigation, Esc + arrow keys, and an error
  *    boundary that ends the tour cleanly instead of stranding a dim overlay.
+ *  - Action-gated steps (`advanceOn.type === 'event'`, no Next button) may
+ *    declare a `showMe` escape hatch — see `_scheduleShowMe`.
  */
 export class OnboardingManager {
     constructor(uiElements, appContext) {
@@ -36,6 +38,8 @@ export class OnboardingManager {
         this._anchorTarget = null;
         this._highlightedParentPanel = null;
         this._padding = 6;
+        this._showMeTimer = null;
+        this._showMeWatchdog = null;
 
         this.ui = {
             overlay: uiElements.overlay,
@@ -45,12 +49,13 @@ export class OnboardingManager {
             primaryBtn: uiElements.primaryBtn,
             secondaryBtn: uiElements.secondaryBtn,
             backBtn: uiElements.backBtn,
+            showMeBtn: uiElements.showMeBtn,
             counter: uiElements.counter,
             progressBar: uiElements.progressBar,
         };
 
-        // backBtn / counter are new — tolerate their absence rather than hard-fail
-        // (keeps the manager usable if index.html lags the rewrite).
+        // backBtn / counter / showMeBtn are additive — tolerate their absence rather
+        // than hard-fail (keeps the manager usable if index.html lags the rewrite).
         const required = ['overlay', 'tooltip', 'title', 'content', 'primaryBtn', 'secondaryBtn', 'progressBar'];
         if (required.some(k => !this.ui[k]) || !this.appContext) {
             console.error('OnboardingManager: One or more required UI elements or the AppContext were not provided.');
@@ -88,6 +93,11 @@ export class OnboardingManager {
         if (this.ui.backBtn) {
             this._onBack = () => this._goToStep(this.currentStepIndex - 1, -1);
             this.ui.backBtn.addEventListener('click', this._onBack);
+        }
+
+        if (this.ui.showMeBtn) {
+            this._onShowMe = () => this._runShowMe();
+            this.ui.showMeBtn.addEventListener('click', this._onShowMe);
         }
 
         this._onKeyDown = (e) => {
@@ -243,6 +253,7 @@ export class OnboardingManager {
         this._reposition();
         this._startFollow();
         this._attachStepAdvanceListener(step, target);
+        this._scheduleShowMe(step);
 
         // a11y: surface the tooltip to assistive tech and give it focus.
         const focusEl = (step.primaryAction && step.primaryAction.text) ? this.ui.primaryBtn : this.ui.tooltip;
@@ -359,7 +370,62 @@ export class OnboardingManager {
         }
     }
 
+    // ---- "Show me" fallback -------------------------------------------------
+
+    /**
+     * Action-gated steps render no Next button on purpose — learn-by-doing only
+     * advances when the user actually does the thing. The cost is that a user who
+     * can't connect the prose to the control has exactly one visible way out, and
+     * it's `Skip` (which abandons onboarding for good). So a gated step may
+     * declare `showMe: { action, after?, watchdog? }`: after a grace period long
+     * enough to try it themselves, a "Show me" button appears that performs the
+     * real command. The gate then fires from the real event, exactly as if the
+     * user had done it — the demonstration and the advance are the same code path.
+     */
+    _scheduleShowMe(step) {
+        if (!this.ui.showMeBtn) return;
+        this.ui.showMeBtn.classList.add('hidden');
+        this.ui.showMeBtn.disabled = false;
+
+        // Gated steps only. A step with its own Next needs no escape hatch, and a
+        // second button there would just read as a duplicate.
+        const isGated = !(step.primaryAction && step.primaryAction.text);
+        if (!isGated || typeof step.showMe?.action !== 'function') return;
+
+        this.ui.showMeBtn.textContent = step.showMe.text || 'Show me';
+        this._showMeTimer = setTimeout(() => {
+            if (this.tourIsActive) this.ui.showMeBtn.classList.remove('hidden');
+        }, step.showMe.after ?? 7000);
+    }
+
+    _runShowMe() {
+        const step = this.activeTourSteps[this.currentStepIndex];
+        if (!this.tourIsActive || typeof step?.showMe?.action !== 'function') return;
+
+        this.ui.showMeBtn.disabled = true;
+        try {
+            step.showMe.action(this.appContext);
+        } catch (err) {
+            console.warn('Onboarding: "Show me" action threw; advancing anyway.', err);
+        }
+        // The action is expected to fire this step's own `advanceOn` event. If it
+        // doesn't (state already satisfied, event renamed, handler missing), the
+        // button would be a dead end — the very trap this fix exists to remove —
+        // so a watchdog moves the tour on regardless.
+        // `_doAdvance`, not `_advance`: it cleans up first, so the step's EventBus
+        // subscription is dropped instead of leaking into the next step.
+        this._showMeWatchdog = setTimeout(() => {
+            if (this.tourIsActive) this._doAdvance(step);
+        }, step.showMe.watchdog ?? 900);
+    }
+
     _cleanupCurrentStep() {
+        clearTimeout(this._showMeTimer);
+        clearTimeout(this._showMeWatchdog);
+        this._showMeTimer = null;
+        this._showMeWatchdog = null;
+        if (this.ui.showMeBtn) this.ui.showMeBtn.classList.add('hidden');
+
         cancelAnimationFrame(this._followRaf);
         this._followRaf = null;
         this._anchorTarget = null;

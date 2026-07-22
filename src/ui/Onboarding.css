@@ -97,6 +97,39 @@
     margin-left: auto;
 }
 
+/* The "Show me" escape hatch on action-gated steps. Deliberately pitched between
+   the Skip link and the solid primary button: clearly offered, but never the
+   loudest thing in the row — doing it yourself is still the point. It fades in
+   only after a grace period (see OnboardingManager._scheduleShowMe). */
+.button-showme {
+    background: none;
+    border: 1px solid #f0c674;
+    border-radius: 4px;
+    color: #f0c674;
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 4px 10px;
+    animation: ob-showme-in 0.35s ease-out;
+}
+
+.button-showme:hover:not(:disabled) {
+    background-color: rgba(240, 198, 116, 0.15);
+}
+
+.button-showme:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+@keyframes ob-showme-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .button-showme { animation: none; }
+}
+
 #onboarding-step-counter {
     color: #999;
     font-size: 0.8em;

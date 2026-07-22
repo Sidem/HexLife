@@ -1,5 +1,7 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import { ICONS } from './icons.js';
+import * as Config from '../core/config.js';
+import { findHexagonsInNeighborhood } from '../utils/utils.js';
 import { ControlsComponent } from './components/ControlsComponent.js';
 import { RulesetActionsComponent } from './components/RulesetActionsComponent.js';
 import { RulesetLibraryComponent } from './components/RulesetLibraryComponent.js';
@@ -97,6 +99,37 @@ export const getTours = (appContext) => {
         return !!panel && !panel.isHidden();
     };
     
+    /**
+     * "Show me" actions for the action-gated core steps (audit fix #6). Each one
+     * performs the *real* command the step is asking for, so the step advances
+     * off its own `advanceOn` event and the user sees the same result they would
+     * have produced themselves — a demonstration, not a bypass.
+     */
+    const showMePlay = () => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+
+    const showMeSelectWorld = () => {
+        const count = appContext.worldManager.worlds.length;
+        const current = appContext.worldManager.getSelectedWorldIndex();
+        EventBus.dispatch(EVENTS.COMMAND_SELECT_WORLD, (current + 1) % count);
+    };
+
+    // A radius-3 hex blob at the centre of the focused world — roughly what a
+    // short drag paints, and enough live cells for the ruleset to do something.
+    const showMeDraw = () => {
+        const cellIndices = new Set();
+        findHexagonsInNeighborhood(
+            Math.floor(Config.GRID_COLS / 2),
+            Math.floor(Config.GRID_ROWS / 2),
+            3,
+            cellIndices
+        );
+        EventBus.dispatch(EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH, {
+            worldIndex: appContext.worldManager.getSelectedWorldIndex(),
+            cellIndices,
+            brushMode: 'draw'
+        });
+    };
+
     const core = [{
         element: 'body',
         title: 'Welcome to the HexLife Explorer',
@@ -110,6 +143,7 @@ export const getTours = (appContext) => {
         content: "Time is currently frozen. Use the <span class=\"onboarding-highlight-text\">Play/Pause button</span> to start and stop the universal clock. Let's see what these worlds are currently doing.",
         //primaryAction: { text: 'Click the Play Button' },
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
+        showMe: { text: 'Start it for me', action: showMePlay },
         delayAfter: 700
     }, {
         element: '#minimap-guide',
@@ -118,6 +152,7 @@ export const getTours = (appContext) => {
         content: "Your main viewer is focused on one universe, while the mini-map shows all nine. This is perfect for comparing experiments. <span class=\"onboarding-highlight-text\">Click any mini-map view</span> to shift your focus.",
         //primaryAction: { text: 'Select a Different World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        showMe: { text: 'Show me', action: showMeSelectWorld },
         delayAfter: 800
     }, {
         element: 'body',
@@ -135,6 +170,7 @@ export const getTours = (appContext) => {
         // The brush event fires on the very first painted cell — hold the step a
         // beat so the user sees their cells appear before the tooltip moves on.
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
+        showMe: { text: 'Draw one for me', action: showMeDraw },
         delayAfter: 1200
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '#colorPanelButton',

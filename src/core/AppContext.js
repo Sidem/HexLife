@@ -56,6 +56,7 @@ export class AppContext {
             primaryBtn: document.getElementById('onboarding-action-primary'),
             secondaryBtn: document.getElementById('onboarding-action-secondary'),
             backBtn: document.getElementById('onboarding-action-back'),
+            showMeBtn: document.getElementById('onboarding-action-showme'),
             counter: document.getElementById('onboarding-step-counter'),
             progressBar: document.getElementById('onboarding-progress-bar'),
         }, this);
