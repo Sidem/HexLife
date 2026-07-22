@@ -137,6 +137,14 @@ blocker that stops background requests) disables it. Nothing else about the post
 - Issues / discussion: [GitHub — Sidem/HexLife](https://github.com/Sidem/HexLife)
 - Subreddit: [r/hexlife](https://www.reddit.com/r/hexlife/)
 
+## License
+
+The source in this directory is **MIT**, under the repository's root [`LICENSE`](../LICENSE) —
+the whole repo is single-licensed, so there is no per-directory exception to reason about.
+
+Originally scaffolded from Reddit's Devvit web template
+(BSD-3-Clause, © Reddit Inc.); whatever remains of that scaffold keeps its notice here.
+
 ## Developer notes
 
 Source lives in the HexLife monorepo under `devvit/`. This is a **separate app with its own

@@ -10,6 +10,7 @@ Design rulesets, draw life into the grid, and watch complex behavior emerge acro
 
 [**▶ Try the Live Demo**](https://sidem.github.io/HexLife/) · [**r/hexlife**](https://www.reddit.com/r/hexlife/) · [GitHub](https://github.com/Sidem/HexLife)
 
+![Release](https://img.shields.io/github/v/release/Sidem/HexLife?sort=semver)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Rust](https://img.shields.io/badge/Rust-WebAssembly-orange?logo=rust&logoColor=white)
 ![WebGL2](https://img.shields.io/badge/WebGL2-instanced-990000?logo=webgl&logoColor=white)
@@ -226,6 +227,34 @@ Additions to the public library are curated/manual by design — there is no aut
 
 </details>
 
+## 🏷️ Versioning & releases
+
+Versions are [semantic](https://semver.org/) and single-sourced in `package.json`. The running
+build identifies itself as `v1.0.0 · <sha> · <date>` in **Settings** and in the boot log — the SHA
+is there because GitHub Pages deploys on every push to `main`, so most live builds sit *between*
+tags and the version alone would be misleading.
+
+What counts as **breaking** here is about worlds, not widgets: ruleset codes, world codes
+(`HXW1.…`), share links, `<hexlife-world>` attributes, and determinism. A total UI redesign is not
+a major bump; silently changing what a 32-char hex string means is. See
+[CHANGELOG.md](CHANGELOG.md).
+
+Cutting a release:
+
+1. Write the new `## [X.Y.Z]` section in [CHANGELOG.md](CHANGELOG.md).
+2. Update `version` and `date-released` in [CITATION.cff](CITATION.cff).
+3. `npm version <patch|minor|major>` — bumps `package.json`, commits, and tags `vX.Y.Z`.
+4. `git push --follow-tags`.
+
+The tag triggers [`release.yml`](.github/workflows/release.yml), which publishes a GitHub Release
+from that CHANGELOG section — and refuses if the tag and `package.json` disagree, or if the
+CHANGELOG has no matching entry. (A GitHub Release is also the event a Zenodo webhook needs to
+mint a citable DOI.)
+
+The Reddit app in [`devvit/`](devvit/) ships on Reddit's own review cadence and is not covered by
+these tags.
+
 ## 📄 License
 
-Released under the [MIT License](LICENSE) — © 2025 Sidem.
+Released under the [MIT License](LICENSE) — © 2025 Sidem. This applies to the whole repository,
+including [`devvit/`](devvit/).

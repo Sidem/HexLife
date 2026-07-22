@@ -1,0 +1,50 @@
+name: Release
+
+# A pushed vX.Y.Z tag becomes a GitHub Release whose body is that version's CHANGELOG section.
+# Deployment is not this workflow's job — `deploy.yml` ships every push to main, so by the time a
+# tag exists its code is already live. What this adds is a citable, archivable artifact: the
+# Release is also the event a Zenodo webhook listens for when minting a DOI.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # `npm version` keeps these in step; a hand-made tag is exactly how they drift.
+      - name: Verify the tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME disagrees with package.json ($PKG). Use 'npm version' rather than tagging by hand."
+            exit 1
+          fi
+
+      - name: Extract the CHANGELOG section
+        run: |
+          awk -v ver="${GITHUB_REF_NAME#v}" '
+            $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for $GITHUB_REF_NAME. Write the entry before tagging."
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          --title "$GITHUB_REF_NAME"
+          --notes-file release-notes.md

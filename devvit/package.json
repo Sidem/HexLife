@@ -2,7 +2,7 @@
   "private": true,
   "name": "hexlifeapp",
   "version": "0.0.0",
-  "license": "BSD-3-Clause",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "npm run build:client -- --metafile=dist/client.meta.json --minify && npm run build:server -- --metafile=dist/server.meta.json --minify",

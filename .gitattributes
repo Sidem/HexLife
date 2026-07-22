@@ -1,0 +1,21 @@
+# Normalize line endings to LF in the repository, check out native. Without this, a Windows
+# checkout stores CRLF and every commit warns about it. (`devvit/.gitattributes` additionally
+# pins LF in the *working tree* there, because Biome refuses to format CRLF.)
+* text=auto
+
+# Binary: never diff, never normalize.
+*.wasm binary
+*.gif  binary
+*.png  binary
+*.ico  binary
+*.webm binary
+
+# Generated, not authored. Keeps GitHub's language stats honest (the wasm-pack JS glue is ~9 KB
+# of machine output that would otherwise read as hand-written source) and collapses these in
+# pull-request diffs.
+src/core/wasm-engine/** linguist-generated=true
+package-lock.json       linguist-generated=true
+devvit/package-lock.json linguist-generated=true
+
+# README media is documentation, not source.
+docs/media/** linguist-documentation=true
