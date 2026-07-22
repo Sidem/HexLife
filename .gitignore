@@ -19,7 +19,7 @@
 
 # ─── Local-only notes ─────────────────────────────────────────────────────────
 # Working context and in-flight planning, not part of the published project.
-# docs/ keeps only what a reader of the repo needs (SUBREDDIT-PLAYBOOK, media).
+# docs/ keeps only what a reader of the repo needs (media).
 CLAUDE.md
 AGENTS.md
 GEMINI.md
@@ -28,6 +28,8 @@ PATCHNOTES.md
 CLAUDE-CODE-CHEATSHEET.pdf
 /.claude
 docs/*-PLAN.md
+docs/*-PLAYBOOK.md
+docs/*-AUDIT-*.md
 
 # Local dev helper, not part of the app (Vite serves the app; see `npm run dev`).
 server.py
