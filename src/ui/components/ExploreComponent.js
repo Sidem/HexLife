@@ -9,6 +9,7 @@ import { ShareCodec } from '../../services/ShareCodec.js';
 import { downloadFile } from '../../utils/utils.js';
 import { decodePack } from '../../services/LibraryPackCodec.js';
 import { ICONS } from '../icons.js';
+import { constraintBadge } from '../RulesetDisplayFactory.js';
 import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
 import { ExploreRaterView } from './ExploreRaterView.js';
@@ -736,6 +737,14 @@ export class ExploreComponent extends BaseComponent {
         const targetChip = (typeof entry.targetSimilarity === 'number')
             ? `<span class="explore-find-target" title="Mean cosine similarity of this find's frames to the target prompt (higher = closer match)">🎯 ${entry.targetSimilarity.toFixed(2)}</span>`
             : '';
+        // Structural constraint class (roadmap #38), derived from the hex like it is on library cards:
+        // symmetric tables are disproportionately likely to be interesting, so the class is worth
+        // scanning down the leaderboard. Sits next to the name — it is a fact about the ruleset,
+        // where the chips after it describe this particular run.
+        const badge = constraintBadge(entry.hex);
+        const constraintChip = badge
+            ? `<span class="constraint-badge constraint-${badge.cls}" title="${this._escape(badge.title)}">${this._escape(badge.label)}</span>`
+            : '';
         // Visual preview (v2.6, F6). v1/old entries have no `thumb` (principle 4) — show a placeholder.
         const thumb = entry.thumb
             ? `<img class="explore-find-thumb" src="${this._escape(entry.thumb)}" alt="" loading="lazy" />`
@@ -748,6 +757,7 @@ export class ExploreComponent extends BaseComponent {
                         <div class="explore-find-head">
                             <span class="explore-find-score" title="Interestingness score">${score}</span>
                             <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
+                            ${constraintChip}
                             <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
                             ${cyclicChip}${chaosChip}${targetChip}
                         </div>

@@ -68,6 +68,12 @@
     font-size: 1.05em;
 }
 
+/* Constraint-class badge (#38) shares `.constraint-badge` styling; collapse it when the hex fails
+   to classify so the flex gap doesn't leave a hole in the head row. */
+.curate-class:empty {
+    display: none;
+}
+
 .curate-hex {
     color: #888;
     font-size: 0.75em;

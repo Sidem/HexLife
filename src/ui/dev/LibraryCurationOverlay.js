@@ -1,5 +1,6 @@
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
+import { constraintBadge } from '../RulesetDisplayFactory.js';
 
 /**
  * DEV-ONLY library curation tool, mounted when the app is opened with `?curate=1`.
@@ -102,6 +103,7 @@ export class LibraryCurationOverlay {
                 <div class="curate-entry-head">
                     <span class="curate-pos"></span>
                     <span class="curate-name"></span>
+                    <span class="curate-class"></span>
                     <code class="curate-hex"></code>
                 </div>
                 <div class="curate-candidates"></div>
@@ -126,6 +128,7 @@ export class LibraryCurationOverlay {
             progress: this.el.querySelector('.curate-progress'),
             pos: this.el.querySelector('.curate-pos'),
             name: this.el.querySelector('.curate-name'),
+            cls: this.el.querySelector('.curate-class'),
             hex: this.el.querySelector('.curate-hex'),
             candidates: this.el.querySelector('.curate-candidates'),
             status: this.el.querySelector('.curate-status'),
@@ -169,6 +172,13 @@ export class LibraryCurationOverlay {
         const rule = this.rulesets[i];
         this.ui.pos.textContent = `${i + 1} / ${this.rulesets.length}`;
         this.ui.name.textContent = rule.name || '(unnamed)';
+        // Structural class (roadmap #38), derived from the hex on the fly — never written into the
+        // exported JSON. Curation is where the library's class mix is actually shaped, so the curator
+        // should see which class they are picking an IC for.
+        const badge = constraintBadge(rule.hex);
+        this.ui.cls.className = badge ? `curate-class constraint-badge constraint-${badge.cls}` : 'curate-class';
+        this.ui.cls.textContent = badge ? badge.label : '';
+        this.ui.cls.title = badge ? badge.title : '';
         this.ui.hex.textContent = rule.hex;
         this._updateProgress();
         this._renderCandidates();
