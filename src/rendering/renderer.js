@@ -601,8 +601,8 @@ function renderMainScene(appContext, fbosDrawn) {
     gl.bindVertexArray(null);
 }
 
-function drawTorus(appContext) {
-    if (!torusShaderProgram || !torusUniformLocations || !layoutCache.selectedView) return false;
+function drawTorus(appContext, viewRect = layoutCache.selectedView, surfaceHeight = gl?.canvas?.height) {
+    if (!torusShaderProgram || !torusUniformLocations || !viewRect || !surfaceHeight) return false;
     const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
     const worldData = appContext.worldManager.getWorldsRenderData()[selectedWorldIndex];
     if (!worldData?.enabled || !worldData.jsStateArray ||
@@ -610,8 +610,7 @@ function drawTorus(appContext) {
         return false;
     }
 
-    const viewRect = layoutCache.selectedView;
-    const viewportY = gl.canvas.height - viewRect.y - viewRect.height;
+    const viewportY = surfaceHeight - viewRect.y - viewRect.height;
     gl.viewport(viewRect.x, viewportY, viewRect.width, viewRect.height);
     gl.clear(gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
@@ -987,6 +986,127 @@ function _poolCanvasFor(worldIndex) {
     return c;
 }
 
+// Reusable color + depth target for torus capture. The live torus is drawn straight to the default
+// framebuffer, while exports need a reliable readback at their requested resolution (the default
+// drawing buffer is not preserved between browser composites).
+const _torusCaptureTarget = {
+    fbo: null,
+    texture: null,
+    depth: null,
+    width: 0,
+    height: 0,
+    canvas: null,
+};
+
+function _ensureTorusCaptureTarget(width, height) {
+    if (!gl) return null;
+    const target = _torusCaptureTarget;
+    if (!target.fbo) {
+        target.fbo = gl.createFramebuffer();
+        target.texture = gl.createTexture();
+        target.depth = gl.createRenderbuffer();
+        target.canvas = document.createElement('canvas');
+    }
+    if (!target.fbo || !target.texture || !target.depth || !target.canvas) return null;
+
+    if (target.width !== width || target.height !== height) {
+        target.width = width;
+        target.height = height;
+        target.canvas.width = width;
+        target.canvas.height = height;
+
+        gl.bindTexture(gl.TEXTURE_2D, target.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        gl.bindRenderbuffer(gl.RENDERBUFFER, target.depth);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D,
+            target.texture,
+            0,
+        );
+        gl.framebufferRenderbuffer(
+            gl.FRAMEBUFFER,
+            gl.DEPTH_ATTACHMENT,
+            gl.RENDERBUFFER,
+            target.depth,
+        );
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+            // Retry allocation on the next capture (for example after a transient context issue)
+            // instead of treating the failed dimensions as a valid cached target.
+            target.width = 0;
+            target.height = 0;
+            return null;
+        }
+    } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+    }
+    return target;
+}
+
+function _captureTorusToCanvas(width, height) {
+    if (!gl || !rendererAppContext || !torusView.enabled) return null;
+    const w = Math.max(1, Math.round(width));
+    const h = Math.max(1, Math.round(height));
+    const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    const previousViewport = gl.getParameter(gl.VIEWPORT);
+    const target = _ensureTorusCaptureTarget(w, h);
+    if (!target) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+        gl.viewport(...previousViewport);
+        return null;
+    }
+
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(...Config.BACKGROUND_COLOR);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const drawn = drawTorus(rendererAppContext, { x: 0, y: 0, width: w, height: h }, h);
+    if (drawn) {
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const ctx = target.canvas.getContext('2d');
+        if (!ctx) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+            gl.viewport(...previousViewport);
+            return null;
+        }
+        const imageData = ctx.createImageData(w, h);
+        const rowBytes = w * 4;
+        for (let y = 0; y < h; y++) {
+            const srcStart = (h - 1 - y) * rowBytes;
+            imageData.data.set(pixels.subarray(srcStart, srcStart + rowBytes), y * rowBytes);
+        }
+        ctx.putImageData(imageData, 0, 0);
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+    gl.viewport(...previousViewport);
+    return drawn ? target.canvas : null;
+}
+
+/**
+ * Capture the selected view through the active projection, falling back to the flat FBO if an
+ * offscreen torus render is unavailable.
+ */
+export function captureActiveSelectedView(torusEnabled, captureTorus, captureFlat) {
+    if (torusEnabled) {
+        const torus = captureTorus();
+        if (torus) return torus;
+    }
+    return captureFlat();
+}
+
 // Convert a Config float color array ([r,g,b,a] in 0..1) to a CSS color string.
 function _floatColorToCss(c) {
     const r = Math.round((c[0] ?? 0) * 255);
@@ -1015,7 +1135,11 @@ export function composeCaptureFrame(ctx, { source, width, height, selectedIndex,
     }
 
     if (source === 'selected') {
-        const c = _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex));
+        const c = captureActiveSelectedView(
+            torusView.enabled,
+            () => _captureTorusToCanvas(width, height),
+            () => _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex)),
+        );
         if (!c) return false;
         ctx.drawImage(c, 0, 0, width, height);
         return true;
@@ -1029,7 +1153,13 @@ export function composeCaptureFrame(ctx, { source, width, height, selectedIndex,
     const sy = height / canvas.height;
 
     const sv = layoutCache.selectedView;
-    const selC = _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex));
+    const selectedWidth = Math.max(1, Math.round(sv.width * sx));
+    const selectedHeight = Math.max(1, Math.round(sv.height * sy));
+    const selC = captureActiveSelectedView(
+        torusView.enabled,
+        () => _captureTorusToCanvas(selectedWidth, selectedHeight),
+        () => _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex)),
+    );
     if (selC) ctx.drawImage(selC, sv.x * sx, sv.y * sy, sv.width * sx, sv.height * sy);
 
     const { gridContainerX, gridContainerY, miniMapW, miniMapH, miniMapSpacing } = layoutCache.miniMap;
