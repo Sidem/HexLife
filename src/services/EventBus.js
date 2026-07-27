@@ -201,6 +201,12 @@ export const EVENTS = {
     LAYOUT_UPDATED: 'renderer:layoutUpdated',
     /** @param {{zoom: number, worldIndex: number}} data - The selected world's camera zoom changed. Camera state is mutated in place (the renderer reads it every frame), so this is the only way a UI surface can observe it — it drives the on-canvas view chip that advertises panning (#31). Pans don't fire it: the chip shows zoom, not position. */
     CAMERA_CHANGED: 'renderer:cameraChanged',
+    /** @event Toggle between the selected world's flat and torus views. */
+    COMMAND_TOGGLE_TORUS_VIEW: 'command:toggleTorusView',
+    /** @param {{enabled: boolean}} data - The selected view entered or left 3D torus mode. */
+    TORUS_VIEW_CHANGED: 'renderer:torusViewChanged',
+    /** @param {{offOpacity: number, radiusRatio: number, autoRotate: boolean, rotationSpeed: number}} data - Persisted torus appearance/motion settings changed. */
+    TORUS_SETTINGS_CHANGED: 'renderer:torusSettingsChanged',
 
     
     /** @param {boolean} isPaused - The desired pause state. */

@@ -1,24 +1,168 @@
-/* Settings / Preferences panel (UX). Mirrors the Controls panel's section/field rhythm
-   so the two read as siblings; toggle rows reuse the shared ToggleSwitch component. */
+/* Settings is deliberately split into three task-based tabs: display, simulation and torus.
+   The panel content scrolls; the tab strip stays visible so a long category never becomes a maze. */
 .settings-component-content {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    width: min(620px, calc(100vw - 48px));
+    min-height: 390px;
 }
 
-.settings-component-content .settings-section {
+@media screen and (min-width: 769px) {
+    #settingsPanel {
+        min-width: 520px;
+    }
+}
+
+.settings-component-content .settings-tabs {
+    position: sticky;
+    top: -10px;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin: -10px -10px 14px;
+    padding: 9px 10px 8px;
+    background: rgba(32, 32, 36, 0.98);
+    border-bottom: 1px solid var(--border-color, #34343d);
+}
+
+.settings-component-content .settings-tab {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 48px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    padding: 7px 10px 8px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted, #9a9aa4);
+    text-align: left;
+    cursor: pointer;
+    transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.settings-component-content .settings-tab::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    bottom: 4px;
+    left: 10px;
+    height: 2px;
+    border-radius: 2px;
+    background: transparent;
+}
+
+.settings-component-content .settings-tab:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary, #d0d0d8);
+}
+
+.settings-component-content .settings-tab.active {
+    border-color: rgba(240, 198, 116, 0.25);
+    background: rgba(240, 198, 116, 0.08);
+    color: var(--accent, #f0c674);
+}
+
+.settings-component-content .settings-tab.active::after {
+    background: var(--accent, #f0c674);
+}
+
+.settings-component-content .settings-tab:focus-visible {
+    outline: 2px solid var(--accent, #f0c674);
+    outline-offset: 1px;
+}
+
+.settings-component-content .settings-tab-label {
+    overflow: hidden;
+    max-width: 100%;
+    font-size: 0.83em;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-component-content .settings-tab-meta {
+    overflow: hidden;
+    max-width: 100%;
+    color: var(--text-muted, #8a8a92);
+    font-size: 0.68em;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-component-content .settings-tab-panel {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 11px;
 }
 
-.settings-component-content .settings-section-title {
+/* `[hidden]` needs an author rule because tab panels set their own display above. */
+.settings-component-content .settings-tab-panel[hidden] {
+    display: none !important;
+}
+
+.settings-component-content .settings-tab-intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px 2px;
+}
+
+.settings-component-content .settings-tab-intro h4 {
+    margin: 0 0 3px;
+    color: var(--text-primary, #eeeef2);
+    font-size: 1em;
+    font-weight: 650;
+}
+
+.settings-component-content .settings-tab-intro p,
+.settings-component-content .settings-group-heading p {
     margin: 0;
-    font-size: 0.72em;
-    font-weight: 600;
+    color: var(--text-muted, #92929b);
+    font-size: 0.76em;
+    line-height: 1.4;
+}
+
+.settings-component-content .settings-context-badge {
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border: 1px solid rgba(240, 198, 116, 0.28);
+    border-radius: 999px;
+    background: rgba(240, 198, 116, 0.08);
+    color: var(--accent, #f0c674);
+    font-size: 0.66em;
+    font-weight: 650;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    letter-spacing: 0.09em;
-    color: var(--text-muted, #8a8a92);
+}
+
+.settings-component-content .settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px;
+    border: 1px solid var(--border-color, #35353f);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.022);
+}
+
+.settings-component-content .settings-group-heading {
+    padding-bottom: 1px;
+}
+
+.settings-component-content .settings-group-heading h5 {
+    margin: 0 0 3px;
+    color: var(--text-secondary, #d4d4dc);
+    font-size: 0.76em;
+    font-weight: 650;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
 }
 
 .settings-component-content .settings-field {
@@ -28,26 +172,32 @@
 }
 
 .settings-component-content .settings-field-label {
-    font-size: 0.82em;
     color: var(--text-secondary, #c8c8d0);
-}
-
-.settings-component-content .settings-field-hint {
-    font-size: 0.85em;
-    color: var(--text-muted, #8a8a92);
+    font-size: 0.78em;
+    font-weight: 550;
 }
 
 .settings-component-content .settings-toggle-list {
     display: flex;
     flex-direction: column;
     gap: 1px;
-    margin: 0 -8px;
+    margin: 0 -6px -4px;
 }
 
-/* Cell-coloring segmented switch fills the panel width, like Controls' switches. */
+.settings-component-content .settings-toggle-list > div + div {
+    border-top: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+/* Segmented controls should fill the card. Grid size uses a readable 2×2 matrix instead of
+   squeezing four dimension-heavy labels into one row. */
 .settings-component-content .switch-component-container .switch-group {
     display: flex;
     width: 100%;
+}
+
+.settings-component-content .settings-grid-size-group .switch-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .settings-component-content .switch-label {
@@ -58,27 +208,115 @@
     padding: 7px 6px;
 }
 
-.settings-component-content .settings-coming-soon {
+.settings-component-content .settings-warning-note,
+.settings-component-content .settings-live-note,
+.settings-component-content .settings-slider-hint {
     margin: 0;
-    font-size: 0.82em;
-    line-height: 1.45;
-    color: var(--text-muted, #9a9aa4);
+    color: var(--text-muted, #8f8f98);
+    font-size: 0.72em;
+    line-height: 1.4;
 }
 
-.settings-component-content .settings-coming-soon strong {
+.settings-component-content .settings-warning-note {
+    padding: 7px 9px;
+    border-left: 2px solid var(--accent-dim, #d8b05b);
+    border-radius: 0 5px 5px 0;
+    background: rgba(240, 198, 116, 0.055);
+}
+
+.settings-component-content .settings-slider-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.settings-component-content .settings-slider-stack .slider-component-container {
+    display: grid;
+    grid-template-columns: minmax(108px, auto) minmax(130px, 1fr) auto;
+}
+
+.settings-component-content .settings-slider-stack .settings-slider-hint {
+    margin: -4px 0 5px;
+    padding-left: 113px;
+}
+
+.settings-component-content .settings-live-note {
+    padding: 2px 3px 0;
+    text-align: center;
+}
+
+.settings-component-content .settings-callout {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 9px;
+    align-items: baseline;
+    padding: 10px 12px;
+    border: 1px dashed var(--border-color, #3d3d47);
+    border-radius: 8px;
+    color: var(--text-muted, #9a9aa4);
+    font-size: 0.76em;
+    line-height: 1.4;
+}
+
+.settings-component-content .settings-callout-label {
+    color: var(--text-secondary, #d0d0d8);
+    font-weight: 650;
+}
+
+.settings-component-content .settings-callout strong {
     color: var(--text-secondary, #d0d0d8);
 }
 
 .settings-component-content .settings-version {
-    margin-top: 4px;
+    margin-top: 12px;
     padding-top: 8px;
     border-top: 1px solid var(--border-color, #33333d);
-    font-size: 0.78em;
-    color: var(--text-muted, #9a9aa4);
+    color: var(--text-muted, #85858e);
+    font-size: 0.7em;
     text-align: right;
 }
 
 .settings-component-content .settings-version code {
+    color: var(--text-secondary, #bdbdc6);
     font-size: inherit;
-    color: var(--text-secondary, #d0d0d8);
+}
+
+@media screen and (max-width: 560px) {
+    .settings-component-content {
+        width: 100%;
+        min-height: 0;
+    }
+
+    .settings-component-content .settings-tab {
+        min-height: 39px;
+        align-items: center;
+        padding-inline: 5px;
+        text-align: center;
+    }
+
+    .settings-component-content .settings-tab-meta {
+        display: none;
+    }
+
+    .settings-component-content .settings-group {
+        padding: 10px;
+    }
+
+    .settings-component-content .settings-slider-stack .slider-component-container {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .settings-component-content .settings-slider-stack .slider-component-container > label {
+        grid-column: 1 / -1;
+    }
+
+    .settings-component-content .settings-slider-stack .settings-slider-hint {
+        margin-top: -2px;
+        padding-left: 0;
+    }
+
+    .settings-component-content .settings-callout {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
 }

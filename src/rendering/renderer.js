@@ -3,6 +3,13 @@ import * as WebGLUtils from './webglUtils.js';
 import * as Utils from '../utils/utils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
+import { lookAt, multiply, perspective } from './mat4.js';
+import {
+    getTorusPeriods,
+    torusOrbitCamera,
+    wrapAngle,
+} from './torusMath.js';
+import { getTorusViewSettings } from '../services/TorusViewSettings.js';
 
 // eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
@@ -12,16 +19,22 @@ import hexFragmentShaderSource from '../../shaders/fragment.glsl?raw';
 import quadVertexShaderSource from '../../shaders/quad_vertex.glsl?raw';
 // eslint-disable-next-line import/no-unresolved
 import quadFragmentShaderSource from '../../shaders/quad_fragment.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import torusVertexShaderSource from '../../shaders/torus_vertex.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import torusFragmentShaderSource from '../../shaders/torus_fragment.glsl?raw';
 
 let gl;
 let canvas;
 let layoutCache = {}; 
 let hexShaderProgram;
 let quadShaderProgram;
+let torusShaderProgram;
 let hexAttributeLocations;
 let hexUniformLocations;
 let quadAttributeLocations;
 let quadUniformLocations;
+let torusUniformLocations;
 let worldFBOs = [];
 let hexBuffers;
 let quadBuffers;
@@ -53,6 +66,20 @@ let worldEverDrawn = [];
 // idle sim therefore issues no GPU work at all. `composeDirty` is set by the
 // layout recompute; per-frame FBO redraws are signalled via renderWorldsToTextures.
 let composeDirty = true;
+const TORUS_SURFACE_PASS = Object.freeze({
+    ALL: 0,
+    LIVE: 1,
+    OFF: 2,
+});
+const torusView = {
+    enabled: false,
+    yaw: 0.55,
+    pitch: 0.42,
+    distance: 6.5,
+    orbiting: false,
+    lastAnimationTime: 0,
+    ...getTorusViewSettings(),
+};
 // Precomputed clip-space quad vertices, rebuilt only when the layout changes.
 // Avoids allocating a Float32Array + per-quad math every frame in drawQuad.
 let quadVertsCache = null;
@@ -77,7 +104,8 @@ export function initRenderer(canvasElement, appContext) {
 
     hexShaderProgram = WebGLUtils.loadShaderProgram(gl, hexVertexShaderSource, hexFragmentShaderSource);
     quadShaderProgram = WebGLUtils.loadShaderProgram(gl, quadVertexShaderSource, quadFragmentShaderSource);
-    if (!hexShaderProgram || !quadShaderProgram) return null;
+    torusShaderProgram = WebGLUtils.loadShaderProgram(gl, torusVertexShaderSource, torusFragmentShaderSource);
+    if (!hexShaderProgram || !quadShaderProgram || !torusShaderProgram) return null;
 
     hexAttributeLocations = {
         position: gl.getAttribLocation(hexShaderProgram, "a_position"),
@@ -106,6 +134,16 @@ export function initRenderer(canvasElement, appContext) {
         texture: gl.getUniformLocation(quadShaderProgram, "u_texture"),
         u_color: gl.getUniformLocation(quadShaderProgram, "u_color"),
         u_useTexture: gl.getUniformLocation(quadShaderProgram, "u_useTexture"),
+    };
+    torusUniformLocations = {
+        hexSize: gl.getUniformLocation(torusShaderProgram, "u_hexSize"),
+        period: gl.getUniformLocation(torusShaderProgram, "u_period"),
+        radii: gl.getUniformLocation(torusShaderProgram, "u_radii"),
+        mvp: gl.getUniformLocation(torusShaderProgram, "u_mvp"),
+        colorLUT: gl.getUniformLocation(torusShaderProgram, "u_colorLUT"),
+        cameraPosition: gl.getUniformLocation(torusShaderProgram, "u_cameraPosition"),
+        offOpacity: gl.getUniformLocation(torusShaderProgram, "u_offOpacity"),
+        surfacePass: gl.getUniformLocation(torusShaderProgram, "u_surfacePass"),
     };
     const colorSettings = appContext.colorController.getSettings();
     const symmetryData = appContext.worldManager.getSymmetryData();
@@ -164,6 +202,12 @@ export function initRenderer(canvasElement, appContext) {
         const effective = settings || appContext.colorController.getSettings();
         updateColorLUTTexture(effective, appContext.worldManager.getSymmetryData());
         appContext.worldManager.markAllWorldsRenderDirty();
+    });
+    EventBus.subscribe(EVENTS.TORUS_VIEW_CHANGED, ({ enabled }) => {
+        setTorusViewEnabled(enabled);
+    });
+    EventBus.subscribe(EVENTS.TORUS_SETTINGS_CHANGED, (settings) => {
+        setTorusViewSettings(settings);
     });
     
     requestAnimationFrame(() => resizeRenderer());
@@ -522,18 +566,24 @@ function renderMainScene(appContext, fbosDrawn) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(...Config.BACKGROUND_COLOR);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(quadShaderProgram);
-    gl.bindVertexArray(quadVAO);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
-        gl.uniform1i(quadUniformLocations.texture, 0);
-        gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
-        drawQuad(quadVertsCache.selectedView);
+        const torusDrawn = torusView.enabled && drawTorus(appContext);
+        if (!torusDrawn) {
+            gl.useProgram(quadShaderProgram);
+            gl.bindVertexArray(quadVAO);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, worldFBOs[selectedWorldIndex].texture);
+            gl.uniform1i(quadUniformLocations.texture, 0);
+            gl.uniform1f(quadUniformLocations.u_useTexture, 1.0);
+            drawQuad(quadVertsCache.selectedView);
+        }
     }
 
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.useProgram(quadShaderProgram);
+    gl.bindVertexArray(quadVAO);
     for (let i = 0; i < Config.NUM_WORLDS; i++) {
         if (i === selectedWorldIndex) {
             gl.uniform1f(quadUniformLocations.u_useTexture, 0.0);
@@ -551,6 +601,103 @@ function renderMainScene(appContext, fbosDrawn) {
     gl.bindVertexArray(null);
 }
 
+function drawTorus(appContext) {
+    if (!torusShaderProgram || !torusUniformLocations || !layoutCache.selectedView) return false;
+    const selectedWorldIndex = appContext.worldManager.getSelectedWorldIndex();
+    const worldData = appContext.worldManager.getWorldsRenderData()[selectedWorldIndex];
+    if (!worldData?.enabled || !worldData.jsStateArray ||
+        !worldData.jsRuleIndexArray || !worldData.jsHoverStateArray) {
+        return false;
+    }
+
+    const viewRect = layoutCache.selectedView;
+    const viewportY = gl.canvas.height - viewRect.y - viewRect.height;
+    gl.viewport(viewRect.x, viewportY, viewRect.width, viewRect.height);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LESS);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.BLEND);
+
+    gl.useProgram(torusShaderProgram);
+    gl.bindVertexArray(hexVAO);
+    WebGLUtils.updateBuffer(gl, hexBuffers.stateBuffer, gl.ARRAY_BUFFER, worldData.jsStateArray);
+    WebGLUtils.updateBuffer(gl, hexBuffers.hoverBuffer, gl.ARRAY_BUFFER, worldData.jsHoverStateArray);
+    WebGLUtils.updateBuffer(gl, hexBuffers.ruleIndexBuffer, gl.ARRAY_BUFFER, worldData.jsRuleIndexArray);
+    if (worldData.jsGhostStateArray) {
+        WebGLUtils.updateBuffer(gl, hexBuffers.ghostBuffer, gl.ARRAY_BUFFER, worldData.jsGhostStateArray);
+    }
+
+    const hexSize = Utils.calculateHexSizeForTexture();
+    const period = getTorusPeriods(Config.GRID_COLS, Config.GRID_ROWS, hexSize);
+    const camera = torusOrbitCamera(torusView.yaw, torusView.pitch, torusView.distance);
+    const cameraPosition = camera.position;
+    const projection = perspective(
+        Math.PI * 42 / 180,
+        Math.max(viewRect.width / viewRect.height, 0.01),
+        0.1,
+        40,
+    );
+    const view = lookAt(cameraPosition, [0, 0, 0], camera.up);
+    const mvp = multiply(projection, view);
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, hexLUTTexture);
+    gl.uniform1i(torusUniformLocations.colorLUT, 1);
+    gl.uniform1f(torusUniformLocations.hexSize, hexSize);
+    gl.uniform2f(torusUniformLocations.period, period.x, period.y);
+    // Keep the outer silhouette framed while the ratio changes: the slider reshapes the hole/tube
+    // instead of also acting as an accidental zoom control.
+    const minorRadius = 2.55 / (torusView.radiusRatio + 1);
+    const majorRadius = torusView.radiusRatio * minorRadius;
+    gl.uniform2f(torusUniformLocations.radii, majorRadius, minorRadius);
+    gl.uniformMatrix4fv(torusUniformLocations.mvp, false, mvp);
+    gl.uniform3fv(torusUniformLocations.cameraPosition, cameraPosition);
+    gl.uniform1f(torusUniformLocations.offOpacity, torusView.offOpacity);
+
+    const opaqueSurface = torusView.offOpacity >= 0.999;
+    if (opaqueSurface) {
+        // At 100% opacity the torus is an ordinary solid: write depth and let the nearest fragment
+        // win. Culling is disabled here so the surface stays complete even while the camera tumbles
+        // through a pole and the inner ring reverses its screen-facing orientation.
+        gl.uniform1i(torusUniformLocations.surfacePass, TORUS_SURFACE_PASS.ALL);
+        gl.depthMask(true);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+    } else {
+        // First keep the nearest live cell along each view ray. Off cells are discarded, so live
+        // activity behind the translucent shell remains in the color buffer.
+        gl.uniform1i(torusUniformLocations.surfacePass, TORUS_SURFACE_PASS.LIVE);
+        gl.depthMask(true);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+
+        // Find the nearest off cell without changing color. This replaces unordered alpha
+        // accumulation: a side-on ray can intersect a torus four times, but opacity represents one
+        // shell layer rather than becoming view-dependent according to the intersection count.
+        gl.colorMask(false, false, false, false);
+        gl.uniform1i(torusUniformLocations.surfacePass, TORUS_SURFACE_PASS.OFF);
+        gl.depthMask(true);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+
+        // Blend only the off fragment that won the depth prepass. If a live cell is behind it, its
+        // existing color shows through; if a live cell is nearer, the off fragment fails EQUAL.
+        gl.colorMask(true, true, true, true);
+        gl.depthFunc(gl.EQUAL);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, Config.NUM_CELLS);
+        gl.depthMask(true);
+    }
+
+    gl.colorMask(true, true, true, true);
+    gl.depthFunc(gl.LEQUAL);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.CULL_FACE);
+    gl.disable(gl.DEPTH_TEST);
+    gl.bindVertexArray(null);
+    return true;
+}
+
 // Upload precomputed clip-space vertices (from quadVertsCache) and draw the quad.
 function drawQuad(verts) {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
@@ -562,8 +709,65 @@ export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
         return;
     }
+    updateTorusAnimation(performance.now());
     const fbosDrawn = renderWorldsToTextures(appContext);
     renderMainScene(appContext, fbosDrawn);
+}
+
+function updateTorusAnimation(now) {
+    if (!torusView.enabled) return;
+    if (!torusView.lastAnimationTime) torusView.lastAnimationTime = now;
+    const elapsed = Math.min((now - torusView.lastAnimationTime) / 1000, 0.05);
+    torusView.lastAnimationTime = now;
+    const rotating = torusView.autoRotate && torusView.rotationSpeed > 0;
+    if (rotating) {
+        torusView.yaw = wrapAngle(
+            torusView.yaw + elapsed * torusView.rotationSpeed * Math.PI / 180,
+        );
+    }
+    if (rotating || torusView.orbiting) composeDirty = true;
+}
+
+function setTorusViewEnabled(enabled) {
+    torusView.enabled = !!enabled;
+    torusView.orbiting = false;
+    torusView.lastAnimationTime = performance.now();
+    composeDirty = true;
+}
+
+function setTorusViewSettings(settings) {
+    Object.assign(torusView, settings);
+    torusView.lastAnimationTime = performance.now();
+    composeDirty = true;
+}
+
+export function isTorusViewEnabled() {
+    return torusView.enabled;
+}
+
+export function getTorusViewState() {
+    return { ...torusView };
+}
+
+export function orbitTorusView(deltaYaw, deltaPitch) {
+    if (!torusView.enabled) return;
+    torusView.yaw = wrapAngle(torusView.yaw + deltaYaw);
+    torusView.pitch = wrapAngle(torusView.pitch + deltaPitch);
+    composeDirty = true;
+}
+
+export function dollyTorusView(wheelDelta) {
+    if (!torusView.enabled) return;
+    torusView.distance = Math.max(
+        4.1,
+        Math.min(10, torusView.distance * Math.exp(wheelDelta * 0.001)),
+    );
+    composeDirty = true;
+}
+
+export function setTorusOrbiting(orbiting) {
+    torusView.orbiting = !!orbiting;
+    composeDirty = true;
 }
 
 export function resizeRenderer() {

@@ -23,8 +23,14 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-07-27
+
 ### Added
 
+- **3D Torus view.** The selected world can now be wrapped onto its actual toroidal topology and
+  explored with drag-to-orbit, wheel-to-dolly, continuous rotation, adjustable speed and ring
+  openness, and off-cell opacity from 1–100%. Vertical orbit is unbounded, so the camera can tumble
+  repeatedly through both poles.
 - **A visible way to pan and to get back out of a zoom.** While the selected view is zoomed in, an
   on-canvas chip shows the zoom level, names the gesture (`Ctrl-drag` or middle-drag on desktop),
   and offers **Reset view**. At 1× there is nothing to pan, so it stays out of the way.
@@ -33,12 +39,20 @@ is not major if every code above still resolves to the same world.
 
 ### Changed
 
+- **Settings are organized by task.** Display, Simulation, and 3D Torus now have persistent,
+  keyboard-accessible tabs with grouped controls instead of one mixed scrolling list.
 - **The app opens on structure, not static.** A first-time visitor now starts zoomed to where
   individual cells are legible, derived from the grid size so every grid preset opens at a
   comparable apparent cell size. Returning visitors keep their own camera.
 - **Library cards carry one load button instead of two.** "Load" and "Load + IC" collapsed into a
   single **Load** governed by the new Paired start switch; the opposite load is still available
   per-entry from a saved ruleset's ⋯ menu. Roughly halves the controls in the Library tab.
+
+### Fixed
+
+- **Torus transparency remains continuous at every camera angle.** A nearest-layer depth pass stops
+  side-on rays from accumulating multiple translucent shell intersections, while stable
+  camera-relative shading keeps black off-cells visibly distinct from the black canvas.
 
 ## [1.0.0] — 2026-07-22
 
@@ -73,5 +87,6 @@ which it gets a version you can cite, link, and file bugs against.
 - `devvit/` may import from `src/embed/` and nowhere else in `src/`; `tests/devvitBoundary.test.js`
   enforces that boundary.
 
-[Unreleased]: https://github.com/Sidem/HexLife/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Sidem/HexLife/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Sidem/HexLife/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sidem/HexLife/releases/tag/v1.0.0

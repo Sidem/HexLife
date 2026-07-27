@@ -230,7 +230,7 @@ Additions to the public library are curated/manual by design — there is no aut
 ## 🏷️ Versioning & releases
 
 Versions are [semantic](https://semver.org/) and single-sourced in `package.json`. The running
-build identifies itself as `v1.0.0 · <sha> · <date>` in **Settings** and in the boot log — the SHA
+build identifies itself as `v1.1.0 · <sha> · <date>` in **Settings** and in the boot log — the SHA
 is there because GitHub Pages deploys on every push to `main`, so most live builds sit *between*
 tags and the version alone would be misleading.
 

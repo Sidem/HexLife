@@ -170,6 +170,7 @@ export class UIManager {
         this.commandPalette = new CommandPalette(appContext);
 
         this.setupGlobalEventListeners();
+        this._mountRestoredDesktopPanels();
         this._setupHelpTriggerListeners();
 
 
@@ -416,6 +417,23 @@ export class UIManager {
         if (typeof componentToPlace.refresh === 'function') {
             componentToPlace.refresh();
         }
+    }
+
+    /**
+     * A panel restored open from persistence never calls Panel.show(), so it cannot emit the
+     * VIEW_SHOWN event that normally mounts its shared component. Populate those visible desktop
+     * panels once the event wiring and shared component registry both exist.
+     */
+    _mountRestoredDesktopPanels() {
+        if (this.isMobile()) return;
+        Object.values(this.appContext.panelManager.panels)
+            .filter((panel) => !panel.isHidden())
+            .forEach((panel) => {
+                this.mountSharedComponentInto(
+                    panel.contentComponentType,
+                    panel.contentContainer,
+                );
+            });
     }
 
     setupGlobalEventListeners() {

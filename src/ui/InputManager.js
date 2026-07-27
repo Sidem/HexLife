@@ -1,6 +1,6 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { getLayoutCache } from '../rendering/renderer.js';
+import { getLayoutCache, isTorusViewEnabled } from '../rendering/renderer.js';
 import { textureCoordsToGridCoords, getGridWorldBounds } from '../utils/utils.js';
 
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
@@ -9,6 +9,7 @@ import { DrawStrategy } from './inputStrategies/DrawStrategy.js';
 import { PlacePatternStrategy } from './inputStrategies/PlacePatternStrategy.js';
 import { SelectRegionStrategy } from './inputStrategies/SelectRegionStrategy.js';
 import { HoverHandler } from './inputStrategies/HoverHandler.js';
+import { OrbitStrategy } from './inputStrategies/OrbitStrategy.js';
 
 /**
  * @class InputManager
@@ -28,12 +29,14 @@ export class InputManager {
             draw: new DrawStrategy(this),
             place: new PlacePatternStrategy(this),
             select: new SelectRegionStrategy(this),
+            orbit: new OrbitStrategy(this),
         };
         // While the "shift world" hotkey is held we temporarily swap into shiftWorld mode and
         // restore the prior mode on release. Tracks that this is a held-key override (not a normal
         // mode change) so an unrelated INTERACTION_MODE_CHANGED can't strand us in shiftWorld.
         this._shiftWorldKeyHeld = false;
         this._strategyBeforeShiftWorld = null;
+        this._strategyBeforeTorus = null;
         this.hoverHandler = new HoverHandler(this);
 
         this.currentStrategyName = 'pan'; 
@@ -42,6 +45,9 @@ export class InputManager {
 
         this._calculateGridBounds();
         this._setupListeners();
+        if (isTorusViewEnabled() && !this.isMobile) {
+            this._handleTorusViewChanged({ enabled: true });
+        }
     }
 
     _setupListeners() {
@@ -73,6 +79,10 @@ export class InputManager {
             if (this.isMobile) return; 
             const { viewType } = this.getCoordsFromPointerEvent(e);
             if (viewType !== 'selected') return;
+            if (this.currentStrategyName === 'orbit') {
+                this.currentStrategy.handleMouseWheel(e);
+                return;
+            }
             if (e.ctrlKey || e.shiftKey) {
                 const scrollAmount = Math.sign(e.deltaY);
                 EventBus.dispatch(EVENTS.COMMAND_INCREMENT_BRUSH_SIZE, -scrollAmount);
@@ -112,10 +122,17 @@ export class InputManager {
         window.addEventListener('keydown', (e) => this._handleShiftWorldKeyDown(e));
         window.addEventListener('keyup', (e) => this._handleShiftWorldKeyUp(e));
         window.addEventListener('blur', () => this._releaseShiftWorldKey());
-        EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => this.setStrategy(mode));
-        EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => this.setStrategy('place', data));
-        EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => this.setStrategy('select', data));
+        EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
+            if (!isTorusViewEnabled()) this.setStrategy(mode);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => {
+            if (!isTorusViewEnabled()) this.setStrategy('place', data);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => {
+            if (!isTorusViewEnabled()) this.setStrategy('select', data);
+        });
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
+        EventBus.subscribe(EVENTS.TORUS_VIEW_CHANGED, (data) => this._handleTorusViewChanged(data));
     }
 
     /**
@@ -134,6 +151,25 @@ export class InputManager {
         this.currentStrategyName = name;
         this.currentStrategy = this.strategies[name];
         this.currentStrategy.enter(options);
+    }
+
+    _handleTorusViewChanged({ enabled }) {
+        if (enabled && !this.isMobile) {
+            if (this.currentStrategyName === 'orbit') return;
+            // Torus mode deliberately cancels transient placing/selecting/drawing gestures.
+            // Those strategies need entry data that cannot be reconstructed on return, while
+            // previousStrategyName is their stable navigation mode.
+            this._strategyBeforeTorus = this.currentStrategyName === 'pan'
+                ? 'pan'
+                : this.previousStrategyName || 'pan';
+            this.setStrategy('orbit');
+            return;
+        }
+        if (!enabled && this.currentStrategyName === 'orbit') {
+            const restore = this._strategyBeforeTorus || 'pan';
+            this._strategyBeforeTorus = null;
+            this.setStrategy(restore);
+        }
     }
     
     

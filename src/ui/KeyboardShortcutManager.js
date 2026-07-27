@@ -56,6 +56,9 @@ export class KeyboardShortcutManager {
             { key: ' ', displayKey: 'Space', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             } },
+            { key: 'v', description: 'Toggle flat / 3D torus view', category: 'Global Controls', handler: () => {
+                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_TORUS_VIEW);
+            } },
             // Speed nudge (±1 tps). Hold to ramp continuously.
             { key: 'ArrowUp', repeatOnHold: true, description: 'Increase speed by 1 tps (hold to ramp)', category: 'Global Controls', handler: () => this._nudgeSpeed(1) },
             { key: 'ArrowDown', repeatOnHold: true, description: 'Decrease speed by 1 tps (hold to ramp)', category: 'Global Controls', handler: () => this._nudgeSpeed(-1) },
