@@ -9,6 +9,10 @@ import {
     mergeSuggestions,
     MAX_SUGGESTIONS,
 } from '../../core/analysis/tagSuggestions.js';
+import {
+    findRulesetRelatives,
+    suggestRulesetFamilyName,
+} from '../../core/rulesetRelatedness.js';
 
 // Fixed seeds for the preview bakes so a candidate's thumbnail reproduces the layout that gets saved
 // with it (the saved `seed` replays the exact same starting cells via "Load + IC").
@@ -44,6 +48,17 @@ export class SaveRulesetModal extends BaseComponent {
                 <div class="form-group">
                     <label for="ruleset-name-input">Name</label>
                     <input type="text" id="ruleset-name-input" required maxlength="50" placeholder="e.g., 'Crawling Crystals'">
+                    <div class="srm-relatedness hidden" aria-live="polite">
+                        <div class="srm-relatedness-heading">
+                            <span>Rule family</span>
+                            <span class="srm-degree-key" title="One degree is one legal mutation unit in the strictest rule space shared by both rulesets.">° = one mutation</span>
+                        </div>
+                        <div class="srm-relative-list"></div>
+                        <div class="srm-family-suggestion hidden">
+                            <span class="srm-family-suggestion-copy"></span>
+                            <button type="button" class="button button-subtle srm-use-family-name"></button>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="ruleset-desc-input">Description (Optional)</label>
@@ -86,6 +101,11 @@ export class SaveRulesetModal extends BaseComponent {
             title: this.element.querySelector('#save-ruleset-modal-title'),
             nameInput: this.element.querySelector('#ruleset-name-input'),
             descInput: this.element.querySelector('#ruleset-desc-input'),
+            relatedness: this.element.querySelector('.srm-relatedness'),
+            relativeList: this.element.querySelector('.srm-relative-list'),
+            familySuggestion: this.element.querySelector('.srm-family-suggestion'),
+            familySuggestionCopy: this.element.querySelector('.srm-family-suggestion-copy'),
+            useFamilyName: this.element.querySelector('.srm-use-family-name'),
             suggestedRow: this.element.querySelector('.srm-suggested-row'),
             suggestedChips: this.element.querySelector('.srm-suggested-chips'),
             tagChips: this.element.querySelector('.srm-tag-chips'),
@@ -104,6 +124,7 @@ export class SaveRulesetModal extends BaseComponent {
         this._addDOMListener(this.ui.nameInput, 'input', () => {
             this.ui.saveBtn.disabled = this.ui.nameInput.value.trim() === '';
         });
+        this._addDOMListener(this.ui.useFamilyName, 'click', this._useSuggestedFamilyName);
         this._addDOMListener(this.ui.bakeBtn, 'click', this._bakeCandidates);
         this._addDOMListener(this.ui.icGrid, 'click', this._onGridClick);
         // Tag pickers: canonical toggle chips, one-tap Suggested chips, and custom-tag add.
@@ -134,6 +155,7 @@ export class SaveRulesetModal extends BaseComponent {
             : "e.g., 'Crawling Crystals'";
         this.ui.nameInput.value = this.rulesetData.name || '';
         this.ui.descInput.value = this.rulesetData.description || '';
+        this._renderRelatedness();
         this.selectedTags = new Set(
             (Array.isArray(this.rulesetData.tags) ? this.rulesetData.tags : [])
                 .map(normalizeTag).filter(Boolean)
@@ -234,6 +256,77 @@ export class SaveRulesetModal extends BaseComponent {
             return null;
         }
     }
+
+    /**
+     * Show the three nearest named rules in the combined personal/public library. Personal entries
+     * win when the same hex exists in both. The degree count comes from legal mutation units rather
+     * than raw table-bit Hamming distance (see core/rulesetRelatedness.js).
+     */
+    _renderRelatedness() {
+        const lc = this.appContext.libraryController;
+        const personal = (lc?.getUserLibrary?.() || []).map(entry => ({ ...entry, source: 'personal' }));
+        const seenHexes = new Set(personal.map(entry => entry.hex?.toUpperCase()).filter(Boolean));
+        const publicEntries = (lc?.getLibraryData?.()?.rulesets || [])
+            .filter(entry => !seenHexes.has(entry.hex?.toUpperCase()))
+            .map(entry => ({ ...entry, source: 'public' }));
+        const entries = [...personal, ...publicEntries];
+        const relatives = findRulesetRelatives(this.rulesetData.hex, entries, {
+            excludeId: this.rulesetData.id || null,
+            limit: 3,
+        });
+
+        this.ui.relatedness.classList.toggle('hidden', relatives.length === 0);
+        if (!relatives.length) {
+            this.ui.relativeList.innerHTML = '';
+            this.ui.familySuggestion.classList.add('hidden');
+            this._relatedNameSuggestion = null;
+            return;
+        }
+
+        this.ui.relativeList.innerHTML = relatives.map(({ entry, relatedness }, index) => {
+            const state = relatedness.isIdentical
+                ? 'Identical'
+                : relatedness.degrees === 1
+                    ? 'Direct relative'
+                    : relatedness.isClose ? 'Close relative' : 'Nearest';
+            const source = entry.source === 'personal' ? 'yours' : 'public';
+            return `
+                <div class="srm-relative${index === 0 ? ' nearest' : ''}">
+                    <span class="srm-relative-name" title="${this._escapeAttr(entry.name)}">${this._escape(entry.name)}</span>
+                    <span class="srm-relative-source">${source}</span>
+                    <span class="srm-relative-distance" title="${this._escapeAttr(`${state}: ${relatedness.degrees} of ${relatedness.totalUnits} independently mutable ${relatedness.spaceLabel} units differ.`)}">
+                        <strong>${relatedness.degrees}°</strong>
+                        <span>${this._escape(relatedness.spaceLabel)} · ${relatedness.degrees}/${relatedness.totalUnits}</span>
+                    </span>
+                </div>`;
+        }).join('');
+
+        const nearest = relatives[0];
+        const suggestion = suggestRulesetFamilyName(relatives, entries);
+        this._relatedNameSuggestion = suggestion?.name || null;
+        this.ui.familySuggestion.classList.toggle('hidden', !suggestion);
+        if (suggestion) {
+            this.ui.familySuggestionCopy.textContent =
+                `A close variant of “${suggestion.basedOn}” — continue the family:`;
+            this.ui.useFamilyName.textContent = suggestion.name;
+            this.ui.useFamilyName.title = `Use “${suggestion.name}”`;
+        } else if (nearest.relatedness.isIdentical) {
+            this.ui.familySuggestion.classList.remove('hidden');
+            this.ui.familySuggestionCopy.textContent =
+                `This exact rule is already saved as “${nearest.entry.name}”.`;
+            this.ui.useFamilyName.textContent = nearest.entry.name;
+            this.ui.useFamilyName.title = `Use existing name “${nearest.entry.name}”`;
+            this._relatedNameSuggestion = nearest.entry.name;
+        }
+    }
+
+    _useSuggestedFamilyName = () => {
+        if (!this._relatedNameSuggestion) return;
+        this.ui.nameInput.value = this._relatedNameSuggestion;
+        this.ui.saveBtn.disabled = false;
+        this.ui.nameInput.focus();
+        this.ui.nameInput.select();
+    };
 
     _onGridClick = (e) => {
         const tile = e.target.closest('[data-ic-index]');

@@ -10,6 +10,15 @@
 /** Canonical orbit representative (6-bit mask) → notation label ('2o', "3m'", …), display order. */
 export const ORBIT_LABELS: Map<number, string>
 
+export type ConstraintClass = 'totalistic' | 'n_count' | 'r_sym' | 'free'
+
+export const CONSTRAINT_CLASSES: ConstraintClass[]
+
+export const CONSTRAINT_CLASS_META: Record<
+  ConstraintClass,
+  { label: string; description: string }
+>
+
 export type RulesetDescription = {
   /** 32-char uppercase hex. */
   hex: string
@@ -18,6 +27,8 @@ export type RulesetDescription = {
    * orbit (o/m/p arrangement suffixes). `raw`: at least one orbit mixed — no compact notation.
    */
   type: 'n-count' | 'r-sym' | 'raw'
+  /** Strictest structural constraint satisfied by the rule table. */
+  constraintClass: ConstraintClass
   /** `B2/S35`, `B2o3p/S2`, … — null for `raw` rules. */
   notation: string | null
   /** Active birth labels (dead center), count-collapsed; empty for `raw`. */
@@ -31,6 +42,11 @@ export type RulesetDescription = {
   /** One plain-English sentence describing the rule for humans. */
   summary: string
 }
+
+/** Name the strictest structural constraint satisfied by a valid ruleset. */
+export function classifyRulesetConstraint(
+  source: string | Uint8Array,
+): ConstraintClass | null
 
 /** Classify a ruleset hex; null when `hex` is not a 32-char hex string. */
 export function describeRuleset(hex: string): RulesetDescription | null
