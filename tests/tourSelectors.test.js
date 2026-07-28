@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getTours, TOUR_CATALOG } from '../src/ui/tourSteps.js';
 import { OnboardingManager } from '../src/ui/OnboardingManager.js';
+import { EVENTS } from '../src/services/EventBus.js';
 
 /**
  * #36a — the tour-selector guard.
@@ -164,8 +165,9 @@ function auditSelector(selector) {
  * a selector is resolved. Deliberately not a full app: this test is about the
  * selector strings, and a fatter stub would just rot.
  */
-const makeAppContext = (isMobile) => ({
+const makeAppContext = (isMobile, torusEnabled = false) => ({
     uiManager: { isMobile: () => isMobile, activeMobileViewName: null },
+    torusView: { getState: () => ({ enabled: torusEnabled }) },
 });
 
 const VIEWPORTS = [
@@ -286,6 +288,23 @@ describe('tour interaction semantics', () => {
             const step = tours[tourId].find((candidate) => candidate.title === title);
             expect(typeof step?.showMe?.action, `${tourId}: ${title}`).toBe('function');
         }
+    });
+
+    it('requires flat view immediately before the core drawing step when torus view is active', () => {
+        const flatContext = makeAppContext(false, false);
+        const torusContext = makeAppContext(false, true);
+        const core = getTours(torusContext).core;
+        const flatStepIndex = core.findIndex((step) => step.title === 'Switch to Flat View');
+        const drawStepIndex = core.findIndex((step) => step.title === 'Draw on the Grid');
+        const flatStep = core[flatStepIndex];
+
+        expect(flatStepIndex).toBe(drawStepIndex - 1);
+        expect(flatStep.condition(flatContext)).toBe(false);
+        expect(flatStep.condition(torusContext)).toBe(true);
+        expect(flatStep.advanceOn.eventName).toBe(EVENTS.TORUS_VIEW_CHANGED);
+        expect(flatStep.advanceOn.condition({ enabled: true })).toBe(false);
+        expect(flatStep.advanceOn.condition({ enabled: false })).toBe(true);
+        expect(typeof flatStep.showMe.action).toBe('function');
     });
 });
 

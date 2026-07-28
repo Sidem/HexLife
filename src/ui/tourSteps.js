@@ -157,6 +157,8 @@ export const getTours = (appContext) => {
 
     const showMeDrawMode = () => EventBus.dispatch(EVENTS.COMMAND_SET_INTERACTION_MODE, 'draw');
 
+    const showMeFlatView = () => appContext.torusView?.setEnabled(false);
+
     const showMeCloneAndMutate = () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
 
     const showMeSelectWorld = () => {
@@ -213,6 +215,13 @@ export const getTours = (appContext) => {
         content: "Mobile starts in pan mode so swipes move the camera. Tap the highlighted <span class=\"onboarding-highlight-text\">hand</span> once; it changes to a pencil when drawing is active.",
         advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' },
         showMe: { text: 'Switch for me', action: showMeDrawMode }
+    }, {
+        element: '.view-controls-torus',
+        title: 'Switch to Flat View',
+        condition: (appContext) => appContext.torusView?.getState().enabled === true,
+        content: "Drawing happens on the flat grid. Select <span class=\"onboarding-highlight-text\">Flat view</span> before continuing.",
+        advanceOn: { type: 'event', eventName: EVENTS.TORUS_VIEW_CHANGED, condition: ({ enabled }) => !enabled },
+        showMe: { text: 'Switch for me', action: showMeFlatView }
     }, {
         element: '#selected-world-guide',
         highlightType: 'canvas',

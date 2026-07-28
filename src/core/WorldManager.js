@@ -14,6 +14,7 @@ import { ScrubHistoryController } from './ScrubHistoryController.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, rulesetName, getGridCenterWorld } from '../utils/utils.js';
 import { parseStateFile } from '../utils/stateFile.js';
 import { stateLibraryService } from '../services/StateLibraryService.js';
+import { createInitialCameraStates } from './cameraState.js';
 
 export class WorldManager {
     constructor(sharedSettings = {}) {
@@ -1451,35 +1452,12 @@ export class WorldManager {
 
     _initCameraStates(sharedCameraSettings) {
         const gridCenter = getGridCenterWorld();
-        const zoom = this._getFirstRunZoom();
-        for (let i = 0; i < Config.NUM_WORLDS; i++) {
-            const defaultCamera = {
-                x: gridCenter.x,
-                y: gridCenter.y,
-                zoom
-            };
-
-            if (sharedCameraSettings && i === this.selectedWorldIndex) {
-                this.cameraStates.push(sharedCameraSettings);
-            } else {
-                this.cameraStates.push(defaultCamera);
-            }
-        }
-    }
-
-    /**
-     * Opening zoom for a first-time visitor (roadmap #34 / UX audit fix 7 — "first legibility").
-     * At zoom 1 the default grid draws ~6.7px hex rows, so a half-filled world reads as monochrome
-     * static and the named gliders of the default ruleset are invisible; `legibleFirstRunZoom`
-     * scales that up to where cells are individually visible. One-shot: the flag is written the
-     * first time this runs, so a returning visitor (or a reload) opens at plain 1.0 and the camera
-     * is theirs from then on. Share links carry their own camera and are untouched.
-     * @returns {number}
-     */
-    _getFirstRunZoom() {
-        if (PersistenceService.loadUISetting('seenFirstRunView', false)) return 1.0;
-        PersistenceService.saveUISetting('seenFirstRunView', true);
-        return Config.legibleFirstRunZoom(Config.GRID_ROWS, Config.RENDER_TEXTURE_SIZE);
+        this.cameraStates.push(...createInitialCameraStates(
+            Config.NUM_WORLDS,
+            gridCenter,
+            this.selectedWorldIndex,
+            sharedCameraSettings,
+        ));
     }
 
     /**
