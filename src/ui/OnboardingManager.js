@@ -7,7 +7,7 @@ import { EventBus, EVENTS } from '../services/EventBus.js';
  * Design contract (rewritten 2026-06-26):
  *  - A step is only shown once its target is *actually visible* — never a blind
  *    `querySelector` against a fixed timeout. `_waitForTarget` rAF-polls for
- *    existence + visibility (offsetParent, non-zero box, not display/visibility
+ *    existence + visibility (rendered client rect, non-zero box, not display/visibility
  *    hidden) within a budget, so slow panel opens and animations are tolerated
  *    and an off-screen / not-yet-rendered element never gets a highlight ring.
  *  - The spotlight is a single, stacking-context-proof model: four dim panels
@@ -37,6 +37,7 @@ export class OnboardingManager {
         this._followRaf = null;
         this._anchorTarget = null;
         this._highlightedParentPanel = null;
+        this._highlightedParentPanelZIndex = null;
         this._padding = 6;
         this._showMeTimer = null;
         this._showMeWatchdog = null;
@@ -118,7 +119,7 @@ export class OnboardingManager {
             else if (e.key === 'ArrowLeft' && this.currentStepIndex > 0) { e.preventDefault(); this._goToStep(this.currentStepIndex - 1, -1); }
             else if (e.key === 'ArrowRight') {
                 const step = this.activeTourSteps[this.currentStepIndex];
-                if (step && step.primaryAction && step.primaryAction.text) { e.preventDefault(); this._advance(step); }
+                if (this._hasPrimaryAction(step)) { e.preventDefault(); this._advance(step); }
             }
         };
         document.addEventListener('keydown', this._onKeyDown);
@@ -231,9 +232,16 @@ export class OnboardingManager {
 
         if (target && target !== document.body) {
             this._anchorTarget = target;
-            const parentPanel = target.closest('.popout-panel, .draggable-panel-base');
+            const parentPanel = target.closest('.popout-panel, .draggable-panel-base, .modal-overlay');
             if (parentPanel) {
-                parentPanel.style.zIndex = '2002';
+                this._highlightedParentPanelZIndex = parentPanel.style.zIndex;
+                // Modal overlays normally live at 9999. Lowering one to 2002
+                // puts it behind the mobile view (4501), so its controls look
+                // present but cannot be clicked. Keep modals above mobile chrome
+                // while leaving the tour ring/tooltip (6000/6001) on top.
+                parentPanel.style.zIndex = parentPanel.classList.contains('modal-overlay')
+                    ? '5999'
+                    : '2002';
                 this._highlightedParentPanel = parentPanel;
             }
             const r = target.getBoundingClientRect();
@@ -255,7 +263,7 @@ export class OnboardingManager {
         if (this.ui.counter) this.ui.counter.textContent = `${stepNo} / ${total}`;
         if (this.ui.backBtn) this.ui.backBtn.style.visibility = this.currentStepIndex > 0 ? 'visible' : 'hidden';
 
-        if (step.primaryAction && step.primaryAction.text) {
+        if (this._hasPrimaryAction(step)) {
             this.ui.primaryBtn.textContent = step.primaryAction.text;
             this.ui.primaryBtn.style.display = 'inline-block';
         } else {
@@ -268,8 +276,18 @@ export class OnboardingManager {
         this._scheduleShowMe(step);
 
         // a11y: surface the tooltip to assistive tech and give it focus.
-        const focusEl = (step.primaryAction && step.primaryAction.text) ? this.ui.primaryBtn : this.ui.tooltip;
+        const focusEl = this._hasPrimaryAction(step) ? this.ui.primaryBtn : this.ui.tooltip;
         try { focusEl.focus({ preventScroll: true }); } catch { /* noop */ }
+    }
+
+    /**
+     * A primary button is navigation, so it only belongs on click-advanced steps.
+     * Event-gated steps must be completed through the highlighted control (or an
+     * explicit Show me action); rendering a same-looking primary there creates a
+     * dead button and ArrowRight used to bypass the lesson entirely.
+     */
+    _hasPrimaryAction(step) {
+        return !!(step?.advanceOn?.type === 'click' && step.primaryAction?.text);
     }
 
     /** rAF-poll until the selector resolves to a visible element, or budget runs out. */
@@ -292,7 +310,10 @@ export class OnboardingManager {
         if (!el || !el.isConnected) return false;
         const cs = getComputedStyle(el);
         if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return false;
-        if (el.offsetParent === null && cs.position !== 'fixed') return false;
+        // `offsetParent` is null for several genuinely visible layouts and browser
+        // harnesses, so it is not a visibility oracle. A hidden ancestor produces
+        // no client rects, which is the signal we actually need.
+        if (el.getClientRects().length === 0) return false;
         const r = el.getBoundingClientRect();
         return r.width >= 1 && r.height >= 1;
     }
@@ -401,7 +422,7 @@ export class OnboardingManager {
 
         // Gated steps only. A step with its own Next needs no escape hatch, and a
         // second button there would just read as a duplicate.
-        const isGated = !(step.primaryAction && step.primaryAction.text);
+        const isGated = !this._hasPrimaryAction(step);
         if (!isGated || typeof step.showMe?.action !== 'function') return;
 
         this.ui.showMeBtn.textContent = step.showMe.text || 'Show me';
@@ -443,8 +464,9 @@ export class OnboardingManager {
         this._anchorTarget = null;
 
         if (this._highlightedParentPanel) {
-            this._highlightedParentPanel.style.zIndex = '';
+            this._highlightedParentPanel.style.zIndex = this._highlightedParentPanelZIndex ?? '';
             this._highlightedParentPanel = null;
+            this._highlightedParentPanelZIndex = null;
         }
         if (this.ring) this.ring.style.display = 'none';
 

@@ -85,7 +85,14 @@ export class BuildView extends BaseComponent {
         if (!force && this._mountedSegment === this.activeSegment) return;
         const segment = this.segments.find(s => s.id === this.activeSegment);
         if (!segment) return;
-        this.appContext.uiManager.mountSharedComponentInto(segment.componentType, this.contentContainer);
+        // Match Panel/MobileView semantics: opening Build (or changing its
+        // segment) is a real VIEW_SHOWN transition. Besides keeping observers
+        // coherent, this lets guided tours advance from the user's actual tap.
+        EventBus.dispatch(EVENTS.VIEW_SHOWN, {
+            view: this,
+            contentComponentType: segment.componentType,
+            contentContainer: this.contentContainer
+        });
         this._mountedSegment = this.activeSegment;
     }
 

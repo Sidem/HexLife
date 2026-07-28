@@ -58,8 +58,15 @@
             // Captured here because SettingsLoader strips the query string on startup,
             // so by the time app code runs `location.search` is already empty.
             window.__headless = true;
-            Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
-            Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+            // Browser harnesses may already provide non-configurable visibility
+            // properties. Keep the rest of the headless shim alive in that case.
+            try {
+                Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+                Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+            } catch {
+                // The harness owns visibility; requestAnimationFrame is still
+                // replaced below so tour target polling remains deterministic.
+            }
             window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
             window.cancelAnimationFrame = (id) => clearTimeout(id);
         }

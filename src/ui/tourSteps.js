@@ -25,6 +25,21 @@ export const getTours = (appContext) => {
     // public library. Guarded by tests/tourSelectors.test.js.
     const GLIDERS_LOAD_BTN = '#ruleset-library-content .library-card[data-source="public"][data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
 
+    const revealGlidersLibraryEntry = () => {
+        document.querySelector('[data-pane="library"]')?.click();
+        const search = /** @type {HTMLInputElement|null} */ (
+            document.querySelector('#ruleset-library-library-pane .library-search')
+        );
+        if (search && search.value) {
+            search.value = '';
+            search.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        document.querySelector('[data-constraint-filter].active')?.click();
+        document.querySelector('[data-tag-filter].active')?.click();
+        document.querySelector('[data-source-filter="public"]')?.click();
+        document.querySelector(GLIDERS_LOAD_BTN)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
     /**
      * A helper function to ensure a consistent state before starting any tour.
      * Hides all panels and popouts and returns to the main simulation view on mobile.
@@ -33,6 +48,18 @@ export const getTours = (appContext) => {
         EventBus.dispatch(EVENTS.COMMAND_HIDE_ALL_OVERLAYS);
         if (appContext.uiManager.isMobile()) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_MOBILE_VIEW, { targetView: 'watch' });
+        }
+    };
+
+    /**
+     * Build remembers its last mobile segment. Prime the lesson's segment while
+     * the view is hidden so tapping Build opens the promised tool immediately,
+     * rather than briefly landing in an unrelated previous segment.
+     */
+    const prepareBuildLesson = (segment) => {
+        resetUIState();
+        if (appContext.uiManager.isMobile()) {
+            appContext.uiManager.mobileViews.build?.setSegment(segment);
         }
     };
 
@@ -63,6 +90,20 @@ export const getTours = (appContext) => {
     };
 
     /**
+     * The default ruleset is public and intentionally cannot be saved as a
+     * personal duplicate. Chronicle therefore creates a guaranteed one-bit
+     * variant up front; the original remains one Undo/history step away.
+     */
+    const preparePersonalDiscovery = () => {
+        resetUIState();
+        EventBus.dispatch(EVENTS.COMMAND_EDITOR_TOGGLE_RULE_OUTPUT, {
+            ruleIndex: 0,
+            modificationScope: 'selected',
+            conditionalResetScope: 'none'
+        });
+    };
+
+    /**
      * Helper to show the correct view for a tour step.
      * @param {{desktop: {type: 'panel'|'popout', name: string}, mobile: {view: string}}} config
      */
@@ -89,7 +130,13 @@ export const getTours = (appContext) => {
      */
     const isViewOpen = (config) => {
         if (appContext.uiManager.isMobile()) {
-            return !!config.mobile && appContext.uiManager.activeMobileViewName === config.mobile.view;
+            if (!config.mobile || appContext.uiManager.activeMobileViewName !== config.mobile.view) {
+                return false;
+            }
+            if (config.mobile.view === 'build' && config.mobile.segment) {
+                return appContext.uiManager.mobileViews.build?.activeSegment === config.mobile.segment;
+            }
+            return true;
         }
         if (!config.desktop) return false;
         if (config.desktop.type === 'popout') {
@@ -107,6 +154,10 @@ export const getTours = (appContext) => {
      * have produced themselves — a demonstration, not a bypass.
      */
     const showMePlay = () => EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
+
+    const showMeDrawMode = () => EventBus.dispatch(EVENTS.COMMAND_SET_INTERACTION_MODE, 'draw');
+
+    const showMeCloneAndMutate = () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
 
     const showMeSelectWorld = () => {
         const count = appContext.worldManager.worlds.length;
@@ -156,12 +207,12 @@ export const getTours = (appContext) => {
         showMe: { text: 'Show me', action: showMeSelectWorld },
         delayAfter: 800
     }, {
-        element: 'body',
-        title: 'The Spark of Creation',
-        condition: (appContext) => appContext.uiManager.isMobile(),
-        content: "The most direct way to influence a universe is to seed it with life. In draw mode, you can toggle cells by clicking. <br><br>On desktop, you are already in draw mode. On mobile, <span class=\"onboarding-highlight-text\">tap the hand icon (🖐️)</span> to switch to draw mode.",
-        primaryAction: { text: 'Continue' },
-        advanceOn: { type: 'click' }
+        element: '#interaction-mode-toggle',
+        title: 'Switch to Draw Mode',
+        condition: (appContext) => appContext.uiManager.isMobile() && appContext.interactionController.getMode() !== 'draw',
+        content: "Mobile starts in pan mode so swipes move the camera. Tap the highlighted <span class=\"onboarding-highlight-text\">hand</span> once; it changes to a pencil when drawing is active.",
+        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' },
+        showMe: { text: 'Switch for me', action: showMeDrawMode }
     }, {
         element: '#selected-world-guide',
         highlightType: 'canvas',
@@ -176,7 +227,7 @@ export const getTours = (appContext) => {
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '#colorPanelButton',
         title: 'A Splash of Color',
-        content: () => "Cells are <span class=\"onboarding-highlight-text\">monochrome</span> right now &mdash; calm and clear to start. But color is HexLife's secret weapon: in the <span class=\"onboarding-highlight-text\">Chroma Lab</span> (the palette icon" + (appContext.uiManager.isMobile() ? ', under the <span class="onboarding-highlight-text">Tools</span> menu' : '') +") you can color cells by <span class=\"onboarding-highlight-text\">which rule fired</span> &mdash; try the <span class=\"onboarding-highlight-text\">Symmetry Groups</span> palette to see your ruleset's hidden structure. It has its own <span class=\"onboarding-highlight-text\">[?]</span> guide when you're ready.",
+        content: () => "Worlds start in calm <span class=\"onboarding-highlight-text\">monochrome</span>. The <span class=\"onboarding-highlight-text\">Chroma Lab</span>" + (appContext.uiManager.isMobile() ? ' under <span class="onboarding-highlight-text">Tools</span>' : '') + " can instead color each cell by <span class=\"onboarding-highlight-text\">which rule fired</span>. Start with <span class=\"onboarding-highlight-text\">Symmetry Groups</span> when you want to reveal a ruleset's hidden structure.",
         primaryAction: { text: 'Good to Know' },
         advanceOn: { type: 'click' }
     }, {
@@ -192,8 +243,7 @@ export const getTours = (appContext) => {
     const controls = [{
         element: () => appContext.uiManager.isMobile() ? '#mobileToolsFab' : '[data-tour-id="controls-button"]',
         title: 'Tutorial: Simulation Controls',
-        content: "This menu contains global controls for simulation speed, brush size, and interaction preferences.",
-        primaryAction: { text: 'Open Controls' },
+        content: "This menu contains global controls for simulation speed, brush size, and drawing behavior. Open the highlighted control to continue.",
         condition: () => !isViewOpen({ desktop: { type: 'popout', name: 'controls' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ControlsComponent }
@@ -208,7 +258,7 @@ export const getTours = (appContext) => {
     }, {
         element: '[id*="controls-brush-stepper"]',
         title: 'Brush Size',
-        content: "Set how many cells your brush paints &mdash; the preview shows the exact hex footprint and cell count. <br><br><b>Desktop Pro-Tip:</b> Use `Ctrl + Mouse Wheel` over the grid to adjust size on the fly.",
+        content: () => "Set how many cells your brush paints &mdash; the preview shows the exact hex footprint and cell count." + (appContext.uiManager.isMobile() ? '' : ' <br><br><b>Desktop shortcut:</b> Hold <kbd>Ctrl</kbd> and scroll over the grid.'),
         primaryAction: { text: 'Finish' },
         onBeforeShow: () => { if (!appContext.uiManager.isMobile()) showView({ desktop: { type: 'popout', name: 'controls' } }); },
         advanceOn: { type: 'click' }
@@ -217,10 +267,9 @@ export const getTours = (appContext) => {
     const ruleset_actions = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="ruleset-actions-button"]',
         title: 'Tutorial: Ruleset Actions',
-        content: "This panel is your laboratory for creating and discovering new rulesets. It allows you to generate, mutate, and load pre-existing rules.",
-        primaryAction: { text: 'Open Panel' },
+        content: "This panel is your laboratory for creating new rulesets. Use <span class=\"onboarding-highlight-text\">Generate</span> for a fresh rule or <span class=\"onboarding-highlight-text\">Mutate</span> to evolve the selected one. Open the highlighted panel to continue.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'rulesetactions' }, mobile: { view: 'build', segment: 'rules' } }),
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => prepareBuildLesson('rules'),
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="generate"]',
@@ -241,8 +290,7 @@ export const getTours = (appContext) => {
     const ruleset_library = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Tutorial: Ruleset Library',
-        content: "Load pre-discovered rulesets from the curated <span class=\"onboarding-highlight-text\">Library</span>, your own saved rules, or paste a ruleset's hex code <span class=\"onboarding-highlight-text\">Directly</span>.",
-        primaryAction: { text: 'Open Library' },
+        content: "Load curated rulesets, revisit your own saved rules, or paste a 32-character hex code <span class=\"onboarding-highlight-text\">Directly</span>. Open the highlighted Library to continue.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'library' }, mobile: { view: 'library' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
@@ -272,10 +320,9 @@ export const getTours = (appContext) => {
     const editor = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="edit-rule-button"]',
         title: 'Tutorial: The Ruleset Editor',
-        content: "This is the most powerful tool in the lab. It lets you directly edit the 128 fundamental rules of your universe.",
-        primaryAction: { text: 'Open Editor' },
+        content: "The editor lets you directly change the 128 local rules governing a world. Open the highlighted Editor to try one.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'build', segment: 'editor' } }),
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => prepareBuildLesson('editor'),
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetEditorComponent }
     }, {
         // Mobile hosts the editor inside the Build view (segment 'editor'), so the
@@ -284,7 +331,6 @@ export const getTours = (appContext) => {
         element: () => (appContext.uiManager.isMobile() ? '#build-mobile-view' : '#rulesetEditorPanel') + ' .r-sym-rule-viz',
         title: 'Toggling Outcomes',
         content: "The visualization shows a center cell and its six neighbors. The color of the <span class=\"onboarding-highlight-text\">inner-most hexagon</span> shows the rule's outcome. <span class=\"onboarding-highlight-text\">Simply click any rule</span> to flip its output state.",
-        primaryAction: { text: 'Click any Rule' },
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'ruleset' }, mobile: { view: 'build', segment: 'editor' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE }
     }, {
@@ -299,9 +345,8 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="setup-panel-button"]',
         title: 'Tutorial: World Setup',
         content: "Each of the nine universes can be configured independently. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel to manage them.",
-        primaryAction: { text: 'Open Panel' },
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => prepareBuildLesson('worlds'),
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
         element: '#world-setup-config-grid .world-config-cell:nth-child(5)',
@@ -321,14 +366,13 @@ export const getTours = (appContext) => {
         element: () => appContext.uiManager.isMobile() ? '#more-view [data-action="analyze"]' : '[data-tour-id="analysis-panel-button"]',
         title: 'Tutorial: Analysis Tools',
         content: "Beyond watching patterns, you can measure them. Open the <span class=\"onboarding-highlight-text\">Analysis</span> panel to see live metrics for the selected world. <br><br>On mobile it's <span class=\"onboarding-highlight-text\">Full Analysis</span>, in the <span class=\"onboarding-highlight-text\">More</span> menu (the gear icon).",
-        primaryAction: { text: 'Open Panel' },
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'analysis' }, mobile: { view: 'analyze' } }),
         onBeforeShow: () => { resetUIState(); showView({ mobile: { view: 'more' } }); },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === AnalysisComponent }
     }, {
-        element: '.plugins-mount-area',
+        element: '#enableSamplingMount',
         title: 'Live Metrics',
-        content: "The <span class=\"onboarding-highlight-text\">Activity Ratio</span> plot tracks the share of living cells over time, and the <span class=\"onboarding-highlight-text\">Entropy</span> plot measures how ordered or chaotic the world is. Stable lines often mean the automaton has settled; oscillations hint at engines and cycles. Enable <span class=\"onboarding-highlight-text\">entropy sampling</span> inside the plot to start measuring.",
+        content: "<span class=\"onboarding-highlight-text\">Activity Ratio</span> tracks how much of the world is alive. <span class=\"onboarding-highlight-text\">Entropy</span> measures order versus chaos; use the highlighted <span class=\"onboarding-highlight-text\">Enable Sampling</span> control to start it. Flat lines suggest settling, while repeating waves can reveal cycles.",
         primaryAction: { text: 'Finish' },
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'analysis' }, mobile: { view: 'analyze' } }),
         advanceOn: { type: 'click' }
@@ -355,15 +399,15 @@ export const getTours = (appContext) => {
     const patterns = [{
         element: () => appContext.uiManager.isMobile() ? '#more-view [data-action="patterns"]' : '[data-tour-id="patterns-button"]',
         title: 'Tutorial: Patterns',
-        content: "Copy and paste regions of cells, or capture a shape into your personal <span class=\"onboarding-highlight-text\">pattern library</span> and stamp it onto any world. <br><br>On mobile, Patterns lives in the <span class=\"onboarding-highlight-text\">More</span> menu (the gear icon) &mdash; opened for you here.",
-        primaryAction: { text: 'Open Patterns' },
+        content: "Copy and paste regions of cells, or save a shape in your personal <span class=\"onboarding-highlight-text\">pattern library</span> and stamp it onto any world. Open the highlighted Patterns tool to continue.",
         condition: () => !isViewOpen({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
         onBeforeShow: () => { resetUIState(); showView({ mobile: { view: 'more' } }); },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === PatternsComponent }
     }, {
         element: '#patterns-copy-button',
         title: 'Copy & Paste a Region',
-        content: "Click <span class=\"onboarding-highlight-text\">Copy Region</span>, then drag a box over active cells to grab them. <span class=\"onboarding-highlight-text\">Paste</span> drops the copy back onto the grid where you click. <br><br><b>Shortcuts:</b> <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy a region, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste.",
+        content: () => "Click <span class=\"onboarding-highlight-text\">Copy Region</span>, then drag a box over active cells to grab them. <span class=\"onboarding-highlight-text\">Paste</span> drops the copy back onto the grid where you click."
+            + (appContext.uiManager.isMobile() ? '' : ' <br><br><b>Shortcuts:</b> <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy a region, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste.'),
         primaryAction: { text: 'Next' },
         onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
         advanceOn: { type: 'click' }
@@ -377,7 +421,9 @@ export const getTours = (appContext) => {
     }, {
         element: '#patterns-list',
         title: 'Stamp Your Patterns',
-        content: "Saved patterns live here. Hit the <span class=\"onboarding-highlight-text\">place</span> icon to stamp one onto the grid &mdash; you can keep stamping repeatedly, and press <kbd>R</kbd> to rotate the stamp by 60°. The trash icon deletes a pattern.",
+        content: () => "Saved patterns live here. Hit the <span class=\"onboarding-highlight-text\">place</span> icon to stamp one onto the grid; you can keep stamping repeatedly."
+            + (appContext.uiManager.isMobile() ? '' : ' Press <kbd>R</kbd> to rotate the stamp by 60°.')
+            + ' The trash icon deletes a pattern.',
         primaryAction: { text: 'Finish' },
         onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'patterns' }, mobile: { view: 'patterns' } }),
         advanceOn: { type: 'click' }
@@ -386,8 +432,7 @@ export const getTours = (appContext) => {
     const explore = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="discover"]' : '[data-tour-id="explore-button"]',
         title: 'Tutorial: Auto-Explore',
-        content: "Let the Explorer hunt for you. Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span> near the edge of chaos, scoring and breeding the best automatically. <br><br>On mobile, it's the <span class=\"onboarding-highlight-text\">Discover</span> tab.",
-        primaryAction: { text: 'Open Auto-Explore' },
+        content: "Auto-Explore searches all nine worlds for <span class=\"onboarding-highlight-text\">interesting rulesets</span>, scoring and breeding promising candidates automatically. Open the highlighted tool; on mobile, this is the <span class=\"onboarding-highlight-text\">Discover</span> tab.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ExploreComponent }
@@ -399,7 +444,7 @@ export const getTours = (appContext) => {
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         advanceOn: { type: 'click' }
     }, {
-        element: '#explore-settings',
+        element: () => appContext.uiManager.isMobile() ? '.explore-advanced-summary' : '#explore-settings',
         title: 'Tune the Search',
         content: "Behind <span class=\"onboarding-highlight-text\">Advanced</span> you control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
         primaryAction: { text: 'Next' },
@@ -429,8 +474,7 @@ export const getTours = (appContext) => {
     const chromaLab = [{
         element: '#colorPanelButton',
         title: 'Tutorial: Chroma Lab',
-        content: "New worlds start in calm <span class=\"onboarding-highlight-text\">Monochrome</span> &mdash; just on/off cells, nothing to overwhelm you. But color is HexLife's most powerful lens: it can reveal <span class=\"onboarding-highlight-text\">which of the 128 rules fired</span> in every cell. The <span class=\"onboarding-highlight-text\">Chroma Lab</span> is where you turn that lens on.",
-        primaryAction: { text: 'Open Chroma Lab' },
+        content: "New worlds start in calm <span class=\"onboarding-highlight-text\">Monochrome</span>. Chroma Lab can instead reveal <span class=\"onboarding-highlight-text\">which of the 128 rules fired</span> in every cell. Open the highlighted palette to turn that lens on.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'chromalab' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === ChromaLabComponent }
@@ -442,16 +486,16 @@ export const getTours = (appContext) => {
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
         advanceOn: { type: 'click' }
     }, {
-        element: '#chroma-preset-section',
+        element: '#chroma-preset-section [data-preset="monochrome"]',
         title: 'Preset Palettes',
         content: "Ready-made looks &mdash; <span class=\"onboarding-highlight-text\">hover any card to preview it live</span> on your worlds, click to keep it. <span class=\"onboarding-highlight-text\">Monochrome</span> (the default) keeps things quiet; <span class=\"onboarding-highlight-text\">Default Spectrum</span> gives every rule its own hue so structure pops; <span class=\"onboarding-highlight-text\">Viridis</span> and <span class=\"onboarding-highlight-text\">Cividis</span> are colorblind-safe ramps. Keep the <span class=\"onboarding-highlight-text\">birth/death flash guard</span> on for busy rulesets &mdash; your choice is saved automatically.",
         primaryAction: { text: 'Show me Symmetry Groups' },
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('preset'); },
         advanceOn: { type: 'click' }
     }, {
-        element: '#chroma-symmetry-section',
+        element: '#chroma-symmetry-section .color-group',
         title: 'Symmetry Groups &mdash; the big idea',
-        content: "A cell has six neighbors, so many of the 128 rules are really the <i>same pattern rotated</i>. HexLife bundles each pattern with all its rotations into a <span class=\"onboarding-highlight-text\">symmetry group</span> &mdash; the little hex diagram shows the pattern and <span class=\"onboarding-highlight-text\">Orbit</span> is how many rotations belong to it. Color a group once and <i>every</i> rotation of it lights up the same, so the grid <span class=\"onboarding-highlight-text\">visually reveals which rule families your ruleset actually uses</span>. The <span class=\"onboarding-highlight-text\">Cell OFF / Cell ON</span> columns set the color for a dead vs. living center cell &mdash; click any swatch to recolor that whole family.",
+        content: "Each row is one rule pattern plus all its rotations: a <span class=\"onboarding-highlight-text\">symmetry group</span>. The hex shows the pattern; <span class=\"onboarding-highlight-text\">Orbit</span> says how many rotations it represents. Its paired swatches color outcomes that turn the cell <span class=\"onboarding-highlight-text\">off</span> or <span class=\"onboarding-highlight-text\">on</span>. Recoloring a family makes its use visible across the whole world.",
         primaryAction: { text: 'Next' },
         onBeforeShow: () => { showView({ desktop: { type: 'panel', name: 'chromalab' } }); setChromaMode('symmetry'); },
         advanceOn: { type: 'click' }
@@ -495,22 +539,25 @@ export const getTours = (appContext) => {
         title: 'Reset Worlds',
         content: "<span class=\"onboarding-highlight-text\">Reset</span> re-seeds the grid with new random cells according to each world's configured density. It's like starting a new petri dish culture.",
         primaryAction: { text: 'Next' },
+        onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'resetClear' } }),
         advanceOn: { type: 'click' }
     }, {
         element: '[data-tour-id="reset-clear-popout"] #clearAllButtonPopout',
         title: 'Clear Worlds',
         content: "<span class=\"onboarding-highlight-text\">Clear</span> sets all cells to inactive (or active, if already clear). It's like sterilizing the dish before an experiment.",
         primaryAction: { text: 'Finish' },
+        onBeforeShow: () => showView({ desktop: { type: 'popout', name: 'resetClear' } }),
         advanceOn: { type: 'click' }
     }];
 
     const saveLoad = [{
         element: () => appContext.uiManager.isMobile() ? '#mobileGearButton' : '[data-tour-id="snapshots-button"]',
         title: 'Tutorial: Save, Load & Share',
-        content: 'Preserve your discoveries and share them with others. On desktop, saving and loading live in the <span class="onboarding-highlight-text">Snapshots</span> panel; on mobile they are in the <span class="onboarding-highlight-text">More</span> menu behind this gear icon.',
-        primaryAction: { text: 'Next' },
+        content: () => appContext.uiManager.isMobile()
+            ? 'Preserve your discoveries and share them with others. Open the highlighted <span class="onboarding-highlight-text">More</span> menu to find Save, Load, and Share.'
+            : 'Preserve your discoveries and share them with others. Open the highlighted <span class="onboarding-highlight-text">Snapshots</span> panel to find Save, Load, and Share.',
         onBeforeShow: resetUIState,
-        advanceOn: { type: 'click' }
+        advanceOn: { type: 'click', target: 'element' }
     }, {
         element: () => appContext.uiManager.isMobile() ? '[data-action="save"]' : '[data-tour-id="save-state-button"]',
         title: 'Save World State',
@@ -527,7 +574,7 @@ export const getTours = (appContext) => {
     }, {
         element: () => appContext.uiManager.isMobile() ? '[data-action="share"]' : '[data-tour-id="share-button"]',
         title: 'Share Setup',
-        content: "This generates a <span class=\"onboarding-highlight-text\">unique URL</span> that encodes your current ruleset and camera position, perfect for sharing a cool discovery with others.",
+        content: "This copies a <span class=\"onboarding-highlight-text\">shareable URL</span> for the full nine-world setup: rulesets, starting conditions, enabled worlds, grid size, selection, and camera. It recreates the recipe, not the exact cells after they have evolved.",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }];
@@ -560,10 +607,17 @@ export const getTours = (appContext) => {
         // a `:nth-child(N)` here breaks the moment the library is reordered.
         element: GLIDERS_LOAD_BTN,
         title: "Step 3: Load 'Spontaneous Gliders'",
-        content: "This ruleset produces interesting mobile patterns. Find it in the list and press <span class=\"onboarding-highlight-text\">'Load Ruleset'</span>. This will apply its laws to all nine universes and reset them.",
+        content: "This ruleset produces mobile patterns. Press its highlighted <span class=\"onboarding-highlight-text\">Load Ruleset</span> button. Loading it into the selected world is enough; the mutation step will copy that parent to all nine worlds later.",
         //primaryAction: { text: 'Load the Ruleset' },
-        onBeforeShow: (_step) => { document.querySelector(GLIDERS_LOAD_BTN)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
-        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_RULESET }
+        onBeforeShow: revealGlidersLibraryEntry,
+        // Library "Paired start" legitimately uses COMMAND_APPLY_EXPLORE_FIND
+        // instead of COMMAND_SET_RULESET. Gate on the shared result so either
+        // user preference completes the lesson.
+        advanceOn: {
+            type: 'event',
+            eventName: EVENTS.RULESET_CHANGED,
+            condition: (hex) => hex === '12482080480080006880800180010117'
+        }
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'Step 4: Observe',
@@ -578,6 +632,7 @@ export const getTours = (appContext) => {
         title: 'Step 5: Control Your Variables',
         content: "For a good experiment, we need consistent starting conditions. Open the <span class=\"onboarding-highlight-text\">World Setup</span> panel.",
         //primaryAction: { text: 'Open World Setup' },
+        onBeforeShow: () => prepareBuildLesson('worlds'),
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === WorldSetupComponent }
     }, {
         element: '#minimap-guide',
@@ -589,34 +644,38 @@ export const getTours = (appContext) => {
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED, condition: (worldIndex) => worldIndex === 4 }
     }, {
         element: () => '#world-setup-config-grid .world-config-cell:nth-child(5) [data-action="edit-state"]',
-        title: "Step 7: Configure Central World's Random Fill",
-        content: "Now click 'Edit...' for the central world (World 4) to open the initial state modal. In the modal, ensure <span class=\"onboarding-highlight-text\">'Random fill'</span> mode is selected and set the <span class=\"onboarding-highlight-text\">Fill amount</span> slider to 50% (or pick the <span class=\"onboarding-highlight-text\">'Balanced'</span> preset). Then save the changes.",
-        //primaryAction: { text: 'Configure Density' },
+        title: "Step 7: Open World 4's Initial State",
+        content: "Click <span class=\"onboarding-highlight-text\">Edit&hellip;</span> on the central world's card.",
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
+        advanceOn: { type: 'click', target: 'element' }
+    }, {
+        element: '#initial-state-config-modal .isc-mode-toggle',
+        title: 'Step 8: Choose a Balanced Random Fill',
+        content: "Choose <span class=\"onboarding-highlight-text\">Random fill</span>, select the <span class=\"onboarding-highlight-text\">Balanced</span> preset (50%), then press <span class=\"onboarding-highlight-text\">Save</span>.",
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SET_WORLD_INITIAL_STATE, condition: (data) => (data.worldIndex === 4 && data.initialState?.mode === 'density' && data.initialState?.params?.density > 0.49 && data.initialState?.params?.density < 0.51) }
     }, {
         element: () => '#world-setup-panel-actions [data-action="apply-state-all"]',
-        title: 'Step 8: Copy Selected &rarr; All',
+        title: 'Step 9: Copy Selected &rarr; All',
         content: "Now click <span class=\"onboarding-highlight-text\">'Copy Selected &rarr; All'</span> to set the same 50% Random fill configuration across all worlds, creating a level playing field for our mutations.",
         // Re-assert the panel so the button is present and gets highlighted.
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTED_INITIAL_STATE_TO_ALL }
     }, {
         element: () => '#world-setup-panel-actions [data-action="reset-all-worlds"]',
-        title: 'Step 9: Reset Worlds',
+        title: 'Step 10: Reset Worlds',
         content: "Finally, click <span class=\"onboarding-highlight-text\">'Regenerate All Worlds'</span> to re-seed all worlds with the new initial Random fill settings.",
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'worldsetup' }, mobile: { view: 'build', segment: 'worlds' } }),
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_RESET_ALL_WORLDS_TO_INITIAL_DENSITIES }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="build"]' : '[data-tour-id="ruleset-actions-button"]',
-        title: 'Step 10: Prepare for Mutation',
+        title: 'Step 11: Prepare for Mutation',
         content: "It's time to evolve our ruleset. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel again.",
         //primaryAction: { text: 'Open Ruleset Actions' },
-        onBeforeShow: resetUIState,
+        onBeforeShow: () => prepareBuildLesson('rules'),
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetActionsComponent }
     }, {
         element: '[data-pane="mutate"]',
-        title: 'Step 11: Access the DNA Splicer',
+        title: 'Step 12: Access the DNA Splicer',
         content: "Select the <span class=\"onboarding-highlight-text\">Mutate</span> tab.",
         // Same as Step 2: skip when Mutate is already the active tab, otherwise
         // advance on the user clicking the highlighted tab itself.
@@ -624,11 +683,11 @@ export const getTours = (appContext) => {
         onBeforeShow: () => showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'build', segment: 'rules'} }),
         advanceOn: { type: 'click', target: 'element' }
     }, {
-        // Highlight the whole mutate pane (not just the button) so the rate
-        // slider and mode radios are inside the interactive hole — the spotlight
-        // is modal, so a button-only highlight blocked the user from adjusting them.
-        element: () => '#ruleset-actions-mutate-pane',
-        title: 'Step 12: Run the Experiment',
+        // Keep the actionable Clone & Mutate row clear of the tooltip. The
+        // surrounding panel/view is elevated as one surface, so the optional
+        // rate and mode controls remain interactive too.
+        element: () => '#ruleset-actions-mutate-pane .ruleset-secondary-actions',
+        title: 'Step 13: Run the Experiment',
         content: "We've preset the recommended <span class=\"onboarding-highlight-text\">R-Sym</span> mode and a <span class=\"onboarding-highlight-text\">~10% Mutation Rate</span> &mdash; the sweet spot for evolving structured rules. Tweak them if you like, then press <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> to copy our 'Gliders' ruleset to all nine worlds and mutate each copy uniquely.",
         onBeforeShow: () => {
             showView({ desktop: {type: 'panel', name: 'rulesetactions'}, mobile: {view: 'build', segment: 'rules'} });
@@ -644,24 +703,34 @@ export const getTours = (appContext) => {
     }, {
         element: '#minimap-guide',
         highlightType: 'canvas',
-        title: 'Step 13: Observe and Select',
+        title: 'Step 14: Observe and Select',
         content: "The experiment is running! Each world is now a slightly different version of the original. <span class=\"onboarding-highlight-text\">Observe the minimap and select a world</span> that looks interesting to you.",
         onBeforeShow: () => { showView({ mobile: {view: 'watch'} }); },
         //primaryAction: { text: 'Select a World' },
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        showMe: { text: 'Choose another world for me', action: showMeSelectWorld, after: 5000 },
         delayAfter: 800
     }, {
-        element: '[data-tour-id="ruleset-actions-button"]',
-        title: 'Step 14: Evolve Again!',
-        condition: (appContext) => !appContext.uiManager.isMobile(),
-        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Open the <span class=\"onboarding-highlight-text\">Ruleset Actions</span> panel and press <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again to evolve from your new selection. <br><br>Pro-tip: Press <span class=\"onboarding-highlight-text\">'M'</span> to quickly Clone & Mutate again.",
-        primaryAction: { text: 'Finish Mission' },
-        advanceOn: { type: 'click' }
+        element: () => appContext.uiManager.isMobile()
+            ? '#mobile-fab-container-left'
+            : '#ruleset-actions-mutate-pane .ruleset-secondary-actions',
+        title: 'Step 15: Evolve Again!',
+        content: () => appContext.uiManager.isMobile()
+            ? "You've selected a promising specimen. Tap <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> in the highlighted quick actions to make it the parent of the next generation."
+            : "You've selected a promising new specimen. Press <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> again to evolve from your new selection. <br><br>Shortcut: press <kbd>M</kbd>.",
+        onBeforeShow: () => {
+            if (!appContext.uiManager.isMobile()) {
+                showView({ desktop: {type: 'panel', name: 'rulesetactions'} });
+                document.querySelector('[data-pane="mutate"]')?.click();
+            }
+        },
+        advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        showMe: { text: 'Mutate again for me', action: showMeCloneAndMutate, after: 4000 },
+        delayAfter: 1000
     }, {
-        element: '[title="Clone & Mutate"]',
-        title: 'Step 14: Evolve Again!',
-        condition: (appContext) => appContext.uiManager.isMobile(),
-        content: "You've selected a promising new specimen. Let's make it the basis for the next generation. Use this <span class=\"onboarding-highlight-text\">Quick Action Button</span> to quickly <span class=\"onboarding-highlight-text\">Clone & Mutate</span> again.",
+        element: 'body',
+        title: 'Mission Complete',
+        content: "You just ran the full loop: <span class=\"onboarding-highlight-text\">load a baseline, control the starting conditions, mutate, observe, and select</span>. Repeat from any promising world to keep steering the next generation.",
         primaryAction: { text: 'Finish Mission' },
         advanceOn: { type: 'click' }
     },
@@ -670,15 +739,14 @@ export const getTours = (appContext) => {
     const personal_library = [{
         element: 'body',
         title: 'Mission: Chronicle Your Discoveries',
-        content: "You've created a unique universe! This mission teaches you how to save its ruleset to your personal library so you never lose it.",
+        content: "We've flipped one rule in the selected world to make a new, unsaved specimen. (Your original is still one Undo step away.) Now you'll name it, save it, and find it again.",
         primaryAction: { text: 'Begin Mission' },
-        onBeforeShow: resetUIState,
+        onBeforeShow: preparePersonalDiscovery,
         advanceOn: { type: 'click' }
     }, {
         element: () => appContext.uiManager.isMobile() ? '[data-action="save-ruleset-mobile"]' : '#saveRulesetButton',
         title: 'Step 1: Save the Ruleset',
-        content: "This star icon (<span class=\"inline-icon\">" + ICONS.star + "</span>) shows the status of the current ruleset. Since it's an outline, it's unsaved. Click the <span class=\"onboarding-highlight-text\">Save button</span> to add it to your personal collection.",
-        primaryAction: { text: 'Click the Star' },
+        content: "This star icon (<span class=\"inline-icon\">" + ICONS.star + "</span>) shows the status of the current ruleset. Since it's an outline, it's unsaved. Click the highlighted <span class=\"onboarding-highlight-text\">Save Ruleset</span> control to add it to your personal collection.",
         onBeforeShow: () => {
             if (appContext.uiManager.isMobile()) {
                 showView({ mobile: { view: 'more' } });
@@ -686,16 +754,14 @@ export const getTours = (appContext) => {
         },
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL }
     }, {
-        element: '#save-ruleset-modal',
+        element: '#ruleset-name-input',
         title: 'Step 2: Name Your Creation',
-        content: "Every great discovery deserves a name. Give your ruleset a memorable <span class=\"onboarding-highlight-text\">Name</span> and an optional description.",
-        primaryAction: { text: 'Save It!' },
+        content: "Give your ruleset a memorable <span class=\"onboarding-highlight-text\">name</span>, add any optional details you want, then press <span class=\"onboarding-highlight-text\">Save</span>.",
         advanceOn: { type: 'event', eventName: EVENTS.USER_RULESET_SAVED }
     }, {
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Step 3: Visit Your Library',
         content: "Excellent! The star is now gold, indicating you've saved it. Let's see your collection. Open the <span class=\"onboarding-highlight-text\">Ruleset Library</span>. <br><br>On mobile, it's the <span class=\"onboarding-highlight-text\">Library</span> tab.",
-        primaryAction: { text: 'Open Library' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
         element: '[data-source-filter="personal"]',
@@ -732,14 +798,17 @@ export const getTours = (appContext) => {
         onBeforeShow: startExperiment,
         advanceOn: { type: 'click' }
     }, {
-        element: '#minimap-guide',
-        highlightType: 'canvas',
+        element: () => appContext.uiManager.isMobile() ? '#mobile-fab-container-left' : '#minimap-guide',
+        highlightType: () => appContext.uiManager.isMobile() ? undefined : 'canvas',
         title: 'Step 1: Mutate',
-        content: "Press <span class=\"onboarding-highlight-text\">M</span> to run <b>Clone &amp; Mutate</b>: the selected world's ruleset is copied into all nine worlds, then each copy is nudged by a small random mutation. <br><br>On mobile, tap the <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> quick-action button. Watch the minimap &mdash; all nine worlds change at once.",
-        onBeforeShow: () => { showView({ mobile: { view: 'simulate' } }); },
+        content: () => appContext.uiManager.isMobile()
+            ? "Tap the <span class=\"inline-icon\">" + ICONS.copyPlus + "</span> <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> quick action. The selected ruleset is copied to all nine worlds, then each copy gets a small random mutation."
+            : "Press <kbd>M</kbd> to run <b>Clone &amp; Mutate</b>. The selected ruleset is copied to all nine worlds, then each copy gets a small random mutation. Watch the minimap change.",
+        onBeforeShow: () => { showView({ mobile: { view: 'watch' } }); },
         // Let the freshly-mutated grid render before advancing — all nine worlds
         // change at once and that change is the whole point of the step.
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        showMe: { text: 'Mutate for me', action: showMeCloneAndMutate, after: 4000 },
         delayAfter: 1000
     }, {
         element: '#minimap-guide',
@@ -747,13 +816,17 @@ export const getTours = (appContext) => {
         title: 'Step 2: Observe & Select',
         content: "Each of the nine worlds now runs a slightly different ruleset. Scan them and <span class=\"onboarding-highlight-text\">click the world that looks most alive</span> to you &mdash; the busiest, the most structured, the strangest. That choice is your selection pressure.",
         advanceOn: { type: 'event', eventName: EVENTS.SELECTED_WORLD_CHANGED },
+        showMe: { text: 'Choose another world for me', action: showMeSelectWorld, after: 5000 },
         delayAfter: 800
     }, {
-        element: '#minimap-guide',
-        highlightType: 'canvas',
+        element: () => appContext.uiManager.isMobile() ? '#mobile-fab-container-left' : '#minimap-guide',
+        highlightType: () => appContext.uiManager.isMobile() ? undefined : 'canvas',
         title: 'Step 3: Repeat',
-        content: "Now press <span class=\"onboarding-highlight-text\">M</span> again. Your chosen world becomes the new parent, and nine fresh mutations of <i>it</i> fill the grid. Do this a few times and you're breeding rulesets &mdash; each generation drifts toward whatever you keep picking.",
+        content: () => appContext.uiManager.isMobile()
+            ? "Tap <span class=\"inline-icon\">" + ICONS.copyPlus + "</span> <span class=\"onboarding-highlight-text\">Clone &amp; Mutate</span> again. Your chosen world becomes the parent of nine fresh variations."
+            : "Press <kbd>M</kbd> again. Your chosen world becomes the parent of nine fresh variations.",
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_CLONE_AND_MUTATE },
+        showMe: { text: 'Mutate again for me', action: showMeCloneAndMutate, after: 4000 },
         delayAfter: 1000
     }, {
         element: 'body',
@@ -784,12 +857,12 @@ export const getTours = (appContext) => {
         },
         advanceOn: { type: 'click' }
     }, {
-        element: 'body',
+        element: '#interaction-mode-toggle',
         title: 'Switch to Draw Mode',
-        condition: (appContext) => appContext.uiManager.isMobile(),
-        content: "On mobile you paint cells in draw mode. <span class=\"onboarding-highlight-text\">Tap the hand icon (&#128075;)</span> to switch to draw mode, then continue. <br><br>On desktop you're already in draw mode.",
-        primaryAction: { text: 'Continue' },
-        advanceOn: { type: 'click' }
+        condition: (appContext) => appContext.uiManager.isMobile() && appContext.interactionController.getMode() !== 'draw',
+        content: "Tap the highlighted <span class=\"onboarding-highlight-text\">hand</span>. It changes to a pencil when drawing is active.",
+        advanceOn: { type: 'event', eventName: EVENTS.INTERACTION_MODE_CHANGED, condition: (mode) => mode === 'draw' },
+        showMe: { text: 'Switch for me', action: showMeDrawMode }
     }, {
         element: '#selected-world-guide',
         highlightType: 'canvas',
@@ -797,19 +870,23 @@ export const getTours = (appContext) => {
         content: "<span class=\"onboarding-highlight-text\">Click and drag (or touch and drag)</span> on the main view to paint living cells onto the blank grid. A small cluster is plenty &mdash; the rules do the rest.",
         // Brush event fires on the first cell — hold so the seeded cluster is visible.
         advanceOn: { type: 'event', eventName: EVENTS.COMMAND_APPLY_SELECTIVE_BRUSH },
+        showMe: { text: 'Draw a spark for me', action: showMeDraw },
         delayAfter: 1200
     }, {
         element: () => appContext.uiManager.isMobile() ? '#mobilePlayPauseButton' : '[data-tour-id="play-pause-button"]',
         title: 'Step 2: Start Time',
-        content: "Now press <span class=\"onboarding-highlight-text\">P</span> (or the Play button) to start the universal clock and watch your spark evolve under the current ruleset.",
+        content: () => appContext.uiManager.isMobile()
+            ? 'Tap the highlighted <span class="onboarding-highlight-text">Play</span> button to start the universal clock and watch your spark evolve.'
+            : 'Press <kbd>P</kbd> (or the highlighted Play button) to start the universal clock and watch your spark evolve.',
         condition: (appContext) => appContext.simulationController.getIsPaused(),
         // Linger so the spark visibly begins to evolve before the closing step.
         advanceOn: { type: 'event', eventName: EVENTS.SIMULATION_PAUSED, condition: (isPaused) => !isPaused },
+        showMe: { text: 'Start time for me', action: showMePlay },
         delayAfter: 1500
     }, {
         element: 'body',
         title: 'State + Rules = Behavior',
-        content: "That's the foundation: the cells you drew are the <span class=\"onboarding-highlight-text\">state</span>, and the ruleset decides how that state changes each tick. Try clearing again (<span class=\"onboarding-highlight-text\">C</span>) and seeding a different shape &mdash; the same rules can treat it completely differently.",
+        content: "That's the foundation: the cells you drew are the <span class=\"onboarding-highlight-text\">state</span>, and the ruleset decides how that state changes each tick. Repeat the experiment with a different starting shape &mdash; the same rules can treat it completely differently.",
         primaryAction: { text: 'Finish Experiment' },
         advanceOn: { type: 'click' }
     }];

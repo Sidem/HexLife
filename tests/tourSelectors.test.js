@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getTours, TOUR_CATALOG } from '../src/ui/tourSteps.js';
+import { OnboardingManager } from '../src/ui/OnboardingManager.js';
 
 /**
  * #36a — the tour-selector guard.
@@ -231,6 +232,60 @@ describe('TOUR_CATALOG ↔ tour registry', () => {
     it('ids are unique', () => {
         const ids = TOUR_CATALOG.map((t) => t.id);
         expect(new Set(ids).size).toBe(ids.length);
+    });
+});
+
+describe('tour interaction semantics', () => {
+    it('the segmented mobile Build view emits the same open transition as other views', () => {
+        const buildViewSource = fs.readFileSync(
+            path.join(REPO_ROOT, 'src', 'ui', 'views', 'BuildView.js'),
+            'utf8',
+        );
+        expect(buildViewSource).toMatch(
+            /_mountActiveSegment[\s\S]*EventBus\.dispatch\(EVENTS\.VIEW_SHOWN,[\s\S]*contentComponentType:\s*segment\.componentType/,
+        );
+    });
+
+    it('event-gated steps never render a fake navigation action', () => {
+        const failures = [];
+        for (const isMobile of [false, true]) {
+            const tours = getTours(makeAppContext(isMobile));
+            for (const [tourId, steps] of Object.entries(tours)) {
+                steps.forEach((step, index) => {
+                    if (step.advanceOn?.type === 'event' && step.primaryAction?.text) {
+                        failures.push(`${isMobile ? 'mobile' : 'desktop'} ${tourId}[${index}] "${step.title}"`);
+                    }
+                });
+            }
+        }
+        expect(failures, `event-gated steps with dead primary buttons:\n${failures.join('\n')}`).toEqual([]);
+    });
+
+    it('the manager only treats click-advanced steps as primary-button navigation', () => {
+        const hasPrimary = OnboardingManager.prototype._hasPrimaryAction;
+        expect(hasPrimary({ advanceOn: { type: 'click' }, primaryAction: { text: 'Next' } })).toBe(true);
+        expect(hasPrimary({ advanceOn: { type: 'event' }, primaryAction: { text: 'Dead button' } })).toBe(false);
+        expect(hasPrimary({ advanceOn: { type: 'event' } })).toBe(false);
+    });
+
+    it('the non-obvious hands-on gates have a working Show me escape hatch', () => {
+        const tours = getTours(makeAppContext(false));
+        const required = [
+            ['core', 'The Flow of Time'],
+            ['core', 'The Observation Deck'],
+            ['core', 'Draw on the Grid'],
+            ['evolutionLoop', 'Step 1: Mutate'],
+            ['evolutionLoop', 'Step 2: Observe & Select'],
+            ['evolutionLoop', 'Step 3: Repeat'],
+            ['sparkOfLife', 'Step 1: Seed a Spark'],
+            ['sparkOfLife', 'Step 2: Start Time'],
+            ['appliedEvolution', 'Step 14: Observe and Select'],
+            ['appliedEvolution', 'Step 15: Evolve Again!'],
+        ];
+        for (const [tourId, title] of required) {
+            const step = tours[tourId].find((candidate) => candidate.title === title);
+            expect(typeof step?.showMe?.action, `${tourId}: ${title}`).toBe('function');
+        }
     });
 });
 

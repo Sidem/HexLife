@@ -23,13 +23,22 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Added
+
+- **Ruleset relatives and family naming.** Saving a ruleset now shows its nearest named relatives in
+  the strictest shared constraint space and can continue a family name with Roman-numeral suffixes.
+
 ### Changed
 
+- **The curated library grew from 39 to 73 rulesets.** Public and personal entries now share one
+  source-filtered list, and duplicate personal copies of built-in rules can be removed safely.
 - **The keyboard shortcut viewer now uses the space it is given.** Resizing its desktop panel grows
   the keyboard in both directions; modifier layers now distinguish Ctrl from Ctrl+Shift; search
   spans keys, actions, categories, and every layer; and the categorized fallback is available from
   mobile More Options. `V` remains the Flat/3D Torus toggle, while recording moves to `Shift+V`
   (start/stop) and `Ctrl+Shift+V` (pause/resume) to remove the previous duplicate binding.
+- **Torus-aware capture and re-centering.** Capture Studio now exports the active 3D projection, and
+  hold-`H` wrap-around shifting works without losing the orbit strategy.
 
 ## [1.1.0] — 2026-07-27
 
