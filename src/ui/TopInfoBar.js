@@ -30,8 +30,6 @@ export class TopInfoBar {
             statActualTps: document.getElementById('stat-actual-tps'),
             statTargetTps: document.getElementById('stat-target-tps'),
             statTpsBar: document.getElementById('stat-tps-bar'),
-            undoButton: document.getElementById('undoButton'),
-            redoButton: document.getElementById('redoButton'),
             historyButton: document.getElementById('historyButton'),
             historyPopout: document.getElementById('historyPopout'),
             rulesetDisplayContainer: document.getElementById('rulesetDisplayContainer'),
@@ -50,17 +48,15 @@ export class TopInfoBar {
         // source — the weakest one (not reliably announced, never shown on keyboard focus).
         // Promote each icon-only control's title to an explicit aria-label.
         for (const el of [this.uiElements.historyButton, this.uiElements.saveRulesetButton,
-            this.uiElements.undoButton, this.uiElements.redoButton, this.uiElements.appMenuButton]) {
+            this.uiElements.appMenuButton]) {
             if (el && el.title && !el.getAttribute('aria-label')) el.setAttribute('aria-label', el.title);
         }
 
-        this._buildRuleDeck();
         this._setupEventListeners();
 
         this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex());
         this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
         this.updateBrushSizeDisplay(this.appContext.brushController.getBrushSize());
-        this.updateUndoRedoButtons();
         this.applyShowPerformance(this.appContext.visualizationController.getShowPerformance());
         if (this.uiElements?.statTargetTps) {
             this.uiElements.statTargetTps.textContent = String(this.appContext.simulationController.getSpeed());
@@ -89,78 +85,12 @@ export class TopInfoBar {
         this.updateSaveStatus(this.worldManager.getCurrentRulesetHex());
     }
 
-    /**
-     * Builds the always-visible "rule deck" — the core creative loop (Surprise /
-     * Generate / Mutate) docked beside the ruleset identity so the 90% action never
-     * needs a panel. Desktop-only (mobile keeps its FAB stack); hidden via CSS there.
-     * @private
-     */
-    _buildRuleDeck() {
-        const container = this.uiElements.rulesetDisplayContainer;
-        const anchor = this.uiElements.saveRulesetButton;
-        if (!container || !anchor) return;
-
-        const deck = document.createElement('div');
-        deck.className = 'ruleset-deck-controls';
-        deck.setAttribute('data-tour-id', 'rule-deck');
-
-        const makeBtn = (id, iconSvg, label, tourId) => {
-            const b = document.createElement('button');
-            b.id = id;
-            b.className = 'button-icon rule-deck-button';
-            b.innerHTML = iconSvg;
-            b.title = label;
-            b.setAttribute('aria-label', label);
-            if (tourId) b.setAttribute('data-tour-id', tourId);
-            deck.appendChild(b);
-            return b;
-        };
-
-        // Surprise Me leads the deck as the hero action. It is dispatched on click
-        // only — it never auto-fires and does not touch the onboarding tour.
-        const surpriseBtn = makeBtn('ruleDeckSurprise', ICONS.wand,
-            'Surprise me — fresh random rule on all 9 worlds, then play', 'surprise-me-button');
-        surpriseBtn.classList.add('rule-deck-surprise');
-        const generateBtn = makeBtn('ruleDeckGenerate', ICONS.sparkles, 'Generate a new ruleset (G)');
-        const cloneMutateBtn = makeBtn('ruleDeckCloneMutate', ICONS.copyPlus, 'Clone & mutate other worlds (M)');
-
-        container.insertBefore(deck, anchor);
-
-        surpriseBtn.addEventListener('click', () => this._surpriseMe());
-        generateBtn.addEventListener('click', () => {
-            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_GENERATE_RULESET);
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Generated new ruleset' });
-        });
-        cloneMutateBtn.addEventListener('click', () => {
-            EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Cloned ruleset to all worlds & mutated others' });
-        });
-    }
-
-    /**
-     * One-click "wow": generate a fresh random ruleset across all 9 worlds, reseed,
-     * and start playing — independent of the user's saved scope / auto-reset settings,
-     * so it behaves identically on a brand-new visit.
-     * @private
-     */
-    _surpriseMe() {
-        EventBus.dispatch(EVENTS.COMMAND_GENERATE_RANDOM_RULESET, {
-            bias: Math.random(),
-            generationMode: 'r_sym',
-            applyScope: 'all',
-            shouldReset: true
-        });
-        EventBus.dispatch(EVENTS.COMMAND_SET_PAUSE_STATE, false);
-        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: '✨ Surprise! New random rule on all worlds.', type: 'success' });
-    }
-
     _setupEventListeners() {
         EventBus.subscribe(EVENTS.RULESET_CHANGED, (hex) => {
             this.updateMainRulesetDisplay(hex);
             this.updateSaveStatus(hex);
         });
         EventBus.subscribe(EVENTS.RULESET_VISUALIZATION_CHANGED, () => this.updateMainRulesetDisplay(this.worldManager.getCurrentRulesetHex()));
-        EventBus.subscribe(EVENTS.HISTORY_CHANGED, () => this.updateUndoRedoButtons());
         EventBus.subscribe(EVENTS.WORLD_STATS_UPDATED, (stats) => this.updateStatsDisplay(stats));
         EventBus.subscribe(EVENTS.ALL_WORLDS_RESET, () => this.updateStatsDisplay(this.worldManager.getSelectedWorldStats()));
         // The status chip depends on pause state, and WORLD_STATS_UPDATED stops arriving while
@@ -173,20 +103,8 @@ export class TopInfoBar {
             const hex = this.worldManager.getCurrentRulesetHex();
             this.updateMainRulesetDisplay(hex);
             this.updateStatsDisplay(this.worldManager.getSelectedWorldStats());
-            this.updateUndoRedoButtons();
             this.updateSaveStatus(hex);
         });
-        if (this.uiElements.undoButton) {
-            this.uiElements.undoButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_UNDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
-            });
-        }
-    
-        if (this.uiElements.redoButton) {
-            this.uiElements.redoButton.addEventListener('click', () => {
-                EventBus.dispatch(EVENTS.COMMAND_REDO_RULESET, { worldIndex: this.worldManager.getSelectedWorldIndex() });
-            });
-        }
         this.uiElements.historyButton?.addEventListener('click', () => this.popoutPanels.history.toggle());
         
         if (!this.appContext.uiManager.isMobile()) {
@@ -337,15 +255,6 @@ export class TopInfoBar {
         }
     }
     
-    updateUndoRedoButtons() {
-        if (!this.worldManager || !this.uiElements.undoButton) return;
-        const selectedIndex = this.worldManager.getSelectedWorldIndex();
-        const { history, future } = this.worldManager.getRulesetHistoryArrays(selectedIndex);
-
-        this.uiElements.undoButton.disabled = history.length <= 1;
-        this.uiElements.redoButton.disabled = future.length === 0;
-    }
-
     updateSaveStatus(hex) {
         if (!hex || hex === "N/A" || hex === "Error") {
             this.uiElements.saveRulesetButton.classList.add('hidden');

@@ -476,9 +476,9 @@ export const getTours = (appContext) => {
         },
         advanceOn: { type: 'click' }
     }, {
-        element: '#undoButton',
+        element: '#historyButton',
         title: 'Undo & Redo',
-        content: "These buttons step backward and forward through the history. <br><br><b>Shortcuts:</b> <span class=\"onboarding-highlight-text\">Ctrl+Z</span> to undo, <span class=\"onboarding-highlight-text\">Ctrl+Shift+Z</span> to redo.",
+        content: "Use the history list to jump back to any recorded ruleset. For quick steps, press <span class=\"onboarding-highlight-text\">Ctrl+Z</span> to undo or <span class=\"onboarding-highlight-text\">Ctrl+Shift+Z</span> to redo.",
         primaryAction: { text: 'Finish' },
         advanceOn: { type: 'click' }
     }];
