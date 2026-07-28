@@ -23,6 +23,14 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Changed
+
+- **The keyboard shortcut viewer now uses the space it is given.** Resizing its desktop panel grows
+  the keyboard in both directions; modifier layers now distinguish Ctrl from Ctrl+Shift; search
+  spans keys, actions, categories, and every layer; and the categorized fallback is available from
+  mobile More Options. `V` remains the Flat/3D Torus toggle, while recording moves to `Shift+V`
+  (start/stop) and `Ctrl+Shift+V` (pause/resume) to remove the previous duplicate binding.
+
 ## [1.1.0] — 2026-07-27
 
 ### Added

@@ -84,6 +84,7 @@ export class UIManager {
         analyze: { constructor: AnalysisComponent, title: 'Analysis' },
         explore: { constructor: ExploreComponent, title: 'Auto-Explore' },
         settings: { constructor: SettingsComponent, title: 'Settings' },
+        shortcuts: { constructor: KeyboardShortcutsComponent, title: 'Keyboard Shortcuts' },
         learning: { constructor: LearningComponent, title: 'Learning Hub (Alpha)' },
     };
 
