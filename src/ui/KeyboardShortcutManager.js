@@ -174,10 +174,12 @@ export class KeyboardShortcutManager {
             { key: 'f', shiftKey: true, displayOnly: true, description: 'Mirror pattern vertically', category: 'Patterns (while placing)' },
 
             // Capture / recording
-            { key: 'v', description: 'Record video — start (last settings) / stop & save', category: 'Capture', handler: () => {
+            // Plain V belongs to the 3D torus toggle above. Keep video actions on the same mnemonic
+            // key without registering a duplicate chord (Array.find would make the later one dead).
+            { key: 'v', shiftKey: true, description: 'Record video — start (last settings) / stop & save', category: 'Capture', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_QUICK_TOGGLE_RECORDING);
             }},
-            { key: 'v', shiftKey: true, description: 'Pause / resume the active recording', category: 'Capture', handler: () => {
+            { key: 'v', ctrlKey: true, shiftKey: true, description: 'Pause / resume the active recording', category: 'Capture', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_RECORDING_PAUSE);
             }},
 

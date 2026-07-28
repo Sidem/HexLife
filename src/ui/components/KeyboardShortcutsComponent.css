@@ -1,18 +1,29 @@
 .keyboard-shortcuts-component-content {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
     height: 100%;
 }
 
 /* ===== Keyboard overlay (desktop / tablet) ===== */
 
-/* The keyboard is a fixed-width block, so the panel must shrink-wrap it instead of
-   inheriting the generic 35vw floor (which leaves dead space on wide screens). */
+/* Give the board a useful first-open footprint. From there, its flex layout consumes every pixel
+   the user adds with the panel resize handles instead of leaving a fixed 520px island. */
 @media screen and (min-width: 769px) {
     #shortcutsPanel {
+        width: 600px;
+        height: 600px;
+        min-width: 540px;
+        min-height: 500px;
+    }
+
+    #shortcutsPanel .panel-content-area {
+        display: flex;
         min-width: 0;
-        width: max-content;
+        min-height: 0;
+        overflow: hidden;
     }
 }
 
@@ -20,8 +31,11 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    /* Fixed width so hovering a key with a long description never reflows the panel. */
-    width: 520px;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
     max-width: 100%;
 }
 
@@ -32,15 +46,29 @@
     align-items: center;
 }
 
-.kb-search {
+.kb-search-block {
     flex: 1 1 180px;
     min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kb-search {
+    width: 100%;
     background-color: #2a2a2a;
     border: 1px solid #555;
     border-radius: 6px;
     color: #eee;
     padding: 7px 10px;
     font-size: 0.9em;
+}
+
+.kb-search-status {
+    min-height: 1em;
+    color: #999;
+    font-size: 0.72em;
+    line-height: 1;
 }
 
 .kb-search:focus {
@@ -78,11 +106,15 @@
 .kb-keys {
     display: flex;
     flex-direction: column;
+    flex: 1 1 250px;
+    min-height: 225px;
     gap: 6px;
 }
 
 .kb-row {
     display: flex;
+    flex: 1 1 0;
+    min-height: 42px;
     gap: 6px;
 }
 
@@ -90,7 +122,7 @@
     position: relative;
     flex: 1 1 0;
     min-width: 44px;
-    height: 54px;
+    height: auto;
     border: 1px solid #555;
     border-bottom: 3px solid #555;
     border-radius: 7px;
@@ -145,6 +177,10 @@
     opacity: 0.12;
 }
 
+.kb-key.kb-search-hit {
+    box-shadow: 0 0 0 1px currentColor, 0 0 10px rgba(240, 198, 116, 0.12);
+}
+
 .kb-key.kb-mod-on {
     border-bottom-color: #f0c674;
     color: #f0f0f0;
@@ -154,6 +190,8 @@
 
 .kb-lower {
     display: flex;
+    flex: 0 1 auto;
+    min-height: 86px;
     gap: 16px;
     align-items: stretch;
 }
@@ -210,6 +248,7 @@
     flex-direction: column;
     justify-content: center;
     gap: 4px;
+    overflow-y: auto;
 }
 
 .kb-detail-hint {

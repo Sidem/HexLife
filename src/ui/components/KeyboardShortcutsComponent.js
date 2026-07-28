@@ -18,6 +18,7 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         this.element = document.createElement('div');
         this.element.className = 'keyboard-shortcuts-component-content';
         this.layer = 'base';
+        this.searchQuery = '';
         this.render();
     }
 
@@ -45,6 +46,8 @@ export class KeyboardShortcutsComponent extends BaseComponent {
             { key: 'reset', rgb: '216,90,48', name: 'Reset & clear' },
             { key: 'pattern', rgb: '239,159,39', name: 'Patterns' },
             { key: 'history', rgb: '212,83,126', name: 'History' },
+            { key: 'saved', rgb: '40,160,176', name: 'Saved starts' },
+            { key: 'capture', rgb: '176,105,224', name: 'Capture' },
         ];
     }
 
@@ -59,6 +62,8 @@ export class KeyboardShortcutsComponent extends BaseComponent {
             case 'Patterns':
             case 'Patterns (while placing)': return { key: 'pattern', rgb: '239,159,39' };
             case 'History': return { key: 'history', rgb: '212,83,126' };
+            case 'Saved Starts': return { key: 'saved', rgb: '40,160,176' };
+            case 'Capture': return { key: 'capture', rgb: '176,105,224' };
             default: return { key: 'misc', rgb: '95,94,90' };
         }
     }
@@ -117,9 +122,68 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         let list;
         if (this.layer === 'base') list = bucket.base;
         else if (this.layer === 'shift') list = bucket.shift;
-        else list = bucket.ctrl.length ? bucket.ctrl : bucket.ctrlShift;
+        else if (this.layer === 'ctrl') list = bucket.ctrl;
+        else list = bucket.ctrlShift;
         if (!list || !list.length) return null;
         return list.find(b => !b.contextual) || list[0];
+    }
+
+    _keyCap(id) {
+        if (id === 'shift') return 'Shift';
+        if (id === 'ctrl') return 'Ctrl';
+        if (id === 'esc') return 'Esc';
+        if (id === 'space') return 'Space';
+        return id.toUpperCase();
+    }
+
+    _modifierPrefix(layer) {
+        if (layer === 'shift') return '⇧ ';
+        if (layer === 'ctrl') return '⌃ ';
+        if (layer === 'ctrlShift') return '⌃⇧ ';
+        return '';
+    }
+
+    _modifierSearchText(layer) {
+        if (layer === 'shift') return 'shift';
+        if (layer === 'ctrl') return 'ctrl command';
+        if (layer === 'ctrlShift') return 'ctrl command shift';
+        return 'base';
+    }
+
+    _allBindings(bucket) {
+        if (!bucket) return [];
+        return ['base', 'shift', 'ctrl', 'ctrlShift'].flatMap(layer =>
+            bucket[layer].map(binding => ({ ...binding, layer }))
+        );
+    }
+
+    _searchMatches(id, bucket, query = this.searchQuery) {
+        if (!query || !bucket) return [];
+        const cap = this._keyCap(id).toLowerCase();
+        const tokens = query.split(/\s+/).filter(Boolean);
+        return this._allBindings(bucket).filter(binding => {
+            const combo = `${this._modifierSearchText(binding.layer)} ${cap}`;
+            const haystack = `${combo} ${binding.desc} ${binding.category}`.toLowerCase();
+            return tokens.every(token => haystack.includes(token));
+        });
+    }
+
+    _shortcutKeyParts(shortcut) {
+        if (shortcut.displayKey) return shortcut.displayKey.split(' + ');
+        const key = (shortcut.key || '').toLowerCase();
+        const caps = {
+            ' ': 'Space',
+            escape: 'Esc',
+            arrowleft: '←',
+            arrowright: '→',
+            arrowup: '↑',
+            arrowdown: '↓',
+        };
+        return [
+            ...(shortcut.ctrlKey ? ['Ctrl/⌘'] : []),
+            ...(shortcut.shiftKey ? ['Shift'] : []),
+            caps[key] || (shortcut.key || '').toUpperCase(),
+        ];
     }
 
     render() {
@@ -135,11 +199,15 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         const controls = document.createElement('div');
         controls.className = 'kb-controls';
         controls.innerHTML = `
-            <input type="text" class="kb-search" placeholder="Search actions…" aria-label="Search shortcut actions" />
+            <div class="kb-search-block">
+                <input type="search" class="kb-search" placeholder="Search keys, actions or categories…" aria-label="Search shortcut keys, actions or categories" />
+                <span class="kb-search-status" role="status" aria-live="polite"></span>
+            </div>
             <div class="kb-layers" role="group" aria-label="Modifier layer">
-                <button type="button" class="kb-layer kb-on" data-layer="base">Base</button>
-                <button type="button" class="kb-layer" data-layer="shift">⇧ Shift</button>
-                <button type="button" class="kb-layer" data-layer="ctrl">⌃ Ctrl</button>
+                <button type="button" class="kb-layer kb-on" data-layer="base" aria-pressed="true">Base</button>
+                <button type="button" class="kb-layer" data-layer="shift" aria-pressed="false">⇧ Shift</button>
+                <button type="button" class="kb-layer" data-layer="ctrl" aria-pressed="false">⌃ Ctrl</button>
+                <button type="button" class="kb-layer" data-layer="ctrlShift" aria-pressed="false">⌃⇧ Both</button>
             </div>`;
         board.appendChild(controls);
 
@@ -179,6 +247,7 @@ export class KeyboardShortcutsComponent extends BaseComponent {
 
         this._wireBoard(board);
         this._paint();
+        this._updateSearchStatus();
     }
 
     _makeKey(cap, id, w) {
@@ -208,6 +277,7 @@ export class KeyboardShortcutsComponent extends BaseComponent {
             const b = byN.get(n);
             const cell = document.createElement('div');
             cell.className = 'kb-key kb-np';
+            cell.dataset.searchText = b ? `ctrl numpad ${n} ${b.desc} ${b.category}`.toLowerCase() : '';
             cell.style.background = 'rgba(239,159,39,0.16)';
             cell.style.borderBottomColor = 'rgb(239,159,39)';
             cell.innerHTML = `<span class="kb-cap">${n}</span>`;
@@ -226,9 +296,8 @@ export class KeyboardShortcutsComponent extends BaseComponent {
         for (const category in grouped) {
             html += `<div class="shortcut-category"><h4>${category}</h4><ul>`;
             grouped[category].forEach(shortcut => {
-                const keysHtml = shortcut.displayKey
-                    ? shortcut.displayKey.split(' + ').map(k => `<kbd>${k}</kbd>`).join(' + ')
-                    : `${shortcut.ctrlKey ? '<kbd>Ctrl</kbd> + ' : ''}${shortcut.shiftKey ? '<kbd>Shift</kbd> + ' : ''}<kbd>${(shortcut.key || '').toUpperCase()}</kbd>`;
+                const keysHtml = this._shortcutKeyParts(shortcut)
+                    .map(key => `<kbd>${key}</kbd>`).join(' + ');
                 html += `<li><div class="keys">${keysHtml}</div><div class="description">${shortcut.description}</div></li>`;
             });
             html += `</ul></div>`;
@@ -245,41 +314,72 @@ export class KeyboardShortcutsComponent extends BaseComponent {
             });
         });
         const search = board.querySelector('.kb-search');
+        this._searchStatusEl = board.querySelector('.kb-search-status');
         search.addEventListener('input', () => this._applySearch(search.value.trim().toLowerCase()));
+        search.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || !search.value) return;
+            event.stopPropagation();
+            search.value = '';
+            this._applySearch('');
+        });
     }
 
     /** Re-color every key face for the active modifier layer. */
     _paint() {
-        const layerActive = { base: false, shift: this.layer === 'shift', ctrl: this.layer === 'ctrl' };
+        const layerActive = {
+            base: false,
+            shift: this.layer === 'shift' || this.layer === 'ctrlShift',
+            ctrl: this.layer === 'ctrl' || this.layer === 'ctrlShift',
+        };
         this.element.querySelectorAll('.kb-board-view .kb-row .kb-key').forEach(el => {
             const id = el.dataset.id;
             const act = el.querySelector('.kb-act');
-            el.classList.remove('kb-bound', 'kb-dim');
+            const bucket = this.bindings.byKey[id];
+            const searchMatches = this._searchMatches(id, bucket);
+            el.classList.remove('kb-bound', 'kb-dim', 'kb-search-hit', 'kb-search-miss');
             el.style.background = '';
             el.style.borderBottomColor = '';
 
             if (id === 'shift' || id === 'ctrl') {
                 act.textContent = '';
                 el.classList.toggle('kb-mod-on', layerActive[id]); // mod keys never bind to an action
+                el.classList.toggle('kb-search-miss', !!this.searchQuery);
                 return;
             }
 
-            const bind = this._faceBinding(this.bindings.byKey[id]);
+            const bind = this.searchQuery ? searchMatches[0] : this._faceBinding(bucket);
             if (bind) {
                 el.classList.add('kb-bound');
+                el.classList.toggle('kb-search-hit', !!this.searchQuery);
                 el.style.background = `rgba(${bind.rgb},0.16)`;
                 el.style.borderBottomColor = `rgb(${bind.rgb})`;
-                act.textContent = bind.desc;
+                act.textContent = this.searchQuery
+                    ? `${this._modifierPrefix(bind.layer)}${bind.desc}`
+                    : bind.desc;
+                el.setAttribute('aria-label', `${this._keyCap(id)}: ${bind.desc}`);
             } else {
                 act.textContent = '';
                 el.classList.add('kb-dim');
+                el.classList.toggle('kb-search-miss', !!this.searchQuery);
+                el.setAttribute('aria-label', `${this._keyCap(id)}: no shortcut on this layer`);
             }
         });
-        this.element.querySelectorAll('.kb-layer').forEach(b => b.classList.toggle('kb-on', b.dataset.layer === this.layer));
+        this.element.querySelectorAll('.kb-layer').forEach(button => {
+            const active = button.dataset.layer === this.layer;
+            button.classList.toggle('kb-on', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
+        this.element.querySelectorAll('.kb-np').forEach(cell => {
+            const hit = !this.searchQuery || this.searchQuery.split(/\s+/).every(token =>
+                cell.dataset.searchText.includes(token)
+            );
+            cell.classList.toggle('kb-search-miss', !hit);
+            cell.classList.toggle('kb-search-hit', !!this.searchQuery && hit);
+        });
     }
 
     _showDetail(id) {
-        const cap = id === 'shift' ? 'Shift' : id === 'ctrl' ? 'Ctrl' : id === 'esc' ? 'Esc' : id === 'space' ? 'Space' : id.toUpperCase();
+        const cap = this._keyCap(id);
         if (id === 'shift' || id === 'ctrl') {
             this._detailEl.innerHTML = `<div class="kb-detail-hint"><kbd>${cap}</kbd> is a modifier — switch the layer above to see its combos.</div>`;
             return;
@@ -305,15 +405,37 @@ export class KeyboardShortcutsComponent extends BaseComponent {
     }
 
     _applySearch(q) {
-        this.element.querySelectorAll('.kb-board-view .kb-row .kb-key').forEach(el => {
-            const bucket = this.bindings.byKey[el.dataset.id];
-            let hit = !q;
-            if (q && bucket) {
-                hit = [...bucket.base, ...bucket.shift, ...bucket.ctrl, ...bucket.ctrlShift]
-                    .some(b => b.desc.toLowerCase().includes(q));
-            }
-            el.classList.toggle('kb-search-miss', !hit);
+        this.searchQuery = q;
+        this._paint();
+        this._updateSearchStatus();
+    }
+
+    _updateSearchStatus() {
+        if (!this._searchStatusEl) return;
+        if (!this.searchQuery) {
+            const total = Object.values(this.bindings.byKey)
+                .reduce((sum, bucket) => sum + this._allBindings(bucket).length, 0)
+                + this.bindings.numpad.length;
+            this._searchStatusEl.textContent = `${total} shortcuts · search checks every layer`;
+            return;
+        }
+        let shortcutCount = 0;
+        let keyCount = 0;
+        Object.entries(this.bindings.byKey).forEach(([id, bucket]) => {
+            const matches = this._searchMatches(id, bucket);
+            shortcutCount += matches.length;
+            if (matches.length) keyCount++;
         });
+        const tokens = this.searchQuery.split(/\s+/).filter(Boolean);
+        const numpadMatches = this.bindings.numpad.filter(binding => {
+            const haystack = `ctrl numpad ${binding.n} ${binding.desc} ${binding.category}`.toLowerCase();
+            return tokens.every(token => haystack.includes(token));
+        });
+        shortcutCount += numpadMatches.length;
+        keyCount += numpadMatches.length;
+        this._searchStatusEl.textContent = shortcutCount
+            ? `${shortcutCount} shortcut${shortcutCount === 1 ? '' : 's'} on ${keyCount} key${keyCount === 1 ? '' : 's'}`
+            : 'No matching shortcuts';
     }
 
     groupShortcuts(shortcuts) {
