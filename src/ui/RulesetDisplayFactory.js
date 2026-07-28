@@ -72,7 +72,8 @@ export class RulesetDisplayFactory {
      * Creates a card for the Ruleset Library (Public or Personal). The hero is the evolved-world
      * thumbnail when the entry has one (schema v2); otherwise it falls back to the lazily-rendered
      * rule-viz glyph (the IntersectionObserver path). When the entry carries a paired initial
-     * condition it shows an "IC" badge and a "Load + IC" action that replays ruleset + IC + seed.
+     * condition it shows an IC badge; the list-level Paired start setting controls how Load behaves.
+     * Every card also carries a visible Public/Mine source marker for the unified library list.
      * @param {object} ruleData - The full ruleset object (may include `tags`, `initialState`, `thumb`).
      * @param {boolean} isPersonal - True if it's from the user's library.
      * @returns {HTMLElement} The created card element.
@@ -81,6 +82,7 @@ export class RulesetDisplayFactory {
         const item = document.createElement('div');
         item.className = 'library-card' + (isPersonal ? ' personal' : '');
         item.dataset.hex = ruleData.hex;
+        item.dataset.source = isPersonal ? 'personal' : 'public';
         if (ruleData.id) item.dataset.id = ruleData.id;
 
         const hasIC = !!(ruleData.initialState && ruleData.initialState.mode);
@@ -101,6 +103,9 @@ export class RulesetDisplayFactory {
         const constraintChip = badge
             ? `<span class="constraint-badge constraint-${badge.cls}" title="${this._escapeAttr(badge.title)}">${this._escape(badge.label)}</span>`
             : '';
+        const sourceBadge = isPersonal
+            ? '<span class="library-card-source source-personal" title="Saved in your personal library">Mine</span>'
+            : '<span class="library-card-source source-public" title="Included in the public library">Public</span>';
 
         // ONE load control per card (roadmap #30 / UX audit fix 3). "Load" and "Load + IC" used to
         // sit side by side on every card that had a paired start — ~2 controls × every entry, which
@@ -127,6 +132,7 @@ export class RulesetDisplayFactory {
             <div class="library-card-body">
                 <div class="library-card-title">
                     <span class="name">${this._escape(ruleData.name || '')}</span>
+                    ${sourceBadge}
                     ${constraintChip}
                 </div>
                 <div class="description${descText ? '' : ' is-empty'}">${descHtml}</div>
@@ -182,4 +188,4 @@ export class RulesetDisplayFactory {
             this.observer.disconnect();
         }
     }
-} 
+}

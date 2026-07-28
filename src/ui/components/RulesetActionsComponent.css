@@ -243,38 +243,63 @@
 }
 
 /* Library Pane Styles */
-.library-filter-tabs {
+.library-source-controls {
     display: flex;
-    justify-content: stretch;
-    border-radius: 4px;
-    overflow: hidden;
-    border: 1px solid #555;
-    margin-bottom: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
     flex-shrink: 0;
 }
 
-.library-filter-tabs .sub-tab-button {
-    flex-grow: 1;
-    padding: 8px;
-    background-color: #4a4a4a;
-    color: #ccc;
-    border: none;
+.library-source-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+button.tag-chip.source-filter {
     cursor: pointer;
-    border-right: 1px solid #555;
-    transition: background-color 0.2s;
+    transition: background-color 0.15s, color 0.15s;
 }
 
-.library-filter-tabs .sub-tab-button:last-child {
-    border-right: none;
+button.tag-chip.source-filter:hover {
+    background-color: #4a4a4a;
 }
 
-.library-filter-tabs .sub-tab-button.active {
+button.tag-chip.source-filter.active {
     background-color: #0078d4;
-    color: white;
+    color: #fff;
+    border-color: #0078d4;
 }
 
-.library-filter-tabs .sub-tab-button:hover:not(.active) {
-    background-color: #5a5a5a;
+.source-filter-count {
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+.library-dedupe-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 4px 8px;
+    background-color: transparent;
+    color: #ffb8b8;
+    border: 1px solid #8a4d4d;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.78em;
+}
+
+.library-dedupe-btn:hover {
+    background-color: rgba(190, 65, 65, 0.16);
+}
+
+.library-dedupe-btn svg {
+    width: 15px;
+    height: 15px;
 }
 
 /* Search / sort toolbar above the Public/Personal lists. Wraps: the paired-start toggle joined it
@@ -495,6 +520,7 @@ button.tag-chip.tag-filter.active {
 .library-card-title {
     display: flex;
     align-items: baseline;
+    flex-wrap: wrap;
     gap: 6px;
     min-width: 0;
 }
@@ -505,6 +531,28 @@ button.tag-chip.tag-filter.active {
     color: #f0f0f0;
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+.library-card-source {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.66em;
+    font-weight: 650;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.library-card-source.source-public {
+    color: #a9c7df;
+    background-color: rgba(115, 159, 194, 0.14);
+    border: 1px solid rgba(142, 184, 217, 0.45);
+}
+
+.library-card-source.source-personal {
+    color: #f0ca71;
+    background-color: rgba(240, 192, 90, 0.13);
+    border: 1px solid rgba(240, 192, 90, 0.5);
 }
 
 /* Structural constraint class (roadmap #38): a derived fact about the rule table, so it reads as a
@@ -828,4 +876,4 @@ button.srm-suggested-chip {
     .library-list {
         max-height: 70vh;
     }
-} 
+}

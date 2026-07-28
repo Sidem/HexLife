@@ -87,6 +87,29 @@ describe('paired-start toggle (#30)', () => {
     });
 });
 
+describe('unified public/personal library', () => {
+    it('uses one source-marked list instead of separate Public and My Rulesets tabs', () => {
+        expect(LIBRARY).toContain('id="ruleset-library-content"');
+        expect(LIBRARY).toContain("{ id: 'all', label: 'All'");
+        expect(LIBRARY).toContain("{ id: 'public', label: 'Public'");
+        expect(LIBRARY).toContain("{ id: 'personal', label: 'Mine'");
+        expect(LIBRARY).toContain('data-source-filter="${id}"');
+        expect(LIBRARY).not.toContain('data-library-filter');
+        expect(LIBRARY).not.toContain('ruleset-library-public-content');
+        expect(LIBRARY).not.toContain('ruleset-library-personal-content');
+        expect(FACTORY).toContain("item.dataset.source = isPersonal ? 'personal' : 'public'");
+        expect(FACTORY).toContain('library-card-source source-personal');
+        expect(FACTORY).toContain('library-card-source source-public');
+    });
+
+    it('offers a confirmed bulk cleanup for personal copies that are already public', () => {
+        expect(LIBRARY).toContain('data-action="remove-public-duplicates"');
+        expect(LIBRARY).toContain('getPublicDuplicateRulesets()');
+        expect(LIBRARY).toContain("title: 'Remove public duplicates'");
+        expect(LIBRARY).toContain('removePublicDuplicates()');
+    });
+});
+
 describe('on-canvas view controls (#31)', () => {
     const VIEW = read(path.join('src', 'ui', 'ViewControls.js'));
     const VIEW_CSS = read(path.join('src', 'ui', 'ViewControls.css'));

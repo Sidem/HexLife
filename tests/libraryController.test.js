@@ -45,6 +45,39 @@ describe('LibraryController.getDisplayName', () => {
     });
 });
 
+describe('LibraryController public duplicate cleanup', () => {
+    it('finds duplicates by case-insensitive hex and removes only the personal copies', () => {
+        const lc = makeController({
+            user: [
+                { id: 'dup-a', hex: HEX_A.toLowerCase(), name: 'My public copy' },
+                { id: 'keep-b', hex: HEX_B, name: 'Personal only' },
+            ],
+            pub: [{ hex: HEX_A, name: 'Public A' }],
+        });
+        expect(lc.getPublicDuplicateRulesets().map(r => r.id)).toEqual(['dup-a']);
+
+        const priorStorage = globalThis.localStorage;
+        globalThis.localStorage = { setItem() {} };
+        try {
+            expect(lc.removePublicDuplicates()).toEqual({ removed: 1, remaining: 1 });
+        } finally {
+            if (priorStorage === undefined) delete globalThis.localStorage;
+            else globalThis.localStorage = priorStorage;
+        }
+        expect(lc.getUserLibrary().map(r => r.id)).toEqual(['keep-b']);
+        expect(lc.libraryData.rulesets).toHaveLength(1);
+    });
+
+    it('is a no-op when no personal rule is public', () => {
+        const lc = makeController({
+            user: [{ id: 'keep-b', hex: HEX_B, name: 'Personal only' }],
+            pub: [{ hex: HEX_A, name: 'Public A' }],
+        });
+        expect(lc.getPublicDuplicateRulesets()).toEqual([]);
+        expect(lc.removePublicDuplicates()).toEqual({ removed: 0, remaining: 1 });
+    });
+});
+
 describe('normalizeRulesetEntry (schema v2)', () => {
     it('upgrades a legacy entry, defaulting the new fields without losing data', () => {
         const legacy = { id: '1', name: 'Old', description: 'd', hex: HEX_A, createdAt: 'then' };

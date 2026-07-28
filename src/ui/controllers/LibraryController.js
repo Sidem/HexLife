@@ -257,6 +257,39 @@ export class LibraryController {
     }
 
     /**
+     * Personal entries whose ruleset hex now also exists in the public catalog.
+     * Comparison is case-insensitive because hex identity does not depend on display casing.
+     * @returns {object[]}
+     */
+    getPublicDuplicateRulesets() {
+        const publicHexes = new Set((this.libraryData?.rulesets || [])
+            .map(r => typeof r?.hex === 'string' ? r.hex.toLowerCase() : null)
+            .filter(Boolean));
+        return this.userLibrary.filter(r =>
+            typeof r?.hex === 'string' && publicHexes.has(r.hex.toLowerCase())
+        );
+    }
+
+    /**
+     * Remove every personal copy that is already represented in the public catalog. The UI
+     * confirmation warns that personal-only metadata is deleted; public entries remain available.
+     * Persists and emits one library-change event for the whole batch.
+     * @returns {{removed: number, remaining: number}}
+     */
+    removePublicDuplicates() {
+        const duplicates = new Set(this.getPublicDuplicateRulesets());
+        if (duplicates.size === 0) {
+            return { removed: 0, remaining: this.userLibrary.length };
+        }
+        const before = this.userLibrary.length;
+        this.userLibrary = this.userLibrary.filter(r => !duplicates.has(r));
+        const removed = before - this.userLibrary.length;
+        PersistenceService.saveUserRulesets(this.userLibrary);
+        EventBus.dispatch(EVENTS.USER_LIBRARY_CHANGED);
+        return { removed, remaining: this.userLibrary.length };
+    }
+
+    /**
      * Deletes a ruleset from the user's personal library.
      * @param {string} rulesetId The ID of the ruleset to delete.
      */
@@ -294,4 +327,4 @@ export class LibraryController {
         const isPublic = this.libraryData.rulesets.some(r => r.hex === hex);
         return { isPersonal: false, isPublic };
     }
-} 
+}

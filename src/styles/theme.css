@@ -394,11 +394,6 @@ select:focus {
     border-bottom-color: var(--accent);
 }
 
-.library-filter-tabs .sub-tab-button.active {
-    background-color: var(--accent-soft);
-    color: var(--accent);
-}
-
 /* ---------- Draggable panels (desktop) ---------- */
 
 @media screen and (min-width: 769px) {

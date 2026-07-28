@@ -22,8 +22,8 @@ export class RulesetLibraryComponent extends BaseComponent {
         this.appContext = appContext;
 
         this.libraryData = options.libraryData;
-        // Cross-list filter/sort state (applies to both Public and Personal lists).
-        this.filterState = { query: '', tag: null, constraint: null, sort: 'recent' };
+        // One combined list, with source as a filter rather than a separate Public/Personal tab.
+        this.filterState = { query: '', tag: null, constraint: null, source: 'all', sort: 'recent' };
         // What "Load" means for an entry that carries a paired initial condition (roadmap #30).
         // This used to be a second button on every such card; it is one list-level choice now,
         // sitting with the scope switch that already governs every load from this list. Default on:
@@ -108,30 +108,26 @@ export class RulesetLibraryComponent extends BaseComponent {
             </div>
             <div class="library-constraint-filters" id="ruleset-library-constraint-filters"></div>
             <div class="library-tag-filters" id="ruleset-library-tag-filters"></div>
-            <div class="library-filter-tabs">
-                <button class="sub-tab-button active" data-library-filter="public">Public</button>
-                <button class="sub-tab-button" data-library-filter="personal">My Rulesets</button>
-            </div>
-            <div id="ruleset-library-public-content" class="library-list"></div>
-            <div id="ruleset-library-personal-content" class="library-list hidden"></div>
+            <div class="library-source-controls" id="ruleset-library-source-controls"></div>
+            <div id="ruleset-library-content" class="library-list"></div>
         `;
 
         this._renderConstraintFilters();
         this._renderTagFilters();
-        this._renderPublicLibrary();
-        this._renderPersonalLibrary();
+        this._renderSourceControls();
+        this._renderLibrary();
         this._scheduleThumbnailBackfill();
     }
 
     /**
-     * Apply the live search query + active tag filter + sort to a list of entries. Search matches
-     * name, description, derived mnemonic, tags and the derived constraint class (case-insensitive);
-     * sort is recent (default order) or name. Pure-ish: returns a new array, doesn't mutate the source.
+     * Apply the live search query + active source/tag/constraint filters + sort. Source is attached
+     * only to the combined view model; it is never persisted onto a library entry.
      */
     _applyFilter(entries) {
-        const { query, tag, constraint, sort } = this.filterState;
+        const { query, tag, constraint, source, sort } = this.filterState;
         const q = query.trim().toLowerCase();
         let out = entries.filter(rule => {
+            if (source !== 'all' && rule.__source !== source) return false;
             if (tag && !(Array.isArray(rule.tags) && rule.tags.includes(tag))) return false;
             // Constraint filter is HIERARCHY-AWARE (unlike the badge, which names only the strictest
             // class): "R-sym" means "is rotationally symmetric", so it includes the n_count and
@@ -157,6 +153,19 @@ export class RulesetLibraryComponent extends BaseComponent {
             out = [...out].sort((a, b) => (a.name || rulesetName(a.hex)).localeCompare(b.name || rulesetName(b.hex)));
         }
         return out;
+    }
+
+    /** Public catalog + personal saves as one source-marked view; personal entries lead in Recent. */
+    _getCombinedEntries() {
+        const personal = this.appContext.libraryController.getUserLibrary()
+            .map(rule => ({ ...rule, __source: 'personal' }));
+        const cache = PersistenceService.loadPublicThumbCache();
+        const publicEntries = (this.libraryData?.rulesets || []).map(rule => ({
+            ...rule,
+            ...(cache[rule.hex] ? { thumb: cache[rule.hex] } : {}),
+            __source: 'public',
+        }));
+        return [...personal, ...publicEntries];
     }
 
     /**
@@ -213,30 +222,35 @@ export class RulesetLibraryComponent extends BaseComponent {
         mount.innerHTML = chips.join('');
     }
 
-    _renderPublicLibrary() {
-        const rulesetsList = this.element.querySelector('#ruleset-library-public-content');
-        rulesetsList.innerHTML = '';
-        const entries = this._applyFilter(this.libraryData?.rulesets || []);
-        if (entries.length === 0) {
-            rulesetsList.innerHTML = `<p class="empty-state-text">No rulesets match your search.</p>`;
-            return;
-        }
-        // Merge any cached evolved-world thumbnail (baked client-side from the entry's curated IC) so
-        // public cards show a preview without bloating the committed JSON with image data.
-        const cache = PersistenceService.loadPublicThumbCache();
-        entries.forEach(rule => {
-            const merged = cache[rule.hex] ? { ...rule, thumb: cache[rule.hex] } : rule;
-            rulesetsList.appendChild(this.factory.createLibraryListItem(merged, false));
-        });
+    _renderSourceControls() {
+        const mount = this.element.querySelector('#ruleset-library-source-controls');
+        if (!mount) return;
+        const publicCount = this.libraryData?.rulesets?.length || 0;
+        const userRulesets = this.appContext.libraryController.getUserLibrary();
+        const duplicateCount = this.appContext.libraryController.getPublicDuplicateRulesets().length;
+        const sources = [
+            { id: 'all', label: 'All', count: publicCount + userRulesets.length },
+            { id: 'public', label: 'Public', count: publicCount },
+            { id: 'personal', label: 'Mine', count: userRulesets.length },
+        ];
+        const filters = sources.map(({ id, label, count }) => {
+            const active = this.filterState.source === id;
+            return `<button class="tag-chip source-filter${active ? ' active' : ''}" data-source-filter="${id}" aria-pressed="${active}">${label} <span class="source-filter-count">${count}</span></button>`;
+        }).join('');
+        const cleanup = duplicateCount > 0
+            ? `<button type="button" class="button-subtle library-dedupe-btn" data-action="remove-public-duplicates" title="Remove personal copies of rulesets that are already in the public library">${ICONS.trash} Remove ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}</button>`
+            : '';
+        mount.innerHTML = `<div class="library-source-filters" aria-label="Filter rulesets by source">${filters}</div>${cleanup}`;
     }
 
-    _renderPersonalLibrary() {
-        const personalList = this.element.querySelector('#ruleset-library-personal-content');
-        personalList.innerHTML = '';
+    _renderLibrary() {
+        const list = this.element.querySelector('#ruleset-library-content');
+        list.innerHTML = '';
         const userRulesets = this.appContext.libraryController.getUserLibrary();
+        const entries = this._applyFilter(this._getCombinedEntries());
 
-        if (userRulesets.length === 0) {
-            personalList.innerHTML = `
+        if (entries.length === 0 && this.filterState.source === 'personal' && userRulesets.length === 0) {
+            list.innerHTML = `
                 <div class="panel-empty-state">
                     <div class="panel-empty-state-icon">${ICONS.star}</div>
                     <p class="panel-empty-state-title">No saved rulesets yet</p>
@@ -244,13 +258,13 @@ export class RulesetLibraryComponent extends BaseComponent {
                 </div>`;
             return;
         }
-
-        const entries = this._applyFilter(userRulesets);
         if (entries.length === 0) {
-            personalList.innerHTML = `<p class="empty-state-text">No saved rulesets match your search.</p>`;
-        } else {
-            entries.forEach(rule => personalList.appendChild(this.factory.createLibraryListItem(rule, true)));
+            list.innerHTML = `<p class="empty-state-text">No rulesets match these filters.</p>`;
+            return;
         }
+        entries.forEach(rule => list.appendChild(
+            this.factory.createLibraryListItem(rule, rule.__source === 'personal')
+        ));
     }
 
     /**
@@ -289,10 +303,10 @@ export class RulesetLibraryComponent extends BaseComponent {
                 if (!thumb) return;
                 if (entry.__scope === 'personal') {
                     this.appContext.libraryController.setUserRulesetThumb(entry.id, thumb, { silent: true });
-                    this._applyThumbToCard('#ruleset-library-personal-content', entry.id, null, thumb);
+                    this._applyThumbToCard(entry.id, null, thumb);
                 } else {
                     PersistenceService.savePublicThumb(entry.hex, thumb);
-                    this._applyThumbToCard('#ruleset-library-public-content', null, entry.hex, thumb);
+                    this._applyThumbToCard(null, entry.hex, thumb);
                 }
             },
             onDone: ({ cancelled, remaining }) => {
@@ -306,11 +320,13 @@ export class RulesetLibraryComponent extends BaseComponent {
         });
     }
 
-    /** Swap a single card's thumbnail in place (no list re-render). Match by id (personal) or hex (public). */
-    _applyThumbToCard(listSelector, id, hex, thumb) {
-        const list = this.element.querySelector(listSelector);
+    /** Swap a card thumbnail in place (no list re-render). Match by id (personal) or public hex. */
+    _applyThumbToCard(id, hex, thumb) {
+        const list = this.element.querySelector('#ruleset-library-content');
         if (!list) return;
-        const sel = id ? `.library-card[data-id="${CSS.escape(id)}"]` : `.library-card[data-hex="${CSS.escape(hex)}"]`;
+        const sel = id
+            ? `.library-card[data-id="${CSS.escape(id)}"]`
+            : `.library-card[data-source="public"][data-hex="${CSS.escape(hex)}"]`;
         const card = list.querySelector(sel);
         const box = card?.querySelector('.library-card-thumb');
         if (!box) return;
@@ -349,15 +365,13 @@ export class RulesetLibraryComponent extends BaseComponent {
         libraryPane.addEventListener('input', e => {
             if (e.target.matches('.library-search')) {
                 this.filterState.query = e.target.value;
-                this._renderPublicLibrary();
-                this._renderPersonalLibrary();
+                this._renderLibrary();
             }
         });
         libraryPane.addEventListener('change', e => {
             if (e.target.matches('.library-sort')) {
                 this.filterState.sort = e.target.value;
-                this._renderPublicLibrary();
-                this._renderPersonalLibrary();
+                this._renderLibrary();
             } else if (e.target.matches('.library-import-input')) {
                 const file = e.target.files && e.target.files[0];
                 e.target.value = ''; // allow re-importing the same file
@@ -383,8 +397,7 @@ export class RulesetLibraryComponent extends BaseComponent {
                 const cls = constraintChip.dataset.constraintFilter;
                 this.filterState.constraint = this.filterState.constraint === cls ? null : cls;
                 this._renderConstraintFilters();
-                this._renderPublicLibrary();
-                this._renderPersonalLibrary();
+                this._renderLibrary();
                 return;
             }
 
@@ -394,21 +407,34 @@ export class RulesetLibraryComponent extends BaseComponent {
                 const tag = tagChip.dataset.tagFilter;
                 this.filterState.tag = this.filterState.tag === tag ? null : tag;
                 this._renderTagFilters();
-                this._renderPublicLibrary();
-                this._renderPersonalLibrary();
+                this._renderLibrary();
                 return;
             }
 
-            if (target.matches('[data-library-filter]')) {
-                const filter = target.dataset.libraryFilter;
-                libraryPane.querySelectorAll('.sub-tab-button').forEach(b => b.classList.remove('active'));
-                target.classList.add('active');
+            const sourceFilter = target.closest('[data-source-filter]');
+            if (sourceFilter) {
+                this.filterState.source = sourceFilter.dataset.sourceFilter;
+                this._renderSourceControls();
+                this._renderLibrary();
+                return;
+            }
 
-                const publicPane = libraryPane.querySelector('#ruleset-library-public-content');
-                const personalPane = libraryPane.querySelector('#ruleset-library-personal-content');
-
-                publicPane.classList.toggle('hidden', filter !== 'public');
-                personalPane.classList.toggle('hidden', filter !== 'personal');
+            const dedupeButton = target.closest('[data-action="remove-public-duplicates"]');
+            if (dedupeButton) {
+                const duplicates = this.appContext.libraryController.getPublicDuplicateRulesets();
+                if (duplicates.length === 0) return;
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+                    title: 'Remove public duplicates',
+                    message: `Remove ${duplicates.length} personal ${duplicates.length === 1 ? 'copy' : 'copies'} that already exist in the public library?\n\nThe public versions stay available. Any personal names, descriptions, tags, thumbnails, or paired starts on those copies will be deleted.`,
+                    confirmLabel: `Remove ${duplicates.length}`,
+                    onConfirm: () => {
+                        const { removed } = this.appContext.libraryController.removePublicDuplicates();
+                        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                            message: `Removed ${removed} duplicate personal ${removed === 1 ? 'ruleset' : 'rulesets'}.`,
+                            type: 'success',
+                        });
+                    },
+                });
                 return;
             }
 
@@ -549,22 +575,28 @@ export class RulesetLibraryComponent extends BaseComponent {
         this.appContext.libraryController.loadRuleset(card.dataset.hex, rac.getGenScope(), rac.getGenAutoReset());
     }
 
-    /** Resolve a card element back to its source entry (personal by id, else public/personal by hex). */
+    /** Resolve a card back to its marked source; duplicates therefore keep their own metadata/recipe. */
     _findCardEntry(card) {
         if (!card) return null;
         const id = card.dataset.id;
         const hex = card.dataset.hex;
+        const source = card.dataset.source;
         const user = this.appContext.libraryController.getUserLibrary();
         if (id) {
             const byId = user.find(r => r.id === id);
             if (byId) return byId;
         }
-        return user.find(r => r.hex === hex) || (this.libraryData?.rulesets || []).find(r => r.hex === hex) || null;
+        if (source === 'public') {
+            return (this.libraryData?.rulesets || []).find(r => r.hex === hex) || null;
+        }
+        return user.find(r => r.hex === hex) || null;
     }
 
     _onUserLibraryChanged = () => {
+        this._renderConstraintFilters();
         this._renderTagFilters();
-        this._renderPersonalLibrary();
+        this._renderSourceControls();
+        this._renderLibrary();
         this._scheduleThumbnailBackfill();
     };
 

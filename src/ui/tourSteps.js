@@ -23,7 +23,7 @@ export const getTours = (appContext) => {
     // rulesets.json). `RulesetDisplayFactory` puts the hex on the card itself
     // (`.library-card[data-hex]`), so this selector survives reordering of the
     // public library. Guarded by tests/tourSelectors.test.js.
-    const GLIDERS_LOAD_BTN = '#ruleset-library-public-content .library-card[data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
+    const GLIDERS_LOAD_BTN = '#ruleset-library-content .library-card[data-source="public"][data-hex="12482080480080006880800180010117"] [data-action="load-rule"]';
 
     /**
      * A helper function to ensure a consistent state before starting any tour.
@@ -698,13 +698,11 @@ export const getTours = (appContext) => {
         primaryAction: { text: 'Open Library' },
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
     }, {
-        element: '[data-library-filter="personal"]',
+        element: '[data-source-filter="personal"]',
         title: 'Step 4: View Your Rulesets',
-        content: "The library contains both public and personal rules. <span class=\"onboarding-highlight-text\">Click on 'My Rulesets'</span> to see your saved creations.",
-        // Skip if already on the personal filter; otherwise advance on the user
-        // clicking the highlighted 'My Rulesets' sub-tab itself (not a separate
-        // button), so the step's instruction matches what actually advances it.
-        condition: () => !document.querySelector('[data-library-filter="personal"]')?.classList.contains('active'),
+        content: "Public and personal rules now share one list, with a source badge on every card. Click <span class=\"onboarding-highlight-text\">Mine</span> to show only your saved creations.",
+        // Skip if the unified list is already filtered to Mine; otherwise advance on the source chip.
+        condition: () => !document.querySelector('[data-source-filter="personal"]')?.classList.contains('active'),
         onBeforeShow: () => {
             showView({ desktop: {type: 'panel', name: 'library'}, mobile: {view: 'library'} });
             document.querySelector('[data-pane="library"]')?.click();
