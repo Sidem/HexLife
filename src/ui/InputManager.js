@@ -154,6 +154,9 @@ export class InputManager {
     }
 
     _handleTorusViewChanged({ enabled }) {
+        // Resolve a held-H override before changing the underlying navigation strategy. Otherwise
+        // releasing H after toggling the view could restore orbit in Flat mode (or pan in Torus).
+        if (this._shiftWorldKeyHeld) this._releaseShiftWorldKey();
         if (enabled && !this.isMobile) {
             if (this.currentStrategyName === 'orbit') return;
             // Torus mode deliberately cancels transient placing/selecting/drawing gestures.
@@ -187,8 +190,8 @@ export class InputManager {
         if (event.key !== InputManager.SHIFT_WORLD_KEY) return;
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         if (this._shiftWorldKeyHeld || this._isTextInputFocused()) return;
-        // Only override the default navigation mode, so placing/selecting a pattern is left intact.
-        if (this.currentStrategyName !== 'pan') return;
+        // Only override the navigation modes, so placing/selecting a pattern is left intact.
+        if (this.currentStrategyName !== 'pan' && this.currentStrategyName !== 'orbit') return;
         event.preventDefault();
         this._shiftWorldKeyHeld = true;
         this._strategyBeforeShiftWorld = this.currentStrategyName;
