@@ -357,6 +357,8 @@ export const EVENTS = {
     COMMAND_EXECUTE_CLONE_AND_MUTATE: 'command:executeCloneAndMutate',
     /** @param {{panelName: string, show?: boolean}} data - Command to show, hide, or toggle a draggable panel. */
     COMMAND_TOGGLE_PANEL: 'command:togglePanel',
+    /** @event Emitted with no payload to restore every draggable panel to its default position and size. */
+    COMMAND_RESET_PANEL_LAYOUT: 'command:resetPanelLayout',
     /** @param {{popoutName: string, show?: boolean}} data - Command to show, hide, or toggle a popout panel. */
     COMMAND_TOGGLE_POPOUT: 'command:togglePopout',
     /** @param {{viewName: string}} data - Command to switch to a specific full-screen mobile view. */

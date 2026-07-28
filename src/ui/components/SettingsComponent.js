@@ -114,6 +114,16 @@ export class SettingsComponent extends BaseComponent {
                     </div>
                 </section>
 
+                <section class="settings-group">
+                    <div class="settings-group-heading">
+                        <h5>Panel layout</h5>
+                        <p>Recover panels after moving or resizing them, including panels saved outside the current viewport.</p>
+                    </div>
+                    <button type="button" class="button settings-layout-reset" data-action="reset-panel-layout">
+                        Reset panel layout
+                    </button>
+                </section>
+
                 <aside class="settings-callout">
                     <span class="settings-callout-label">Color palettes</span>
                     <span>Viridis, Cividis, and custom palettes are managed in <strong>Chroma Lab → Palettes</strong>.</span>
@@ -205,6 +215,11 @@ export class SettingsComponent extends BaseComponent {
         `;
         // textContent (not template interpolation): the injected build string must never be parsed as HTML.
         this.element.querySelector('#settings-version-code').textContent = APP_VERSION;
+        this._addDOMListener(
+            this.element.querySelector('[data-action="reset-panel-layout"]'),
+            'click',
+            () => EventBus.dispatch(EVENTS.COMMAND_RESET_PANEL_LAYOUT),
+        );
 
         const vizController = this.appContext.visualizationController;
 

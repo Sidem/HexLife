@@ -50,4 +50,20 @@ describe('Settings tabs', () => {
             /_mountRestoredDesktopPanels\(\)[\s\S]*filter\(\(panel\) => !panel\.isHidden\(\)\)[\s\S]*mountSharedComponentInto/,
         );
     });
+
+    it('offers panel-layout recovery through Settings and the command palette', () => {
+        const settingsSource = readFileSync(
+            path.join(REPO_ROOT, 'src/ui/components/SettingsComponent.js'),
+            'utf8',
+        );
+        const paletteSource = readFileSync(
+            path.join(REPO_ROOT, 'src/ui/components/CommandPalette.js'),
+            'utf8',
+        );
+
+        expect(settingsSource).toContain('data-action="reset-panel-layout"');
+        expect(settingsSource).toContain('EVENTS.COMMAND_RESET_PANEL_LAYOUT');
+        expect(paletteSource).toContain("title: 'Reset panel layout'");
+        expect(paletteSource).toContain('dispatch(EVENTS.COMMAND_RESET_PANEL_LAYOUT)');
+    });
 });

@@ -103,6 +103,10 @@ export class PanelManager {
         EventBus.subscribe(EVENTS.COMMAND_HIDE_ALL_OVERLAYS, () => {
             this.hideAllPanels();
         });
+
+        EventBus.subscribe(EVENTS.COMMAND_RESET_PANEL_LAYOUT, () => {
+            this.resetPanelLayout();
+        });
     }
     
     getPanel(panelName) {
@@ -111,5 +115,16 @@ export class PanelManager {
     
     hideAllPanels() {
         Object.values(this.panels).forEach(panel => panel.hide());
+    }
+
+    resetPanelLayout() {
+        Object.values(this.panels).forEach((panel, index) => {
+            panel.resetLayout();
+            panel.panelElement.style.zIndex = String(1001 + index);
+        });
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+            message: 'Panel layout restored',
+            type: 'success',
+        });
     }
 }

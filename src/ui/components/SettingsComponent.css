@@ -177,6 +177,10 @@
     font-weight: 550;
 }
 
+.settings-component-content .settings-layout-reset {
+    align-self: flex-start;
+}
+
 .settings-component-content .settings-toggle-list {
     display: flex;
     flex-direction: column;

@@ -154,6 +154,27 @@ export class DraggablePanel extends Panel {
     }
 
     /**
+     * Restores the configured first-open geometry while preserving visibility. PanelManager calls
+     * this for every panel so the default cascade is recovered as one atomic user action.
+     */
+    resetLayout() {
+        const defaultPos = this.options.defaultPosition || { x: 100, y: 100 };
+        const style = this.panelElement.style;
+        style.left = `${defaultPos.x}px`;
+        style.top = `${defaultPos.y}px`;
+        style.width = '';
+        style.height = '';
+        style.maxWidth = '';
+        style.maxHeight = '';
+        style.transform = 'none';
+
+        // If the current window is smaller than the normal desktop viewport, keep the restored
+        // panel reachable without reintroducing its old geometry.
+        this._clampIntoViewport();
+        this._saveState();
+    }
+
+    /**
      * Keeps the panel reachable: the top edge clamp is applied LAST, so a panel taller than the
      * viewport overflows off the bottom (still draggable) rather than off the top (unreachable).
      */

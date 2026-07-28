@@ -102,6 +102,7 @@ export class CommandPalette {
             { title: 'Copy code & open r/hexlife', subtitle: 'Then ⋯ → New HexLife post on the subreddit', category: 'Capture', icon: ICONS.share, run: dispatch(EVENTS.COMMAND_POST_TO_REDDIT) },
             { title: 'Colors (Chroma Lab)', category: 'Capture', icon: ICONS.palette, run: () => this._openPanel('chromalab') },
             { title: 'Settings / preferences', category: 'Capture', icon: ICONS.cog, run: () => this._openPanel('settings') },
+            { title: 'Reset panel layout', subtitle: 'Restore the default panel cascade and sizes', category: 'Capture', icon: ICONS.rotateCcw, run: dispatch(EVENTS.COMMAND_RESET_PANEL_LAYOUT) },
             { title: 'Keyboard shortcuts', category: 'Capture', icon: ICONS.keyboard, run: () => this._openPanel('shortcuts') },
             { title: 'Learning Hub', category: 'Capture', icon: ICONS.graduationCap, run: () => this._openPanel('learning') },
         ];
