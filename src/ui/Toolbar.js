@@ -59,14 +59,6 @@ const TOOLBAR_BUTTON_ICONS = {
     helpButton: ICONS.graduationCap,
 };
 
-// The first-session loop should remain visually legible even with the labels
-// collapsed: run a world, generate a rule, then keep or load a discovery.
-const TOOLBAR_DAY_ONE_BUTTONS = new Set([
-    'playPauseButton',
-    'rulesetActionsButton',
-    'libraryButton',
-]);
-
 export class Toolbar {
     constructor(appContext, libraryData) {
         this.appContext = appContext;
@@ -149,7 +141,6 @@ export class Toolbar {
         const label = TOOLBAR_BUTTON_LABELS[elementId] || el.title || '';
         el.innerHTML = `<span class="toolbar-icon">${svg}</span><span class="toolbar-label">${label}</span>`;
         if (label) el.setAttribute('aria-label', label);
-        el.classList.toggle('toolbar-button--day-one', TOOLBAR_DAY_ONE_BUTTONS.has(elementId));
     }
 
     /** Swaps only the inner glyph of a decorated button, preserving its label. @private */

@@ -44,12 +44,10 @@ describe('top-bar action close-out (#32)', () => {
 });
 
 describe('collapsed and expanded rail hierarchy (#32)', () => {
-    it('marks Play, Generate, and Library as the newcomer loop', () => {
-        expect(TOOLBAR).toContain("'playPauseButton'");
-        expect(TOOLBAR).toContain("'rulesetActionsButton'");
-        expect(TOOLBAR).toContain("'libraryButton'");
-        expect(TOOLBAR).toContain('toolbar-button--day-one');
-        expect(THEME_CSS).toMatch(/toolbar-button--day-one:not\(#playPauseButton\)/);
+    it('keeps rail actions visually uniform apart from the existing Play hero', () => {
+        expect(TOOLBAR).not.toContain('toolbar-button--day-one');
+        expect(THEME_CSS).not.toContain('toolbar-button--day-one');
+        expect(THEME_CSS).toMatch(/#playPauseButton\s*\{[^}]*background-color:\s*var\(--accent\)/s);
     });
 
     it('gives collapsed separators a visible two-pixel treatment', () => {

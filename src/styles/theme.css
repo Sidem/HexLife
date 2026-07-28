@@ -340,19 +340,6 @@ select:focus {
     background-color: var(--border-strong);
 }
 
-/* The newcomer loop reads as one tier: Play is the filled hero above; the
-   Generate and Library entries retain a quieter amber treatment. */
-.toolbar-button.toolbar-button--day-one:not(#playPauseButton) {
-    background-color: var(--accent-soft);
-    border-color: var(--accent-border);
-    color: var(--accent);
-}
-
-.toolbar-button.toolbar-button--day-one:not(#playPauseButton):hover {
-    background-color: var(--accent-soft-hover);
-    color: var(--accent-bright);
-}
-
 /* ---------- Popouts ---------- */
 
 .popout-panel {
