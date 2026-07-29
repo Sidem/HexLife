@@ -1,0 +1,118 @@
+{
+  "acceptance": {
+    "browserLatency": {},
+    "familyHeldOut": {
+      "splitMethod": "sha256 family key, 80/10/10 buckets",
+      "test": {
+        "accuracy": 0.8333333333333334,
+        "logLoss": 1.6312632203540052,
+        "pairs": 12
+      },
+      "validation": {
+        "accuracy": 1.0,
+        "logLoss": 0.000033230160100369436,
+        "pairs": 35
+      }
+    },
+    "gliderVsChurn": {
+      "status": "not-run"
+    },
+    "note": "Manual production smoke artifact only; not accepted for Auto-Explore ranking.",
+    "quantizationDrift": {
+      "artifact": "float32",
+      "status": "not-applicable"
+    },
+    "status": "testing"
+  },
+  "architecture": "HexTemporalNetS",
+  "artifact": "model.onnx",
+  "artifactBytes": 127208,
+  "artifactSha256": "b71638e2178f3edf71d5e806622368d7db9770e5ddcf404f96a958a3174ccdd5",
+  "checkpoint": {
+    "epoch": 5,
+    "metrics": {
+      "parameterCount": 21569.0,
+      "trainLogLoss": 0.0014851520937552284,
+      "validationAccuracy": 1.0,
+      "validationLogLoss": 3.3230164353881265e-05,
+      "validationPairs": 35.0
+    }
+  },
+  "createdAt": "2026-07-29T11:41:36.843781+00:00",
+  "dynamicFrames": true,
+  "dynamicGrid": true,
+  "inputs": {
+    "features": {
+      "dtype": "uint8",
+      "shape": [
+        "batch",
+        "time",
+        4,
+        "rows",
+        "pairedCols"
+      ]
+    },
+    "frame_mask": {
+      "dtype": "float32",
+      "shape": [
+        "batch",
+        "time"
+      ]
+    },
+    "tick_offsets": {
+      "dtype": "float32",
+      "shape": [
+        "batch",
+        "time"
+      ]
+    }
+  },
+  "maxFrames": 32,
+  "modelConfig": {
+    "descriptor_dim": 32,
+    "frame_dim": 48,
+    "input_channels": 4,
+    "stage_channels": [
+      16,
+      24,
+      32
+    ],
+    "stem_channels": 8,
+    "temporal_dilations": [
+      1,
+      2,
+      4
+    ],
+    "temporal_dim": 48,
+    "tick_scale": 32.0
+  },
+  "modelId": "hex-temporal-s-smoke-20260729",
+  "outputs": {
+    "descriptor": {
+      "dtype": "float32",
+      "shape": [
+        "batch",
+        32
+      ]
+    },
+    "reward": {
+      "dtype": "float32",
+      "shape": [
+        "batch",
+        1
+      ]
+    }
+  },
+  "parameterCount": 21569,
+  "preprocessing": "state-change-parity-v1",
+  "quantization": "float32",
+  "schema": "hexlife-interest-model-v1",
+  "topology": "odd-q-torus-v1",
+  "trainingData": {
+    "boring": 23,
+    "families": 55,
+    "interesting": 99,
+    "trajectories": 122
+  },
+  "trajectorySchema": "HXLT1"
+}

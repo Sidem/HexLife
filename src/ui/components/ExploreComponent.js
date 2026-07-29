@@ -17,6 +17,10 @@ import { PredictionDeck, PREDICTION_MODE_ENABLED } from './PredictionDeck.js';
 import { VoteBank } from '../../core/analysis/VoteBank.js';
 import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
 import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
+import {
+    MAX_TRAJECTORY_SERIES_TICKS,
+    MAX_TRAJECTORY_SLICES,
+} from '../../services/TrajectoryCaptureService.js';
 
 /**
  * Phase 6 UI for the auto-explore feature (the dual-surface "Explore" panel: desktop popout/panel +
@@ -50,6 +54,7 @@ const SETTING_KEYS = {
     targetBank: 'exploreTargetBankThreshold',
     nativeFrames: 'nativeTrajectoryFrames',
     nativeStride: 'nativeTrajectoryStride',
+    nativeSlices: 'nativeTrajectorySlices',
     nativeLabel: 'nativeTrajectoryLabel',
     nativeFamily: 'nativeTrajectoryFamily',
 };
@@ -203,13 +208,16 @@ export class ExploreComponent extends BaseComponent {
             PersistenceService.loadUISetting(SETTING_KEYS.targetBank, EXPLORE_CONFIG.targetBankThreshold),
         );
         const nativeStatus = this.worldManager.nativeTrajectoryModelService?.getStatus?.() || {
-            enabled: false, status: 'disabled', message: null, modelId: null, backend: null,
+            enabled: false, status: 'disabled', message: null, modelId: null, backend: null, acceptanceStatus: null,
         };
         const nativeFrames = Math.max(1, Math.min(32, Math.trunc(
             Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeFrames, 32)) || 32,
         )));
         const nativeStride = Math.max(1, Math.min(32, Math.trunc(
             Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeStride, 1)) || 1,
+        )));
+        const nativeSlices = Math.max(1, Math.min(MAX_TRAJECTORY_SLICES, Math.trunc(
+            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeSlices, 8)) || 8,
         )));
         const persistedNativeLabel = PersistenceService.loadUISetting(SETTING_KEYS.nativeLabel, 'unlabeled');
         const nativeLabel = ['unlabeled', 'interesting', 'boring'].includes(persistedNativeLabel)
@@ -338,6 +346,12 @@ export class ExploreComponent extends BaseComponent {
                             <input type="number" id="explore-native-stride" min="1" max="32" step="1" value="${nativeStride}">
                         </label>
                         <label>
+                            <span>Slices</span>
+                            <select id="explore-native-slices">
+                                ${[1, 2, 4, 8, 16].map((value) => `<option value="${value}" ${value === nativeSlices ? 'selected' : ''}>${value}</option>`).join('')}
+                            </select>
+                        </label>
+                        <label>
                             <span>Collection label</span>
                             <select id="explore-native-label">
                                 ${['unlabeled', 'interesting', 'boring'].map((value) => `<option value="${value}" ${value === nativeLabel ? 'selected' : ''}>${value}</option>`).join('')}
@@ -349,10 +363,10 @@ export class ExploreComponent extends BaseComponent {
                         </label>
                     </div>
                     <div class="form-group-buttons explore-native-actions">
-                        <button class="button" data-action="export-training-slice" title="Capture exact bit-packed states without advancing the selected world">Export HXLT1 slice</button>
-                        <button class="button" data-action="evaluate-native" ${nativeStatus.status === 'ready' ? '' : 'disabled'} title="Evaluate this same slice with the installed native model">Evaluate selected</button>
+                        <button class="button" data-action="export-training-slice" title="Capture exact bit-packed states without advancing the selected world">Export HXLT1 set</button>
+                        <button class="button" data-action="evaluate-native" ${nativeStatus.status === 'ready' ? '' : 'disabled'} title="Evaluate one clip using the selected frame count and tick stride">Evaluate selected</button>
                     </div>
-                    <div class="explore-field-hint">Exports exact bit matrices; no screenshot or CLIP data. A 32-frame medium slice is about 170 KB.</div>
+                    <div class="explore-field-hint">Multiple slices sample consecutive, non-overlapping future windows and download as one ZIP with an index. The selected world is restored exactly.</div>
                 </div>
             </div>
             <details class="tool-group explore-scoring-group" id="explore-scoring-group" ${scoringOpen ? 'open' : ''}>
@@ -400,6 +414,7 @@ export class ExploreComponent extends BaseComponent {
         this.nativeStatusEl = this.element.querySelector('#explore-native-status');
         this.nativeFramesSelect = this.element.querySelector('#explore-native-frames');
         this.nativeStrideInput = this.element.querySelector('#explore-native-stride');
+        this.nativeSlicesSelect = this.element.querySelector('#explore-native-slices');
         this.nativeLabelSelect = this.element.querySelector('#explore-native-label');
         this.nativeFamilyInput = this.element.querySelector('#explore-native-family');
         this.nativeExportButton = this.element.querySelector('[data-action="export-training-slice"]');
@@ -557,6 +572,11 @@ export class ExploreComponent extends BaseComponent {
                 PersistenceService.saveUISetting(SETTING_KEYS.nativeStride, stride);
             });
         }
+        if (this.nativeSlicesSelect) {
+            this._addDOMListener(this.nativeSlicesSelect, 'change', () => {
+                PersistenceService.saveUISetting(SETTING_KEYS.nativeSlices, Number(this.nativeSlicesSelect.value));
+            });
+        }
         if (this.nativeLabelSelect) {
             this._addDOMListener(this.nativeLabelSelect, 'change', () => {
                 PersistenceService.saveUISetting(SETTING_KEYS.nativeLabel, this.nativeLabelSelect.value);
@@ -657,7 +677,7 @@ export class ExploreComponent extends BaseComponent {
 
     _nativeStatusText(status) {
         if (status?.status === 'ready') {
-            const details = [status.modelId, status.backend].filter(Boolean).join(' · ');
+            const details = [status.modelId, status.backend, status.acceptanceStatus].filter(Boolean).join(' · ');
             return `${NATIVE_STATUS_TEXT.ready}${details ? ` ${details}` : ''}`;
         }
         return status?.message || NATIVE_STATUS_TEXT[status?.status] || NATIVE_STATUS_TEXT.disabled;
@@ -676,6 +696,10 @@ export class ExploreComponent extends BaseComponent {
     _nativeCaptureOptions() {
         const frameCount = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeFramesSelect?.value) || 32)));
         const tickStride = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeStrideInput?.value) || 1)));
+        const sliceCount = Math.max(1, Math.min(
+            MAX_TRAJECTORY_SLICES,
+            Math.trunc(Number(this.nativeSlicesSelect?.value) || 1),
+        ));
         if ((frameCount - 1) * tickStride > 256) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
                 message: 'Training slice span must be 256 ticks or less.',
@@ -683,9 +707,18 @@ export class ExploreComponent extends BaseComponent {
             });
             return null;
         }
+        const totalSpan = (sliceCount - 1) * frameCount * tickStride + (frameCount - 1) * tickStride;
+        if (totalSpan > MAX_TRAJECTORY_SERIES_TICKS) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: `Training-slice set span must be ${MAX_TRAJECTORY_SERIES_TICKS} ticks or less.`,
+                type: 'error',
+            });
+            return null;
+        }
         return {
             frameCount,
             tickStride,
+            sliceCount,
             label: this.nativeLabelSelect?.value || 'unlabeled',
             family: this.nativeFamilyInput?.value.trim().slice(0, 100) || '',
         };

@@ -52,6 +52,7 @@ export class NativeTrajectoryModelService {
             message: this.message,
             modelId: this.manifest?.modelId || null,
             backend: this.backend,
+            acceptanceStatus: this.manifest?.acceptance?.status || null,
         };
     }
 

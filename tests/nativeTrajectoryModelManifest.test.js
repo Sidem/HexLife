@@ -21,6 +21,11 @@ describe('native trajectory model manifest', () => {
         expect(validateNativeTrajectoryModelManifest(accepted)).toBe(accepted);
     });
 
+    it('accepts an explicitly marked manual-testing artifact', () => {
+        const testing = manifest({ acceptance: { status: 'testing' } });
+        expect(validateNativeTrajectoryModelManifest(testing)).toBe(testing);
+    });
+
     it('refuses an unvalidated training export', () => {
         expect(() => validateNativeTrajectoryModelManifest(manifest({
             acceptance: { status: 'unvalidated' },

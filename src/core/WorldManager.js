@@ -317,9 +317,14 @@ export class WorldManager {
         });
         EventBus.subscribe(EVENTS.COMMAND_CAPTURE_TRAINING_SLICE, async (data) => {
             try {
-                const result = await this.trajectoryCaptureService.captureAndDownload(data || {});
+                const sliceCount = Math.max(1, Math.trunc(Number(data?.sliceCount) || 1));
+                const result = sliceCount > 1
+                    ? await this.trajectoryCaptureService.captureSeriesAndDownload(data || {})
+                    : await this.trajectoryCaptureService.captureAndDownload(data || {});
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                    message: `Exported ${result.header.frameCount}-frame training slice.`,
+                    message: sliceCount > 1
+                        ? `Exported ${result.headers.length} training slices as one ZIP.`
+                        : `Exported ${result.header.frameCount}-frame training slice.`,
                     type: 'success',
                 });
             } catch (error) {

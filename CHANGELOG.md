@@ -25,6 +25,10 @@ is not major if every code above still resolves to the same world.
 
 ### Added
 
+- **Native-interest data collection and manual model testing.** Auto-Explore can export 1–16
+  consecutive, non-destructive HXLT1 slices as one indexed ZIP. An explicitly marked `testing`
+  native model can now be loaded for the manual **Evaluate selected** action without enabling it
+  for Auto-Explore ranking.
 - **Ruleset relatives and family naming.** Saving a ruleset now shows its nearest named relatives in
   the strictest shared constraint space and can continue a family name with Roman-numeral suffixes.
 

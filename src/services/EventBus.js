@@ -449,11 +449,11 @@ export const EVENTS = {
     EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
     /** @param {{enabled: boolean}} data - Enable/disable the final HexLife-native trajectory model. Training never runs in Explorer; enabling loads the local versioned manifest + ONNX artifact. */
     COMMAND_SET_NATIVE_MODEL_ENABLED: 'command:setNativeModelEnabled',
-    /** @param {{frameCount?: number, tickStride?: number, label?: 'unlabeled'|'interesting'|'boring', notes?: string}} data - Non-destructively capture and download an HXLT1 training slice from the selected world. */
+    /** @param {{frameCount?: number, tickStride?: number, sliceCount?: number, label?: 'unlabeled'|'interesting'|'boring', family?: string, notes?: string}} data - Non-destructively capture and download one HXLT1 slice, or a ZIP of consecutive non-overlapping slices, from the selected world. */
     COMMAND_CAPTURE_TRAINING_SLICE: 'command:captureTrainingSlice',
     /** @param {{frameCount?: number, tickStride?: number}} data - Capture the selected world non-destructively and evaluate it with the loaded native model. */
     COMMAND_EVALUATE_NATIVE_MODEL: 'command:evaluateNativeModel',
-    /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean, modelId: string|null, backend: string|null}} data - Native trajectory-model load status. */
+    /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean, modelId: string|null, backend: string|null, acceptanceStatus: 'accepted'|'testing'|null}} data - Native trajectory-model load status. */
     NATIVE_MODEL_STATUS_CHANGED: 'explore:nativeModelStatusChanged',
     /** @param {{count: number, winner: 'a'|'b'|'skip'}} data - A swipe-to-judge "which is more interesting?" vote was banked (PLAY-LAYER-PLAN §S). `count` is the new total banked vote count; surfaces use it to update their "N votes banked" chips and the refit affordance. */
     VOTE_RECORDED: 'explore:voteRecorded',

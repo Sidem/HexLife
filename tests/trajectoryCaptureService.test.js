@@ -35,4 +35,43 @@ describe('TrajectoryCaptureService', () => {
         expect(captured.header.family).toBe('glider-mutants-a');
         expect(captured.frames).toBe(frames);
     });
+
+    it('encodes a labeled series with non-overlapping worker-sampled source ticks', async () => {
+        const bytesPerFrame = Math.ceil(Config.NUM_CELLS / 8);
+        const makeFrames = () => [new Uint8Array(bytesPerFrame), new Uint8Array(bytesPerFrame)];
+        const proxy = {
+            isInitialized: true,
+            getLatestStats: () => ({ rulesetHex: '0'.repeat(32) }),
+            captureTrajectorySeries: vi.fn(async () => [
+                { frames: makeFrames(), sourceTick: 40 },
+                { frames: makeFrames(), sourceTick: 46 },
+                { frames: makeFrames(), sourceTick: 52 },
+            ]),
+        };
+        const service = new TrajectoryCaptureService({
+            selectedWorldIndex: 0,
+            worlds: [proxy],
+            worldSettings: [{ rulesetHex: '1'.repeat(32), initialState: { mode: 'blank' } }],
+            autoExploreService: { isRunning: () => false },
+        });
+
+        const records = await service.captureSeriesSelected({
+            frameCount: 2,
+            tickStride: 3,
+            sliceCount: 3,
+            label: 'boring',
+            family: 'still-life-a',
+        });
+
+        expect(proxy.captureTrajectorySeries).toHaveBeenCalledWith({
+            frameCount: 2,
+            tickStride: 3,
+            sliceCount: 3,
+        });
+        expect(records.map((record) => record.header.sourceTick)).toEqual([40, 46, 52]);
+        expect(records.map((record) => record.header.collectionIndex)).toEqual([0, 1, 2]);
+        expect(new Set(records.map((record) => record.header.collectionId)).size).toBe(1);
+        expect(records.every((record) => record.header.label === 'boring')).toBe(true);
+        expect(records.every((record) => record.header.family === 'still-life-a')).toBe(true);
+    });
 });

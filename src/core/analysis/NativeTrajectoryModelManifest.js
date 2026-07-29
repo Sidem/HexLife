@@ -12,7 +12,9 @@ export function validateNativeTrajectoryModelManifest(manifest) {
         manifest.preprocessing !== 'state-change-parity-v1') {
         throw new Error('incompatible native-model manifest');
     }
-    if (manifest.acceptance?.status !== 'accepted') {
+    // `testing` artifacts are explicitly permitted for the owner-facing manual evaluation surface.
+    // They still never enter Auto-Explore ranking; `unvalidated` exports remain refused.
+    if (!['accepted', 'testing'].includes(manifest.acceptance?.status)) {
         throw new Error('native-model manifest has not passed acceptance');
     }
     if (!manifest.artifact || !manifest.artifactSha256) {

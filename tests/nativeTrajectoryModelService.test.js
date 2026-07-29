@@ -8,7 +8,7 @@ class FakeWorker {
                 queueMicrotask(() => this.onmessage({
                     data: {
                         type: 'READY',
-                        manifest: { modelId: 'native-test' },
+                        manifest: { modelId: 'native-test', acceptance: { status: 'testing' } },
                         backend: 'wasm',
                     },
                 }));
@@ -38,7 +38,12 @@ describe('NativeTrajectoryModelService', () => {
             manifestUrl: '/model.json',
         });
         expect(await service.ensureReady()).toBe(true);
-        expect(service.getStatus()).toMatchObject({ status: 'ready', modelId: 'native-test', backend: 'wasm' });
+        expect(service.getStatus()).toMatchObject({
+            status: 'ready',
+            modelId: 'native-test',
+            backend: 'wasm',
+            acceptanceStatus: 'testing',
+        });
         const result = await service.evaluate({
             frames: [new Uint8Array([1])],
             rows: 2,
