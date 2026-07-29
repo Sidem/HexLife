@@ -14,10 +14,15 @@ import {
 } from '../src/core/analysis/ScoringPresets.js';
 import { SCORE_CONFIG, scoreSingleIC } from '../src/core/analysis/InterestingnessScore.js';
 import { EXPLORE_CONFIG } from '../src/core/AutoExploreService.js';
+import { COMPONENT_META } from '../src/ui/components/scoringTermMeta.js';
 
 describe('ScoringPresets — drift guards', () => {
     it('WEIGHT_KEYS exactly covers SCORE_CONFIG.weights', () => {
         expect([...WEIGHT_KEYS].sort()).toEqual(Object.keys(SCORE_CONFIG.weights).sort());
+    });
+
+    it('the scoring UI metadata exactly covers WEIGHT_KEYS in display order', () => {
+        expect(COMPONENT_META.map((term) => term.key)).toEqual([...WEIGHT_KEYS]);
     });
 
     it('DEFAULT_WEIGHTS_PCT mirrors SCORE_CONFIG.weights (×100, rounded)', () => {

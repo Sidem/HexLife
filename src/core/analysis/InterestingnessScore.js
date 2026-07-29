@@ -42,6 +42,13 @@
  */
 
 /**
+ * @typedef {object} ChangeOrderStats
+ * @property {number} mean  Mean join-count order of the last-tick change mask over the burst.
+ *   Positive = localized changes; ~0 = randomly distributed changes; negative = alternating changes.
+ * @property {number} last  Last sampled change-mask order value.
+ */
+
+/**
  * @typedef {object} TransportStats
  * @property {number} meanSpeed  Mean per-tick active-cell centroid drift speed (cells/tick) over the
  *   burst (v2.9 transport/mobility term). Coherent translation (gliders/spaceships) → high; a dense
@@ -68,6 +75,7 @@
  * @property {ChangedStats} [changed]
  * @property {BlockEntropyStats} [blockEntropy]
  * @property {SpatialOrderStats} [spatialOrder] v2.1 spatial-order stats (absent on v1 metrics).
+ * @property {ChangeOrderStats} [changeOrder] v3.4 change-mask localization stats (absent on legacy metrics).
  * @property {TransportStats} [transport] v2.9 centroid-drift transport stats (absent on v1 metrics).
  * @property {EmbeddingStats} [embedding] v3.0 foundation-model perceptual stats (absent unless the
  *   optional embedding objective is enabled and a model produced a usable frame trajectory).
@@ -86,12 +94,14 @@
  * @property {number} fluctuation   Activity-fluctuation (CV) term ([0,1]).
  * @property {number} ruleDiversity Shannon diversity of rule usage ([0,1]).
  * @property {number} spatialStructure     Spatial-order deviation term ([0,1]) — 0 if unused (v2).
+ * @property {number} changeLocalization   Positive change-mask localization term ([0,1]) — 0 if unused (v3.4).
  * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
  * @property {number} temporalEntropyVariance Temporal block-entropy-variance term ([0,1]) — 0 if unused (v2.8).
  * @property {number} transport     Centroid-drift transport/mobility term ([0,1]) — 0 if unused (v2.9).
  * @property {number} openEndedness Foundation-model trajectory-novelty term ([0,1]) — 0 if unused (v3.0).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
  * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
+ * @property {boolean} changeLocalizationUsed Whether changeOrder.mean was present and counted (v3.4).
  * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
  * @property {boolean} transportUsed   Whether transport.meanSpeed was present and the transport term counted (v2.9).
  * @property {boolean} openEndednessUsed Whether an embedding trajectory was present and the perceptual term counted (v3.0).
@@ -110,6 +120,7 @@
  * @property {number|null} cv                Changed-count CV (fluctuation input).
  * @property {number|null} ruleDiversityNorm Normalized rule-usage Shannon entropy (ruleDiversity input).
  * @property {number|null} spatialOrderMean  Mean spatial-order statistic (spatialStructure input).
+ * @property {number|null} changeOrderMean   Mean change-mask order (changeLocalization input).
  * @property {number|null} spatialVariance   Across-block surprisal variance (spatialHeterogeneity input).
  * @property {number|null} temporalVariance  Temporal block-entropy variance (temporalEntropyVariance input).
  * @property {number|null} transportSpeed    Mean centroid drift speed (transport input).
@@ -203,14 +214,20 @@ export const SCORE_CONFIG = {
     // smaller scale (historical ≤ consecutive, always). Weights are untouched, so an embeddings-off
     // score is byte-identical and every existing fixture ordering is preserved.
     weights: {
-        criticality: 0.16,
-        entropyBand: 0.07,
+        // v3.4 (#37 Stage 2): reserve 0.15 for localized change and scale the prior statistical
+        // objective by 0.85, preserving every old term's relative influence. The optional perceptual
+        // weight remains additive so embeddings-off and embeddings-on continue sharing one basis.
+        // Integer-percent values keep the default Scoring sliders exactly round-trippable. The
+        // largest-remainder rounding of the ideal ×0.85 allocation assigns the spare point to Flux.
+        criticality: 0.14,
+        entropyBand: 0.06,
         fluctuation: 0.04,
-        ruleDiversity: 0.07,
-        spatialStructure: 0.31,
-        spatialHeterogeneity: 0.11,
-        temporalEntropyVariance: 0.13,
-        transport: 0.11,
+        ruleDiversity: 0.06,
+        spatialStructure: 0.26,
+        changeLocalization: 0.15,
+        spatialHeterogeneity: 0.09,
+        temporalEntropyVariance: 0.11,
+        transport: 0.09,
         openEndedness: 0.12,
     },
 
@@ -233,6 +250,9 @@ export const SCORE_CONFIG = {
     /** |spatialOrder.mean| at which the structure term reaches 0.5. Deviation in EITHER direction
      *  from random mixing (≈0) counts as structure. Tuned from the fixtures (gliders ≈0.23 vs churn ≈0.02). */
     spatialOrderHalfSat: 0.12,
+    /** Positive changeOrder.mean at which localized change reaches 0.5. The captured reference
+     *  values are gliders-chaos 0.41193 and churn-sparse 0.14210; their geometric mean is 0.24194. */
+    changeOrderHalfSat: 0.242,
     /** blockEntropy.spatialVariance at which the heterogeneity term reaches 0.5 (the [0,1]-entropy
      *  variance scale is small). */
     spatialVarHalfSat: 0.02,
@@ -266,7 +286,7 @@ export const SCORE_CONFIG = {
 
     // --- Uniform-chaos penalty (v3.1): a MULTIPLICATIVE factor on the combined score, not a tenth
     // weighted term. Rationale (measured on tests/fixtures/exploreEvalFixtures.json): homogeneous
-    // full-coverage churn maxes five of the nine graded terms (criticality≈1, entropyBand≈1,
+    // full-coverage churn maxed five of the nine pre-Stage-2 graded terms (criticality≈1, entropyBand≈1,
     // fluctuation≈0.81, heterogeneity≈0.84), so churn_sparse_160 lands at ≈0.49 — ABOVE the 0.45
     // findThreshold — and floods the gallery whenever confirmation misses its cycle. A weighted
     // coverage term cannot fix this: drop-and-renormalize dilutes it (weight 0.12→0.20 only moves
@@ -370,12 +390,14 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 fluctuation: 0,
                 ruleDiversity: 0,
                 spatialStructure: 0,
+                changeLocalization: 0,
                 spatialHeterogeneity: 0,
                 temporalEntropyVariance: 0,
                 transport: 0,
                 openEndedness: 0,
                 criticalityUsed: false,
                 spatialUsed: false,
+                changeLocalizationUsed: false,
                 temporalVarUsed: false,
                 transportUsed: false,
                 openEndednessUsed: false,
@@ -412,6 +434,16 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const hasSpatialOrder = soMean != null && Number.isFinite(soMean);
     const soMag = hasSpatialOrder ? Math.abs(soMean) : 0;
     const spatialStructure = hasSpatialOrder ? soMag / (soMag + cfg.spatialOrderHalfSat) : 0;
+
+    // --- Change localization (positive join-count order of the last-tick change mask). v3.4. ---
+    // Localized fronts/movers flip compact regions; uniform churn scatters flips randomly (~0).
+    // Anti-clustered/checkerboard-like change is not useful structure, so negative values receive 0.
+    const coMean = metrics.changeOrder != null ? metrics.changeOrder.mean : undefined;
+    const hasChangeOrder = coMean != null && Number.isFinite(coMean);
+    const coPositive = hasChangeOrder ? Math.max(0, /** @type {number} */(coMean)) : 0;
+    const changeLocalization = hasChangeOrder
+        ? coPositive / (coPositive + cfg.changeOrderHalfSat)
+        : 0;
 
     // --- Spatial heterogeneity (across-block surprisal variance). v2.1. ---
     const sv = metrics.blockEntropy ? metrics.blockEntropy.spatialVariance : undefined;
@@ -464,6 +496,10 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += spatialStructure * w.spatialStructure;
         den += w.spatialStructure;
     }
+    if (hasChangeOrder) {
+        num += changeLocalization * w.changeLocalization;
+        den += w.changeLocalization;
+    }
     if (hasSpatialVar) {
         num += spatialHeterogeneity * w.spatialHeterogeneity;
         den += w.spatialHeterogeneity;
@@ -499,8 +535,10 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         score,
         components: {
             criticality, entropyBand, fluctuation, ruleDiversity,
-            spatialStructure, spatialHeterogeneity, temporalEntropyVariance, transport, openEndedness,
-            criticalityUsed, spatialUsed, temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
+            spatialStructure, changeLocalization, spatialHeterogeneity,
+            temporalEntropyVariance, transport, openEndedness,
+            criticalityUsed, spatialUsed, changeLocalizationUsed: hasChangeOrder,
+            temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
             openEndednessUsed: hasOpenEndedness,
             uniformFactor, uniformUsed,
         },
@@ -513,6 +551,7 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
             cv: metrics.changed ? cv : null,
             ruleDiversityNorm: metrics.ruleUsageDelta ? ruleUsageDiversity(metrics.ruleUsageDelta) : null,
             spatialOrderMean: hasSpatialOrder ? /** @type {number} */(soMean) : null,
+            changeOrderMean: hasChangeOrder ? /** @type {number} */(coMean) : null,
             spatialVariance: hasSpatialVar ? /** @type {number} */(sv) : null,
             temporalVariance: hasTemporalVar ? /** @type {number} */(tv) : null,
             transportSpeed: hasTransport ? /** @type {number} */(tp) : null,
@@ -544,9 +583,11 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
             perIC: [],
             perComponent: {
                 criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
-                spatialStructure: 0, spatialHeterogeneity: 0, temporalEntropyVariance: 0, transport: 0,
+                spatialStructure: 0, changeLocalization: 0, spatialHeterogeneity: 0,
+                temporalEntropyVariance: 0, transport: 0,
                 openEndedness: 0,
-                criticalityUsed: false, spatialUsed: false, temporalVarUsed: false, transportUsed: false,
+                criticalityUsed: false, spatialUsed: false, changeLocalizationUsed: false,
+                temporalVarUsed: false, transportUsed: false,
                 openEndednessUsed: false,
                 uniformFactor: 1, uniformUsed: false,
             },

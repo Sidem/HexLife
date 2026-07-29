@@ -69,8 +69,10 @@ async function initialize() {
     }
     console.log("GPU detection:", detection);
 
-    // Capture the dev curation flag BEFORE loadFromUrl, which may strip query params via replaceState.
+    // Capture dev-tool flags BEFORE loadFromUrl, which may strip query params via replaceState.
     const curateMode = new URLSearchParams(window.location.search).has('curate');
+    const benchmarkMode = import.meta.env.DEV
+        && new URLSearchParams(window.location.search).has('benchmark');
 
     const sharedSettings = SettingsLoader.loadFromUrl();
 
@@ -134,6 +136,7 @@ async function initialize() {
 
     const app = new Application(appContext);
     if (window.__headless) window.__hexlife = appContext; // headless-only debug handle for in-browser verification
+    if (benchmarkMode) appContext.suppressAutoTour = true;
     app.run();
 
     // Second half of `?edit=1`: open the editor where this device shows it — draggable panel on
@@ -158,6 +161,17 @@ async function initialize() {
                 appContext._curationOverlay = new LibraryCurationOverlay(appContext);
             })
             .catch(err => console.error('Failed to load curation overlay:', err));
+    }
+
+    // DEV-only: deterministic #37 benchmark capture surface. The browser runner uses a real live
+    // worker per world and publishes the generated JSON into the page for saving; normal sessions
+    // never load this module.
+    if (benchmarkMode) {
+        import('./ui/dev/InterestingnessBenchmarkCapture.js')
+            .then(({ mountInterestingnessBenchmarkCapture }) => {
+                mountInterestingnessBenchmarkCapture(appContext, rulesetLibrary);
+            })
+            .catch(err => console.error('Failed to load benchmark capture surface:', err));
     }
 }
 

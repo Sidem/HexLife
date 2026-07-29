@@ -988,7 +988,7 @@ export class AutoExploreService {
     _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, embedding = null, cellKeyOverride = null) {
         // Screening is model-free, so its perComponent has no perceptual term. The open-endedness is
         // measured during confirmation; overlay it (the half-saturation reward + flag) so the gallery's
-        // "Novelty" bar shows it. The other eight terms keep their screen values (screening measures them).
+        // "Novelty" bar shows it. The other nine terms keep their screen values (screening measures them).
         let perComponent = scored.perComponent;
         if (embedding && Number.isFinite(embedding.openEndedness)) {
             const oe = embedding.openEndedness;

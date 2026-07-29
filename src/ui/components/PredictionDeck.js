@@ -10,7 +10,7 @@ import { makePredictionRound, randomRoundSeed } from '../../core/analysis/predic
  *
  * One card at a time: the still first frame of a real world, four buttons, then the reveal. It is the
  * newcomer-tier entry point on Discover, so by the #29 rule it mounts *above* `#explore-advanced`,
- * never inside it — a first-time visitor should meet a question they can answer, not the nine-term
+ * never inside it — a first-time visitor should meet a question they can answer, not the multi-term
  * objective. Its whole surface is three resting controls (the card, the four choices, "Next").
  *
  * **Why it exists beyond being fun.** Every graded round is a human labelling a real ruleset with what

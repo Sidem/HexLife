@@ -302,6 +302,7 @@ function uniformChurn() {
         changed: { mean: 4000, variance: 64000000, fano: 16000, cv: 2.0 },
         blockEntropy: { mean: 0.4, variance: 0.01, spatialVariance: 0.001 },
         spatialOrder: { mean: 0.0, last: 0.0 },
+        changeOrder: { mean: 0.0, last: 0.0 },
         sigma: 1.0,
         ruleUsageDelta: uniformDelta(120),
         extinct: false,
@@ -320,6 +321,7 @@ function structuredCritical() {
         changed: { mean: 1500, variance: 2250000, fano: 1500, cv: 1.0 },
         blockEntropy: { mean: 0.4, variance: 0.01, spatialVariance: 0.05 },
         spatialOrder: { mean: 0.5, last: 0.5 },
+        changeOrder: { mean: 0.4, last: 0.4 },
         sigma: 1.0,
         ruleUsageDelta: uniformDelta(80),
         extinct: false,
@@ -359,6 +361,53 @@ describe('scoreSingleIC — spatial structure (v2)', () => {
         expect(r.components.spatialStructure).toBe(0);
         expect(r.components.spatialHeterogeneity).toBe(0);
         // Dropping the spatial weights must not zero the score — it scores on the remaining terms.
+        expect(r.score).toBeGreaterThan(0);
+    });
+});
+
+// --- v3.4: change-mask localization (#37 Stage 2) ---------------------------
+
+describe('scoreSingleIC — change-mask localization (v3.4)', () => {
+    it('rewards positive localized change and maps random/alternating change to zero', () => {
+        const localized = scoreSingleIC({
+            ...structuredCritical(),
+            changeOrder: { mean: 0.4, last: 0.4 },
+        });
+        const random = scoreSingleIC({
+            ...structuredCritical(),
+            changeOrder: { mean: 0, last: 0 },
+        });
+        const alternating = scoreSingleIC({
+            ...structuredCritical(),
+            changeOrder: { mean: -0.4, last: -0.4 },
+        });
+
+        expect(localized.components.changeLocalizationUsed).toBe(true);
+        expect(localized.components.changeLocalization).toBeGreaterThan(0.5);
+        expect(random.components.changeLocalization).toBe(0);
+        expect(alternating.components.changeLocalization).toBe(0);
+        expect(localized.score).toBeGreaterThan(random.score);
+        expect(alternating.score).toBeCloseTo(random.score, 12);
+    });
+
+    it('is exactly 0.5 at the calibrated half-saturation value', () => {
+        const r = scoreSingleIC({
+            ...structuredCritical(),
+            changeOrder: {
+                mean: SCORE_CONFIG.changeOrderHalfSat,
+                last: SCORE_CONFIG.changeOrderHalfSat,
+            },
+        });
+        expect(r.components.changeLocalization).toBeCloseTo(0.5, 12);
+    });
+
+    it('drops and renormalizes the term when changeOrder is absent on legacy metrics', () => {
+        const metrics = structuredCritical();
+        delete metrics.changeOrder;
+        const r = scoreSingleIC(metrics);
+        expect(r.components.changeLocalizationUsed).toBe(false);
+        expect(r.components.changeLocalization).toBe(0);
+        expect(r.raw.changeOrderMean).toBeNull();
         expect(r.score).toBeGreaterThan(0);
     });
 });
@@ -466,8 +515,8 @@ describe('scoreSingleIC — open-endedness / perceptual novelty (v3.0)', () => {
 
     it('OFF-PATH IDENTITY: adding the (absent) term does not change a model-free score', () => {
         // The embedding-off score must be byte-identical to the statistical pipeline. Since the
-        // openEndedness weight is ADDED without touching the other eight, scoring metrics with no
-        // `embedding` field renormalizes over exactly the same eight terms ⇒ same number.
+        // openEndedness weight is ADDED without touching the statistical basis, so metrics with no
+        // `embedding` field renormalize over exactly the same statistical terms ⇒ same number.
         const m = structuredCritical();
         const withUndefined = scoreSingleIC({ ...m, embedding: undefined }).score;
         const without = scoreSingleIC(m).score;
@@ -598,15 +647,24 @@ describe('scoreSingleIC — raw metric inputs (v3.1 explainer markers)', () => {
         expect(r.raw.blockEntropyMean).toBeCloseTo(0.4, 10);
         expect(r.raw.cv).toBe(1.0);
         expect(r.raw.spatialOrderMean).toBe(0.5);
+        expect(r.raw.changeOrderMean).toBe(0.4);
         expect(r.raw.finalRatio).toBeCloseTo(0.3, 10);
         expect(r.raw.transportSpeed).toBeNull();   // no transport field
         expect(r.raw.openEndedness).toBeNull();    // embeddings off
     });
 });
 
-describe('Score v3.1 — real fixtures (the strengthened chaos regression)', () => {
+describe('Score v3.4 — real fixtures (#37 Stage 2)', () => {
     const glidersChaos = scoreSingleIC({ ...fixtures.gliders_chaos_160, icLabel: 'chaos' }).score;
     const churn = scoreSingleIC({ ...fixtures.churn_sparse_160, icLabel: 'sparse' });
+
+    it('change localization clearly separates the glider footprint from churn', () => {
+        const gliderOrder = fixtures.gliders_chaos_160.changeOrder.mean;
+        const churnOrder = fixtures.churn_sparse_160.changeOrder.mean;
+        expect(gliderOrder).toBeGreaterThan(churnOrder * 2.5);
+        expect(gliderOrder).toBeGreaterThan(SCORE_CONFIG.changeOrderHalfSat);
+        expect(churnOrder).toBeLessThan(SCORE_CONFIG.changeOrderHalfSat);
+    });
 
     it('churn-sparse now screens BELOW the find threshold (0.45) with margin', () => {
         expect(churn.score).toBeLessThan(0.35);
@@ -622,8 +680,8 @@ describe('Score v3.1 — real fixtures (the strengthened chaos regression)', () 
         expect(glidersChaos).toBeCloseTo(unpenalized, 12);
     });
 
-    it('the gliders−churn gap widened to ≥0.25 (was ≥0.10)', () => {
-        expect(glidersChaos - churn.score).toBeGreaterThanOrEqual(0.25);
+    it('the gliders−churn gap widened to ≥0.40 (was ≥0.25 before Stage 2)', () => {
+        expect(glidersChaos - churn.score).toBeGreaterThanOrEqual(0.40);
     });
 });
 

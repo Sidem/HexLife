@@ -2,23 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { scoreSingleIC, applyConfirmation } from '../src/core/analysis/InterestingnessScore.js';
 import { classifyRulesetConstraint } from '../src/core/rulesetDescriptor.js';
 import benchmark from './fixtures/interestingnessBenchmark.json';
+import library from '../src/core/library/rulesets.json';
 
 /**
- * #37 Stage 0 — the human-alignment benchmark (the instrument, not a fix).
+ * #37 human-alignment benchmark (the instrument, not a fix).
  *
- * Two fixture rulesets can tell us gliders out-rank churn; they cannot tell us whether the objective
- * agrees with a human *in general*. This file measures that on a labeled panel: 16 human-picked
- * "interesting" rulesets (the curated library is human-picked by definition) vs 7 hand-verified
- * "boring" ones (the v2 churn reference plus high-scoring auto-explore finds that are visually
- * uniform static — the exact failure the owner reports).
+ * Every curated public-library ruleset is a positive; the seven Stage-0 hand-verified uniform/static
+ * controls are negatives. The complete-library view is the current product baseline. Entries from
+ * the original 16-positive panel retain `cohort: "stage0"` so the old 0.509 measurement remains
+ * available as a longitudinal slice instead of being overwritten by panel growth.
  *
  * The two headline numbers:
  *   pairwiseAccuracy — fraction of (interesting, boring) cross-pairs the scorer orders correctly.
  *   marginMean       — mean(interesting score) − mean(boring score).
  *
- * Both are pinned at **whatever the scorer measured when the panel was captured** (2026-07-22).
- * Stage 0 deliberately does NOT improve the score — it pins the starting point so Stages 2/5 have a
- * needle to move. The baseline is mediocre by design: pairwiseAccuracy 0.509 is a coin flip.
+ * Baselines are pinned at whatever the scorer measured when the panel was captured. Stage 2 moves
+ * the complete-library pairwise accuracy from 0.431 to 0.444 and the preserved slice from 0.509
+ * to 0.518 by rewarding localized change.
  *
  * Scores are read at CONFIRM length (600 ticks) through `applyConfirmation`, i.e. exactly what
  * auto-explore banks: hard kills → 0, long cycles → penalized+tagged. `SCREEN_*` constants record
@@ -58,6 +58,12 @@ function scoreEntry(entry) {
 const rows = benchmark.entries.map(scoreEntry);
 const positives = rows.filter((r) => r.label === 'interesting');
 const negatives = rows.filter((r) => r.label === 'boring');
+const stage0Rows = benchmark.entries
+    .map((entry, index) => ({ entry, row: rows[index] }))
+    .filter(({ entry }) => entry.cohort === 'stage0')
+    .map(({ row }) => row);
+const stage0Positives = stage0Rows.filter((r) => r.label === 'interesting');
+const stage0Negatives = stage0Rows.filter((r) => r.label === 'boring');
 
 /**
  * Fraction of (interesting × boring) cross-pairs the scorer orders correctly (ties count as losses).
@@ -80,51 +86,31 @@ function pairwiseAccuracy(pos, neg, key = 'score') {
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const marginMean = (pos, neg) => mean(pos.map((r) => r.score)) - mean(neg.map((r) => r.score));
 
-// --- Recorded baselines (measured 2026-07-22, score v3.1) ------------------------------------
-// Exact measurements, kept as the raw win/pair fractions so a re-derivation is legible:
-//   overall  57/112 = 0.508928…   margin −0.00098   (mean pos 0.50876, mean neg 0.50974)
-//   free     14/24  = 0.583333…
-//   r_sym     7/18  = 0.388888…   ← symmetric churn out-ranks symmetric structure more often than not
-//   screen   39/112 = 0.348214…   (the cheap screen is *worse* than chance)
+// --- Recorded baselines (score v3.4, #37 Stage 2) --------------------------------------------
+// Complete public library, captured 2026-07-29:
+//   overall  227/511 = 0.444227…   margin −0.05584
+//   free       34/64 = 0.531250…
+//   r_sym     55/150 = 0.366666…   ← the largest and still-weakest library class
+//   screen    150/511 = 0.293542…
+//
+// Preserved Stage-0 slice, captured with the Stage-2 metric:
+//   overall   58/112 = 0.517857…   margin +0.01617
+//   free       15/24 = 0.625000…
+//   r_sym       8/18 = 0.444444…
+//   screen     45/112 = 0.401785…
 // The constants sit a hair below the measurements so a last-bit float drift can't fail the build;
-// a real regression moves these by whole pairs (1 pair ≈ 0.009).
-const BASELINE_PAIRWISE_ACCURACY = 0.5089;
-const BASELINE_MARGIN = -0.0010;
-const BASELINE_FREE_ACCURACY = 0.5833;
-const BASELINE_RSYM_ACCURACY = 0.3888;
-const BASELINE_SCREEN_ACCURACY = 0.3482;
+// a real regression moves these by whole pairs.
+const BASELINE_PAIRWISE_ACCURACY = 0.4442;
+const BASELINE_MARGIN = -0.0559;
+const BASELINE_FREE_ACCURACY = 0.5312;
+const BASELINE_RSYM_ACCURACY = 0.3666;
+const BASELINE_SCREEN_ACCURACY = 0.2935;
 
-// Per-entry table at capture time (confirm-length banked score, best first). Stages 2/5 must show
-// which rows flip; regenerate with `BENCH_TABLE=1 npx vitest run tests/interestingnessBenchmark.test.js`.
-//
-//   0.759  interesting  r_sym       lib27_stable_exchange
-//   0.748  interesting  free        lib23_dancer_1
-//   0.702  interesting  free        lib34_lazers
-//   0.700  interesting  n_count     lib19_mandala_1_with_hidden_stability
-//   0.693  interesting  r_sym       lib29_mutated_oscillators
-//   0.693  BORING       r_sym       neg_rsym_static_a
-//   0.691  interesting  totalistic  lib20_exothermic_reaction_requiring_activation
-//   0.623  BORING       free        neg_free_static_c
-//   0.609  interesting  free        lib02_moving_cracks
-//   0.587  BORING       free        neg_free_static_b
-//   0.554  BORING       r_sym       neg_rsym_static_b
-//   0.535  interesting  r_sym       lib09_spontaneous_gliders
-//   0.534  BORING       r_sym       neg_rsym_static_c
-//   0.516  BORING       free        neg_free_static_a
-//   0.480  interesting  free        lib15_chains
-//   0.472  interesting  r_sym       lib14_organic_crystals
-//   0.429  interesting  free        lib03_lichtenberg_figures
-//   0.406  interesting  r_sym       lib10_amoeba_1
-//   0.399  interesting  free        lib25_spears_in_rain
-//   0.177  interesting  n_count     lib13_game_of_life_like_3   (cycle 12 → ×0.25)
-//   0.173  interesting  r_sym       lib08_oscillators_2_spinners (cycle 42 → ×0.25)
-//   0.167  interesting  n_count     lib11_game_of_life_like_1   (cycle 12 → ×0.25)
-//   0.063  BORING       free        neg_churn_sparse            (cycle 84 → ×0.25)
-//
-// Reading it: five of the seven boring entries land in the interesting entries' score band, and the
-// only negative the objective decisively rejects (neg_churn_sparse) is rejected by the *cycle*
-// penalty rather than by any structure term. Meanwhile three genuine positives are demoted by that
-// same cycle penalty — human-interesting rules are often long cyclers.
+const STAGE0_PAIRWISE_ACCURACY = 0.5178;
+const STAGE0_MARGIN = 0.0161;
+const STAGE0_FREE_ACCURACY = 0.6249;
+const STAGE0_RSYM_ACCURACY = 0.4444;
+const STAGE0_SCREEN_ACCURACY = 0.4017;
 
 function formatTable() {
     return rows
@@ -144,23 +130,34 @@ if (process.env.BENCH_TABLE) {
 // --- Tests -----------------------------------------------------------------------------------
 
 describe('interestingness benchmark — panel integrity', () => {
-    it('is a two-class panel of 16–24 entries with at least 6 negatives', () => {
-        expect(rows.length).toBeGreaterThanOrEqual(16);
-        expect(rows.length).toBeLessThanOrEqual(24);
-        expect(negatives.length).toBeGreaterThanOrEqual(6);
-        expect(positives.length).toBeGreaterThanOrEqual(6);
-        expect(positives.length + negatives.length).toBe(rows.length);
+    it('covers every current public-library entry exactly once plus the seven controls', () => {
+        expect(positives).toHaveLength(library.length);
+        expect(negatives).toHaveLength(7);
+        expect(rows).toHaveLength(library.length + negatives.length);
+        for (let i = 0; i < library.length; i++) {
+            const entry = benchmark.entries[i];
+            expect(entry.source).toBe(`library:${i}`);
+            expect(entry.hex).toBe(library[i].hex);
+            expect(entry.seed).toBe(library[i].seed);
+            expect(entry.initialState).toEqual(library[i].initialState);
+        }
     });
 
     it('every entry carries a reproducible recipe and both burst lengths', () => {
         for (const e of benchmark.entries) {
             expect(e.hex).toMatch(/^[0-9A-F]{32}$/);
             expect(Number.isFinite(e.seed)).toBe(true);
-            expect(e.initialState.mode).toMatch(/^(density|clusters)$/);
-            expect(e.metrics.ticksRun).toBe(benchmark._meta.capture.screenTicks);
+            expect(e.initialState.mode).toMatch(/^(density|clusters|saved)$/);
+            expect(e.metrics.ticksRun).toBeGreaterThan(0);
+            expect(e.metrics.ticksRun).toBeLessThanOrEqual(benchmark._meta.capture.screenTicks);
             expect(e.confirmMetrics.ticksRun).toBeLessThanOrEqual(benchmark._meta.capture.confirmTicks);
             expect(e.metrics.ruleUsageDelta).toHaveLength(128);
         }
+    });
+
+    it('preserves the complete original Stage-0 cohort', () => {
+        expect(stage0Positives).toHaveLength(16);
+        expect(stage0Negatives).toHaveLength(7);
     });
 
     it('the recorded constraint class matches the class derived from the hex (hand-edit guard)', () => {
@@ -178,7 +175,7 @@ describe('interestingness benchmark — panel integrity', () => {
     });
 });
 
-describe('interestingness benchmark — human alignment baseline (#37 Stage 0)', () => {
+describe('interestingness benchmark — complete-library baseline (#37)', () => {
     it(`ranks interesting above boring on ≥${BASELINE_PAIRWISE_ACCURACY} of cross-pairs`, () => {
         const acc = pairwiseAccuracy(positives, negatives);
         expect(acc, `pairwiseAccuracy regressed below the pinned baseline.\n${formatTable()}`)
@@ -191,8 +188,7 @@ describe('interestingness benchmark — human alignment baseline (#37 Stage 0)',
     });
 
     it('the cheap screening burst is no better than the confirmed ranking', () => {
-        // Recorded so a later stage that improves screening can see it move; screening at 0.348 is
-        // worse than a coin flip, which is why finds are confirmed before banking.
+        // Recorded so a later stage that improves screening can see it move.
         expect(pairwiseAccuracy(positives, negatives, 'screen')).toBeGreaterThanOrEqual(BASELINE_SCREEN_ACCURACY);
     });
 
@@ -220,5 +216,22 @@ describe('interestingness benchmark — within-class alignment', () => {
         // Documented gap: the curated library has no boring n-count rules to draw on. If Stage 2+
         // needs them, capture n_count-mode explore churn and extend the panel (README procedure).
         expect(negatives.filter((r) => r.cls === 'n_count' || r.cls === 'totalistic')).toHaveLength(0);
+    });
+});
+
+describe('interestingness benchmark — preserved Stage-0 slice', () => {
+    it('retains the Stage-2 overall baselines on the longitudinal slice', () => {
+        expect(pairwiseAccuracy(stage0Positives, stage0Negatives)).toBeGreaterThanOrEqual(STAGE0_PAIRWISE_ACCURACY);
+        expect(marginMean(stage0Positives, stage0Negatives)).toBeGreaterThanOrEqual(STAGE0_MARGIN);
+        expect(pairwiseAccuracy(stage0Positives, stage0Negatives, 'screen')).toBeGreaterThanOrEqual(STAGE0_SCREEN_ACCURACY);
+    });
+
+    it('retains the Stage-2 within-class baselines on the longitudinal slice', () => {
+        const freePos = stage0Positives.filter((r) => r.cls === 'free');
+        const freeNeg = stage0Negatives.filter((r) => r.cls === 'free');
+        const rSymPos = stage0Positives.filter((r) => r.cls === 'r_sym');
+        const rSymNeg = stage0Negatives.filter((r) => r.cls === 'r_sym');
+        expect(pairwiseAccuracy(freePos, freeNeg)).toBeGreaterThanOrEqual(STAGE0_FREE_ACCURACY);
+        expect(pairwiseAccuracy(rSymPos, rSymNeg)).toBeGreaterThanOrEqual(STAGE0_RSYM_ACCURACY);
     });
 });

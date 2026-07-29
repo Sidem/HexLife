@@ -433,16 +433,18 @@ function calculateHexBlockEntropy() {
 // `block_entropy_stats()` returns a `Vec<f64>` and therefore ALLOCATES in Wasm linear memory — that
 // can grow the heap and detach every typed-array view (state/ruleset/usage), so refresh the views
 // immediately after it and before any further JS-side buffer access. `spatial_order`,
+// `change_spatial_order`,
 // `block_entropy` and `compute_active_centroid`/`centroid_*_angle` are all alloc-free; the mean from
 // stats equals `block_entropy()` by construction. The centroid angles feed the transport metric.
 function sampleEvalSpatialMetrics() {
     const be = wasm_world.block_entropy_stats(); // [mean, variance]
     refreshSimViews(); // block_entropy_stats allocated → views may be detached
     const spatialOrder = wasm_world.spatial_order();
+    const changeOrder = wasm_world.change_spatial_order();
     // Alloc-free: one pass stashes both axis angles + their concentrations; accessors read them back.
     wasm_world.compute_active_centroid();
     return {
-        beMean: be[0], beVariance: be[1], spatialOrder,
+        beMean: be[0], beVariance: be[1], spatialOrder, changeOrder,
         centroidColAngle: wasm_world.centroid_col_angle(),
         centroidRowAngle: wasm_world.centroid_row_angle(),
         centroidColR: wasm_world.centroid_col_concentration(),
@@ -1000,6 +1002,8 @@ function startEvaluation(opts) {
         spatialVarianceSamples: [],
         // per-frame join-count spatial-order statistic; mean + last reported at the end.
         spatialOrderSamples: [],
+        // per-frame join-count order of the last-tick change mask; positive means localized motion.
+        changeOrderSamples: [],
         // transport / mobility: running mean of the per-tick active-cell centroid drift speed, plus
         // the previous sample's centroid angles to difference against (see accumulateTransport).
         transportSum: 0,
@@ -1068,6 +1072,7 @@ function runEvaluationChunk() {
             evalState.blockEntropySamples.push(m.beMean);
             evalState.spatialVarianceSamples.push(m.beVariance);
             evalState.spatialOrderSamples.push(m.spatialOrder);
+            evalState.changeOrderSamples.push(m.changeOrder);
             // Fold the inter-sample centroid drift (concentration-gated) into the mean transport speed.
             accumulateTransport(m);
         }
@@ -1143,6 +1148,15 @@ function finishEvaluation() {
         spatialOrderLast = soSamples[soSamples.length - 1];
     }
 
+    // Change-mask localization (join-count): mean over samples + last sampled value.
+    let changeOrderMean = 0, changeOrderLast = 0;
+    const coSamples = s.changeOrderSamples;
+    if (coSamples.length > 0) {
+        for (const v of coSamples) changeOrderMean += v;
+        changeOrderMean /= coSamples.length;
+        changeOrderLast = coSamples[coSamples.length - 1];
+    }
+
     // Transport (mobility): mean per-tick active-cell centroid drift speed over the burst's samples.
     // Needs ≥2 samples to difference; a sub-warmup or instantly-terminal burst leaves it at 0.
     const transportMeanSpeed = s.transportN > 0 ? s.transportSum / s.transportN : 0;
@@ -1177,6 +1191,7 @@ function finishEvaluation() {
             samples: beSamples,
         },
         spatialOrder: { mean: spatialOrderMean, last: spatialOrderLast },
+        changeOrder: { mean: changeOrderMean, last: changeOrderLast },
         transport: { meanSpeed: transportMeanSpeed },
         sigma,
         probeHamming: s.probeHamming,

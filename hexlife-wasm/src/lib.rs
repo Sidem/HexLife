@@ -355,6 +355,51 @@ impl World {
         (1.0 - (hetero as f64) / expected).clamp(-1.0, 1.0)
     }
 
+    /// Spatial-order join-count statistic over the cells that changed in the most recent tick.
+    ///
+    /// After `run_tick`, `state` holds the current generation and `next_state` holds the previous
+    /// generation because the fixed double buffers were swapped. Their inequality therefore forms a
+    /// binary change mask without allocating it. The same random-mixing-normalized join-count used by
+    /// `spatial_order` is applied to that mask:
+    ///
+    /// - positive => changes are localized into clusters/fronts;
+    /// - near zero => changes are distributed like random flips at the same density;
+    /// - negative => changes are anti-clustered/alternating.
+    ///
+    /// Returns zero when no cells or all cells changed, because the expected heterogeneous-edge count
+    /// is then zero. Valid only after at least one tick since a reset or direct state write; evaluation
+    /// warmup guarantees that precondition. No allocation — safe to call without detaching JS views.
+    pub fn change_spatial_order(&self) -> f64 {
+        if self.num_cells == 0 {
+            return 0.0;
+        }
+        let mut changed: u32 = 0;
+        let mut hetero: u32 = 0;
+        for i in 0..self.num_cells {
+            let changed_i = self.state[i] != self.next_state[i];
+            if changed_i {
+                changed += 1;
+            }
+            let nbase = i * 6;
+            for n_order in 0..6 {
+                let j = self.neighbor_indices[nbase + n_order] as usize;
+                if j > i {
+                    let changed_j = self.state[j] != self.next_state[j];
+                    if changed_j != changed_i {
+                        hetero += 1;
+                    }
+                }
+            }
+        }
+        let n = self.num_cells as f64;
+        let p = changed as f64 / n;
+        let expected = 3.0 * n * 2.0 * p * (1.0 - p);
+        if expected == 0.0 {
+            return 0.0;
+        }
+        (1.0 - (hetero as f64) / expected).clamp(-1.0, 1.0)
+    }
+
     /// Block-pattern entropy of the current state as `[mean, variance]` (auto-explore spatial-
     /// heterogeneity term). `mean` equals {@link World::block_entropy} — the normalized Shannon
     /// entropy of the 7-cell block-pattern distribution, expressible as the average per-cell
@@ -857,6 +902,87 @@ mod tests {
             *c = 1;
         }
         assert_eq!(full.spatial_order(), 0.0);
+    }
+
+    #[test]
+    fn change_spatial_order_matches_manual_planted_mask() {
+        let mut w = World::new(12, 10);
+        // `next_state` is the old generation. Flip a compact, deliberately asymmetric footprint in
+        // `state`, then independently recompute the join count from those two buffers.
+        for &i in &[39usize, 40, 41, 51, 52, 53, 64] {
+            w.state[i] = 1;
+        }
+        let mut changed = 0u32;
+        let mut hetero = 0u32;
+        for i in 0..w.num_cells {
+            let changed_i = w.state[i] != w.next_state[i];
+            if changed_i {
+                changed += 1;
+            }
+            for k in 0..6 {
+                let j = w.neighbor_indices[i * 6 + k] as usize;
+                if j > i
+                    && (w.state[j] != w.next_state[j]) != changed_i
+                {
+                    hetero += 1;
+                }
+            }
+        }
+        let p = changed as f64 / w.num_cells as f64;
+        let expected = 3.0 * w.num_cells as f64 * 2.0 * p * (1.0 - p);
+        let want = (1.0 - hetero as f64 / expected).clamp(-1.0, 1.0);
+        assert!(
+            (w.change_spatial_order() - want).abs() < 1e-9,
+            "change_spatial_order {} != manual {want}",
+            w.change_spatial_order(),
+        );
+        assert!(want > 0.0, "the planted footprint should be localized, got {want}");
+    }
+
+    #[test]
+    fn change_spatial_order_near_zero_for_random_flips() {
+        let mut w = World::new(80, 70);
+        let mut seed = 0xC0FFEEu32;
+        for i in 0..w.num_cells {
+            // Start from arbitrary cell states, then flip an independently random ~35% mask.
+            w.next_state[i] = (xorshift32(&mut seed) & 1) as u8;
+            let flip = xorshift32(&mut seed) % 100 < 35;
+            w.state[i] = w.next_state[i] ^ u8::from(flip);
+        }
+        let v = w.change_spatial_order();
+        assert!(v.abs() < 0.08, "random flips should be near zero, got {v}");
+    }
+
+    #[test]
+    fn change_spatial_order_positive_for_moving_block_edges() {
+        let cols = 40usize;
+        let rows = 30usize;
+        let mut w = World::new(cols as i32, rows as i32);
+        // Previous generation: a 10x10 block. Current generation: the same block shifted right by
+        // one cell. Only the compact trailing and leading edge columns form the change mask.
+        for row in 10..20 {
+            for col in 10..20 {
+                w.next_state[row * cols + col] = 1;
+            }
+            for col in 11..21 {
+                w.state[row * cols + col] = 1;
+            }
+        }
+        let v = w.change_spatial_order();
+        assert!(v > 0.25, "moving block edges should be clearly localized, got {v}");
+    }
+
+    #[test]
+    fn change_spatial_order_zero_for_no_change_and_all_change() {
+        let mut unchanged = seeded_world(40, 46, 0x123456);
+        unchanged.next_state.copy_from_slice(&unchanged.state);
+        assert_eq!(unchanged.change_spatial_order(), 0.0);
+
+        let mut all_changed = seeded_world(40, 46, 0x654321);
+        for i in 0..all_changed.num_cells {
+            all_changed.next_state[i] = 1 - all_changed.state[i];
+        }
+        assert_eq!(all_changed.change_spatial_order(), 0.0);
     }
 
     #[test]

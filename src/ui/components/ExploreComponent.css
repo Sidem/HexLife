@@ -13,7 +13,7 @@
 
 /* A closed <details> hides its children through a UA `display: none` rule, and UA rules lose to
    *any* author `display` on those children — which is how `.tool-group { display: flex }` left the
-   shipped Scoring disclosure rendering all nine sliders while looking collapsed. Restate the hiding
+   shipped Scoring disclosure rendering every slider while looking collapsed. Restate the hiding
    as an author rule specific enough to outrank the component's own layout, ids included. */
 .explore-component-content details:not([open]) > *:not(summary),
 .explore-component-content details:not([open]) #explore-scoring-mount {

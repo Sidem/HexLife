@@ -1,10 +1,10 @@
 // @ts-check
 
 /**
- * User-facing scoring configuration for the auto-explore objective (v3.1).
+ * User-facing scoring configuration for the auto-explore objective (v3.4).
  *
  * PURE module (no UI, EventBus, persistence): the single source of truth for
- *  - the user-tunable subset of {@link SCORE_CONFIG} (the nine term weights, the uniform-chaos
+ *  - the user-tunable subset of {@link SCORE_CONFIG} (the ten term weights, the uniform-chaos
  *    penalty strength, the find threshold), expressed in UI units (integer percent sliders),
  *  - the named presets the Scoring panel offers,
  *  - sanitization of untrusted scoring blobs (persisted settings, share-link `xc` payloads),
@@ -16,13 +16,14 @@
 
 import { SCORE_CONFIG } from './InterestingnessScore.js';
 
-/** The nine graded terms, in canonical display order (matches the UI component bars). */
+/** The ten graded terms, in canonical display order (matches the UI component bars). */
 export const WEIGHT_KEYS = /** @type {const} */ ([
     'criticality',
     'entropyBand',
     'fluctuation',
     'ruleDiversity',
     'spatialStructure',
+    'changeLocalization',
     'spatialHeterogeneity',
     'temporalEntropyVariance',
     'transport',
@@ -52,7 +53,7 @@ export const FIND_THRESHOLD_MAX = 0.8;
 
 /**
  * Named scoring presets. `default` must stay byte-equal to the derived defaults (drift-guarded).
- * The others re-balance the same nine weights toward a teaching goal; none of them touches
+ * The others re-balance the same ten weights toward a teaching goal; none of them touches
  * findThreshold (that stays whatever the user set).
  * @type {Record<string, {label: string, description: string, weights: Record<string, number>, uniformPenaltyPct: number}>}
  */
@@ -67,9 +68,9 @@ export const SCORING_PRESETS = {
         label: 'Gliders & Ships',
         description: 'Hunts coherently moving structures: spatial order and centroid transport dominate; chaos is penalized hard.',
         weights: {
-            criticality: 5, entropyBand: 4, fluctuation: 2, ruleDiversity: 4,
-            spatialStructure: 30, spatialHeterogeneity: 5, temporalEntropyVariance: 15,
-            transport: 30, openEndedness: 5,
+            criticality: 4, entropyBand: 3, fluctuation: 2, ruleDiversity: 3,
+            spatialStructure: 25, changeLocalization: 25, spatialHeterogeneity: 4,
+            temporalEntropyVariance: 12, transport: 20, openEndedness: 2,
         },
         uniformPenaltyPct: 70,
     },
@@ -77,8 +78,9 @@ export const SCORING_PRESETS = {
         label: 'Edge of Chaos',
         description: 'Hunts near-critical dynamics: σ≈1 damage spreading and mid-band entropy lead; denser worlds are tolerated.',
         weights: {
-            criticality: 30, entropyBand: 20, fluctuation: 15, ruleDiversity: 10,
-            spatialStructure: 10, spatialHeterogeneity: 5, temporalEntropyVariance: 5,
+            criticality: 27, entropyBand: 18, fluctuation: 14, ruleDiversity: 9,
+            spatialStructure: 9, changeLocalization: 10, spatialHeterogeneity: 4,
+            temporalEntropyVariance: 4,
             transport: 2, openEndedness: 3,
         },
         uniformPenaltyPct: 30,
@@ -88,8 +90,8 @@ export const SCORING_PRESETS = {
         description: 'Leans on the perceptual (CLIP) open-endedness signal: worlds whose look keeps evolving. Best with the embedding objective enabled.',
         weights: {
             criticality: 4, entropyBand: 2, fluctuation: 2, ruleDiversity: 2,
-            spatialStructure: 15, spatialHeterogeneity: 15, temporalEntropyVariance: 10,
-            transport: 10, openEndedness: 40,
+            spatialStructure: 12, changeLocalization: 10, spatialHeterogeneity: 13,
+            temporalEntropyVariance: 9, transport: 8, openEndedness: 38,
         },
         uniformPenaltyPct: 50,
     },

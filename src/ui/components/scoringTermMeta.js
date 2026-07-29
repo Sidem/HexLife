@@ -1,7 +1,7 @@
 import { SCORE_CONFIG } from '../../core/analysis/InterestingnessScore.js';
 
 /**
- * Single source of truth for how the auto-explore scoring terms are PRESENTED (v3.1): labels,
+ * Single source of truth for how the auto-explore scoring terms are PRESENTED (v3.4): labels,
  * gating flags, tooltips, educational explainer copy, and each term's shape function for the
  * inline explainer curves. Consumed by the Explore gallery bars, the Scoring panel's sliders,
  * and the Analysis panel's Interestingness plugin — previously two drifting copies.
@@ -74,6 +74,17 @@ export const COMPONENT_META = [
         shape: 'halfsat', shapeParams: { halfSat: SCORE_CONFIG.spatialOrderHalfSat },
         domain: [0, SCORE_CONFIG.spatialOrderHalfSat * 4], axisLabel: '|spatial order|', rawKey: 'spatialOrderMean',
         rawToX: (raw) => Math.abs(raw),
+    },
+    {
+        key: 'changeLocalization', label: 'Local flux', usedFlag: 'changeLocalizationUsed',
+        hint: 'Where cells flip — compact moving fronts vs changes scattered like noise.',
+        description: 'The changed cells from each tick form a temporary mask. This term rewards masks whose flips cluster into localized fronts, collisions or moving objects; uniformly scattered and alternating churn score zero.',
+        zeroMeans: 'Localized and globally scattered activity are equally welcome.',
+        maxMeans: 'Demand activity concentrated into coherent regions.',
+        shape: 'halfsat', shapeParams: { halfSat: SCORE_CONFIG.changeOrderHalfSat },
+        domain: [0, SCORE_CONFIG.changeOrderHalfSat * 4],
+        axisLabel: 'positive change-mask order', rawKey: 'changeOrderMean',
+        rawToX: (raw) => Math.max(0, raw),
     },
     {
         key: 'spatialHeterogeneity', label: 'Heterog.', usedFlag: 'spatialUsed',

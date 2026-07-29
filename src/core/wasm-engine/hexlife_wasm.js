@@ -82,6 +82,27 @@ export class World {
         return ret;
     }
     /**
+     * Spatial-order join-count statistic over the cells that changed in the most recent tick.
+     *
+     * After `run_tick`, `state` holds the current generation and `next_state` holds the previous
+     * generation because the fixed double buffers were swapped. Their inequality therefore forms a
+     * binary change mask without allocating it. The same random-mixing-normalized join-count used by
+     * `spatial_order` is applied to that mask:
+     *
+     * - positive => changes are localized into clusters/fronts;
+     * - near zero => changes are distributed like random flips at the same density;
+     * - negative => changes are anti-clustered/alternating.
+     *
+     * Returns zero when no cells or all cells changed, because the expected heterogeneous-edge count
+     * is then zero. Valid only after at least one tick since a reset or direct state write; evaluation
+     * warmup guarantees that precondition. No allocation — safe to call without detaching JS views.
+     * @returns {number}
+     */
+    change_spatial_order() {
+        const ret = wasm.world_change_spatial_order(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * Rolling hash of the current state buffer, used for cycle detection.
      * @returns {number}
      */

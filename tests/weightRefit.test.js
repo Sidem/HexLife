@@ -69,8 +69,8 @@ describe('refitWeights recovery', () => {
         // A clearly-structured objective: spatialStructure + transport dominate, others quiet.
         const trueW = {
             criticality: 0.2, entropyBand: 0.1, fluctuation: 0.05, ruleDiversity: 0.1,
-            spatialStructure: 1.0, spatialHeterogeneity: 0.15, temporalEntropyVariance: 0.3,
-            transport: 0.8, openEndedness: 0.1,
+            spatialStructure: 1.0, changeLocalization: 0.2, spatialHeterogeneity: 0.15,
+            temporalEntropyVariance: 0.3, transport: 0.8, openEndedness: 0.1,
         };
         const res = refitWeights(syntheticVotes(trueW, { n: 800, seed: 7 }));
         expect(res.ok).toBe(true);

@@ -5,55 +5,25 @@ Two captured datasets live here, both regenerated in-browser and **never hand-ed
 | File | What it pins | Test |
 |------|--------------|------|
 | `exploreEvalFixtures.json` | the gliders-vs-churn ordering (2 rulesets × ICs) | `tests/interestingnessScore.test.js` |
-| `interestingnessBenchmark.json` | human-alignment baseline over a 23-ruleset labeled panel (#37 Stage 0) | `tests/interestingnessBenchmark.test.js` |
+| `interestingnessBenchmark.json` | public-library alignment over 80 labeled entries (#37) | `tests/interestingnessBenchmark.test.js` |
 
 ## Reference fixtures (`exploreEvalFixtures.json`)
 
 `exploreEvalFixtures.json` holds real `EVALUATION_RESULT` objects for the two reference rulesets
-from CLAUDE.md's "Reference fixtures" note, captured headless. They pin the v2 score's ordering
-behaviour to **measured** engine metrics (including the v2.1 spatial fields) rather than guessed
+from the project's reference-fixture recipe, captured headless. They pin the score's ordering
+behaviour to **measured** engine metrics (including the v3.4 change-localization field) rather than guessed
 numbers — `tests/interestingnessScore.test.js` asserts gliders-chaos out-ranks churn-sparse.
 
 **Regenerate, never hand-edit.** Resets are seeded so the run is reproducible on the same grid
-config (default `GRID_COLS`/`GRID_ROWS`). If you change the grid size or the engine metrics, re-run
-the snippet below and overwrite the file.
+config (default `GRID_COLS`/`GRID_ROWS`). If you change the grid size or the engine metrics,
+regenerate the whole file.
 
 ## Capture procedure
 
-1. `npm run dev`, open `http://localhost:5173/HexLife/?headless=1` (exposes `window.__hexlife`).
-2. In the devtools console (or the preview `preview_eval` tool) run:
-
-```js
-await (async () => {
-  const wm = window.__hexlife.worldManager;
-  const ICS = {
-    chaos: { mode: 'density', params: { density: 0.5 } },
-    sparse: { mode: 'density', params: { density: 0.05 } },
-    seed: { mode: 'cluster', params: { count: 1, density: 1.0, densityVariation: 0, diameter: 14, diameterVariation: 0, eccentricity: 0, orientation: 0, orientationVariation: 0, gaussianStdDev: 1.5 } },
-  };
-  const capture = async (hex, icLabel, seed, ticks) => {
-    const proxy = wm.worlds[0];
-    wm._applyExploreRuleset(0, hex);
-    proxy.resetWorld(ICS[icLabel], seed);
-    const r = await proxy.runEvaluation({ ticks, sampleEvery: 10, warmupTicks: 20, probe: { enabled: true, probeTicks: 64 } });
-    const { probeHamming, ruleUsageDelta, ...rest } = r;
-    if (rest.blockEntropy?.samples) { rest.blockEntropy = { ...rest.blockEntropy }; delete rest.blockEntropy.samples; }
-    rest.ruleUsageDelta = Array.from(new Uint32Array(ruleUsageDelta));
-    return rest;
-  };
-  const CHURN = '4CAC74B122612B1EEBE3FFFDDCFBFFB7';
-  const GLIDERS = '12482080480080006880800180010117';
-  return {
-    churn_sparse_160:  await capture(CHURN,   'sparse', 1781242654715, 160),
-    churn_sparse_600:  await capture(CHURN,   'sparse', 1781242654715, 600),
-    gliders_chaos_160: await capture(GLIDERS, 'chaos',  4242,           160),
-    gliders_sparse_160:await capture(GLIDERS, 'sparse', 4242,           160),
-    gliders_seed_160:  await capture(GLIDERS, 'seed',   4242,           160),
-  };
-})();
-```
-
-3. Copy the returned object into `exploreEvalFixtures.json` (keep the `_meta` block).
+1. `npm run dev -- --port 5180`, then open
+   `http://localhost:5180/HexLife/?headless=1&benchmark=1`.
+2. Click **Capture 5 reference fixtures**. The dev-only runner captures all five cases in parallel.
+3. Click **Download JSON** and replace `tests/fixtures/exploreEvalFixtures.json`.
 
 ## Notes on the captured numbers
 
@@ -62,35 +32,38 @@ await (async () => {
 - `gliders_seed_160` saturates within 2 ticks (`saturated:true`) — a hard kill, as expected.
 - `gliders_chaos_160` shows the structure the v2 spatial term rewards: `spatialOrder.mean ≈ 0.23`
   vs churn's `≈ -0.02` (random mixing), and `spatialVariance ≈ 0.16` vs `≈ 0.10`.
-- These four predate the v2.9 `transport` metric, so they carry no `transport` field (the score
-  drops-and-renormalizes it). `interestingnessBenchmark.json` was captured after and does carry it.
+- Stage 2 change localization is `≈0.412` for gliders-chaos vs `≈0.142` for churn-sparse. Their
+  geometric mean (`≈0.242`) calibrates `changeOrderHalfSat`; the scored gap is now `≈0.431`.
 
 ---
 
-# Human-alignment benchmark (`interestingnessBenchmark.json`)
+# Public-library alignment benchmark (`interestingnessBenchmark.json`)
 
-The instrument for roadmap **#37** (`docs/INTERESTINGNESS-PLAN.md`, Stage 0). Two fixture rulesets
-can show gliders out-ranking churn; they cannot say whether the objective agrees with a human in
-general. This panel can: it measures `pairwiseAccuracy` (fraction of interesting-vs-boring pairs the
-scorer orders correctly) and `marginMean` over labeled entries, and
-`tests/interestingnessBenchmark.test.js` pins both at the values measured when it was captured.
+The instrument for roadmap **#37** (`docs/INTERESTINGNESS-PLAN.md`). Two fixture rulesets can show
+gliders out-ranking churn; they cannot say whether the objective agrees with the project's curated
+public library in general. This panel measures `pairwiseAccuracy` (fraction of
+interesting-vs-boring pairs the scorer orders correctly) and `marginMean` over labeled entries.
+`tests/interestingnessBenchmark.test.js` pins both at their captured values.
 
-**Baseline at capture (2026-07-22, score v3.1): `pairwiseAccuracy` 0.509 (57/112), `marginMean`
-−0.001.** A coin flip — that is the point. Stage 0 buys the needle, not the fix.
+**Stage-2 baseline (2026-07-29, score v3.4): `pairwiseAccuracy` 0.444 (227/511),
+`marginMean` −0.056; the 160-tick screen is 0.294 (150/511).** Before Stage 2 the same complete
+panel measured 0.431 (220/511), −0.070, and 0.258. The original 16-positive Stage-0 slice remains
+marked and improves from 0.509 (57/112) to 0.518 (58/112).
 
-## The panel (23 entries)
+## The panel (80 entries)
 
 | Class | Interesting | Boring |
 |-------|-------------|--------|
-| `free` (no rotational symmetry) | 6 | 4 |
-| `r_sym` (rotationally symmetric) | 6 | 3 |
-| `n_count` (outer-totalistic) | 3 | 0 |
+| `free` (no rotational symmetry) | 16 | 4 |
+| `r_sym` (rotationally symmetric) | 50 | 3 |
+| `n_count` (outer-totalistic) | 6 | 0 |
 | `totalistic` | 1 | 0 |
 
-- **Positives** are curated public-library entries (`src/core/library/rulesets.json`) — human-picked
-  by definition — one per distinct named behaviour family, stratified across constraint classes.
-  Each carries the library's own `{hex, seed, initialState}`, so the capture is deterministic.
-  `lib09_spontaneous_gliders` is the same ruleset as the `gliders` reference fixture.
+- **Positives** are all 73 curated public-library entries (`src/core/library/rulesets.json`). Public
+  inclusion is the project's manual interestingness label; it is not a blinded or multi-rater human
+  study. Every entry carries the library's `{hex, seed, initialState}`, including saved starts, so
+  the capture is deterministic. An integrity test requires a one-to-one, index-preserving match:
+  adding or reordering the library forces an explicit benchmark refresh.
 - **Negatives** are the `churn` reference fixture plus six *high-scoring auto-explore finds* that are
   visually uniform static — the exact failure #37 exists to fix. They were produced by running
   auto-explore headless from a random seed ruleset (once in `single`/free mutation mode, once in
@@ -99,8 +72,13 @@ scorer orders correctly) and `marginMean` over labeled entries, and
 - **Why the class stratification matters:** symmetric rulesets have far better odds of being
   interesting, so an unstratified panel would let a scorer (or Stage 4's reward model) look good by
   learning "symmetric = good" instead of reading the dynamics. Hence `r_sym` *negatives* exist, and
-  the test reports within-class accuracy (`free` 0.583, `r_sym` 0.389) next to the overall number.
+  the test reports within-class accuracy (`free` 0.531, `r_sym` 0.367) next to the overall
+  number. The library is itself heavily `r_sym`, so the overall number describes the real curated
+  catalog distribution rather than a class-balanced research sample.
   Gap: the library has no boring `n_count`/`totalistic` rules, so those classes are positives-only.
+- **Longitudinal slice:** the original 16 positives and all seven negatives carry
+  `cohort: "stage0"`. Tests pin its current overall, screen, and within-class measurements
+  independently of the expanded baseline, while this document records the pre-Stage-2 comparison.
 - Each entry carries its `constraintClass` from `classifyRulesetConstraint()` (strictest of
   `totalistic ⊂ n_count ⊂ r_sym ⊂ free`); the test recomputes it from the hex as a hand-edit guard.
 
@@ -111,69 +89,18 @@ twice per entry: at the 160-tick **screen** length and at the 600-tick **confirm
 long horizon is where boring rules give themselves away. Embeddings are **off** (the benchmark
 gates the statistical pipeline; the embedding stages get synthetic unit tests instead).
 
-1. `npm run dev`, open `http://localhost:5180/HexLife/?headless=1` (exposes `window.__hexlife`).
+1. `npm run dev -- --port 5180`, then open
+   `http://localhost:5180/HexLife/?headless=1&benchmark=1`.
    `?headless=1` forces `fromUrl:true` and overwrites the `worldSettings` localStorage — capture in
    a throwaway browser profile, not your daily one.
-2. Run the snippet below in the devtools console. It rebuilds the whole file, `_meta` included.
-   Editing the panel = editing `POS_LIB` / `NEG` here, not the JSON.
-3. Save the returned object as `interestingnessBenchmark.json` (`JSON.stringify(out, null, 1)`).
-4. Re-run `npx vitest run tests/interestingnessBenchmark.test.js`. If the baselines moved, update the
-   `BASELINE_*` constants **and** the committed per-entry table in that file, and say why in
-   `PATCHNOTES.md` — a moved baseline is a scoring-behaviour change, not fixture churn.
-   `BENCH_TABLE=1` on the vitest run prints the fresh table to paste in.
-
-```js
-await (async () => {
-  const wm = window.__hexlife.worldManager;
-  const { classifyRulesetConstraint } = await import('/HexLife/src/core/rulesetDescriptor.js');
-  const lib = await (await fetch('/HexLife/src/core/library/rulesets.json')).json();
-
-  // Positives: curated-library indices. Negatives: hex + IC + seed, verified by eye (see above).
-  const POS_LIB = [2, 3, 15, 23, 25, 34, 8, 9, 10, 14, 27, 29, 11, 13, 19, 20];
-  const NEG = [ /* copy the `id`/`note`/`source`/`hex`/`icLabel`/`seed`/`initialState` blocks
-                   straight out of the current interestingnessBenchmark.json entries */ ];
-
-  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
-  const panel = [
-    ...POS_LIB.map((i) => ({
-      id: `lib${String(i).padStart(2, '0')}_${slug(lib[i].name)}`,
-      label: 'interesting', source: `library:${i}`, note: lib[i].name,
-      hex: lib[i].hex, icLabel: `library:${lib[i].initialState.mode}`, seed: lib[i].seed,
-      initialState: lib[i].initialState,
-    })),
-    ...NEG.map((n) => ({ ...n, label: 'boring' })),
-  ];
-
-  const capture = async (e, ticks) => {
-    const proxy = wm.worlds[0];
-    wm._applyExploreRuleset(0, e.hex);
-    proxy.resetWorld(e.initialState, e.seed);
-    const r = await proxy.runEvaluation({ ticks, sampleEvery: 10, warmupTicks: 20, probe: { enabled: true, probeTicks: 64 } });
-    const { probeHamming, ruleUsageDelta, worldIndex, type, ...rest } = r;
-    if (rest.blockEntropy?.samples) { rest.blockEntropy = { ...rest.blockEntropy }; delete rest.blockEntropy.samples; }
-    rest.ruleUsageDelta = Array.from(new Uint32Array(ruleUsageDelta));
-    rest.icLabel = e.icLabel;
-    return rest;
-  };
-
-  const entries = [];
-  for (const e of panel) {
-    const metrics = await capture(e, 160);
-    const confirmMetrics = await capture(e, 600);
-    entries.push({ ...e, constraintClass: classifyRulesetConstraint(e.hex), metrics, confirmMetrics });
-  }
-  return {
-    _meta: {
-      description: 'Human-labeled interestingness benchmark panel (#37 Stage 0). Real EVALUATION_RESULT captures for a curated set of human-interesting rulesets and hand-verified boring ones. Regenerated by the snippet in README.md - never hand-edit.',
-      capture: { warmupTicks: 20, sampleEvery: 10, probeTicks: 64, screenTicks: 160, confirmTicks: 600, embeddings: 'off', gridCols: 222, gridRows: 192 },
-      capturedAt: '2026-07-22',
-      counts: { total: entries.length, interesting: entries.filter((x) => x.label === 'interesting').length, boring: entries.filter((x) => x.label === 'boring').length },
-      byClass: entries.reduce((acc, x) => { const k = `${x.constraintClass}/${x.label}`; acc[k] = (acc[k] || 0) + 1; return acc; }, {}),
-    },
-    entries,
-  };
-})();
-```
+2. Click **Capture 73 library entries + controls**. The dev-only runner uses all nine workers in
+   parallel and rebuilds every screen/confirm metric from the current library plus the negative
+   recipes in the existing fixture.
+3. Click **Download JSON** and replace `tests/fixtures/interestingnessBenchmark.json`.
+4. Run `npx vitest run tests/interestingnessBenchmark.test.js`. If the captured measurements moved,
+   update the expanded `BASELINE_*` constants. The `STAGE0_*` constants should move only when scoring
+   or engine behavior changes, never merely because the library grew. Record why in `PATCHNOTES.md`.
+   `BENCH_TABLE=1` prints the complete per-entry ranking for diagnosis.
 
 ## Finding more negatives
 
@@ -192,9 +119,9 @@ The panel's negatives came from this loop — repeat it when a stage needs harde
 
 ## Notes on the captured numbers
 
-- Three genuine positives (`lib11`/`lib13` Game-of-life-like, `lib08` Oscillators 2) settle into long
-  cycles by tick 600 and are cut to ×0.25 by `confirmCyclePenalty` — human-interesting rules are
-  often long cyclers. `neg_churn_sparse` is likewise rejected by the *cycle* penalty, not by any
-  structure term: no term in v3.1 decisively separates the other six negatives from the positives.
-- The cheap 160-tick screen ranks the panel at 0.348 — **worse than chance** — which is why finds are
+- Several genuine positives settle into long cycles by tick 600 and are cut to ×0.25 by
+  `confirmCyclePenalty` — human-interesting rules are often long cyclers. `neg_churn_sparse` is
+  likewise rejected by the cycle penalty, while change localization improves separation from the
+  six non-cycling negative controls.
+- The cheap 160-tick screen improves from 0.258 to 0.294 but remains weak, which is why finds are
   re-scored on the confirmation burst before banking.

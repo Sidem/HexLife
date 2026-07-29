@@ -22,7 +22,7 @@
 }
 
 /* Author rule, not a bare [hidden]/UA default: every other `display` here would outrank that
-   (see AGENTS.md — the Scoring disclosure shipped "collapsed" while rendering nine sliders). */
+   (see AGENTS.md — the Scoring disclosure shipped "collapsed" while rendering every slider). */
 .view-controls.hidden {
     display: none;
 }

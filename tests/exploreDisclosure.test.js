@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * #29 re-tiered mobile Discover: the expert controls (Search Settings + the nine-term Scoring
+ * #29 re-tiered mobile Discover: the expert controls (Search Settings + the multi-term Scoring
  * objective) moved behind an "Advanced" disclosure so the tab lands on one action.
  *
  * The tier is held up by two things that fail *silently* — no throw, no console warning, the panel
@@ -66,7 +66,7 @@ describe('Advanced disclosure structure (#29)', () => {
     it('keeps the Prediction mount (#19) ABOVE the disclosure, in the newcomer tier', () => {
         // #29 set the rule every later Discover surface inherits: newcomer-facing content goes above
         // `<details id="explore-advanced">`, expert content inside it. Prediction mode is a newcomer
-        // entry point, so a refactor that tucks it in with the nine-term objective is a regression of
+        // entry point, so a refactor that tucks it in with the multi-term objective is a regression of
         // the tier — and one nothing else would catch. The deck is currently switched OFF (see the
         // next test), which is exactly when a placement contract quietly rots, so pin it anyway.
         const deck = JS.indexOf('id="explore-prediction-mount"');
