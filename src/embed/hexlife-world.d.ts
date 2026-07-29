@@ -3,9 +3,8 @@
  *
  * `src/embed/` is plain JS (see the note atop EmbedSim.js for why it is not `@ts-check`ed), so this
  * file is the one place the element's *documented* surface is written down in a form a compiler can
- * enforce. It exists because the Devvit client (`devvit/src/client/hexlife.ts`) is TypeScript and
- * was hand-mirroring this API in a local type that nothing checked against the real element — the
- * two could drift silently, which is exactly the failure a type is supposed to prevent.
+ * enforce. It also gives TypeScript hosts, including the separate Devvit repository, a declaration
+ * that cannot silently drift from the element maintained here.
  *
  * **This file is documentation with teeth: it must match `docs/EMBED-PLAN.md` § Public API.** The
  * embed's API is frozen (additive changes only), so adding to it means editing the plan, the

@@ -1,5 +1,5 @@
 /**
- * Type declarations for `gpuSupport.js` (Devvit `allowJs: false` boundary).
+ * Type declarations for `gpuSupport.js` (the package's Devvit `allowJs: false` boundary).
  * Keep in step with the JSDoc next door.
  */
 

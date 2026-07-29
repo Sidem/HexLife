@@ -67,8 +67,8 @@ const DATA_URI_RE = /^data:[^,]*;base64,(.*)$/s;
  * Resolve the wasm import into raw bytes.
  *
  * The import is a *URL*, and which kind depends on the bundler: a real path under the dev server /
- * the app build, or an inlined base64 `data:` URI once Vite's lib build (#25 Phase 3) or Devvit's
- * esbuild (#26) inlines the binary into the single output file. Both must work from one code path —
+ * the app build, or an inlined base64 `data:` URI once the embed package build inlines the binary
+ * into the single output file. Both must work from one code path —
  * the embed ships as one self-contained file and the Devvit webview may not fetch anything at all.
  *
  * A `data:` URI is decoded **here rather than handed to `fetch()`**: fetching a data URI is subject

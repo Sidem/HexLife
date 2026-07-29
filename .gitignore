@@ -10,13 +10,6 @@
 /hexlife-wasm/target
 **/Cargo.lock
 
-# ─── Devvit app (devvit/) ─────────────────────────────────────────────────────
-# devvit/ is a separate build target with its own toolchain and its own
-# .gitignore (node_modules/, dist/, the esbuild bundles in public/*.js).
-# Listed here are only the artifacts that can land outside that directory.
-*.tsbuildinfo
-.devvit/
-
 # ─── Local-only notes ─────────────────────────────────────────────────────────
 # Working context and in-flight planning, not part of the published project.
 # docs/ keeps only what a reader of the repo needs (media).
