@@ -287,7 +287,7 @@ export function isPointInHexagon(pointX, pointY, hexCenterX, hexCenterY, hexSize
 /**
  * Triggers a browser download for the given content.
  * @param {string} filename Desired filename.
- * @param {string} content File content.
+ * @param {BlobPart} content File content.
  * @param {string} [mimeType='text/plain'] MIME type.
  */
 export function downloadFile(filename, content, mimeType = 'text/plain') {

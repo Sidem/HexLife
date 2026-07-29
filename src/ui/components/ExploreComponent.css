@@ -215,6 +215,64 @@
 .explore-embedding-status[data-status="ready"] { color: var(--success, #4caf50); }
 .explore-embedding-status[data-status="error"] { color: var(--text-muted, #87878f); }
 
+.explore-native-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle, #3a3a3f);
+}
+
+.explore-native-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.explore-native-status {
+    min-height: 1em;
+    font-size: 0.8em;
+    line-height: 1.35;
+    color: var(--text-muted, #87878f);
+}
+
+.explore-native-status[data-status="loading"] { color: var(--accent, #5a9bd4); }
+.explore-native-status[data-status="ready"] { color: var(--success, #4caf50); }
+
+.explore-native-capture-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.explore-native-capture-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    font-size: 0.78em;
+    color: var(--text-muted, #87878f);
+}
+
+.explore-native-capture-grid select,
+.explore-native-capture-grid input {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 5px;
+    color: var(--text-primary, #e6e6ea);
+    background: var(--surface-1, #1d1d20);
+    border: 1px solid var(--border, #444);
+    border-radius: var(--radius-sm, 6px);
+}
+
+.explore-native-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 /* While a search is active, re-testing a find would fight the loop for the worker — dim + block it. */
 .explore-component-content.is-running .explore-find-actions [data-action="retest"] {
     opacity: 0.4;

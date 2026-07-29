@@ -95,7 +95,7 @@ const EVAL_SATURATION_RATIO = 0.99;
 // evaluation. Lifecycle-only commands (START/STOP/SPEED, entropy params) are deliberately excluded.
 const EVAL_DISRUPTIVE_COMMANDS = new Set([
     'RESET_WORLD', 'LOAD_STATE', 'SET_RULESET', 'APPLY_BRUSH', 'APPLY_SELECTIVE_BRUSH', 'SET_ENABLED',
-    'SHIFT_STATE',
+    'SHIFT_STATE', 'CAPTURE_TRAJECTORY',
 ]);
 
 const strategies = {
@@ -157,6 +157,52 @@ function copyCellsOut(view) {
     const buf = acquireCellBuffer();
     new Uint8Array(buf).set(view);
     return buf;
+}
+
+// Capture 1–32 exact, bit-packed states without advancing the visible world. The command runs
+// synchronously inside this worker, so no live tick can interleave. run_tick swaps Wasm's double
+// buffers; after capture the semantic current/next contents, rule-index buffers, usage counters, and
+// cached tick observables are restored into whichever physical buffers now own those roles.
+function captureTrajectory(data = {}) {
+    if (!wasm_world || !jsStateArray || isEvaluating || isRunRecording) {
+        self.postMessage({ type: 'TRAJECTORY_CAPTURE_ERROR', error: 'World is busy or not ready.' });
+        return;
+    }
+    const frameCount = Math.max(1, Math.min(32, Math.trunc(Number(data.frameCount) || 32)));
+    const tickStride = Math.max(1, Math.min(32, Math.trunc(Number(data.tickStride) || 1)));
+    if ((frameCount - 1) * tickStride > 256) {
+        self.postMessage({ type: 'TRAJECTORY_CAPTURE_ERROR', error: 'Trajectory span exceeds 256 ticks.' });
+        return;
+    }
+
+    const savedState = jsStateArray.slice();
+    const savedNextState = jsNextStateArray.slice();
+    const savedRules = jsRuleIndexArray.slice();
+    const savedNextRules = jsNextRuleIndexArray.slice();
+    const savedUsage = ruleUsageCounters.slice();
+    const savedActive = wasm_world.active_count();
+    const savedChanged = wasm_world.last_changed_count();
+    const frames = [packCells(jsStateArray)];
+
+    try {
+        for (let frame = 1; frame < frameCount; frame++) {
+            for (let step = 0; step < tickStride; step++) {
+                wasm_world.run_tick();
+                [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+                [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
+            }
+            frames.push(packCells(jsStateArray));
+        }
+    } finally {
+        jsStateArray.set(savedState);
+        jsNextStateArray.set(savedNextState);
+        jsRuleIndexArray.set(savedRules);
+        jsNextRuleIndexArray.set(savedNextRules);
+        ruleUsageCounters.set(savedUsage);
+        wasm_world.restore_tick_observables(savedActive, savedChanged);
+    }
+    const buffers = frames.map((frame) => frame.buffer);
+    self.postMessage({ type: 'TRAJECTORY_CAPTURE_RESULT', frames: buffers, sourceTick: worldTickCounter }, buffers);
 }
 
 // Toroidally translate the live cell state (and its rule-index colouring) by (dCol, dRow) whole
@@ -1388,6 +1434,10 @@ self.onmessage = async function(event) {
         case 'RUN_EVALUATION': {
             // { ticks, sampleEvery, probe: { enabled, flipIndex, probeTicks } } → one EVALUATION_RESULT.
             startEvaluation(command.data || {});
+            break;
+        }
+        case 'CAPTURE_TRAJECTORY': {
+            captureTrajectory(command.data || {});
             break;
         }
         case 'SET_HISTORY_CAPTURE': {

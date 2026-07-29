@@ -48,6 +48,10 @@ const SETTING_KEYS = {
     embeddingModel: 'embeddingModelId',
     targetPrompt: 'exploreTargetPrompt',
     targetBank: 'exploreTargetBankThreshold',
+    nativeFrames: 'nativeTrajectoryFrames',
+    nativeStride: 'nativeTrajectoryStride',
+    nativeLabel: 'nativeTrajectoryLabel',
+    nativeFamily: 'nativeTrajectoryFamily',
 };
 
 /** Cap on the target prompt length (chars) — sanitized here and again in AutoExploreService/share links. */
@@ -66,6 +70,13 @@ const EMBEDDING_STATUS_TEXT = {
     loading: 'Loading vision model… (downloads ~tens of MB once, then cached)',
     ready: 'Vision model ready — finds are also scored on perceptual novelty.',
     error: 'Vision model unavailable — using the statistical objective.',
+};
+
+const NATIVE_STATUS_TEXT = {
+    disabled: 'Native model is off. Training-slice export remains available.',
+    loading: 'Loading the local native trajectory model…',
+    ready: 'Native trajectory model ready.',
+    error: 'No accepted native model is installed yet. Export slices, train externally, then install the final artifact.',
 };
 
 const MAX_GALLERY_RENDER = 40;
@@ -191,6 +202,22 @@ export class ExploreComponent extends BaseComponent {
         const targetBank = this._sanitizeTargetBank(
             PersistenceService.loadUISetting(SETTING_KEYS.targetBank, EXPLORE_CONFIG.targetBankThreshold),
         );
+        const nativeStatus = this.worldManager.nativeTrajectoryModelService?.getStatus?.() || {
+            enabled: false, status: 'disabled', message: null, modelId: null, backend: null,
+        };
+        const nativeFrames = Math.max(1, Math.min(32, Math.trunc(
+            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeFrames, 32)) || 32,
+        )));
+        const nativeStride = Math.max(1, Math.min(32, Math.trunc(
+            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeStride, 1)) || 1,
+        )));
+        const persistedNativeLabel = PersistenceService.loadUISetting(SETTING_KEYS.nativeLabel, 'unlabeled');
+        const nativeLabel = ['unlabeled', 'interesting', 'boring'].includes(persistedNativeLabel)
+            ? persistedNativeLabel
+            : 'unlabeled';
+        const nativeFamily = sanitizeTargetPrompt(
+            String(PersistenceService.loadUISetting(SETTING_KEYS.nativeFamily, '')),
+        ).slice(0, 100);
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
@@ -287,6 +314,46 @@ export class ExploreComponent extends BaseComponent {
                             title="A target-mode find enters the gallery only when its mean frame→prompt cosine similarity reaches this. CLIP image-text similarities sit around 0.1–0.35, so 0.22 keeps the genuine matches.">
                     </div>
                 </div>
+                <div class="form-group explore-native-field">
+                    <div class="explore-native-heading">
+                        <strong>Native trajectory model</strong>
+                        <span class="explore-field-hint">#37 Stage 4A</span>
+                    </div>
+                    <label class="explore-embedding-toggle" title="Load an accepted HexLife-native ONNX model from this Explorer build. Training runs only in the separate HexLifeInterestModel project.">
+                        <input type="checkbox" id="explore-native-enabled" ${nativeStatus.enabled ? 'checked' : ''}>
+                        <span>Enable installed model</span>
+                    </label>
+                    <div class="explore-native-status" id="explore-native-status" data-status="${nativeStatus.status}">
+                        ${this._escape(this._nativeStatusText(nativeStatus))}
+                    </div>
+                    <div class="explore-native-capture-grid">
+                        <label>
+                            <span>Frames</span>
+                            <select id="explore-native-frames">
+                                ${[1, 2, 4, 8, 16, 32].map((value) => `<option value="${value}" ${value === nativeFrames ? 'selected' : ''}>${value}</option>`).join('')}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Tick stride</span>
+                            <input type="number" id="explore-native-stride" min="1" max="32" step="1" value="${nativeStride}">
+                        </label>
+                        <label>
+                            <span>Collection label</span>
+                            <select id="explore-native-label">
+                                ${['unlabeled', 'interesting', 'boring'].map((value) => `<option value="${value}" ${value === nativeLabel ? 'selected' : ''}>${value}</option>`).join('')}
+                            </select>
+                        </label>
+                        <label>
+                            <span>Ruleset family <span class="explore-field-hint">optional</span></span>
+                            <input type="text" id="explore-native-family" maxlength="100" value="${this._escape(nativeFamily)}" placeholder="e.g. glider-mutants-a">
+                        </label>
+                    </div>
+                    <div class="form-group-buttons explore-native-actions">
+                        <button class="button" data-action="export-training-slice" title="Capture exact bit-packed states without advancing the selected world">Export HXLT1 slice</button>
+                        <button class="button" data-action="evaluate-native" ${nativeStatus.status === 'ready' ? '' : 'disabled'} title="Evaluate this same slice with the installed native model">Evaluate selected</button>
+                    </div>
+                    <div class="explore-field-hint">Exports exact bit matrices; no screenshot or CLIP data. A 32-frame medium slice is about 170 KB.</div>
+                </div>
             </div>
             <details class="tool-group explore-scoring-group" id="explore-scoring-group" ${scoringOpen ? 'open' : ''}>
                 <summary class="explore-scoring-summary">
@@ -329,6 +396,14 @@ export class ExploreComponent extends BaseComponent {
         this.embeddingStatusEl = this.element.querySelector('#explore-embedding-status');
         this.embeddingModelField = this.element.querySelector('#explore-embedding-model-field');
         this.embeddingModelSelect = this.element.querySelector('#explore-embedding-model');
+        this.nativeToggle = this.element.querySelector('#explore-native-enabled');
+        this.nativeStatusEl = this.element.querySelector('#explore-native-status');
+        this.nativeFramesSelect = this.element.querySelector('#explore-native-frames');
+        this.nativeStrideInput = this.element.querySelector('#explore-native-stride');
+        this.nativeLabelSelect = this.element.querySelector('#explore-native-label');
+        this.nativeFamilyInput = this.element.querySelector('#explore-native-family');
+        this.nativeExportButton = this.element.querySelector('[data-action="export-training-slice"]');
+        this.nativeEvaluateButton = this.element.querySelector('[data-action="evaluate-native"]');
         this.targetInput = this.element.querySelector('#explore-target-prompt');
         this.targetBankInput = this.element.querySelector('#explore-target-bank');
         this.targetAdvanced = this.element.querySelector('#explore-target-advanced');
@@ -465,6 +540,44 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
+        if (this.nativeToggle) {
+            this._addDOMListener(this.nativeToggle, 'change', () => {
+                EventBus.dispatch(EVENTS.COMMAND_SET_NATIVE_MODEL_ENABLED, { enabled: this.nativeToggle.checked });
+            });
+        }
+        if (this.nativeFramesSelect) {
+            this._addDOMListener(this.nativeFramesSelect, 'change', () => {
+                PersistenceService.saveUISetting(SETTING_KEYS.nativeFrames, Number(this.nativeFramesSelect.value));
+            });
+        }
+        if (this.nativeStrideInput) {
+            this._addDOMListener(this.nativeStrideInput, 'change', () => {
+                const stride = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeStrideInput.value) || 1)));
+                this.nativeStrideInput.value = stride;
+                PersistenceService.saveUISetting(SETTING_KEYS.nativeStride, stride);
+            });
+        }
+        if (this.nativeLabelSelect) {
+            this._addDOMListener(this.nativeLabelSelect, 'change', () => {
+                PersistenceService.saveUISetting(SETTING_KEYS.nativeLabel, this.nativeLabelSelect.value);
+            });
+        }
+        if (this.nativeFamilyInput) {
+            this._addDOMListener(this.nativeFamilyInput, 'change', () => {
+                const family = this.nativeFamilyInput.value.trim().slice(0, 100);
+                this.nativeFamilyInput.value = family;
+                PersistenceService.saveUISetting(SETTING_KEYS.nativeFamily, family);
+            });
+        }
+        this._addDOMListener(this.nativeExportButton, 'click', () => {
+            const options = this._nativeCaptureOptions();
+            if (options) EventBus.dispatch(EVENTS.COMMAND_CAPTURE_TRAINING_SLICE, options);
+        });
+        this._addDOMListener(this.nativeEvaluateButton, 'click', () => {
+            const options = this._nativeCaptureOptions();
+            if (options) EventBus.dispatch(EVENTS.COMMAND_EVALUATE_NATIVE_MODEL, options);
+        });
+
         if (this.scoringGroup) {
             this._addDOMListener(this.scoringGroup, 'toggle', () => {
                 PersistenceService.saveUISetting(SETTING_KEYS.scoringOpen, this.scoringGroup.open);
@@ -490,6 +603,7 @@ export class ExploreComponent extends BaseComponent {
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
         this._subscribeToEvent(EVENTS.EXPLORE_FIND_ADDED, this._onFindAdded);
         this._subscribeToEvent(EVENTS.EMBEDDING_STATUS_CHANGED, this._onEmbeddingStatus);
+        this._subscribeToEvent(EVENTS.NATIVE_MODEL_STATUS_CHANGED, this._onNativeModelStatus);
         this._subscribeToEvent(EVENTS.VOTE_RECORDED, this._onVoteRecorded);
     }
 
@@ -539,6 +653,42 @@ export class ExploreComponent extends BaseComponent {
         if (this.embeddingModelField) this.embeddingModelField.hidden = !payload.enabled;
         // The mode chip + target-field gating depend on the embedding toggle.
         this._updateModeChip();
+    }
+
+    _nativeStatusText(status) {
+        if (status?.status === 'ready') {
+            const details = [status.modelId, status.backend].filter(Boolean).join(' · ');
+            return `${NATIVE_STATUS_TEXT.ready}${details ? ` ${details}` : ''}`;
+        }
+        return status?.message || NATIVE_STATUS_TEXT[status?.status] || NATIVE_STATUS_TEXT.disabled;
+    }
+
+    _onNativeModelStatus(payload) {
+        if (!payload) return;
+        if (this.nativeToggle) this.nativeToggle.checked = !!payload.enabled;
+        if (this.nativeStatusEl) {
+            this.nativeStatusEl.dataset.status = payload.status || 'disabled';
+            this.nativeStatusEl.textContent = this._nativeStatusText(payload);
+        }
+        if (this.nativeEvaluateButton) this.nativeEvaluateButton.disabled = payload.status !== 'ready';
+    }
+
+    _nativeCaptureOptions() {
+        const frameCount = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeFramesSelect?.value) || 32)));
+        const tickStride = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeStrideInput?.value) || 1)));
+        if ((frameCount - 1) * tickStride > 256) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                message: 'Training slice span must be 256 ticks or less.',
+                type: 'error',
+            });
+            return null;
+        }
+        return {
+            frameCount,
+            tickStride,
+            label: this.nativeLabelSelect?.value || 'unlabeled',
+            family: this.nativeFamilyInput?.value.trim().slice(0, 100) || '',
+        };
     }
 
     _updatePresetChip(presetKey) {
@@ -772,6 +922,11 @@ export class ExploreComponent extends BaseComponent {
         if (this.populationSelect) this.populationSelect.disabled = isRunning;
         this.scoringPanel?.setDisabled(isRunning);
         if (this.embeddingModelSelect) this.embeddingModelSelect.disabled = isRunning;
+        if (this.nativeExportButton) this.nativeExportButton.disabled = isRunning;
+        if (this.nativeEvaluateButton) {
+            this.nativeEvaluateButton.disabled = isRunning ||
+                this.worldManager.nativeTrajectoryModelService?.getStatus?.().status !== 'ready';
+        }
         // Target controls are read at Start; a running search also can't have embeddings toggled off.
         if (this.targetInput) this.targetInput.disabled = isRunning || !this.embeddingToggle?.checked;
         if (this.targetBankInput) this.targetBankInput.disabled = isRunning;

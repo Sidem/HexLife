@@ -243,6 +243,25 @@ export class WorldProxy {
                 }
                 break;
             }
+            case 'TRAJECTORY_CAPTURE_RESULT': {
+                if (this._pendingTrajectoryCapture) {
+                    const { resolve } = this._pendingTrajectoryCapture;
+                    this._pendingTrajectoryCapture = null;
+                    resolve({
+                        frames: (data.frames || []).map((buffer) => new Uint8Array(buffer)),
+                        sourceTick: Number(data.sourceTick) || 0,
+                    });
+                }
+                break;
+            }
+            case 'TRAJECTORY_CAPTURE_ERROR': {
+                if (this._pendingTrajectoryCapture) {
+                    const { reject } = this._pendingTrajectoryCapture;
+                    this._pendingTrajectoryCapture = null;
+                    reject(new Error(data.error || 'Trajectory capture failed.'));
+                }
+                break;
+            }
         }
     }
 
@@ -315,6 +334,18 @@ export class WorldProxy {
         return new Promise((resolve) => {
             this._pendingEvaluation = resolve;
             this.sendCommand('RUN_EVALUATION', opts);
+        });
+    }
+    // Capture an exact, bit-packed trajectory from the current state. The worker restores its Wasm
+    // buffers and cached observables before replying, so the visible/live world does not advance.
+    // sourceTick is sampled in the worker at the same instant as frame 0 (main-thread stats can lag).
+    captureTrajectory({ frameCount = 32, tickStride = 1 } = {}) {
+        return new Promise((resolve, reject) => {
+            if (this._pendingTrajectoryCapture) {
+                this._pendingTrajectoryCapture.reject(new Error('Trajectory capture was superseded.'));
+            }
+            this._pendingTrajectoryCapture = { resolve, reject };
+            this.sendCommand('CAPTURE_TRAJECTORY', { frameCount, tickStride });
         });
     }
     // Fetch the worker's detected-cycle frames (bit-packed state + rule indices per frame) for the

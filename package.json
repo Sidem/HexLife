@@ -30,6 +30,7 @@
         "wasm-pack": "^0.0.0"
     },
     "dependencies": {
-        "gifenc": "^1.0.3"
+        "gifenc": "^1.0.3",
+        "onnxruntime-web": "^1.27.0"
     }
 }

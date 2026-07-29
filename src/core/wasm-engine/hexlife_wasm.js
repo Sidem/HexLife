@@ -182,6 +182,17 @@ export class World {
         wasm.world_reset_rule_usage_counters(this.__wbg_ptr);
     }
     /**
+     * Restore the two cached tick observables after a non-destructive, worker-side trajectory
+     * preview. The worker snapshots/restores both simulation buffers and the usage counters around
+     * that preview; these scalar caches are the only remaining run_tick mutation outside those
+     * buffers. This does not alter evolution semantics and is not used by normal ticking.
+     * @param {number} active_count
+     * @param {number} changed_count
+     */
+    restore_tick_observables(active_count, changed_count) {
+        wasm.world_restore_tick_observables(this.__wbg_ptr, active_count, changed_count);
+    }
+    /**
      * @returns {number}
      */
     rule_indices_ptr() {

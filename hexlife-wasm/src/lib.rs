@@ -229,6 +229,15 @@ impl World {
         self.last_changed_count
     }
 
+    /// Restore the two cached tick observables after a non-destructive, worker-side trajectory
+    /// preview. The worker snapshots/restores both simulation buffers and the usage counters around
+    /// that preview; these scalar caches are the only remaining run_tick mutation outside those
+    /// buffers. This does not alter evolution semantics and is not used by normal ticking.
+    pub fn restore_tick_observables(&mut self, active_count: u32, changed_count: u32) {
+        self.last_active_count = active_count;
+        self.last_changed_count = changed_count;
+    }
+
     /// Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
     /// one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
     /// reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range

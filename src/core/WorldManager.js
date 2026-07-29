@@ -6,6 +6,8 @@ import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService } from './AutoExploreService.js';
 import { EmbeddingService, EMBEDDING_CONFIG, EMBEDDING_MODELS } from '../services/EmbeddingService.js';
+import { NativeTrajectoryModelService } from '../services/NativeTrajectoryModelService.js';
+import { TrajectoryCaptureService } from '../services/TrajectoryCaptureService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
 import { encodeWorldCode } from './WorldCodec.js';
 import { ThumbnailBakeService } from './ThumbnailBakeService.js';
@@ -64,6 +66,15 @@ export class WorldManager {
         // truthful ready/error status instead of a stuck "will load on demand"; fire-and-forget and
         // self-degrading. Default-off users never spawn the worker.
         if (this.embeddingService.isEnabled()) this.embeddingService.ensureReady();
+        // HexLife-native trajectory model boundary (#37 Stage 4A). Training stays in the sibling
+        // HexLifeInterestModel project; Explorer only loads a final manifest+ONNX artifact and
+        // exports exact HXLT1 slices. It is default-off and does not affect Auto-Explore ranking
+        // until a trained artifact passes Stage 4B's held-out/runtime gates.
+        this.nativeTrajectoryModelService = new NativeTrajectoryModelService({
+            enabled: PersistenceService.loadUISetting('nativeTrajectoryModelEnabled', false),
+        });
+        if (this.nativeTrajectoryModelService.enabled) this.nativeTrajectoryModelService.ensureReady();
+        this.trajectoryCaptureService = new TrajectoryCaptureService(this);
         // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
         // it only references the proxies/ruleset service lazily once started. The thumbnail provider
         // (v2.6, F6) waits a couple of rAFs for the renderer to draw the world's final eval frame,
@@ -298,6 +309,43 @@ export class WorldManager {
             PersistenceService.saveUISetting('embeddingModelId', modelId);
             this.embeddingService.setModel(modelId);
             this.autoExploreService.onEmbeddingModelChanged();
+        });
+        EventBus.subscribe(EVENTS.COMMAND_SET_NATIVE_MODEL_ENABLED, (data) => {
+            const enabled = !!data?.enabled;
+            PersistenceService.saveUISetting('nativeTrajectoryModelEnabled', enabled);
+            this.nativeTrajectoryModelService.setEnabled(enabled);
+        });
+        EventBus.subscribe(EVENTS.COMMAND_CAPTURE_TRAINING_SLICE, async (data) => {
+            try {
+                const result = await this.trajectoryCaptureService.captureAndDownload(data || {});
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: `Exported ${result.header.frameCount}-frame training slice.`,
+                    type: 'success',
+                });
+            } catch (error) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: error?.message || 'Training-slice capture failed.',
+                    type: 'error',
+                });
+            }
+        });
+        EventBus.subscribe(EVENTS.COMMAND_EVALUATE_NATIVE_MODEL, async (data) => {
+            try {
+                const result = await this.trajectoryCaptureService.evaluateSelected(
+                    this.nativeTrajectoryModelService,
+                    data || {},
+                );
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: `Native reward ${result.reward.toFixed(3)} · ${result.modelId}`,
+                    type: 'info',
+                    duration: 7000,
+                });
+            } catch (error) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: error?.message || 'Native-model evaluation failed.',
+                    type: 'error',
+                });
+            }
         });
     }
 
