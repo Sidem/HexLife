@@ -1,0 +1,37 @@
+{
+  "name": "@hexlife/embed",
+  "version": "1.0.0",
+  "description": "Embeddable HexLife cellular automaton world and host-safe world-code API",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": [
+    "./src/embed/index.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/embed/hexlife-world.d.ts",
+      "import": "./src/embed/index.js",
+      "default": "./src/embed/index.js"
+    },
+    "./api": {
+      "types": "./src/embed/api.d.ts",
+      "import": "./src/embed/api.js",
+      "default": "./src/embed/api.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sidem/HexLife.git"
+  },
+  "homepage": "https://sidem.github.io/HexLife/"
+}

@@ -1,14 +1,11 @@
 /**
  * The import surface for **external hosts** of the HexLife engine.
  *
- * One host exists today: the Devvit app in `devvit/`, which is bundled straight from this source
- * tree (esbuild, not a package) so that Reddit posts and the Explorer share one engine, one codec
- * and one determinism contract. That arrangement is deliberate — see `devvit/scripts/build-client.mjs`
- * — but without a declared surface it degrades into "reach into whatever `src/` file has the symbol",
- * and every such reach is a refactor in the main app that silently breaks the Reddit app.
+ * External hosts consume this surface through `@hexlife/embed/api`. The package is built from
+ * this source tree so Reddit posts and the Explorer share one engine, one codec, and one
+ * determinism contract without cross-repository source imports.
  *
- * So the boundary is this file, and the rule is one line: **`devvit/` imports from `src/embed/` and
- * nowhere else in `src/`.** `tests/devvitBoundary.test.js` enforces it.
+ * The boundary is this file: adding an export is an explicit compatibility decision for hosts.
  *
  * Two entry points, split by what they need to run:
  *
@@ -18,8 +15,8 @@
  * - `index.js` — the **browser** entry: importing it registers `<hexlife-world>` and pulls in the
  *   sim + renderer. Webview clients import it for the side effect; a Node bundle must not.
  *
- * Adding an export here is the point at which a main-app internal becomes something the Devvit app
- * may depend on. Give it a declaration in `api.d.ts` (the host builds with `allowJs: false`) and
+ * Adding an export here is the point at which a main-app internal becomes something external hosts
+ * may depend on. Give it a declaration in `api.d.ts` (Devvit builds with `allowJs: false`) and
  * keep it dependency-light — the modules re-exported below deliberately avoid `utils.js`/`config.js`.
  */
 

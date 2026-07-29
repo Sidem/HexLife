@@ -14,8 +14,8 @@
  * Registration is idempotent: a page that (say) loads the script twice, or a bundler that pulls it
  * in from two places, must not throw a "name has already been used" DOMException at the host.
  *
- * The named exports exist for programmatic consumers — notably the Devvit webview (#26), which
- * imports this module directly from source rather than over a CDN.
+ * The named exports exist for programmatic consumers. Devvit consumes the bundled npm entry;
+ * script-tag hosts use the Pages/CDN build.
  */
 
 import { HexLifeElement } from './HexLifeElement.js';

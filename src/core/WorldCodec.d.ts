@@ -2,7 +2,7 @@
  * Type declarations for `WorldCodec.js`.
  *
  * The app itself needs none of this — it type-checks the JSDoc in place via `// @ts-check`. This file
- * exists for the **Devvit app** (`devvit/`), whose TypeScript build imports the codec across the repo
+ * exists for the **Devvit app**, whose TypeScript build imports the codec across the package
  * boundary (server-side validation of the pasted world code) and, unlike the root, does not enable
  * `allowJs`. Keep it in step with the JSDoc next door; `tests/worldCodec.test.js` pins the behavior.
  */

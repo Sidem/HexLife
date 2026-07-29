@@ -107,9 +107,9 @@ sizes change.
   **animated GIF** at preset or custom resolutions.
 - Export a detected cycle as a seamless GIF, or arm a perfect-run recording that starts from the
   current state and closes on a detected cycle.
-- Turn a world code into a playable **Live Specimen** on Reddit. The app under [`devvit/`](devvit/)
-  supports play, restart, zoom, drawing, ruleset inspection, and posting an exact remix from inside
-  Reddit.
+- Turn a world code into a playable **Live Specimen** on Reddit. The separate
+  [HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit) app supports play, restart, zoom,
+  drawing, ruleset inspection, and posting an exact remix from inside Reddit.
 
 ### Learn and work efficiently
 
@@ -184,12 +184,13 @@ npm run build:wasm
 
 ## 🧩 Reusable world element
 
-The source tree includes the `<hexlife-world>` custom element used by the Reddit app. It accepts a
+The `@hexlife/embed` package provides the `<hexlife-world>` custom element used by the Reddit
+app. It accepts a
 ruleset or exact world code, seed, density, rows, speed, palette, paused/drawing/zoom policies, and
 also exposes play, pause, reset, tick, brush-size, checksum, and world-code APIs.
 
 ```js
-import './src/embed/index.js';
+import '@hexlife/embed';
 ```
 
 ```html
@@ -203,8 +204,8 @@ import './src/embed/index.js';
 </hexlife-world>
 ```
 
-The element is reusable from source today, but the standalone CDN bundle and in-app “Copy embed
-code” workflow are not yet published.
+The package is built from `src/embed/` with `npm run build:embed`; the standalone CDN and in-app
+“Copy embed code” workflows remain open.
 
 ## 🏗️ Architecture
 
@@ -227,11 +228,11 @@ code” workflow are not yet published.
 | `index.html`, `src/` | Explorer application, UI, renderer, services, and JavaScript simulation orchestration |
 | `hexlife-wasm/` | Rust tick engine compiled to WebAssembly |
 | `src/embed/` | Reusable single-world runtime and host boundary |
-| `devvit/` | Live Specimens Reddit app, with its own Node 22.6+ toolchain and tests |
-| `tests/` | Explorer unit, regression, boundary, determinism, and codec tests |
+| `packages/hexlife-embed/` | Metadata and documentation for the published embed package |
+| `tests/` | Explorer unit, regression, determinism, and codec tests |
 
-The Explorer and Reddit app share the engine, ruleset descriptors, and world codec through
-`src/embed/`. A boundary test prevents `devvit/` from depending on the rest of the Explorer UI.
+The Explorer and the separate Reddit app share the engine, ruleset descriptors, and world codec
+through the versioned `@hexlife/embed` package.
 
 </details>
 
@@ -300,9 +301,9 @@ codes, share links, `<hexlife-world>` attributes, and deterministic trajectories
 meaning. See the public [CHANGELOG](CHANGELOG.md) for release notes and [`CITATION.cff`](CITATION.cff)
 for citation metadata.
 
-The Reddit app under [`devvit/`](devvit/) versions and ships separately on Reddit's review cadence.
+The [HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit) app versions and ships separately on
+Reddit's review cadence.
 
 ## 📄 License
 
-Released under the [MIT License](LICENSE) — © 2025 Sidem. The license covers the entire repository,
-including [`devvit/`](devvit/).
+Released under the [MIT License](LICENSE) — © 2025 Sidem.

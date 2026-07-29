@@ -2,7 +2,7 @@
  * Type declarations for `rulesetDescriptor.js`.
  *
  * The app itself type-checks the JSDoc in place via `// @ts-check`; this file exists for the
- * **Devvit app** (`devvit/`), whose TypeScript build imports the classifier across the repo
+ * **Devvit app**, whose TypeScript build imports the classifier across the package
  * boundary (ruleset identity comment + in-post rule card) and does not enable `allowJs`.
  * Keep it in step with the JSDoc next door; `tests/rulesetDescriptor.test.js` pins the behavior.
  */
