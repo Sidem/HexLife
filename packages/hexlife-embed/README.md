@@ -26,3 +26,6 @@ The browser bundle includes the HexLife Wasm engine. Its public custom-element A
 versioned; world codes (`HXW1.…`) and deterministic simulation behavior are compatibility
 contracts. Source and releases are maintained in
 [Sidem/HexLife](https://github.com/Sidem/HexLife).
+
+Package releases use `embed-vX.Y.Z` tags and GitHub trusted publishing. The package version is
+independent of HexLife Explorer's application version.

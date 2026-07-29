@@ -184,10 +184,14 @@ npm run build:wasm
 
 ## 🧩 Reusable world element
 
-The `@hexlife/embed` package provides the `<hexlife-world>` custom element used by the Reddit
-app. It accepts a
+The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides the
+`<hexlife-world>` custom element used by the Reddit app. It accepts a
 ruleset or exact world code, seed, density, rows, speed, palette, paused/drawing/zoom policies, and
 also exposes play, pause, reset, tick, brush-size, checksum, and world-code APIs.
+
+```bash
+npm install @hexlife/embed
+```
 
 ```js
 import '@hexlife/embed';

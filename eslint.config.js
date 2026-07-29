@@ -5,11 +5,9 @@ import unusedImports from 'eslint-plugin-unused-imports';
 import prettierConfig from 'eslint-config-prettier';
 
 export default [
-  // Global ignores. `devvit/` is a separate build target with its own toolchain (TypeScript +
-  // esbuild + Biome); it lints itself via `npm run lint` in that directory. Without this, the root
-  // ESLint run would also pick up its bundled esbuild output in devvit/public/*.js.
+  // Global ignores for generated output.
   {
-    ignores: ['dist/**', 'hexlife-wasm/src/core/wasm-engine/**', 'devvit/**'],
+    ignores: ['dist/**', 'hexlife-wasm/src/core/wasm-engine/**'],
   },
 
   // Base configuration for JavaScript files
