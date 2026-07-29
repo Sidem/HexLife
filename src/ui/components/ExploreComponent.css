@@ -659,7 +659,8 @@
     background-color: var(--warning, #d8a04b);
 }
 
-.explore-find-chaos {
+.explore-find-chaos,
+.explore-find-noise {
     font-size: 0.72em;
     color: var(--warning, #d8a04b);
     border: 1px solid currentColor;

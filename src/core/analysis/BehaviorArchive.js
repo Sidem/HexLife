@@ -57,6 +57,9 @@ import { hammingDistanceHex } from '../../utils/utils.js';
  *   statistical `ratio|entropy|σ` descriptor.
  * @property {number} [targetSimilarity] Mean cosine similarity of the find's trajectory to the run's
  *   target prompt embedding (v3.2 supervised target search); present only for target-mode finds.
+ * @property {number} [noiseSimilarity] Mean frame-wise maximum cosine similarity to the fixed noise
+ *   prompt battery (#37 Stage 3); present only when perceptual confirmation succeeded.
+ * @property {number} [noiseFactor] Multiplicative confirmation factor derived from noiseSimilarity.
  */
 
 /**

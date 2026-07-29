@@ -404,6 +404,7 @@ button.tag-chip.constraint-filter .constraint-filter-count {
 
 button.tag-chip.constraint-filter.constraint-totalistic { color: #f0c05a; }
 button.tag-chip.constraint-filter.constraint-n_count { color: #8fd694; }
+button.tag-chip.constraint-filter.constraint-d_sym { color: #71d6d0; }
 button.tag-chip.constraint-filter.constraint-r_sym { color: #7fc4ff; }
 button.tag-chip.constraint-filter.constraint-free { color: #a0a0a8; }
 
@@ -418,6 +419,7 @@ button.tag-chip.constraint-filter.active {
 
 button.tag-chip.constraint-filter.constraint-totalistic.active { background-color: #f0c05a; border-color: #f0c05a; }
 button.tag-chip.constraint-filter.constraint-n_count.active { background-color: #8fd694; border-color: #8fd694; }
+button.tag-chip.constraint-filter.constraint-d_sym.active { background-color: #71d6d0; border-color: #71d6d0; }
 button.tag-chip.constraint-filter.constraint-r_sym.active { background-color: #7fc4ff; border-color: #7fc4ff; }
 button.tag-chip.constraint-filter.constraint-free.active { background-color: #a0a0a8; border-color: #a0a0a8; }
 
@@ -579,6 +581,11 @@ button.tag-chip.tag-filter.active {
 .constraint-badge.constraint-n_count {
     color: #8fd694;
     background-color: rgba(143, 214, 148, 0.12);
+}
+
+.constraint-badge.constraint-d_sym {
+    color: #71d6d0;
+    background-color: rgba(113, 214, 208, 0.12);
 }
 
 .constraint-badge.constraint-r_sym {

@@ -20,7 +20,7 @@ function hexFrom(predicate) {
 const DEAD = '0'.repeat(32);
 
 describe('rulesetRelatedness', () => {
-    it('counts a multi-entry rotational orbit flip as one degree', () => {
+    it('counts a reflection-symmetric orbit flip in D-sym space', () => {
         const orbit = new Set(getAllRotations(0b000011));
         const child = hexFrom((cs, mask) => cs === 0 && orbit.has(mask));
         const relation = rulesetRelatedness(DEAD, child);
@@ -28,9 +28,19 @@ describe('rulesetRelatedness', () => {
         expect(orbit.size).toBe(6);
         expect(relation).toMatchObject({
             degrees: 1,
+            totalUnits: 26,
+            space: 'd_sym',
+            isClose: true,
+        });
+    });
+
+    it('keeps a chiral orbit flip in the 28-unit R-sym space', () => {
+        const orbit = new Set(getAllRotations(0b001011));
+        const child = hexFrom((cs, mask) => cs === 0 && orbit.has(mask));
+        expect(rulesetRelatedness(DEAD, child)).toMatchObject({
+            degrees: 1,
             totalUnits: 28,
             space: 'r_sym',
-            isClose: true,
         });
     });
 

@@ -7,7 +7,7 @@ import { getCanonicalRepresentative, countSetBits } from './Symmetry.js';
  * Ruleset classification + human-readable notation ("what ruleset is this?").
  *
  * Two related answers live here. {@link classifyRulesetConstraint} names the **strictest structural
- * constraint** a rule satisfies (`totalistic ⊂ n_count ⊂ r_sym ⊂ free`) — a badge-sized fact,
+ * constraint** a rule satisfies (`totalistic ⊂ n_count ⊂ d_sym ⊂ r_sym ⊂ free`) — a badge-sized fact,
  * derived post-hoc from the 128-entry table, never stored. {@link describeRuleset} additionally
  * classifies a 32-char ruleset hex into one of three *notation* tiers and, where the structure
  * allows, emits a compact birth/survival notation:
@@ -56,12 +56,13 @@ const CHIRAL_REPS = [0b001011, 0b001101];
 
 /**
  * The constraint classes, **strictest first**. They nest: every totalistic rule is also n_count,
- * every n_count rule is also r_sym, and `free` is "none of the above". A rule is reported as the
- * strictest class its table satisfies, so the four are mutually exclusive as labels.
- * @typedef {'totalistic'|'n_count'|'r_sym'|'free'} ConstraintClass
+ * every n_count rule is also d_sym, every d_sym rule is also r_sym, and `free` is "none of the
+ * above". A rule is reported as the
+ * strictest class its table satisfies, so the five are mutually exclusive as labels.
+ * @typedef {'totalistic'|'n_count'|'d_sym'|'r_sym'|'free'} ConstraintClass
  */
 /** @type {ConstraintClass[]} */
-export const CONSTRAINT_CLASSES = ['totalistic', 'n_count', 'r_sym', 'free'];
+export const CONSTRAINT_CLASSES = ['totalistic', 'n_count', 'd_sym', 'r_sym', 'free'];
 
 /**
  * Display metadata per constraint class, for badges/filters. Kept next to the classifier (and
@@ -77,9 +78,13 @@ export const CONSTRAINT_CLASS_META = {
         label: 'N-count',
         description: 'Outer-totalistic: the outcome depends on the centre cell and how many neighbours are alive, not on where they are.',
     },
+    d_sym: {
+        label: 'D-sym',
+        description: 'Dihedrally symmetric: rotating or reflecting a neighbour arrangement changes nothing.',
+    },
     r_sym: {
         label: 'R-sym',
-        description: 'Rotationally symmetric: the outcome depends on the arrangement of neighbours, but rotating that arrangement changes nothing.',
+        description: 'Rotationally symmetric: rotations change nothing; an exact R-sym badge means at least one mirrored arrangement behaves differently.',
     },
     free: {
         label: 'Free',
@@ -97,6 +102,11 @@ function classFromTable(rules, perState) {
     // Not rotationally symmetric ⇒ neither of the stricter classes can hold either.
     if (!perState) return 'free';
 
+    // For binary 6-neighbour masks, D6 differs from C6 only by merging the chiral 3m/3m' pair.
+    const reflectionSymmetric = perState.every(
+        (outputs) => outputs.get(CHIRAL_REPS[0]) === outputs.get(CHIRAL_REPS[1]),
+    );
+
     // n-count: within a centre state, every mask with the same neighbour count agrees.
     const bucket = [new Int8Array(7).fill(-1), new Int8Array(7).fill(-1)];
     for (let cs = 0; cs < 2; cs++) {
@@ -104,7 +114,7 @@ function classFromTable(rules, perState) {
             const n = countSetBits(mask);
             const out = rules[(cs << 6) | mask];
             if (bucket[cs][n] === -1) bucket[cs][n] = out;
-            else if (bucket[cs][n] !== out) return 'r_sym';
+            else if (bucket[cs][n] !== out) return reflectionSymmetric ? 'd_sym' : 'r_sym';
         }
     }
 
@@ -139,6 +149,21 @@ export function classifyRulesetConstraint(source) {
         return null;
     }
     return classFromTable(rules, orbitOutputs(rules));
+}
+
+/**
+ * Whether a ruleset satisfies a requested constraint, including stricter nested classes.
+ * For example, a D-sym rule satisfies the R-sym filter, while a chiral R-sym rule does not satisfy
+ * D-sym. This is the hierarchy-aware predicate used by the Library.
+ * @param {string|Uint8Array} source
+ * @param {ConstraintClass} requested
+ * @returns {boolean}
+ */
+export function satisfiesRulesetConstraint(source, requested) {
+    const own = classifyRulesetConstraint(source);
+    const ownRank = own ? CONSTRAINT_CLASSES.indexOf(own) : -1;
+    const requestedRank = CONSTRAINT_CLASSES.indexOf(requested);
+    return ownRank >= 0 && requestedRank >= 0 && ownRank <= requestedRank;
 }
 
 /** Display order of orbit labels within a notation string. */

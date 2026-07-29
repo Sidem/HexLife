@@ -26,6 +26,7 @@ export class RulesetService {
      *                 the classic plain-totalistic CA constraint. 8 buckets, so the whole space is
      *                 2^8 = 256 rulesets; strictly coarser than `n_count` (a totalistic ruleset is
      *                 an n_count ruleset whose (cs=1, n) bucket always equals its (cs=0, n+1) bucket).
+     * - `d_sym`:      one random output per (centerState × D6 rotation/reflection orbit) group.
      * - `r_sym`:      one random output per (centerState × canonical orbit) group.
      * - default:      each of the 128 entries flipped independently.
      * @param {number} bias - Probability of a 1 output.
@@ -51,13 +52,14 @@ export class RulesetService {
                     }
                 }
             }
-        } else if (generationMode === 'r_sym') {
-            if (!this.symmetryData || !this.symmetryData.canonicalRepresentatives) {
-                console.warn("generateRandomRulesetHex: symmetryData not available for r_sym, falling back to random.");
+        } else if (generationMode === 'r_sym' || generationMode === 'd_sym') {
+            const groups = this._groupsForMode(generationMode);
+            if (!groups) {
+                console.warn(`generateRandomRulesetHex: symmetryData not available for ${generationMode}, falling back to random.`);
                 for (let i = 0; i < 128; i++) tempRuleset[i] = rng() < bias ? 1 : 0;
             } else {
                 tempRuleset.fill(0);
-                for (const group of this.symmetryData.canonicalRepresentatives) {
+                for (const group of groups) {
                     for (let cs = 0; cs <= 1; cs++) {
                         const out = rng() < bias ? 1 : 0;
                         for (const member of group.members) tempRuleset[(cs << 6) | member] = out;
@@ -73,6 +75,7 @@ export class RulesetService {
     /**
      * Produce a mutated copy of `sourceHex`.
      * - `single`:     flip each of the 128 entries with probability `mutationRate`.
+     * - `d_sym`:      flip whole D6 rotation/reflection orbit groups (per centerState).
      * - `r_sym`:      flip whole canonical orbit groups (per centerState).
      * - `n_count`:    flip whole neighbor-count buckets, seeded from `referenceRuleset`'s
      *                 effective output (matches the legacy behaviour where the n_count
@@ -88,7 +91,7 @@ export class RulesetService {
      * @returns {string} 32-char hex
      */
     generateMutatedHex(sourceHex, mutationRate, mutationMode, referenceRuleset = null, rng = Math.random) {
-        if (mutationMode === 'r_sym' && !this._canonicalGroups()) return sourceHex;
+        if ((mutationMode === 'r_sym' || mutationMode === 'd_sym') && !this._groupsForMode(mutationMode)) return sourceHex;
         const rules = hexToRuleset(sourceHex);
         this._mutateUnitsInPlace(rules, mutationRate, mutationMode, referenceRuleset, rng);
         return rulesetToHex(rules);
@@ -98,6 +101,16 @@ export class RulesetService {
     _canonicalGroups() {
         const groups = this.symmetryData && this.symmetryData.canonicalRepresentatives;
         return groups && groups.length > 0 ? groups : null;
+    }
+
+    /** The C6 or D6 orbit groups for a symmetry mode, or null when unavailable/unknown. */
+    _groupsForMode(mode) {
+        if (mode === 'r_sym') return this._canonicalGroups();
+        if (mode === 'd_sym') {
+            const groups = this.symmetryData && this.symmetryData.dihedralCanonicalRepresentatives;
+            return groups && groups.length > 0 ? groups : null;
+        }
+        return null;
     }
 
     /**
@@ -113,11 +126,11 @@ export class RulesetService {
      * @param {() => number} rng
      */
     _mutateUnitsInPlace(rules, mutationRate, mode, referenceRuleset, rng) {
-        if (mode === 'r_sym') {
-            const canonicalGroups = this._canonicalGroups();
-            if (!canonicalGroups) return;
+        if (mode === 'r_sym' || mode === 'd_sym') {
+            const symmetryGroups = this._groupsForMode(mode);
+            if (!symmetryGroups) return;
 
-            for (const group of canonicalGroups) {
+            for (const group of symmetryGroups) {
                 for (let cs = 0; cs <= 1; cs++) {
                     if (rng() < mutationRate) {
                         const currentOutput = rules[(cs << 6) | group.representative];
@@ -173,6 +186,7 @@ export class RulesetService {
     /**
      * Breed two parent ruleset hexes into a child (Phase 5 of the auto-explore roadmap).
      * - `uniform`: per-bit coin flip — each of the 128 outputs is taken from A or B independently.
+     * - `d_sym`:   per `(centerState × D6 orbit)` group, pick one parent wholesale.
      * - `r_sym`:   per `(centerState × canonical orbit)` group, pick one parent wholesale and copy
      *              its outputs across every orbit member, so coherent rule families travel together
      *              (exactly like r_sym mutation/generation). Falls back to `uniform` if symmetryData
@@ -190,7 +204,7 @@ export class RulesetService {
      * Pure — the injectable `rng` keeps it deterministically testable like the rest of the algebra.
      * @param {string} hexA
      * @param {string} hexB
-     * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
+     * @param {'uniform'|'d_sym'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
      * @param {number} [postMutationRate=0] - Post-crossover flip probability per inheritance unit
      *        (the unit follows `mode`: orbit group / count bucket / sum bucket / single bit).
@@ -205,6 +219,8 @@ export class RulesetService {
      * `crossoverHexes`). For each inheritance unit a parent is drawn uniformly at random from the pool
      * and its outputs copied across that whole unit:
      * - `uniform`: per-bit.
+     * - `d_sym`:   per `(centerState × D6 orbit)` group. Falls back to `uniform` if symmetryData
+     *              is unavailable.
      * - `r_sym`:   per `(centerState × canonical orbit)` group. Falls back to `uniform` if symmetryData
      *              is unavailable.
      * - `n_count`: per `(centerState × neighbor-count bucket)`.
@@ -214,7 +230,7 @@ export class RulesetService {
      * the binary `crossoverHexes` (`floor(rng()*2)` matches `rng() < 0.5`), so existing callers/tests
      * are byte-identical. The injectable `rng` keeps it deterministic.
      * @param {string[]} hexes - One or more 32-char ruleset hexes.
-     * @param {'uniform'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
+     * @param {'uniform'|'d_sym'|'r_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {() => number} [rng=Math.random]
      * @param {number} [postMutationRate=0] - Post-crossover flip probability per inheritance unit
      *        (the unit follows `mode`: orbit group / count bucket / sum bucket / single bit).
@@ -228,9 +244,9 @@ export class RulesetService {
         // Draw a parent uniformly from the pool; clamp guards an injected rng that returns exactly 1.
         const pickParent = () => parents[Math.min(parents.length - 1, Math.floor(rng() * parents.length))];
 
-        const canonicalGroups = this.symmetryData && this.symmetryData.canonicalRepresentatives;
-        if (mode === 'r_sym' && canonicalGroups && canonicalGroups.length > 0) {
-            for (const group of canonicalGroups) {
+        const symmetryGroups = this._groupsForMode(mode);
+        if ((mode === 'r_sym' || mode === 'd_sym') && symmetryGroups) {
+            for (const group of symmetryGroups) {
                 for (let cs = 0; cs <= 1; cs++) {
                     const parent = pickParent();
                     for (const member of group.members) {
@@ -264,7 +280,7 @@ export class RulesetService {
                 }
             }
         } else {
-            // uniform (and the r_sym fallback): per-bit draw from the pool.
+            // uniform (and unavailable symmetry-mode fallbacks): per-bit draw from the pool.
             for (let i = 0; i < 128; i++) {
                 child[i] = pickParent()[i];
             }
@@ -272,10 +288,10 @@ export class RulesetService {
 
         if (postMutationRate > 0) {
             // The post-crossover mutation flips the SAME inheritance units the crossover treats as
-            // atomic genes (per-bit for uniform / an unavailable r_sym), so a mode-constrained child
+            // atomic genes (per-bit for uniform / an unavailable symmetry mode), so a constrained child
             // never picks up a unit-breaking stray bit — each mode's subspace is closed under
             // breeding (auto-explore relies on this).
-            const unitMode = (mode === 'r_sym' && canonicalGroups && canonicalGroups.length > 0) || mode === 'n_count' || mode === 'totalistic'
+            const unitMode = ((mode === 'r_sym' || mode === 'd_sym') && symmetryGroups) || mode === 'n_count' || mode === 'totalistic'
                 ? mode : 'single';
             this._mutateUnitsInPlace(child, postMutationRate, unitMode, child, rng);
         }
@@ -285,10 +301,11 @@ export class RulesetService {
 
     /**
      * Project a ruleset hex onto a constraint mode's subspace by majority vote over each of the
-     * mode's inheritance units (`r_sym`: canonical orbit group × centerState; `n_count`:
+     * mode's inheritance units (`r_sym`: C6 orbit group × centerState; `d_sym`: D6 orbit group ×
+     * centerState; `n_count`:
      * neighbor-count bucket × centerState; `totalistic`: totalistic-sum bucket). Ties take the
      * unit's first (lowest-index) entry, so the projection is deterministic; a ruleset already in
-     * the subspace is returned bit-identical. `single`/unknown modes (and `r_sym` without
+     * the subspace is returned bit-identical. `single`/unknown modes (and symmetry modes without
      * symmetryData) return the hex unchanged. Auto-explore uses this to coerce a free-form seed
      * ruleset into the selected search mode before mutating it — unit-wise mutation flips whole
      * units but never repairs asymmetry the seed already carries.
@@ -311,13 +328,13 @@ export class RulesetService {
 
     /**
      * The inheritance units (arrays of rule indices) a constraint mode treats as atomic genes, or
-     * null for `single`/unknown modes (and `r_sym` without symmetryData) — i.e. no constraint.
+     * null for `single`/unknown modes (and symmetry modes without symmetryData) — i.e. no constraint.
      * @param {string} mode
      * @returns {number[][]|null}
      */
     _unitsForMode(mode) {
-        if (mode === 'r_sym') {
-            const groups = this._canonicalGroups();
+        if (mode === 'r_sym' || mode === 'd_sym') {
+            const groups = this._groupsForMode(mode);
             if (!groups) return null;
             const units = [];
             for (const group of groups) {
@@ -406,14 +423,17 @@ export class RulesetService {
      * @param {Uint8Array|null} ruleset
      * @returns {Array<object>}
      */
-    getCanonicalRuleDetails(ruleset) {
+    getCanonicalRuleDetails(ruleset, mode = 'r_sym') {
         if (!this.symmetryData) {
             console.error("getCanonicalRuleDetails: symmetryData is undefined.");
             return [];
         }
         if (!ruleset) return [];
 
-        return this.symmetryData.canonicalRepresentatives.flatMap(group => {
+        const groups = this._groupsForMode(mode);
+        if (!groups) return [];
+
+        return groups.flatMap(group => {
             let outputState0 = -1, outputState1 = -1;
             let mixed0 = false, mixed1 = false;
 

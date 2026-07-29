@@ -424,7 +424,10 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
                 const rules = hexToRuleset(currentRulesetHex);
-                const group = this.symmetryData.canonicalRepresentatives.find(g => g.representative === data.canonicalBitmask);
+                const groups = data.symmetryMode === 'd_sym'
+                    ? this.symmetryData.dihedralCanonicalRepresentatives
+                    : this.symmetryData.canonicalRepresentatives;
+                const group = groups.find(g => g.representative === data.canonicalBitmask);
                 if (group) {
                     for (const member of group.members) {
                         const idx = (data.centerState << 6) | member;
@@ -827,7 +830,7 @@ export class WorldManager {
      * - 0 parents → no-op (with guidance toast).
      * - 1 parent  → each offspring is that parent's ruleset + post-mutation (i.e. clone-and-mutate).
      * - ≥2        → multi-parent recombination (2 parents is identical to the old A×B breed).
-     * @param {'uniform'|'r_sym'|'n_count'} [mode='r_sym']
+     * @param {'uniform'|'r_sym'|'d_sym'|'n_count'|'totalistic'} [mode='r_sym']
      * @param {number} [postMutationRate=0]
      */
     _breedFromGenepool = (mode = 'r_sym', postMutationRate = 0) => {
@@ -1080,8 +1083,8 @@ export class WorldManager {
     getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) =>
         RulesetService.getEffectiveRuleForNeighborCount(this._getParsedCurrentRuleset(), centerState, numActiveNeighbors);
 
-    getCanonicalRuleDetails = () =>
-        this.rulesetService.getCanonicalRuleDetails(this._getParsedCurrentRuleset());
+    getCanonicalRuleDetails = (mode = 'r_sym') =>
+        this.rulesetService.getCanonicalRuleDetails(this._getParsedCurrentRuleset(), mode);
 
     _generateRandomRulesetHex = (bias, generationMode) =>
         this.rulesetService.generateRandomRulesetHex(bias, generationMode);

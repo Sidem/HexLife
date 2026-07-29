@@ -21,6 +21,7 @@ export class RulesetEditorComponent extends BaseComponent {
 
         this.cachedDetailedRules = [];
         this.cachedNeighborCountRules = [];
+        this.cachedDihedralSymmetryRules = [];
         this.cachedRotationalSymmetryRules = [];
         this.areGridsCreated = false;
 
@@ -49,6 +50,7 @@ export class RulesetEditorComponent extends BaseComponent {
                 <select id="ruleset-editor-mode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
+                    <option value="dihedralSymmetry">Dihedral Symmetry (26 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
                 </select>
                 <label class="editor-advanced-toggle mobile-only" title="Reveal the full 128-cell bit grid">
@@ -64,6 +66,7 @@ export class RulesetEditorComponent extends BaseComponent {
             <div class="panel-content-area">
                 <div id="rulesetEditorGrid" class="hidden"></div>
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
+                <div id="dihedralSymmetryRulesetEditorGrid" class="hidden"></div>
                 <div id="rotationalSymmetryRulesetEditorGrid"></div>
                 <div class="editor-text">
                     <p>This editor modifies the ruleset of the currently selected world. Use "Apply Changes To" to
@@ -89,6 +92,7 @@ export class RulesetEditorComponent extends BaseComponent {
             rulesetEditorMode: this.element.querySelector(`#ruleset-editor-mode`),
             rulesetEditorGrid: this.element.querySelector('#rulesetEditorGrid'),
             neighborCountRulesetEditorGrid: this.element.querySelector('#neighborCountRulesetEditorGrid'),
+            dihedralSymmetryRulesetEditorGrid: this.element.querySelector('#dihedralSymmetryRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),
             editorScopeSwitchMount: this.element.querySelector('#ruleset-editor-scope-switch-mount'),
             editorResetSwitchMount: this.element.querySelector('#ruleset-editor-reset-switch-mount'),
@@ -125,7 +129,7 @@ export class RulesetEditorComponent extends BaseComponent {
         const saved = PersistenceService.loadUISetting('rulesetEditorMode', null);
         if (this._isMobile()) {
             // Never open the 128-cell grid by default on a phone.
-            return (saved === 'neighborCount' || saved === 'rotationalSymmetry') ? saved : 'neighborCount';
+            return (saved === 'neighborCount' || saved === 'dihedralSymmetry' || saved === 'rotationalSymmetry') ? saved : 'neighborCount';
         }
         return saved || 'rotationalSymmetry';
     }
@@ -182,6 +186,22 @@ export class RulesetEditorComponent extends BaseComponent {
         }
         neighborGrid.appendChild(neighborFrag);
 
+        const dihedralGrid = this.uiElements.dihedralSymmetryRulesetEditorGrid;
+        const dihedralFrag = document.createDocumentFragment();
+        const dihedralDetails = this.worldManager.getCanonicalRuleDetails('d_sym');
+        if (dihedralDetails && dihedralDetails.length > 0) {
+            dihedralDetails.forEach(detail => {
+                const viz = this._createSymmetryRuleViz(detail);
+                this.cachedDihedralSymmetryRules.push({
+                    viz,
+                    innerHex: viz.querySelector('.inner-hex'),
+                    ...detail,
+                });
+                dihedralFrag.appendChild(viz);
+            });
+        }
+        dihedralGrid.appendChild(dihedralFrag);
+
         const symmetryGrid = this.uiElements.rotationalSymmetryRulesetEditorGrid;
         const symmetryFrag = document.createDocumentFragment();
         const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
@@ -210,6 +230,23 @@ export class RulesetEditorComponent extends BaseComponent {
         symmetryGrid.appendChild(symmetryFrag);
 
         this.areGridsCreated = true;
+    }
+
+    _createSymmetryRuleViz(detail) {
+        const viz = document.createElement('div');
+        viz.className = 'r-sym-rule-viz';
+        viz.dataset.canonicalBitmask = detail.canonicalBitmask;
+        viz.dataset.centerState = detail.centerState;
+        viz.innerHTML = `
+            <div class="rule-label">C=${detail.centerState},N<sub>c</sub>=${detail.canonicalBitmask.toString(2).padStart(6, '0')}</div>
+            <div class="rule-viz-hex-display">
+                <div class="hexagon center-hex state-${detail.centerState}">
+                    <div class="hexagon inner-hex"></div>
+                </div>
+                ${Array.from({ length: 6 }, (_, n) => `<div class="hexagon neighbor-hex neighbor-${n} state-${(detail.canonicalBitmask >> n) & 1}"></div>`).join('')}
+            </div>
+            <div class="orbit-size-display">Orbit:${detail.orbitSize}</div>`;
+        return viz;
     }
 
     _getEditorModificationScope() {
@@ -374,6 +411,24 @@ export class RulesetEditorComponent extends BaseComponent {
                 }
             }));
         }
+        if (this.uiElements.dihedralSymmetryRulesetEditorGrid) {
+            this.uiElements.dihedralSymmetryRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, {
+                selector: '.r-sym-rule-viz',
+                getDetails: (el, wm) => {
+                    const cb = parseInt(el.dataset.canonicalBitmask, 10);
+                    const cs = parseInt(el.dataset.centerState, 10);
+                    const detail = wm.getCanonicalRuleDetails('d_sym')
+                        .find(d => d.canonicalBitmask === cb && d.centerState === cs);
+                    const currentOut = detail ? detail.effectiveOutput : 2;
+                    return {
+                        canonicalBitmask: cb,
+                        centerState: cs,
+                        outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1,
+                        symmetryMode: 'd_sym',
+                    };
+                }
+            }));
+        }
 
         this._subscribeToEvent(EVENTS.COLOR_SETTINGS_CHANGED, this.refresh);
     }
@@ -384,6 +439,7 @@ export class RulesetEditorComponent extends BaseComponent {
         const grids = {
             detailed: this.uiElements.rulesetEditorGrid,
             neighborCount: this.uiElements.neighborCountRulesetEditorGrid,
+            dihedralSymmetry: this.uiElements.dihedralSymmetryRulesetEditorGrid,
             rotationalSymmetry: this.uiElements.rotationalSymmetryRulesetEditorGrid
         };
         for (const key in grids) grids[key]?.classList.add('hidden');
@@ -398,8 +454,10 @@ export class RulesetEditorComponent extends BaseComponent {
             this._updateDetailedGrid(rulesetArray);
         } else if (currentMode === 'neighborCount') {
             this._updateNeighborCountGrid();
+        } else if (currentMode === 'dihedralSymmetry') {
+            this._updateSymmetryGrid(this.cachedDihedralSymmetryRules, 'd_sym');
         } else if (currentMode === 'rotationalSymmetry') {
-            this._updateRotationalSymmetryGrid();
+            this._updateSymmetryGrid(this.cachedRotationalSymmetryRules, 'r_sym');
         }
     }
 
@@ -435,15 +493,15 @@ export class RulesetEditorComponent extends BaseComponent {
         }
     }
 
-    _updateRotationalSymmetryGrid() {
-        if (this.cachedRotationalSymmetryRules.length === 0) return;
-        const canonicalDetails = this.worldManager.getCanonicalRuleDetails();
+    _updateSymmetryGrid(cachedRules, mode) {
+        if (cachedRules.length === 0) return;
+        const canonicalDetails = this.worldManager.getCanonicalRuleDetails(mode);
         if (!canonicalDetails) return;
 
         const colorSettings = this.appContext.colorController.getSettings();
         const symmetryData = this.appContext.worldManager.getSymmetryData();
 
-        this.cachedRotationalSymmetryRules.forEach((cachedRule) => {
+        cachedRules.forEach((cachedRule) => {
             const detail = canonicalDetails.find(d =>
                 d.canonicalBitmask === cachedRule.canonicalBitmask && d.centerState === cachedRule.centerState
             );

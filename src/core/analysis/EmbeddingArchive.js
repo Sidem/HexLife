@@ -52,6 +52,8 @@ export const EMBEDDING_ARCHIVE_CONFIG = {
  * @property {number} [trajectorySpeed] The find's raw perceptual velocity — mean distance between
  *   consecutive frames. NOT scored (v3.3 replaced it); kept so the two can be compared on real finds
  *   when calibrating `SCORE_CONFIG.openEndednessHalfSat`.
+ * @property {number} [noiseSimilarity] Raw Stage-3 nuisance-prompt similarity, for inspection.
+ * @property {number} [noiseFactor] Stage-3 multiplicative confirmation factor, for inspection.
  * @property {number} [generation]   Generation the entry was found in.
  */
 

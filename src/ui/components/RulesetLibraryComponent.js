@@ -4,7 +4,12 @@ import { SwitchComponent } from './SwitchComponent.js';
 import { RulesetDirectInput } from './RulesetDirectInput.js';
 import { ICONS } from '../icons.js';
 import { rulesetName, downloadFile } from '../../utils/utils.js';
-import { classifyRulesetConstraint, CONSTRAINT_CLASSES, CONSTRAINT_CLASS_META } from '../../core/rulesetDescriptor.js';
+import {
+    classifyRulesetConstraint,
+    satisfiesRulesetConstraint,
+    CONSTRAINT_CLASSES,
+    CONSTRAINT_CLASS_META,
+} from '../../core/rulesetDescriptor.js';
 import * as InitialStateCodec from '../../services/InitialStateCodec.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { decodePack, toPublicLibraryEntry } from '../../services/LibraryPackCodec.js';
@@ -173,9 +178,7 @@ export class RulesetLibraryComponent extends BaseComponent {
      * CONSTRAINT_CLASSES is ordered strictest-first, so "at least as strict" is an index compare.
      */
     _satisfiesConstraint(hex, cls) {
-        const own = classifyRulesetConstraint(hex);
-        if (!own) return false;
-        return CONSTRAINT_CLASSES.indexOf(own) <= CONSTRAINT_CLASSES.indexOf(cls);
+        return satisfiesRulesetConstraint(hex, cls);
     }
 
     /** Build the union of all tags across public + personal entries as toggleable filter chips. */

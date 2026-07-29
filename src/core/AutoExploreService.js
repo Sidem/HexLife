@@ -7,6 +7,7 @@ import { BehaviorArchive } from './analysis/BehaviorArchive.js';
 import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
 import { encodePack } from '../services/LibraryPackCodec.js';
 import { historicalNovelty, trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
+import { NOISE_PROMPTS, noiseSimilarity, noiseFactor } from './analysis/PerceptualContrast.js';
 // Population builder (mutants + crossover children) must derive from the run's base seed, or a
 // shared search link couldn't replay the identical generation sequence.
 import { mulberry32 } from './rng.js';
@@ -174,7 +175,7 @@ export class AutoExploreService {
      * @param {((worldIndex: number) => Promise<string|null>)|null} [opts.thumbnailProvider]
      *   Async capture of a world's current render as a small data-URL thumbnail (DI so the service
      *   stays renderer-free, principle 5). null in unit tests / when no renderer is available.
-     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, getStatus?: () => string, getSpaceId?: () => string, getModelId?: () => string}|null} [opts.embeddingProvider]
+     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, embedText?: (prompt: string) => Promise<Float32Array|null>, getStatus?: () => string, getSpaceId?: () => string, getModelId?: () => string}|null} [opts.embeddingProvider]
      *   Optional foundation-model embedding provider for the perceptual objective (v3.0). null/absent ⇒
      *   the statistical objective is used unchanged (the default).
      * @param {((worldIndex: number) => Promise<any|null>)|null} [opts.frameProvider]
@@ -203,6 +204,9 @@ export class AutoExploreService {
          *  foundation-model embedding, running alongside `archive`. Populated only when embeddings are
          *  on; supplies an additional perceptual-novelty pressure on champion selection. */
         this.embeddingArchive = new EmbeddingArchive();
+        /** Prompt-vector battery cached by embedding model id (#37 Stage 3). Values are promises so
+         * concurrent warmup/capture calls share the same text-model work. */
+        this._noisePromptCache = new Map();
         /** Snapshot of pre-explore per-world settings + pause state, for restore on stop. */
         this._snapshot = null;
         /** Resolver used to suspend the loop while paused. */
@@ -296,7 +300,7 @@ export class AutoExploreService {
         // every candidate the search produces actually satisfies the selected constraint.
         const seedHex = this.wm.rulesetService.projectToMode(rawSeedHex, this.options.mutationMode);
         if (seedHex.toUpperCase() !== rawSeedHex.toUpperCase()) {
-            const modeLabel = { r_sym: 'R-Sym', n_count: 'N-Count', totalistic: 'Totalistic' }[this.options.mutationMode] || this.options.mutationMode;
+            const modeLabel = { r_sym: 'R-Sym', d_sym: 'D-Sym', n_count: 'N-Count', totalistic: 'Totalistic' }[this.options.mutationMode] || this.options.mutationMode;
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
                 message: `Seed ruleset projected onto the ${modeLabel} constraint (majority vote per group).`,
                 type: 'info',
@@ -313,6 +317,10 @@ export class AutoExploreService {
             this.embeddingProvider.ensureReady().then((ok) => {
                 if (!ok) this.embeddingEnabled = false; // model unavailable ⇒ silent statistical fallback
             }).catch(() => { this.embeddingEnabled = false; });
+            // Warm the fixed nuisance prompts once per model. This is intentionally non-blocking; the
+            // first embedding confirmation awaits the same cached promise if text inference is slower
+            // than statistical screening.
+            this._getNoisePromptEmbeddings().catch(() => {});
         }
 
         // Supervised target search (v3.2, ASAL https://arxiv.org/abs/2412.17799): active iff embeddings
@@ -629,6 +637,8 @@ export class AutoExploreService {
                             score: entry.score,
                             openEndedness: embedding.openEndedness,
                             trajectorySpeed: embedding.trajectorySpeed,
+                            noiseSimilarity: embedding.noiseSimilarity,
+                            noiseFactor: embedding.noiseFactor,
                             generation: this.generation,
                             vector: embVector,
                         });
@@ -732,6 +742,15 @@ export class AutoExploreService {
                 confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod,
                 confirmCyclePenalty: this.options.confirmCyclePenalty,
             });
+            // #37 Stage 3: the CLIP nuisance contrast is a confirmation-only multiplier. It never
+            // touches screening or embeddings-off scoring, and missing prompt/frame embeddings are
+            // neutral (factor 1). Cycle penalties and this graded factor commute.
+            if (!confirmed.rejected && embedding && Number.isFinite(embedding.noiseFactor)) {
+                confirmed = {
+                    ...confirmed,
+                    finalScore: confirmed.finalScore * embedding.noiseFactor,
+                };
+            }
         }
 
         // Capture a thumbnail of the just-confirmed world NOW — it still holds the confirmation
@@ -749,10 +768,11 @@ export class AutoExploreService {
      * Capture a short trajectory of rendered frames of the just-confirmed world and reduce it to a
      * perceptual open-endedness signal (v3.0, ASAL). Starts from the confirmation burst's final state,
      * then advances the world in small sub-bursts, capturing one frame between each, and embeds every
-     * frame with the (off-thread) foundation model. Returns `{ openEndedness, trajectorySpeed, vector }`
-     * — the historical novelty (v3.3, the scored signal), the raw consecutive-frame velocity (kept for
-     * inspection/calibration only) and the mean embedding (the perceptual archive key) — or null on any
-     * failure / abort / fewer than two usable embeddings (the caller then degrades gracefully).
+     * frame with the (off-thread) foundation model. Returns
+     * `{ openEndedness, trajectorySpeed, vector, noiseSimilarity, noiseFactor }` — the historical
+     * novelty (v3.3, the scored signal), the raw consecutive-frame velocity (kept for
+     * inspection/calibration only), the mean embedding (the perceptual archive key), and the optional
+     * Stage-3 nuisance contrast — or null on failure / abort / fewer than two usable embeddings.
      *
      * v3.3 (#37 Stage 1): `openEndedness` is {@link historicalNovelty}, NOT {@link trajectoryNovelty}.
      * Velocity is maximized by churn — the term was pulling auto-explore toward the very chaos it was
@@ -765,7 +785,7 @@ export class AutoExploreService {
      * order matters for selection.
      * @param {number} worldIndex
      * @param {number} token
-     * @returns {Promise<{openEndedness: number, trajectorySpeed: number, vector: Float32Array, targetSimilarity?: number}|null>}
+     * @returns {Promise<{openEndedness: number, trajectorySpeed: number, vector: Float32Array, targetSimilarity?: number, noiseSimilarity?: number, noiseFactor?: number}|null>}
      */
     async _captureEmbedding(worldIndex, token) {
         if (!this.embeddingEnabled || !this.frameProvider || !this.embeddingProvider) return null;
@@ -809,6 +829,16 @@ export class AutoExploreService {
             trajectorySpeed: trajectoryNovelty(embeds),
             vector,
         };
+        // #37 Stage 3: compare every frame with the strongest fixed nuisance prompt, then average.
+        // Text vectors are cached per model. Failure is neutral: the optional fields stay absent and
+        // confirmation proceeds exactly as it did before this stage.
+        const noisePrompts = await this._getNoisePromptEmbeddings();
+        if (token !== this._runToken) return null;
+        const similarity = noiseSimilarity(embeds, noisePrompts);
+        if (Number.isFinite(similarity)) {
+            result.noiseSimilarity = similarity;
+            result.noiseFactor = noiseFactor(similarity);
+        }
         // Supervised target search (v3.2): score each frame against the prompt vector and average.
         if (this._targetVector && this._targetVector.length) {
             let sum = 0;
@@ -816,6 +846,32 @@ export class AutoExploreService {
             result.targetSimilarity = sum / embeds.length;
         }
         return result;
+    }
+
+    /**
+     * Resolve the fixed Stage-3 prompt battery once per embedding model. EmbeddingService also caches
+     * each individual `(modelId, prompt)` request; this service-level cache avoids even repeated
+     * async lookups and gives providers without an internal cache the same contract.
+     * @returns {Promise<Float32Array[]>}
+     */
+    async _getNoisePromptEmbeddings() {
+        if (!this.embeddingProvider || typeof this.embeddingProvider.embedText !== 'function') return [];
+        const modelId = this.embeddingProvider.getModelId ? this.embeddingProvider.getModelId() : 'default';
+        const cached = this._noisePromptCache.get(modelId);
+        if (cached) return cached;
+        const pending = Promise.all(NOISE_PROMPTS.map((prompt) =>
+            Promise.resolve(this.embeddingProvider.embedText(prompt)).catch(() => null)
+        )).then((vectors) => {
+            const usable = vectors.filter((v) => v && v.length);
+            // Cache successful model work, not a transient load/inference failure. A later run may
+            // retry the same model after the provider has been re-enabled.
+            if (usable.length === 0 && this._noisePromptCache.get(modelId) === pending) {
+                this._noisePromptCache.delete(modelId);
+            }
+            return usable;
+        });
+        this._noisePromptCache.set(modelId, pending);
+        return pending;
     }
 
     /**
@@ -977,7 +1033,7 @@ export class AutoExploreService {
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
      * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
-     * @param {{openEndedness: number, trajectorySpeed?: number, vector: Float32Array, targetSimilarity?: number}|null} [embedding]
+     * @param {{openEndedness: number, trajectorySpeed?: number, vector: Float32Array, targetSimilarity?: number, noiseSimilarity?: number, noiseFactor?: number}|null} [embedding]
      *   Perceptual trajectory result (v3.0); when present, its open-endedness term is overlaid onto the
      *   (screen-derived) component breakdown so the gallery bar reflects the perceptual signal the
      *   confirmation measured, and its `targetSimilarity` (v3.2) is stored for the target-match chip.
@@ -996,6 +1052,9 @@ export class AutoExploreService {
                 ...scored.perComponent,
                 openEndedness: oe / (oe + this._scoreConfig.openEndednessHalfSat),
                 openEndednessUsed: true,
+                noiseSimilarity: Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
+                noiseFactor: Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : 1,
+                noiseUsed: Number.isFinite(embedding.noiseSimilarity),
             };
         }
         // Raw metric inputs of the winning IC (v3.1) — feed the UI's per-term explainer curve
@@ -1003,7 +1062,12 @@ export class AutoExploreService {
         // the perComponent overlay above. Legacy entries simply lack the field.
         let rawMetrics = (scored.perIC && scored.perIC[scored.winningIC]) ? scored.perIC[scored.winningIC].raw : null;
         if (embedding && Number.isFinite(embedding.openEndedness)) {
-            rawMetrics = { ...(rawMetrics || {}), openEndedness: embedding.openEndedness };
+            rawMetrics = {
+                ...(rawMetrics || {}),
+                openEndedness: embedding.openEndedness,
+                noiseSimilarity: Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
+                noiseFactor: Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : undefined,
+            };
         }
         return {
             rawMetrics,
@@ -1014,6 +1078,8 @@ export class AutoExploreService {
             cyclic: confirmed.cyclic,
             thumb: thumb || null,
             openEndedness: embedding && Number.isFinite(embedding.openEndedness) ? embedding.openEndedness : undefined,
+            noiseSimilarity: embedding && Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
+            noiseFactor: embedding && Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : undefined,
             // Supervised target search (v3.2): the trajectory→prompt match, for the gallery "target" chip.
             targetSimilarity: embedding && Number.isFinite(embedding.targetSimilarity) ? embedding.targetSimilarity : undefined,
             // Which descriptor keyed this entry (roadmap #3): 'embedding' when banked under a perceptual

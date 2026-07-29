@@ -1,4 +1,15 @@
 import { classifyRulesetConstraint } from '../../core/rulesetDescriptor.js';
+import {
+    scoreSingleIC,
+    applyConfirmation,
+    SCORE_CONFIG,
+} from '../../core/analysis/InterestingnessScore.js';
+import { historicalNovelty, trajectoryNovelty } from '../../core/analysis/EmbeddingNovelty.js';
+import {
+    NOISE_PROMPTS,
+    noiseSimilarity,
+    noiseFactor,
+} from '../../core/analysis/PerceptualContrast.js';
 
 const SCREEN_TICKS = 160;
 const CONFIRM_TICKS = 600;
@@ -77,6 +88,22 @@ function normalizeReferenceMetrics(result) {
     return rest;
 }
 
+function buildBenchmarkPanel(library, negatives) {
+    const positives = library.map((entry, index) => ({
+        id: `lib${String(index).padStart(2, '0')}_${slug(entry.name)}`,
+        label: 'interesting',
+        source: `library:${index}`,
+        note: entry.name,
+        cohort: STAGE0_POSITIVE_HEXES.has(entry.hex) ? 'stage0' : 'library-2026-07-28',
+        hex: entry.hex,
+        icLabel: `library:${entry.initialState.mode}`,
+        seed: entry.seed,
+        initialState: entry.initialState,
+    }));
+    return [...positives, ...negatives.map(entry => ({ ...entry, cohort: 'stage0' }))]
+        .map(entry => ({ ...entry, constraintClass: classifyRulesetConstraint(entry.hex) }));
+}
+
 async function captureBurst(worldManager, entry, ticks, worldIndex) {
     const proxy = worldManager.worlds[worldIndex];
     worldManager._applyExploreRuleset(worldIndex, entry.hex);
@@ -91,18 +118,8 @@ async function captureBurst(worldManager, entry, ticks, worldIndex) {
 }
 
 async function capturePanel(appContext, library, negatives, onProgress) {
-    const positives = library.map((entry, index) => ({
-        id: `lib${String(index).padStart(2, '0')}_${slug(entry.name)}`,
-        label: 'interesting',
-        source: `library:${index}`,
-        note: entry.name,
-        cohort: STAGE0_POSITIVE_HEXES.has(entry.hex) ? 'stage0' : 'library-2026-07-28',
-        hex: entry.hex,
-        icLabel: `library:${entry.initialState.mode}`,
-        seed: entry.seed,
-        initialState: entry.initialState,
-    }));
-    const panel = [...positives, ...negatives.map(entry => ({ ...entry, cohort: 'stage0' }))];
+    const panel = buildBenchmarkPanel(library, negatives);
+    const positives = panel.filter(entry => entry.label === 'interesting');
     const entries = [];
     const worldCount = appContext.worldManager.worlds.length;
 
@@ -158,6 +175,238 @@ async function capturePanel(appContext, library, negatives, onProgress) {
     };
 }
 
+async function captureCalibrationFrames(worldManager, entry, worldIndex) {
+    const proxy = worldManager.worlds[worldIndex];
+    worldManager._applyExploreRuleset(worldIndex, entry.hex);
+    proxy.resetWorld(entry.initialState, entry.seed);
+    const result = await proxy.runEvaluation({
+        ticks: CONFIRM_TICKS,
+        sampleEvery: SAMPLE_EVERY,
+        warmupTicks: WARMUP_TICKS,
+        probe: { enabled: true, probeTicks: PROBE_TICKS },
+    });
+    if (!result || result.cancelled) return null;
+
+    const frames = [];
+    const first = await worldManager._captureExploreFrame(worldIndex);
+    if (first) frames.push(first);
+    for (let i = 1; i < 6; i++) {
+        const advanced = await proxy.runEvaluation({
+            ticks: 50,
+            sampleEvery: SAMPLE_EVERY,
+            warmupTicks: 0,
+            probe: { enabled: false },
+        });
+        if (!advanced || advanced.cancelled) break;
+        const frame = await worldManager._captureExploreFrame(worldIndex);
+        if (frame) frames.push(frame);
+    }
+    return {
+        confirmMetrics: normalizeMetrics(result, entry.icLabel),
+        frames,
+    };
+}
+
+async function embedCalibrationFrames(embeddingService, captured, promptVectors) {
+    if (!captured || captured.frames.length < 2) return null;
+    const embeddings = [];
+    for (const frame of captured.frames) {
+        const vector = await embeddingService.embed(frame);
+        if (vector && vector.length) embeddings.push(vector);
+    }
+    if (embeddings.length < 2) return null;
+    const openEndedness = historicalNovelty(embeddings);
+    const similarity = noiseSimilarity(embeddings, promptVectors);
+    if (!Number.isFinite(similarity)) return null;
+    const confirmIC = scoreSingleIC({
+        ...captured.confirmMetrics,
+        embedding: { openEndedness },
+    }, SCORE_CONFIG);
+    const confirmed = applyConfirmation(0, confirmIC, captured.confirmMetrics, {
+        ...SCORE_CONFIG,
+        confirmCycleMaxPeriod: 120,
+        confirmCyclePenalty: 0.25,
+    });
+    return {
+        openEndedness,
+        trajectorySpeed: trajectoryNovelty(embeddings),
+        noiseSimilarity: similarity,
+        unpenalizedScore: confirmed.rejected ? 0 : confirmed.finalScore,
+        rejected: confirmed.rejected,
+        cyclic: confirmed.cyclic,
+    };
+}
+
+function quantile(values, q) {
+    if (!values.length) return NaN;
+    const sorted = [...values].sort((a, b) => a - b);
+    const position = (sorted.length - 1) * q;
+    const lo = Math.floor(position);
+    const hi = Math.ceil(position);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (position - lo);
+}
+
+function contrastStats(entries, config) {
+    const scored = entries.map(entry => ({
+        ...entry,
+        score: entry.unpenalizedScore * noiseFactor(entry.noiseSimilarity, config),
+    }));
+    const positives = scored.filter(entry => entry.label === 'interesting');
+    const negatives = scored.filter(entry => entry.label === 'boring');
+    let wins = 0;
+    let pairs = 0;
+    for (const positive of positives) {
+        for (const negative of negatives) {
+            pairs++;
+            if (positive.score > negative.score) wins++;
+        }
+    }
+    const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
+    return {
+        strength: config.strength,
+        wins,
+        pairs,
+        pairwiseAccuracy: pairs ? wins / pairs : NaN,
+        marginMean: mean(positives.map(entry => entry.score)) - mean(negatives.map(entry => entry.score)),
+    };
+}
+
+async function capturePerceptualCalibration(appContext, library, negatives, onProgress) {
+    const worldManager = appContext.worldManager;
+    const embeddingService = worldManager.embeddingService;
+    embeddingService.setEnabled(true);
+    onProgress('Loading the default CLIP model…');
+    if (!await embeddingService.ensureReady()) throw new Error('CLIP model failed to load');
+
+    onProgress('Embedding the fixed noise-prompt battery…');
+    const promptVectors = [];
+    for (const prompt of NOISE_PROMPTS) {
+        const vector = await embeddingService.embedText(prompt);
+        if (vector && vector.length) promptVectors.push(vector);
+    }
+    if (!promptVectors.length) throw new Error('Noise prompts failed to embed');
+
+    const panel = buildBenchmarkPanel(library, negatives);
+    const references = [
+        {
+            id: 'reference_gliders_chaos',
+            label: 'reference',
+            hex: REFERENCE_RULESETS.gliders,
+            icLabel: 'chaos',
+            seed: 4242,
+            initialState: REFERENCE_ICS.chaos,
+        },
+        {
+            id: 'reference_churn_sparse',
+            label: 'reference',
+            hex: REFERENCE_RULESETS.churn,
+            icLabel: 'sparse',
+            seed: 1781242654715,
+            initialState: REFERENCE_ICS.sparse,
+        },
+    ];
+    const recipes = [...panel, ...references];
+    const rows = [];
+    const snapshot = worldManager._captureAutoExploreSnapshot();
+    worldManager._setAllWorldsEnabledForExplore(true);
+    try {
+        const worldCount = worldManager.worlds.length;
+        for (let offset = 0; offset < recipes.length; offset += worldCount) {
+            const batch = recipes.slice(offset, offset + worldCount);
+            onProgress(`Capturing perceptual trajectories ${offset + 1}–${offset + batch.length} of ${recipes.length}…`);
+            const captured = await Promise.all(batch.map((entry, index) =>
+                captureCalibrationFrames(worldManager, entry, index)
+            ));
+            for (let index = 0; index < batch.length; index++) {
+                onProgress(`Embedding trajectory ${offset + index + 1} of ${recipes.length}…`);
+                const perceptual = await embedCalibrationFrames(embeddingService, captured[index], promptVectors);
+                if (perceptual) rows.push({ ...batch[index], ...perceptual });
+            }
+        }
+    } finally {
+        worldManager._restoreAutoExploreSnapshot(snapshot);
+    }
+
+    const panelRows = rows.filter(entry => entry.label !== 'reference');
+    const positiveSimilarities = panelRows
+        .filter(entry => entry.label === 'interesting')
+        .map(entry => entry.noiseSimilarity);
+    const negativeSimilarities = panelRows
+        .filter(entry => entry.label === 'boring')
+        .map(entry => entry.noiseSimilarity);
+    const simMin = quantile(positiveSimilarities, 0.75);
+    const simMax = quantile(negativeSimilarities, 0.5);
+    if (!(simMax > simMin)) {
+        throw new Error(`Noise contrast did not separate the panel (positive q75 ${simMin}, negative median ${simMax})`);
+    }
+    const candidates = [];
+    for (let strength = 0; strength <= 0.9001; strength += 0.05) {
+        candidates.push(contrastStats(panelRows, { simMin, simMax, strength: Number(strength.toFixed(2)) }));
+    }
+    // Prefer the smallest strength that reaches the best pairwise accuracy. Margin is diagnostic,
+    // but must not make an optional model-derived multiplier harsher once the ordering stops improving.
+    candidates.sort((a, b) =>
+        b.pairwiseAccuracy - a.pairwiseAccuracy
+        || a.strength - b.strength
+        || b.marginMean - a.marginMean
+    );
+    const best = candidates[0];
+    const referenceRows = rows.filter(entry => entry.label === 'reference');
+    const glider = referenceRows.find(entry => entry.id === 'reference_gliders_chaos');
+    const churn = referenceRows.find(entry => entry.id === 'reference_churn_sparse');
+    const recommendedHalfSat = glider && churn && glider.openEndedness > 0 && churn.openEndedness > 0
+        ? Math.sqrt(glider.openEndedness * churn.openEndedness)
+        : null;
+
+    return {
+        _meta: {
+            description: '#37 Stage-3 CLIP calibration; generated in-browser from deterministic recipes.',
+            capturedAt: new Date().toISOString().slice(0, 10),
+            embeddingSpace: embeddingService.getSpaceId(),
+            prompts: NOISE_PROMPTS,
+            trajectory: { frames: 6, frameTicks: 50, confirmTicks: CONFIRM_TICKS },
+            rowsCaptured: panelRows.length,
+        },
+        distributions: {
+            interesting: {
+                min: quantile(positiveSimilarities, 0),
+                q25: quantile(positiveSimilarities, 0.25),
+                median: quantile(positiveSimilarities, 0.5),
+                q75: simMin,
+                max: quantile(positiveSimilarities, 1),
+            },
+            boring: {
+                min: quantile(negativeSimilarities, 0),
+                q25: quantile(negativeSimilarities, 0.25),
+                median: simMax,
+                q75: quantile(negativeSimilarities, 0.75),
+                max: quantile(negativeSimilarities, 1),
+            },
+        },
+        recommendation: {
+            simMin,
+            simMax,
+            strength: best.strength,
+            pairwiseAccuracy: best.pairwiseAccuracy,
+            marginMean: best.marginMean,
+            baselineEmbeddingsOn: contrastStats(panelRows, { simMin, simMax, strength: 0 }),
+            openEndednessHalfSat: recommendedHalfSat,
+        },
+        references: referenceRows.map(({ id, openEndedness, trajectorySpeed, noiseSimilarity }) => ({
+            id, openEndedness, trajectorySpeed, noiseSimilarity,
+        })),
+        strengthSweep: candidates.sort((a, b) => a.strength - b.strength),
+        entries: panelRows.map(({
+            id, label, hex, constraintClass, openEndedness, trajectorySpeed,
+            noiseSimilarity: similarity, unpenalizedScore, rejected, cyclic,
+        }) => ({
+            id, label, hex, constraintClass, openEndedness, trajectorySpeed,
+            noiseSimilarity: similarity, unpenalizedScore, rejected, cyclic,
+        })),
+    };
+}
+
 async function captureReferences(appContext, priorMeta, onProgress) {
     const output = { _meta: priorMeta };
     onProgress(`Capturing ${REFERENCE_CASES.length} reference fixtures…`);
@@ -204,6 +453,7 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
         <p id="benchmark-status">Waiting for simulation workers…</p>
         <button id="reference-run" type="button" disabled>Capture 5 reference fixtures</button>
         <button id="benchmark-run" type="button" disabled>Capture ${library.length} library entries + controls</button>
+        <button id="perceptual-run" type="button" disabled>Calibrate Stage 3 perceptual contrast</button>
         <a id="benchmark-download" hidden>Download JSON</a>
         <pre id="benchmark-json" data-testid="benchmark-json" hidden></pre>
     `;
@@ -212,6 +462,7 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
     const status = host.querySelector('#benchmark-status');
     const referenceButton = host.querySelector('#reference-run');
     const button = host.querySelector('#benchmark-run');
+    const perceptualButton = host.querySelector('#perceptual-run');
     const download = host.querySelector('#benchmark-download');
     const output = host.querySelector('#benchmark-json');
 
@@ -219,6 +470,7 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
         status.textContent = 'Ready.';
         referenceButton.disabled = false;
         button.disabled = false;
+        perceptualButton.disabled = false;
     });
 
     const publishResult = (value, filename) => {
@@ -234,6 +486,7 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
     referenceButton.addEventListener('click', async () => {
         referenceButton.disabled = true;
         button.disabled = true;
+        perceptualButton.disabled = true;
         try {
             const fixtureUrl = `${import.meta.env.BASE_URL}tests/fixtures/exploreEvalFixtures.json`;
             const prior = await fetch(fixtureUrl).then(response => response.json());
@@ -249,12 +502,14 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
         } finally {
             referenceButton.disabled = false;
             button.disabled = false;
+            perceptualButton.disabled = false;
         }
     });
 
     button.addEventListener('click', async () => {
         referenceButton.disabled = true;
         button.disabled = true;
+        perceptualButton.disabled = true;
         try {
             const fixtureUrl = `${import.meta.env.BASE_URL}tests/fixtures/interestingnessBenchmark.json`;
             const prior = await fetch(fixtureUrl).then(response => response.json());
@@ -282,6 +537,42 @@ export function mountInterestingnessBenchmarkCapture(appContext, library) {
         } finally {
             referenceButton.disabled = false;
             button.disabled = false;
+            perceptualButton.disabled = false;
+        }
+    });
+
+    perceptualButton.addEventListener('click', async () => {
+        referenceButton.disabled = true;
+        button.disabled = true;
+        perceptualButton.disabled = true;
+        try {
+            const fixtureUrl = `${import.meta.env.BASE_URL}tests/fixtures/interestingnessBenchmark.json`;
+            const prior = await fetch(fixtureUrl).then(response => response.json());
+            const negatives = prior.entries
+                .filter(entry => entry.label === 'boring')
+                .map(entry => ({
+                    id: entry.id,
+                    label: entry.label,
+                    source: entry.source,
+                    note: entry.note,
+                    hex: entry.hex,
+                    icLabel: entry.icLabel,
+                    seed: entry.seed,
+                    initialState: entry.initialState,
+                }));
+            const calibration = await capturePerceptualCalibration(appContext, library, negatives, message => {
+                status.textContent = message;
+            });
+            publishResult(calibration, 'perceptualContrastCalibration.json');
+            status.textContent = `Complete: ${calibration._meta.rowsCaptured} perceptual entries.`;
+            document.title = 'Perceptual calibration complete';
+        } catch (error) {
+            console.error('Perceptual calibration failed:', error);
+            status.textContent = `Failed: ${error instanceof Error ? error.message : String(error)}`;
+        } finally {
+            referenceButton.disabled = false;
+            button.disabled = false;
+            perceptualButton.disabled = false;
         }
     });
 }

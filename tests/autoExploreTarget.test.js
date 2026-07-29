@@ -13,6 +13,8 @@ vi.mock('../src/services/PersistenceService.js', () => ({
 
 import { AutoExploreService } from '../src/core/AutoExploreService.js';
 import { RulesetService } from '../src/core/RulesetService.js';
+import { NOISE_PROMPTS, noiseFactor } from '../src/core/analysis/PerceptualContrast.js';
+import { scoreSingleIC, SCORE_CONFIG } from '../src/core/analysis/InterestingnessScore.js';
 import * as Symmetry from '../src/core/Symmetry.js';
 import { EventBus, EVENTS } from '../src/services/EventBus.js';
 
@@ -146,6 +148,32 @@ describe('AutoExploreService — supervised target search (v3.2)', () => {
         expect(best.descriptorKind).toBe('embedding'); // banked under a perceptual SimHash cell
         expect(typeof best.cellKey).toBe('string');
         expect(best.cellKey.startsWith('e:')).toBe(true);
+    });
+
+    it('caches the noise prompt battery and stores its confirmation-only factor for explanation', async () => {
+        const r = await runTargetSearch({
+            baseSeed: 17, maxGenerations: 1, mutationMode: 'r_sym', populationSize: 9,
+            targetPrompt: 'spirals', targetBankThreshold: 0.5,
+        });
+        for (const prompt of NOISE_PROMPTS) {
+            expect(r.embeddingProvider.embedText).toHaveBeenCalledWith(prompt);
+            expect(r.embeddingProvider.embedText.mock.calls.filter(([value]) => value === prompt)).toHaveLength(1);
+        }
+
+        // The fake maps every text prompt and world-0 frame to the same direction: raw similarity 1,
+        // so the calibrated factor is at its full-strength clamp and survives gallery persistence.
+        const best = r.service.getGalleryEntries()[0];
+        expect(best.noiseSimilarity).toBeCloseTo(1, 6);
+        expect(best.noiseFactor).toBeCloseTo(noiseFactor(1), 10);
+        expect(best.perComponent.noiseUsed).toBe(true);
+        expect(best.perComponent.noiseSimilarity).toBeCloseTo(1, 6);
+        expect(best.perComponent.noiseFactor).toBeCloseTo(noiseFactor(1), 10);
+        expect(best.rawMetrics.noiseSimilarity).toBeCloseTo(1, 6);
+        const unpenalizedConfirm = scoreSingleIC({
+            ...liveMetrics(),
+            embedding: { openEndedness: 0 },
+        }, SCORE_CONFIG).score;
+        expect(best.score).toBeCloseTo(unpenalizedConfirm * noiseFactor(1), 10);
     });
 
     it('degrades to the statistical objective (and toasts) when the prompt cannot be embedded', async () => {

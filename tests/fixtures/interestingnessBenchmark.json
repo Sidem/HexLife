@@ -21,7 +21,8 @@
   },
   "byClass": {
    "free/interesting": 16,
-   "r_sym/interesting": 50,
+   "d_sym/interesting": 27,
+   "r_sym/interesting": 23,
    "n_count/interesting": 6,
    "totalistic/interesting": 1,
    "free/boring": 4,
@@ -1787,7 +1788,7 @@
      "density": 0.3
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.3375797672672673,
@@ -3183,7 +3184,7 @@
      "gaussianStdDev": 2.5
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.007601351351351352,
@@ -4224,7 +4225,7 @@
      "density": 0.85
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.060177364864864864,
@@ -9485,7 +9486,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.10754504504504504,
@@ -10179,7 +10180,7 @@
      "density": 0.85
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.05065221471471471,
@@ -11567,7 +11568,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.22820476726726727,
@@ -12269,7 +12270,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.07338588588588589,
@@ -12624,7 +12625,7 @@
      "gaussianStdDev": 2
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.14355762012012013,
@@ -13318,7 +13319,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.015061936936936937,
@@ -13665,7 +13666,7 @@
      "density": 0.05
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.06421265015015015,
@@ -14733,7 +14734,7 @@
      "gaussianStdDev": 1.6
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.0016891891891891893,
@@ -15089,7 +15090,7 @@
      "gaussianStdDev": 1.6
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.005325638138138138,
@@ -15445,7 +15446,7 @@
      "gaussianStdDev": 1.6
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.19437406156156156,
@@ -15797,7 +15798,7 @@
      "density": 0.00009645061728395061
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 3,
     "finalRatio": 0.00007038288288288288,
@@ -16144,7 +16145,7 @@
      "density": 0.05
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.011683558558558559,
@@ -16846,7 +16847,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 5,
     "finalRatio": 0,
@@ -17193,7 +17194,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.41382789039039036,
@@ -17540,7 +17541,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 3,
     "finalRatio": 0,
@@ -18243,7 +18244,7 @@
      "density": 0.05
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 125,
     "finalRatio": 0.022874436936936936,
@@ -20334,7 +20335,7 @@
      "gaussianStdDev": 1.6
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.006099849849849849,
@@ -22441,7 +22442,7 @@
      "density": 0.5
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.47069725975975973,
@@ -22788,7 +22789,7 @@
      "density": 0
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.4721283783783784,
@@ -23135,7 +23136,7 @@
      "density": 0.5
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.5289508258258259,
@@ -23490,7 +23491,7 @@
      "gaussianStdDev": 2
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.32995495495495497,
@@ -24184,7 +24185,7 @@
      "density": 0.5
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.01775994744744745,
@@ -24531,7 +24532,7 @@
      "density": 0
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 2,
     "finalRatio": 0.00002346096096096096,
@@ -24878,7 +24879,7 @@
      "density": 1
     }
    },
-   "constraintClass": "r_sym",
+   "constraintClass": "d_sym",
    "metrics": {
     "ticksRun": 160,
     "finalRatio": 0.4040915915915916,

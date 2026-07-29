@@ -6,22 +6,29 @@ import {
     CONSTRAINT_CLASS_META,
     ORBIT_LABELS,
 } from './rulesetDescriptor.js';
+import { getDihedralCanonicalRepresentative } from './Symmetry.js';
 
 /**
  * A mutation degree is one independently mutable unit in the strictest rule space shared by both
  * rulesets. The spaces are nested:
  *
- *     totalistic (8 sums) ⊂ n_count (14 buckets) ⊂ r_sym (28 orbits) ⊂ free (128 bits)
+ *     totalistic (8 sums) ⊂ n_count (14 buckets) ⊂ d_sym (26 orbits)
+ *       ⊂ r_sym (28 orbits) ⊂ free (128 bits)
  *
  * This makes the number evolutionary rather than representational. Flipping a six-member rotation
  * orbit is 1°, not six unrelated table edits.
  */
-/** @type {Array<'totalistic'|'n_count'|'r_sym'|'free'>} */
-const SPACE_ORDER = ['totalistic', 'n_count', 'r_sym', 'free'];
+/** @type {Array<'totalistic'|'n_count'|'d_sym'|'r_sym'|'free'>} */
+const SPACE_ORDER = ['totalistic', 'n_count', 'd_sym', 'r_sym', 'free'];
+
+const DIHEDRAL_REPRESENTATIVES = [...new Set(
+    Array.from({ length: 64 }, (_, mask) => getDihedralCanonicalRepresentative(mask)),
+)].sort((a, b) => a - b);
 
 export const RELATEDNESS_SPACE_META = {
     totalistic: { units: 8, label: CONSTRAINT_CLASS_META.totalistic.label },
     n_count: { units: 14, label: CONSTRAINT_CLASS_META.n_count.label },
+    d_sym: { units: 26, label: CONSTRAINT_CLASS_META.d_sym.label },
     r_sym: { units: 28, label: CONSTRAINT_CLASS_META.r_sym.label },
     free: { units: 128, label: CONSTRAINT_CLASS_META.free.label },
 };
@@ -31,10 +38,10 @@ export const RELATEDNESS_SPACE_META = {
  *   degrees: number,
  *   totalUnits: number,
  *   ratio: number,
- *   space: 'totalistic'|'n_count'|'r_sym'|'free',
+ *   space: 'totalistic'|'n_count'|'d_sym'|'r_sym'|'free',
  *   spaceLabel: string,
- *   classA: 'totalistic'|'n_count'|'r_sym'|'free',
- *   classB: 'totalistic'|'n_count'|'r_sym'|'free',
+ *   classA: 'totalistic'|'n_count'|'d_sym'|'r_sym'|'free',
+ *   classB: 'totalistic'|'n_count'|'d_sym'|'r_sym'|'free',
  *   isIdentical: boolean,
  *   isClose: boolean,
  * }} RulesetRelatedness
@@ -142,7 +149,7 @@ export function suggestRulesetFamilyName(relatives, allEntries, maxLength = 50) 
 /**
  * @param {Uint8Array} a
  * @param {Uint8Array} b
- * @param {'totalistic'|'n_count'|'r_sym'|'free'} space
+ * @param {'totalistic'|'n_count'|'d_sym'|'r_sym'|'free'} space
  */
 function countDifferentUnits(a, b, space) {
     let differences = 0;
@@ -170,6 +177,15 @@ function countDifferentUnits(a, b, space) {
     if (space === 'r_sym') {
         for (let cs = 0; cs <= 1; cs++) {
             for (const representative of ORBIT_LABELS.keys()) {
+                if (a[(cs << 6) | representative] !== b[(cs << 6) | representative]) differences++;
+            }
+        }
+        return differences;
+    }
+
+    if (space === 'd_sym') {
+        for (let cs = 0; cs <= 1; cs++) {
+            for (const representative of DIHEDRAL_REPRESENTATIVES) {
                 if (a[(cs << 6) | representative] !== b[(cs << 6) | representative]) differences++;
             }
         }

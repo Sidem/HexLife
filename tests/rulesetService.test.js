@@ -151,6 +151,20 @@ describe('RulesetService.generateMutatedHex (r_sym)', () => {
     });
 });
 
+describe('RulesetService.generateMutatedHex (d_sym)', () => {
+    it('keeps every rotation/reflection orbit member in agreement', () => {
+        const out = service.generateMutatedHex(ALL_ZERO, 1, 'd_sym', null, () => 0);
+        const rules = hexToRuleset(out);
+        for (const group of symmetryData.dihedralCanonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = rules[(cs << 6) | group.members[0]];
+                for (const m of group.members) expect(rules[(cs << 6) | m]).toBe(ref);
+            }
+        }
+        expect(out).toBe(ALL_ONE);
+    });
+});
+
 describe('RulesetService.generateMutatedHex (n_count)', () => {
     it('keeps every neighbor-count bucket uniform', () => {
         const out = service.generateMutatedHex(ALL_ZERO, 1, 'n_count', hexToRuleset(ALL_ZERO), () => 0);
@@ -224,6 +238,17 @@ describe('RulesetService.generateRandomRulesetHex', () => {
                 for (const m of group.members) {
                     expect(rules[(cs << 6) | m]).toBe(ref);
                 }
+            }
+        }
+    });
+
+    it('d_sym output is rotation/reflection-orbit-uniform', () => {
+        const out = service.generateRandomRulesetHex(0.5, 'd_sym', seq([0, 0.9]));
+        const rules = hexToRuleset(out);
+        for (const group of symmetryData.dihedralCanonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = rules[(cs << 6) | group.members[0]];
+                for (const m of group.members) expect(rules[(cs << 6) | m]).toBe(ref);
             }
         }
     });
@@ -403,6 +428,19 @@ describe('RulesetService.crossoverHexes', () => {
         }
     });
 
+    it('d_sym breeding + post-mutation keeps the child reflection-orbit-uniform', () => {
+        const symA = service.generateRandomRulesetHex(0.5, 'd_sym', seq([0, 0.9]));
+        const symB = service.generateRandomRulesetHex(0.5, 'd_sym', seq([0.9, 0, 0]));
+        const out = service.crossoverHexes(symA, symB, 'd_sym', seq([0.1, 0.6, 0.4, 0.8]), 0.5);
+        const child = hexToRuleset(out);
+        for (const group of symmetryData.dihedralCanonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = child[(cs << 6) | group.members[0]];
+                for (const m of group.members) expect(child[(cs << 6) | m]).toBe(ref);
+            }
+        }
+    });
+
     it('totalistic breeding + post-mutation keeps the child totalistic', () => {
         const tA = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0, 0.9]));
         const tB = service.generateRandomRulesetHex(0.5, 'totalistic', seq([0.9, 0]));
@@ -435,7 +473,7 @@ describe('RulesetService.crossoverPoolHexes (genepool)', () => {
     const hexC = '0FF00FF00FF00FF00FF00FF00FF00FF0';
 
     it('two-parent pool is byte-identical to crossoverHexes (same rng sequence)', () => {
-        for (const mode of ['uniform', 'r_sym', 'n_count', 'totalistic']) {
+        for (const mode of ['uniform', 'r_sym', 'd_sym', 'n_count', 'totalistic']) {
             const draws = [0.1, 0.8, 0.3, 0.9, 0.2, 0.6, 0.05, 0.95, 0.4, 0.55, 0.7, 0.15, 0.85, 0.25];
             const pool = service.crossoverPoolHexes([hexA, hexB], mode, seq(draws), 0);
             const bin = service.crossoverHexes(hexA, hexB, mode, seq(draws), 0);
@@ -506,6 +544,17 @@ describe('RulesetService.projectToMode', () => {
         }
     });
 
+    it('d_sym projection makes every rotation/reflection orbit uniform', () => {
+        const out = service.projectToMode(hexA, 'd_sym');
+        const rules = hexToRuleset(out);
+        for (const group of symmetryData.dihedralCanonicalRepresentatives) {
+            for (const cs of [0, 1]) {
+                const ref = rules[(cs << 6) | group.members[0]];
+                for (const m of group.members) expect(rules[(cs << 6) | m]).toBe(ref);
+            }
+        }
+    });
+
     it('r_sym projection takes the majority output of each orbit', () => {
         const group3 = symmetryData.canonicalRepresentatives.find(g => g.members.length === 3);
         const rules = hexToRuleset(ALL_ZERO);
@@ -541,12 +590,19 @@ describe('RulesetService.projectToMode', () => {
     it('r_sym without symmetryData returns the hex unchanged', () => {
         const bare = new RulesetService(null);
         expect(bare.projectToMode(hexA, 'r_sym')).toBe(hexA);
+        expect(bare.projectToMode(hexA, 'd_sym')).toBe(hexA);
     });
 });
 
 describe('RulesetService.getCanonicalRuleDetails', () => {
     it('returns [] for a null ruleset', () => {
         expect(service.getCanonicalRuleDetails(null)).toEqual([]);
+    });
+
+    it('returns 28 C6 details or 26 D6 details', () => {
+        const rules = hexToRuleset(ALL_ZERO);
+        expect(service.getCanonicalRuleDetails(rules, 'r_sym')).toHaveLength(28);
+        expect(service.getCanonicalRuleDetails(rules, 'd_sym')).toHaveLength(26);
     });
 
     it('returns two rows (centerState 0 and 1) per canonical group with correct effective output', () => {

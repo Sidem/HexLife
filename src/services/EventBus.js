@@ -227,17 +227,17 @@ export const EVENTS = {
     COMMAND_INCREMENT_BRUSH_SIZE: 'command:incrementBrushSize',
     /** @param {'invert'|'draw'|'erase'} mode - The desired brush interaction mode. */
     COMMAND_SET_BRUSH_MODE: 'command:setBrushMode', 
-    /** @param {{bias: number, generationMode: 'random'|'n_count'|'r_sym'|'totalistic', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
+    /** @param {{bias: number, generationMode: 'random'|'n_count'|'d_sym'|'r_sym'|'totalistic', resetScopeForThisChange: 'all'|'selected'|'none'}} data - Parameters for generating a random ruleset. */
     COMMAND_GENERATE_RANDOM_RULESET: 'command:generateRandomRuleset',
     /** @param {{hexString: string, resetScopeForThisChange: 'all'|'selected'|'none'}} data - The ruleset to set. */
     COMMAND_SET_RULESET: 'command:setRuleset',
-    /** @param {{mutationRate: number, scope: 'all'|'selected', mode: 'single'|'r_sym'|'n_count'|'totalistic'}} data - Parameters for mutating a ruleset. */
+    /** @param {{mutationRate: number, scope: 'all'|'selected', mode: 'single'|'r_sym'|'d_sym'|'n_count'|'totalistic'}} data - Parameters for mutating a ruleset. */
     COMMAND_MUTATE_RULESET: 'command:mutateRuleset',
-    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'n_count'|'totalistic', ensureMutation: boolean}} data - Parameters for cloning and mutating. */
+    /** @param {{mutationRate: number, mode: 'single'|'r_sym'|'d_sym'|'n_count'|'totalistic', ensureMutation: boolean}} data - Parameters for cloning and mutating. */
     COMMAND_CLONE_AND_MUTATE: 'command:cloneAndMutate',
     /** @event Emitted with no payload to clone the selected world's ruleset to all other worlds. */
     COMMAND_CLONE_RULESET: 'command:cloneRuleset',
-    /** @param {{mode: 'uniform'|'r_sym'|'n_count'|'totalistic', postMutationRate: number}} data - Breed from the genepool: recombine all worlds flagged `isParent` into every non-parent world. */
+    /** @param {{mode: 'uniform'|'r_sym'|'d_sym'|'n_count'|'totalistic', postMutationRate: number}} data - Breed from the genepool: recombine all worlds flagged `isParent` into every non-parent world. */
     COMMAND_BREED_WORLDS: 'command:breedWorlds',
     /** @event A user-initiated command to execute the genepool breed with the controller's current inheritance mode + offspring-mutation rate. */
     COMMAND_EXECUTE_BREED_WORLDS: 'command:executeBreedWorlds',
@@ -257,7 +257,7 @@ export const EVENTS = {
     COMMAND_EDITOR_SET_ALL_RULES_STATE: 'command:editorSetAllRulesState', 
     /** @param {{centerState: 0|1, numActive: number, outputState: 0|1, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set rules based on neighbor count. */
     COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:editorSetRulesForNeighborCount', 
-    /** @param {{canonicalBitmask: number, centerState: 0|1, outputState: 0|1, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set rules based on their canonical representative. */
+    /** @param {{canonicalBitmask: number, centerState: 0|1, outputState: 0|1, symmetryMode?: 'r_sym'|'d_sym', modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set rules based on their canonical representative. */
     COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:editorSetRulesForCanonicalRep', 
     /** @param {{hexString: string, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - The ruleset hex string to apply from the editor. */
     COMMAND_EDITOR_SET_RULESET_HEX: 'command:editorSetRulesetHex', 

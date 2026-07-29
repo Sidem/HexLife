@@ -137,6 +137,18 @@ export const UNIFORM_FACTOR_META = {
 };
 
 /**
+ * Display-only meta for the optional Stage-3 CLIP nuisance multiplier. Calibration lives in
+ * PerceptualContrast.js; this surface explains the raw match and resulting factor stored on a find.
+ */
+export const NOISE_FACTOR_META = {
+    key: 'noiseFactor', usedFlag: 'noiseUsed', label: 'Noise',
+    hint: 'Perceptual-noise factor — multiplies the confirmed score. 1.00 = no penalty; lower = the frames strongly resemble static or random pixels.',
+    description: 'Each embedded frame is compared with a fixed battery of CLIP text prompts for television static, random binary pixels, and white-noise textures. The strongest prompt match per frame is averaged across the trajectory and converted into this graded confirmation-only factor.',
+    zeroMeans: 'Clear nuisance matches receive the strongest configured suppression.',
+    maxMeans: 'The perceptual confirmation does not resemble the fixed noise concepts.',
+};
+
+/**
  * Render a term's shape function as a small inline SVG: the curve over `meta.domain`, a dashed
  * guide at the peak/half-saturation point, and — when `rawValue` is finite — a marker dot at the
  * measured value with a caption. Pure string-returning (shared by the Scoring panel, the gallery,

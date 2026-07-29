@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     describeRuleset,
     classifyRulesetConstraint,
+    satisfiesRulesetConstraint,
     CONSTRAINT_CLASSES,
     CONSTRAINT_CLASS_META,
     ORBIT_LABELS,
@@ -120,7 +121,7 @@ describe('describeRuleset', () => {
     });
 });
 
-// --- #38: constraint classification (totalistic ⊂ n_count ⊂ r_sym ⊂ free) --------------------
+// --- Constraint classification (totalistic ⊂ n_count ⊂ d_sym ⊂ r_sym ⊂ free) -----------------
 
 /** Strictness rank: 0 = totalistic (strictest) … 3 = free. Lower means more constrained. */
 const rank = (cls) => CONSTRAINT_CLASSES.indexOf(cls);
@@ -154,9 +155,10 @@ describe('classifyRulesetConstraint', () => {
         // Depends on the count, but a live and a dead cell with the same TOTAL disagree
         // (born at 3 neighbours, survives with 3 — sum 3 vs sum 4), so it is only outer-totalistic.
         expect(classifyRulesetConstraint(hexFrom((cs, mask) => countSetBits(mask) === 3))).toBe('n_count');
-        // Depends on the neighbour ARRANGEMENT (adjacent pair vs opposite pair are both count 2),
-        // but every rotation of an arrangement agrees.
-        expect(classifyRulesetConstraint(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b000011))).toBe('r_sym');
+        // Depends on arrangement, but rotations and reflections agree.
+        expect(classifyRulesetConstraint(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b000011))).toBe('d_sym');
+        // The chiral 3m orbit differs from its 3m′ reflection, while rotations still agree.
+        expect(classifyRulesetConstraint(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b001011))).toBe('r_sym');
         // A single mask fires — its own rotations do not, so not even rotationally symmetric.
         expect(classifyRulesetConstraint(hexFrom((cs, mask) => cs === 0 && mask === 0b000011))).toBe('free');
     });
@@ -174,6 +176,7 @@ describe('classifyRulesetConstraint', () => {
         const modes = [
             ['totalistic', 'totalistic'],
             ['n_count', 'n_count'],
+            ['d_sym', 'd_sym'],
             ['r_sym', 'r_sym'],
             ['single', 'free'],
         ];
@@ -193,6 +196,7 @@ describe('classifyRulesetConstraint', () => {
         const service = new RulesetService(precomputeSymmetryGroups());
         expect(classifyRulesetConstraint(service.generateRandomRulesetHex(0.5, 'totalistic', seededRng(7)))).toBe('totalistic');
         expect(classifyRulesetConstraint(service.generateRandomRulesetHex(0.5, 'n_count', seededRng(7)))).toBe('n_count');
+        expect(classifyRulesetConstraint(service.generateRandomRulesetHex(0.5, 'd_sym', seededRng(7)))).toBe('d_sym');
         expect(classifyRulesetConstraint(service.generateRandomRulesetHex(0.5, 'r_sym', seededRng(7)))).toBe('r_sym');
         expect(classifyRulesetConstraint(service.generateRandomRulesetHex(0.5, 'single', seededRng(7)))).toBe('free');
     });
@@ -203,9 +207,10 @@ describe('classifyRulesetConstraint', () => {
         for (let i = 0; i < 20; i++) {
             const free = service.generateRandomRulesetHex(0.5, 'single', rng);
             const rsym = service.projectToMode(free, 'r_sym');
-            const ncount = service.projectToMode(rsym, 'n_count');
+            const dsym = service.projectToMode(rsym, 'd_sym');
+            const ncount = service.projectToMode(dsym, 'n_count');
             const tot = service.projectToMode(ncount, 'totalistic');
-            const ranks = [free, rsym, ncount, tot].map((h) => rank(classifyRulesetConstraint(h)));
+            const ranks = [free, rsym, dsym, ncount, tot].map((h) => rank(classifyRulesetConstraint(h)));
             for (let k = 1; k < ranks.length; k++) {
                 expect(ranks[k]).toBeLessThanOrEqual(ranks[k - 1]);
             }
@@ -225,7 +230,19 @@ describe('classifyRulesetConstraint', () => {
             expect(CONSTRAINT_CLASS_META[cls].label).toBeTruthy();
             expect(CONSTRAINT_CLASS_META[cls].description.length).toBeGreaterThan(20);
         }
-        expect(CONSTRAINT_CLASSES).toEqual(['totalistic', 'n_count', 'r_sym', 'free']);
+        expect(CONSTRAINT_CLASSES).toEqual(['totalistic', 'n_count', 'd_sym', 'r_sym', 'free']);
+    });
+
+    it('library-style filtering distinguishes exact R-sym from D-sym hierarchically', () => {
+        const dSym = hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b000011);
+        const rSym = hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b001011);
+
+        expect(classifyRulesetConstraint(dSym)).toBe('d_sym');
+        expect(classifyRulesetConstraint(rSym)).toBe('r_sym');
+        expect(satisfiesRulesetConstraint(dSym, 'd_sym')).toBe(true);
+        expect(satisfiesRulesetConstraint(dSym, 'r_sym')).toBe(true);
+        expect(satisfiesRulesetConstraint(rSym, 'r_sym')).toBe(true);
+        expect(satisfiesRulesetConstraint(rSym, 'd_sym')).toBe(false);
     });
 });
 
@@ -233,7 +250,7 @@ describe('describeRuleset — constraintClass field', () => {
     it('agrees with the standalone classifier', () => {
         const service = new RulesetService(precomputeSymmetryGroups());
         const rng = seededRng(11);
-        for (const mode of ['totalistic', 'n_count', 'r_sym', 'single']) {
+        for (const mode of ['totalistic', 'n_count', 'd_sym', 'r_sym', 'single']) {
             for (let i = 0; i < 10; i++) {
                 const hex = service.generateRandomRulesetHex(0.5, mode, rng);
                 expect(describeRuleset(hex).constraintClass).toBe(classifyRulesetConstraint(hex));
@@ -246,7 +263,11 @@ describe('describeRuleset — constraintClass field', () => {
         expect(raw.type).toBe('raw');
         expect(raw.constraintClass).toBe('free');
 
-        const rsym = describeRuleset(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b000011));
+        const dsym = describeRuleset(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b000011));
+        expect(dsym.type).toBe('r-sym');
+        expect(dsym.constraintClass).toBe('d_sym');
+
+        const rsym = describeRuleset(hexFrom((_cs, mask) => getCanonicalRepresentative(mask) === 0b001011));
         expect(rsym.type).toBe('r-sym');
         expect(rsym.constraintClass).toBe('r_sym');
 

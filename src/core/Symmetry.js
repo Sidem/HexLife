@@ -33,6 +33,22 @@ export function rotateBitmaskClockwise(bitmask) {
            (se << 5);     // new S = old SE
 }
 
+/**
+ * Reflects a 6-bit neighborhood mask across the SW↔NE axis.
+ * Bits on the axis (0=SW, 3=NE) stay fixed; the other pairs swap (NW↔S, N↔SE).
+ * Together with {@link rotateBitmaskClockwise}, this generates the 12 transforms of D6.
+ * @param {number} bitmask - The 6-bit integer representing neighbor states.
+ * @returns {number} The reflected bitmask.
+ */
+export function reflectBitmask(bitmask) {
+    return (((bitmask >> 0) & 1) << 0)
+        | (((bitmask >> 5) & 1) << 1)
+        | (((bitmask >> 4) & 1) << 2)
+        | (((bitmask >> 3) & 1) << 3)
+        | (((bitmask >> 2) & 1) << 4)
+        | (((bitmask >> 1) & 1) << 5);
+}
+
 
 /**
  * Calculates all 6 unique rotations of a given 6-bit neighborhood mask.
@@ -50,6 +66,16 @@ export function getAllRotations(bitmask) {
 }
 
 /**
+ * Calculates all 12 D6 transforms: the 6 rotations of a mask and of one reflection.
+ * Entries may repeat for symmetric masks.
+ * @param {number} bitmask - The 6-bit integer.
+ * @returns {number[]}
+ */
+export function getAllDihedralTransforms(bitmask) {
+    return [...getAllRotations(bitmask), ...getAllRotations(reflectBitmask(bitmask))];
+}
+
+/**
  * Finds the canonical representative for a 6-bit neighborhood mask.
  * The canonical representative is the smallest numerical value among all its unique rotations.
  * @param {number} bitmask - The 6-bit integer.
@@ -58,6 +84,15 @@ export function getAllRotations(bitmask) {
 export function getCanonicalRepresentative(bitmask) {
     const rotations = getAllRotations(bitmask);
     return Math.min(...rotations);
+}
+
+/**
+ * Finds the smallest representative under rotations and reflections (D6).
+ * @param {number} bitmask - The 6-bit integer.
+ * @returns {number}
+ */
+export function getDihedralCanonicalRepresentative(bitmask) {
+    return Math.min(...getAllDihedralTransforms(bitmask));
 }
 
 /**
@@ -72,18 +107,33 @@ export function getOrbitSize(bitmask) {
 }
 
 /**
+ * Number of unique patterns in a mask's D6 orbit.
+ * @param {number} bitmask - The 6-bit integer.
+ * @returns {number}
+ */
+export function getDihedralOrbitSize(bitmask) {
+    return new Set(getAllDihedralTransforms(bitmask)).size;
+}
+
+/**
  * Precomputes symmetry groups for all 64 possible 6-bit neighbor configurations.
  * Groups bitmasks by their canonical representative.
  * @returns {{
  * canonicalRepresentatives: Array<{representative: number, orbitSize: number, members: number[]}>,
  * bitmaskToCanonical: Map<number, number>,
- * bitmaskToOrbitSize: Map<number, number>
+ * bitmaskToOrbitSize: Map<number, number>,
+ * dihedralCanonicalRepresentatives: Array<{representative: number, orbitSize: number, members: number[]}>,
+ * bitmaskToDihedralCanonical: Map<number, number>,
+ * bitmaskToDihedralOrbitSize: Map<number, number>
  * }}
  */
 export function precomputeSymmetryGroups() {
     const allCanonicalReps = new Map();
     const bitmaskToCanonical = new Map();
     const bitmaskToOrbitSize = new Map();
+    const allDihedralCanonicalReps = new Map();
+    const bitmaskToDihedralCanonical = new Map();
+    const bitmaskToDihedralOrbitSize = new Map();
 
     for (let i = 0; i < 64; i++) { 
         const canonical = getCanonicalRepresentative(i);
@@ -95,15 +145,34 @@ export function precomputeSymmetryGroups() {
             allCanonicalReps.set(canonical, { representative: canonical, orbitSize: getOrbitSize(canonical), members: [] });
         }
         allCanonicalReps.get(canonical).members.push(i);
+
+        const dihedralCanonical = getDihedralCanonicalRepresentative(i);
+        const dihedralOrbit = getDihedralOrbitSize(i);
+        bitmaskToDihedralCanonical.set(i, dihedralCanonical);
+        bitmaskToDihedralOrbitSize.set(i, dihedralOrbit);
+        if (!allDihedralCanonicalReps.has(dihedralCanonical)) {
+            allDihedralCanonicalReps.set(dihedralCanonical, {
+                representative: dihedralCanonical,
+                orbitSize: getDihedralOrbitSize(dihedralCanonical),
+                members: [],
+            });
+        }
+        allDihedralCanonicalReps.get(dihedralCanonical).members.push(i);
     }
 
     allCanonicalReps.forEach(group => group.members.sort((a, b) => a - b));
+    allDihedralCanonicalReps.forEach(group => group.members.sort((a, b) => a - b));
     const canonicalRepresentativesArray = Array.from(allCanonicalReps.values())
+        .sort((a, b) => a.representative - b.representative);
+    const dihedralCanonicalRepresentatives = Array.from(allDihedralCanonicalReps.values())
         .sort((a, b) => a.representative - b.representative);
 
     return {
         canonicalRepresentatives: canonicalRepresentativesArray,
         bitmaskToCanonical,
-        bitmaskToOrbitSize
+        bitmaskToOrbitSize,
+        dihedralCanonicalRepresentatives,
+        bitmaskToDihedralCanonical,
+        bitmaskToDihedralOrbitSize,
     };
 }

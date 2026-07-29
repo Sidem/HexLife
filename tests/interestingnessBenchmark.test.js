@@ -30,8 +30,9 @@ import library from '../src/core/library/rulesets.json';
 // The panel is stratified by constraint class (`classifyRulesetConstraint`, roadmap #38) because
 // symmetric rulesets have much better odds of being interesting: an unstratified panel would let a
 // scorer (or Stage 4's reward model) score well by learning "symmetric = good" instead of reading
-// the dynamics. Hence r_sym-class NEGATIVES exist in the panel and within-class accuracy is
-// reported alongside the overall number.
+// the dynamics. Hence chiral r_sym-class NEGATIVES exist in the panel and within-class accuracy is
+// reported alongside the overall number; D-sym is reported separately even though it lacks a
+// boring control today.
 
 // --- Scoring the panel -----------------------------------------------------------------------
 
@@ -90,26 +91,26 @@ const marginMean = (pos, neg) => mean(pos.map((r) => r.score)) - mean(neg.map((r
 // Complete public library, captured 2026-07-29:
 //   overall  227/511 = 0.444227…   margin −0.05584
 //   free       34/64 = 0.531250…
-//   r_sym     55/150 = 0.366666…   ← the largest and still-weakest library class
+//   r_sym      26/69 = 0.376811…   ← chiral C6 only; D6 is now its own stratum
 //   screen    150/511 = 0.293542…
 //
 // Preserved Stage-0 slice, captured with the Stage-2 metric:
 //   overall   58/112 = 0.517857…   margin +0.01617
 //   free       15/24 = 0.625000…
-//   r_sym       8/18 = 0.444444…
+//   r_sym        0/9 = 0.000000…   ← only three chiral positives/negatives in this small slice
 //   screen     45/112 = 0.401785…
 // The constants sit a hair below the measurements so a last-bit float drift can't fail the build;
 // a real regression moves these by whole pairs.
 const BASELINE_PAIRWISE_ACCURACY = 0.4442;
 const BASELINE_MARGIN = -0.0559;
 const BASELINE_FREE_ACCURACY = 0.5312;
-const BASELINE_RSYM_ACCURACY = 0.3666;
+const BASELINE_RSYM_ACCURACY = 0.3768;
 const BASELINE_SCREEN_ACCURACY = 0.2935;
 
 const STAGE0_PAIRWISE_ACCURACY = 0.5178;
 const STAGE0_MARGIN = 0.0161;
 const STAGE0_FREE_ACCURACY = 0.6249;
-const STAGE0_RSYM_ACCURACY = 0.4444;
+const STAGE0_RSYM_ACCURACY = 0;
 const STAGE0_SCREEN_ACCURACY = 0.4017;
 
 function formatTable() {
@@ -212,10 +213,12 @@ describe('interestingness benchmark — within-class alignment', () => {
         expect(pairwiseAccuracy(pos, neg)).toBeGreaterThanOrEqual(BASELINE_RSYM_ACCURACY);
     });
 
-    it('n_count / totalistic entries are positives only (no within-class pair to report yet)', () => {
+    it('d_sym / n_count / totalistic entries are positives only (no within-class pair to report yet)', () => {
         // Documented gap: the curated library has no boring n-count rules to draw on. If Stage 2+
         // needs them, capture n_count-mode explore churn and extend the panel (README procedure).
-        expect(negatives.filter((r) => r.cls === 'n_count' || r.cls === 'totalistic')).toHaveLength(0);
+        expect(negatives.filter((r) =>
+            r.cls === 'd_sym' || r.cls === 'n_count' || r.cls === 'totalistic'
+        )).toHaveLength(0);
     });
 });
 
@@ -232,6 +235,8 @@ describe('interestingness benchmark — preserved Stage-0 slice', () => {
         const rSymPos = stage0Positives.filter((r) => r.cls === 'r_sym');
         const rSymNeg = stage0Negatives.filter((r) => r.cls === 'r_sym');
         expect(pairwiseAccuracy(freePos, freeNeg)).toBeGreaterThanOrEqual(STAGE0_FREE_ACCURACY);
+        expect(rSymPos).toHaveLength(3);
+        expect(rSymNeg).toHaveLength(3);
         expect(pairwiseAccuracy(rSymPos, rSymNeg)).toBeGreaterThanOrEqual(STAGE0_RSYM_ACCURACY);
     });
 });

@@ -10,7 +10,7 @@ import { downloadFile } from '../../utils/utils.js';
 import { decodePack } from '../../services/LibraryPackCodec.js';
 import { ICONS } from '../icons.js';
 import { constraintBadge } from '../RulesetDisplayFactory.js';
-import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
+import { COMPONENT_META, UNIFORM_FACTOR_META, NOISE_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
 import { ExploreRaterView } from './ExploreRaterView.js';
 import { PredictionDeck, PREDICTION_MODE_ENABLED } from './PredictionDeck.js';
@@ -363,6 +363,7 @@ export class ExploreComponent extends BaseComponent {
             items: [
                 { value: 'single', text: 'Single' },
                 { value: 'r_sym', text: 'R-Sym' },
+                { value: 'd_sym', text: 'D-Sym' },
                 { value: 'n_count', text: 'N-Count' },
                 { value: 'totalistic', text: 'Totalistic' },
             ],
@@ -840,6 +841,12 @@ export class ExploreComponent extends BaseComponent {
         const chaosChip = (entry.perComponent?.uniformUsed && typeof uf === 'number' && uf < 0.995)
             ? `<span class="explore-find-chaos" title="${this._escape(UNIFORM_FACTOR_META.hint)}">chaos ×${uf.toFixed(2)}</span>`
             : '';
+        // #37 Stage 3: surface both the raw nuisance similarity and the factor that scaled confirmation.
+        const nf = entry.perComponent?.noiseFactor;
+        const ns = entry.perComponent?.noiseSimilarity ?? entry.noiseSimilarity;
+        const noiseChip = (entry.perComponent?.noiseUsed && typeof nf === 'number' && nf < 0.995)
+            ? `<span class="explore-find-noise" title="${this._escape(`${NOISE_FACTOR_META.hint} Raw similarity: ${typeof ns === 'number' ? ns.toFixed(3) : 'n/a'}.`)}">noise ×${nf.toFixed(2)}</span>`
+            : '';
         // Supervised target search (v3.2): a find banked in target mode carries its trajectory→prompt match.
         const targetChip = (typeof entry.targetSimilarity === 'number')
             ? `<span class="explore-find-target" title="Mean cosine similarity of this find's frames to the target prompt (higher = closer match)">🎯 ${entry.targetSimilarity.toFixed(2)}</span>`
@@ -866,7 +873,7 @@ export class ExploreComponent extends BaseComponent {
                             <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
                             ${constraintChip}
                             <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
-                            ${cyclicChip}${chaosChip}${targetChip}
+                            ${cyclicChip}${chaosChip}${noiseChip}${targetChip}
                         </div>
                         ${bars}
                         <div class="explore-find-actions">
@@ -909,6 +916,19 @@ export class ExploreComponent extends BaseComponent {
                     <span class="explore-bar-label">${UNIFORM_FACTOR_META.label}</span>
                     <span class="explore-bar-track"><span class="explore-bar-fill${penalized ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(uf * 100)}%"></span></span>
                     <span class="explore-bar-val">×${uf.toFixed(2)}</span>
+                </div>
+            `;
+        }
+        if (perComponent.noiseUsed && typeof perComponent.noiseFactor === 'number') {
+            const nf = Math.max(0, Math.min(1, perComponent.noiseFactor));
+            const similarity = typeof perComponent.noiseSimilarity === 'number'
+                ? ` Similarity ${perComponent.noiseSimilarity.toFixed(3)}.`
+                : '';
+            rows += `
+                <div class="explore-bar-row" title="${this._escape(`${NOISE_FACTOR_META.label} — ${NOISE_FACTOR_META.hint}${similarity}`)}">
+                    <span class="explore-bar-label">${NOISE_FACTOR_META.label}</span>
+                    <span class="explore-bar-track"><span class="explore-bar-fill${nf < 0.995 ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(nf * 100)}%"></span></span>
+                    <span class="explore-bar-val">×${nf.toFixed(2)}</span>
                 </div>
             `;
         }

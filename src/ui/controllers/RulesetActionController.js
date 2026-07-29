@@ -58,6 +58,7 @@ export class RulesetActionController {
             { value: 'random', text: 'Random' },
             { value: 'n_count', text: 'N-Count' },
             { value: 'totalistic', text: 'Totalistic' },
+            { value: 'd_sym', text: 'D-Sym' },
             { value: 'r_sym', text: 'R-Sym' }
         ];
     }
@@ -66,6 +67,7 @@ export class RulesetActionController {
         return [
             { value: 'single', text: 'Single' },
             { value: 'r_sym', text: 'R-Sym' },
+            { value: 'd_sym', text: 'D-Sym' },
             { value: 'n_count', text: 'N-Count' },
             { value: 'totalistic', text: 'Totalistic' }
         ];
@@ -82,6 +84,7 @@ export class RulesetActionController {
         return [
             { value: 'uniform', text: 'Uniform' },
             { value: 'r_sym', text: 'R-Sym' },
+            { value: 'd_sym', text: 'D-Sym' },
             { value: 'n_count', text: 'N-Count' },
             { value: 'totalistic', text: 'Totalistic' }
         ];
@@ -156,4 +159,4 @@ export class RulesetActionController {
     setEnsureMutation = (shouldEnsure) => PersistenceService.saveUISetting('ensureMutation', shouldEnsure);
     setBreedMode = (mode) => PersistenceService.saveUISetting('breedMode', mode);
     setBreedMutationRate = (rate) => PersistenceService.saveUISetting('breedMutationRate', rate);
-} 
+}

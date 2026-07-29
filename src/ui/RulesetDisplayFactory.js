@@ -21,7 +21,7 @@ export function icBadgeLabel(initialState) {
 
 /**
  * Badge descriptor for a ruleset's structural constraint class (roadmap #38) — the strictest of
- * `totalistic ⊂ n_count ⊂ r_sym ⊂ free` its rule table satisfies. Derived from the hex on every
+ * `totalistic ⊂ n_count ⊂ d_sym ⊂ r_sym ⊂ free` its rule table satisfies. Derived from the hex on every
  * render, never stored: it is a fact about the table, not metadata someone can get wrong.
  * @param {string} hex 32-char ruleset hex.
  * @returns {{cls: string, label: string, title: string}|null} null for an unparseable hex.

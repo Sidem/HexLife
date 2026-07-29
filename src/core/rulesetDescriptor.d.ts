@@ -10,7 +10,7 @@
 /** Canonical orbit representative (6-bit mask) → notation label ('2o', "3m'", …), display order. */
 export const ORBIT_LABELS: Map<number, string>
 
-export type ConstraintClass = 'totalistic' | 'n_count' | 'r_sym' | 'free'
+export type ConstraintClass = 'totalistic' | 'n_count' | 'd_sym' | 'r_sym' | 'free'
 
 export const CONSTRAINT_CLASSES: ConstraintClass[]
 
@@ -47,6 +47,12 @@ export type RulesetDescription = {
 export function classifyRulesetConstraint(
   source: string | Uint8Array,
 ): ConstraintClass | null
+
+/** Whether a ruleset satisfies a requested constraint, including any stricter nested class. */
+export function satisfiesRulesetConstraint(
+  source: string | Uint8Array,
+  requested: ConstraintClass,
+): boolean
 
 /** Classify a ruleset hex; null when `hex` is not a 32-char hex string. */
 export function describeRuleset(hex: string): RulesetDescription | null

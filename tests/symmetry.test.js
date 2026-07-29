@@ -2,9 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
     countSetBits,
     rotateBitmaskClockwise,
+    reflectBitmask,
     getAllRotations,
+    getAllDihedralTransforms,
     getCanonicalRepresentative,
+    getDihedralCanonicalRepresentative,
     getOrbitSize,
+    getDihedralOrbitSize,
     precomputeSymmetryGroups,
 } from '../src/core/Symmetry.js';
 
@@ -33,6 +37,22 @@ describe('rotateBitmaskClockwise', () => {
     it('rotates a single bit into the documented neighbour slot', () => {
         // Bit 0 (SW) rotates to bit 1 (NW) under one clockwise step.
         expect(rotateBitmaskClockwise(0b000001)).toBe(0b000010);
+    });
+});
+
+describe('reflectBitmask / D6 transforms', () => {
+    it('reflection is an involution and preserves population', () => {
+        for (let mask = 0; mask < 64; mask++) {
+            expect(reflectBitmask(reflectBitmask(mask))).toBe(mask);
+            expect(countSetBits(reflectBitmask(mask))).toBe(countSetBits(mask));
+        }
+    });
+
+    it('merges the chiral 3m/3m′ rotation orbits', () => {
+        expect(getCanonicalRepresentative(0b001011)).not.toBe(getCanonicalRepresentative(0b001101));
+        expect(getDihedralCanonicalRepresentative(0b001011))
+            .toBe(getDihedralCanonicalRepresentative(0b001101));
+        expect(new Set(getAllDihedralTransforms(0b001011)).size).toBe(getDihedralOrbitSize(0b001011));
     });
 });
 
@@ -113,5 +133,16 @@ describe('precomputeSymmetryGroups', () => {
     it('has the known hexagonal symmetry-group count (14)', () => {
         // The number of distinct rotation orbits of a 6-bit cyclic mask is 14 (necklace count C(6)).
         expect(groups.canonicalRepresentatives.length).toBe(14);
+    });
+
+    it('has 13 D6 groups and partitions all masks exactly once', () => {
+        expect(groups.dihedralCanonicalRepresentatives.length).toBe(13);
+        expect(groups.dihedralCanonicalRepresentatives.flatMap(g => g.members).sort((a, b) => a - b))
+            .toEqual(Array.from({ length: 64 }, (_, i) => i));
+        for (let mask = 0; mask < 64; mask++) {
+            expect(groups.bitmaskToDihedralCanonical.get(mask))
+                .toBe(getDihedralCanonicalRepresentative(mask));
+            expect(groups.bitmaskToDihedralOrbitSize.get(mask)).toBe(getDihedralOrbitSize(mask));
+        }
     });
 });

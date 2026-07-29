@@ -100,7 +100,7 @@
     font-size: 0.9em;
 }
 
-#rulesetEditorGrid, #neighborCountRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
+#rulesetEditorGrid, #neighborCountRulesetEditorGrid, #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
     display: grid;
     margin: 0 auto 10px auto;
     gap: 2px;
@@ -122,7 +122,7 @@
     gap: 5px;
 }
 
-#rotationalSymmetryRulesetEditorGrid {
+#dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
     grid-template-columns: repeat(7, 14.3%);
     max-width: 900px;
     gap: 0px;
@@ -302,7 +302,7 @@
 }
 
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 700px)), (max-width: 600px) {
-    #rotationalSymmetryRulesetEditorGrid {
+    #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(4, 1fr);
         gap: 0px;
     }
@@ -313,7 +313,7 @@
 }
 
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 600px)), (max-width: 500px) {
-    #rotationalSymmetryRulesetEditorGrid {
+    #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(3, 1fr);
         gap: 0px;
     }
@@ -328,7 +328,7 @@
 
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 500px)), (max-width: 480px) {
     .editor-controls { flex-direction: row; align-items: stretch; }
-    #rotationalSymmetryRulesetEditorGrid {
+    #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
         grid-template-columns: repeat(2, 1fr);
     }
 }

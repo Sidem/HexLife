@@ -210,9 +210,12 @@ export const SCORE_CONFIG = {
     // the objective's ONE human-perception-aligned term was voting for exactly the chaos #37 exists to
     // de-rank. It is now `historicalNovelty` — the mean distance from each frame to the nearest
     // ALREADY-VISITED state (EmbeddingNovelty.js) — which is what ASAL's open-endedness actually means
-    // and is anti-chaos by construction. `openEndednessHalfSat` dropped 0.08 → 0.05 to match the
-    // smaller scale (historical ≤ consecutive, always). Weights are untouched, so an embeddings-off
-    // score is byte-identical and every existing fixture ordering is preserved.
+    // and is anti-chaos by construction. Stage 1 provisionally dropped `openEndednessHalfSat`
+    // 0.08 → 0.05 to match the smaller scale (historical ≤ consecutive, always). #37 Stage 3 closed
+    // that calibration debt with canonical-raster CLIP captures: reference gliders measured
+    // historical=0.02545 / speed=0.03001 and reference churn historical=0.00759 / speed=0.00851.
+    // Their historical-novelty geometric mean is 0.01390. Weights are untouched, so an
+    // embeddings-off score is byte-identical and every existing fixture ordering is preserved.
     weights: {
         // v3.4 (#37 Stage 2): reserve 0.15 for localized change and scale the prior statistical
         // objective by 0.85, preserving every old term's relative influence. The optional perceptual
@@ -276,13 +279,13 @@ export const SCORE_CONFIG = {
      *  still/settled pattern sits at ≈0 either way, but a churn or a period-2 oscillator (which
      *  travels fast while revisiting the same looks) now also sits near 0 instead of near the
      *  ceiling; only a trajectory that keeps arriving somewhere perceptually new scores.
-     *  Retuned 0.08 → 0.05 because the new statistic is provably ≤ the old one (a minimum over all
-     *  earlier frames is ≤ the distance to the immediately-previous frame), so the old half-sat
-     *  under-rewards it across the board. 0.05 is a principled starting point, NOT a measured one —
-     *  calibrating it against a known-glider/known-churn pair (halfSat ≈ their geometric mean) needs
-     *  a run with the optional CLIP objective enabled; `EmbeddingEntry.trajectorySpeed` is banked
-     *  next to `openEndedness` so that comparison can be read off a real explore run. */
-    openEndednessHalfSat: 0.05,
+     *  Stage 1 provisionally retuned 0.08 → 0.05 because the new statistic is provably ≤ the old
+     *  one. Stage 3 replaces that estimate with a real
+     *  `Xenova/clip-vit-base-patch16::cell-raster-v1` capture: known gliders historical=0.02545,
+     *  known churn historical=0.00759, so their geometric mean gives halfSat=0.01390. The banked
+     *  trajectory speeds (0.03001 / 0.00851) close the calibration debt by recording how the old
+     *  velocity input compares on the identical two runs. */
+    openEndednessHalfSat: 0.0139,
 
     // --- Uniform-chaos penalty (v3.1): a MULTIPLICATIVE factor on the combined score, not a tenth
     // weighted term. Rationale (measured on tests/fixtures/exploreEvalFixtures.json): homogeneous

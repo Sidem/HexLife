@@ -55,7 +55,8 @@ marked and improves from 0.509 (57/112) to 0.518 (58/112).
 | Class | Interesting | Boring |
 |-------|-------------|--------|
 | `free` (no rotational symmetry) | 16 | 4 |
-| `r_sym` (rotationally symmetric) | 50 | 3 |
+| `r_sym` (rotationally symmetric, reflection-asymmetric) | 23 | 3 |
+| `d_sym` (rotation + reflection symmetric) | 27 | 0 |
 | `n_count` (outer-totalistic) | 6 | 0 |
 | `totalistic` | 1 | 0 |
 
@@ -71,16 +72,19 @@ marked and improves from 0.509 (57/112) to 0.518 (58/112).
   them from the `hex` + `seed` + `initialState` in the JSON to re-verify by eye.
 - **Why the class stratification matters:** symmetric rulesets have far better odds of being
   interesting, so an unstratified panel would let a scorer (or Stage 4's reward model) look good by
-  learning "symmetric = good" instead of reading the dynamics. Hence `r_sym` *negatives* exist, and
-  the test reports within-class accuracy (`free` 0.531, `r_sym` 0.367) next to the overall
-  number. The library is itself heavily `r_sym`, so the overall number describes the real curated
-  catalog distribution rather than a class-balanced research sample.
-  Gap: the library has no boring `n_count`/`totalistic` rules, so those classes are positives-only.
+  learning "symmetric = good" instead of reading the dynamics. Hence chiral `r_sym` *negatives*
+  exist, and the test reports within-class accuracy (`free` 0.531, `r_sym` 0.377) next to the
+  overall number. D-sym is kept separate: the library contains 27 D-sym positives but no boring
+  D-sym control yet. The overall number describes the real curated catalog distribution rather
+  than a class-balanced research sample.
+  Gap: the library has no boring `d_sym`/`n_count`/`totalistic` rules, so those classes are
+  positives-only.
 - **Longitudinal slice:** the original 16 positives and all seven negatives carry
   `cohort: "stage0"`. Tests pin its current overall, screen, and within-class measurements
   independently of the expanded baseline, while this document records the pre-Stage-2 comparison.
 - Each entry carries its `constraintClass` from `classifyRulesetConstraint()` (strictest of
-  `totalistic ⊂ n_count ⊂ r_sym ⊂ free`); the test recomputes it from the hex as a hand-edit guard.
+  `totalistic ⊂ n_count ⊂ d_sym ⊂ r_sym ⊂ free`); the test recomputes it from the hex as a
+  hand-edit guard.
 
 ## Capture procedure
 
@@ -125,3 +129,23 @@ The panel's negatives came from this loop — repeat it when a stage needs harde
   six non-cycling negative controls.
 - The cheap 160-tick screen improves from 0.258 to 0.294 but remains weak, which is why finds are
   re-scored on the confirmation burst before banking.
+
+## Stage-3 perceptual calibration
+
+The dev panel also exposes **Calibrate Stage 3 perceptual contrast**. It keeps the statistical
+fixture untouched, loads the default CLIP model, and captures the same deterministic 80 recipes plus
+the reference glider/churn pair. Each recipe runs a 600-tick confirmation followed by six canonical
+cell-raster frames at 50-tick spacing. The output records every trajectory's historical novelty,
+legacy trajectory speed, noise-prompt similarity, and unpenalized embeddings-on score.
+
+The 2026-07-29 `Xenova/clip-vit-base-patch16::cell-raster-v1` calibration measured:
+
+- interesting noise similarity q75 `0.332614`; boring-control median `0.334169`;
+- embeddings-on pairwise accuracy `234/511 = 0.458` before the noise factor;
+- strength `0.85` as the smallest sweep value reaching `318/511 = 0.622`, margin `+0.108`;
+- reference glider historical novelty/speed `0.02545 / 0.03001`;
+- reference churn historical novelty/speed `0.00759 / 0.00851`;
+- their historical-novelty geometric mean, and the calibrated `openEndednessHalfSat`, `0.01390`.
+
+The generated calibration JSON is diagnostic output, not a tracked fixture. The checked-in prompt
+battery, thresholds, and rationale live beside the pure transform in `PerceptualContrast.js`.
