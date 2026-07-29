@@ -28,5 +28,8 @@
   },
   "engines": {
     "node": ">=22.6"
+  },
+  "dependencies": {
+    "@hexlife/embed": "1.0.0"
   }
 }

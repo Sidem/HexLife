@@ -19,7 +19,7 @@ const IO_GRACE_MS = 1500
  * element already pauses itself offscreen — this is about the boot it does before that gate ever
  * applies.
  *
- * Host-side on purpose: 3.6 deferred this as an embed change, but `src/embed/` is frozen and
+ * Host-side on purpose: 3.6 deferred this as an embed change, but the embed API is frozen and
  * moving *every* existing embed's boot timing to first-intersection is not a change this app gets
  * to make on their behalf. Out here it is this page's own policy and nothing else can notice.
  *

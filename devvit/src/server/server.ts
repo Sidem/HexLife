@@ -6,19 +6,19 @@ import type {
   TriggerResponse,
   UiResponse,
 } from '@devvit/web/shared'
-// The SAME codec the explorer exports with and the webview renders from — imported straight from the
-// HexLife source tree (this is why the Devvit app lives in-repo). Validating here means a bad paste
+// The SAME codec the Explorer exports with and the webview renders from, supplied by the versioned
+// HexLife embed package. Validating here means a bad paste
 // fails at the form, with a message, instead of becoming a permanently broken post.
 //
-// `src/embed/api.js` is the host boundary and is DOM-free by contract, which is what makes it safe
-// to bundle into this Node server; `src/embed/index.js` (the browser entry) is not, and must never
+// The package's `/api` entry is DOM-free by contract, which makes it safe
+// to bundle into this Node server; the browser entry is not, and must never
 // be imported here — it registers a custom element and drags in the sim and the GL renderer.
 import {
   decodeWorldCode,
   describeRuleset,
   explorerUrlForRuleset,
   rulesetName,
-} from '../../../src/embed/api.js'
+} from '@hexlife/embed/api'
 import {
   type CreatePostRsp,
   Endpoint,

@@ -1,7 +1,7 @@
 /**
  * Shared webview bootstrap for HexLife Live Specimen posts (#26).
  *
- * Both entrypoints mount the same `<hexlife-world>` from `src/embed/` — no second engine.
+ * Both entrypoints mount the same `<hexlife-world>` from `@hexlife/embed` — no second engine.
  * World codes (`HXW1.…`) are the post payload; transport chrome + identity + Explorer deep-link
  * live outside the element.
  *
@@ -17,12 +17,10 @@
  */
 
 import {canRunAsUser, context, navigateTo, showForm} from '@devvit/web/client'
-import '../../../src/embed/index.js'
-// Everything this app borrows from the HexLife source tree comes through `src/embed/api.js` — the
-// declared host boundary (`tests/devvitBoundary.test.js` fails the build if anything reaches past
-// it). `HexLifeElement` is the embed's own declaration of the element registered by the
-// side-effecting import above, so drift between what the element does and what this page expects
-// of it is a compile error rather than a runtime surprise.
+import '@hexlife/embed'
+// Everything this app borrows from HexLife comes through the package's declared host API.
+// `HexLifeElement` is the package's own declaration of the element registered by the side-effecting
+// import above, so drift between runtime behavior and host expectations is a compile error.
 import {
   createGpuHelpPanel,
   decodeWorldCode,
@@ -32,7 +30,7 @@ import {
   type GraphicsStatus,
   type HexLifeElement,
   rulesetName,
-} from '../../../src/embed/api.js'
+} from '@hexlife/embed/api'
 import {
   type CreatePostRsp,
   Endpoint,

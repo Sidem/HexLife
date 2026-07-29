@@ -17,7 +17,7 @@ import path from 'node:path'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const PUBLIC = path.join(ROOT, 'public')
 
-/** Bundles (`*.js`), their maps (`*.js.map`), split chunks, and the emitted wasm (`INLINE_WASM=0`). */
+/** Bundles (`*.js`), their maps (`*.js.map`), split chunks, and any legacy emitted Wasm asset. */
 const GENERATED = /(\.js(\.map)?|\.wasm)$/
 
 await rm(path.join(ROOT, 'dist'), {recursive: true, force: true})

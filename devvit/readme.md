@@ -134,36 +134,31 @@ blocker that stops background requests) disables it. Nothing else about the post
 
 ## Support
 
-- Issues / discussion: [GitHub — Sidem/HexLife](https://github.com/Sidem/HexLife)
+- Issues / discussion: [GitHub — Sidem/HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit)
 - Subreddit: [r/hexlife](https://www.reddit.com/r/hexlife/)
 
 ## License
 
-The source in this directory is **MIT**, under the repository's root [`LICENSE`](../LICENSE) —
-the whole repo is single-licensed, so there is no per-directory exception to reason about.
+The source is released under the repository's [MIT License](LICENSE).
 
 Originally scaffolded from Reddit's Devvit web template
 (BSD-3-Clause, © Reddit Inc.); whatever remains of that scaffold keeps its notice here.
 
 ## Developer notes
 
-Source lives in the HexLife monorepo under `devvit/`. This is a **separate app with its own
-toolchain** — TypeScript + esbuild + Biome, Node 22.6+, its own `package.json`, `tsconfig`s and
-tests. The root project's `npm run lint` / `test` / `typecheck` deliberately do not cover it
-(root ESLint ignores `devvit/**`, root Vitest only collects `tests/**`); `npm test` in *this*
-directory is the gate, and CI runs both.
+This is a standalone app with its own toolchain: TypeScript + esbuild + Biome on Node 22.6+.
+`npm test` is the complete local and CI gate.
 
 What the two apps share is the engine, and only through a declared surface:
 
 | | |
 | :--- | :--- |
-| **`src/embed/api.js`** | Host boundary — ruleset descriptor, mnemonic names, world codec, GPU detection. DOM-free, so the Node server bundles it safely. Types in `api.d.ts` (this app builds with `allowJs: false`). |
-| **`src/embed/index.js`** | Browser entry — importing it registers `<hexlife-world>`. Client only; it pulls in the sim and the GL renderer. |
+| **`@hexlife/embed/api`** | Host boundary — ruleset descriptor, mnemonic names, world codec, GPU detection. DOM-free, so the Node server bundles it safely. |
+| **`@hexlife/embed`** | Browser entry — importing it registers `<hexlife-world>`. Client only; it includes the sim and GL renderer. |
 
-**`devvit/` imports from `src/embed/` and nowhere else in `src/`.** One engine, one codec, one
-determinism contract for the explorer, embeds and Reddit — and a rename in the main app can't
-silently break the Reddit app. `tests/devvitBoundary.test.js` (root suite) fails the build if
-anything reaches past it; the fix is to re-export the symbol from `api.js`, not to widen the check.
+The package keeps one engine, one codec, and one determinism contract across Explorer, embeds, and
+Reddit. Dependency updates are explicit pull requests here instead of cross-repository source
+imports.
 
 ```bash
 # Node 22.6+
@@ -175,11 +170,5 @@ npx devvit publish # submit a version for Reddit review (owner only)
 
 The webview bundles are code-split: `splash.js` and `game.js` are thin entries over one shared
 chunk holding the embed runtime, so expanding a post reuses what the feed card already fetched.
-Sourcemaps are emitted for dev/watch builds only — `--minify` (the publish build) drops them, since
-`public/` uploads whole.
-
-`INLINE_WASM=0 npm run build:client` emits the engine as a real `public/hexlife_wasm_bg.wasm`
-instead of a base64 `data:` URI, which is ~33% smaller and allows streaming compilation. **It is
-not the default and must not be published until a playtest confirms it**: whether the webview's CSP
-permits a same-origin `fetch` of the asset is not knowable from here. `loadWasmBytes` handles both
-forms, so the flag is the only thing that changes.
+The embed package inlines Wasm for Reddit's CSP. Sourcemaps are emitted for dev/watch builds only;
+the publish build drops them because `public/` uploads whole.
