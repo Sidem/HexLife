@@ -279,9 +279,10 @@ export function saveExploreGallery(entries) {
 // Perceptual auto-explore illumination archive (v3.0): compact embedding-cell entries (hex + score +
 // random-projection cell key — NO raw vectors, so it stays small). Keyed separately from the main
 // gallery; only written/read when the embedding objective is in use.
-// v3.1: the blob is namespaced by the CLIP model id ({ modelId, entries }) — SimHash cells from
-// different embedding models/spaces are not comparable, so a model switch must start fresh. Legacy
-// plain-array blobs (pre-namespacing) were written by the then-only default model.
+// v3.1: the blob is namespaced by the CLIP model id ({ modelId, entries }); the field now carries the
+// complete embedding-space id (checkpoint + input-representation version). SimHash cells from
+// different spaces are not comparable, so a checkpoint or raster change must start fresh. Legacy
+// plain-array blobs (pre-namespacing) were written by the then-only default screenshot-based model.
 const LEGACY_EMBEDDING_MODEL_ID = 'Xenova/clip-vit-base-patch16';
 
 /**

@@ -174,11 +174,11 @@ export class AutoExploreService {
      * @param {((worldIndex: number) => Promise<string|null>)|null} [opts.thumbnailProvider]
      *   Async capture of a world's current render as a small data-URL thumbnail (DI so the service
      *   stays renderer-free, principle 5). null in unit tests / when no renderer is available.
-     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, getStatus?: () => string}|null} [opts.embeddingProvider]
+     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, getStatus?: () => string, getSpaceId?: () => string, getModelId?: () => string}|null} [opts.embeddingProvider]
      *   Optional foundation-model embedding provider for the perceptual objective (v3.0). null/absent ⇒
      *   the statistical objective is used unchanged (the default).
      * @param {((worldIndex: number) => Promise<any|null>)|null} [opts.frameProvider]
-     *   Async capture of a world's current render as raw ImageData (fed to the embedder). null ⇒ no
+     *   Async capture of a world's current cell raster (one pixel/cell, tiled when needed). null ⇒ no
      *   perceptual trajectory is captured (the term is simply absent and the score renormalizes).
      */
     constructor(worldManager, { thumbnailProvider = null, embeddingProvider = null, frameProvider = null } = {}) {
@@ -1071,11 +1071,11 @@ export class AutoExploreService {
 
     // --- Perceptual illumination archive persistence (v3.0; compact, no raw vectors) --------------
 
-    /** Model id namespacing the perceptual archive: cells from different CLIP models are not comparable. */
+    /** Embedding-space id: checkpoint and input representation must both match for cells to compare. */
     _embeddingModelId() {
-        return (this.embeddingProvider && this.embeddingProvider.getModelId)
-            ? this.embeddingProvider.getModelId()
-            : null;
+        if (!this.embeddingProvider) return null;
+        if (this.embeddingProvider.getSpaceId) return this.embeddingProvider.getSpaceId();
+        return this.embeddingProvider.getModelId ? this.embeddingProvider.getModelId() : null;
     }
 
     _loadEmbeddingGallery() {

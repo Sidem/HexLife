@@ -67,8 +67,9 @@ export class WorldManager {
         // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
         // it only references the proxies/ruleset service lazily once started. The thumbnail provider
         // (v2.6, F6) waits a couple of rAFs for the renderer to draw the world's final eval frame,
-        // then grabs a small JPEG data URL — DI so the service stays renderer-free. The frame provider
-        // (v3.0) likewise grabs raw ImageData for the embedder; both are renderer-free DI.
+        // then grabs a small JPEG data URL — DI so the service stays renderer-free. The perceptual
+        // frame provider now rasterizes exact cells at one pixel/cell (tiled above 224), bypassing
+        // WebGL and palette state; both providers remain renderer-free DI at the service boundary.
         this.autoExploreService = new AutoExploreService(this, {
             thumbnailProvider: (worldIndex) => this._captureExploreThumbnail(worldIndex),
             embeddingProvider: this.embeddingService,

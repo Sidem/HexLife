@@ -99,6 +99,28 @@ describe('EmbeddingService — embedding', () => {
         ]);
     });
 
+    it('posts a lossless raster tile set as one embedding batch', async () => {
+        const { svc, worker } = makeService(true);
+        const ready = svc.ensureReady();
+        worker().emit({ type: 'READY' });
+        await ready;
+
+        const tiles = [
+            { width: 2, height: 2, data: new Uint8ClampedArray(16).fill(1) },
+            { width: 2, height: 2, data: new Uint8ClampedArray(16).fill(2) },
+        ];
+        const p = svc.embed({ tiles });
+        const sent = worker().lastOfType('EMBED_BATCH');
+        expect(sent.frames).toHaveLength(2);
+        expect(sent.frames.map((f) => [f.width, f.height])).toEqual([[2, 2], [2, 2]]);
+        expect(new Uint8ClampedArray(sent.frames[0].data)[0]).toBe(1);
+        expect(new Uint8ClampedArray(sent.frames[1].data)[0]).toBe(2);
+
+        const vec = new Float32Array([0.25, 0.75]);
+        worker().emit({ type: 'EMBED_RESULT', id: sent.id, embedding: vec.buffer });
+        expect(Array.from(await p)).toEqual([0.25, 0.75]);
+    });
+
     it('resolves null on EMBED_ERROR', async () => {
         const { svc, worker } = makeService(true);
         const ready = svc.ensureReady();
@@ -262,6 +284,7 @@ describe('EmbeddingService - model selection (v3.1)', () => {
         const { svc } = makeService(true);
         expect(EMBEDDING_MODELS.some((m) => m.id === EMBEDDING_CONFIG.modelId)).toBe(true);
         expect(svc.getModelId()).toBe(EMBEDDING_CONFIG.modelId);
+        expect(svc.getSpaceId()).toBe(`${EMBEDDING_CONFIG.modelId}::cell-raster-v1`);
     });
 
     it('setModel tears the old worker down and INITs a fresh one with the new id', async () => {

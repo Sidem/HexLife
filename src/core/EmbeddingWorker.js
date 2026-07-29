@@ -1,7 +1,7 @@
 /**
  * Foundation-model embedding worker for the perceptual auto-explore objective (v3.0, ASAL-style).
- * Loads a small CLIP image encoder via transformers.js and turns rendered frames (RGBA pixels) into
- * embedding vectors, entirely off the main/sim threads.
+ * Loads a small CLIP image encoder via transformers.js and turns lossless-at-source cell-raster tiles
+ * (RGBA pixels) into embedding vectors, entirely off the main/sim threads.
  *
  * transformers.js is dynamically imported from a CDN (passed in the INIT message) rather than bundled,
  * so the multi-MB library + ONNX runtime are only fetched when the user opts in, and the model weights
@@ -16,6 +16,7 @@
  * Protocol (host → worker):
  *   { type: 'INIT', modelId, cdnUrl, device, dtype }
  *   { type: 'EMBED', id, width, height, data: ArrayBuffer }   // RGBA bytes, width*height*4
+ *   { type: 'EMBED_BATCH', id, frames: [{width, height, data}] } // lossless cell-raster tiles
  *   { type: 'EMBED_TEXT', id, text }                          // a natural-language target prompt (v3.2)
  * Protocol (worker → host):
  *   { type: 'READY' } | { type: 'INIT_ERROR', error }
@@ -75,22 +76,65 @@ async function init(opts) {
     ready = true;
 }
 
+/** Run one or more prebuilt RawImages and mean-pool their projected CLIP vectors. */
+async function inferImages(images) {
+    const inputs = await processor(images.length === 1 ? images[0] : images);
+    const { image_embeds } = await model(inputs);
+    const data = image_embeds.data;
+    const batch = images.length;
+    if (!data || data.length === 0 || data.length % batch !== 0) {
+        throw new Error('unexpected CLIP embedding batch shape');
+    }
+    const dim = data.length / batch;
+    // Copy out of the tensor's backing store into a standalone, transferable buffer.
+    const out = new Float32Array(dim);
+    for (let item = 0; item < batch; item++) {
+        const offset = item * dim;
+        // Equal-weight normalized pooling prevents one tile's projection magnitude from dominating.
+        let normSq = 0;
+        for (let d = 0; d < dim; d++) normSq += data[offset + d] * data[offset + d];
+        const invNorm = normSq > 0 ? 1 / Math.sqrt(normSq) : 0;
+        for (let d = 0; d < dim; d++) out[d] += data[offset + d] * invNorm;
+    }
+    let pooledNormSq = 0;
+    for (let d = 0; d < dim; d++) pooledNormSq += out[d] * out[d];
+    const pooledInvNorm = pooledNormSq > 0 ? 1 / Math.sqrt(pooledNormSq) : 0;
+    for (let d = 0; d < dim; d++) out[d] *= pooledInvNorm;
+    return out;
+}
+
 /**
- * Embed one RGBA frame into a (projected, L2-normalized) CLIP image embedding.
- * @param {{width: number, height: number, data: ArrayBuffer}} msg
+ * Embed one frame or a lossless cell-raster tile batch into one normalized CLIP vector. Batch
+ * inference is attempted first; a backend without dynamic-batch support falls back to per-tile
+ * inference while preserving the same equal-weight pooling.
+ * @param {Array<{width: number, height: number, data: ArrayBuffer}>} frames
  * @returns {Promise<Float32Array>}
  */
-async function embed(msg) {
-    const rgba = new Uint8ClampedArray(msg.data);
-    // RawImage(data, width, height, channels). Drop alpha → RGB, which the CLIP processor expects.
-    const image = new RawImage(rgba, msg.width, msg.height, 4).rgb();
-    const inputs = await processor(image);
-    const { image_embeds } = await model(inputs);
-    const data = image_embeds.data; // Float32Array (projection dim, e.g. 512)
-    // Copy out of the tensor's backing store into a standalone, transferable buffer.
-    const out = new Float32Array(data.length);
-    out.set(data);
-    return out;
+async function embedFrames(frames) {
+    if (!Array.isArray(frames) || frames.length === 0) throw new Error('empty image batch');
+    const images = frames.map((frame) => {
+        const rgba = new Uint8ClampedArray(frame.data);
+        // RawImage(data, width, height, channels). Drop alpha → RGB, which CLIP expects.
+        return new RawImage(rgba, frame.width, frame.height, 4).rgb();
+    });
+    try {
+        return await inferImages(images);
+    } catch (batchError) {
+        if (images.length === 1) throw batchError;
+        const vectors = [];
+        for (const image of images) vectors.push(await inferImages([image]));
+        const dim = vectors[0].length;
+        const out = new Float32Array(dim);
+        for (const vector of vectors) {
+            if (vector.length !== dim) throw new Error('inconsistent CLIP embedding dimensions');
+            for (let d = 0; d < dim; d++) out[d] += vector[d];
+        }
+        let normSq = 0;
+        for (let d = 0; d < dim; d++) normSq += out[d] * out[d];
+        const invNorm = normSq > 0 ? 1 / Math.sqrt(normSq) : 0;
+        for (let d = 0; d < dim; d++) out[d] *= invNorm;
+        return out;
+    }
 }
 
 /**
@@ -160,13 +204,14 @@ self.onmessage = async (event) => {
         return;
     }
 
-    if (msg.type === 'EMBED') {
+    if (msg.type === 'EMBED' || msg.type === 'EMBED_BATCH') {
         if (!ready) {
             self.postMessage({ type: 'EMBED_ERROR', id: msg.id, error: 'model not ready' });
             return;
         }
         try {
-            const embedding = await embed(msg);
+            const frames = msg.type === 'EMBED_BATCH' ? msg.frames : [msg];
+            const embedding = await embedFrames(frames);
             self.postMessage({ type: 'EMBED_RESULT', id: msg.id, embedding: embedding.buffer }, [embedding.buffer]);
         } catch (err) {
             self.postMessage({ type: 'EMBED_ERROR', id: msg.id, error: (err && err.message) || String(err) });

@@ -1,11 +1,12 @@
 import { EventBus, EVENTS } from './EventBus.js';
+import { CELL_RASTER_VERSION } from '../core/analysis/CellRaster.js';
 
 /**
  * Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
  * ASAL-style). Owns the lifecycle of a dedicated {@link module:core/EmbeddingWorker} that lazily
- * loads a small CLIP/MobileCLIP image encoder (transformers.js) and turns rendered frames into
- * embedding vectors. Kept entirely off the main thread (and the sim worker threads) so model load and
- * inference never block ticking or rendering.
+ * loads a small CLIP/MobileCLIP image encoder (transformers.js) and turns palette-independent,
+ * one-cell-per-pixel raster tiles into embedding vectors. Kept entirely off the main thread (and the
+ * sim worker threads) so model load and inference never block ticking or rendering.
  *
  * **Default off + graceful degradation are the contract** (see CLAUDE.md): nothing here runs until
  * `setEnabled(true)` is called, and EVERY failure path (model can't load, inference throws, network
@@ -29,7 +30,7 @@ export const EMBEDDING_CONFIG = {
     device: 'auto',
     /** Quantization dtype for the ONNX weights ('q8' ⇒ small + fast; 'fp32' for max fidelity). */
     dtype: 'q8',
-    /** Square edge (px) frames are downscaled to before embedding (the processor resizes to 224 anyway). */
+    /** CLIP input edge and lossless cell-raster tile edge: one cell maps to one pixel in each tile. */
     frameSize: 224,
     /** Hard ceiling on the one-time model load (ms) before we give up and degrade. */
     initTimeoutMs: 120000,
@@ -111,6 +112,15 @@ export class EmbeddingService {
     /** @returns {string} The active model id (namespaces the perceptual archive). */
     getModelId() {
         return this.config.modelId;
+    }
+
+    /**
+     * Namespaces persisted perceptual cells by both checkpoint and input representation. A change to
+     * either produces a different embedding space even when the vector dimensionality is unchanged.
+     * @returns {string}
+     */
+    getSpaceId() {
+        return `${this.config.modelId}::${CELL_RASTER_VERSION}`;
     }
 
     /**
@@ -209,13 +219,16 @@ export class EmbeddingService {
     }
 
     /**
-     * Embed one rendered frame into a CLIP image-embedding vector. Resolves null on any failure
-     * (disabled, model not ready, inference error, timeout) so the search never stalls or throws.
-     * @param {ImageData|{data: Uint8ClampedArray|Uint8Array, width: number, height: number}|null} frame
+     * Embed one image or a lossless cell-raster tile set into one CLIP vector. Multiple tiles are
+     * inferred as one batch and mean-pooled by the worker, so large grids retain one source pixel per
+     * cell without changing the fixed descriptor shape. Resolves null on any failure.
+     * @param {ImageData|{data: Uint8ClampedArray|Uint8Array, width: number, height: number}|{tiles: Array<{data: Uint8ClampedArray|Uint8Array, width: number, height: number}>}|null} frame
      * @returns {Promise<Float32Array|null>}
      */
     async embed(frame) {
-        if (!this.enabled || !frame || !frame.data) return null;
+        const frames = frame && Array.isArray(frame.tiles) ? frame.tiles : [frame];
+        const validFrames = frames.filter((f) => f && f.data && f.width > 0 && f.height > 0);
+        if (!this.enabled || validFrames.length === 0) return null;
         // Await the load only when not already ready — so once warm, the EMBED is posted synchronously
         // within this call (no microtask gap), which keeps the request ordering simple and testable.
         if (this.status !== EMBEDDING_STATUS.READY) {
@@ -225,8 +238,12 @@ export class EmbeddingService {
         if (!this.worker) return null;
 
         const id = ++this._reqId;
-        // Copy the RGBA bytes into a transferable ArrayBuffer (the source may be a canvas-owned view).
-        const bytes = new Uint8ClampedArray(frame.data);
+        // Copy the RGBA bytes into transferable buffers (the sources may be canvas-owned views).
+        const payloadFrames = validFrames.map((f) => {
+            const bytes = new Uint8ClampedArray(f.data);
+            return { width: f.width, height: f.height, data: bytes.buffer };
+        });
+        const isBatch = payloadFrames.length > 1;
         return new Promise((resolve) => {
             let settled = false;
             const done = (vec) => {
@@ -237,10 +254,18 @@ export class EmbeddingService {
             };
             this._pending.set(id, done);
             try {
-                this.worker.postMessage(
-                    { type: 'EMBED', id, width: frame.width, height: frame.height, data: bytes.buffer },
-                    [bytes.buffer]
-                );
+                if (isBatch) {
+                    this.worker.postMessage(
+                        { type: 'EMBED_BATCH', id, frames: payloadFrames },
+                        payloadFrames.map((f) => f.data)
+                    );
+                } else {
+                    const only = payloadFrames[0];
+                    this.worker.postMessage(
+                        { type: 'EMBED', id, width: only.width, height: only.height, data: only.data },
+                        [only.data]
+                    );
+                }
             } catch {
                 done(null);
                 return;
