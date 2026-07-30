@@ -24,8 +24,14 @@ async function loadModel(manifestUrl) {
     const response = await fetch(manifestUrl, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`model manifest request failed (${response.status})`);
     const loaded = validateNativeTrajectoryModelManifest(await response.json());
-    const artifactUrl = new URL(loaded.artifact, response.url).href;
-    const artifactResponse = await fetch(artifactUrl);
+    // Vite copies public/ verbatim, so the artifact sits at a stable, non-content-hashed URL that
+    // GitHub Pages serves with max-age=600. The manifest above is force-revalidated but the artifact
+    // is not, so a browser still holding a previous model.onnx would pair it with the fresh manifest
+    // and fail the digest check below. Keying the URL on the digest self-invalidates whenever the
+    // model changes, while keeping the artifact cacheable between changes.
+    const artifactUrl = new URL(loaded.artifact, response.url);
+    artifactUrl.searchParams.set('v', String(loaded.artifactSha256).toLowerCase());
+    const artifactResponse = await fetch(artifactUrl.href);
     if (!artifactResponse.ok) throw new Error(`model artifact request failed (${artifactResponse.status})`);
     const artifact = await artifactResponse.arrayBuffer();
     const digest = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', artifact)));

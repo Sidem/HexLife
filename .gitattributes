@@ -9,6 +9,9 @@
 *.png  binary
 *.ico  binary
 *.webm binary
+# Auto-detection happens to classify the current model as binary, but an ONNX protobuf without
+# NUL bytes early would be CRLF-normalized on commit and ship a corrupt artifact.
+*.onnx binary
 
 # Generated, not authored. Keeps GitHub's language stats honest (the wasm-pack JS glue is ~9 KB
 # of machine output that would otherwise read as hand-written source) and collapses these in
