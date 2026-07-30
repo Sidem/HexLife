@@ -71,6 +71,7 @@ async function initialize() {
 
     // Capture dev-tool flags BEFORE loadFromUrl, which may strip query params via replaceState.
     const curateMode = new URLSearchParams(window.location.search).has('curate');
+    const corpusMode = new URLSearchParams(window.location.search).has('corpus');
     const benchmarkMode = import.meta.env.DEV
         && new URLSearchParams(window.location.search).has('benchmark');
 
@@ -161,6 +162,18 @@ async function initialize() {
                 appContext._curationOverlay = new LibraryCurationOverlay(appContext);
             })
             .catch(err => console.error('Failed to load curation overlay:', err));
+    }
+
+    // OWNER-only: Corpus v1 collection tool (#37 Stage 4B.2). Opened with `?corpus=1`; lazily
+    // imported so it never ships in a normal session's hot path. It drives all nine worlds and
+    // brackets the session with the auto-explore snapshot/restore pair, so it must mount after the
+    // workers exist.
+    if (corpusMode) {
+        import('./ui/dev/CorpusLabOverlay.js')
+            .then(({ CorpusLabOverlay }) => {
+                appContext._corpusLab = new CorpusLabOverlay(appContext);
+            })
+            .catch(err => console.error('Failed to load Corpus Lab overlay:', err));
     }
 
     // DEV-only: deterministic #37 benchmark capture surface. The browser runner uses a real live

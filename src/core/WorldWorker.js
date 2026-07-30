@@ -159,20 +159,33 @@ function copyCellsOut(view) {
     return buf;
 }
 
-// Capture 1–32 exact, bit-packed states without advancing the visible world. The command runs
-// synchronously, so no live tick can interleave. After capture, semantic current/next contents,
-// rule-index buffers, counters, and tick observables are restored.
+// Capture 1–32 exact, bit-packed states without advancing the visible world. A series captures up
+// to 16 consecutive, non-overlapping slices in one probe, removing the quadratic replay cost of
+// issuing each future slice separately. The command runs synchronously inside this worker, so no
+// live tick can interleave. run_tick swaps Wasm's double buffers; after capture the semantic
+// current/next contents, rule-index buffers, usage counters, and cached tick observables are
+// restored into whichever physical buffers now own those roles.
 function captureTrajectory(data = {}) {
     if (!wasm_world || !jsStateArray || isEvaluating || isRunRecording) {
         self.postMessage({ type: 'TRAJECTORY_CAPTURE_ERROR', error: 'World is busy or not ready.' });
         return;
     }
     const frameCount = Math.max(1, Math.min(32, Math.trunc(Number(data.frameCount) || 32)));
-    const tickStride = Math.max(1, Math.min(8, Math.trunc(Number(data.tickStride) || 8)));
+    // The shipped single-slice path clamps to 8 in TrajectoryCaptureService before it ever gets
+    // here; the wider bound exists for Corpus Lab, which captures dense stride-1 series.
+    const tickStride = Math.max(1, Math.min(32, Math.trunc(Number(data.tickStride) || 8)));
+    const sliceCount = Math.max(1, Math.min(16, Math.trunc(Number(data.sliceCount) || 1)));
     if ((frameCount - 1) * tickStride > 256) {
         self.postMessage({ type: 'TRAJECTORY_CAPTURE_ERROR', error: 'Trajectory span exceeds 256 ticks.' });
         return;
     }
+    const sliceSpacing = frameCount * tickStride;
+    const totalSpan = (sliceCount - 1) * sliceSpacing + (frameCount - 1) * tickStride;
+    if (totalSpan > 4096) {
+        self.postMessage({ type: 'TRAJECTORY_CAPTURE_ERROR', error: 'Trajectory series span exceeds 4096 ticks.' });
+        return;
+    }
+
     const sourceTick = worldTickCounter;
     const savedState = jsStateArray.slice();
     const savedNextState = jsNextStateArray.slice();
@@ -181,19 +194,21 @@ function captureTrajectory(data = {}) {
     const savedUsage = ruleUsageCounters.slice();
     const savedActive = wasm_world.active_count();
     const savedChanged = wasm_world.last_changed_count();
-    const frames = [];
+    const slices = Array.from({ length: sliceCount }, () => []);
     let simulatedTicks = 0;
 
     try {
-        for (let frame = 0; frame < frameCount; frame++) {
-            const targetTick = frame * tickStride;
-            while (simulatedTicks < targetTick) {
-                wasm_world.run_tick();
-                [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
-                [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
-                simulatedTicks++;
+        for (let slice = 0; slice < sliceCount; slice++) {
+            for (let frame = 0; frame < frameCount; frame++) {
+                const targetTick = slice * sliceSpacing + frame * tickStride;
+                while (simulatedTicks < targetTick) {
+                    wasm_world.run_tick();
+                    [jsStateArray, jsNextStateArray] = [jsNextStateArray, jsStateArray];
+                    [jsRuleIndexArray, jsNextRuleIndexArray] = [jsNextRuleIndexArray, jsRuleIndexArray];
+                    simulatedTicks++;
+                }
+                slices[slice].push(packCells(jsStateArray));
             }
-            frames.push(packCells(jsStateArray));
         }
     } finally {
         jsStateArray.set(savedState);
@@ -203,8 +218,20 @@ function captureTrajectory(data = {}) {
         ruleUsageCounters.set(savedUsage);
         wasm_world.restore_tick_observables(savedActive, savedChanged);
     }
-    const buffers = frames.map((frame) => frame.buffer);
-    self.postMessage({ type: 'TRAJECTORY_CAPTURE_RESULT', frames: buffers, sourceTick }, buffers);
+    if (sliceCount === 1) {
+        const buffers = slices[0].map((frame) => frame.buffer);
+        self.postMessage({ type: 'TRAJECTORY_CAPTURE_RESULT', frames: buffers, sourceTick }, buffers);
+    } else {
+        const transfers = [];
+        const result = slices.map((frames, index) => ({
+            frames: frames.map((frame) => {
+                transfers.push(frame.buffer);
+                return frame.buffer;
+            }),
+            sourceTick: sourceTick + index * sliceSpacing,
+        }));
+        self.postMessage({ type: 'TRAJECTORY_SERIES_CAPTURE_RESULT', slices: result }, transfers);
+    }
 }
 
 // Toroidally translate the live cell state (and its rule-index colouring) by (dCol, dRow) whole

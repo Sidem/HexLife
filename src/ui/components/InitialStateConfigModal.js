@@ -4,6 +4,7 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as Config from '../../core/config.js';
 import { renderInitialStatePreview } from './initialStatePreview.js';
 import { SavedStartsList, importStateFileToLibrary } from './SavedStartsList.js';
+import { CLUSTER_PRESETS, DENSITY_PRESETS, DEFAULT_PARAMS } from '../../core/initialStatePresets.js';
 
 // Plain-language metadata for every tunable param, grouped so the dialog can show a small "basics"
 // set up front and tuck the fine-grained knobs behind an "Advanced" disclosure. paramKey values are
@@ -28,26 +29,8 @@ const DENSITY_CONTROLS = [
     { key: 'density', label: 'Fill amount', min: 0, max: 1, step: 0.001, help: 'Fraction of cells that start alive. Setting it to exactly 0 or 1 places a single opposite seed cell in the center.' },
 ];
 
-// Named starting points. Each preset is a full cluster param bundle; picking one fills the sliders.
-const CLUSTER_PRESETS = [
-    { name: 'Scattered', params: { count: 35, density: 0.6, densityVariation: 0.2, diameter: 6, diameterVariation: 3, eccentricity: 0.2, orientation: 0, orientationVariation: 1.0, gaussianStdDev: 2.5 } },
-    { name: 'Islands', params: { count: 12, density: 0.75, densityVariation: 0.15, diameter: 18, diameterVariation: 6, eccentricity: 0.3, orientation: 0, orientationVariation: 1.0, gaussianStdDev: 2.0 } },
-    { name: 'Big blobs', params: { count: 5, density: 0.8, densityVariation: 0.1, diameter: 42, diameterVariation: 10, eccentricity: 0.2, orientation: 0, orientationVariation: 1.0, gaussianStdDev: 1.6 } },
-    { name: 'Streaks', params: { count: 14, density: 0.7, densityVariation: 0.2, diameter: 24, diameterVariation: 8, eccentricity: 0.82, orientation: 30, orientationVariation: 0.6, gaussianStdDev: 2.6 } },
-];
-const DENSITY_PRESETS = [
-    { name: 'Sparse', params: { density: 0.15 } },
-    { name: 'Balanced', params: { density: 0.5 } },
-    { name: 'Dense', params: { density: 0.85 } },
-    { name: 'Single seed', params: { density: 1 } },
-];
-
-const DEFAULT_PARAMS = {
-    density: { density: 0.5 },
-    clusters: { count: 25, density: 0.7, densityVariation: 0.2, diameter: 10, diameterVariation: 5, eccentricity: 0.33, orientation: 0, orientationVariation: 1.0, distribution: 'gaussian', gaussianStdDev: 2.0 },
-    // Saved starts carry a captured payload, never defaults: an empty selection means "Save" is off.
-    saved: {},
-};
+// Named starting points and per-mode defaults live in `core/initialStatePresets.js` so the Corpus
+// Lab collector can draw from the same frozen bundles without importing this dialog.
 
 export class InitialStateConfigModal extends BaseComponent {
     constructor(mountPoint, appContext) {

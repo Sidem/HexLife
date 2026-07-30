@@ -62,5 +62,8 @@
 /* DEV-only library IC curation overlay (?curate=1). */
 @import url('src/ui/dev/LibraryCurationOverlay.css');
 
+/* OWNER-only Corpus v1 collection overlay (?corpus=1). */
+@import url('src/ui/dev/CorpusLabOverlay.css');
+
 /* 7. Design Token Theme Layer — must be imported LAST so it wins the cascade */
 @import url('src/styles/theme.css');

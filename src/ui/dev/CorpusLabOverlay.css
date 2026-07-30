@@ -1,0 +1,228 @@
+/*
+ * OWNER-ONLY Corpus Lab overlay (#37 Stage 4B.2), loaded with `?corpus=1`.
+ *
+ * Docked to the right so the live 3×3 grid and the selected world stay visible behind it — the owner
+ * is judging what the renderer is showing, so the panel must never cover it.
+ */
+
+.corpus-overlay {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(440px, 100vw);
+    z-index: 4000;
+    display: flex;
+    pointer-events: none;
+    font-size: 0.85rem;
+}
+
+.corpus-panel {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.75rem;
+    overflow-y: auto;
+    background: var(--panel-bg, rgba(18, 20, 26, 0.96));
+    border-left: 1px solid var(--border-color, #333);
+    color: var(--text-color, #e8e8e8);
+}
+
+.corpus-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.corpus-head h2 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.corpus-session {
+    font-weight: 400;
+    font-size: 0.7rem;
+    opacity: 0.6;
+}
+
+.corpus-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.corpus-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+}
+
+.corpus-lineage,
+.corpus-ruleset {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.corpus-family {
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.corpus-origin,
+.corpus-ic {
+    font-size: 0.72rem;
+    opacity: 0.7;
+}
+
+.corpus-hex {
+    font-size: 0.68rem;
+    opacity: 0.65;
+    word-break: break-all;
+}
+
+.corpus-guess-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+}
+
+.corpus-guess-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+}
+
+.corpus-guess {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* A low-confidence proposal has to look different, or the owner accepts a bad guess on reflex. */
+.corpus-guess[data-confidence='low'] { color: var(--warning-color, #e0a030); }
+.corpus-guess[data-confidence='owner'] { color: var(--accent-color, #4fc3f7); }
+
+.corpus-guess-hint {
+    font-size: 0.7rem;
+    opacity: 0.6;
+}
+
+.corpus-scenario-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.corpus-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.7rem;
+    background: transparent;
+    color: inherit;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.corpus-chip.active {
+    border-color: var(--accent-color, #4fc3f7);
+    background: color-mix(in srgb, var(--accent-color, #4fc3f7) 18%, transparent);
+}
+
+.corpus-chip kbd {
+    font-size: 0.62rem;
+    opacity: 0.65;
+}
+
+.corpus-judge {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.corpus-judge .button { flex: 1 1 auto; }
+.corpus-interesting { border-color: var(--success-color, #4caf50) !important; }
+.corpus-boring { border-color: var(--danger-color, #d9534f) !important; }
+
+.corpus-queue {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.corpus-queue-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    border: 1px solid var(--border-color, #444);
+}
+
+.corpus-queue-dot.done { background: var(--success-color, #4caf50); opacity: 0.55; }
+.corpus-queue-dot.current { border-color: var(--accent-color, #4fc3f7); border-width: 2px; }
+
+.corpus-coverage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+}
+
+.corpus-coverage-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: baseline;
+}
+
+.corpus-tally {
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* An empty stratum is the whole point of the readout — make the gaps findable at a glance. */
+.corpus-tally.empty { border-color: var(--warning-color, #e0a030); opacity: 0.9; }
+.corpus-tally.ok { border-color: var(--success-color, #4caf50); }
+
+.corpus-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border-color, #333);
+}
+
+.corpus-foot label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+}
+
+.corpus-foot input {
+    width: 3.2rem;
+    background: var(--input-bg, #14161c);
+    color: inherit;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    padding: 0.15rem 0.3rem;
+}
+
+.corpus-status {
+    flex: 1 1 100%;
+    font-size: 0.7rem;
+    opacity: 0.8;
+    min-height: 1em;
+}
