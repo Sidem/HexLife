@@ -1,9 +1,19 @@
 import * as Config from './config.js';
 
+const SEED_INVALIDATING_COMMANDS = new Set([
+    'LOAD_STATE',
+    'APPLY_BRUSH',
+    'APPLY_SELECTIVE_BRUSH',
+    'SHIFT_STATE',
+]);
+
 export class WorldProxy {
     constructor(worldIndex, initialSettings, worldManagerCallbacks) {
         this.worldIndex = worldIndex;
         this.worker = new Worker(new URL('./WorldWorker.js', import.meta.url), { type: 'module' });
+        // Corpus provenance: the seed that produced this world's current reset lineage. Capture is
+        // non-destructive, so this remains valid as the world evolves until the next reset.
+        this.lastResetSeed = Number.isFinite(initialSettings.seed) ? Number(initialSettings.seed) : null;
 
         this.latestStateArray = null;
         this.latestRuleIndexArray = null;
@@ -254,6 +264,17 @@ export class WorldProxy {
                 }
                 break;
             }
+            case 'TRAJECTORY_SERIES_CAPTURE_RESULT': {
+                if (this._pendingTrajectoryCapture) {
+                    const { resolve } = this._pendingTrajectoryCapture;
+                    this._pendingTrajectoryCapture = null;
+                    resolve((data.slices || []).map((slice) => ({
+                        frames: (slice.frames || []).map((buffer) => new Uint8Array(buffer)),
+                        sourceTick: Number(slice.sourceTick) || 0,
+                    })));
+                }
+                break;
+            }
             case 'TRAJECTORY_CAPTURE_ERROR': {
                 if (this._pendingTrajectoryCapture) {
                     const { reject } = this._pendingTrajectoryCapture;
@@ -286,6 +307,9 @@ export class WorldProxy {
     }
 
     sendCommand(commandType, commandData, transferList = []) {
+        // Reset-seed provenance is valid only while state changes come from simulation ticks.
+        // Hand edits, imports, and shifts introduce inputs the seed cannot reproduce.
+        if (SEED_INVALIDATING_COMMANDS.has(commandType)) this.lastResetSeed = null;
         if (!this.isInitialized && commandType !== 'INIT') {
             
             return;
@@ -310,7 +334,7 @@ export class WorldProxy {
         this.sendCommand('SET_RULESET', { rulesetBuffer: rulesetArrayBuffer }, [rulesetArrayBuffer]);
     }
     resetWorld(initialState, seed) {
-        
+        this.lastResetSeed = Number.isFinite(seed) ? Number(seed) : null;
         this.tpsAggregator.ticksCounted = 0;
         this.tpsAggregator.startTime = performance.now();
         this.lastTickCountForServerUpdate = 0; 
@@ -346,6 +370,18 @@ export class WorldProxy {
             }
             this._pendingTrajectoryCapture = { resolve, reject };
             this.sendCommand('CAPTURE_TRAJECTORY', { frameCount, tickStride });
+        });
+    }
+    // Capture consecutive non-overlapping slices in one non-destructive worker probe. Each next
+    // slice starts frameCount * tickStride ticks after the previous slice's frame 0. Corpus Lab's
+    // capture-at-judgment path is the only caller; the shipped single-slice UI uses captureTrajectory.
+    captureTrajectorySeries({ frameCount = 32, tickStride = 1, sliceCount = 8 } = {}) {
+        return new Promise((resolve, reject) => {
+            if (this._pendingTrajectoryCapture) {
+                this._pendingTrajectoryCapture.reject(new Error('Trajectory capture was superseded.'));
+            }
+            this._pendingTrajectoryCapture = { resolve, reject };
+            this.sendCommand('CAPTURE_TRAJECTORY', { frameCount, tickStride, sliceCount });
         });
     }
     // Fetch the worker's detected-cycle frames (bit-packed state + rule indices per frame) for the

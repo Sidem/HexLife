@@ -14,6 +14,7 @@ function manifest(overrides = {}) {
         artifactSha256: 'a'.repeat(64),
         outputs: { descriptor: { shape: ['batch', 32] }, reward: { shape: ['batch', 1] } },
         acceptance: { status: 'accepted' },
+        corpus: { protocolId: 'corpus-v1', rootSha256: 'b'.repeat(64) },
         ...overrides,
     };
 }
@@ -25,7 +26,7 @@ describe('native trajectory model manifest', () => {
     });
 
     it('accepts an explicitly marked manual-testing artifact', () => {
-        const testing = manifest({ acceptance: { status: 'testing' } });
+        const testing = manifest({ acceptance: { status: 'testing' }, corpus: {} });
         expect(validateNativeTrajectoryModelManifest(testing)).toBe(testing);
     });
 
@@ -58,6 +59,12 @@ describe('native trajectory model manifest', () => {
                 percentiles: [0, 1],
             },
         }))).toThrow(/monotonic/);
+    });
+
+    it('refuses accepted artifacts without the frozen corpus checksum', () => {
+        expect(() => validateNativeTrajectoryModelManifest(manifest({
+            corpus: {},
+        }))).toThrow(/Corpus v1/);
     });
 
     it('refuses an unvalidated training export', () => {

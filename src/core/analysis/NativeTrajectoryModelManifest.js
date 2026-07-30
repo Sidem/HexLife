@@ -19,6 +19,11 @@ export function validateNativeTrajectoryModelManifest(manifest) {
     if (!manifest.artifact || !manifest.artifactSha256) {
         throw new Error('native-model manifest is incomplete');
     }
+    if (manifest.acceptance.status === 'accepted' &&
+        (manifest.corpus?.protocolId !== 'corpus-v1' ||
+            !/^[a-f0-9]{64}$/i.test(String(manifest.corpus?.rootSha256 || '')))) {
+        throw new Error('accepted native-model manifest requires a checksummed Corpus v1');
+    }
     if (Number(manifest.outputs?.descriptor?.shape?.at(-1)) !== 32) {
         throw new Error('native-model descriptor contract must be 32-D');
     }
