@@ -164,6 +164,137 @@ describe('CorpusCollectionBuffer — coverage', () => {
     });
 });
 
+describe('CorpusCollectionBuffer — coverage survives a flush', () => {
+    it('keeps counting after the payloads are written out', () => {
+        // Recomputing coverage from resident clips would zero the readout and blind the scheduler at
+        // the first auto-flush — exactly when a long session needs both most.
+        const b = buffer();
+        b.add([clip({ id: 'a', scenario: 'glider', symmetryClass: 'r_sym' })], LINEAGE);
+        b.markFlushed();
+        b.add([clip({ id: 'b', scenario: 'oscillator', symmetryClass: 'free' })], LINEAGE);
+        const c = b.coverage();
+        expect(c.clips).toBe(2);
+        expect(c.scenarios).toEqual({ glider: 1, oscillator: 1 });
+        expect(c.symmetryClasses).toEqual({ r_sym: 1, free: 1 });
+    });
+
+    it('tallies the (symmetry class, label) cells the auditor checks', () => {
+        const b = buffer();
+        b.add([
+            clip({ id: 'a', symmetryClass: 'free', label: 'interesting' }),
+            clip({ id: 'b', symmetryClass: 'free', label: 'boring' }),
+            clip({ id: 'c', symmetryClass: 'totalistic', label: 'boring' }),
+        ], LINEAGE);
+        const c = b.coverage();
+        expect(c.symmetryLabelCells.free).toEqual({ interesting: 1, boring: 1 });
+        // A healthy-looking class total with one label missing is the failure mode this exists for.
+        expect(c.symmetryClasses.totalistic).toBe(1);
+        expect(c.symmetryLabelCells.totalistic).toEqual({ boring: 1 });
+    });
+
+    it('exposes the per-ruleset seed and initial-condition ids the scheduler excludes', () => {
+        const b = buffer();
+        const ruleset = 'C'.repeat(32);
+        b.add([
+            clip({ id: 'a', ruleset, seedId: 'seed-5', initialConditionId: 'ic-5' }),
+            clip({ id: 'b', ruleset, seedId: 'seed-6', initialConditionId: 'ic-5' }),
+        ], LINEAGE);
+        const [row] = b.coverage().rulesets;
+        expect(row.ruleset).toBe(ruleset);
+        expect(row.seedIds.sort()).toEqual(['seed-5', 'seed-6']);
+        expect(row.initialConditionIds).toEqual(['ic-5']);
+        expect(row.family).toBe(LINEAGE.familyId);
+    });
+
+    it('keeps the id lists out of the written index, which already carries them per clip', () => {
+        const b = buffer();
+        b.add([clip()], LINEAGE);
+        const [row] = b.index().coverage.rulesets;
+        expect(row).not.toHaveProperty('seedIds');
+        expect(row.seeds).toBe(1);
+    });
+
+    it('undoing a judgment takes its coverage back too', () => {
+        const b = buffer();
+        b.add([clip({ id: 'a', scenario: 'glider' })], LINEAGE);
+        b.add([clip({ id: 'b', scenario: 'oscillator' })], LINEAGE);
+        expect(b.undoLast()).toBe(1);
+        const c = b.coverage();
+        expect(c.clips).toBe(1);
+        expect(c.scenarios).toEqual({ glider: 1 });
+        // A ruleset with no clips left is not in the corpus, so it must not appear as owing seeds.
+        expect(c.distinctRulesets).toBe(1);
+    });
+
+    it('forgets a ruleset entirely once its last clip is undone', () => {
+        const b = buffer();
+        b.add([clip({ id: 'a', ruleset: 'D'.repeat(32) })], LINEAGE);
+        expect(b.coverage().distinctRulesets).toBe(1);
+        b.undoLast();
+        expect(b.coverage().distinctRulesets).toBe(0);
+    });
+});
+
+describe('CorpusCollectionBuffer — reload handoff', () => {
+    it('restores tallies, families and lifetime count from a snapshot', () => {
+        // A grid-preset change is only applicable through a page reload, so the session has to be able
+        // to continue on the far side of one without restarting coverage from zero.
+        const first = buffer();
+        first.add([
+            clip({ id: 'a', gridPreset: 'small', scenario: 'glider', seedId: 'seed-1', initialConditionId: 'ic-1' }),
+            clip({ id: 'b', gridPreset: 'small', scenario: 'extinction', seedId: 'seed-2', initialConditionId: 'ic-2' }),
+        ], LINEAGE);
+        const snapshot = JSON.parse(JSON.stringify(first.coverageSnapshot()));
+
+        const second = new CorpusCollectionBuffer({
+            sessionId: first.sessionId,
+            createdAt: first.createdAt,
+            appVersion: '1.1.0',
+            priorCoverage: snapshot,
+        });
+        const c = second.coverage();
+        expect(c.clips).toBe(2);
+        expect(c.gridPresets).toEqual({ small: 2 });
+        expect(c.families).toBe(1);
+        expect(second.lifetimeClipCount).toBe(2);
+        expect(second.clipCount).toBe(0); // payloads do not travel through a reload
+        const [row] = c.rulesets;
+        expect(row.seeds).toBe(2);
+        expect(row.initialConditionIds.sort()).toEqual(['ic-1', 'ic-2']);
+    });
+
+    it('keeps the restored family order so part 2 proposes the same splits as part 1', () => {
+        const first = buffer();
+        for (let index = 0; index < 3; index++) {
+            first.add([clip({ id: `c${index}` })], {
+                ...LINEAGE,
+                familyId: `rand-free-${String(index).repeat(12).slice(0, 12)}`,
+            });
+        }
+        const before = first.familyRegistry();
+        const second = new CorpusCollectionBuffer({
+            sessionId: first.sessionId,
+            createdAt: first.createdAt,
+            priorCoverage: first.coverageSnapshot(),
+        });
+        expect(second.familyRegistry()).toEqual(before);
+    });
+
+    it('adds new clips on top of the restored tallies', () => {
+        const first = buffer();
+        first.add([clip({ id: 'a', gridPreset: 'small' })], LINEAGE);
+        const second = new CorpusCollectionBuffer({
+            sessionId: first.sessionId,
+            createdAt: first.createdAt,
+            priorCoverage: first.coverageSnapshot(),
+        });
+        second.add([clip({ id: 'b', gridPreset: 'medium' })], LINEAGE);
+        expect(second.coverage().gridPresets).toEqual({ small: 1, medium: 1 });
+        expect(second.lifetimeClipCount).toBe(2);
+        expect(second.index({ partIndex: 1 }).sessionClipCount).toBe(2);
+    });
+});
+
 describe('CorpusCollectionBuffer — proposed family registry', () => {
     it('meets the protocol 6/2/2 family minimums at ten families', () => {
         const b = buffer();

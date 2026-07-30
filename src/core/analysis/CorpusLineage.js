@@ -3,7 +3,7 @@
 import libraryRulesets from '../library/rulesets.json';
 import { classifyRulesetConstraint } from '../rulesetDescriptor.js';
 import { GENERATIVE_PRESETS, initialStateFromPreset } from '../initialStatePresets.js';
-import { CORPUS_FAMILY_PATTERN } from './corpusProtocol.js';
+import { CORPUS_FAMILY_PATTERN, initialConditionId } from './corpusProtocol.js';
 
 /**
  * Ruleset-lineage generation for Corpus v1 collection (#37 Stage 4B.2).
@@ -137,34 +137,122 @@ function pickIndex(rng, length) {
  * show its interesting behaviour, while the preset draws supply the variety the audit's
  * per-ruleset initial-condition minimum demands. Both are wanted in the corpus.
  *
+ * `excludeIds` is how a revisit round *guarantees* the second distinct initial condition the audit
+ * requires per ruleset, rather than hoping a fresh random draw happens to differ from the first: a
+ * repeat draw would produce the same `initialConditionId` and credit nothing. `preferPresetNames`
+ * biases toward presets known to produce a missing scenario (`Single seed` for extinction and
+ * saturation). Exclusion wins over preference, and an exhausted pool falls back to a free draw so
+ * this can never fail to return a usable condition.
+ *
  * @param {() => number} rng
- * @param {{ownInitialState?: object|null}} [options]
- * @returns {{presetName: string, initialState: object, source: 'preset'|'library-entry'}}
+ * @param {{
+ *   ownInitialState?: object|null,
+ *   excludeIds?: Iterable<string>|null,
+ *   preferPresetNames?: string[]|null,
+ * }} [options]
+ * @returns {{presetName: string, initialState: object, source: 'preset'|'library-entry', id: string}}
  */
 export function pickInitialCondition(rng, options = {}) {
+    const excluded = new Set(options.excludeIds || []);
     if (options.ownInitialState && rng() < LIBRARY_OWN_IC_PROBABILITY) {
-        return {
-            presetName: 'Library entry',
-            initialState: structuredClone(options.ownInitialState),
-            source: 'library-entry',
-        };
+        const initialState = structuredClone(options.ownInitialState);
+        const id = initialConditionId(initialState);
+        if (!excluded.has(id)) {
+            return { presetName: 'Library entry', initialState, source: 'library-entry', id };
+        }
     }
-    const preset = GENERATIVE_PRESETS[pickIndex(rng, GENERATIVE_PRESETS.length)];
-    return {
-        presetName: preset.name,
+
+    const withIds = GENERATIVE_PRESETS.map((preset) => ({
+        preset,
         initialState: initialStateFromPreset(preset),
+    })).map((entry) => ({ ...entry, id: initialConditionId(entry.initialState) }));
+
+    const fresh = withIds.filter((entry) => !excluded.has(entry.id));
+    const preferredNames = options.preferPresetNames || [];
+    const preferred = preferredNames.length
+        ? fresh.filter((entry) => preferredNames.includes(entry.preset.name))
+        : [];
+    const pool = preferred.length ? preferred : (fresh.length ? fresh : withIds);
+
+    const chosen = pool[pickIndex(rng, pool.length)];
+    return {
+        presetName: chosen.preset.name,
+        initialState: chosen.initialState,
         source: 'preset',
+        id: chosen.id,
     };
 }
 
 /**
  * Draw a fresh reset seed. Non-zero because `WorldManager._getResetSeed` treats a falsy seed as
  * "let the worker pick", which would lose the provenance the corpus audit requires.
+ *
+ * `excludeIds` holds `seedId` values (`seed-<uint32>`) already collected for the ruleset this seed is
+ * for. A collision is astronomically unlikely from a 32-bit draw, but a repeat would silently credit
+ * zero progress toward the per-ruleset seed minimum, so it is cheap to rule out.
+ *
  * @param {() => number} rng
+ * @param {{excludeIds?: Iterable<string>|null}} [options]
  * @returns {number}
  */
-export function pickSeed(rng) {
-    return Math.floor(rng() * 0xFFFFFFFE) + 1;
+export function pickSeed(rng, options = {}) {
+    const excluded = new Set(options.excludeIds || []);
+    let seed = 0;
+    for (let attempt = 0; attempt <= DISTINCT_RETRIES; attempt++) {
+        seed = Math.floor(rng() * 0xFFFFFFFE) + 1;
+        if (!excluded.has(seedIdFor(seed))) break;
+    }
+    return seed;
+}
+
+/**
+ * The `seedId` header value a reset seed produces. Mirrors `TrajectoryCaptureService`, so exclusion
+ * sets built from collected headers compare against candidates in the same space.
+ * @param {number} seed
+ */
+export function seedIdFor(seed) {
+    return `seed-${Math.trunc(seed) >>> 0}`;
+}
+
+/**
+ * Rebuild a lineage for a **revisit** round: the same family and the same member rulesets, to be run
+ * again under fresh seeds and initial conditions.
+ *
+ * This is not a cosmetic variant of {@link buildLineage}. Re-deriving a lineage from its anchor would
+ * generate *new* mutant hexes, which adds nine more rulesets each owing three seeds instead of paying
+ * off the nine already collected. Only replaying the exact hexes can close the per-ruleset minimums.
+ *
+ * @param {{
+ *   familyId: string,
+ *   anchorRuleset: string,
+ *   relationship: string,
+ *   memberHexes: string[],
+ *   libraryName?: string|null,
+ * }} family
+ * @returns {Lineage}
+ */
+export function buildRevisitLineage(family) {
+    const anchorHex = String(family?.anchorRuleset || '').toUpperCase();
+    const hexes = (family?.memberHexes || []).map((hex) => String(hex).toUpperCase());
+    if (!hexes.length) throw new Error('A revisit lineage needs at least one member ruleset.');
+    return {
+        familyId: String(family.familyId),
+        anchorRuleset: anchorHex,
+        relationship: family.relationship === 'exact-ruleset' ? 'exact-ruleset' : 'mutation-lineage',
+        // The id already encodes where the anchor came from; there is no second source of truth.
+        origin: String(family.familyId).startsWith('lib-') ? 'library' : 'random',
+        libraryName: family.libraryName || null,
+        anchorSymmetryClass: anchorHex ? classifyRulesetConstraint(anchorHex) : null,
+        members: hexes.map((hex) => ({
+            rulesetHex: hex,
+            isAnchor: hex === anchorHex,
+            // Distance from the anchor is not recoverable from a hex pair in any meaningful unit, and
+            // nothing downstream reads it — a revisit reports itself as a revisit instead of guessing.
+            mutationRate: 0,
+            mutationMode: 'revisit',
+            symmetryClass: classifyRulesetConstraint(hex),
+        })),
+    };
 }
 
 /**
@@ -176,6 +264,9 @@ export function pickSeed(rng) {
  * @param {string} [options.symmetryClass] For random anchors, the generation mode to draw in.
  *        Ignored for library anchors, whose class is whatever their table says.
  * @param {string} [options.anchorHex] Force a specific anchor (replay/testing).
+ * @param {Iterable<string>} [options.excludeAnchorHexes] Library anchors already used this session.
+ *        Re-drawing one would re-derive its family id and graft nine *new* mutant rulesets onto a
+ *        family whose per-ruleset minimums are already being paid off, so it would never complete.
  * @param {object} deps
  * @param {import('../RulesetService.js').RulesetService} deps.rulesetService
  * @param {() => number} [deps.rng]
@@ -194,9 +285,13 @@ export function buildLineage(options, deps) {
     if (options?.anchorHex) {
         anchor = { hex: String(options.anchorHex), name: null, initialState: null, seed: undefined };
     } else if (origin === 'library') {
-        const anchors = libraryAnchors();
-        if (!anchors.length) throw new Error('The public ruleset library has no usable anchors.');
-        const entry = anchors[pickIndex(rng, anchors.length)];
+        const all = libraryAnchors();
+        if (!all.length) throw new Error('The public ruleset library has no usable anchors.');
+        const excluded = new Set([...(options?.excludeAnchorHexes || [])].map((hex) => String(hex).toUpperCase()));
+        // Fall back to the full table once every entry has been used, rather than failing a round.
+        const anchors = all.filter((entry) => !excluded.has(entry.hex.toUpperCase()));
+        const pool = anchors.length ? anchors : all;
+        const entry = pool[pickIndex(rng, pool.length)];
         anchor = {
             hex: entry.hex,
             name: entry.name,

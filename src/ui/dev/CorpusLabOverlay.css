@@ -55,6 +55,32 @@
     cursor: pointer;
 }
 
+/* What the scheduler chose and why. The owner needs to see that a round is paying off seed debt
+   rather than drawing new rules, or a revisit round looks like the tool repeating itself. */
+.corpus-plan {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+}
+
+.corpus-plan-kind {
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.62rem;
+    border: 1px solid var(--border-color, #333);
+}
+
+.corpus-plan-kind[data-kind='revisit'] {
+    border-color: var(--accent-color, #4fc3f7);
+    color: var(--accent-color, #4fc3f7);
+}
+
+.corpus-plan-reason { opacity: 0.75; }
+
 .corpus-card {
     display: flex;
     flex-direction: column;
@@ -194,6 +220,39 @@
 /* An empty stratum is the whole point of the readout — make the gaps findable at a glance. */
 .corpus-tally.empty { border-color: var(--warning-color, #e0a030); opacity: 0.9; }
 .corpus-tally.ok { border-color: var(--success-color, #4caf50); }
+
+.corpus-tally em {
+    font-style: normal;
+    opacity: 0.6;
+}
+
+.corpus-deficits {
+    font-size: 0.68rem;
+}
+
+.corpus-deficits summary {
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.corpus-deficit-list {
+    margin: 0.3rem 0 0;
+    padding-left: 1.2rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    font-family: var(--font-mono, monospace);
+    opacity: 0.85;
+}
+
+/*
+ * A closed <details> hides its children only through a *UA* `display: none`, which loses to any
+ * author `display` on the child — see the AGENTS.md gotcha. Restate the hiding as an author rule so
+ * the list cannot leak out of a collapsed disclosure if this file ever gives it a layout.
+ */
+.corpus-deficits:not([open]) .corpus-deficit-list { display: none; }
+
+/* Same trap for `[hidden]`: keep the grid-switch button's own hiding an author rule. */
+.corpus-foot .button[hidden] { display: none; }
 
 .corpus-foot {
     display: flex;

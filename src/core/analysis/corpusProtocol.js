@@ -46,6 +46,33 @@ export const CORPUS_SYMMETRY_CLASSES = ['free', 'r_sym', 'd_sym', 'n_count', 'to
 /** Family ids are 3–100 chars of lowercase alphanumerics and hyphens (`familyTaxonomy.idPattern`). */
 export const CORPUS_FAMILY_PATTERN = /^[a-z0-9][a-z0-9-]{2,99}$/;
 
+/**
+ * Grid-preset keys the audit requires clips for, in size order. Mirrors `corpus-v1.json` →
+ * `gridPresets`. Kept as bare keys rather than importing `Config.GRID_SIZE_PRESETS` so this module
+ * stays dependency-free; the two agree because both derive from `gridMath.js`.
+ */
+export const CORPUS_GRID_PRESETS = ['small', 'medium', 'large', 'huge'];
+
+/**
+ * The `coverage` gate block, mirrored field-for-field from `corpus-v1.json`.
+ *
+ * Read `minimumSeedsPerRuleset` / `minimumInitialConditionsPerRuleset` carefully: the auditor applies
+ * them to **every** ruleset it finds, not to a quota of rulesets. One world judged once and never
+ * revisited is therefore a permanent audit failure, which is why collection has to schedule revisits
+ * rather than only drawing fresh lineages.
+ */
+export const CORPUS_COVERAGE = {
+    minimumLabeledClips: 400,
+    minimumSeedsPerRuleset: 3,
+    minimumInitialConditionsPerRuleset: 2,
+    minimumClipsPerGridPreset: 32,
+    requireBothLabelsPerSymmetryClass: true,
+    requireEveryScenario: true,
+};
+
+/** `splitPolicy.minimumFamilies` — ten families in total, which the proposed split cycle fills. */
+export const CORPUS_MINIMUM_FAMILIES = { train: 6, validation: 2, test: 2 };
+
 /** Lineage relationships a registered family may declare. */
 export const CORPUS_FAMILY_RELATIONSHIPS = ['mutation-lineage', 'exact-ruleset'];
 
@@ -78,4 +105,39 @@ export function normalizeScenario(value) {
 /** @param {unknown} value @returns {boolean} */
 export function isCorpusFamilyId(value) {
     return typeof value === 'string' && CORPUS_FAMILY_PATTERN.test(value);
+}
+
+/** @param {unknown} value @returns {string} Key-sorted JSON, so equal states hash equal. */
+function canonicalJson(value) {
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+    if (value && typeof value === 'object') {
+        const object = /** @type {Record<string, unknown>} */ (value);
+        return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+}
+
+/** @param {string} value */
+function fnv1a(value) {
+    let hash = 0x811C9DC5;
+    for (let index = 0; index < value.length; index++) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * The `initialConditionId` header value for an initial state.
+ *
+ * Single-sourced here because two callers must agree exactly: the capture service *writes* the id
+ * into every clip header, and the collection scheduler *reads* it to decide whether a ruleset still
+ * needs a second distinct initial condition. A private copy in either place would let the scheduler
+ * believe it had achieved diversity it had not.
+ *
+ * @param {object|undefined|null} initialState
+ * @returns {string}
+ */
+export function initialConditionId(initialState) {
+    return `ic-${fnv1a(canonicalJson(initialState || { mode: 'unknown' }))}`;
 }
