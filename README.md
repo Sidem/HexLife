@@ -125,10 +125,28 @@ sizes change.
 
 Auto-Explore is an **alpha** evolutionary search for rulesets with potentially interesting
 behavior. It can run candidate populations, bank promising finds into a gallery, and hand those
-finds back to the normal save/share/breed workflow.
+finds back to the normal save/share/breed workflow. The panel keeps the run status and the
+Start / Pause / Stop / Stop &amp; Keep controls always in view, with everything else behind three tabs:
 
-This area is still under active development and its rankings should be treated as suggestions, not
-ground truth. Expect the controls and scoring behavior to evolve.
+- **Setup** — mutation rate and mode, population size, initial conditions, evaluation length, budget.
+- **Objective** — how candidates are ranked, plus the scoring weights.
+- **Finds** — the gallery, head-to-head rating, and pack import/export.
+
+Two objectives are available:
+
+- **Native beta** (default) — statistics screen and hard-kill candidates cheaply; every survivor then
+  gets an exact 32-frame trajectory scored by a small HexLife-native model that runs entirely in your
+  browser from `public/models/hexlife-interest/`. Nothing is downloaded from a third party. Its
+  displayed 0–1 score is the model's percentile against a frozen reference corpus, so it is stable
+  across sessions. If the model fails to load, times out, or errors, the run silently falls back to
+  the statistical score rather than stalling.
+- **Statistical only** — the deterministic, model-free objective. Byte-identical to the pre-model
+  search, and the right choice for reproducibility work.
+
+The native model is explicitly a **beta**: it clearly beats the statistical objective on a curated
+sanity panel, but it has not passed the project's strict corpus-acceptance gates (owner hard-pair
+votes, locked test cases, mixed-grid corpus coverage, quantization). Treat all rankings as
+suggestions, not ground truth, and expect the controls and scoring behavior to keep evolving.
 
 ## 🧠 How HexLife rules work
 

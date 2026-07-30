@@ -1,13 +1,12 @@
 import { EventBus, EVENTS } from '../services/EventBus.js';
 import * as PersistenceService from '../services/PersistenceService.js';
+import * as Config from './config.js';
 import { hexToRuleset, rulesetName } from '../utils/utils.js';
 import { scoreCandidate, scoreSingleIC, applyConfirmation, SCORE_CONFIG } from './analysis/InterestingnessScore.js';
 import { sanitizeScoring, buildScoreConfig, isDefaultScoring } from './analysis/ScoringPresets.js';
 import { BehaviorArchive } from './analysis/BehaviorArchive.js';
-import { EmbeddingArchive } from './analysis/EmbeddingArchive.js';
+import { DescriptorArchive } from './analysis/DescriptorArchive.js';
 import { encodePack } from '../services/LibraryPackCodec.js';
-import { historicalNovelty, trajectoryNovelty, meanVector, cosineSimilarity } from './analysis/EmbeddingNovelty.js';
-import { NOISE_PROMPTS, noiseSimilarity, noiseFactor } from './analysis/PerceptualContrast.js';
 // Population builder (mutants + crossover children) must derive from the run's base seed, or a
 // shared search link couldn't replay the identical generation sequence.
 import { mulberry32 } from './rng.js';
@@ -150,20 +149,13 @@ export const EXPLORE_CONFIG = {
     maxGalleryEntries: 200,
     /** Generation budget: stop the loop after this many generations (0 = unlimited). */
     maxGenerations: 0,
-    // --- Perceptual objective (v3.0, ASAL; only active when the embedding model is enabled + loaded) ---
-    /** Frames captured per confirmed find to form the embedding trajectory (the open-endedness signal). */
-    embeddingFrames: 6,
-    /** Ticks advanced between captured trajectory frames (spacing of the perceptual time series). */
-    embeddingFrameTicks: 50,
-    // --- Supervised target search (v3.2, ASAL; only active when embeddings are on AND a prompt is set) --
-    /** Natural-language target ("find life that looks like…"). Empty ⇒ the statistical / open-ended
-     *  pipeline, UNCHANGED — an empty prompt is byte-identical to Stage 2 (an acceptance criterion). */
-    targetPrompt: '',
-    /** Reserved weight for future target/statistical blending (parked; selection is pure targetSim today). */
-    targetWeight: 0.7,
-    /** Minimum trajectory→prompt cosine similarity to bank a target-mode find into the gallery. CLIP
-     *  image-text similarities sit in ~[0.1, 0.35]; 0.22 keeps only the genuine matches. */
-    targetBankThreshold: 0.22,
+    /** Learned objective. `statistical` preserves the pre-model path byte-for-byte. */
+    objective: 'native-beta',
+    /** Exact non-destructive HXLT trajectory evaluated after statistical confirmation. */
+    nativeFrames: 32,
+    nativeTickStride: 8,
+    /** Per-candidate model deadline. Failure always falls back to confirmed statistics. */
+    nativeInferenceTimeoutMs: 15000,
 };
 
 const EXPLORE_STATE = Object.freeze({ IDLE: 'idle', RUNNING: 'running', PAUSED: 'paused' });
@@ -175,22 +167,15 @@ export class AutoExploreService {
      * @param {((worldIndex: number) => Promise<string|null>)|null} [opts.thumbnailProvider]
      *   Async capture of a world's current render as a small data-URL thumbnail (DI so the service
      *   stays renderer-free, principle 5). null in unit tests / when no renderer is available.
-     * @param {{isEnabled: () => boolean, ensureReady: () => Promise<boolean>, embed: (frame: any) => Promise<Float32Array|null>, embedText?: (prompt: string) => Promise<Float32Array|null>, getStatus?: () => string, getSpaceId?: () => string, getModelId?: () => string}|null} [opts.embeddingProvider]
-     *   Optional foundation-model embedding provider for the perceptual objective (v3.0). null/absent ⇒
-     *   the statistical objective is used unchanged (the default).
-     * @param {((worldIndex: number) => Promise<any|null>)|null} [opts.frameProvider]
-     *   Async capture of a world's current cell raster (one pixel/cell, tiled when needed). null ⇒ no
-     *   perceptual trajectory is captured (the term is simply absent and the score renormalizes).
+     * @param {import('../services/NativeTrajectoryModelService.js').NativeTrajectoryModelService|null} [opts.nativeModelProvider]
      */
-    constructor(worldManager, { thumbnailProvider = null, embeddingProvider = null, frameProvider = null } = {}) {
+    constructor(worldManager, { thumbnailProvider = null, nativeModelProvider = null } = {}) {
         this.wm = worldManager;
         this.thumbnailProvider = thumbnailProvider;
-        this.embeddingProvider = embeddingProvider;
-        this.frameProvider = frameProvider;
+        this.nativeModelProvider = nativeModelProvider;
         /** Per-find thumbnail/frame capture deadline (ms) so the search never stalls on a slow capture. */
         this.thumbnailTimeoutMs = 300;
-        /** Whether the perceptual objective is active for the current run (set in start()). */
-        this.embeddingEnabled = false;
+        this.nativeEnabled = false;
         this.state = EXPLORE_STATE.IDLE;
         this.generation = 0;
         this.championHex = null;
@@ -200,22 +185,17 @@ export class AutoExploreService {
         /** Score config for the current run (v3.1 user-customizable scoring); defaults otherwise. */
         this._scoreConfig = SCORE_CONFIG;
         this.archive = new BehaviorArchive();
-        /** Perceptual illumination archive (v3.0): a second MAP-Elites-lite archive keyed by the
-         *  foundation-model embedding, running alongside `archive`. Populated only when embeddings are
-         *  on; supplies an additional perceptual-novelty pressure on champion selection. */
-        this.embeddingArchive = new EmbeddingArchive();
-        /** Prompt-vector battery cached by embedding model id (#37 Stage 3). Values are promises so
-         * concurrent warmup/capture calls share the same text-model work. */
-        this._noisePromptCache = new Map();
+        this.descriptorArchive = new DescriptorArchive();
         /** Snapshot of pre-explore per-world settings + pause state, for restore on stop. */
         this._snapshot = null;
         /** Resolver used to suspend the loop while paused. */
         this._resumeResolver = null;
         /** Monotonic run token so a stop/restart invalidates an in-flight generation. */
         this._runToken = 0;
+        this._nativeAbortController = null;
 
         this._loadGallery();
-        this._loadEmbeddingGallery();
+        this._loadDescriptorGallery();
     }
 
     isRunning() {
@@ -233,11 +213,10 @@ export class AutoExploreService {
             generation: this.generation,
             championHex: this.championHex,
             gallerySize: this.archive.size,
-            embeddingEnabled: !!(this.embeddingProvider && this.embeddingProvider.isEnabled()),
-            embeddingStatus: this.embeddingProvider && this.embeddingProvider.getStatus ? this.embeddingProvider.getStatus() : 'disabled',
-            embeddingCells: this.embeddingArchive.size,
-            targetMode: !!this._targetMode,
-            targetPrompt: this._targetPrompt || '',
+            objective: this.options.objective,
+            nativeEnabled: this.nativeEnabled,
+            nativeStatus: this.nativeModelProvider?.getStatus?.() || null,
+            descriptorCells: this.descriptorArchive.size,
             options: { ...this.options },
         };
     }
@@ -309,45 +288,14 @@ export class AutoExploreService {
         this.championHex = seedHex;
         this._activeICSuite = this._resolveICSuite(this.options.icLabels);
 
-        // Perceptual objective (v3.0): active only when a provider is wired AND the user enabled it.
-        // Warm the model up front (non-blocking); if it can't load, degrade to the statistical objective
-        // for this run. The frameProvider is required to capture the trajectory the embedder consumes.
-        this.embeddingEnabled = !!(this.embeddingProvider && this.embeddingProvider.isEnabled() && this.frameProvider);
-        if (this.embeddingEnabled) {
-            this.embeddingProvider.ensureReady().then((ok) => {
-                if (!ok) this.embeddingEnabled = false; // model unavailable ⇒ silent statistical fallback
-            }).catch(() => { this.embeddingEnabled = false; });
-            // Warm the fixed nuisance prompts once per model. This is intentionally non-blocking; the
-            // first embedding confirmation awaits the same cached promise if text inference is slower
-            // than statistical screening.
-            this._getNoisePromptEmbeddings().catch(() => {});
-        }
-
-        // Supervised target search (v3.2, ASAL https://arxiv.org/abs/2412.17799): active iff embeddings
-        // are on AND the caller supplied a non-empty prompt AND the provider can embed text. The target
-        // vector resolves lazily (fire-and-forget, like ensureReady) — a generation that runs before it
-        // lands scores statistically (degrade, don't block). A null result (model failed to embed the
-        // prompt) toasts once and falls back to the statistical objective for the whole run.
-        this._targetPrompt = '';
-        this._targetVector = null;
-        this._targetMode = false;
-        const rawPrompt = typeof this.options.targetPrompt === 'string' ? this.options.targetPrompt.trim() : '';
-        if (this.embeddingEnabled && rawPrompt && typeof this.embeddingProvider.embedText === 'function') {
-            this._targetPrompt = rawPrompt;
-            this._targetMode = true;
-            const token = this._runToken;
-            Promise.resolve(this.embeddingProvider.embedText(rawPrompt)).then((vec) => {
-                if (token !== this._runToken) return;
-                if (vec && vec.length) {
-                    this._targetVector = vec;
-                } else {
-                    this._targetMode = false;
-                    EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                        message: 'Could not embed the target prompt — searching with the statistical objective.',
-                        type: 'info',
-                    });
-                }
-            }).catch(() => { if (token === this._runToken) this._targetMode = false; });
+        this.nativeEnabled = this.options.objective !== 'statistical' && !!this.nativeModelProvider;
+        this._nativeAbortController?.abort();
+        this._nativeAbortController = new AbortController();
+        if (this.nativeEnabled) {
+            this.nativeModelProvider.setEnabled(true);
+            // Loading overlaps statistical screening. Every inference call also awaits readiness and
+            // degrades independently, so one failed load can never hang or abort the generation.
+            this.nativeModelProvider.ensureReady().catch(() => false);
         }
 
         this._snapshot = this.wm._captureAutoExploreSnapshot();
@@ -370,6 +318,7 @@ export class AutoExploreService {
                 maxGenerations: this.options.maxGenerations,
                 icLabels: this.options.icLabels || null,
                 findThreshold: this.options.findThreshold,
+                objective: this.options.objective,
             },
         };
         // Population size shapes the trajectory (more candidates ⇒ different champions), so a replay
@@ -377,13 +326,6 @@ export class AutoExploreService {
         // no populationSize replays under the default 9). Mirrors how `scoring` is omitted at default.
         const popSize = this._resolvePopulationSize();
         if (popSize !== EXPLORE_CONFIG.populationSize) this._searchDescriptor.config.populationSize = popSize;
-        // Supervised target search (v3.2): a prompt shapes the trajectory (it drives selection), so a
-        // faithful replay needs it — carried only when non-empty to keep statistical-search links short
-        // and byte-identical. Cross-device replay is best-effort (webgpu/wasm numerics differ marginally).
-        if (this._targetPrompt) {
-            this._searchDescriptor.config.targetPrompt = this._targetPrompt;
-            this._searchDescriptor.config.targetWeight = this.options.targetWeight;
-        }
         // Custom scoring changes champion selection, so a replay needs it; omitted when default
         // (short URLs, and old links keep replaying under whatever the current defaults are).
         if (options.scoring) {
@@ -429,6 +371,8 @@ export class AutoExploreService {
         const wasPaused = this.state === EXPLORE_STATE.PAUSED;
         this.state = EXPLORE_STATE.IDLE;
         this._runToken++; // invalidate any in-flight generation
+        this._nativeAbortController?.abort();
+        this._nativeAbortController = null;
         if (wasPaused && this._resumeResolver) {
             const r = this._resumeResolver;
             this._resumeResolver = null;
@@ -565,46 +509,36 @@ export class AutoExploreService {
         // Bank confirmed finds, then rank by novelty-weighted *confirmed* score.
         const ranked = [];
         const finds = [];
-        let embeddingChanged = false;
+        let descriptorChanged = false;
         // Per-DISPLAYED-SLOT score/kill snapshot for the minimap badges: length == numWorlds, and
         // slot `c % numWorlds` is overwritten as its queued candidates finish, so at generation end it
         // holds each world's LAST candidate. (MinimapOverlays consumes this under the same field name.)
         const perWorldScores = new Array(numWorlds).fill(null);
 
-        const targetBankThreshold = this._resolveTargetBankThreshold();
         results.forEach((r, idx) => {
             if (!r || r.scored.perIC.length === 0) return;
-            const { scored, screenScore, winMetrics, confirmed, embedding } = r;
-            // The statistical score, always banked HONESTLY as the gallery `score` (chips/bars keep
-            // meaning): the confirmed final score when a confirmation ran (so the period-84 screen-trap
-            // can't win), else the screen. In target mode selection is driven by `targetSim` instead.
-            const baseScore = confirmed ? confirmed.finalScore : screenScore;
-            const embVector = embedding ? embedding.vector : null;
-            // Embedding-first gallery descriptor (v3.0/v3.2, roadmap #3): when an embedding is available,
-            // the find is keyed by its perceptual SimHash cell (prefixed `e:` so it never collides with a
-            // statistical `r|e|σ` key) — for both novelty pressure and the gallery cell it occupies.
-            const statsCellOverride = (this.embeddingEnabled && embVector)
-                ? `e:${this.embeddingArchive.cellKeyFor(embVector)}`
+            const { scored, screenScore, winMetrics, confirmed, native } = r;
+            // Confirmed native reward ranks learned runs; a missing/failed native result falls back
+            // to the exact statistical score.
+            const statisticalScore = confirmed ? confirmed.finalScore : screenScore;
+            const baseScore = confirmed && native && Number.isFinite(native.reward)
+                ? native.reward
+                : statisticalScore;
+            const nativeDescriptor = native?.descriptor || null;
+            const nativeCellOverride = nativeDescriptor
+                ? `n:${this.descriptorArchive.cellKeyFor(nativeDescriptor)}`
                 : null;
-            // Target similarity (v3.2): mean trajectory→prompt cosine, present only in target mode with a
-            // resolved prompt vector + captured trajectory. Null ⇒ this candidate scores statistically
-            // (the target vector hasn't resolved yet, or no embedding was captured) — degrade, don't block.
-            const targetSim = (this._targetMode && embedding && Number.isFinite(embedding.targetSimilarity))
-                ? embedding.targetSimilarity
-                : null;
-            const targetActive = this._targetMode && targetSim != null;
-            const selBase = targetActive ? targetSim : baseScore;
+            const selBase = baseScore;
             // Pass the candidate hex so the incumbent champion isn't penalized against itself (F3), and
-            // the perceptual cell override so novelty pressure matches the embedding-first descriptor.
-            let selectionScore = selBase * this.archive.noveltyMultiplier(winMetrics, baseScore, r.hex, statsCellOverride);
-            // Perceptual illumination (v3.0): when an embedding is available, also push the search away
-            // from perceptually-explored cells — the second (embedding-keyed) novelty pressure.
-            if (this.embeddingEnabled && embVector) {
-                selectionScore *= this.embeddingArchive.noveltyMultiplier(embVector, baseScore, r.hex);
+            // keep learned-cell novelty pressure aligned with the gallery cell.
+            let selectionScore = selBase * this.archive.noveltyMultiplier(
+                winMetrics, baseScore, r.hex, nativeCellOverride,
+            );
+            if (nativeDescriptor) {
+                selectionScore *= this.descriptorArchive.noveltyMultiplier(nativeDescriptor, baseScore, r.hex);
             }
-            // The score surfaced to the UI/progress: targetSim in target mode (labelled "match"), else base.
-            const reportScore = targetActive ? targetSim : baseScore;
-            ranked.push({ r, scored, winMetrics, selectionScore, baseScore, reportScore, targetSim });
+            const reportScore = baseScore;
+            ranked.push({ r, scored, winMetrics, selectionScore, baseScore, reportScore });
 
             const winIC = scored.perIC[scored.winningIC];
             // Candidate `idx` was displayed on world `idx % numWorlds`; later candidates on the same
@@ -618,32 +552,22 @@ export class AutoExploreService {
 
             // Bank only candidates that survived a confirmation burst (rejected-at-confirm are dropped).
             // A cycle-penalized find is still banked — it's a legitimate, honestly-tagged category.
-            // Banking gate: statistical mode banks every survivor (findThreshold already gated screening).
-            // Target mode (v3.2) instead gates on the target match — the user asked for things that look
-            // like X, so bank the top matches (targetSim ≥ targetBankThreshold), not the statistical score.
             if (confirmed && !confirmed.rejected) {
-                const bankOk = this._targetMode
-                    ? (targetSim != null && targetSim >= targetBankThreshold)
-                    : true;
-                if (bankOk) {
-                    const entry = this._makeEntry(r, scored, winMetrics, confirmed, screenScore, r.thumb, embedding, statsCellOverride);
-                    const res = this.archive.tryInsert(entry, { cellKeyOverride: statsCellOverride });
-                    if (res.added || res.improved) finds.push(entry);
-                    // Mirror into the perceptual illumination archive (keyed by the find's embedding).
-                    if (embVector) {
-                        this.embeddingArchive.tryInsert({
-                            hex: entry.hex,
-                            mnemonic: entry.mnemonic,
-                            score: entry.score,
-                            openEndedness: embedding.openEndedness,
-                            trajectorySpeed: embedding.trajectorySpeed,
-                            noiseSimilarity: embedding.noiseSimilarity,
-                            noiseFactor: embedding.noiseFactor,
-                            generation: this.generation,
-                            vector: embVector,
-                        });
-                        embeddingChanged = true;
-                    }
+                const entry = this._makeEntry(
+                    r, scored, winMetrics, confirmed, screenScore, r.thumb, native, nativeCellOverride,
+                );
+                const res = this.archive.tryInsert(entry, { cellKeyOverride: nativeCellOverride });
+                if (res.added || res.improved) finds.push(entry);
+                if (nativeDescriptor) {
+                    this.descriptorArchive.tryInsert({
+                        hex: entry.hex,
+                        mnemonic: entry.mnemonic,
+                        score: entry.score,
+                        modelId: native.modelId,
+                        generation: this.generation,
+                        vector: nativeDescriptor,
+                    });
+                    descriptorChanged = true;
                 }
             }
         });
@@ -652,7 +576,7 @@ export class AutoExploreService {
             this._persistGallery();
             for (const f of finds) EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: f, gallerySize: this.archive.size });
         }
-        if (embeddingChanged) this._persistEmbeddingGallery();
+        if (descriptorChanged) this._persistDescriptorGallery();
 
         // Best = next champion; second-best = runner-up parent for next generation's crossover.
         ranked.sort((a, b) => b.selectionScore - a.selectionScore);
@@ -661,8 +585,6 @@ export class AutoExploreService {
         this.runnerUpHex = ranked.length > 1 ? ranked[1].r.hex : null;
 
         if (bestHex) this.championHex = bestHex;
-        // In target mode `reportScore` is the target-match cosine (labelled "match" in the UI); otherwise
-        // it's the statistical base score. Both `_bestScoreSeen` and the progress bestScore follow it.
         if (bestScored && bestScored.reportScore > this._bestScoreSeen) this._bestScoreSeen = bestScored.reportScore;
 
         EventBus.dispatch(EVENTS.EXPLORE_PROGRESS, this._progressPayload('generation', {
@@ -671,7 +593,7 @@ export class AutoExploreService {
             bestComponents: bestScored ? bestScored.scored.perComponent : null,
             perWorldScores,
             selectedWorldIndex: selectedIdx,
-            targetMode: this._targetMode,
+            objective: this.nativeEnabled ? 'native-beta' : 'statistical',
         }));
     }
 
@@ -699,16 +621,10 @@ export class AutoExploreService {
         const winMetrics = ev.perIC[scored.winningIC] || {};
 
         let confirmed = null;
-        let embedding = null;
-        // Screening gate. Statistical mode: only candidates whose cheap screen clears `findThreshold` pay
-        // for confirmation. Target mode (v3.2): confirm EVERY candidate that survives the hard kills
-        // (extinct/saturated/frozen/short-cycle still die) regardless of the statistical score — the
-        // vision model, not the statistical proxy, must drive selection, or a prompt-matching-but-
-        // statistically-dull candidate would never be seen by the model. This is what makes it ASAL-faithful.
-        const winICScore = scored.perIC[scored.winningIC];
-        const passesGate = this._targetMode
-            ? !!(winICScore && !winICScore.killed)
-            : screenScore >= this.options.findThreshold;
+        let native = null;
+        // Only candidates that clear the cheap statistical screen pay for long confirmation and
+        // optional native inference. Hard kills therefore stay model-free and deterministic.
+        const passesGate = screenScore >= this.options.findThreshold;
         if (passesGate && winMetrics.initialState) {
             if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
             const proxy = this.wm.worlds[worldIndex];
@@ -721,173 +637,60 @@ export class AutoExploreService {
             });
             if (!confirmMetrics || confirmMetrics.cancelled || token !== this._runToken) return null;
 
-            // Perceptual objective (v3.0): capture a short embedding trajectory of the just-confirmed
-            // behavior and fold its open-endedness (trajectory novelty) into the confirmation metrics
-            // so the CONFIRMED score carries the perceptual term. Cheap statistical screening stays
-            // model-free; only confirmed finds pay the embedding cost. ANY failure (no model, capture
-            // miss, < 2 usable frames) leaves confirmMetrics untouched ⇒ the score renormalizes over
-            // the statistical terms (graceful degradation). Runs only after the confirmation burst, so
-            // deterministic per-(gen,world,IC) seeding upstream is unaffected.
-            if (this.embeddingEnabled) {
-                embedding = await this._captureEmbedding(worldIndex, token);
-                if (token !== this._runToken) return null;
-                if (embedding && Number.isFinite(embedding.openEndedness)) {
-                    confirmMetrics.embedding = { openEndedness: embedding.openEndedness };
-                }
-            }
-
             const confirmIC = scoreSingleIC({ ...confirmMetrics, icLabel: winMetrics.icLabel }, this._scoreConfig);
             confirmed = applyConfirmation(screenScore, confirmIC, confirmMetrics, {
                 ...this._scoreConfig,
                 confirmCycleMaxPeriod: this.options.confirmCycleMaxPeriod,
                 confirmCyclePenalty: this.options.confirmCyclePenalty,
             });
-            // #37 Stage 3: the CLIP nuisance contrast is a confirmation-only multiplier. It never
-            // touches screening or embeddings-off scoring, and missing prompt/frame embeddings are
-            // neutral (factor 1). Cycle penalties and this graded factor commute.
-            if (!confirmed.rejected && embedding && Number.isFinite(embedding.noiseFactor)) {
-                confirmed = {
-                    ...confirmed,
-                    finalScore: confirmed.finalScore * embedding.noiseFactor,
-                };
+            // Model load, capture, timeout, and inference failures return null and preserve the
+            // confirmed statistical score.
+            if (!confirmed.rejected && this.nativeEnabled) {
+                native = await this._evaluateNativeTrajectory(worldIndex, token);
+                if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
             }
         }
 
         // Capture a thumbnail of the just-confirmed world NOW — it still holds the confirmation
-        // burst's final frame (or the embedding trajectory's last frame), and the next generation
+        // burst's final frame (or the native trajectory's last frame), and the next generation
         // hasn't reset it yet (v2.6, F6). Time-boxed so a slow capture never stalls the search.
         let thumb = null;
         if (confirmed && !confirmed.rejected && this.thumbnailProvider) {
             thumb = await this._captureThumbnail(worldIndex);
             if (token !== this._runToken) return null;
         }
-        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed, thumb, embedding };
+        return { hex, perIC: ev.perIC, scored, screenScore, winMetrics, confirmed, thumb, native };
     }
 
     /**
-     * Capture a short trajectory of rendered frames of the just-confirmed world and reduce it to a
-     * perceptual open-endedness signal (v3.0, ASAL). Starts from the confirmation burst's final state,
-     * then advances the world in small sub-bursts, capturing one frame between each, and embeds every
-     * frame with the (off-thread) foundation model. Returns
-     * `{ openEndedness, trajectorySpeed, vector, noiseSimilarity, noiseFactor }` — the historical
-     * novelty (v3.3, the scored signal), the raw consecutive-frame velocity (kept for
-     * inspection/calibration only), the mean embedding (the perceptual archive key), and the optional
-     * Stage-3 nuisance contrast — or null on failure / abort / fewer than two usable embeddings.
-     *
-     * v3.3 (#37 Stage 1): `openEndedness` is {@link historicalNovelty}, NOT {@link trajectoryNovelty}.
-     * Velocity is maximized by churn — the term was pulling auto-explore toward the very chaos it was
-     * meant to counterbalance. Both are computed so the pair can be compared on real finds (the
-     * `trajectorySpeed`/`openEndedness` ratio is what `openEndednessHalfSat` is calibrated against);
-     * only the former is scored. In supervised target mode
-     * (v3.2) it also returns `targetSimilarity`: the mean cosine similarity of the trajectory's frame
-     * embeddings to the run's target-prompt vector (mean is robust to one noisy frame). Raw cosine is
-     * stored — CLIP's image-text similarity range (~[0.1, 0.35]) is NOT renormalized, only relative
-     * order matters for selection.
+     * Capture the exact post-confirmation cell trajectory and evaluate it with the native model.
+     * The run token, AbortSignal, and inference deadline ensure stop/restart cannot bank stale work.
      * @param {number} worldIndex
      * @param {number} token
-     * @returns {Promise<{openEndedness: number, trajectorySpeed: number, vector: Float32Array, targetSimilarity?: number, noiseSimilarity?: number, noiseFactor?: number}|null>}
+     * @returns {Promise<{reward: number, rawReward: number, descriptor: Float32Array, modelId: string}|null>}
      */
-    async _captureEmbedding(worldIndex, token) {
-        if (!this.embeddingEnabled || !this.frameProvider || !this.embeddingProvider) return null;
+    async _evaluateNativeTrajectory(worldIndex, token) {
+        if (!this.nativeEnabled || !this.nativeModelProvider) return null;
         const proxy = this.wm.worlds[worldIndex];
         if (!proxy) return null;
-
-        const n = Math.max(2, this.options.embeddingFrames || EXPLORE_CONFIG.embeddingFrames);
-        const frameTicks = Math.max(1, this.options.embeddingFrameTicks || EXPLORE_CONFIG.embeddingFrameTicks);
-
-        const frames = [];
-        const first = await this._captureFrame(worldIndex);
-        if (token !== this._runToken) return null;
-        if (first) frames.push(first);
-        for (let i = 1; i < n; i++) {
-            if (token !== this._runToken || this.state === EXPLORE_STATE.IDLE) return null;
-            const r = await proxy.runEvaluation({
-                ticks: frameTicks,
-                sampleEvery: this.options.sampleEvery,
-                warmupTicks: 0,
-                probe: { enabled: false },
-            });
-            if (!r || r.cancelled || token !== this._runToken) break;
-            const f = await this._captureFrame(worldIndex);
-            if (token !== this._runToken) return null;
-            if (f) frames.push(f);
-        }
-        if (frames.length < 2) return null;
-
-        const embeds = [];
-        for (const f of frames) {
-            if (token !== this._runToken) return null;
-            const e = await this.embeddingProvider.embed(f);
-            if (e && e.length) embeds.push(e);
-        }
-        if (embeds.length < 2) return null;
-
-        const vector = meanVector(embeds);
-        if (!vector) return null;
-        const result = {
-            openEndedness: historicalNovelty(embeds),
-            trajectorySpeed: trajectoryNovelty(embeds),
-            vector,
-        };
-        // #37 Stage 3: compare every frame with the strongest fixed nuisance prompt, then average.
-        // Text vectors are cached per model. Failure is neutral: the optional fields stay absent and
-        // confirmation proceeds exactly as it did before this stage.
-        const noisePrompts = await this._getNoisePromptEmbeddings();
-        if (token !== this._runToken) return null;
-        const similarity = noiseSimilarity(embeds, noisePrompts);
-        if (Number.isFinite(similarity)) {
-            result.noiseSimilarity = similarity;
-            result.noiseFactor = noiseFactor(similarity);
-        }
-        // Supervised target search (v3.2): score each frame against the prompt vector and average.
-        if (this._targetVector && this._targetVector.length) {
-            let sum = 0;
-            for (const e of embeds) sum += cosineSimilarity(e, this._targetVector);
-            result.targetSimilarity = sum / embeds.length;
-        }
-        return result;
-    }
-
-    /**
-     * Resolve the fixed Stage-3 prompt battery once per embedding model. EmbeddingService also caches
-     * each individual `(modelId, prompt)` request; this service-level cache avoids even repeated
-     * async lookups and gives providers without an internal cache the same contract.
-     * @returns {Promise<Float32Array[]>}
-     */
-    async _getNoisePromptEmbeddings() {
-        if (!this.embeddingProvider || typeof this.embeddingProvider.embedText !== 'function') return [];
-        const modelId = this.embeddingProvider.getModelId ? this.embeddingProvider.getModelId() : 'default';
-        const cached = this._noisePromptCache.get(modelId);
-        if (cached) return cached;
-        const pending = Promise.all(NOISE_PROMPTS.map((prompt) =>
-            Promise.resolve(this.embeddingProvider.embedText(prompt)).catch(() => null)
-        )).then((vectors) => {
-            const usable = vectors.filter((v) => v && v.length);
-            // Cache successful model work, not a transient load/inference failure. A later run may
-            // retry the same model after the provider has been re-enabled.
-            if (usable.length === 0 && this._noisePromptCache.get(modelId) === pending) {
-                this._noisePromptCache.delete(modelId);
-            }
-            return usable;
-        });
-        this._noisePromptCache.set(modelId, pending);
-        return pending;
-    }
-
-    /**
-     * Race the injected frame provider (raw ImageData capture) against the capture deadline so the loop
-     * never blocks on a slow render read.
-     * @param {number} worldIndex
-     * @returns {Promise<any|null>}
-     */
-    async _captureFrame(worldIndex) {
-        if (!this.frameProvider) return null;
         try {
-            return await Promise.race([
-                Promise.resolve(this.frameProvider(worldIndex)),
-                new Promise((resolve) => setTimeout(() => resolve(null), this.thumbnailTimeoutMs)),
-            ]);
-        } catch {
+            const frameCount = Math.max(1, Math.min(32, Math.trunc(this.options.nativeFrames)));
+            const tickStride = Math.max(1, Math.min(8, Math.trunc(this.options.nativeTickStride)));
+            const capture = await proxy.captureTrajectory({ frameCount, tickStride });
+            if (token !== this._runToken || !capture?.frames?.length) return null;
+            return await this.nativeModelProvider.evaluate({
+                frames: capture.frames,
+                rows: Config.GRID_ROWS,
+                cols: Config.GRID_COLS,
+                tickOffsets: capture.frames.map((_, index) => index * tickStride),
+            }, {
+                signal: this._nativeAbortController?.signal,
+                timeoutMs: this.options.nativeInferenceTimeoutMs,
+            });
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.warn('Native trajectory ranking fell back to statistics:', error);
+            }
             return null;
         }
     }
@@ -1012,18 +815,6 @@ export class AutoExploreService {
     }
 
     /**
-     * Resolve the target-mode banking threshold (v3.2): the configured `targetBankThreshold`, clamped to
-     * a sane cosine range, defaulting to EXPLORE_CONFIG's 0.22. Entries whose trajectory→prompt cosine
-     * clears this are banked into the gallery.
-     * @returns {number}
-     */
-    _resolveTargetBankThreshold() {
-        const raw = Number(this.options.targetBankThreshold);
-        if (!Number.isFinite(raw)) return EXPLORE_CONFIG.targetBankThreshold;
-        return Math.min(1, Math.max(0, raw));
-    }
-
-    /**
      * Build a gallery entry from a scored + confirmed candidate (winning IC reproduces the behavior).
      * The banked `score` is the *confirmed* final score; `screenScore` and `cyclic` are kept for the
      * gallery (honest labeling — a `↻N` chip, design principle 3).
@@ -1033,58 +824,27 @@ export class AutoExploreService {
      * @param {{finalScore: number, cyclic: number|null, rejected: boolean}} confirmed
      * @param {number} screenScore
      * @param {string|null} [thumb] Optional data-URL thumbnail of the find (v2.6).
-     * @param {{openEndedness: number, trajectorySpeed?: number, vector: Float32Array, targetSimilarity?: number, noiseSimilarity?: number, noiseFactor?: number}|null} [embedding]
-     *   Perceptual trajectory result (v3.0); when present, its open-endedness term is overlaid onto the
-     *   (screen-derived) component breakdown so the gallery bar reflects the perceptual signal the
-     *   confirmation measured, and its `targetSimilarity` (v3.2) is stored for the target-match chip.
-     * @param {string|null} [cellKeyOverride] Perceptual SimHash cell the entry is banked under (v3.2);
-     *   sets `descriptorKind: 'embedding'` so persistence preserves the (unrecomputable) key on reload.
+     * @param {{reward: number, rawReward: number, descriptor: Float32Array, modelId: string}|null} [native]
+     * @param {string|null} [cellKeyOverride] Native descriptor SimHash cell.
      * @returns {import('./analysis/BehaviorArchive.js').ArchiveEntry}
      */
-    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, embedding = null, cellKeyOverride = null) {
-        // Screening is model-free, so its perComponent has no perceptual term. The open-endedness is
-        // measured during confirmation; overlay it (the half-saturation reward + flag) so the gallery's
-        // "Novelty" bar shows it. The other nine terms keep their screen values (screening measures them).
-        let perComponent = scored.perComponent;
-        if (embedding && Number.isFinite(embedding.openEndedness)) {
-            const oe = embedding.openEndedness;
-            perComponent = {
-                ...scored.perComponent,
-                openEndedness: oe / (oe + this._scoreConfig.openEndednessHalfSat),
-                openEndednessUsed: true,
-                noiseSimilarity: Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
-                noiseFactor: Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : 1,
-                noiseUsed: Number.isFinite(embedding.noiseSimilarity),
-            };
-        }
-        // Raw metric inputs of the winning IC (v3.1) — feed the UI's per-term explainer curve
-        // markers. The confirmation-measured open-endedness overlays the screen value, matching
-        // the perComponent overlay above. Legacy entries simply lack the field.
-        let rawMetrics = (scored.perIC && scored.perIC[scored.winningIC]) ? scored.perIC[scored.winningIC].raw : null;
-        if (embedding && Number.isFinite(embedding.openEndedness)) {
-            rawMetrics = {
-                ...(rawMetrics || {}),
-                openEndedness: embedding.openEndedness,
-                noiseSimilarity: Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
-                noiseFactor: Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : undefined,
-            };
-        }
+    _makeEntry(ev, scored, winMetrics, confirmed, screenScore, thumb = null, native = null, cellKeyOverride = null) {
+        const perComponent = scored.perComponent;
+        // Raw statistical inputs remain available for explanation even when native reward ranks the find.
+        const rawMetrics = (scored.perIC && scored.perIC[scored.winningIC]) ? scored.perIC[scored.winningIC].raw : null;
         return {
             rawMetrics,
             hex: ev.hex,
             mnemonic: rulesetName(ev.hex),
-            score: confirmed.finalScore,
+            score: native && Number.isFinite(native.reward) ? native.reward : confirmed.finalScore,
+            statisticalScore: confirmed.finalScore,
+            nativeRawReward: native && Number.isFinite(native.rawReward) ? native.rawReward : undefined,
+            nativeModelId: native?.modelId || undefined,
             screenScore,
             cyclic: confirmed.cyclic,
             thumb: thumb || null,
-            openEndedness: embedding && Number.isFinite(embedding.openEndedness) ? embedding.openEndedness : undefined,
-            noiseSimilarity: embedding && Number.isFinite(embedding.noiseSimilarity) ? embedding.noiseSimilarity : undefined,
-            noiseFactor: embedding && Number.isFinite(embedding.noiseFactor) ? embedding.noiseFactor : undefined,
-            // Supervised target search (v3.2): the trajectory→prompt match, for the gallery "target" chip.
-            targetSimilarity: embedding && Number.isFinite(embedding.targetSimilarity) ? embedding.targetSimilarity : undefined,
-            // Which descriptor keyed this entry (roadmap #3): 'embedding' when banked under a perceptual
-            // SimHash cell, else 'stats'. loadEntries preserves the opaque embedding key on reload.
-            descriptorKind: cellKeyOverride ? 'embedding' : 'stats',
+            // Native keys are opaque because raw descriptors are intentionally not persisted.
+            descriptorKind: cellKeyOverride ? 'native' : 'stats',
             perComponent,
             winningIC: scored.winningIC,
             icLabel: winMetrics.icLabel,
@@ -1135,52 +895,52 @@ export class AutoExploreService {
         PersistenceService.saveExploreGallery(entries);
     }
 
-    // --- Perceptual illumination archive persistence (v3.0; compact, no raw vectors) --------------
+    // --- Native descriptor archive persistence (compact, no raw vectors) --------------------------
 
-    /** Embedding-space id: checkpoint and input representation must both match for cells to compare. */
-    _embeddingModelId() {
-        if (!this.embeddingProvider) return null;
-        if (this.embeddingProvider.getSpaceId) return this.embeddingProvider.getSpaceId();
-        return this.embeddingProvider.getModelId ? this.embeddingProvider.getModelId() : null;
+    /** Descriptor-space id: model and preprocessing must match for cells to compare. */
+    _descriptorModelId() {
+        return this.nativeModelProvider?.getStatus?.().modelId || null;
     }
 
-    _loadEmbeddingGallery() {
+    _loadDescriptorGallery() {
         try {
-            this.embeddingArchive.loadEntries(PersistenceService.loadEmbeddingGallery(this._embeddingModelId()));
+            this.descriptorArchive.loadEntries(
+                PersistenceService.loadNativeDescriptorGallery(this._descriptorModelId()),
+            );
         } catch (e) {
-            console.warn('AutoExploreService: failed to load embedding gallery', e);
+            console.warn('AutoExploreService: failed to load native descriptor gallery', e);
         }
     }
 
-    _persistEmbeddingGallery() {
-        const entries = this.embeddingArchive.getEntries().slice(0, this.options.maxGalleryEntries);
-        PersistenceService.saveEmbeddingGallery(entries, this._embeddingModelId());
+    _persistDescriptorGallery() {
+        const entries = this.descriptorArchive.getEntries().slice(0, this.options.maxGalleryEntries);
+        PersistenceService.saveNativeDescriptorGallery(entries, this._descriptorModelId());
     }
 
     /**
-     * The perceptual (CLIP) model changed: SimHash cell keys — and even the projection's
+     * The native model changed: SimHash cell keys — and even the projection's
      * dimensionality — are model-specific, so the in-memory archive must be REPLACED (a fresh
      * instance re-derives its projection lazily from the next vector's dim; clear() would keep a
      * stale-dim projection and silently mis-hash). The persisted gallery self-invalidates on the
      * modelId mismatch at load. Only valid while idle (WorldManager guards this).
      */
-    onEmbeddingModelChanged() {
-        this.embeddingArchive = new EmbeddingArchive();
-        this._loadEmbeddingGallery();
-        this._persistEmbeddingGallery();
+    onNativeModelChanged() {
+        this.descriptorArchive = new DescriptorArchive();
+        this._loadDescriptorGallery();
+        this._persistDescriptorGallery();
     }
 
     clearGallery() {
         this.archive.clear();
-        this.embeddingArchive.clear();
+        this.descriptorArchive.clear();
         PersistenceService.saveExploreGallery([]);
-        PersistenceService.saveEmbeddingGallery([], this._embeddingModelId());
+        PersistenceService.saveNativeDescriptorGallery([], this._descriptorModelId());
         EventBus.dispatch(EVENTS.EXPLORE_FIND_ADDED, { find: null, gallerySize: 0, cleared: true });
     }
 
     /**
      * Serialize the current gallery (statistical archive, best-first) into a portable pack JSON
-     * string. The perceptual archive is intentionally NOT exported — its SimHash cells are
+     * string. The native descriptor archive is intentionally not exported — its SimHash cells are
      * model-specific and would be stripped on import anyway.
      * @returns {string}
      */
@@ -1190,9 +950,8 @@ export class AutoExploreService {
 
     /**
      * Merge decoded pack finds into the session gallery via the normal {@link BehaviorArchive.tryInsert}
-     * semantics (best-per-cell + family dedupe). The codec already stripped each find's opaque
-     * embedding `cellKey` and reset `descriptorKind: 'stats'`, so the statistical descriptor is
-     * re-derived from `metrics` here — a pack made with embeddings ON imports cleanly with them OFF.
+     * semantics (best-per-cell + family dedupe). The codec strips opaque learned `cellKey` values and
+     * resets `descriptorKind: 'stats'`, so old and new packs import safely across model versions.
      * Persists once and dispatches one gallery refresh. **Refused while a run is active.**
      * @param {object[]} decodedFinds Already sanitized by {@link decodePack}.
      * @returns {{added: number, improved: number, rejected: number}}
@@ -1206,8 +965,7 @@ export class AutoExploreService {
         let improved = 0;
         let rejected = 0;
         for (const find of decodedFinds || []) {
-            // No cellKeyOverride: the stats descriptor is re-derived from metrics (embedding cells
-            // were stripped on decode and never trusted cross-device).
+            // No override: the statistical descriptor is re-derived from portable metrics.
             const res = this.archive.tryInsert(find);
             if (res.added) added++;
             else if (res.improved) improved++;

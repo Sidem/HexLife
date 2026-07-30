@@ -54,7 +54,17 @@
     <script>
         // Testing shim: "?headless=1" keeps the render loop and visibility state alive
         // in hidden/headless browsers (rAF is suspended when document.hidden is true).
-        if (new URLSearchParams(location.search).has('headless')) {
+        // Sticky for the tab: SettingsLoader strips the query string on startup, so any
+        // reload afterwards (Vite HMR, a grid-preset resize, a harness re-navigation) would
+        // otherwise silently drop headless mode and with it `window.__hexlife`.
+        var __headlessSticky = false;
+        try {
+            if (new URLSearchParams(location.search).has('headless')) sessionStorage.setItem('hexlifeHeadless', '1');
+            __headlessSticky = sessionStorage.getItem('hexlifeHeadless') === '1';
+        } catch {
+            // Storage may be blocked; fall back to the query string alone.
+        }
+        if (__headlessSticky || new URLSearchParams(location.search).has('headless')) {
             // Captured here because SettingsLoader strips the query string on startup,
             // so by the time app code runs `location.search` is already empty.
             window.__headless = true;

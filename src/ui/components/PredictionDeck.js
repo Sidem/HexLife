@@ -9,9 +9,10 @@ import { makePredictionRound, randomRoundSeed } from '../../core/analysis/predic
  * Prediction mode — "call it before it runs" (PLAY-LAYER-PLAN §P1, roadmap #19).
  *
  * One card at a time: the still first frame of a real world, four buttons, then the reveal. It is the
- * newcomer-tier entry point on Discover, so by the #29 rule it mounts *above* `#explore-advanced`,
- * never inside it — a first-time visitor should meet a question they can answer, not the multi-term
- * objective. Its whole surface is three resting controls (the card, the four choices, "Next").
+ * newcomer-tier entry point on Discover, so by the #29 rule it mounts *above* the Setup / Objective /
+ * Finds tab list, never inside a tab — a first-time visitor should meet a question they can answer,
+ * not the multi-term objective. Its whole surface is three resting controls (the card, the four
+ * choices, "Next").
  *
  * **Why it exists beyond being fun.** Every graded round is a human labelling a real ruleset with what
  * it does, which is the one kind of data the statistical objective cannot generate for itself; the

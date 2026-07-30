@@ -3,22 +3,15 @@
 /**
  * Tag suggestion engine (roadmap #13, PLAY-LAYER-PLAN §T3/§T4).
  *
- * Two independent, PURE suggestion sources plus a merge rule:
- *  - {@link suggestTagsFromStats}     — always available; maps already-computed behaviour metrics to
- *                                       canonical tags via named thresholds (no model needed).
- *  - {@link suggestTagsFromEmbedding} — available only when the optional CLIP objective is enabled;
- *                                       cosine-ranks the world's frame embedding against the embedded
- *                                       canonical-tag prompt bank.
- *  - {@link mergeSuggestions}         — embedding suggestions win; heuristics fill remaining slots.
+ * The pure statistical source maps already-computed behavior metrics to canonical tags via named
+ * thresholds. {@link mergeSuggestions} combines caller-provided suggestion lists without coupling
+ * this module to a model.
  *
  * Every canonical id these emit exists in {@link module:core/tags.CANONICAL_TAGS}. Suggestions are
  * one-tap accept, never auto-applied (§T4 merge rule) — the caller renders them as a "Suggested" row.
  *
- * No DOM / EventBus / persistence / globals here, so both sources are unit-testable against fixture
- * metrics and fixture vectors.
+ * No DOM / EventBus / persistence / globals here, so the rules are fixture-testable.
  */
-
-import { cosineSimilarity } from './EmbeddingNovelty.js';
 
 /** Maximum suggestions surfaced at once (§T2/§T3: "top 3–4"). */
 export const MAX_SUGGESTIONS = 4;
@@ -130,47 +123,16 @@ export function suggestTagsFromStats(metrics, thresholds = STATS_THRESHOLDS) {
 }
 
 /**
- * A single embedded canonical tag: its id and its (text) embedding vector.
- * @typedef {object} TagVector
- * @property {string} id
- * @property {Float32Array|number[]} vector
- */
-
-/**
- * Cosine-rank a world's frame embedding against the embedded canonical-tag bank (§T3). Returns the
- * top tags above a similarity floor, most-similar first. Pure; the caller supplies both vectors (the
- * frame embedding and the tag bank) from {@link module:services/EmbeddingService}.
- *
- * @param {Float32Array|number[]|null} embedding  The world frame's CLIP image embedding.
- * @param {TagVector[]} tagBank                    Embedded canonical tags (may be empty ⇒ []).
- * @param {{floor?: number, max?: number}} [opts]  `floor` min cosine similarity; `max` cap.
- * @returns {string[]} Canonical tag ids, most-similar first.
- */
-export function suggestTagsFromEmbedding(embedding, tagBank, { floor = 0.18, max = MAX_SUGGESTIONS } = {}) {
-    if (!embedding || !embedding.length || !Array.isArray(tagBank) || tagBank.length === 0) return [];
-    /** @type {Array<{id: string, sim: number}>} */
-    const scored = [];
-    for (const t of tagBank) {
-        if (!t || !t.vector || !t.vector.length) continue;
-        const sim = cosineSimilarity(embedding, t.vector);
-        if (sim >= floor) scored.push({ id: t.id, sim });
-    }
-    scored.sort((a, b) => b.sim - a.sim);
-    return scored.slice(0, max).map((s) => s.id);
-}
-
-/**
- * Merge the two suggestion sources (§T4 merge rule): embedding suggestions win and lead, heuristics
- * fill the remaining slots, deduped, order-preserving, capped.
- * @param {string[]} embeddingSuggestions
- * @param {string[]} statsSuggestions
+ * Merge two suggestion sources, deduped, order-preserving, and capped.
+ * @param {string[]} primarySuggestions
+ * @param {string[]} fallbackSuggestions
  * @param {number} [max]
  * @returns {string[]}
  */
-export function mergeSuggestions(embeddingSuggestions, statsSuggestions, max = MAX_SUGGESTIONS) {
+export function mergeSuggestions(primarySuggestions, fallbackSuggestions, max = MAX_SUGGESTIONS) {
     /** @type {string[]} */
     const out = [];
-    for (const id of [...(embeddingSuggestions || []), ...(statsSuggestions || [])]) {
+    for (const id of [...(primarySuggestions || []), ...(fallbackSuggestions || [])]) {
         if (id && !out.includes(id)) out.push(id);
         if (out.length >= max) break;
     }

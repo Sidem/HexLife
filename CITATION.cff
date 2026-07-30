@@ -10,15 +10,16 @@ abstract: >-
   each), rendered with instanced WebGL2. Rulesets are 128-bit (32-character
   hex) with deterministic mnemonic names, and an evolutionary Auto-Explore
   search scores candidates on structure, criticality, block-entropy dynamics,
-  transport, and optional CLIP-embedding novelty to find interesting emergent
-  behavior.
+  and transport, then ranks the survivors with a small HexLife-native
+  trajectory model trained on human preference judgements, to find interesting
+  emergent behavior.
 repository-code: "https://github.com/Sidem/HexLife"
 url: "https://sidem.github.io/HexLife/"
 license: MIT
 # Keep in step with package.json and the git tag — `npm version` bumps package.json, and these
 # two lines are the manual half of a release (see README § Versioning & releases).
-version: "1.1.0"
-date-released: "2026-07-27"
+version: "1.2.0"
+date-released: "2026-07-30"
 keywords:
   - cellular automata
   - hexagonal grid

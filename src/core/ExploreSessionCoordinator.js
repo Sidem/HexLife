@@ -5,7 +5,6 @@ import * as Renderer from '../rendering/renderer.js';
 import { EXPLORE_CONFIG } from './AutoExploreService.js';
 import { scoreSingleIC } from './analysis/InterestingnessScore.js';
 import { sanitizeScoring, buildScoreConfig } from './analysis/ScoringPresets.js';
-import { rasterizeCellState } from './analysis/CellRaster.js';
 import { hexToRuleset } from '../utils/utils.js';
 
 /**
@@ -74,31 +73,6 @@ export class ExploreSessionCoordinator {
                 requestAnimationFrame(() => {
                     try {
                         resolve(Renderer.captureWorldThumbnail(worldIndex));
-                    } catch {
-                        resolve(null);
-                    }
-                });
-            });
-        } catch {
-            resolve(null);
-        }
-    });
-
-    /**
-     * Capture the world's exact binary state as palette-independent, one-cell-per-pixel CLIP tiles.
-     * No WebGL readback or application-side scaling: medium grids fit one 224px tile; larger grids
-     * retain every cell across a tile batch. Two rAFs preserve the prior capture timing contract and
-     * let the final evaluation STATE_UPDATE settle before the synchronous copy/raster pass.
-     * @param {number} worldIndex
-     * @returns {Promise<import('./analysis/CellRaster.js').CellRaster|null>}
-     */
-    _captureExploreFrame = (worldIndex) => new Promise((resolve) => {
-        try {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    try {
-                        const cells = this.wm.worlds[worldIndex]?.latestStateArray || null;
-                        resolve(rasterizeCellState(cells, Config.GRID_ROWS, Config.GRID_COLS));
                     } catch {
                         resolve(null);
                     }

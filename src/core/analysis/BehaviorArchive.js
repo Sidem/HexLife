@@ -51,15 +51,8 @@ import { hammingDistanceHex } from '../../utils/utils.js';
  * @property {number} [generation]        Generation the entry was found in.
  * @property {BehaviorMetrics} [metrics]  Winning-IC behavior metrics (drives the descriptor).
  * @property {string} [cellKey]           The descriptor cell this entry occupies (filled by tryInsert).
- * @property {'stats'|'embedding'} [descriptorKind] Which descriptor keyed this entry (v3.2): 'embedding'
- *   when a perceptual SimHash cell override was supplied (the `cellKey` is then opaque and NOT
- *   recomputable — no raw vector is stored), 'stats' (or absent, for legacy entries) for the
- *   statistical `ratio|entropy|σ` descriptor.
- * @property {number} [targetSimilarity] Mean cosine similarity of the find's trajectory to the run's
- *   target prompt embedding (v3.2 supervised target search); present only for target-mode finds.
- * @property {number} [noiseSimilarity] Mean frame-wise maximum cosine similarity to the fixed noise
- *   prompt battery (#37 Stage 3); present only when perceptual confirmation succeeded.
- * @property {number} [noiseFactor] Multiplicative confirmation factor derived from noiseSimilarity.
+ * @property {'stats'|'native'} [descriptorKind] 'native' when a learned-descriptor SimHash cell
+ *   override was supplied; 'stats' (or absent for legacy entries) for the statistical descriptor.
  */
 
 /**
@@ -175,8 +168,8 @@ export class BehaviorArchive {
      * @param {ArchiveEntry} entry - Must carry `score`, `hex`, and (winning-IC) `metrics`.
      * @param {{cellKeyOverride?: string|null}} [opts] - When `cellKeyOverride` is a non-empty string,
      *   the entry occupies THAT cell verbatim instead of the statistical `descriptorFor(metrics)` cell
-     *   (v3.2 embedding-first descriptor: the perceptual SimHash cell, prefixed `e:` by the caller so it
-     *   can never collide with a statistical `r|e|σ` key). Family-Hamming dedupe is unchanged.
+     *   (native descriptor cells are prefixed `n:` by the caller so they cannot collide with the
+     *   statistical descriptor). Family-Hamming dedupe is unchanged.
      * @returns {{added: boolean, improved: boolean, cellKey: string, displaced: ArchiveEntry|null, rejectedBy?: string}}
      *   `added` true when a new cell was filled; `improved` true when an occupied cell's incumbent
      *   was beaten and replaced; both false when the entry was rejected (occupied/family, not better).
@@ -217,8 +210,8 @@ export class BehaviorArchive {
      * @param {BehaviorMetrics} metrics
      * @param {number} score
      * @param {string} [hex] - The candidate's hex; an incumbent with this same hex is exempt.
-     * @param {string|null} [cellKeyOverride] - Perceptual SimHash cell (v3.2); overrides the statistical
-     *   descriptor cell so novelty pressure matches the embedding-first gallery descriptor.
+     * @param {string|null} [cellKeyOverride] - Native SimHash cell; overrides the statistical
+     *   descriptor so novelty pressure matches learned ranking.
      * @returns {boolean}
      */
     isOccupiedBetter(metrics, score, hex, cellKeyOverride = null) {
@@ -237,7 +230,7 @@ export class BehaviorArchive {
      * @param {BehaviorMetrics} metrics
      * @param {number} score
      * @param {string} [hex] - The candidate's hex (for self-exemption, F3).
-     * @param {string|null} [cellKeyOverride] - Perceptual SimHash cell (v3.2); see {@link isOccupiedBetter}.
+     * @param {string|null} [cellKeyOverride] - Native SimHash cell; see {@link isOccupiedBetter}.
      * @returns {number}
      */
     noveltyMultiplier(metrics, score, hex, cellKeyOverride = null) {
@@ -283,11 +276,9 @@ export class BehaviorArchive {
     /**
      * Replace the archive contents from a previously persisted entry list.
      *
-     * Statistical entries re-derive their cell key from `metrics` via {@link tryInsert} (self-healing:
-     * best per cell). Embedding-first entries (v3.2, `descriptorKind === 'embedding'`) carry an OPAQUE
-     * SimHash `cellKey` that cannot be recomputed — the raw vector is not persisted — so their stored key
-     * is preserved verbatim and placed directly (still best-per-cell). Legacy entries have no
-     * `descriptorKind` ⇒ the statistical path, byte-identical to the pre-v3.2 behaviour.
+     * Statistical entries re-derive their cell key from `metrics` via {@link tryInsert}. Native
+     * entries carry an opaque SimHash key that cannot be recomputed because raw descriptors are not
+     * persisted, so their stored key is preserved. Legacy CLIP-keyed entries take the statistical path.
      * @param {ArchiveEntry[]} entries
      */
     loadEntries(entries) {
@@ -295,7 +286,7 @@ export class BehaviorArchive {
         if (!Array.isArray(entries)) return;
         for (const e of entries) {
             if (!(e && typeof e.hex === 'string' && typeof e.score === 'number')) continue;
-            if (e.descriptorKind === 'embedding' && typeof e.cellKey === 'string' && e.cellKey) {
+            if (e.descriptorKind === 'native' && typeof e.cellKey === 'string' && e.cellKey.startsWith('n:')) {
                 const existing = this.cells.get(e.cellKey);
                 if (!existing || e.score > existing.score) this.cells.set(e.cellKey, { ...e });
             } else {

@@ -439,17 +439,9 @@ export const EVENTS = {
     EXPLORE_PROGRESS: 'explore:progress',
     /** @param {{find: import('../core/analysis/BehaviorArchive.js').ArchiveEntry|null, gallerySize: number, cleared?: boolean}} data - A new/improved gallery find was archived (or the gallery was cleared when `cleared` is true and `find` is null). */
     EXPLORE_FIND_ADDED: 'explore:findAdded',
-    /** @param {{enabled: boolean}} data - Toggle the optional foundation-model (CLIP) perceptual auto-explore objective (v3.0). When enabled, the embedding model lazily loads in its own worker; the statistical objective is unchanged when disabled (default). */
-    COMMAND_SET_EMBEDDING_ENABLED: 'command:setEmbeddingEnabled',
-    /** @param {{modelId: string}} data - Switch the perceptual objective's CLIP checkpoint (v3.1; one of EmbeddingService's EMBEDDING_MODELS ids). Refused while a search is running; a switch replaces the model-specific perceptual archive (cells from different embedding spaces are not comparable). */
-    COMMAND_SET_EMBEDDING_MODEL: 'command:setEmbeddingModel',
-    /** @param {{prompt: string}} data - Set the supervised target-search prompt ("find life that looks like…", v3.2, ASAL). Persisted as the `exploreTargetPrompt` UI setting and read at the next Start (threaded into COMMAND_START_AUTO_EXPLORE options like `scoring`); empty ⇒ the statistical/open-ended pipeline unchanged. Target mode also requires the CLIP embedding objective to be enabled. */
-    COMMAND_SET_EXPLORE_TARGET_PROMPT: 'command:setExploreTargetPrompt',
-    /** @param {{status: 'disabled'|'loading'|'ready'|'error', message: string|null, enabled: boolean}} data - The perceptual-objective embedding provider changed status (toggled, model loading, ready, or degraded after a failure). */
-    EMBEDDING_STATUS_CHANGED: 'explore:embeddingStatusChanged',
     /** @param {{enabled: boolean}} data - Enable/disable the final HexLife-native trajectory model. Training never runs in Explorer; enabling loads the local versioned manifest + ONNX artifact. */
     COMMAND_SET_NATIVE_MODEL_ENABLED: 'command:setNativeModelEnabled',
-    /** @param {{frameCount?: number, tickStride?: number, sliceCount?: number, label?: 'unlabeled'|'interesting'|'boring', family?: string, notes?: string}} data - Non-destructively capture and download one HXLT1 slice, or a ZIP of consecutive non-overlapping slices, from the selected world. */
+    /** @param {{frameCount?: number, tickStride?: number, label?: 'unlabeled'|'interesting'|'boring', notes?: string}} data - Non-destructively capture and download one exact HXLT1 trajectory from the selected world. */
     COMMAND_CAPTURE_TRAINING_SLICE: 'command:captureTrainingSlice',
     /** @param {{frameCount?: number, tickStride?: number}} data - Capture the selected world non-destructively and evaluate it with the loaded native model. */
     COMMAND_EVALUATE_NATIVE_MODEL: 'command:evaluateNativeModel',

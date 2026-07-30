@@ -1,6 +1,7 @@
 // @ts-check
 
 import { EventBus, EVENTS } from './EventBus.js';
+import { calibrateNativeReward } from '../core/analysis/NativeTrajectoryModelManifest.js';
 
 export const NATIVE_MODEL_STATUS = Object.freeze({
     DISABLED: 'disabled',
@@ -41,7 +42,7 @@ export class NativeTrajectoryModelService {
         /** @type {Promise<boolean>|null} */
         this._readyPromise = null;
         this._nextId = 1;
-        /** @type {Map<number, {resolve: (value: {reward:number, descriptor:Float32Array, modelId:string}) => void, reject: (error: Error) => void}>} */
+        /** @type {Map<number, {resolve: (value: {reward:number, rawReward:number, descriptor:Float32Array, modelId:string}) => void, reject: (error: Error) => void}>} */
         this._pending = new Map();
     }
 
@@ -90,7 +91,16 @@ export class NativeTrajectoryModelService {
             return false;
         }
         this._setStatus(NATIVE_MODEL_STATUS.LOADING);
-        const worker = this.workerFactory();
+        let worker;
+        try {
+            worker = this.workerFactory();
+        } catch (error) {
+            this._setStatus(
+                NATIVE_MODEL_STATUS.ERROR,
+                error instanceof Error ? error.message : 'Native model worker failed to start.',
+            );
+            return false;
+        }
         this.worker = worker;
         this._readyPromise = new Promise((resolve) => {
             const timeout = setTimeout(() => {
@@ -132,9 +142,10 @@ export class NativeTrajectoryModelService {
 
     /**
      * @param {{frames: Uint8Array[], rows: number, cols: number, tickOffsets: number[]}} trajectory
-     * @returns {Promise<{reward: number, descriptor: Float32Array, modelId: string}>}
+     * @param {{signal?: AbortSignal, timeoutMs?: number}} [options]
+     * @returns {Promise<{reward: number, rawReward: number, descriptor: Float32Array, modelId: string}>}
      */
-    async evaluate(trajectory) {
+    async evaluate(trajectory, options = {}) {
         if (!this.enabled) throw new Error('Native trajectory model is disabled.');
         if (!await this.ensureReady() || !this.worker) throw new Error(this.message || 'Native trajectory model is unavailable.');
         const id = this._nextId++;
@@ -142,19 +153,32 @@ export class NativeTrajectoryModelService {
             frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength)
         );
         return new Promise((resolve, reject) => {
+            if (options.signal?.aborted) {
+                reject(new DOMException('Native model inference was cancelled.', 'AbortError'));
+                return;
+            }
             const timeout = setTimeout(() => {
                 this._pending.delete(id);
+                options.signal?.removeEventListener('abort', abort);
                 reject(new Error('Native model inference timed out.'));
-            }, this.timeoutMs);
+            }, options.timeoutMs || this.timeoutMs);
+            const abort = () => {
+                this._pending.delete(id);
+                clearTimeout(timeout);
+                reject(new DOMException('Native model inference was cancelled.', 'AbortError'));
+            };
+            options.signal?.addEventListener('abort', abort, { once: true });
             this._pending.set(id, {
-                /** @param {{reward:number, descriptor:Float32Array, modelId:string}} value */
+                /** @param {{reward:number, rawReward:number, descriptor:Float32Array, modelId:string}} value */
                 resolve: (value) => {
                     clearTimeout(timeout);
+                    options.signal?.removeEventListener('abort', abort);
                     resolve(value);
                 },
                 /** @param {Error} error */
                 reject: (error) => {
                     clearTimeout(timeout);
+                    options.signal?.removeEventListener('abort', abort);
                     reject(error);
                 },
             });
@@ -162,17 +186,25 @@ export class NativeTrajectoryModelService {
             if (!worker) {
                 this._pending.delete(id);
                 clearTimeout(timeout);
+                options.signal?.removeEventListener('abort', abort);
                 reject(new Error('Native trajectory model worker disappeared.'));
                 return;
             }
-            worker.postMessage({
-                type: 'EVALUATE',
-                id,
-                frames: frameBuffers,
-                rows: trajectory.rows,
-                cols: trajectory.cols,
-                tickOffsets: trajectory.tickOffsets,
-            }, frameBuffers);
+            try {
+                worker.postMessage({
+                    type: 'EVALUATE',
+                    id,
+                    frames: frameBuffers,
+                    rows: trajectory.rows,
+                    cols: trajectory.cols,
+                    tickOffsets: trajectory.tickOffsets,
+                }, frameBuffers);
+            } catch (error) {
+                this._pending.delete(id);
+                clearTimeout(timeout);
+                options.signal?.removeEventListener('abort', abort);
+                reject(error instanceof Error ? error : new Error(String(error)));
+            }
         });
     }
 
@@ -185,9 +217,20 @@ export class NativeTrajectoryModelService {
         if (data.type === 'EVALUATE_ERROR') {
             pending.reject(new Error(data.error || 'Native model inference failed.'));
         } else {
+            const rawReward = Number(data.reward);
+            if (!Number.isFinite(rawReward) || !(data.descriptor instanceof ArrayBuffer)) {
+                pending.reject(new Error('Native model returned an invalid result.'));
+                return;
+            }
+            const descriptor = new Float32Array(data.descriptor);
+            if (descriptor.length !== 32 || descriptor.some((value) => !Number.isFinite(value))) {
+                pending.reject(new Error('Native model returned an invalid descriptor.'));
+                return;
+            }
             pending.resolve({
-                reward: Number(data.reward),
-                descriptor: new Float32Array(data.descriptor),
+                reward: calibrateNativeReward(rawReward, this.manifest?.rewardCalibration),
+                rawReward,
+                descriptor,
                 modelId: String(data.modelId || this.manifest?.modelId || 'unknown'),
             });
         }

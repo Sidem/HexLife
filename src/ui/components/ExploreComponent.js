@@ -10,17 +10,12 @@ import { downloadFile } from '../../utils/utils.js';
 import { decodePack } from '../../services/LibraryPackCodec.js';
 import { ICONS } from '../icons.js';
 import { constraintBadge } from '../RulesetDisplayFactory.js';
-import { COMPONENT_META, UNIFORM_FACTOR_META, NOISE_FACTOR_META } from './scoringTermMeta.js';
+import { COMPONENT_META, UNIFORM_FACTOR_META } from './scoringTermMeta.js';
 import { ExploreScoringPanel } from './ExploreScoringPanel.js';
 import { ExploreRaterView } from './ExploreRaterView.js';
 import { PredictionDeck, PREDICTION_MODE_ENABLED } from './PredictionDeck.js';
 import { VoteBank } from '../../core/analysis/VoteBank.js';
 import { WEIGHT_KEYS, SCORING_PRESETS, sanitizeScoring } from '../../core/analysis/ScoringPresets.js';
-import { EMBEDDING_MODELS } from '../../services/EmbeddingService.js';
-import {
-    MAX_TRAJECTORY_SERIES_TICKS,
-    MAX_TRAJECTORY_SLICES,
-} from '../../services/TrajectoryCaptureService.js';
 
 /**
  * Phase 6 UI for the auto-explore feature (the dual-surface "Explore" panel: desktop popout/panel +
@@ -44,44 +39,17 @@ const SETTING_KEYS = {
     maxGenerations: 'exploreMaxGenerations',
     scoring: 'exploreScoring',
     scoringOpen: 'exploreScoringOpen',
-    // #29 re-tier: the "Advanced" disclosure remembers its state per surface. Mobile Discover is a
-    // newcomer tab and opens collapsed; the desktop Auto-Explore panel is reached by an explicit
-    // rail icon, so it keeps the expert layout and opens expanded.
-    advancedOpenMobile: 'exploreAdvancedOpenMobile',
-    advancedOpenDesktop: 'exploreAdvancedOpenDesktop',
-    embeddingModel: 'embeddingModelId',
-    targetPrompt: 'exploreTargetPrompt',
-    targetBank: 'exploreTargetBankThreshold',
+    activeTab: 'exploreActiveTab',
+    objective: 'exploreObjective',
     nativeFrames: 'nativeTrajectoryFrames',
     nativeStride: 'nativeTrajectoryStride',
-    nativeSlices: 'nativeTrajectorySlices',
-    nativeLabel: 'nativeTrajectoryLabel',
-    nativeFamily: 'nativeTrajectoryFamily',
-};
-
-/** Cap on the target prompt length (chars) — sanitized here and again in AutoExploreService/share links. */
-const TARGET_PROMPT_MAXLEN = 200;
-
-/** Strip control chars and clamp length from an untrusted prompt (UI input, persisted, or share link). */
-function sanitizeTargetPrompt(value) {
-    if (typeof value !== 'string') return '';
-    // eslint-disable-next-line no-control-regex
-    return value.replace(/[\u0000-\u001F\u007F]+/g, ' ').slice(0, TARGET_PROMPT_MAXLEN).trim();
-}
-
-/** Human-readable status line for the perceptual-objective toggle, keyed by EMBEDDING_STATUS. */
-const EMBEDDING_STATUS_TEXT = {
-    disabled: '',
-    loading: 'Loading vision model… (downloads ~tens of MB once, then cached)',
-    ready: 'Vision model ready — finds are also scored on perceptual novelty.',
-    error: 'Vision model unavailable — using the statistical objective.',
 };
 
 const NATIVE_STATUS_TEXT = {
-    disabled: 'Native model is off. Training-slice export remains available.',
+    disabled: 'Native beta is off. Statistical screening remains available.',
     loading: 'Loading the local native trajectory model…',
     ready: 'Native trajectory model ready.',
-    error: 'No accepted native model is installed yet. Export slices, train externally, then install the final artifact.',
+    error: 'Native beta is unavailable. Runs fall back to confirmed statistics.',
 };
 
 const MAX_GALLERY_RENDER = 40;
@@ -112,9 +80,8 @@ export class ExploreComponent extends BaseComponent {
     }
 
     refresh() {
-        // The component is a single shared instance moved between the desktop panel and the mobile
-        // Discover tab, so the Advanced tier has to be re-read on every mount (#29).
-        this._setAdvancedOpen(this._loadAdvancedOpen());
+        // The shared component moves between desktop and mobile, so re-read the active tab on mount.
+        this._selectTab(PersistenceService.loadUISetting(SETTING_KEYS.activeTab, 'setup'), false);
         this._mountPredictionDeck();
         this._syncFromStatus();
         this._renderGallery();
@@ -159,11 +126,8 @@ export class ExploreComponent extends BaseComponent {
         }
         if (typeof cfg.maxGenerations === 'number') PersistenceService.saveUISetting(SETTING_KEYS.maxGenerations, cfg.maxGenerations);
         if (Array.isArray(cfg.icLabels) && cfg.icLabels.length > 0) PersistenceService.saveUISetting(SETTING_KEYS.icLabels, cfg.icLabels);
-        // v3.2 supervised target search: a shared prompt shapes the trajectory, so replay adopts it —
-        // sanitized (untrusted URL: control chars stripped, length-capped). Only when non-empty.
-        if (typeof cfg.targetPrompt === 'string') {
-            const prompt = sanitizeTargetPrompt(cfg.targetPrompt);
-            if (prompt) PersistenceService.saveUISetting(SETTING_KEYS.targetPrompt, prompt);
+        if (cfg.objective === 'statistical' || cfg.objective === 'native-beta') {
+            PersistenceService.saveUISetting(SETTING_KEYS.objective, cfg.objective);
         }
         // v3.1: a shared search may carry custom scoring (weights/penalty) and a find threshold —
         // both shape the trajectory, so a faithful replay must adopt them. Sanitized (untrusted URL).
@@ -196,36 +160,19 @@ export class ExploreComponent extends BaseComponent {
             : [...POPULATION_OPTIONS, populationSize].sort((a, b) => a - b);
         const icLabels = PersistenceService.loadUISetting(SETTING_KEYS.icLabels, IC_SUITE.map(ic => ic.label));
         const maxGenerations = PersistenceService.loadUISetting(SETTING_KEYS.maxGenerations, EXPLORE_CONFIG.maxGenerations);
-        const status = this.service.getStatus();
-        const embeddingEnabled = !!status.embeddingEnabled;
-        const embeddingStatus = status.embeddingStatus || 'disabled';
         const scoringOpen = !!PersistenceService.loadUISetting(SETTING_KEYS.scoringOpen, false);
-        const advancedOpen = this._loadAdvancedOpen();
-        const activeModelId = this.worldManager.embeddingService?.getModelId?.()
-            || PersistenceService.loadUISetting(SETTING_KEYS.embeddingModel, EMBEDDING_MODELS[0].id);
-        const targetPrompt = sanitizeTargetPrompt(PersistenceService.loadUISetting(SETTING_KEYS.targetPrompt, ''));
-        const targetBank = this._sanitizeTargetBank(
-            PersistenceService.loadUISetting(SETTING_KEYS.targetBank, EXPLORE_CONFIG.targetBankThreshold),
-        );
+        const activeTab = PersistenceService.loadUISetting(SETTING_KEYS.activeTab, 'setup');
+        const objective = PersistenceService.loadUISetting(SETTING_KEYS.objective, 'native-beta');
         const nativeStatus = this.worldManager.nativeTrajectoryModelService?.getStatus?.() || {
             enabled: false, status: 'disabled', message: null, modelId: null, backend: null, acceptanceStatus: null,
         };
         const nativeFrames = Math.max(1, Math.min(32, Math.trunc(
             Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeFrames, 32)) || 32,
         )));
-        const nativeStride = Math.max(1, Math.min(32, Math.trunc(
-            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeStride, 1)) || 1,
+        const nativeStride = Math.max(1, Math.min(8, Math.trunc(
+            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeStride, EXPLORE_CONFIG.nativeTickStride))
+                || EXPLORE_CONFIG.nativeTickStride,
         )));
-        const nativeSlices = Math.max(1, Math.min(MAX_TRAJECTORY_SLICES, Math.trunc(
-            Number(PersistenceService.loadUISetting(SETTING_KEYS.nativeSlices, 8)) || 8,
-        )));
-        const persistedNativeLabel = PersistenceService.loadUISetting(SETTING_KEYS.nativeLabel, 'unlabeled');
-        const nativeLabel = ['unlabeled', 'interesting', 'boring'].includes(persistedNativeLabel)
-            ? persistedNativeLabel
-            : 'unlabeled';
-        const nativeFamily = sanitizeTargetPrompt(
-            String(PersistenceService.loadUISetting(SETTING_KEYS.nativeFamily, '')),
-        ).slice(0, 100);
 
         this.element.innerHTML = `
             <div class="tool-group explore-intro">
@@ -249,23 +196,18 @@ export class ExploreComponent extends BaseComponent {
                     <button class="button explore-run-secondary" data-action="adopt" disabled title="Stop and keep the current champion ruleset in the selected world">Stop &amp; Keep</button>
                 </div>
             </div>
-            <!-- #19 Prediction mode. Newcomer tier, so by the #29 rule it lives ABOVE the Advanced
-                 disclosure — the first thing a visitor meets on Discover is a question they can
-                 answer, not the search's expert controls. Mounted lazily (see _mountPredictionDeck):
-                 dealing a card borrows a scratch world, which must not happen on a surface the user
-                 never opened. CURRENTLY INERT — PREDICTION_MODE_ENABLED is false, so this div stays
-                 empty and renders nothing. The div is kept so the placement contract above the
-                 disclosure survives re-enabling; tests/exploreDisclosure.test.js pins both.
+            <!-- #19 Prediction mode mounts lazily because dealing a card borrows a scratch world.
+                 CURRENTLY INERT — PREDICTION_MODE_ENABLED is false.
                  NB no backticks in this comment: it lives inside a template literal, where one
                  would close the string and take the whole render template with it. -->
             <div id="explore-prediction-mount"></div>
-            <details class="tool-group explore-advanced" id="explore-advanced" ${advancedOpen ? 'open' : ''}>
-                <summary class="explore-advanced-summary">
-                    <h5>Advanced <span class="explore-advanced-chip" data-field="advanced-chip"></span></h5>
-                </summary>
-                <p class="explore-advanced-blurb">Each generation: candidates are <strong>screened</strong> cheaply across an initial-condition suite, promising ones are <strong>confirmed</strong> with a long burst, and survivors are <strong>banked</strong> in the gallery — the best two breed the next generation. Scoring decides what "interesting" means.</p>
+            <div class="explore-tabs" role="tablist" aria-label="Auto-Explore sections">
+                ${['setup', 'objective', 'finds'].map((tab) => `<button type="button" class="explore-tab" role="tab" id="explore-tab-${tab}" data-tab="${tab}" aria-controls="explore-panel-${tab}" aria-selected="${activeTab === tab}" tabindex="${activeTab === tab ? '0' : '-1'}">${tab[0].toUpperCase()}${tab.slice(1)}</button>`).join('')}
+            </div>
+            <section class="explore-tab-panel" role="tabpanel" id="explore-panel-setup" aria-labelledby="explore-tab-setup" ${activeTab === 'setup' ? '' : 'hidden'}>
+                <p class="explore-blurb">Configure mutation, population, initial conditions, evaluation length, and budget.</p>
             <div class="tool-group explore-settings" id="explore-settings">
-                <h5>Search Settings</h5>
+                <h5>Setup</h5>
                 <div class="form-group" id="explore-mutation-rate-mount"></div>
                 <div class="form-group" id="explore-mutation-mode-mount"></div>
                 <div class="form-group" id="explore-eval-ticks-mount"></div>
@@ -290,50 +232,24 @@ export class ExploreComponent extends BaseComponent {
                     <label class="explore-field-label" for="explore-max-generations">Generation Budget <span class="explore-field-hint">(0 = unlimited)</span></label>
                     <input type="number" id="explore-max-generations" class="explore-budget-input" min="0" max="10000" step="1" value="${maxGenerations}">
                 </div>
-                <div class="form-group explore-embedding-field">
-                    <label class="explore-embedding-toggle" title="Score finds on perceptual novelty using a vision model (CLIP) embedding of their frames — ASAL-style. Optional: the model loads on demand (tens of MB, cached) and the search falls back to the statistical objective if it can't load.">
-                        <input type="checkbox" id="explore-embedding-enabled" ${embeddingEnabled ? 'checked' : ''}>
-                        <span>Perceptual novelty (CLIP) <span class="explore-field-hint">experimental</span></span>
-                    </label>
-                    <div class="explore-embedding-model" id="explore-embedding-model-field" ${embeddingEnabled ? '' : 'hidden'}>
-                        <label class="explore-field-label" for="explore-embedding-model">Vision model</label>
-                        <select id="explore-embedding-model" class="explore-embedding-model-select">
-                            ${EMBEDDING_MODELS.map((m) => `<option value="${this._escape(m.id)}" title="${this._escape(m.detail)}" ${m.id === activeModelId ? 'selected' : ''}>${this._escape(m.label)}</option>`).join('')}
-                        </select>
-                        <div class="explore-field-hint explore-embedding-model-hint">${this._escape(EMBEDDING_MODELS.find((m) => m.id === activeModelId)?.detail || '')} Changing models resets the perceptual-novelty archive (different models see differently).</div>
-                    </div>
-                    <div class="explore-embedding-status" id="explore-embedding-status" data-status="${embeddingStatus}">${this._escape(EMBEDDING_STATUS_TEXT[embeddingStatus] || '')}</div>
-                </div>
-                <div class="form-group explore-target-field" id="explore-target-field">
-                    <label class="explore-field-label" for="explore-target-prompt">
-                        Find life that looks like…
-                        <span class="explore-mode-chip" data-field="mode-chip" title="Statistical: no vision model. Open-ended: perceptual novelty. Target: evolution steered toward your prompt."></span>
-                    </label>
-                    <input type="text" id="explore-target-prompt" class="explore-target-input" maxlength="${TARGET_PROMPT_MAXLEN}"
-                        placeholder="e.g. spirals, a maze, gliders" value="${this._escape(targetPrompt)}"
-                        ${embeddingEnabled ? '' : 'disabled'}
-                        title="Type what you want the search to hunt for. Evolution is steered toward frames a vision model (CLIP) reads as your prompt (ASAL supervised target search). Requires the perceptual-novelty toggle above.">
-                    <div class="explore-field-hint explore-target-hint" data-field="target-hint">${embeddingEnabled
-                        ? 'Steers evolution toward frames that match your prompt. Leave empty for open-ended novelty.'
-                        : 'Enable “Perceptual novelty (CLIP)” above to search by prompt.'}</div>
-                    <div class="explore-target-advanced" id="explore-target-advanced" ${embeddingEnabled ? '' : 'hidden'}>
-                        <label class="explore-field-label" for="explore-target-bank">Match threshold <span class="explore-field-hint">bank finds with cosine ≥ this</span></label>
-                        <input type="number" id="explore-target-bank" class="explore-budget-input" min="0" max="1" step="0.01" value="${targetBank}"
-                            title="A target-mode find enters the gallery only when its mean frame→prompt cosine similarity reaches this. CLIP image-text similarities sit around 0.1–0.35, so 0.22 keeps the genuine matches.">
-                    </div>
+            </div>
+            </section>
+            <section class="explore-tab-panel" role="tabpanel" id="explore-panel-objective" aria-labelledby="explore-tab-objective" ${activeTab === 'objective' ? '' : 'hidden'}>
+                <div class="tool-group explore-objective-choices">
+                    <h5>Objective</h5>
+                    <label class="explore-objective-choice"><input type="radio" name="explore-objective" value="native-beta" ${objective !== 'statistical' ? 'checked' : ''}> <strong>Native beta</strong> <small>Calibrated learned ranking; falls back safely to statistics.</small></label>
+                    <label class="explore-objective-choice"><input type="radio" name="explore-objective" value="statistical" ${objective === 'statistical' ? 'checked' : ''}> <strong>Statistical only</strong> <small>Deterministic model-free baseline.</small></label>
                 </div>
                 <div class="form-group explore-native-field">
                     <div class="explore-native-heading">
-                        <strong>Native trajectory model</strong>
-                        <span class="explore-field-hint">#37 Stage 4A</span>
+                        <strong>Model status</strong>
+                        <span class="explore-field-hint">beta · 32-D trajectory descriptor</span>
                     </div>
-                    <label class="explore-embedding-toggle" title="Load an accepted HexLife-native ONNX model from this Explorer build. Training runs only in the separate HexLifeInterestModel project.">
-                        <input type="checkbox" id="explore-native-enabled" ${nativeStatus.enabled ? 'checked' : ''}>
-                        <span>Enable installed model</span>
-                    </label>
                     <div class="explore-native-status" id="explore-native-status" data-status="${nativeStatus.status}">
                         ${this._escape(this._nativeStatusText(nativeStatus))}
                     </div>
+                    <details class="explore-model-tools" id="explore-model-tools">
+                    <summary>Model Tools</summary>
                     <div class="explore-native-capture-grid">
                         <label>
                             <span>Frames</span>
@@ -343,39 +259,24 @@ export class ExploreComponent extends BaseComponent {
                         </label>
                         <label>
                             <span>Tick stride</span>
-                            <input type="number" id="explore-native-stride" min="1" max="32" step="1" value="${nativeStride}">
-                        </label>
-                        <label>
-                            <span>Slices</span>
-                            <select id="explore-native-slices">
-                                ${[1, 2, 4, 8, 16].map((value) => `<option value="${value}" ${value === nativeSlices ? 'selected' : ''}>${value}</option>`).join('')}
-                            </select>
-                        </label>
-                        <label>
-                            <span>Collection label</span>
-                            <select id="explore-native-label">
-                                ${['unlabeled', 'interesting', 'boring'].map((value) => `<option value="${value}" ${value === nativeLabel ? 'selected' : ''}>${value}</option>`).join('')}
-                            </select>
-                        </label>
-                        <label>
-                            <span>Ruleset family <span class="explore-field-hint">optional</span></span>
-                            <input type="text" id="explore-native-family" maxlength="100" value="${this._escape(nativeFamily)}" placeholder="e.g. glider-mutants-a">
+                            <input type="number" id="explore-native-stride" min="1" max="8" step="1" value="${nativeStride}">
                         </label>
                     </div>
                     <div class="form-group-buttons explore-native-actions">
-                        <button class="button" data-action="export-training-slice" title="Capture exact bit-packed states without advancing the selected world">Export HXLT1 set</button>
+                        <button class="button" data-action="export-training-slice" title="Capture exact bit-packed states without advancing the selected world">Export selected</button>
                         <button class="button" data-action="evaluate-native" ${nativeStatus.status === 'ready' ? '' : 'disabled'} title="Evaluate one clip using the selected frame count and tick stride">Evaluate selected</button>
                     </div>
-                    <div class="explore-field-hint">Multiple slices sample consecutive, non-overlapping future windows and download as one ZIP with an index. The selected world is restored exactly.</div>
+                    <div class="explore-field-hint">Both tools capture exact HXLT1 states and restore the selected world exactly.</div>
+                    </details>
                 </div>
-            </div>
             <details class="tool-group explore-scoring-group" id="explore-scoring-group" ${scoringOpen ? 'open' : ''}>
                 <summary class="explore-scoring-summary">
                     <h5>Scoring <span class="explore-scoring-preset-chip" data-field="preset-chip"></span></h5>
                 </summary>
                 <div id="explore-scoring-mount"></div>
             </details>
-            </details><!-- /#explore-advanced: Search Settings + Scoring are its children -->
+            </section>
+            <section class="explore-tab-panel" role="tabpanel" id="explore-panel-finds" aria-labelledby="explore-tab-finds" ${activeTab === 'finds' ? '' : 'hidden'}>
             <div class="tool-group explore-gallery-group">
                 <div class="explore-gallery-header">
                     <h5>Gallery / Leaderboard <span class="explore-gallery-count" data-field="count">(0)</span></h5>
@@ -390,11 +291,13 @@ export class ExploreComponent extends BaseComponent {
                 <div id="explore-rater-mount" class="explore-rater" hidden></div>
                 <div id="explore-gallery-list" class="explore-gallery-list"></div>
             </div>
+            </section>
         `;
 
         this.statusEl = this.element.querySelector('#explore-status');
         this.settingsEl = this.element.querySelector('#explore-settings');
-        this.advancedGroup = this.element.querySelector('#explore-advanced');
+        this.tabButtons = Array.from(this.element.querySelectorAll('[role="tab"][data-tab]'));
+        this.tabPanels = Array.from(this.element.querySelectorAll('[role="tabpanel"]'));
         this.galleryGroup = this.element.querySelector('.explore-gallery-group');
         this.galleryList = this.element.querySelector('#explore-gallery-list');
         this.raterMount = this.element.querySelector('#explore-rater-mount');
@@ -406,26 +309,13 @@ export class ExploreComponent extends BaseComponent {
         };
         this.budgetInput = this.element.querySelector('#explore-max-generations');
         this.populationSelect = this.element.querySelector('#explore-population');
-        this.embeddingToggle = this.element.querySelector('#explore-embedding-enabled');
-        this.embeddingStatusEl = this.element.querySelector('#explore-embedding-status');
-        this.embeddingModelField = this.element.querySelector('#explore-embedding-model-field');
-        this.embeddingModelSelect = this.element.querySelector('#explore-embedding-model');
-        this.nativeToggle = this.element.querySelector('#explore-native-enabled');
+        this.objectiveRadios = Array.from(this.element.querySelectorAll('input[name="explore-objective"]'));
         this.nativeStatusEl = this.element.querySelector('#explore-native-status');
         this.nativeFramesSelect = this.element.querySelector('#explore-native-frames');
         this.nativeStrideInput = this.element.querySelector('#explore-native-stride');
-        this.nativeSlicesSelect = this.element.querySelector('#explore-native-slices');
-        this.nativeLabelSelect = this.element.querySelector('#explore-native-label');
-        this.nativeFamilyInput = this.element.querySelector('#explore-native-family');
         this.nativeExportButton = this.element.querySelector('[data-action="export-training-slice"]');
         this.nativeEvaluateButton = this.element.querySelector('[data-action="evaluate-native"]');
-        this.targetInput = this.element.querySelector('#explore-target-prompt');
-        this.targetBankInput = this.element.querySelector('#explore-target-bank');
-        this.targetAdvanced = this.element.querySelector('#explore-target-advanced');
-        this.targetHintEl = this.element.querySelector('[data-field="target-hint"]');
         this.scoringGroup = this.element.querySelector('#explore-scoring-group');
-        this._updateModeChip();
-        this._updateAdvancedChip();
 
         // Scoring panel (v3.1): user-customizable objective. The summary chip mirrors the active
         // preset; explainer curve markers follow the current best find's measured raw metrics.
@@ -434,7 +324,6 @@ export class ExploreComponent extends BaseComponent {
             voteBank: this.voteBank,
         });
         this._updatePresetChip(this.scoringPanel.getPresetKey());
-        this._updateAdvancedChip();
 
         this.sliders.rate = new SliderComponent(this.element.querySelector('#explore-mutation-rate-mount'), {
             id: 'explore-mutation-rate',
@@ -490,24 +379,6 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
-        if (this.targetInput) {
-            // Persist + refresh the mode chip live; dispatch the command so any other surface can react.
-            this._addDOMListener(this.targetInput, 'input', () => {
-                const prompt = sanitizeTargetPrompt(this.targetInput.value);
-                PersistenceService.saveUISetting(SETTING_KEYS.targetPrompt, prompt);
-                EventBus.dispatch(EVENTS.COMMAND_SET_EXPLORE_TARGET_PROMPT, { prompt });
-                this._updateModeChip();
-            });
-        }
-
-        if (this.targetBankInput) {
-            this._addDOMListener(this.targetBankInput, 'change', () => {
-                const v = this._sanitizeTargetBank(this.targetBankInput.value);
-                this.targetBankInput.value = v;
-                PersistenceService.saveUISetting(SETTING_KEYS.targetBank, v);
-            });
-        }
-
         this._addDOMListener(this.element.querySelector('[data-action="copy-search-link"]'), 'click', () => this._copySearchLink());
 
         this._addDOMListener(this.element.querySelector('[data-action="clear-gallery"]'), 'click', () => {
@@ -537,29 +408,19 @@ export class ExploreComponent extends BaseComponent {
             PersistenceService.saveUISetting(SETTING_KEYS.icLabels, this._readICLabels());
         });
 
-        if (this.embeddingToggle) {
-            this._addDOMListener(this.embeddingToggle, 'change', () => {
-                EventBus.dispatch(EVENTS.COMMAND_SET_EMBEDDING_ENABLED, { enabled: this.embeddingToggle.checked });
+        this.tabButtons.forEach((button) => {
+            this._addDOMListener(button, 'click', () => this._selectTab(button.dataset.tab));
+            this._addDOMListener(button, 'keydown', (event) => this._onTabKeydown(event));
+        });
+        this.objectiveRadios.forEach((radio) => {
+            this._addDOMListener(radio, 'change', () => {
+                if (!radio.checked) return;
+                PersistenceService.saveUISetting(SETTING_KEYS.objective, radio.value);
+                EventBus.dispatch(EVENTS.COMMAND_SET_NATIVE_MODEL_ENABLED, {
+                    enabled: radio.value !== 'statistical',
+                });
             });
-        }
-
-        if (this.embeddingModelSelect) {
-            this._addDOMListener(this.embeddingModelSelect, 'change', () => {
-                const modelId = this.embeddingModelSelect.value;
-                const hintEl = this.element.querySelector('.explore-embedding-model-hint');
-                if (hintEl) {
-                    const detail = EMBEDDING_MODELS.find((m) => m.id === modelId)?.detail || '';
-                    hintEl.textContent = `${detail} Changing models resets the perceptual-novelty archive (different models see differently).`;
-                }
-                EventBus.dispatch(EVENTS.COMMAND_SET_EMBEDDING_MODEL, { modelId });
-            });
-        }
-
-        if (this.nativeToggle) {
-            this._addDOMListener(this.nativeToggle, 'change', () => {
-                EventBus.dispatch(EVENTS.COMMAND_SET_NATIVE_MODEL_ENABLED, { enabled: this.nativeToggle.checked });
-            });
-        }
+        });
         if (this.nativeFramesSelect) {
             this._addDOMListener(this.nativeFramesSelect, 'change', () => {
                 PersistenceService.saveUISetting(SETTING_KEYS.nativeFrames, Number(this.nativeFramesSelect.value));
@@ -567,26 +428,11 @@ export class ExploreComponent extends BaseComponent {
         }
         if (this.nativeStrideInput) {
             this._addDOMListener(this.nativeStrideInput, 'change', () => {
-                const stride = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeStrideInput.value) || 1)));
+                const stride = Math.max(1, Math.min(8, Math.trunc(
+                    Number(this.nativeStrideInput.value) || EXPLORE_CONFIG.nativeTickStride,
+                )));
                 this.nativeStrideInput.value = stride;
                 PersistenceService.saveUISetting(SETTING_KEYS.nativeStride, stride);
-            });
-        }
-        if (this.nativeSlicesSelect) {
-            this._addDOMListener(this.nativeSlicesSelect, 'change', () => {
-                PersistenceService.saveUISetting(SETTING_KEYS.nativeSlices, Number(this.nativeSlicesSelect.value));
-            });
-        }
-        if (this.nativeLabelSelect) {
-            this._addDOMListener(this.nativeLabelSelect, 'change', () => {
-                PersistenceService.saveUISetting(SETTING_KEYS.nativeLabel, this.nativeLabelSelect.value);
-            });
-        }
-        if (this.nativeFamilyInput) {
-            this._addDOMListener(this.nativeFamilyInput, 'change', () => {
-                const family = this.nativeFamilyInput.value.trim().slice(0, 100);
-                this.nativeFamilyInput.value = family;
-                PersistenceService.saveUISetting(SETTING_KEYS.nativeFamily, family);
             });
         }
         this._addDOMListener(this.nativeExportButton, 'click', () => {
@@ -604,25 +450,10 @@ export class ExploreComponent extends BaseComponent {
             });
         }
 
-        const advancedSummary = this.advancedGroup?.querySelector('summary');
-        if (advancedSummary) {
-            // Persist the *user's* choice per surface, so opening the expert block on desktop does
-            // not un-tier mobile Discover. Deliberately not the `toggle` event: that also fires for
-            // the parser setting `open` and for programmatic opens (mount, tour, error rescue), and
-            // it fires asynchronously — a startup render could land on the wrong surface's key.
-            // `click` covers keyboard activation too (summary synthesizes one) and runs *before* the
-            // default action, so the state being chosen is `!open`.
-            this._addDOMListener(advancedSummary, 'click', () => {
-                const key = this._isMobileSurface() ? SETTING_KEYS.advancedOpenMobile : SETTING_KEYS.advancedOpenDesktop;
-                PersistenceService.saveUISetting(key, !this.advancedGroup.open);
-            });
-        }
-
         this._addDOMListener(this.galleryList, 'click', (e) => this._onGalleryClick(e));
 
         this._subscribeToEvent(EVENTS.EXPLORE_PROGRESS, this._onProgress);
         this._subscribeToEvent(EVENTS.EXPLORE_FIND_ADDED, this._onFindAdded);
-        this._subscribeToEvent(EVENTS.EMBEDDING_STATUS_CHANGED, this._onEmbeddingStatus);
         this._subscribeToEvent(EVENTS.NATIVE_MODEL_STATUS_CHANGED, this._onNativeModelStatus);
         this._subscribeToEvent(EVENTS.VOTE_RECORDED, this._onVoteRecorded);
     }
@@ -662,19 +493,6 @@ export class ExploreComponent extends BaseComponent {
         this._renderGallery();
     }
 
-    _onEmbeddingStatus(payload) {
-        if (!payload) return;
-        if (this.embeddingToggle) this.embeddingToggle.checked = !!payload.enabled;
-        if (this.embeddingStatusEl) {
-            const status = payload.status || 'disabled';
-            this.embeddingStatusEl.dataset.status = status;
-            this.embeddingStatusEl.textContent = EMBEDDING_STATUS_TEXT[status] || '';
-        }
-        if (this.embeddingModelField) this.embeddingModelField.hidden = !payload.enabled;
-        // The mode chip + target-field gating depend on the embedding toggle.
-        this._updateModeChip();
-    }
-
     _nativeStatusText(status) {
         if (status?.status === 'ready') {
             const details = [status.modelId, status.backend, status.acceptanceStatus].filter(Boolean).join(' · ');
@@ -685,7 +503,6 @@ export class ExploreComponent extends BaseComponent {
 
     _onNativeModelStatus(payload) {
         if (!payload) return;
-        if (this.nativeToggle) this.nativeToggle.checked = !!payload.enabled;
         if (this.nativeStatusEl) {
             this.nativeStatusEl.dataset.status = payload.status || 'disabled';
             this.nativeStatusEl.textContent = this._nativeStatusText(payload);
@@ -695,11 +512,9 @@ export class ExploreComponent extends BaseComponent {
 
     _nativeCaptureOptions() {
         const frameCount = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeFramesSelect?.value) || 32)));
-        const tickStride = Math.max(1, Math.min(32, Math.trunc(Number(this.nativeStrideInput?.value) || 1)));
-        const sliceCount = Math.max(1, Math.min(
-            MAX_TRAJECTORY_SLICES,
-            Math.trunc(Number(this.nativeSlicesSelect?.value) || 1),
-        ));
+        const tickStride = Math.max(1, Math.min(8, Math.trunc(
+            Number(this.nativeStrideInput?.value) || EXPLORE_CONFIG.nativeTickStride,
+        )));
         if ((frameCount - 1) * tickStride > 256) {
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
                 message: 'Training slice span must be 256 ticks or less.',
@@ -707,62 +522,47 @@ export class ExploreComponent extends BaseComponent {
             });
             return null;
         }
-        const totalSpan = (sliceCount - 1) * frameCount * tickStride + (frameCount - 1) * tickStride;
-        if (totalSpan > MAX_TRAJECTORY_SERIES_TICKS) {
-            EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                message: `Training-slice set span must be ${MAX_TRAJECTORY_SERIES_TICKS} ticks or less.`,
-                type: 'error',
-            });
-            return null;
-        }
         return {
             frameCount,
             tickStride,
-            sliceCount,
-            label: this.nativeLabelSelect?.value || 'unlabeled',
-            family: this.nativeFamilyInput?.value.trim().slice(0, 100) || '',
         };
     }
 
     _updatePresetChip(presetKey) {
         const chip = this.element.querySelector('[data-field="preset-chip"]');
         if (chip) chip.textContent = presetKey === 'custom' ? 'Custom' : (SCORING_PRESETS[presetKey]?.label || '');
-        this._updateAdvancedChip();
     }
 
-    /** True on the mobile Discover tab, false in the desktop Auto-Explore panel (#29 tiering). */
-    _isMobileSurface() {
-        return !!this.appContext?.uiManager?.isMobile?.();
+    /** Public entry point for tours/other surfaces that need a specific tab shown. */
+    selectTab(tab) {
+        this._selectTab(tab);
     }
 
-    /** Persisted open-state of the Advanced disclosure — collapsed by default on mobile only. */
-    _loadAdvancedOpen() {
-        const mobile = this._isMobileSurface();
-        const key = mobile ? SETTING_KEYS.advancedOpenMobile : SETTING_KEYS.advancedOpenDesktop;
-        return !!PersistenceService.loadUISetting(key, !mobile);
+    _selectTab(tab, persist = true) {
+        const valid = ['setup', 'objective', 'finds'].includes(tab) ? tab : 'setup';
+        this.tabButtons?.forEach((button) => {
+            const selected = button.dataset.tab === valid;
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+        this.tabPanels?.forEach((panel) => {
+            panel.hidden = panel.id !== `explore-panel-${valid}`;
+        });
+        if (persist) PersistenceService.saveUISetting(SETTING_KEYS.activeTab, valid);
     }
 
-    /**
-     * #29: collapsing Advanced must not hide *state*, only controls — the summary chip carries the
-     * two settings that change what a run does (search mode and scoring preset) up to the summary.
-     */
-    _updateAdvancedChip() {
-        const chip = this.element.querySelector('[data-field="advanced-chip"]');
-        if (!chip) return;
-        const mode = this.element.querySelector('[data-field="mode-chip"]')?.textContent || '';
-        const preset = this.element.querySelector('[data-field="preset-chip"]')?.textContent || '';
-        chip.textContent = [mode, preset].filter(Boolean).join(' · ');
-    }
-
-    /** Open/close Advanced. Programmatic changes are not a user preference, so they never persist. */
-    _setAdvancedOpen(open) {
-        if (this.advancedGroup) this.advancedGroup.open = open;
-    }
-
-    /** Open the Advanced disclosure (and optionally Scoring inside it) — used by tours and errors. */
-    openAdvanced({ scoring = false } = {}) {
-        this._setAdvancedOpen(true);
-        if (scoring && this.scoringGroup) this.scoringGroup.open = true;
+    _onTabKeydown(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const current = this.tabButtons.indexOf(event.currentTarget);
+        const last = this.tabButtons.length - 1;
+        const next = event.key === 'Home' ? 0
+            : event.key === 'End' ? last
+                : (current + (event.key === 'ArrowRight' ? 1 : -1) + this.tabButtons.length)
+                    % this.tabButtons.length;
+        const button = this.tabButtons[next];
+        this._selectTab(button.dataset.tab);
+        button.focus();
     }
 
     /** Coerce any inbound population value (UI select, persisted, or share link) to an int in range. */
@@ -770,36 +570,6 @@ export class ExploreComponent extends BaseComponent {
         const n = Math.floor(Number(value));
         if (!Number.isFinite(n)) return EXPLORE_CONFIG.populationSize;
         return Math.min(POPULATION_MAX, Math.max(POPULATION_MIN, n));
-    }
-
-    /** Coerce the target-match banking threshold to a cosine in [0,1] (2 dp), defaulting to the config. */
-    _sanitizeTargetBank(value) {
-        const n = Number(value);
-        if (!Number.isFinite(n)) return EXPLORE_CONFIG.targetBankThreshold;
-        return Math.round(Math.min(1, Math.max(0, n)) * 100) / 100;
-    }
-
-    /**
-     * Update the search-mode chip + target-field gating from the live embedding toggle and prompt input:
-     * Statistical (no vision model) → Open-ended (perceptual novelty, no prompt) → 🎯 Target (prompt set).
-     */
-    _updateModeChip() {
-        const embeddingsOn = !!this.embeddingToggle?.checked;
-        const hasPrompt = !!(this.targetInput && sanitizeTargetPrompt(this.targetInput.value));
-        const chip = this.element.querySelector('[data-field="mode-chip"]');
-        if (chip) {
-            const label = !embeddingsOn ? 'Statistical' : (hasPrompt ? '🎯 Target' : 'Open-ended');
-            chip.textContent = label;
-            chip.dataset.mode = !embeddingsOn ? 'statistical' : (hasPrompt ? 'target' : 'open');
-        }
-        if (this.targetInput) this.targetInput.disabled = !embeddingsOn;
-        if (this.targetAdvanced) this.targetAdvanced.hidden = !embeddingsOn;
-        if (this.targetHintEl) {
-            this.targetHintEl.textContent = embeddingsOn
-                ? 'Steers evolution toward frames that match your prompt. Leave empty for open-ended novelty.'
-                : 'Enable “Perceptual novelty (CLIP)” above to search by prompt.';
-        }
-        this._updateAdvancedChip();
     }
 
     _readICLabels() {
@@ -811,23 +581,20 @@ export class ExploreComponent extends BaseComponent {
     _startExploration() {
         const icLabels = this._readICLabels();
         if (icLabels.length === 0) {
-            this.openAdvanced();
+            this._selectTab('setup');
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Select at least one initial condition to explore.', type: 'error' });
             return;
         }
         // v3.1 custom objective. Weights that sum to zero over the terms a run can actually
         // measure would score every candidate 0 and bank nothing — refuse loudly instead.
         const scoring = this.scoringPanel.getScoring();
-        const embeddingsOn = !!this.embeddingToggle?.checked;
-        const effectiveKeys = embeddingsOn ? WEIGHT_KEYS : WEIGHT_KEYS.filter((k) => k !== 'openEndedness');
+        const effectiveKeys = WEIGHT_KEYS;
         if (effectiveKeys.every((k) => (scoring.weights[k] || 0) === 0)) {
-            // The sliders that caused this may be collapsed behind Advanced — reveal them, or the
-            // toast points at controls the user cannot see.
-            this.openAdvanced({ scoring: true });
+            // Reveal the controls that need attention.
+            this._selectTab('objective');
+            if (this.scoringGroup) this.scoringGroup.open = true;
             EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                message: embeddingsOn
-                    ? 'All scoring weights are 0 — nothing would ever be banked. Raise at least one weight.'
-                    : 'All active scoring weights are 0 (Novelty needs the CLIP objective enabled). Raise at least one other weight.',
+                message: 'All scoring weights are 0 — nothing would ever be banked. Raise at least one weight.',
                 type: 'error',
             });
             return;
@@ -841,10 +608,7 @@ export class ExploreComponent extends BaseComponent {
             icLabels,
             scoring,
             findThreshold: scoring.findThreshold,
-            // Supervised target search (v3.2): the prompt only takes effect when embeddings are on (the
-            // service also re-checks). targetBankThreshold gates which matches enter the gallery.
-            targetPrompt: embeddingsOn ? sanitizeTargetPrompt(this.targetInput?.value) : '',
-            targetBankThreshold: this._sanitizeTargetBank(this.targetBankInput?.value),
+            objective: this.objectiveRadios.find((radio) => radio.checked)?.value || 'native-beta',
         };
         // One-shot replay seed from a shared search link (see _consumeSharedSearch).
         if (this._pendingBaseSeed != null) {
@@ -954,15 +718,12 @@ export class ExploreComponent extends BaseComponent {
         if (this.budgetInput) this.budgetInput.disabled = isRunning;
         if (this.populationSelect) this.populationSelect.disabled = isRunning;
         this.scoringPanel?.setDisabled(isRunning);
-        if (this.embeddingModelSelect) this.embeddingModelSelect.disabled = isRunning;
+        this.objectiveRadios?.forEach((radio) => { radio.disabled = isRunning; });
         if (this.nativeExportButton) this.nativeExportButton.disabled = isRunning;
         if (this.nativeEvaluateButton) {
             this.nativeEvaluateButton.disabled = isRunning ||
                 this.worldManager.nativeTrajectoryModelService?.getStatus?.().status !== 'ready';
         }
-        // Target controls are read at Start; a running search also can't have embeddings toggled off.
-        if (this.targetInput) this.targetInput.disabled = isRunning || !this.embeddingToggle?.checked;
-        if (this.targetBankInput) this.targetBankInput.disabled = isRunning;
 
         const stateEl = this.statusEl?.querySelector('[data-field="state"]');
         const detailEl = this.statusEl?.querySelector('[data-field="detail"]');
@@ -974,9 +735,7 @@ export class ExploreComponent extends BaseComponent {
         if (detailEl) {
             if (isRunning) {
                 const gen = payload.generation ?? 0;
-                // In target mode `bestScore` is the best prompt-match cosine, so label it "match".
-                const bestLabel = payload.targetMode ? 'match' : 'best';
-                const best = typeof payload.bestScore === 'number' ? ` · ${bestLabel} ${payload.bestScore.toFixed(2)}` : '';
+                const best = typeof payload.bestScore === 'number' ? ` · best ${payload.bestScore.toFixed(2)}` : '';
                 detailEl.textContent = `gen ${gen}${best}`;
             } else {
                 detailEl.textContent = '';
@@ -1030,15 +789,9 @@ export class ExploreComponent extends BaseComponent {
             ? `<span class="explore-find-chaos" title="${this._escape(UNIFORM_FACTOR_META.hint)}">chaos ×${uf.toFixed(2)}</span>`
             : '';
         // #37 Stage 3: surface both the raw nuisance similarity and the factor that scaled confirmation.
-        const nf = entry.perComponent?.noiseFactor;
-        const ns = entry.perComponent?.noiseSimilarity ?? entry.noiseSimilarity;
-        const noiseChip = (entry.perComponent?.noiseUsed && typeof nf === 'number' && nf < 0.995)
-            ? `<span class="explore-find-noise" title="${this._escape(`${NOISE_FACTOR_META.hint} Raw similarity: ${typeof ns === 'number' ? ns.toFixed(3) : 'n/a'}.`)}">noise ×${nf.toFixed(2)}</span>`
-            : '';
-        // Supervised target search (v3.2): a find banked in target mode carries its trajectory→prompt match.
-        const targetChip = (typeof entry.targetSimilarity === 'number')
-            ? `<span class="explore-find-target" title="Mean cosine similarity of this find's frames to the target prompt (higher = closer match)">🎯 ${entry.targetSimilarity.toFixed(2)}</span>`
-            : '';
+        const modelChip = entry.nativeModelId
+            ? `<span class="explore-find-model" title="Ranked by calibrated native beta reward">native beta</span>`
+            : `<span class="explore-find-model" title="Native model unavailable or Statistical only selected">statistical</span>`;
         // Structural constraint class (roadmap #38), derived from the hex like it is on library cards:
         // symmetric tables are disproportionately likely to be interesting, so the class is worth
         // scanning down the leaderboard. Sits next to the name — it is a fact about the ruleset,
@@ -1061,7 +814,7 @@ export class ExploreComponent extends BaseComponent {
                             <span class="explore-find-name" title="${this._escape(entry.hex)}">${name}</span>
                             ${constraintChip}
                             <span class="explore-find-ic" title="Winning initial condition">${ic}</span>
-                            ${cyclicChip}${chaosChip}${noiseChip}${targetChip}
+                            ${cyclicChip}${chaosChip}${modelChip}
                         </div>
                         ${bars}
                         <div class="explore-find-actions">
@@ -1104,19 +857,6 @@ export class ExploreComponent extends BaseComponent {
                     <span class="explore-bar-label">${UNIFORM_FACTOR_META.label}</span>
                     <span class="explore-bar-track"><span class="explore-bar-fill${penalized ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(uf * 100)}%"></span></span>
                     <span class="explore-bar-val">×${uf.toFixed(2)}</span>
-                </div>
-            `;
-        }
-        if (perComponent.noiseUsed && typeof perComponent.noiseFactor === 'number') {
-            const nf = Math.max(0, Math.min(1, perComponent.noiseFactor));
-            const similarity = typeof perComponent.noiseSimilarity === 'number'
-                ? ` Similarity ${perComponent.noiseSimilarity.toFixed(3)}.`
-                : '';
-            rows += `
-                <div class="explore-bar-row" title="${this._escape(`${NOISE_FACTOR_META.label} — ${NOISE_FACTOR_META.hint}${similarity}`)}">
-                    <span class="explore-bar-label">${NOISE_FACTOR_META.label}</span>
-                    <span class="explore-bar-track"><span class="explore-bar-fill${nf < 0.995 ? ' explore-bar-fill--penalty' : ''}" style="width:${Math.round(nf * 100)}%"></span></span>
-                    <span class="explore-bar-val">×${nf.toFixed(2)}</span>
                 </div>
             `;
         }

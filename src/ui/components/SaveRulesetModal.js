@@ -5,7 +5,6 @@ import { IC_SUITE } from '../../core/AutoExploreService.js';
 import { CANONICAL_TAGS, tagLabel, isCanonicalTag, normalizeTag } from '../../core/tags.js';
 import {
     suggestTagsFromStats,
-    suggestTagsFromEmbedding,
     mergeSuggestions,
     MAX_SUGGESTIONS,
 } from '../../core/analysis/tagSuggestions.js';
@@ -31,8 +30,6 @@ export class SaveRulesetModal extends BaseComponent {
         this.selectedTags = new Set();
         /** Currently-offered suggestion ids not already selected. @type {string[]} */
         this._suggestions = [];
-        /** Token guarding the async (embedding) suggestion pass against a modal reopen. */
-        this._suggestToken = 0;
         this.render();
         this.hide();
     }
@@ -427,22 +424,11 @@ export class SaveRulesetModal extends BaseComponent {
         this._renderSuggestions();
     };
 
-    /**
-     * Compute tag suggestions for the current candidate: the always-available stats heuristic first
-     * (rendered synchronously), then the optional embedding pass overlaid when CLIP is enabled + a
-     * thumbnail frame is available. Both sources never throw; failures just leave fewer suggestions.
-     */
+    /** Compute deterministic tag suggestions from the candidate's recorded statistics. */
     _computeSuggestions() {
-        const token = ++this._suggestToken;
         const statsSug = suggestTagsFromStats(this._statsMetrics());
         this._suggestions = mergeSuggestions([], statsSug, MAX_SUGGESTIONS);
         this._renderSuggestions();
-
-        this._embeddingSuggestions().then((embSug) => {
-            if (token !== this._suggestToken || !embSug.length) return; // superseded, or nothing to add
-            this._suggestions = mergeSuggestions(embSug, statsSug, MAX_SUGGESTIONS);
-            this._renderSuggestions();
-        }).catch(() => { /* never-throw: keep the stats suggestions */ });
     }
 
     /** Normalize the incoming metrics (gallery-entry `metrics` + `cyclic`) into the heuristic's shape. */
@@ -450,62 +436,6 @@ export class SaveRulesetModal extends BaseComponent {
         const m = this.rulesetData.metrics;
         if (!m || typeof m !== 'object') return {};
         return { ...m, cyclic: this.rulesetData.cyclic ?? m.cyclic ?? null };
-    }
-
-    /**
-     * Best-effort embedding suggestions (§T3): only when the embedding model is enabled + ready and a
-     * chosen/paired thumbnail exists to embed. Decodes the thumb data-URL to a frame, embeds it, embeds
-     * the canonical-tag bank (cached), and cosine-ranks. Resolves [] on any miss (degrade to stats).
-     * @returns {Promise<string[]>}
-     */
-    async _embeddingSuggestions() {
-        const svc = this.appContext.worldManager?.embeddingService;
-        const thumb = this.chosenIC?.thumb || this.rulesetData.thumb;
-        if (!svc || !svc.isEnabled?.() || !thumb) return [];
-        try {
-            const frame = await this._decodeThumbToFrame(thumb);
-            if (!frame) return [];
-            const [embedding, tagBank] = await Promise.all([
-                svc.embed(frame),
-                svc.embedTags(CANONICAL_TAGS),
-            ]);
-            if (!embedding || !tagBank.length) return [];
-            return suggestTagsFromEmbedding(embedding, tagBank);
-        } catch {
-            return [];
-        }
-    }
-
-    /**
-     * Decode a thumbnail data-URL into an ImageData-like frame ({data,width,height}) for embedding.
-     * Resolves null on any failure (bad URL, canvas unavailable). Browser-only; unused in tests.
-     * @param {string} dataUrl
-     * @returns {Promise<{data: Uint8ClampedArray, width: number, height: number}|null>}
-     */
-    _decodeThumbToFrame(dataUrl) {
-        return new Promise((resolve) => {
-            try {
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        const size = 224;
-                        const canvas = document.createElement('canvas');
-                        canvas.width = size;
-                        canvas.height = size;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) { resolve(null); return; }
-                        ctx.drawImage(img, 0, 0, size, size);
-                        resolve(ctx.getImageData(0, 0, size, size));
-                    } catch {
-                        resolve(null);
-                    }
-                };
-                img.onerror = () => resolve(null);
-                img.src = dataUrl;
-            } catch {
-                resolve(null);
-            }
-        });
     }
 
     handleSave = () => {

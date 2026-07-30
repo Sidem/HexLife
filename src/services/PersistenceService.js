@@ -21,6 +21,7 @@ const KEYS = {
     USER_PATTERNS: `${LS_KEY_PREFIX}userPatterns`,
     EXPLORE_GALLERY: `${LS_KEY_PREFIX}exploreGallery`,
     EMBEDDING_GALLERY: `${LS_KEY_PREFIX}embeddingGallery`,
+    NATIVE_DESCRIPTOR_GALLERY: `${LS_KEY_PREFIX}nativeDescriptorGallery`,
     FAB_SETTINGS: `${LS_KEY_PREFIX}fabSettings`,
     ONBOARDING_STATES: `${LS_KEY_PREFIX}onboardingStates`,
     COLOR_SETTINGS: `${LS_KEY_PREFIX}colorSettings`,
@@ -276,37 +277,24 @@ export function saveExploreGallery(entries) {
     }
 }
 
-// Perceptual auto-explore illumination archive (v3.0): compact embedding-cell entries (hex + score +
-// random-projection cell key — NO raw vectors, so it stays small). Keyed separately from the main
-// gallery; only written/read when the embedding objective is in use.
-// v3.1: the blob is namespaced by the CLIP model id ({ modelId, entries }); the field now carries the
-// complete embedding-space id (checkpoint + input-representation version). SimHash cells from
-// different spaces are not comparable, so a checkpoint or raster change must start fresh. Legacy
-// plain-array blobs (pre-namespacing) were written by the then-only default screenshot-based model.
-const LEGACY_EMBEDDING_MODEL_ID = 'Xenova/clip-vit-base-patch16';
-
 /**
- * @param {string|null} [expectedModelId] Active model id; a blob stored for a different model loads
- *   as empty (self-invalidation). null/undefined skips the check.
- * @returns {object[]}
+ * Load the native descriptor archive. Descriptor cells are model-specific, so a model mismatch
+ * starts a fresh archive. The obsolete CLIP-keyed blob is discarded during this migration.
+ * @param {string|null} [expectedModelId]
  */
-export function loadEmbeddingGallery(expectedModelId = null) {
-    const blob = _getItem(KEYS.EMBEDDING_GALLERY);
-    if (!blob) return [];
-    if (Array.isArray(blob)) {
-        return (!expectedModelId || expectedModelId === LEGACY_EMBEDDING_MODEL_ID) ? blob : [];
-    }
-    if (!Array.isArray(blob.entries)) return [];
-    if (expectedModelId && blob.modelId && blob.modelId !== expectedModelId) return [];
+export function loadNativeDescriptorGallery(expectedModelId = null) {
+    try {
+        localStorage.removeItem(KEYS.EMBEDDING_GALLERY);
+    } catch { /* storage may be unavailable */ }
+    const blob = _getItem(KEYS.NATIVE_DESCRIPTOR_GALLERY);
+    if (!blob || !Array.isArray(blob.entries)) return [];
+    if (expectedModelId && blob.modelId !== expectedModelId) return [];
     return blob.entries;
 }
 
-/**
- * @param {object[]} entries
- * @param {string|null} [modelId] Model id the entries belong to (namespaces the blob).
- */
-export function saveEmbeddingGallery(entries, modelId = null) {
-    _setItem(KEYS.EMBEDDING_GALLERY, { modelId: modelId || null, entries });
+/** @param {object[]} entries @param {string|null} [modelId] */
+export function saveNativeDescriptorGallery(entries, modelId = null) {
+    _setItem(KEYS.NATIVE_DESCRIPTOR_GALLERY, { modelId: modelId || null, entries });
 }
 
 // Client-side cache of evolved-world thumbnails for PUBLIC library rulesets (keyed by ruleset hex).

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import fixtures from './fixtures/exploreEvalFixtures.json';
 import {
     suggestTagsFromStats,
-    suggestTagsFromEmbedding,
     mergeSuggestions,
     MAX_SUGGESTIONS,
 } from '../src/core/analysis/tagSuggestions.js';
@@ -82,39 +81,8 @@ describe('suggestTagsFromStats — gallery-entry metric shape', () => {
     });
 });
 
-describe('suggestTagsFromEmbedding', () => {
-    const bank = [
-        { id: 'gliders', vector: [1, 0, 0] },
-        { id: 'chaos', vector: [0, 1, 0] },
-        { id: 'growth', vector: [0, 0, 1] },
-    ];
-
-    it('ranks the nearest tag first, filters below the floor', () => {
-        const s = suggestTagsFromEmbedding([0.9, 0.1, 0], bank);
-        expect(s[0]).toBe('gliders');
-        expect(s).not.toContain('growth');
-    });
-
-    it('returns multiple tags in descending similarity order', () => {
-        const s = suggestTagsFromEmbedding([0.8, 0.6, 0], bank);
-        expect(s).toEqual(['gliders', 'chaos']);
-    });
-
-    it('respects the max cap and the floor', () => {
-        const s = suggestTagsFromEmbedding([1, 1, 1], bank, { max: 2, floor: 0 });
-        expect(s.length).toBe(2);
-        expect(suggestTagsFromEmbedding([1, 1, 1], bank, { floor: 0.99 })).toEqual([]);
-    });
-
-    it('empty / missing inputs resolve to []', () => {
-        expect(suggestTagsFromEmbedding(null, bank)).toEqual([]);
-        expect(suggestTagsFromEmbedding([1, 0, 0], [])).toEqual([]);
-        expect(suggestTagsFromEmbedding([1, 0, 0], null)).toEqual([]);
-    });
-});
-
 describe('mergeSuggestions', () => {
-    it('embedding suggestions win and lead, heuristics fill the rest', () => {
+    it('primary suggestions lead and heuristics fill the rest', () => {
         expect(mergeSuggestions(['gliders'], ['chaos', 'growth'])).toEqual(['gliders', 'chaos', 'growth']);
     });
 

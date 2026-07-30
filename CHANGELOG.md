@@ -3,8 +3,10 @@
 Notable changes to **HexLife Explorer**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The Reddit app under [`devvit/`](devvit/) versions separately, on Reddit's own review cadence — see
-[`devvit/readme.md`](devvit/readme.md).
+The Reddit app lives in its own repository,
+[Sidem/HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit), and versions separately on Reddit's
+review cadence. The embeddable `@hexlife/embed` package versions independently under
+[`packages/hexlife-embed/`](packages/hexlife-embed/).
 
 ### What counts as breaking
 
@@ -23,17 +25,35 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-07-30
+
+Auto-Explore now ranks with a model that was trained on this cellular automaton, instead of one
+borrowed from photographs. The optional CLIP path is gone — code, worker, dependencies, settings,
+and all.
+
 ### Added
 
-- **Native-interest data collection and manual model testing.** Auto-Explore can export 1–16
-  consecutive, non-destructive HXLT1 slices as one indexed ZIP. An explicitly marked `testing`
-  native model can now be loaded for the manual **Evaluate selected** action without enabling it
-  for Auto-Explore ranking.
-- **Ruleset relatives and family naming.** Saving a ruleset now shows its nearest named relatives in
-  the strictest shared constraint space and can continue a family name with Roman-numeral suffixes.
+- **A HexLife-native interest model ranks Auto-Explore, and it is the default.** Statistics still do
+  the cheap screening and the hard kills, so a dead or saturated candidate is rejected without any
+  model involvement. Every survivor of the confirmation burst then gets an exact 32-frame trajectory
+  scored by a 21.5k-parameter model that runs from `public/models/hexlife-interest/` inside your own
+  browser — no third-party host, no CDN, nothing downloaded at runtime. The same pass returns a
+  32-value behavior descriptor that drives novelty pressure and the illumination archive.
+- **A displayed score that means the same thing tomorrow.** The model's raw preference utility has no
+  meaningful absolute scale, so the shipped artifact carries a calibration that maps it to its
+  percentile against a frozen reference corpus. The transform is monotonic, so rankings are
+  unchanged, but a 0.87 in one session is the same 0.87 in the next.
+- **"Statistical only".** One radio button restores the deterministic, model-free objective exactly
+  as it behaved before this release — same populations, same champions, same reset seeds, same banked
+  scores, pinned by a golden test.
 
 ### Changed
 
+- **Auto-Explore is organised into tabs.** Run status and Start / Pause / Stop / Stop &amp; Keep stay
+  visible at all times; **Setup**, **Objective**, and **Finds** hold everything else. The tabs are
+  keyboard-navigable (arrows, Home, End), remember which one you were on, and behave the same on
+  mobile Discover as in the desktop panel. Owner-facing **Export selected** and **Evaluate selected**
+  moved into a collapsed **Model Tools** area under Objective.
 - **The curated library grew from 39 to 73 rulesets.** Public and personal entries now share one
   source-filtered list, and duplicate personal copies of built-in rules can be removed safely.
 - **The keyboard shortcut viewer now uses the space it is given.** Resizing its desktop panel grows
@@ -43,6 +63,37 @@ is not major if every code above still resolves to the same world.
   (start/stop) and `Ctrl+Shift+V` (pause/resume) to remove the previous duplicate binding.
 - **Torus-aware capture and re-centering.** Capture Studio now exports the active 3D projection, and
   hold-`H` wrap-around shifting works without losing the orbit strategy.
+- **Ruleset relatives and family naming.** Saving a ruleset now shows its nearest named relatives in
+  the strictest shared constraint space and can continue a family name with Roman-numeral suffixes.
+
+### Removed
+
+- **The optional CLIP perceptual objective, entirely.** The embedding service and its worker, the
+  perceptual novelty and archive modules, the cell rasterizer, the noise-prompt contrast battery, the
+  CLIP model picker, the perceptual status and progress UI, the `openEndedness` scoring term, the
+  "Maximal Novelty" preset, and the embedding-based tag suggestions are all deleted. Because that
+  term was always dropped-and-renormalized when absent, statistical scores are unchanged.
+- **Text-prompt target search.** It only ever worked because CLIP had a text encoder; the native
+  model has none, so a supervised prompt search would have been a control that could not work.
+
+### Fixed
+
+- **A run can no longer be stalled by the model.** Inference has a deadline, an abort signal wired to
+  the run token, and a fallback to the confirmed statistical score. A failed load, a timeout, a bad
+  descriptor, or a mid-flight Stop all degrade to statistics instead of leaving a generation pending.
+
+### Notes for upgraders
+
+- Nothing about worlds changed: ruleset codes, `HXW1.…` world codes, share links,
+  `<hexlife-world>` attributes, and determinism are all untouched. Old share links and exported find
+  packs still decode; fields that only meant something to the CLIP path are ignored on import.
+- The old perceptual archive in local storage is discarded on first load and replaced by a
+  native-descriptor archive that self-invalidates when the model changes. Your gallery of finds is
+  not affected.
+- The shipped model is labelled **beta**, not accepted. On the project's curated sanity panel it
+  orders interesting-vs-boring pairs correctly 67% of the time against the statistical objective's
+  44%, but it has not cleared the strict corpus gates (direct owner hard-pair votes, locked test
+  cases, mixed-grid corpus coverage, quantization), and the manifest says so.
 
 ## [1.1.0] — 2026-07-27
 
@@ -97,17 +148,20 @@ which it gets a version you can cite, link, and file bugs against.
 - **Sharing** — share links (`?r=`), world codes (`HXW1.…`), portable `hexlife-pack` exports for
   the ruleset library and the Auto-Explore gallery, PNG snapshots and WebM recordings.
 - **`<hexlife-world>` embed** — the simulation as a custom element for third-party pages.
-- **Live Specimens on Reddit** ([`devvit/`](devvit/)) — playable worlds as Reddit posts, sharing
-  one engine with the Explorer.
+- **Live Specimens on Reddit** — playable worlds as Reddit posts, sharing one engine with the
+  Explorer. Shipped from `devvit/` in this release; since moved to
+  [Sidem/HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit).
 - **Mobile UI**, guided tours and a Learning Hub, and a help panel that explains how to switch
   hardware acceleration on rather than refusing with an unactionable error.
 
 ### Notes
 
 - The Wasm binary is committed, so `npm run dev` needs no Rust toolchain.
-- `devvit/` may import from `src/embed/` and nowhere else in `src/`; `tests/devvitBoundary.test.js`
-  enforces that boundary.
+- At the time, `devvit/` could import from `src/embed/` and nowhere else in `src/`, enforced by a
+  test. The Reddit app is now a separate repository consuming the published `@hexlife/embed`
+  package, so that boundary is a package dependency rather than a lint.
 
-[Unreleased]: https://github.com/Sidem/HexLife/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Sidem/HexLife/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Sidem/HexLife/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Sidem/HexLife/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Sidem/HexLife/releases/tag/v1.0.0

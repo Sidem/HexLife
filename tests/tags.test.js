@@ -9,14 +9,12 @@ import {
 } from '../src/core/tags.js';
 
 describe('tags — canonical vocabulary', () => {
-    it('every entry has id/label/description/promptText', () => {
+    it('every entry has id, label, and description', () => {
         for (const t of CANONICAL_TAGS) {
             expect(typeof t.id).toBe('string');
             expect(t.id.length).toBeGreaterThan(0);
             expect(typeof t.label).toBe('string');
             expect(typeof t.description).toBe('string');
-            expect(typeof t.promptText).toBe('string');
-            expect(t.promptText.length).toBeGreaterThan(0);
         }
     });
 

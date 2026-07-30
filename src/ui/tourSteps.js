@@ -453,16 +453,13 @@ export const getTours = (appContext) => {
         onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
         advanceOn: { type: 'click' }
     }, {
-        element: () => appContext.uiManager.isMobile() ? '.explore-advanced-summary' : '#explore-settings',
+        element: '#explore-settings',
         title: 'Tune the Search',
-        content: "Behind <span class=\"onboarding-highlight-text\">Advanced</span> you control the <span class=\"onboarding-highlight-text\">mutation rate &amp; mode</span>, ticks per evaluation, which <span class=\"onboarding-highlight-text\">initial conditions</span> each candidate is tested on, and a generation budget. The optional <span class=\"onboarding-highlight-text\">Perceptual novelty (CLIP)</span> toggle also scores finds on how they <i>look</i>.",
+        content: "The <span class=\"onboarding-highlight-text\">Setup</span> tab controls mutation, population, ticks per evaluation, initial conditions, and generation budget. The Objective tab chooses native beta ranking or the original statistical score.",
         primaryAction: { text: 'Next' },
         onBeforeShow: () => {
             showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } });
-            // #29 put Search Settings inside the "Advanced" disclosure, collapsed by default on
-            // mobile. A target that resolves but never becomes visible auto-skips with only a
-            // console.warn, so open it before spotlighting.
-            appContext.uiManager?.getSharedComponent?.(ExploreComponent)?.openAdvanced();
+            appContext.uiManager?.getSharedComponent?.(ExploreComponent)?.selectTab('setup');
         },
         advanceOn: { type: 'click' }
     }, {
@@ -470,7 +467,10 @@ export const getTours = (appContext) => {
         title: 'The Gallery',
         content: "Every interesting find collects here, best-first, with a per-component score breakdown. Use the per-find actions to <span class=\"onboarding-highlight-text\">apply</span> it to the selected world, re-test, <span class=\"onboarding-highlight-text\">save</span> it to your library, or <span class=\"onboarding-highlight-text\">share</span> a link.",
         primaryAction: { text: 'Finish' },
-        onBeforeShow: () => showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } }),
+        onBeforeShow: () => {
+            showView({ desktop: { type: 'panel', name: 'explore' }, mobile: { view: 'discover' } });
+            appContext.uiManager?.getSharedComponent?.(ExploreComponent)?.selectTab('finds');
+        },
         advanceOn: { type: 'click' }
     }];
 

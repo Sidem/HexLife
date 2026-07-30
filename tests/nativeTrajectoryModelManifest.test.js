@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateNativeTrajectoryModelManifest } from '../src/core/analysis/NativeTrajectoryModelManifest.js';
+import {
+    calibrateNativeReward,
+    validateNativeTrajectoryModelManifest,
+} from '../src/core/analysis/NativeTrajectoryModelManifest.js';
 
 function manifest(overrides = {}) {
     return {
@@ -24,6 +27,37 @@ describe('native trajectory model manifest', () => {
     it('accepts an explicitly marked manual-testing artifact', () => {
         const testing = manifest({ acceptance: { status: 'testing' } });
         expect(validateNativeTrajectoryModelManifest(testing)).toBe(testing);
+    });
+
+    it('accepts a beta only with monotonic reference-quantile calibration', () => {
+        const beta = manifest({
+            acceptance: { status: 'beta' },
+            rewardCalibration: {
+                status: 'calibrated',
+                method: 'reference-quantile-v1',
+                utilities: [-3, 0, 2],
+                percentiles: [0, 0.6, 1],
+            },
+        });
+        expect(validateNativeTrajectoryModelManifest(beta)).toBe(beta);
+        expect(calibrateNativeReward(-5, beta.rewardCalibration)).toBe(0);
+        expect(calibrateNativeReward(1, beta.rewardCalibration)).toBe(0.8);
+        expect(calibrateNativeReward(10, beta.rewardCalibration)).toBe(1);
+    });
+
+    it('refuses a beta with missing or non-monotonic calibration', () => {
+        expect(() => validateNativeTrajectoryModelManifest(manifest({
+            acceptance: { status: 'beta' },
+        }))).toThrow(/calibrated/);
+        expect(() => validateNativeTrajectoryModelManifest(manifest({
+            acceptance: { status: 'beta' },
+            rewardCalibration: {
+                status: 'calibrated',
+                method: 'reference-quantile-v1',
+                utilities: [0, -1],
+                percentiles: [0, 1],
+            },
+        }))).toThrow(/monotonic/);
     });
 
     it('refuses an unvalidated training export', () => {

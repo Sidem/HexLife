@@ -17,10 +17,8 @@
  *
  * A pack is UNTRUSTED input (a downloaded file, same posture as a shared search link), so
  * {@link decodePack} sanitizes every field: bad `hex` drops the entry, over-long text is clamped,
- * non-image or oversized thumbs are dropped, and — critically — an embedding-keyed find has its
- * OPAQUE SimHash `cellKey` stripped and `descriptorKind` reset to `'stats'` (that cell belongs to the
- * exporter's CLIP model/projection instance and must never be trusted cross-device; the archive
- * re-derives the statistical descriptor from `metrics` on insert). Every drop/clamp emits a
+ * non-image or oversized thumbs are dropped, and opaque learned-model SimHash cells are stripped
+ * because they are not portable across model versions or devices. Every drop/clamp emits a
  * human-readable warning string so the import confirmation can surface exactly what changed.
  */
 
@@ -152,7 +150,7 @@ function sanitizeRulesetEntry(entry, warnings, label) {
 
 /**
  * Sanitize one gallery find. Preserves `metrics`/`rawMetrics` and any unknown fields verbatim, but
- * requires a valid `hex` + finite `score`, strips the opaque embedding `cellKey`, and forces
+ * requires a valid `hex` + finite `score`, strips an opaque learned `cellKey`, and forces
  * `descriptorKind: 'stats'` so the archive re-derives the statistical descriptor on insert. Returns
  * the cleaned entry or `null` (dropped, with a warning).
  */
@@ -170,7 +168,7 @@ function sanitizeFindEntry(entry, warnings, label) {
         warnings.push(`${label} dropped (missing or non-numeric score).`);
         return null;
     }
-    // Drop the cross-device-invalid embedding cell + kind; keep everything else (metrics stay honest).
+    // Drop cross-device-invalid learned cells; portable statistical metrics stay intact.
     const { cellKey: _cell, descriptorKind: _kind, thumb, initialState, seed, ...rest } = entry;
     const out = { ...rest, hex, descriptorKind: 'stats' };
     const cleanThumb = sanitizeThumb(thumb, warnings, label);
