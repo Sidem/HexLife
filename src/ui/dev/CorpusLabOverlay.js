@@ -15,6 +15,9 @@ import {
 } from '../../core/analysis/corpusProtocol.js';
 import { auditStatus, planRound } from '../../core/analysis/CorpusScheduler.js';
 import { CorpusCollectionBuffer, DEFAULT_FLUSH_BYTES } from '../../core/analysis/CorpusCollectionBuffer.js';
+import { CorpusVoteBank } from '../../core/analysis/CorpusVoteBank.js';
+import { CorpusVoteView } from './CorpusVoteView.js';
+import { decodeTrajectory } from '../../core/analysis/TrajectoryFormat.js';
 import { TrajectoryCaptureService, currentGridPreset } from '../../services/TrajectoryCaptureService.js';
 
 /**
@@ -70,6 +73,13 @@ const GRID_SWITCH_RELOAD_DELAY_MS = 1500;
  */
 const HANDOFF_KEY = 'corpusLabHandoff';
 
+/**
+ * Longest edge of a vote-card preview, in cells. Previews are rasterized from a clip's own frame 0
+ * rather than from the live canvas, so they stay valid after the world has been recycled — and stay
+ * small enough that a few hundred of them survive the grid-switch reload as data URLs.
+ */
+const THUMB_MAX_EDGE = 132;
+
 export class CorpusLabOverlay {
     /** @param {any} appContext */
     constructor(appContext) {
@@ -86,6 +96,10 @@ export class CorpusLabOverlay {
             appVersion: APP_VERSION,
             priorCoverage: handoff?.coverage || null,
         });
+        this.voteBank = new CorpusVoteBank({ sessionId: this.buffer.sessionId });
+        this.voteBank.restore(handoff?.votes || null);
+        /** @type {CorpusVoteView|null} Non-null only while the overlay is in vote mode. */
+        this.voteView = null;
 
         /** @type {import('../../core/analysis/CorpusScheduler.js').RoundPlan|null} */
         this.plan = null;
@@ -129,6 +143,9 @@ export class CorpusLabOverlay {
             partIndex: this.partIndex,
             settings: this.settings,
             coverage: this.buffer.coverageSnapshot(),
+            // Votes are tiny next to clip payloads and cannot be re-derived from them, so unlike the
+            // clips they ride through the reload rather than being flushed first.
+            votes: this.voteBank.snapshot(),
         });
     }
 
@@ -172,16 +189,22 @@ export class CorpusLabOverlay {
                     </div>
                     <div class="corpus-queue"></div>
                 </div>
+                <div class="corpus-vote" hidden></div>
                 <div class="corpus-coverage"></div>
                 <details class="corpus-deficits">
                     <summary>Strict audit deficits <span class="corpus-deficit-count"></span></summary>
                     <ol class="corpus-deficit-list"></ol>
+                    <p class="corpus-deficit-note">
+                        Coverage only. Hard-pair owner votes live in <code>comparisons.jsonl</code> and are
+                        counted separately — see the hard-pair row above.
+                    </p>
                 </details>
                 <footer class="corpus-foot">
                     <label>Slices <input type="number" class="corpus-slices" min="1" max="16" step="1" value="4"></label>
                     <label>Frames <input type="number" class="corpus-frames" min="1" max="32" step="1" value="32"></label>
                     <label>Stride <input type="number" class="corpus-stride" min="1" max="32" step="1" value="1"></label>
                     <button class="button" data-corpus="new-round">New round</button>
+                    <button class="button corpus-vote-toggle" data-corpus="vote">Vote pairs <kbd>V</kbd></button>
                     <button class="button corpus-grid-switch" data-corpus="grid-switch" hidden></button>
                     <button class="button action-button" data-corpus="finish">Finish &amp; download</button>
                     <span class="corpus-status info-text"></span>
@@ -204,6 +227,9 @@ export class CorpusLabOverlay {
             guessHint: this.el.querySelector('.corpus-guess-hint'),
             chips: this.el.querySelector('.corpus-scenario-chips'),
             queue: this.el.querySelector('.corpus-queue'),
+            card: this.el.querySelector('.corpus-card'),
+            vote: this.el.querySelector('.corpus-vote'),
+            voteToggle: this.el.querySelector('.corpus-vote-toggle'),
             coverage: this.el.querySelector('.corpus-coverage'),
             deficitCount: this.el.querySelector('.corpus-deficit-count'),
             deficitList: this.el.querySelector('.corpus-deficit-list'),
@@ -360,6 +386,111 @@ export class CorpusLabOverlay {
         return this.queue[this.cursor] || null;
     }
 
+    // --- hard-pair voting ------------------------------------------------------------------------
+
+    /**
+     * Enter or leave the hard-pair vote deck.
+     *
+     * Voting is a separate mode rather than a step inside the judging loop because its candidates are
+     * the *output* of judging: a stratum can only be served once clips exist on both of its sides, so
+     * interleaving the two would spend most of a session showing an empty deck.
+     */
+    _toggleVoteMode() {
+        if (this.voteView) {
+            this.voteView.destroy();
+            this.voteView = null;
+            this.ui.vote.hidden = true;
+            this.ui.card.hidden = false;
+            this.ui.voteToggle.classList.remove('is-active');
+            this._selectCurrentWorld();
+            this._update();
+            return;
+        }
+        this.ui.card.hidden = true;
+        this.ui.vote.hidden = false;
+        this.ui.voteToggle.classList.add('is-active');
+        this.voteView = new CorpusVoteView(this.ui.vote, {
+            bank: this.voteBank,
+            onVote: () => this._update(),
+            onExit: () => this._toggleVoteMode(),
+        });
+        this._update();
+    }
+
+    /**
+     * Rasterize a clip's frame 0 into a data URL for the versus cards.
+     *
+     * Reads the clip's own packed payload rather than the live canvas: by the time a pairing is
+     * offered, both worlds have long since been recycled into other rulesets. Drawn at one device
+     * pixel per cell into a downscaled canvas — the card only has to make two behaviours
+     * distinguishable, not be a faithful render.
+     *
+     * @param {{bytes: Uint8Array}} clip
+     * @returns {string|undefined} A PNG data URL, or undefined if anything about the clip is unusable.
+     */
+    _thumbFor(clip) {
+        try {
+            const { header, frames } = decodeTrajectory(clip.bytes);
+            const { rows, cols } = header;
+            const scale = Math.max(1, Math.ceil(Math.max(rows, cols) / THUMB_MAX_EDGE));
+            const width = Math.ceil(cols / scale);
+            const height = Math.ceil(rows / scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext('2d');
+            if (!context) return undefined;
+            const image = context.createImageData(width, height);
+            const packed = frames[0];
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const cell = row * cols + col;
+                    if (!(packed[cell >> 3] & (1 << (cell & 7)))) continue;
+                    const offset = ((Math.floor(row / scale) * width) + Math.floor(col / scale)) * 4;
+                    image.data[offset] = 0x6d;
+                    image.data[offset + 1] = 0xd4;
+                    image.data[offset + 2] = 0xff;
+                    image.data[offset + 3] = 0xff;
+                }
+            }
+            context.putImageData(image, 0, 0);
+            return canvas.toDataURL('image/png');
+        } catch {
+            // A preview is a convenience; a clip that will not decode must not break the judging loop.
+            return undefined;
+        }
+    }
+
+    /**
+     * Offer a just-judged world to the vote bank.
+     *
+     * `initialDensity` is the whole-grid starting coverage the stratum matches on, so it is taken only
+     * from `density` mode — a cluster initial state's `density` fills the blobs, not the grid, and
+     * treating the two as comparable would silently defeat the matching rule.
+     *
+     * @param {any} item @param {'interesting'|'boring'} label @param {string} scenario
+     * @param {Array<{bytes: Uint8Array, header: Record<string, any>}>} clips
+     */
+    _registerVoteCandidate(item, label, scenario, clips) {
+        const header = clips[0]?.header;
+        if (!header) return;
+        this.voteBank.addCandidate({
+            id: String(header.collectionId),
+            scenario,
+            label,
+            ruleset: item.rulesetHex,
+            family: item.family.familyId,
+            initialDensity: this._initialRatioFor(item.ic) ?? null,
+            gridPreset: header.gridPreset,
+            initialConditionId: header.initialConditionId,
+            seed: header.seed,
+            clipIds: clips.map((clip) => clip.header?.id),
+            thumb: this._thumbFor(clips[0]),
+        });
+    }
+
+    // --- judging ---------------------------------------------------------------------------------
+
     /** @param {'interesting'|'boring'} label */
     async _judge(label) {
         const item = this.current;
@@ -383,6 +514,7 @@ export class CorpusLabOverlay {
                 anchorRuleset: item.family.anchorRuleset,
                 relationship: item.family.relationship,
             });
+            this._registerVoteCandidate(item, label, scenario, clips);
             this._setStatus(`${label} · ${clips.length} clips`);
             await this._advance();
         } catch (error) {
@@ -414,7 +546,11 @@ export class CorpusLabOverlay {
     }
 
     _undo() {
+        // Read the group's identity before undoing it — `undoLast` pops the group it removes.
+        const lastGroup = this.buffer.groups[this.buffer.groups.length - 1];
+        const collectionId = lastGroup?.[0]?.collectionId;
         const removed = this.buffer.undoLast();
+        if (removed && collectionId) this.voteBank.removeCandidate(String(collectionId));
         if (!removed) {
             this._setStatus('Nothing to undo — earlier clips are already written out.');
             this._update();
@@ -445,6 +581,7 @@ export class CorpusLabOverlay {
             const { filename } = this.capture.downloadCorpusBuffer(this.buffer, {
                 partIndex: this.partIndex,
                 final,
+                voteBank: this.voteBank,
             });
             this.buffer.markFlushed();
             this.partIndex++;
@@ -521,6 +658,7 @@ export class CorpusLabOverlay {
             case 'skip': this._skip(); break;
             case 'undo': this._undo(); break;
             case 'new-round': void this._startRound(); break;
+            case 'vote': this._toggleVoteMode(); break;
             case 'grid-switch': this._switchGridBlock(); break;
             case 'finish': this._flush(true); break;
             default: break;
@@ -533,6 +671,12 @@ export class CorpusLabOverlay {
         if (event.target?.tagName === 'INPUT') return;
         const key = event.key.toLowerCase();
         if (key === 'escape') { this.destroy(); return; }
+        if (key === 'v') { this._toggleVoteMode(); event.preventDefault(); return; }
+        // In vote mode the arrow keys belong to the deck, and the judging keys have no card to act on.
+        if (this.voteView) {
+            if (this.voteView.handleKey(event)) event.preventDefault();
+            return;
+        }
         if (key === 'i') { void this._judge('interesting'); }
         else if (key === 'b') { void this._judge('boring'); }
         else if (key === 'u') { this._skip(); }
@@ -639,6 +783,7 @@ export class CorpusLabOverlay {
         const labeled = CORPUS_LABELS.reduce((sum, label) => sum + (coverage.labels[label] || 0), 0);
         const activePreset = currentGridPreset();
         const debtRulesets = status.rulesetGaps.length;
+        const votes = this.voteBank.voteStatus();
 
         const tally = (label, value, ok) =>
             `<span class="corpus-tally${ok ? ' ok' : ' empty'}">${label} <b>${value}</b></span>`;
@@ -682,11 +827,21 @@ export class CorpusLabOverlay {
                 <span>${coverage.rulesetsWithThreeSeeds}/${coverage.distinctRulesets} at ${CORPUS_COVERAGE.minimumSeedsPerRuleset}+ seeds</span>
                 <span>${coverage.rulesetsWithTwoInitialConditions}/${coverage.distinctRulesets} at ${CORPUS_COVERAGE.minimumInitialConditionsPerRuleset}+ ICs</span>
             </div>
+            <div class="corpus-coverage-row">
+                <span>hard pairs</span>
+                ${votes.strata.map((stratum) => tally(
+                    `${stratum.strictRegression ? '★ ' : ''}${stratum.id}`,
+                    `${stratum.have}/${stratum.need}`,
+                    stratum.satisfied,
+                )).join('')}
+            </div>
         `;
 
-        const deficits = status.deficits;
-        this.ui.deficitCount.textContent = status.passing
-            ? '— none, coverage passes'
+        // Hard-pair debt is folded in here as well as shown above, because this list is what the owner
+        // reads to decide the session is done — and coverage passing on its own does not mean that.
+        const deficits = [...status.deficits, ...votes.deficits];
+        this.ui.deficitCount.textContent = status.passing && votes.passing
+            ? '— none, coverage and hard pairs pass'
             : `— ${deficits.length}`;
         // Per-ruleset lines dominate the list early on; showing the head plus a count keeps the panel
         // readable without hiding the fact that hundreds remain.

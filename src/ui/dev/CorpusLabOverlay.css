@@ -285,3 +285,131 @@
     opacity: 0.8;
     min-height: 1em;
 }
+
+/* --- hard-pair vote deck (#37 4B.2 step 6) ------------------------------------------------- */
+
+.corpus-vote {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    background: var(--panel-bg, #1a1d24);
+}
+
+.corpus-vote-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.corpus-vote-title { font-weight: 600; }
+
+.corpus-vote-count {
+    font-size: 0.72rem;
+    opacity: 0.8;
+}
+
+.corpus-vote-strata,
+.corpus-vote-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.corpus-vote-stratum {
+    font-size: 0.72rem;
+    opacity: 0.85;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.corpus-vote-delta { opacity: 0.7; }
+
+.corpus-vote-cards {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.corpus-vote-vs {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    text-transform: uppercase;
+}
+
+.corpus-vote-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem;
+    background: var(--input-bg, #14161c);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: center;
+}
+
+.corpus-vote-card:hover,
+.corpus-vote-card:focus-visible {
+    border-color: var(--accent-color, #6dd4ff);
+}
+
+.corpus-vote-thumb {
+    width: 100%;
+    max-width: 220px;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    image-rendering: pixelated;
+    background: #05070c;
+    border-radius: 4px;
+}
+
+.corpus-vote-thumb.is-missing { opacity: 0.35; }
+
+.corpus-vote-card-scenario {
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.corpus-vote-card-meta {
+    font-size: 0.68rem;
+    opacity: 0.75;
+}
+
+.corpus-vote-empty {
+    font-size: 0.78rem;
+    opacity: 0.85;
+    padding: 0.75rem 0;
+}
+
+.corpus-vote-empty ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.corpus-vote-hint {
+    font-size: 0.68rem;
+    opacity: 0.65;
+}
+
+.corpus-vote-toggle.is-active {
+    border-color: var(--accent-color, #6dd4ff);
+    color: var(--accent-color, #6dd4ff);
+}
+
+.corpus-deficit-note {
+    margin: 0.4rem 0 0;
+    font-size: 0.68rem;
+    opacity: 0.7;
+}
+
+.corpus-deficits:not([open]) .corpus-deficit-note { display: none; }

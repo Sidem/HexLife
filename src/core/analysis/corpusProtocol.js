@@ -79,6 +79,84 @@ export const CORPUS_FAMILY_RELATIONSHIPS = ['mutation-lineage', 'exact-ruleset']
 /** Clip labels the protocol accepts, plus the pre-judgment sentinel used by collection UIs. */
 export const CORPUS_LABELS = ['interesting', 'boring'];
 
+/**
+ * The four `hardPairs` strata, mirrored field-for-field from `corpus-v1.json`.
+ *
+ * These are the confusions a coverage count cannot express: a corpus can satisfy every per-scenario,
+ * per-seed and per-grid minimum and still leave the model unable to tell a glider from distributed
+ * churn. Each stratum names two scenario sides and demands direct owner preference votes between
+ * them, matched on initial density so the comparison is about *behaviour* rather than about one world
+ * simply having more live cells than the other.
+ *
+ * `strictRegression: true` marks the stratum whose accuracy the acceptance gate refuses to let drop —
+ * glider-vs-distributed-churn is the discrimination the whole objective exists to make.
+ *
+ * Votes are owner judgments, so unlike coverage they cannot be produced by scheduling alone; the
+ * scenario clips a stratum pairs must already exist before its votes can be cast.
+ */
+export const CORPUS_HARD_PAIRS = [
+    {
+        id: 'glider-vs-distributed-churn',
+        sideA: ['glider'],
+        sideB: ['distributed_churn'],
+        maximumInitialDensityDelta: 0.05,
+        minimumOwnerVotes: 12,
+        minimumHeldOutVotes: 4,
+        strictRegression: true,
+    },
+    {
+        id: 'still-life-vs-oscillator',
+        sideA: ['still_life'],
+        sideB: ['oscillator'],
+        maximumInitialDensityDelta: 0.05,
+        minimumOwnerVotes: 12,
+        minimumHeldOutVotes: 4,
+        strictRegression: false,
+    },
+    {
+        id: 'slow-boiling-vs-extinction',
+        sideA: ['slow_boiling'],
+        sideB: ['extinction'],
+        maximumInitialDensityDelta: 0.05,
+        minimumOwnerVotes: 12,
+        minimumHeldOutVotes: 4,
+        strictRegression: false,
+    },
+    {
+        id: 'localized-vs-distributed-change',
+        sideA: ['localized_change', 'glider'],
+        sideB: ['distributed_churn'],
+        maximumInitialDensityDelta: 0.05,
+        minimumOwnerVotes: 12,
+        minimumHeldOutVotes: 4,
+        strictRegression: false,
+    },
+];
+
+/** Every scenario named by any hard-pair side — the clips a vote session needs collected first. */
+export const HARD_PAIR_SCENARIOS = [...new Set(
+    CORPUS_HARD_PAIRS.flatMap((pair) => [...pair.sideA, ...pair.sideB]),
+)];
+
+/**
+ * The strata a given ordered scenario pair can serve, if any.
+ *
+ * A single pairing can satisfy more than one stratum — a glider against distributed churn counts for
+ * both `glider-vs-distributed-churn` and `localized-vs-distributed-change`, because the latter's
+ * `sideA` includes `glider`. Returning all matches lets one owner vote pay down both, which matters
+ * when 48 votes have to be cast by hand.
+ *
+ * @param {string} scenarioA @param {string} scenarioB
+ * @returns {typeof CORPUS_HARD_PAIRS} Matching strata (empty when the two scenarios are not a stratum).
+ */
+export function hardPairsForScenarios(scenarioA, scenarioB) {
+    const a = String(scenarioA);
+    const b = String(scenarioB);
+    return CORPUS_HARD_PAIRS.filter((pair) =>
+        (pair.sideA.includes(a) && pair.sideB.includes(b))
+        || (pair.sideA.includes(b) && pair.sideB.includes(a)));
+}
+
 const SCENARIO_SET = new Set(CORPUS_SCENARIOS);
 const ACCEPTANCE_SET = new Set(ACCEPTANCE_SCENARIOS);
 

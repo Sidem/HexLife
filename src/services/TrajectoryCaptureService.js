@@ -241,12 +241,20 @@ export class TrajectoryCaptureService {
      * proposed family registry fragment.
      *
      * @param {import('../core/analysis/CorpusCollectionBuffer.js').CorpusCollectionBuffer} buffer
-     * @param {{partIndex?: number, final?: boolean}} [options]
+     * @param {{
+     *   partIndex?: number,
+     *   final?: boolean,
+     *   voteBank?: import('../core/analysis/CorpusVoteBank.js').CorpusVoteBank,
+     * }} [options]
      */
     downloadCorpusBuffer(buffer, options = {}) {
         if (!buffer?.clipCount) throw new Error('Nothing collected yet.');
         const index = buffer.index(options);
         const part = index.partIndex ? `-part${index.partIndex + 1}` : '';
+        // Owner hard-pair votes. Written whole into every part rather than split across them: the
+        // rows are cumulative and tiny, and a comparison can reference clips from an earlier part, so
+        // partitioning them would leave dangling references in any part read on its own.
+        const comparisons = options.voteBank?.comparisonsJsonl?.() || '';
         const zip = createStoredZip([
             ...buffer.clips.map(({ filename, bytes }) => ({ name: filename, bytes })),
             {
@@ -257,6 +265,10 @@ export class TrajectoryCaptureService {
                 name: `_families-v1-proposed-${buffer.sessionId}${part}.json`,
                 bytes: new TextEncoder().encode(`${JSON.stringify(buffer.familyRegistry(), null, 2)}\n`),
             },
+            ...(comparisons ? [{
+                name: 'comparisons.jsonl',
+                bytes: new TextEncoder().encode(comparisons),
+            }] : []),
         ]);
         const filename = `hexlife-corpus-session-${buffer.sessionId.slice(0, 8)}${part}-${index.clipCount}-clips.zip`;
         downloadFile(filename, Uint8Array.from(zip).buffer, 'application/zip');
