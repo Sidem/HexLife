@@ -2,22 +2,22 @@
   "acceptance": {
     "browserLatency": {},
     "familyHeldOut": {
-      "splitMethod": "sha256 family key, 80/10/10 buckets",
+      "splitMethod": "frozen families-v1 registry",
       "test": {
-        "accuracy": 0.8333333333333334,
-        "logLoss": 1.6312632203540052,
-        "pairs": 12
+        "accuracy": 0.8342,
+        "logLoss": 0.6885370324492455,
+        "pairs": 5000
       },
       "validation": {
-        "accuracy": 1.0,
-        "logLoss": 0.000033230160100369436,
-        "pairs": 35
+        "accuracy": 0.961,
+        "logLoss": 0.1141917205389589,
+        "pairs": 5000
       }
     },
     "gliderVsChurn": {
       "status": "not-run"
     },
-    "note": "Manual production smoke artifact only; not accepted for Auto-Explore ranking.",
+    "note": "Owner-facing manual evaluation only. Corpus v1 strict audit, direct owner hard-pair votes, locked tests, mixed-grid coverage, statistical-baseline comparison, quantization, and browser latency gates are incomplete; this artifact is not accepted for Auto-Explore ranking.",
     "quantizationDrift": {
       "artifact": "float32",
       "status": "not-applicable"
@@ -27,18 +27,23 @@
   "architecture": "HexTemporalNetS",
   "artifact": "model.onnx",
   "artifactBytes": 127208,
-  "artifactSha256": "b71638e2178f3edf71d5e806622368d7db9770e5ddcf404f96a958a3174ccdd5",
+  "artifactSha256": "776d4d915132f53e2e1bf9ead115e17cafd128b72802e6352d15ee74e97263f5",
   "checkpoint": {
-    "epoch": 5,
+    "epoch": 4,
     "metrics": {
       "parameterCount": 21569.0,
-      "trainLogLoss": 0.0014851520937552284,
-      "validationAccuracy": 1.0,
-      "validationLogLoss": 3.3230164353881265e-05,
-      "validationPairs": 35.0
+      "trainLogLoss": 0.17989909922257066,
+      "validationAccuracy": 0.961,
+      "validationLogLoss": 0.1141917205389589,
+      "validationPairs": 5000.0
     }
   },
-  "createdAt": "2026-07-29T11:41:36.843781+00:00",
+  "corpus": {
+    "protocolId": "corpus-v1",
+    "ready": false,
+    "rootSha256": "8fb1e3161334fdf3a62a155819db5c01dd8cdcfd5124a666c4835bb7bccbef6c"
+  },
+  "createdAt": "2026-07-30T09:40:09.317346+00:00",
   "dynamicFrames": true,
   "dynamicGrid": true,
   "inputs": {
@@ -86,7 +91,7 @@
     "temporal_dim": 48,
     "tick_scale": 32.0
   },
-  "modelId": "hex-temporal-s-smoke-20260729",
+  "modelId": "hex-temporal-s-large-corpus-20260730",
   "outputs": {
     "descriptor": {
       "dtype": "float32",
@@ -109,10 +114,14 @@
   "schema": "hexlife-interest-model-v1",
   "topology": "odd-q-torus-v1",
   "trainingData": {
-    "boring": 23,
-    "families": 55,
-    "interesting": 99,
-    "trajectories": 122
+    "boring": 1408,
+    "comparisonSource": "binary-label-v1",
+    "families": 15,
+    "gridPresets": {
+      "large": 1596
+    },
+    "interesting": 188,
+    "trajectories": 1596
   },
   "trajectorySchema": "HXLT1"
 }
