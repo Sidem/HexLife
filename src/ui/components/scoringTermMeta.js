@@ -113,15 +113,6 @@ export const COMPONENT_META = [
         shape: 'halfsat', shapeParams: { halfSat: SCORE_CONFIG.transportHalfSat },
         domain: [0, SCORE_CONFIG.transportHalfSat * 4], axisLabel: 'centroid drift (cells/tick)', rawKey: 'transportSpeed',
     },
-    {
-        key: 'openEndedness', label: 'Novelty', usedFlag: 'openEndednessUsed',
-        hint: 'Perceptual (CLIP) novelty — how often the LOOK reaches a state it has not been in.',
-        description: 'Frames of the find are embedded with a vision model (CLIP); this term rewards how far each frame lands from the nearest look the world has ALREADY passed through. Revisiting old states — including noise that just looks like more noise, or an oscillator flipping between two frames — does not count, no matter how fast it moves. Only measured when the perceptual objective is enabled.',
-        zeroMeans: 'Perceptual novelty is ignored (also effectively 0 when embeddings are off).',
-        maxMeans: 'Chase worlds that keep reaching genuinely new looks (needs the CLIP objective enabled).',
-        shape: 'halfsat', shapeParams: { halfSat: SCORE_CONFIG.openEndednessHalfSat },
-        domain: [0, SCORE_CONFIG.openEndednessHalfSat * 4], axisLabel: 'distance to nearest earlier frame', rawKey: 'openEndedness',
-    },
 ];
 
 /**
@@ -134,18 +125,6 @@ export const UNIFORM_FACTOR_META = {
     description: 'A multiplicative penalty on the final score, ramping in when the world covers most of the grid (coverage above 50%) WITHOUT spatial structure. Structured dense worlds are rescued by their Structure term; blanket chaos is not.',
     zeroMeans: 'Blanket chaos is never penalized.',
     maxMeans: 'Blanket chaos is (almost) disqualified.',
-};
-
-/**
- * Display-only meta for the optional Stage-3 CLIP nuisance multiplier. Calibration lives in
- * PerceptualContrast.js; this surface explains the raw match and resulting factor stored on a find.
- */
-export const NOISE_FACTOR_META = {
-    key: 'noiseFactor', usedFlag: 'noiseUsed', label: 'Noise',
-    hint: 'Perceptual-noise factor — multiplies the confirmed score. 1.00 = no penalty; lower = the frames strongly resemble static or random pixels.',
-    description: 'Each embedded frame is compared with a fixed battery of CLIP text prompts for television static, random binary pixels, and white-noise textures. The strongest prompt match per frame is averaged across the trajectory and converted into this graded confirmation-only factor.',
-    zeroMeans: 'Clear nuisance matches receive the strongest configured suppression.',
-    maxMeans: 'The perceptual confirmation does not resemble the fixed noise concepts.',
 };
 
 /**

@@ -90,8 +90,7 @@ marked and improves from 0.509 (57/112) to 0.518 (58/112).
 
 Same settings as the reference fixtures (`warmupTicks:20, sampleEvery:10`, probe on), captured
 twice per entry: at the 160-tick **screen** length and at the 600-tick **confirm** length — the
-long horizon is where boring rules give themselves away. Embeddings are **off** (the benchmark
-gates the statistical pipeline; the embedding stages get synthetic unit tests instead).
+long horizon is where boring rules give themselves away. This fixture gates the statistical stage.
 
 1. `npm run dev -- --port 5180`, then open
    `http://localhost:5180/HexLife/?headless=1&benchmark=1`.
@@ -129,23 +128,3 @@ The panel's negatives came from this loop — repeat it when a stage needs harde
   six non-cycling negative controls.
 - The cheap 160-tick screen improves from 0.258 to 0.294 but remains weak, which is why finds are
   re-scored on the confirmation burst before banking.
-
-## Stage-3 perceptual calibration
-
-The dev panel also exposes **Calibrate Stage 3 perceptual contrast**. It keeps the statistical
-fixture untouched, loads the default CLIP model, and captures the same deterministic 80 recipes plus
-the reference glider/churn pair. Each recipe runs a 600-tick confirmation followed by six canonical
-cell-raster frames at 50-tick spacing. The output records every trajectory's historical novelty,
-legacy trajectory speed, noise-prompt similarity, and unpenalized embeddings-on score.
-
-The 2026-07-29 `Xenova/clip-vit-base-patch16::cell-raster-v1` calibration measured:
-
-- interesting noise similarity q75 `0.332614`; boring-control median `0.334169`;
-- embeddings-on pairwise accuracy `234/511 = 0.458` before the noise factor;
-- strength `0.85` as the smallest sweep value reaching `318/511 = 0.622`, margin `+0.108`;
-- reference glider historical novelty/speed `0.02545 / 0.03001`;
-- reference churn historical novelty/speed `0.00759 / 0.00851`;
-- their historical-novelty geometric mean, and the calibrated `openEndednessHalfSat`, `0.01390`.
-
-The generated calibration JSON is diagnostic output, not a tracked fixture. The checked-in prompt
-battery, thresholds, and rationale live beside the pure transform in `PerceptualContrast.js`.

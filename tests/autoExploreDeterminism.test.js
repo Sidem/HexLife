@@ -7,8 +7,8 @@ vi.mock('../src/services/PersistenceService.js', () => ({
     loadUISetting: vi.fn((_k, d) => d),
     loadExploreGallery: vi.fn(() => []),
     saveExploreGallery: vi.fn(),
-    loadEmbeddingGallery: vi.fn(() => []),
-    saveEmbeddingGallery: vi.fn(),
+    loadNativeDescriptorGallery: vi.fn(() => []),
+    saveNativeDescriptorGallery: vi.fn(),
 }));
 
 import { AutoExploreService } from '../src/core/AutoExploreService.js';
@@ -194,10 +194,15 @@ describe('AutoExploreService determinism (golden characterization)', () => {
         expect(r.badgeLengths).toEqual([9, 9, 9]);
     });
 
-    it('an explicit empty targetPrompt is byte-identical to the statistical pipeline (v3.2)', async () => {
-        // Acceptance criterion 1: no prompt ⇒ the entire trajectory is identical to Stage 2. With no
-        // embedding provider wired, target mode is inert and targetPrompt:'' must change nothing.
-        const r = await runSearch({ baseSeed: 123456, maxGenerations: 3, mutationMode: 'r_sym', targetPrompt: '' });
+    it('Statistical only is byte-identical to the pre-model pipeline', async () => {
+        // The "Statistical only" objective must reproduce the pre-native pipeline exactly: same
+        // populations, champions, reset seeds, and banked scores as the golden capture.
+        const r = await runSearch({
+            baseSeed: 123456,
+            maxGenerations: 3,
+            mutationMode: 'r_sym',
+            objective: 'statistical',
+        });
         expect(r.populations).toEqual(GOLDEN_POPULATIONS);
         expect(r.champions).toEqual(GOLDEN_CHAMPIONS);
         expect(r.resetSeeds).toEqual(GOLDEN_RESETSEEDS);

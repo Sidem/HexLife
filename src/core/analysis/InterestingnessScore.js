@@ -56,17 +56,6 @@
  */
 
 /**
- * @typedef {object} EmbeddingStats
- * @property {number} openEndedness  Raw **historical** novelty of a find's frame embeddings in a
- *   foundation-model (CLIP) space: the mean cosine distance from each frame to the nearest state the
- *   trajectory had already visited (v3.0 ASAL perceptual term; v3.3 replaced the consecutive-frame
- *   *velocity* that used to fill this field, because velocity is maximized by noise). Present ONLY
- *   when the optional, default-off embedding objective is enabled AND a model produced ≥2 usable
- *   frame embeddings; absent otherwise (statistical objective ⇒ term dropped + renormalized, so the
- *   score is unchanged from the embedding-off pipeline).
- */
-
-/**
  * Subset of an EVALUATION_RESULT that the score consumes. Extra fields are ignored.
  * @typedef {object} EvalMetrics
  * @property {number} [finalRatio]       Final active-cell ratio in [0,1].
@@ -77,8 +66,6 @@
  * @property {SpatialOrderStats} [spatialOrder] v2.1 spatial-order stats (absent on v1 metrics).
  * @property {ChangeOrderStats} [changeOrder] v3.4 change-mask localization stats (absent on legacy metrics).
  * @property {TransportStats} [transport] v2.9 centroid-drift transport stats (absent on v1 metrics).
- * @property {EmbeddingStats} [embedding] v3.0 foundation-model perceptual stats (absent unless the
- *   optional embedding objective is enabled and a model produced a usable frame trajectory).
  * @property {number|null} [sigma]       Damage-spreading σ (1≈critical; null if no probe).
  * @property {Uint32Array|number[]} [ruleUsageDelta] 128-entry rule-usage delta over the burst.
  * @property {boolean} [extinct]
@@ -98,13 +85,11 @@
  * @property {number} spatialHeterogeneity Across-block surprisal-variance term ([0,1]) — 0 if unused (v2).
  * @property {number} temporalEntropyVariance Temporal block-entropy-variance term ([0,1]) — 0 if unused (v2.8).
  * @property {number} transport     Centroid-drift transport/mobility term ([0,1]) — 0 if unused (v2.9).
- * @property {number} openEndedness Foundation-model trajectory-novelty term ([0,1]) — 0 if unused (v3.0).
  * @property {boolean} criticalityUsed Whether σ was present and the criticality term counted.
  * @property {boolean} spatialUsed     Whether spatial metrics were present and counted (v2; UI shows n/a otherwise).
  * @property {boolean} changeLocalizationUsed Whether changeOrder.mean was present and counted (v3.4).
  * @property {boolean} temporalVarUsed Whether blockEntropy.variance was present and the temporal term counted (v2.8).
  * @property {boolean} transportUsed   Whether transport.meanSpeed was present and the transport term counted (v2.9).
- * @property {boolean} openEndednessUsed Whether an embedding trajectory was present and the perceptual term counted (v3.0).
  * @property {number} uniformFactor  Multiplicative uniform-chaos factor applied to the combined score
  *   (v3.1): 1 = no penalty, lower = high-coverage structureless churn. Not a weighted term.
  * @property {boolean} uniformUsed   Whether the uniform-chaos penalty could be evaluated (needs
@@ -124,7 +109,6 @@
  * @property {number|null} spatialVariance   Across-block surprisal variance (spatialHeterogeneity input).
  * @property {number|null} temporalVariance  Temporal block-entropy variance (temporalEntropyVariance input).
  * @property {number|null} transportSpeed    Mean centroid drift speed (transport input).
- * @property {number|null} openEndedness     Raw trajectory novelty (openEndedness input).
  * @property {number|null} finalRatio        Final active-cell ratio (uniform-chaos penalty input).
  */
 
@@ -191,35 +175,9 @@ export const SCORE_CONFIG = {
     // were scaled down proportionally to make room (spatialStructure stays dominant; their relative
     // proportions — and therefore the gliders-vs-churn fixture gap — are preserved). Like the spatial
     // and temporal terms it is dropped-and-renormalized for v1/legacy entries that predate it.
-    //
-    // v3.0 (perceptual interestingness, ASAL): added `openEndedness` — the temporal novelty of a
-    // find's frames in a foundation-model (CLIP) embedding space (Kumar et al. 2024). It is an
-    // OPTIONAL, default-off term: present only when the embedding objective is enabled AND a model
-    // produced a usable frame trajectory, dropped-and-renormalized otherwise. CRITICALLY, its weight
-    // is ADDED WITHOUT changing the other eight values, so when embeddings are off the term is absent
-    // and the renormalized score is byte-identical to the statistical pipeline (the eight terms keep
-    // their exact relative proportions — fixtures lacking it still rank gliders > churn unchanged).
-    // It complements the statistical terms with a human-perception-aligned signal rather than
-    // replacing them; it sits downstream of the v2.4 confirmation filter like every other graded term.
-    //
-    // v3.3 (#37 Stage 1 — fix the SIGN of the perceptual term): no weight changed; what changed is the
-    // statistic feeding `openEndedness`. v3.0 fed it `trajectoryNovelty` (mean distance between
-    // CONSECUTIVE frame embeddings) on the reading "the look keeps evolving". That is perceptual
-    // *velocity*, and velocity is maximized by noise: a dense churn steps a long way every frame while
-    // never arriving anywhere it has not been, and a period-2 oscillator scores near the ceiling. So
-    // the objective's ONE human-perception-aligned term was voting for exactly the chaos #37 exists to
-    // de-rank. It is now `historicalNovelty` — the mean distance from each frame to the nearest
-    // ALREADY-VISITED state (EmbeddingNovelty.js) — which is what ASAL's open-endedness actually means
-    // and is anti-chaos by construction. Stage 1 provisionally dropped `openEndednessHalfSat`
-    // 0.08 → 0.05 to match the smaller scale (historical ≤ consecutive, always). #37 Stage 3 closed
-    // that calibration debt with canonical-raster CLIP captures: reference gliders measured
-    // historical=0.02545 / speed=0.03001 and reference churn historical=0.00759 / speed=0.00851.
-    // Their historical-novelty geometric mean is 0.01390. Weights are untouched, so an
-    // embeddings-off score is byte-identical and every existing fixture ordering is preserved.
     weights: {
         // v3.4 (#37 Stage 2): reserve 0.15 for localized change and scale the prior statistical
-        // objective by 0.85, preserving every old term's relative influence. The optional perceptual
-        // weight remains additive so embeddings-off and embeddings-on continue sharing one basis.
+        // objective by 0.85, preserving every old term's relative influence.
         // Integer-percent values keep the default Scoring sliders exactly round-trippable. The
         // largest-remainder rounding of the ideal ×0.85 allocation assigns the spare point to Flux.
         criticality: 0.14,
@@ -231,7 +189,6 @@ export const SCORE_CONFIG = {
         spatialHeterogeneity: 0.09,
         temporalEntropyVariance: 0.11,
         transport: 0.09,
-        openEndedness: 0.12,
     },
 
     // --- Criticality term: gaussian in ln(σ), peaked at σ=1 → exp(-(ln σ)² / 2τ²) ---
@@ -271,21 +228,6 @@ export const SCORE_CONFIG = {
      *  term reaches 0.5. A glider/spaceship soup drifts the centroid on the order of tenths of a cell
      *  per tick; a dense churn keeps it near zero, so a low half-sat keeps the term discriminating. */
     transportHalfSat: 0.1,
-
-    // --- Open-endedness term (v3.0 ASAL perceptual novelty; half-saturation reward) ---
-    /** embedding.openEndedness at which the term reaches 0.5. **v3.3 (#37 Stage 1) changed what this
-     *  measures**: it is now `historicalNovelty` — the mean cosine distance from each frame to the
-     *  NEAREST already-visited frame — not `trajectoryNovelty`'s mean *consecutive* distance. A
-     *  still/settled pattern sits at ≈0 either way, but a churn or a period-2 oscillator (which
-     *  travels fast while revisiting the same looks) now also sits near 0 instead of near the
-     *  ceiling; only a trajectory that keeps arriving somewhere perceptually new scores.
-     *  Stage 1 provisionally retuned 0.08 → 0.05 because the new statistic is provably ≤ the old
-     *  one. Stage 3 replaces that estimate with a real
-     *  `Xenova/clip-vit-base-patch16::cell-raster-v1` capture: known gliders historical=0.02545,
-     *  known churn historical=0.00759, so their geometric mean gives halfSat=0.01390. The banked
-     *  trajectory speeds (0.03001 / 0.00851) close the calibration debt by recording how the old
-     *  velocity input compares on the identical two runs. */
-    openEndednessHalfSat: 0.0139,
 
     // --- Uniform-chaos penalty (v3.1): a MULTIPLICATIVE factor on the combined score, not a tenth
     // weighted term. Rationale (measured on tests/fixtures/exploreEvalFixtures.json): homogeneous
@@ -397,13 +339,11 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
                 spatialHeterogeneity: 0,
                 temporalEntropyVariance: 0,
                 transport: 0,
-                openEndedness: 0,
                 criticalityUsed: false,
                 spatialUsed: false,
                 changeLocalizationUsed: false,
                 temporalVarUsed: false,
                 transportUsed: false,
-                openEndednessUsed: false,
                 uniformFactor: 1,
                 uniformUsed: false,
             },
@@ -471,19 +411,6 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
     const hasTransport = tp != null && Number.isFinite(tp);
     const transport = hasTransport ? tp / (tp + cfg.transportHalfSat) : 0;
 
-    // --- Open-endedness / perceptual novelty (foundation-model historical novelty). v3.0/v3.3. ---
-    // The mean cosine distance from each frame embedding to the NEAREST already-visited one in a
-    // CLIP-style space: a DIRECT, human-perception-aligned signal for "the look keeps becoming
-    // something it has not been yet". v3.3 (#37 Stage 1) replaced the consecutive-frame distance that
-    // filled this input from v3.0: that measured perceptual *velocity*, which noise maximizes, so the
-    // one perception-aligned term in the objective was voting pro-chaos. Present only when the
-    // optional embedding objective is enabled and a model produced a usable trajectory; absent
-    // otherwise → dropped + renormalized below, so the embedding-off score is unchanged.
-    // Half-saturation reward.
-    const oe = metrics.embedding ? metrics.embedding.openEndedness : undefined;
-    const hasOpenEndedness = oe != null && Number.isFinite(oe);
-    const openEndedness = hasOpenEndedness ? oe / (oe + cfg.openEndednessHalfSat) : 0;
-
     // Weighted combine; drop a weight (and renormalize) when its input is unavailable so a burst is
     // judged on the terms it has rather than penalized: criticality when σ is null, the two spatial
     // terms when the v2.1 metrics are absent, the temporal-variance term when blockEntropy.variance
@@ -515,10 +442,6 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         num += transport * w.transport;
         den += w.transport;
     }
-    if (hasOpenEndedness) {
-        num += openEndedness * w.openEndedness;
-        den += w.openEndedness;
-    }
     // --- Uniform-chaos penalty (v3.1): multiplicative suppression of high-coverage structureless
     // churn — see the SCORE_CONFIG rationale. Needs finalRatio AND the v2.1 spatialOrder metric
     // (the structure term is what rescues dense-but-structured rules); factor 1 otherwise.
@@ -539,10 +462,9 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
         components: {
             criticality, entropyBand, fluctuation, ruleDiversity,
             spatialStructure, changeLocalization, spatialHeterogeneity,
-            temporalEntropyVariance, transport, openEndedness,
+            temporalEntropyVariance, transport,
             criticalityUsed, spatialUsed, changeLocalizationUsed: hasChangeOrder,
             temporalVarUsed: hasTemporalVar, transportUsed: hasTransport,
-            openEndednessUsed: hasOpenEndedness,
             uniformFactor, uniformUsed,
         },
         killed: false,
@@ -558,7 +480,6 @@ export function scoreSingleIC(metrics, config = SCORE_CONFIG) {
             spatialVariance: hasSpatialVar ? /** @type {number} */(sv) : null,
             temporalVariance: hasTemporalVar ? /** @type {number} */(tv) : null,
             transportSpeed: hasTransport ? /** @type {number} */(tp) : null,
-            openEndedness: hasOpenEndedness ? /** @type {number} */(oe) : null,
             finalRatio: Number.isFinite(metrics.finalRatio) ? /** @type {number} */(metrics.finalRatio) : null,
         },
     };
@@ -588,10 +509,8 @@ export function scoreCandidate(metricsPerIC, config = SCORE_CONFIG) {
                 criticality: 0, entropyBand: 0, fluctuation: 0, ruleDiversity: 0,
                 spatialStructure: 0, changeLocalization: 0, spatialHeterogeneity: 0,
                 temporalEntropyVariance: 0, transport: 0,
-                openEndedness: 0,
                 criticalityUsed: false, spatialUsed: false, changeLocalizationUsed: false,
                 temporalVarUsed: false, transportUsed: false,
-                openEndednessUsed: false,
                 uniformFactor: 1, uniformUsed: false,
             },
             winningIC: -1,

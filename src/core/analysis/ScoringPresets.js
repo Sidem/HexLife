@@ -27,7 +27,6 @@ export const WEIGHT_KEYS = /** @type {const} */ ([
     'spatialHeterogeneity',
     'temporalEntropyVariance',
     'transport',
-    'openEndedness',
 ]);
 
 /**
@@ -70,7 +69,7 @@ export const SCORING_PRESETS = {
         weights: {
             criticality: 4, entropyBand: 3, fluctuation: 2, ruleDiversity: 3,
             spatialStructure: 25, changeLocalization: 25, spatialHeterogeneity: 4,
-            temporalEntropyVariance: 12, transport: 20, openEndedness: 2,
+            temporalEntropyVariance: 12, transport: 20,
         },
         uniformPenaltyPct: 70,
     },
@@ -81,19 +80,9 @@ export const SCORING_PRESETS = {
             criticality: 27, entropyBand: 18, fluctuation: 14, ruleDiversity: 9,
             spatialStructure: 9, changeLocalization: 10, spatialHeterogeneity: 4,
             temporalEntropyVariance: 4,
-            transport: 2, openEndedness: 3,
+            transport: 2,
         },
         uniformPenaltyPct: 30,
-    },
-    novelty: {
-        label: 'Maximal Novelty',
-        description: 'Leans on the perceptual (CLIP) open-endedness signal: worlds whose look keeps evolving. Best with the embedding objective enabled.',
-        weights: {
-            criticality: 4, entropyBand: 2, fluctuation: 2, ruleDiversity: 2,
-            spatialStructure: 12, changeLocalization: 10, spatialHeterogeneity: 13,
-            temporalEntropyVariance: 9, transport: 8, openEndedness: 38,
-        },
-        uniformPenaltyPct: 50,
     },
 };
 

@@ -5,7 +5,6 @@ import * as PersistenceService from '../services/PersistenceService.js';
 import * as Symmetry from './Symmetry.js';
 import { RulesetService } from './RulesetService.js';
 import { AutoExploreService } from './AutoExploreService.js';
-import { EmbeddingService, EMBEDDING_CONFIG, EMBEDDING_MODELS } from '../services/EmbeddingService.js';
 import { NativeTrajectoryModelService } from '../services/NativeTrajectoryModelService.js';
 import { TrajectoryCaptureService } from '../services/TrajectoryCaptureService.js';
 import { ShareCodec } from '../services/ShareCodec.js';
@@ -48,43 +47,26 @@ export class WorldManager {
         this.exploreSessionCoordinator = new ExploreSessionCoordinator(this);
         this._initWorlds();
         this._initCameraStates(sharedSettings.camera);
-        // Optional foundation-model embedding provider for the perceptual auto-explore objective (v3.0,
-        // ASAL). Default off (persisted setting); lazily loads a CLIP image encoder in its own worker
-        // only when enabled, and degrades to the statistical objective on any failure.
-        // The CLIP checkpoint is user-selectable (v3.1); an unknown persisted id (e.g. a since-
-        // removed option) falls back to the default so a stale setting can never wedge the provider.
-        const persistedModelId = PersistenceService.loadUISetting('embeddingModelId', EMBEDDING_CONFIG.modelId);
-        this.embeddingService = new EmbeddingService({
-            enabled: PersistenceService.loadUISetting('embeddingEnabled', false),
-            config: {
-                modelId: EMBEDDING_MODELS.some((m) => m.id === persistedModelId)
-                    ? persistedModelId
-                    : EMBEDDING_CONFIG.modelId,
-            },
-        });
-        // If the user previously opted in, warm the (browser-cached) model now so the panel shows a
-        // truthful ready/error status instead of a stuck "will load on demand"; fire-and-forget and
-        // self-degrading. Default-off users never spawn the worker.
-        if (this.embeddingService.isEnabled()) this.embeddingService.ensureReady();
-        // HexLife-native trajectory model boundary (#37 Stage 4A). Training stays in the sibling
-        // HexLifeInterestModel project; Explorer only loads a final manifest+ONNX artifact and
-        // exports exact HXLT1 slices. It is default-off and does not affect Auto-Explore ranking
-        // until a trained artifact passes Stage 4B's held-out/runtime gates.
+        // #37 Stage 4B: the native trajectory model is the DEFAULT learned objective. Training stays
+        // in the sibling HexLifeInterestModel project; Explorer only loads the local versioned
+        // manifest + ONNX artifact and exports exact HXLT1 slices. "Statistical only" turns it off
+        // and restores the byte-identical pre-model search.
+        const exploreObjective = PersistenceService.loadUISetting('exploreObjective', 'native-beta');
         this.nativeTrajectoryModelService = new NativeTrajectoryModelService({
-            enabled: PersistenceService.loadUISetting('nativeTrajectoryModelEnabled', false),
+            enabled: exploreObjective !== 'statistical',
         });
+        /** Model id the native descriptor archive is currently keyed to (see NATIVE_MODEL_STATUS_CHANGED). */
+        this._nativeDescriptorModelId = null;
         if (this.nativeTrajectoryModelService.enabled) this.nativeTrajectoryModelService.ensureReady();
         this.trajectoryCaptureService = new TrajectoryCaptureService(this);
         // Auto-explore (Phase 4): generation loop + session gallery. Constructed after worlds exist;
         // it only references the proxies/ruleset service lazily once started. The thumbnail provider
         // (v2.6, F6) waits a couple of rAFs for the renderer to draw the world's final eval frame,
-        // then grabs a small JPEG data URL — DI so the service stays renderer-free. The perceptual
-        // frame provider now rasterizes exact cells at one pixel/cell (tiled above 224), bypassing
-        // WebGL and palette state; both providers remain renderer-free DI at the service boundary.
+        // then grabs a small JPEG data URL — DI so the service stays renderer-free. The native model
+        // provider is injected the same way, so the service never imports a worker or a manifest.
         this.autoExploreService = new AutoExploreService(this, {
             thumbnailProvider: (worldIndex) => this._captureExploreThumbnail(worldIndex),
-            embeddingProvider: this.embeddingService,
-            frameProvider: (worldIndex) => this._captureExploreFrame(worldIndex),
+            nativeModelProvider: this.nativeTrajectoryModelService,
         });
         this._setupEventListeners();
     }
@@ -289,42 +271,27 @@ export class WorldManager {
         EventBus.subscribe(EVENTS.COMMAND_CLEAR_AUTO_EXPLORE_GALLERY, () => this.autoExploreService.clearGallery());
         EventBus.subscribe(EVENTS.COMMAND_APPLY_EXPLORE_FIND, (data) => this.applyExploreFind(data?.find));
         EventBus.subscribe(EVENTS.COMMAND_RETEST_EXPLORE_FIND, (data) => this.autoExploreService.retestFind(data?.find));
-        // Perceptual objective toggle (v3.0): persist the choice and load/unload the embedding model.
-        EventBus.subscribe(EVENTS.COMMAND_SET_EMBEDDING_ENABLED, (data) => {
-            const enabled = !!(data && data.enabled);
-            PersistenceService.saveUISetting('embeddingEnabled', enabled);
-            this.embeddingService.setEnabled(enabled);
-        });
-        // CLIP checkpoint switch (v3.1): refuse mid-run (the search owns the provider AND the
-        // perceptual archive keys are model-specific), else persist + swap the model and replace
-        // the model-namespaced archive.
-        EventBus.subscribe(EVENTS.COMMAND_SET_EMBEDDING_MODEL, (data) => {
-            const modelId = data && data.modelId;
-            if (!modelId || !EMBEDDING_MODELS.some((m) => m.id === modelId)) return;
-            if (this.autoExploreService.isRunning()) {
-                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, { message: 'Stop the search before switching the CLIP model.', type: 'error' });
-                return;
-            }
-            if (modelId === this.embeddingService.getModelId()) return;
-            PersistenceService.saveUISetting('embeddingModelId', modelId);
-            this.embeddingService.setModel(modelId);
-            this.autoExploreService.onEmbeddingModelChanged();
-        });
         EventBus.subscribe(EVENTS.COMMAND_SET_NATIVE_MODEL_ENABLED, (data) => {
             const enabled = !!data?.enabled;
-            PersistenceService.saveUISetting('nativeTrajectoryModelEnabled', enabled);
+            PersistenceService.saveUISetting('exploreObjective', enabled ? 'native-beta' : 'statistical');
             this.nativeTrajectoryModelService.setEnabled(enabled);
+        });
+        // The descriptor archive is loaded in AutoExploreService's constructor, which runs long
+        // before the manifest arrives — so it loads under a null model id and cannot self-invalidate.
+        // Re-key it the moment the real id is known (and on any later id change). Refused mid-run:
+        // the search owns the archive, and SimHash cells from two models are not comparable.
+        EventBus.subscribe(EVENTS.NATIVE_MODEL_STATUS_CHANGED, (status) => {
+            const modelId = status?.modelId || null;
+            if (!modelId || modelId === this._nativeDescriptorModelId) return;
+            if (this.autoExploreService.isRunning()) return;
+            this._nativeDescriptorModelId = modelId;
+            this.autoExploreService.onNativeModelChanged();
         });
         EventBus.subscribe(EVENTS.COMMAND_CAPTURE_TRAINING_SLICE, async (data) => {
             try {
-                const sliceCount = Math.max(1, Math.trunc(Number(data?.sliceCount) || 1));
-                const result = sliceCount > 1
-                    ? await this.trajectoryCaptureService.captureSeriesAndDownload(data || {})
-                    : await this.trajectoryCaptureService.captureAndDownload(data || {});
+                const result = await this.trajectoryCaptureService.captureAndDownload(data || {});
                 EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
-                    message: sliceCount > 1
-                        ? `Exported ${result.headers.length} training slices as one ZIP.`
-                        : `Exported ${result.header.frameCount}-frame training slice.`,
+                    message: `Exported ${result.header.frameCount}-frame training slice.`,
                     type: 'success',
                 });
             } catch (error) {
@@ -1055,7 +1022,6 @@ export class WorldManager {
     _setAllWorldsEnabledForExplore = (enabled) => this.exploreSessionCoordinator._setAllWorldsEnabledForExplore(enabled);
     _applyExploreRuleset = (worldIndex, hex) => this.exploreSessionCoordinator._applyExploreRuleset(worldIndex, hex);
     _captureExploreThumbnail = (worldIndex) => this.exploreSessionCoordinator._captureExploreThumbnail(worldIndex);
-    _captureExploreFrame = (worldIndex) => this.exploreSessionCoordinator._captureExploreFrame(worldIndex);
     _restoreAutoExploreSnapshot = (snapshot, opts) => this.exploreSessionCoordinator._restoreAutoExploreSnapshot(snapshot, opts);
 
     setGlobalSpeed = (speed) => {
