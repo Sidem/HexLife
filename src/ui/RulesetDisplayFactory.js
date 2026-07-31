@@ -33,6 +33,23 @@ export function constraintBadge(hex) {
     return { cls, label: meta.label, title: `${meta.label} ruleset — ${meta.description}` };
 }
 
+/**
+ * A committed catalog entry may carry an optional `authorUrl` alongside its `author` credit (#27).
+ * Only `http(s)` survives: the field is data, and a card must never turn data into a `javascript:`
+ * link. Returns '' when there is nothing safe to link to.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function safeCreditUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    try {
+        const url = new URL(value.trim());
+        return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : '';
+    } catch {
+        return '';
+    }
+}
+
 export class RulesetDisplayFactory {
     constructor(appContext) {
         this.appContext = appContext;
@@ -107,6 +124,17 @@ export class RulesetDisplayFactory {
             ? '<span class="library-card-source source-personal" title="Saved in your personal library">Mine</span>'
             : '<span class="library-card-source source-public" title="Included in the public library">Public</span>';
 
+        // Community credit (#27): committed catalog entries can name whoever submitted them. Assigned
+        // at review from the GitHub issue, never from imported data — no personal or pack entry has it.
+        const author = typeof ruleData.author === 'string' ? ruleData.author.trim() : '';
+        const authorUrl = safeCreditUrl(ruleData.authorUrl);
+        const creditName = author ? this._escape(author) : '';
+        const credit = author
+            ? `<div class="library-card-credit">Found by ${authorUrl
+                ? `<a href="${this._escapeAttr(authorUrl)}" target="_blank" rel="noopener noreferrer">${creditName}</a>`
+                : creditName}</div>`
+            : '';
+
         // ONE load control per card (roadmap #30 / UX audit fix 3). "Load" and "Load + IC" used to
         // sit side by side on every card that had a paired start — ~2 controls × every entry, which
         // is how the Library tab reached 104 controls. Which of the two a click means is now a
@@ -136,6 +164,7 @@ export class RulesetDisplayFactory {
                     ${constraintChip}
                 </div>
                 <div class="description${descText ? '' : ' is-empty'}">${descHtml}</div>
+                ${credit}
                 ${tagChips}
             </div>
             <div class="library-card-actions">${actions.join('')}</div>

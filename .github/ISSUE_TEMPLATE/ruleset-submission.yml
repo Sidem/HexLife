@@ -1,0 +1,53 @@
+name: Ruleset submission
+description: Propose one of your rulesets for the bundled public library.
+title: "Ruleset: "
+labels: ["ruleset submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The Explorer fills this in for you.** Save the ruleset to your personal library with a name,
+        a description, at least one standard tag and a paired starting condition, then open its **⋯**
+        menu and choose **Submit to public library**.
+
+        Filling it in by hand works too — the entry below just has to match the shape of the entries in
+        [`src/core/library/rulesets.json`](../../blob/main/src/core/library/rulesets.json).
+  - type: textarea
+    id: entry
+    attributes:
+      label: Library entry
+      description: >-
+        The `rulesets.json` entry, exactly as the Explorer generated it. Please don't hand-edit the
+        `hex`, `initialState` or `seed` — together they are the recipe that reproduces what you saw.
+        Leave out any thumbnail; the app bakes those locally.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: credit
+    attributes:
+      label: Credit
+      description: >-
+        How you want to be credited on the library card. Leave blank to be credited as your GitHub
+        username, or write "no credit" to be left out.
+      placeholder: e.g. Sidem
+  - type: input
+    id: link
+    attributes:
+      label: Explorer link
+      description: A deep link that loads the ruleset, so this can be reviewed in one click.
+      placeholder: https://sidem.github.io/HexLife/?r=…
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: >-
+        What makes it worth including — what to look for, how long it takes to develop, which grid
+        size it looks best at.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Confirmation
+      options:
+        - label: This is my own find, and I'm happy for it to ship with HexLife under the project's MIT licence.
+          required: true

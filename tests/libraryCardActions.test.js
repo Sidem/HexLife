@@ -110,6 +110,25 @@ describe('unified public/personal library', () => {
     });
 });
 
+describe('community credit on catalog cards (#27)', () => {
+    const body = cardFactoryBody();
+
+    it('renders the optional author credit a submission is merged with', () => {
+        expect(body).toContain('library-card-credit');
+        expect(body).toContain('ruleData.author');
+    });
+
+    it('links a credit only through the http(s) guard — the field is data, not markup', () => {
+        expect(body).toContain('safeCreditUrl(ruleData.authorUrl)');
+        expect(FACTORY).toMatch(/export function safeCreditUrl[\s\S]*?protocol === 'https:'/);
+        expect(body).toContain('rel="noopener noreferrer"');
+    });
+
+    it('escapes the credit name like every other card string', () => {
+        expect(body).toContain('this._escape(author)');
+    });
+});
+
 describe('on-canvas view controls (#31)', () => {
     const VIEW = read(path.join('src', 'ui', 'ViewControls.js'));
     const VIEW_CSS = read(path.join('src', 'ui', 'ViewControls.css'));

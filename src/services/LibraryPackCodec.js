@@ -287,10 +287,14 @@ export function mergeRulesets(existing = [], incoming = []) {
 /**
  * Project a personal-library entry down to the committed public-library shape
  * (`{name, description, tags, hex, initialState?, seed?}` — no thumb, no volatile fields). Used by
- * the "Copy as public-library JSON" per-card action so a personal find is one paste from a
- * `rulesets.json` PR entry.
+ * the "Copy as public-library JSON" per-card action and by {@link module:services/LibrarySubmission},
+ * so a personal find is one paste (or one click) from a `rulesets.json` entry.
+ *
+ * Deliberately author-free: credit on a catalog entry is assigned at review from whoever opened the
+ * submission issue, never carried in client data.
  * @param {object} entry
- * @returns {object}
+ * @returns {{name: string, description: string, tags: string[], hex: string,
+ *   initialState?: {mode: string, params: object}, seed?: number|null}}
  */
 export function toPublicLibraryEntry(entry) {
     const out = {

@@ -615,6 +615,27 @@ button.tag-chip.tag-filter.active {
     font-style: normal;
 }
 
+/* Community credit on a committed catalog entry (#27) — quieter than the description it follows,
+   because it is provenance rather than a claim about the rule. */
+.library-card-credit {
+    font-size: 0.75em;
+    color: #8a8a92;
+    line-height: 1.35;
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+}
+
+.library-card-credit a {
+    color: #9fb8cc;
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(159, 184, 204, 0.5);
+}
+
+.library-card-credit a:hover,
+.library-card-credit a:focus-visible {
+    color: #cfe3f2;
+}
+
 .library-card-tags {
     display: flex;
     flex-wrap: wrap;

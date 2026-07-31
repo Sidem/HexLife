@@ -271,10 +271,19 @@ cannot be completed automatically from the Explorer.
 
 To propose a ruleset for the bundled public catalog:
 
-1. Save it to your personal library and add a useful name, description, tags, and paired start.
-2. Open its **⋯** menu and choose **Copy as public-library JSON**.
-3. Add the copied entry to [`src/core/library/rulesets.json`](src/core/library/rulesets.json) in a
-   pull request. Do not add a thumbnail; the app generates and caches those locally.
+1. Save it to your personal library with a name, a description, at least one standard tag, and a
+   paired starting condition. Those four are what turn a personal save into a usable catalog entry,
+   and the Explorer checks for them before it lets the submission out.
+2. Open its **⋯** menu and choose **Submit to public library**. This opens a prefilled
+   [ruleset submission issue](https://github.com/Sidem/HexLife/issues/new?template=ruleset-submission.yml)
+   carrying the entry and a link that loads the rule — nothing else from your browser.
+3. Say how you want to be credited in the form's **Credit** field. Accepted entries are merged into
+   [`src/core/library/rulesets.json`](src/core/library/rulesets.json) with that credit on the card;
+   leave it blank to be credited as your GitHub username.
+
+Prefer to open the pull request yourself? The same menu still offers **Copy as public-library JSON**,
+which puts the exact committed entry shape on your clipboard. Either way, leave the thumbnail out —
+the app bakes and caches those locally from the paired start.
 
 General bug reports and feature proposals are welcome in
 [GitHub Issues](https://github.com/Sidem/HexLife/issues).

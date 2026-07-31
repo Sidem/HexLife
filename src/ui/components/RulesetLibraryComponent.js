@@ -13,6 +13,7 @@ import {
 import * as InitialStateCodec from '../../services/InitialStateCodec.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { decodePack, toPublicLibraryEntry } from '../../services/LibraryPackCodec.js';
+import { validateSubmission, buildSubmissionIssue } from '../../services/LibrarySubmission.js';
 
 /**
  * The Ruleset Library menu: load saved rulesets (public + personal) or set one
@@ -516,6 +517,14 @@ export class RulesetLibraryComponent extends BaseComponent {
                     });
                 }
 
+                // The streamlined route into the curated catalog (#27): validate here, then hand a
+                // prefilled GitHub issue to the user. Sits above the manual copy, which stays as the
+                // escape hatch for anyone who'd rather open the PR themselves.
+                popoverActions.push({
+                    label: 'Submit to public library…',
+                    callback: () => this._submitToPublicLibrary(rule),
+                });
+
                 // One-paste path into a public-library PR: emit the committed rulesets.json shape.
                 popoverActions.push({
                     label: 'Copy as public-library JSON',
@@ -602,6 +611,81 @@ export class RulesetLibraryComponent extends BaseComponent {
         this._renderLibrary();
         this._scheduleThumbnailBackfill();
     };
+
+    /**
+     * "Submit to public library" (#27) — propose a personal entry for the committed catalog.
+     *
+     * Two gates, both here rather than on the reviewer: the entry has to clear the intake bar
+     * ({@link validateSubmission} — named, described, tagged, replayable, not already public), and the
+     * user has to confirm what leaves the browser. A failed check is not a dead end: the same dialog
+     * offers the editor that fixes it.
+     * @param {object} rule Personal-library entry
+     */
+    _submitToPublicLibrary(rule) {
+        const publicHexes = (this.libraryData?.rulesets || []).map(r => r.hex);
+        const { ok, problems } = validateSubmission(rule, { publicHexes });
+        const label = rule.name || rulesetName(rule.hex);
+
+        if (!ok) {
+            EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+                title: 'Not ready for the public library',
+                message: `"${label}" needs a little more before it can be proposed:\n\n${problems.map(p => `• ${p}`).join('\n')}\n\nOpen the editor to fill these in?`,
+                confirmLabel: 'Edit entry',
+                onConfirm: () => EventBus.dispatch(EVENTS.COMMAND_SHOW_SAVE_RULESET_MODAL, rule),
+            });
+            return;
+        }
+
+        // Deep-link the reviewer back at THIS build's origin (a local or preview copy reviews itself),
+        // trimmed to its directory so `index.html` doesn't end up in the base.
+        const origin = `${window.location.origin}${window.location.pathname}`.replace(/[^/]*$/, '');
+        const submission = buildSubmissionIssue(rule, { origin });
+        EventBus.dispatch(EVENTS.COMMAND_SHOW_CONFIRMATION, {
+            title: 'Submit to the public library',
+            message: `This opens a prefilled GitHub issue proposing "${label}" for the bundled library.\n\nIt carries the name, description, tags, ruleset code and paired start — no thumbnail and nothing else from this browser. You'll be credited by your GitHub username unless the form's Credit field says otherwise.\n\nA GitHub account is needed to post it.`,
+            confirmLabel: 'Open GitHub',
+            onConfirm: () => this._openSubmissionIssue(submission),
+        });
+    }
+
+    /**
+     * Open a built submission. When the entry is too big to ride the URL it goes on the clipboard
+     * instead and the form opens empty — the copy is STARTED before `window.open` (same task, so the
+     * confirm click's transient activation still covers the popup) and only reported on afterwards.
+     * @param {{url: string, entryJson: string, oversize: boolean}} submission
+     */
+    _openSubmissionIssue(submission) {
+        const copy = submission.oversize
+            ? navigator.clipboard.writeText(submission.entryJson).then(() => true, () => false)
+            : Promise.resolve(null);
+        const opened = window.open(submission.url, '_blank', 'noopener,noreferrer');
+
+        copy.then(copied => {
+            if (!opened) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: 'GitHub was blocked from opening — allow popups for this site, or use "Copy as public-library JSON" and open an issue yourself.',
+                    type: 'error',
+                });
+                return;
+            }
+            if (copied === null) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: 'Submission form opened with your entry filled in — check the Credit field, then post it.',
+                    type: 'success',
+                });
+            } else if (copied) {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: 'Entry was too long for the link, so it is on your clipboard — paste it into "Library entry" on GitHub.',
+                    type: 'info',
+                });
+            } else {
+                EventBus.dispatch(EVENTS.COMMAND_SHOW_TOAST, {
+                    message: 'Entry was too long for the link and the clipboard was blocked — use "Copy as public-library JSON", then paste it into the form.',
+                    type: 'error',
+                });
+            }
+        });
+    }
 
     /** Download the personal library as a dated pack file (no-op with a toast when it's empty). */
     _exportPack() {

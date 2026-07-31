@@ -26,6 +26,19 @@
     overflow-y: auto;
 }
 
+/* Confirmation copy is set as textContent, so its blank lines and bullet lists only survive with
+   `pre-line` — several dialogs (public-duplicate cleanup, ruleset submission) write multi-line
+   messages that otherwise collapse into one paragraph. */
+#confirmation-dialog .modal-content {
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+
+#confirmation-message {
+    white-space: pre-line;
+    line-height: 1.45;
+}
+
 .modal-close-button {
     position: absolute;
     top: 10px; right: 15px;

@@ -1,0 +1,7 @@
+# Bug reports and feature proposals stay free-form; only ruleset submissions get a form, because
+# they are the one issue type with a fixed payload the reviewer has to paste into a committed file.
+blank_issues_enabled: true
+contact_links:
+  - name: HexLife on Reddit
+    url: https://www.reddit.com/r/hexlife/
+    about: Share a Live Specimen, ask questions, or show a world off.
