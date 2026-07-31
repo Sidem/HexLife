@@ -276,6 +276,25 @@ export class TrajectoryCaptureService {
     }
 
     /**
+     * Write the banked hard-pair votes on their own, as the bare `comparisons.jsonl` the auditor and
+     * `hexlife-build-comparisons` both read.
+     *
+     * Votes normally ride inside a clip ZIP, which is fine while clips are still arriving — but the
+     * deck can only be served once clips exist on *both* sides of a stratum, so the votes at the end
+     * of a session routinely arrive after the last clips have already been flushed. Without a
+     * container of their own they would be dropped on close.
+     *
+     * @param {import('../core/analysis/CorpusVoteBank.js').CorpusVoteBank} voteBank
+     */
+    downloadComparisons(voteBank) {
+        const jsonl = voteBank?.comparisonsJsonl?.() || '';
+        if (!jsonl) throw new Error('No hard-pair votes to write.');
+        const filename = `comparisons-${String(voteBank.sessionId).slice(0, 8)}.jsonl`;
+        downloadFile(filename, jsonl, 'application/x-ndjson');
+        return { filename, voteCount: voteBank.voteCount };
+    }
+
+    /**
      * Capture and evaluate without downloading.
      * @param {import('./NativeTrajectoryModelService.js').NativeTrajectoryModelService} modelService
      * @param {{frameCount?: number, tickStride?: number}} [options]

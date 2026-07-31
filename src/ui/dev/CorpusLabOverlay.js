@@ -19,6 +19,7 @@ import { CorpusVoteBank } from '../../core/analysis/CorpusVoteBank.js';
 import { CorpusVoteView } from './CorpusVoteView.js';
 import { decodeTrajectory } from '../../core/analysis/TrajectoryFormat.js';
 import { TrajectoryCaptureService, currentGridPreset } from '../../services/TrajectoryCaptureService.js';
+import { corpusOwnsKey } from './corpusKeyOwnership.js';
 
 /**
  * OWNER-ONLY Corpus v1 collection tool, mounted with `?corpus=1` (#37 Stage 4B.2).
@@ -98,6 +99,12 @@ export class CorpusLabOverlay {
         });
         this.voteBank = new CorpusVoteBank({ sessionId: this.buffer.sessionId });
         this.voteBank.restore(handoff?.votes || null);
+        /**
+         * Votes already written to disk. Votes are cumulative and are re-written whole into every
+         * part, so anything that survived the grid-switch handoff is by definition already in the
+         * previous part's ZIP — `_switchGridBlock` flushes before it persists.
+         */
+        this.flushedVoteCount = this.voteBank.voteCount;
         /** @type {CorpusVoteView|null} Non-null only while the overlay is in vote mode. */
         this.voteView = null;
 
@@ -156,6 +163,11 @@ export class CorpusLabOverlay {
             <div class="corpus-panel">
                 <header class="corpus-head">
                     <h2>Corpus Lab <span class="corpus-session"></span></h2>
+                    <span class="corpus-keys">
+                        <kbd>I</kbd>/<kbd>B</kbd> judge · <kbd>U</kbd> skip · <kbd>&larr;</kbd> undo ·
+                        <kbd>1</kbd>–<kbd>9</kbd>,<kbd>0</kbd> scenario · <kbd>V</kbd> vote deck ·
+                        <kbd>Esc</kbd> close — all other app shortcuts are suspended
+                    </span>
                     <button class="corpus-close" title="Close (Esc)">&times;</button>
                 </header>
                 <div class="corpus-plan">
@@ -251,11 +263,40 @@ export class CorpusLabOverlay {
         this.el.addEventListener('click', (event) => this._onClick(event));
         this.el.addEventListener('change', () => this._readSettings());
         this._keyHandler = (event) => this._onKey(event);
-        window.addEventListener('keydown', this._keyHandler);
+        // Capture phase on `window` — the first handler anywhere in the document to see the key, and
+        // therefore the only place a key can be taken away from `KeyboardShortcutManager` (bubble
+        // phase on `document`) and `InputManager`. See `corpusKeyOwnership.js` for why the overlay
+        // claims the whole unmodified keyboard rather than just the keys that visibly collide.
+        window.addEventListener('keydown', this._keyHandler, true);
+    }
+
+    /**
+     * Close, but never silently: `destroy()` drops the clip buffer and the vote bank on the floor.
+     * Both live only in this page — clip payloads are far too large for localStorage, which is why
+     * the grid-switch handoff carries tallies and votes but never bytes — so an `Esc` slip three
+     * hundred judgments into a session is unrecoverable, and the ZIP that would have proved the work
+     * happened is the thing that never gets written.
+     */
+    _requestClose() {
+        const clips = this.buffer.clipCount;
+        const votes = this._unsavedVoteCount();
+        if (!clips && !votes) { this.destroy(); return; }
+
+        const pending = [
+            clips ? `${clips} clip${clips === 1 ? '' : 's'}` : '',
+            votes ? `${votes} hard-pair vote${votes === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' and ');
+        const confirmed = globalThis.confirm?.(
+            `Discard ${pending}?\n\n`
+            + 'They exist only in this page and cannot be recovered once it closes.\n\n'
+            + 'Cancel, then press "Finish & download", to keep them.'
+        );
+        if (confirmed) this.destroy();
+        else this._setStatus(`Still open — ${pending} unsaved. "Finish & download" writes them.`);
     }
 
     destroy() {
-        window.removeEventListener('keydown', this._keyHandler);
+        window.removeEventListener('keydown', this._keyHandler, true);
         this.el?.remove();
         // Hand the owner's worlds back exactly as they were before the session.
         this.wm._restoreAutoExploreSnapshot(this.snapshot);
@@ -571,9 +612,24 @@ export class CorpusLabOverlay {
 
     // --- output ----------------------------------------------------------------------------------
 
+    /** Hard-pair votes cast since the last part was written. */
+    _unsavedVoteCount() {
+        return Math.max(0, this.voteBank.voteCount - this.flushedVoteCount);
+    }
+
+    /** Whether anything would be lost by closing the page right now. */
+    _hasUnsavedWork() {
+        return this.buffer.clipCount > 0 || this._unsavedVoteCount() > 0;
+    }
+
     /** @param {boolean} final */
     _flush(final) {
         if (!this.buffer.clipCount) {
+            // Votes ride inside the clip ZIP, so a session that flushed its last clips and then spent
+            // an hour in the vote deck has no container left to write them into. That is the *expected*
+            // shape of a session — the deck can only be served once clips exist on both sides of a
+            // stratum — so votes get their own file rather than a "nothing collected" dead end.
+            if (this._unsavedVoteCount()) return this._flushVotesOnly(final);
             this._setStatus('Nothing collected yet.');
             return false;
         }
@@ -584,6 +640,7 @@ export class CorpusLabOverlay {
                 voteBank: this.voteBank,
             });
             this.buffer.markFlushed();
+            this.flushedVoteCount = this.voteBank.voteCount;
             this.partIndex++;
             this._setStatus(`Wrote ${filename}`);
         } catch (error) {
@@ -592,6 +649,25 @@ export class CorpusLabOverlay {
             return false;
         }
         // A finished session must not leave a handoff behind for the next `?corpus=1` visit to adopt.
+        if (final) PersistenceService.saveUISetting(HANDOFF_KEY, null);
+        this._update();
+        return true;
+    }
+
+    /**
+     * Write the vote rows on their own, as the bare `comparisons.jsonl` the auditor reads.
+     * @param {boolean} final
+     */
+    _flushVotesOnly(final) {
+        try {
+            const { filename } = this.capture.downloadComparisons(this.voteBank);
+            this.flushedVoteCount = this.voteBank.voteCount;
+            this._setStatus(`Wrote ${filename} — ${this.flushedVoteCount} votes, no new clips`);
+        } catch (error) {
+            this._setStatus(`Download failed: ${error.message}`);
+            this._update();
+            return false;
+        }
         if (final) PersistenceService.saveUISetting(HANDOFF_KEY, null);
         this._update();
         return true;
@@ -613,8 +689,11 @@ export class CorpusLabOverlay {
             this._setStatus(`Unknown grid preset "${target.preset}".`);
             return;
         }
-        if (this.buffer.clipCount && !this._flush(false)) {
-            this._setStatus('Not switching blocks — the partial ZIP failed to write.');
+        // Votes as well as clips: the handoff carries vote rows through the reload, so if they were
+        // never written here, `flushedVoteCount` on the far side would claim a saved state that has
+        // no file behind it.
+        if (this._hasUnsavedWork() && !this._flush(false)) {
+            this._setStatus('Not switching blocks — the partial write failed.');
             return;
         }
         this.busy = true;
@@ -643,7 +722,7 @@ export class CorpusLabOverlay {
     /** @param {MouseEvent} event */
     _onClick(event) {
         const target = event.target;
-        if (target.closest('.corpus-close')) { this.destroy(); return; }
+        if (target.closest('.corpus-close')) { this._requestClose(); return; }
         const chip = target.closest('[data-scenario]');
         if (chip) {
             this.override = chip.dataset.scenario;
@@ -652,6 +731,9 @@ export class CorpusLabOverlay {
         }
         const button = target.closest('[data-corpus]');
         if (!button) return;
+        // Drop focus before acting. A focused button re-fires on Space and Enter, so clicking
+        // "Boring" once would otherwise turn the next Space into a second, unintended judgment.
+        button.blur();
         switch (button.dataset.corpus) {
             case 'interesting': void this._judge('interesting'); break;
             case 'boring': void this._judge('boring'); break;
@@ -667,16 +749,23 @@ export class CorpusLabOverlay {
 
     /** @param {KeyboardEvent} event */
     _onKey(event) {
-        // Never steal keys from the numeric settings inputs.
-        if (event.target?.tagName === 'INPUT') return;
+        // Settings inputs and browser/devtools chords are not ours; everything else is.
+        if (!corpusOwnsKey(event)) return;
+        // Consumed whether or not the overlay has a use for the key. An unowned key that reaches the
+        // global registry mid-round can generate, reset, mutate, clear or invert the world the next
+        // capture is about to encode, and nothing downstream records that it happened.
+        event.stopPropagation();
+
         const key = event.key.toLowerCase();
-        if (key === 'escape') { this.destroy(); return; }
+        if (key === 'escape') { event.preventDefault(); this._requestClose(); return; }
         if (key === 'v') { this._toggleVoteMode(); event.preventDefault(); return; }
         // In vote mode the arrow keys belong to the deck, and the judging keys have no card to act on.
         if (this.voteView) {
             if (this.voteView.handleKey(event)) event.preventDefault();
             return;
         }
+        // Space would scroll the panel and re-activate whatever the last click left focused.
+        if (key === ' ') { event.preventDefault(); return; }
         if (key === 'i') { void this._judge('interesting'); }
         else if (key === 'b') { void this._judge('boring'); }
         else if (key === 'u') { this._skip(); }
@@ -829,6 +918,9 @@ export class CorpusLabOverlay {
             </div>
             <div class="corpus-coverage-row">
                 <span>hard pairs</span>
+                ${this._unsavedVoteCount()
+                    ? `<span class="corpus-tally empty">${this._unsavedVoteCount()} unwritten</span>`
+                    : ''}
                 ${votes.strata.map((stratum) => tally(
                     `${stratum.strictRegression ? '★ ' : ''}${stratum.id}`,
                     `${stratum.have}/${stratum.need}`,
