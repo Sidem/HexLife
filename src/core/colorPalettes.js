@@ -71,4 +71,24 @@ export const PRESET_PALETTES = {
         gradient: ['#009FFF', '#36D1DC', '#6EFA7D', '#B4FF64'],
         offColor: '#1A1A1A'
     }
-}; 
+};
+
+/**
+ * The presets a host UI can offer, in declaration order — the `palette` attribute takes `key`.
+ *
+ * A projection rather than the table itself: a picker needs a key and a label, and handing external
+ * hosts the raw gradients would make every stop in every ramp a compatibility surface. `logic`
+ * distinguishes the two presets that color by *rule structure* (neighbor count, symmetry group)
+ * rather than by taste, so a host can group or omit them; `cvdSafe` marks the perceptually-uniform
+ * ramps, which is the difference between an accessibility option and a decorative one.
+ *
+ * @returns {Array<{key: string, name: string, logic?: string, cvdSafe?: boolean}>}
+ */
+export function listPresetPalettes() {
+    return Object.entries(PRESET_PALETTES).map(([key, preset]) => ({
+        key,
+        name: preset.name || key,
+        ...(preset.logic ? { logic: preset.logic } : {}),
+        ...(preset.cvdSafe ? { cvdSafe: true } : {}),
+    }));
+}

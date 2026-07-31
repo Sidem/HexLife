@@ -20,11 +20,17 @@ import * as WebGLUtils from '../rendering/webglUtils.js';
 import { generateColorLUT } from '../utils/ruleVizUtils.js';
 import { PRESET_PALETTES } from '../core/colorPalettes.js';
 import { precomputeSymmetryGroups } from '../core/Symmetry.js';
+import { lookAt, multiply, perspective } from '../rendering/mat4.js';
+import { getTorusPeriods, torusOrbitCamera, wrapAngle } from '../rendering/torusMath.js';
 
 // eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
 // eslint-disable-next-line import/no-unresolved
 import hexFragmentShaderSource from '../../shaders/fragment.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import torusVertexShaderSource from '../../shaders/torus_vertex.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import torusFragmentShaderSource from '../../shaders/torus_fragment.glsl?raw';
 
 // Same base hex geometry constants the app uses (config.js). Copied rather than imported because
 // config.js runs setGridDimensions() at import time; these three are inert numbers. The absolute
@@ -36,6 +42,37 @@ const HEX_HEIGHT = Math.sqrt(3) * HEX_SIZE;
 
 /** Background behind the hexes — Config.BACKGROUND_COLOR. */
 const BACKGROUND_COLOR = [0.1, 0.1, 0.1, 1.0];
+
+/**
+ * Which cells the torus fragment shader keeps this pass — mirrors `u_surfacePass` in
+ * `torus_fragment.glsl` and the app renderer's own table.
+ */
+const TORUS_SURFACE_PASS = Object.freeze({ ALL: 0, LIVE: 1, OFF: 2 });
+
+/**
+ * Torus look, copied from the app's `TORUS_VIEW_DEFAULTS` rather than imported: that module is a
+ * *settings service* (EventBus + PersistenceService), and an embed on someone else's page has no
+ * business owning localStorage keys. These are the shape the Explorer ships, so a world looks the
+ * same in both. `radiusRatio` is major/minor; the pair is normalized in `_drawTorus` so the outer
+ * silhouette keeps its framing whatever the ratio.
+ */
+const TORUS_LOOK = Object.freeze({
+    offOpacity: 0.12,
+    radiusRatio: 1.55,
+});
+
+/** Camera framing for the torus view — same figures the app's `drawTorus` uses. */
+const TORUS_CAMERA = Object.freeze({
+    fovY: (Math.PI * 42) / 180,
+    near: 0.1,
+    far: 40,
+    minDistance: 4.1,
+    maxDistance: 10,
+    /** Start angles + dolly — the app's initial `torusView`, so the first frame reads the same. */
+    yaw: 0.55,
+    pitch: 0.42,
+    distance: 6.5,
+});
 
 /**
  * The symmetry tables `generateColorLUT` needs for the symmetry-keyed palettes (the
@@ -115,7 +152,9 @@ export class EmbedRenderer {
         this.rows = rows;
         this.numCells = cols * rows;
 
-        const gl = canvas.getContext('webgl2', { alpha: false, antialias: true });
+        // `depth` is on by default, but the torus view depends on it (three depth-resolved passes),
+        // so it is asked for explicitly rather than inherited from a default that could change.
+        const gl = canvas.getContext('webgl2', { alpha: false, antialias: true, depth: true });
         if (!gl) throw new Error('WebGL2 is not available');
         this.gl = gl;
 
@@ -160,6 +199,21 @@ export class EmbedRenderer {
         this._viewZoom = 1;
         this._viewPanX = 0;
         this._viewPanY = 0;
+
+        // --- torus view (opt-in; see setTorus) ---
+        /**
+         * Built on first use, never at boot. A feed card that only ever shows the flat grid must not
+         * pay for a second shader program compile + link it will never draw with.
+         * @type {WebGLProgram|null}
+         */
+        this._torusProgram = null;
+        this._torusUniforms = null;
+        this._torusEnabled = false;
+        this._torusCamera = {
+            yaw: TORUS_CAMERA.yaw,
+            pitch: TORUS_CAMERA.pitch,
+            distance: TORUS_CAMERA.distance,
+        };
     }
 
     _setupGeometry() {
@@ -367,6 +421,170 @@ export class EmbedRenderer {
         gl.uniform2f(this.uniforms.pan, worldPanX, worldPanY);
     }
 
+    // --- torus view -----------------------------------------------------------
+
+    /**
+     * Wrap the live world onto a 3D torus instead of drawing it flat.
+     *
+     * The grid *is* a torus already — edges wrap in both axes — so this is the same instanced draw
+     * seen from outside the surface rather than a second world or a second geometry. It shares the
+     * VAO, the instance buffers and the color LUT with the flat path; only the program and the
+     * depth/blend state differ.
+     *
+     * @param {boolean} enabled
+     * @returns {boolean} Whether the torus is on afterwards — false when the program failed to
+     *   build, which is the caller's cue to stay flat rather than show a blank canvas.
+     */
+    setTorus(enabled) {
+        const want = !!enabled;
+        if (want && !this._ensureTorusProgram()) {
+            this._torusEnabled = false;
+            return false;
+        }
+        this._torusEnabled = want;
+        return want;
+    }
+
+    /** @returns {boolean} Is the torus projection the one being drawn? */
+    get torusEnabled() {
+        return this._torusEnabled;
+    }
+
+    /**
+     * Turn the camera around the torus. Both angles wrap: `torusOrbitCamera` derives `up` from the
+     * view tangent, so pitch can pass through the poles indefinitely without a look-at singularity
+     * or the sudden flip a fixed world-up would give.
+     * @param {number} deltaYaw Radians.
+     * @param {number} deltaPitch Radians.
+     */
+    orbitTorus(deltaYaw, deltaPitch) {
+        if (Number.isFinite(deltaYaw)) {
+            this._torusCamera.yaw = wrapAngle(this._torusCamera.yaw + deltaYaw);
+        }
+        if (Number.isFinite(deltaPitch)) {
+            this._torusCamera.pitch = wrapAngle(this._torusCamera.pitch + deltaPitch);
+        }
+    }
+
+    /**
+     * Move the camera in or out by a multiplicative factor, clamped to the framing range so the
+     * torus can neither be lost in the distance nor turned inside out.
+     * @param {number} factor >1 pulls back, <1 moves closer.
+     */
+    dollyTorus(factor) {
+        if (!Number.isFinite(factor) || factor <= 0) return;
+        this._torusCamera.distance = Math.min(
+            TORUS_CAMERA.maxDistance,
+            Math.max(TORUS_CAMERA.minDistance, this._torusCamera.distance * factor),
+        );
+    }
+
+    /**
+     * Compile + link the torus program on first use. Kept out of the constructor on purpose: the
+     * common case for this element is a feed card that is never switched to 3D, and a shader compile
+     * it never draws with is pure cost on the exact device least able to pay it.
+     * @returns {boolean} False if the program could not be built (the caller stays flat).
+     */
+    _ensureTorusProgram() {
+        if (this._torusProgram) return true;
+        const gl = this.gl;
+        const program = WebGLUtils.loadShaderProgram(gl, torusVertexShaderSource, torusFragmentShaderSource);
+        if (!program) {
+            console.warn('<hexlife-world>: torus shaders failed to compile; staying flat.');
+            return false;
+        }
+        this._torusProgram = program;
+        this._torusUniforms = {
+            hexSize: gl.getUniformLocation(program, 'u_hexSize'),
+            period: gl.getUniformLocation(program, 'u_period'),
+            radii: gl.getUniformLocation(program, 'u_radii'),
+            mvp: gl.getUniformLocation(program, 'u_mvp'),
+            colorLUT: gl.getUniformLocation(program, 'u_colorLUT'),
+            cameraPosition: gl.getUniformLocation(program, 'u_cameraPosition'),
+            offOpacity: gl.getUniformLocation(program, 'u_offOpacity'),
+            surfacePass: gl.getUniformLocation(program, 'u_surfacePass'),
+        };
+        return true;
+    }
+
+    /**
+     * One torus frame. Ported from the app renderer's `drawTorus`, minus the per-world FBO and the
+     * hover/ghost buffers the embed doesn't have.
+     *
+     * The three-pass structure below is the transparency contract, not an optimization: a side-on
+     * ray crosses a torus up to four times, so ordinary alpha accumulation would make the shell's
+     * opacity depend on the viewing angle. Instead each pass resolves one thing — nearest live cell,
+     * nearest off cell, then blend only that winner.
+     * @param {import('./EmbedSim.js').EmbedSim} sim
+     */
+    _drawTorus(sim) {
+        const gl = this.gl;
+
+        gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LESS);
+        // Never cull: the camera tumbles through the poles, and the inner ring reverses its
+        // screen-facing orientation when it does.
+        gl.disable(gl.CULL_FACE);
+        gl.disable(gl.BLEND);
+
+        gl.useProgram(this._torusProgram);
+        gl.bindVertexArray(this.vao);
+        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
+        WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+
+        const u = this._torusUniforms;
+        const period = getTorusPeriods(this.cols, this.rows, this._hexSize);
+        const camera = torusOrbitCamera(
+            this._torusCamera.yaw, this._torusCamera.pitch, this._torusCamera.distance,
+        );
+        const projection = perspective(
+            TORUS_CAMERA.fovY,
+            Math.max(this.canvas.width / Math.max(this.canvas.height, 1), 0.01),
+            TORUS_CAMERA.near,
+            TORUS_CAMERA.far,
+        );
+        const mvp = multiply(projection, lookAt(camera.position, [0, 0, 0], camera.up));
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.lutTexture);
+        gl.uniform1i(u.colorLUT, 1);
+        gl.uniform1f(u.hexSize, this._hexSize);
+        gl.uniform2f(u.period, period.x, period.y);
+        // Normalized so the ratio reshapes the hole and the tube without also acting as a zoom.
+        const minorRadius = 2.55 / (TORUS_LOOK.radiusRatio + 1);
+        gl.uniform2f(u.radii, TORUS_LOOK.radiusRatio * minorRadius, minorRadius);
+        gl.uniformMatrix4fv(u.mvp, false, mvp);
+        gl.uniform3fv(u.cameraPosition, camera.position);
+        gl.uniform1f(u.offOpacity, TORUS_LOOK.offOpacity);
+
+        // Nearest live cell wins the depth buffer; off cells are discarded, so activity behind the
+        // translucent shell survives in the color buffer.
+        gl.uniform1i(u.surfacePass, TORUS_SURFACE_PASS.LIVE);
+        gl.depthMask(true);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+
+        // Depth-only prepass for the nearest off cell — one shell layer, not four.
+        gl.colorMask(false, false, false, false);
+        gl.uniform1i(u.surfacePass, TORUS_SURFACE_PASS.OFF);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+
+        // Blend only the off fragment that won that prepass.
+        gl.colorMask(true, true, true, true);
+        gl.depthFunc(gl.EQUAL);
+        gl.enable(gl.BLEND);
+        gl.depthMask(false);
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+
+        // Back to the state the flat path assumes the constructor left behind.
+        gl.depthMask(true);
+        gl.depthFunc(gl.LESS);
+        gl.disable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.bindVertexArray(null);
+    }
+
     /**
      * Map a CSS-pixel point on the canvas to a grid cell (odd-q flat-top, matching the shader).
      * Returns null if the pointer is outside the canvas or the camera isn't ready.
@@ -427,6 +645,11 @@ export class EmbedRenderer {
         const gl = this.gl;
         if (!this._hexSize) this.resize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1);
 
+        if (this._torusEnabled && this._torusProgram) {
+            this._drawTorus(sim);
+            return;
+        }
+
         gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -454,5 +677,10 @@ export class EmbedRenderer {
         gl.deleteVertexArray(this.vao);
         gl.deleteTexture(this.lutTexture);
         gl.deleteProgram(this.program);
+        if (this._torusProgram) {
+            gl.deleteProgram(this._torusProgram);
+            this._torusProgram = null;
+            this._torusUniforms = null;
+        }
     }
 }

@@ -86,6 +86,15 @@
         </div>
 
         <div class="cell">
+            <h2>F — torus projection</h2>
+            <p><code>torus</code> · drag to orbit · wheel to dolly</p>
+            <hexlife-world id="f"
+                ruleset="D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6"
+                seed="12345" rows="64" density="0.5" speed="20"
+                palette="synthwave" torus></hexlife-world>
+        </div>
+
+        <div class="cell">
             <h2>E — invalid ruleset (error state)</h2>
             <p>proves a bad attribute styles, never throws</p>
             <hexlife-world id="e" ruleset="not-a-ruleset" rows="64"></hexlife-world>
@@ -96,6 +105,7 @@
         <button id="btn-add">Add world D now</button>
         <button id="btn-remove">Remove world D (leak check)</button>
         <button id="btn-verify">Re-verify A's checksum</button>
+        <button id="btn-torus">Toggle torus on A</button>
     </div>
 
     <div id="stats">booting…</div>
@@ -143,6 +153,14 @@
 
         el('btn-add').addEventListener('click', addD);
         el('btn-remove').addEventListener('click', removeD);
+        // Toggling on a *running* world is the case worth eyeballing: the projection must swap
+        // without re-booting, so the tick count above must keep climbing straight through it.
+        el('btn-torus').addEventListener('click', () => {
+            const w = el('a');
+            if (w.hasAttribute('torus')) w.removeAttribute('torus');
+            else w.setAttribute('torus', '');
+            render();
+        });
         el('btn-verify').addEventListener('click', () => {
             const r = window.__hexlifeEmbed.runTicks(REFERENCE.ticks, REFERENCE.seed, 'a');
             console.log('A re-verified:', r);

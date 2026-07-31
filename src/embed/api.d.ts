@@ -14,6 +14,10 @@ export {
 } from '../core/rulesetDescriptor.js'
 export {rulesetName} from '../core/rulesetName.js'
 export {
+  listPresetPalettes,
+  type PresetPaletteInfo,
+} from '../core/colorPalettes.js'
+export {
   decodeWorldCode,
   encodeWorldCode,
   explorerUrlForRuleset,

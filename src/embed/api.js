@@ -23,6 +23,10 @@
 export { describeRuleset, ORBIT_LABELS } from '../core/rulesetDescriptor.js';
 export { rulesetName } from '../core/rulesetName.js';
 export { decodeWorldCode, encodeWorldCode, explorerUrlForRuleset } from '../core/WorldCodec.js';
+// Just the key + label projection, not the gradient table — a host building a palette picker needs
+// the names the `palette` attribute accepts, and nothing here should make a ramp's stops a
+// compatibility surface. `colorPalettes.js` is plain data with no imports, so this stays server-safe.
+export { listPresetPalettes } from '../core/colorPalettes.js';
 // DOM-building, but only when called — the panel is detached nodes built on demand, so a server
 // bundle that never calls it carries nothing that touches `document` at import time.
 export { createGpuHelpPanel, detectGraphicsPath } from '../utils/gpuSupport.js';

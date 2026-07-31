@@ -8,6 +8,7 @@ const copies = [
   ['src/embed/hexlife-world.d.ts', 'dist/embed-package/src/embed/hexlife-world.d.ts'],
   ['src/core/rulesetDescriptor.d.ts', 'dist/embed-package/src/core/rulesetDescriptor.d.ts'],
   ['src/core/rulesetName.d.ts', 'dist/embed-package/src/core/rulesetName.d.ts'],
+  ['src/core/colorPalettes.d.ts', 'dist/embed-package/src/core/colorPalettes.d.ts'],
   ['src/core/WorldCodec.d.ts', 'dist/embed-package/src/core/WorldCodec.d.ts'],
   ['src/utils/gpuSupport.d.ts', 'dist/embed-package/src/utils/gpuSupport.d.ts'],
 ]

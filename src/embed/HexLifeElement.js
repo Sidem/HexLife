@@ -64,6 +64,39 @@ const PREVIEW_DEFAULT = 12;
 /** ~4 ticks/sec — slow enough to read as deliberate rather than as the world having started. */
 const PREVIEW_TICK_MS = 250;
 
+/**
+ * `torus` — auto-rotation rate in degrees/second, taken from the attribute's *value* the same way
+ * `preview` takes its tick count. `torus="0"` is a still torus the viewer turns by hand; the default
+ * matches the Explorer's `TORUS_VIEW_DEFAULTS.rotationSpeed`.
+ */
+const TORUS_SPIN_MIN = 0;
+const TORUS_SPIN_MAX = 45;
+const TORUS_SPIN_DEFAULT = 14;
+
+/** Drag-to-orbit sensitivity: radians per CSS pixel. A full turn is roughly a 900px drag. */
+const TORUS_ORBIT_RADIANS_PER_PX = 0.007;
+
+/**
+ * Flat-camera zoom range. 1 is the fitted "whole world" view and the hard floor — below it the grid
+ * would letterbox inside empty canvas, which is never what anyone means by zooming out.
+ */
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 8;
+
+/**
+ * Attributes that reconfigure a **live** world instead of re-booting it.
+ *
+ * The default is the other way round, and deliberately so: a `code` is a complete world, and
+ * changing any part of what it specifies means a different world. What is listed here is everything
+ * that is *not* part of the world — playback rate, input policy, camera, tool settings, decoration.
+ * Getting this wrong is quiet and expensive: a re-boot re-decodes the code and replays tick 0, so a
+ * mis-classified attribute throws away whatever the viewer had drawn or evolved.
+ */
+const LIVE_ATTRS = new Set([
+    'paused', 'max-dpr', 'link', 'speed', 'draw', 'wheel-zoom', 'preview',
+    'torus', 'brush', 'zoom', 'palette', 'palette-on', 'palette-off',
+]);
+
 const RULESET_RE = /^[0-9a-fA-F]{32}$/;
 
 const STYLES = `
@@ -178,7 +211,7 @@ export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
             'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw', 'wheel-zoom',
-            'preview'];
+            'preview', 'torus', 'brush', 'zoom'];
     }
 
     constructor() {
@@ -305,6 +338,21 @@ export class HexLifeElement extends HTMLElement {
         this._onPointerMove = this._onPointerMove.bind(this);
         this._onPointerUp = this._onPointerUp.bind(this);
 
+        // --- torus view (`torus` attribute) ---
+        /**
+         * Its own rAF, deliberately not `_rafId`. A spinning torus is a *camera* animation: the sim
+         * is not advancing, so `playing` must stay false and no `hexlife-playstate` may fire. Same
+         * separation as the poster preview burst's timer, and for the same reason.
+         */
+        this._spinRafId = 0;
+        this._spinLastTime = 0;
+        /** Drag-to-orbit state; null when no pointer owns the camera. */
+        this._orbitPointerId = null;
+        this._orbitLast = null;
+        /** Two-finger dolly baseline, mirroring `_pinchStartDist` / `_pinchStartZoom` for the flat view. */
+        this._pinchLastDist = 0;
+        this._spinFrame = this._spinFrame.bind(this);
+
         /** Brush radius from world code (or default 2). */
         this._brushSize = DEFAULT_BRUSH_SIZE;
         /** Invert-draw stroke state (when `draw` attribute is set). */
@@ -378,13 +426,10 @@ export class HexLifeElement extends HTMLElement {
         }
 
         // A world code owns every world-defining attribute (see `_boot`): the only way to change one
-        // of them is a new code, and a new code means a new world. Both cases are a re-boot. `speed`
-        // is exempt — it's a playback rate, not part of the tick sequence, so it applies live. So is
-        // `wheel-zoom`, which only gates an input handler (`_onWheel` reads it fresh on every event),
-        // and `preview`, which is poster decoration and is read fresh at the start of every burst.
-        if (name === 'code' || (this._world && name !== 'paused' && name !== 'max-dpr'
-            && name !== 'link' && name !== 'speed' && name !== 'draw'
-            && name !== 'wheel-zoom' && name !== 'preview')) {
+        // of them is a new code, and a new code means a new world. Both cases are a re-boot.
+        // Everything in `LIVE_ATTRS` is exempt because it isn't part of the world at all — see the
+        // note on that set for what earns a place in it.
+        if (name === 'code' || (this._world && !LIVE_ATTRS.has(name))) {
             this._generation++;
             this._teardown();
             this._boot(this._generation);
@@ -424,12 +469,16 @@ export class HexLifeElement extends HTMLElement {
                 break;
             case 'palette':
             case 'palette-on':
-            case 'palette-off': {
-                const p = this._readParams();
-                this.renderer.setPalette({ palette: p.palette, customGradient: p.customGradient });
+            case 'palette-off':
+                this.renderer.setPalette(this._paletteOptions());
                 this._drawOnce();
                 break;
-            }
+            case 'brush':
+                this._brushSize = this._readBrushSize();
+                break;
+            case 'zoom':
+                this.setZoom(this._readZoom());
+                break;
             case 'paused':
                 this._userPaused = this.hasAttribute('paused');
                 if (this._userPaused) this._playRequested = false;
@@ -452,14 +501,14 @@ export class HexLifeElement extends HTMLElement {
                 if (this.hasAttribute('draw')) {
                     // Pointer events are about to mean "paint": the poster, and its burst, are done.
                     this._cancelPreviewBurst(true);
-                    this._canvas.style.touchAction = 'none';
-                    this._canvas.style.cursor = 'crosshair';
                 } else {
                     this._endDrawStroke(false);
-                    this._canvas.style.touchAction = '';
-                    this._canvas.style.cursor = '';
                 }
+                this._applyPointerAffordance();
                 this._syncPlayback();
+                break;
+            case 'torus':
+                this._syncTorus();
                 break;
             case 'wheel-zoom':
                 // Nothing to apply: `_onWheel` reads the attribute on every event.
@@ -502,6 +551,21 @@ export class HexLifeElement extends HTMLElement {
     }
 
     /**
+     * Blank the world: every cell dead, no rule history, nothing else touched — same ruleset, same
+     * speed, same play state, same camera.
+     *
+     * Distinct from {@link reset}, which rewinds to the *authored* tick 0 and hands back the world
+     * somebody else made. This is an empty canvas, and with `draw` it is what turns a remix from
+     * "invert some of this stranger's cells" into "make your own thing". `tickCount` deliberately
+     * keeps counting: the sim has not gone back in time, it has been painted over.
+     */
+    clear() {
+        if (!this.sim || this.error) return;
+        this.sim.clear();
+        this._drawOnce();
+    }
+
+    /**
      * Advance exactly `n` generations right now, independent of `speed` and the play state. This is
      * the determinism cross-check hook (tick to 100, compare `checksum`).
      * @param {number} [n=1]
@@ -533,16 +597,20 @@ export class HexLifeElement extends HTMLElement {
         if (!this.sim || this.error) return null;
         const cells = this.sim.snapshotCells();
         if (!cells) return null;
+        // A host that recolored this world must post the colors on screen, not the ones the code
+        // arrived with — "what you see is what posts" is the whole contract of this method, and it
+        // covers the palette exactly as much as it covers painted cells. So an override drops the
+        // decoded settings and encodes the table the renderer actually drew with.
+        const source = this._paletteOverridden() ? null : this._world;
         return encodeWorldCode({
             rows: this.sim.rows,
             cols: this.sim.cols,
             rulesetHex: this.sim.rulesetHex,
             cells,
-            // Palette precedence mirrors the decoder's: a decoded world's own settings win, then
-            // its baked LUT, then — for an attribute-driven world, which has no code to carry
-            // either — whatever the renderer actually resolved and drew.
-            colorSettings: this._world ? this._world.colorSettings : null,
-            lut: (this._world && this._world.lut) || (this.renderer && this.renderer.getLut()),
+            // Otherwise the decoder's own precedence: the world's settings, then its baked LUT, then
+            // — for an attribute-driven world, which carries neither — whatever the renderer resolved.
+            colorSettings: source ? source.colorSettings : null,
+            lut: (source && source.lut) || (this.renderer && this.renderer.getLut()),
             speed: this.sim.speed,
             brushSize: this._brushSize,
         });
@@ -564,10 +632,35 @@ export class HexLifeElement extends HTMLElement {
     get brushSize() { return this._brushSize; }
 
     /**
-     * @param {number} size
+     * @param {number} size Clamped to 0 (single cell) … `MAX_BRUSH_SIZE`.
+     *
+     * Does not reflect into the `brush` attribute, so a host that drives brush size through the
+     * attribute should keep doing that rather than mixing the two — the attribute is re-read on
+     * every change and would win the next time it moved.
      */
     setBrushSize(size) {
         this._brushSize = clampBrushSize(size);
+    }
+
+    /** @returns {number} Current flat-camera zoom; 1 is the fitted "whole world" view. */
+    get zoom() { return this._viewZoom; }
+
+    /**
+     * Set the flat camera's zoom about the centre of the view.
+     *
+     * Clamped to 1…8, and `setZoom(1)` is the "I am lost, show me the world again" primitive: the
+     * floor clears the pan too, so it always lands on the same fitted view no matter where a pinch
+     * left things. That is worth a host putting a button on, because a viewer who has pinched into
+     * a corner has no other way back.
+     *
+     * The torus has its own camera (drag to orbit, wheel to dolly) and ignores this; the value is
+     * kept, so it is what the flat view returns to.
+     * @param {number} zoom
+     */
+    setZoom(zoom) {
+        if (!this.renderer || !Number.isFinite(zoom)) return;
+        const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+        this._zoomBy(next / (this._viewZoom || 1));
     }
 
     // --- boot / teardown ------------------------------------------------------
@@ -592,9 +685,7 @@ export class HexLifeElement extends HTMLElement {
             return;
         }
         this._world = world;
-        this._brushSize = world
-            ? clampBrushSize(world.brushSize)
-            : DEFAULT_BRUSH_SIZE;
+        this._brushSize = this._readBrushSize();
 
         const hex = world ? world.rulesetHex : this._readRuleset();
         if (typeof hex !== 'string') {
@@ -646,10 +737,9 @@ export class HexLifeElement extends HTMLElement {
             this.renderer = new EmbedRenderer(this._canvas, {
                 cols: this.sim.cols,
                 rows: this.sim.rows,
-                palette: params.palette,
-                customGradient: params.customGradient,
-                colorSettings: world ? world.colorSettings : null,
-                lut: world ? world.lut : null,
+                // Same precedence the live path uses, so a world booted *with* a palette attribute
+                // shows what a world given one a moment later would.
+                ...this._paletteOptions(),
             });
         } catch (e) {
             // Almost always "no WebGL2". Per the plan there is no 2D fallback in v1 — say so plainly
@@ -684,8 +774,13 @@ export class HexLifeElement extends HTMLElement {
         this._canvas.addEventListener('touchcancel', this._onTouchEnd, { passive: true });
         this._bindDrawListeners(true);
 
+        // Before the first resize, so an authored `zoom` is what the opening frame is drawn at
+        // rather than something the viewer watches snap into place.
+        this._viewZoom = this._readZoom();
         this._resize();
         this._updateAttribution();
+        // Before the first draw, so a world booted with `torus` already set never flashes flat.
+        this._syncTorus();
         this._drawOnce();
         this._syncPlayback();
 
@@ -703,6 +798,9 @@ export class HexLifeElement extends HTMLElement {
 
     _teardown() {
         this._stopLoop();
+        if (this._spinRafId) { cancelAnimationFrame(this._spinRafId); this._spinRafId = 0; }
+        this._orbitPointerId = null;
+        this._orbitLast = null;
         // No restore: the sim is about to be freed, and a reset on the way out is pure work.
         this._cancelPreviewBurst(false);
         this._endDrawStroke(false);
@@ -722,6 +820,7 @@ export class HexLifeElement extends HTMLElement {
         this._canvas.removeEventListener('touchend', this._onTouchEnd);
         this._canvas.removeEventListener('touchcancel', this._onTouchEnd);
         this._pinchTouches.clear();
+        this._pinchLastDist = 0;
 
         if (this.renderer) { this.renderer.destroy(); this.renderer = null; }
         // Frees the wasm World and unregisters from the view-refresh registry. Skipping this would
@@ -758,6 +857,63 @@ export class HexLifeElement extends HTMLElement {
         return raw.toUpperCase();
     }
 
+    /**
+     * Is an explicit palette attribute overriding whatever colors a world code carried?
+     *
+     * Presence, not value: `palette="volcanic"` and a `palette-on` gradient both mean "the host is
+     * choosing the colors now", and *removing* both means "give the world its own back". That undo
+     * is the whole reason this is a separate question from "what palette" — without it a host could
+     * recolor a post but never restore it, since a decoded world's colors have no preset name to
+     * ask for. An empty value doesn't count: it names nothing.
+     */
+    _paletteOverridden() {
+        return (this.getAttribute('palette') || '').trim() !== ''
+            || (this.getAttribute('palette-on') || '').trim() !== '';
+    }
+
+    /**
+     * The palette arguments for the renderer — the one place attribute-vs-code precedence is
+     * decided, so the boot and a live change cannot disagree about which colors win.
+     *
+     * `_resolveLUT` prefers `colorSettings`, then `lut`, then the gradient, then the preset name.
+     * Nulling the first two when the host has overridden is therefore what lets the attributes
+     * through; leaving them in place is what makes the world's own colors authoritative otherwise.
+     */
+    _paletteOptions() {
+        const p = this._readParams();
+        const override = this._paletteOverridden();
+        const world = override ? null : this._world;
+        return {
+            palette: p.palette,
+            customGradient: p.customGradient,
+            colorSettings: world ? world.colorSettings : null,
+            lut: world ? world.lut : null,
+        };
+    }
+
+    /**
+     * Brush radius: the `brush` attribute wins, then a world code's own value, then the default.
+     *
+     * Note the precedence runs the *opposite* way to every world-defining attribute, where `code`
+     * wins. Brush size is a tool setting, not part of the world: it never touches the tick sequence,
+     * and a host rendering its own brush control has to be able to make that control tell the truth.
+     * A code's value is the author's last setting — an excellent default and a poor override.
+     *
+     * A valueless `brush` falls through rather than meaning 0: `brush=""` coerces to a legitimate
+     * single-cell brush, and silently handing someone that because they wrote a bare attribute is
+     * the kind of surprise this element does not do.
+     */
+    _readBrushSize() {
+        const raw = (this.getAttribute('brush') || '').trim();
+        if (raw !== '') return clampBrushSize(raw);
+        return this._world ? clampBrushSize(this._world.brushSize) : DEFAULT_BRUSH_SIZE;
+    }
+
+    /** @returns {number} The `zoom` attribute clamped to the camera's range; absent ⇒ fitted (1). */
+    _readZoom() {
+        return clampFloat(this.getAttribute('zoom'), ZOOM_MIN, ZOOM_MAX, ZOOM_MIN);
+    }
+
     /** Parse + clamp every non-ruleset attribute. Anything unparseable silently falls back. */
     _readParams() {
         return {
@@ -791,18 +947,23 @@ export class HexLifeElement extends HTMLElement {
         const canRun = wants && this._onScreen && this._docVisible;
 
         // When `draw` is enabled the host usually owns play chrome (Devvit transport bar); keep the
-        // poster off so pointer events reach the canvas for painting.
-        const drawMode = this.hasAttribute('draw');
-        this._overlay.hidden = wants || drawMode;
+        // poster off so pointer events reach the canvas for painting. `torus` claims the pointer the
+        // same way — for the camera — so it makes the same trade, and a host that turns it on owns
+        // its own play control.
+        const pointerOwned = this.hasAttribute('draw') || this._torusActive();
+        this._overlay.hidden = wants || pointerOwned;
         // Reset is the mirror image: offer it only once the world is running (the overlay is gone),
         // never over the poster frame where it would compete with the play button.
-        this._resetBtn.hidden = !wants || drawMode;
+        this._resetBtn.hidden = !wants || pointerOwned;
 
         if (canRun) this._startLoop();
         else this._stopLoop();
 
         // After the loop has actually started/stopped, so `playing` is the truth and not a forecast.
         this._emitPlayState();
+        // Last: the camera's own loop only runs when the sim's does not, so it needs the settled
+        // answer rather than the one from before `_startLoop`.
+        this._syncSpinLoop();
     }
 
     /**
@@ -848,7 +1009,10 @@ export class HexLifeElement extends HTMLElement {
      * already moving.
      */
     _posterShowing() {
-        return this._userPaused && !this.hasAttribute('draw') && !this._playRequested;
+        return this._userPaused && !this.hasAttribute('draw') && !this._playRequested
+            // The torus hides the poster too (see `_syncPlayback`), and a burst that ticked and then
+            // rewound underneath a camera the viewer is turning would read as the world glitching.
+            && !this._torusActive();
     }
 
     /** Start a burst if every gate agrees. Idempotent — a burst in flight is left alone. */
@@ -934,17 +1098,22 @@ export class HexLifeElement extends HTMLElement {
         this._canvas[method]('pointerup', this._onPointerUp);
         this._canvas[method]('pointercancel', this._onPointerUp);
         this._canvas[method]('lostpointercapture', this._onPointerUp);
-        if (on && this.hasAttribute('draw')) {
-            this._canvas.style.touchAction = 'none';
-            this._canvas.style.cursor = 'crosshair';
-        } else if (!on) {
+        if (on) this._applyPointerAffordance();
+        else {
             this._canvas.style.touchAction = '';
             this._canvas.style.cursor = '';
         }
     }
 
     _onPointerDown(e) {
-        if (!this.hasAttribute('draw') || !this.sim || !this.renderer || this.error) return;
+        if (!this.sim || !this.renderer || this.error) return;
+        // The torus takes the pointer before `draw` gets a look at it: there is no hit-test for a
+        // cell on a 3D surface, so a drag there can only mean the camera.
+        if (this._torusActive()) {
+            this._beginOrbit(e);
+            return;
+        }
+        if (!this.hasAttribute('draw')) return;
         // Multi-touch pinch owns the gesture — don't paint under a second finger, and stay out of
         // the way for the rest of it (see `_gestureLock`).
         if (this._pinchTouches.size >= 2 || this._gestureLock) return;
@@ -985,6 +1154,10 @@ export class HexLifeElement extends HTMLElement {
     }
 
     _onPointerMove(e) {
+        if (this._orbitPointerId != null) {
+            this._moveOrbit(e);
+            return;
+        }
         if (!this._drawing || e.pointerId !== this._drawPointerId) return;
         if (this._pinchTouches.size >= 2 || this._gestureLock) {
             this._beginTouchGesture();
@@ -1008,6 +1181,10 @@ export class HexLifeElement extends HTMLElement {
     }
 
     _onPointerUp(e) {
+        if (this._orbitPointerId != null) {
+            if (!e || e.pointerId === this._orbitPointerId) this._endOrbit();
+            return;
+        }
         if (!this._drawing) return;
         if (e && this._drawPointerId != null && e.pointerId !== this._drawPointerId) return;
         this._endDrawStroke(true);
@@ -1078,6 +1255,9 @@ export class HexLifeElement extends HTMLElement {
         // ticks. EmbedSim.advance caps ticks per call too; this keeps the accumulator honest.
         const dt = Math.min(now - this._lastFrameTime, 100);
         this._lastFrameTime = now;
+        // The camera rides this loop while it exists — `_syncSpinLoop` keeps its own rAF parked for
+        // exactly as long as this one is running, so the torus never spins at double rate.
+        this._advanceSpin(dt);
         this.sim.advance(dt);
         this.renderer.draw(this.sim);
     }
@@ -1092,6 +1272,147 @@ export class HexLifeElement extends HTMLElement {
         const rect = this.getBoundingClientRect();
         this.renderer.resize(rect.width || 1, rect.height || 1, this._readParams().maxDpr);
         this._applyView();
+    }
+
+    // --- torus view -----------------------------------------------------------
+    // `torus` wraps the live world onto the 3D surface its edges already imply. It is a *projection*,
+    // not a mode: same sim, same cells, same instanced draw — only the camera changes. Three rules,
+    // mirroring the ones that keep the preview burst honest:
+    //
+    //   1. It never touches `_rafId`. A spinning camera is not a running simulation, so `playing`
+    //      stays false and no `hexlife-playstate` fires for it.
+    //   2. The pointer belongs to the camera while it is on, so — exactly as with `draw` — the poster
+    //      overlay steps aside and the host owns the play control.
+    //   3. Nothing is built until it is first switched on (see `EmbedRenderer._ensureTorusProgram`),
+    //      so a feed card that never leaves the flat view pays nothing for this.
+
+    /** @returns {boolean} Is the world being drawn on the torus right now? */
+    _torusActive() {
+        return this.hasAttribute('torus') && !!this.renderer && this.renderer.torusEnabled;
+    }
+
+    /** @returns {number} Auto-rotation in degrees/second; 0 means the viewer turns it by hand. */
+    _readTorusSpin() {
+        if (!this.hasAttribute('torus')) return 0;
+        return clampFloat(this.getAttribute('torus'), TORUS_SPIN_MIN, TORUS_SPIN_MAX, TORUS_SPIN_DEFAULT);
+    }
+
+    /**
+     * Apply the `torus` attribute to the renderer and everything that follows from it. Safe to call
+     * repeatedly — the renderer's own program build is the only one-time part.
+     */
+    _syncTorus() {
+        if (!this.renderer || this.error) return;
+        const want = this.hasAttribute('torus');
+        // The overwhelmingly common case — a flat world that has never been anything else. There is
+        // nothing to undo and no reason to spend a redraw on it, which is what keeps a feed card
+        // that never touches 3D paying nothing for this feature at boot.
+        if (!want && !this.renderer.torusEnabled) return;
+        // `setTorus` returns false when the shaders would not build, which is the one case where the
+        // attribute is set but the flat view is still what's on screen. Everything downstream reads
+        // `_torusActive()` rather than the attribute, so that stays coherent.
+        this.renderer.setTorus(want);
+        if (want) {
+            // Pointer events are about to mean "turn this", not "paint on it".
+            this._endDrawStroke(false);
+            this._cancelPreviewBurst(true);
+        } else {
+            this._endOrbit();
+        }
+        this._applyPointerAffordance();
+        this._syncSpinLoop();
+        this._syncPlayback();
+        this._drawOnce();
+    }
+
+    /**
+     * Cursor + `touch-action` for whatever currently owns the pointer. One place, because `draw` and
+     * `torus` both claim it and the loser must not leave its cursor behind.
+     */
+    _applyPointerAffordance() {
+        const owned = this._torusActive() || this.hasAttribute('draw');
+        this._canvas.style.touchAction = owned ? 'none' : '';
+        this._canvas.style.cursor = this._torusActive() ? 'grab'
+            : this.hasAttribute('draw') ? 'crosshair' : '';
+    }
+
+    /**
+     * Run the camera's own rAF only when it is the only thing that would move.
+     *
+     * While the sim loop is running it already redraws every frame, so `_frame` advances the spin
+     * itself and a second loop would just double the work. The gates are otherwise the playback
+     * gates: an offscreen or backgrounded element spins nothing, and reduced motion gets a still
+     * torus it can still turn by hand.
+     */
+    _syncSpinLoop() {
+        const wants = this._torusActive()
+            && this._readTorusSpin() > 0
+            && !this.playing
+            && !this._orbitPointerId
+            && this._onScreen
+            && this._docVisible
+            && (!this._reducedMotion || this._playRequested)
+            && !this.error;
+        if (wants) {
+            if (this._spinRafId) return;
+            this._spinLastTime = performance.now();
+            this._spinRafId = requestAnimationFrame(this._spinFrame);
+        } else if (this._spinRafId) {
+            cancelAnimationFrame(this._spinRafId);
+            this._spinRafId = 0;
+        }
+    }
+
+    _spinFrame(now) {
+        this._spinRafId = requestAnimationFrame(this._spinFrame);
+        const dt = Math.min(now - this._spinLastTime, 100);
+        this._spinLastTime = now;
+        this._advanceSpin(dt);
+        this._drawOnce();
+    }
+
+    /**
+     * Turn the camera by one frame's worth of auto-rotation.
+     * @param {number} dt Milliseconds since the previous frame (already clamped by the caller).
+     */
+    _advanceSpin(dt) {
+        if (!this._torusActive() || this._orbitPointerId != null) return;
+        const degreesPerSecond = this._readTorusSpin();
+        if (degreesPerSecond <= 0) return;
+        this.renderer.orbitTorus((degreesPerSecond * Math.PI / 180) * (dt / 1000), 0);
+    }
+
+    /** Drag-to-orbit: take the pointer, or ignore it if another one already has the camera. */
+    _beginOrbit(e) {
+        if (this._orbitPointerId != null) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        this._orbitPointerId = e.pointerId;
+        this._orbitLast = { x: e.clientX, y: e.clientY };
+        this._canvas.style.cursor = 'grabbing';
+        try { this._canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        // Hand the frame back: while a finger is on the glass the camera follows it, not the clock.
+        this._syncSpinLoop();
+    }
+
+    _moveOrbit(e) {
+        if (this._orbitPointerId !== e.pointerId || !this._orbitLast) return;
+        e.preventDefault();
+        const dx = e.clientX - this._orbitLast.x;
+        const dy = e.clientY - this._orbitLast.y;
+        this._orbitLast = { x: e.clientX, y: e.clientY };
+        // Drag right turns the torus right; drag down tips the near face toward the viewer.
+        this.renderer.orbitTorus(-dx * TORUS_ORBIT_RADIANS_PER_PX, dy * TORUS_ORBIT_RADIANS_PER_PX);
+        if (!this.playing) this._drawOnce();
+    }
+
+    _endOrbit() {
+        if (this._orbitPointerId == null) return;
+        try { this._canvas.releasePointerCapture(this._orbitPointerId); } catch { /* ignore */ }
+        this._orbitPointerId = null;
+        this._orbitLast = null;
+        this._applyPointerAffordance();
+        this._syncSpinLoop();
     }
 
     // --- camera (zoom) --------------------------------------------------------
@@ -1161,6 +1482,14 @@ export class HexLifeElement extends HTMLElement {
         if (!wheelZoomAllowed(this.getAttribute('wheel-zoom'), e)) return;
         // Zoom is ours: preventDefault so the host page doesn't scroll away under the cursor.
         e.preventDefault();
+        // On the torus the wheel dollies the camera. There is no anchor point to hold steady — the
+        // thing under the cursor is a curved surface, not a spot on a map — so it moves in and out
+        // about the centre, which is also the only place the whole shape stays framed.
+        if (this._torusActive()) {
+            this.renderer.dollyTorus(Math.exp(e.deltaY * 0.001));
+            if (!this.playing) this._drawOnce();
+            return;
+        }
         const rect = this._canvas.getBoundingClientRect();
         const localX = e.clientX - rect.left;
         const localY = e.clientY - rect.top;
@@ -1178,11 +1507,15 @@ export class HexLifeElement extends HTMLElement {
             const dx = pts[0].x - pts[1].x;
             const dy = pts[0].y - pts[1].y;
             this._pinchStartDist = Math.hypot(dx, dy) || 1;
+            this._pinchLastDist = this._pinchStartDist;
             this._pinchStartZoom = this._viewZoom;
             this._pinchLastMid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+            // On the torus, one finger orbits and two dolly — so a second finger ends the orbit
+            // rather than a draw stroke.
+            if (this._torusActive()) this._endOrbit();
             // Belt and braces: `pointerdown` for the second finger normally gets here first, but a
             // host that swallows pointer events would leave the stroke running without this.
-            this._beginTouchGesture();
+            else this._beginTouchGesture();
         }
     }
 
@@ -1199,6 +1532,14 @@ export class HexLifeElement extends HTMLElement {
         const dx = pts[0].x - pts[1].x;
         const dy = pts[0].y - pts[1].y;
         const dist = Math.hypot(dx, dy) || 1;
+        if (this._torusActive()) {
+            // Spread = closer. Relative to the previous frame rather than the gesture start, because
+            // `dollyTorus` accumulates into a clamped distance and has no absolute target to aim at.
+            this.renderer.dollyTorus((this._pinchLastDist || dist) / dist);
+            this._pinchLastDist = dist;
+            if (!this.playing) this._drawOnce();
+            return;
+        }
         const factor = dist / this._pinchStartDist;
         // Same floor as wheel zoom: never smaller than the initial fitted view.
         const target = Math.min(8, Math.max(1, this._pinchStartZoom * factor));
@@ -1246,6 +1587,7 @@ export class HexLifeElement extends HTMLElement {
         for (const t of e.changedTouches) this._pinchTouches.delete(t.identifier);
         if (this._pinchTouches.size < 2) {
             this._pinchStartDist = 0;
+            this._pinchLastDist = 0;
             this._pinchLastMid = null;
         }
         // Only a fully empty glass releases the lock — one finger left over from a pinch must not

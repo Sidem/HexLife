@@ -354,6 +354,27 @@ export class EmbedSim {
     }
 
     /**
+     * Blank every cell and forget which rule last fired where.
+     *
+     * Not a `reset()`: reset rewinds to the *authored* tick 0 — replaying a world code's exact cells,
+     * or re-rolling its generator — which is the world somebody else made. This is an empty canvas.
+     *
+     * The rule-index wipe is not bookkeeping. `fragment.glsl` keys the off-cell color off
+     * `a_instance_rule_index` as well as the state, so a grid of dead cells still carries a visible
+     * ghost of the rules that killed them; leaving the indices behind would clear the world into a
+     * faint image of what used to be there.
+     *
+     * @returns {boolean} Whether the sim was live enough to clear.
+     */
+    clear() {
+        if (!this.state || !this.ruleIndices) return false;
+        this.state.fill(0);
+        this.ruleIndices.fill(RULE_INDEX_INITIAL);
+        this.activeCount = 0;
+        return true;
+    }
+
+    /**
      * A private copy of the current generation's cells.
      *
      * `state` is a *view* into wasm linear memory, so handing it to a caller hands them something

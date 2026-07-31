@@ -24,6 +24,8 @@ export interface HexLifeSim {
     readonly rulesetHex: string;
     /** Generations elapsed since the last reset. */
     readonly tickCount: number;
+    /** Live cells in the current generation. Maintained by ticks, draw strokes and `clear`. */
+    readonly activeCount: number;
     /** Target ticks/second once playing. */
     speed: number;
     /**
@@ -35,6 +37,8 @@ export interface HexLifeSim {
     tick(): number;
     /** Re-seed the initial state and rewind to tick 0. */
     reset(seed?: number | null): void;
+    /** Blank every cell and forget the rule history. @returns Whether the sim was live. */
+    clear(): boolean;
     /** Rolling hash of the current state — the determinism cross-check hook. */
     checksum(): number;
     /**
@@ -90,7 +94,17 @@ export interface HexLifeElementEventMap {
  * `<hexlife-world>` — see `docs/EMBED-PLAN.md` § Public API for the attributes:
  * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` · `code`
  * (`HXW1.…`, wins over the individual attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
- * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60).
+ * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60) ·
+ * `torus` (wrap the world onto its own 3D surface; value = auto-rotation °/s, 0–45, default 14,
+ * `torus="0"` for a still one). Drag orbits, wheel/pinch dollies; like `draw`, it takes the pointer,
+ * so the poster play overlay steps aside and the host owns play.
+ * `brush` (draw radius, 0–40; overrides a code's own value — it is a tool setting, not part of the
+ * world) · `zoom` (flat camera, 1–8; 1 is the fitted view).
+ *
+ * `palette` / `palette-on` / `palette-off` **override** the colors a `code` carries, and apply to a
+ * live world without re-booting it. Removing them restores the world's own colors — which is the
+ * only way back, since decoded colors have no preset name to ask for. While overridden,
+ * {@link HexLifeElement.worldCode} encodes what is on screen rather than what arrived.
  */
 export declare class HexLifeElement extends HTMLElement {
     /** The live sim, or null before boot / after teardown / in the error state. */
@@ -109,12 +123,25 @@ export declare class HexLifeElement extends HTMLElement {
      */
     reset(seed?: number): void;
     /**
+     * Blank the world — every cell dead, no rule history — leaving the ruleset, speed, play state
+     * and camera alone. Unlike {@link reset} this does not rewind: `tickCount` keeps counting,
+     * because the sim has not gone back in time, it has been painted over. With `draw`, this is
+     * what turns a remix into an empty canvas rather than an edit of someone else's world.
+     */
+    clear(): void;
+    /**
      * Advance exactly `n` generations now, independent of `speed` and the play state.
      * @returns The new tick count.
      */
     tick(n?: number): number;
-    /** Set the brush / neighborhood radius used for draw strokes (clamped). */
+    /** Set the brush / neighborhood radius used for draw strokes (clamped 0–40). */
     setBrushSize(size: number): void;
+    /**
+     * Set the flat camera's zoom (1–8) about the centre of the view. `setZoom(1)` also clears the
+     * pan, so it is the reliable way back to the fitted world after a pinch. The torus keeps its
+     * own camera and ignores this.
+     */
+    setZoom(zoom: number): void;
     /**
      * The world as it stands right now — exact cells, painted ones included — as an `HXW1.` code,
      * or null when there is nothing to encode (error state, or not booted).
@@ -134,6 +161,8 @@ export declare class HexLifeElement extends HTMLElement {
     readonly userPaused: boolean;
     /** Brush / neighborhood radius used for draw strokes. */
     readonly brushSize: number;
+    /** Flat-camera zoom; 1 is the fitted "whole world" view. */
+    readonly zoom: number;
 
     addEventListener<K extends keyof HexLifeElementEventMap>(
         type: K,
