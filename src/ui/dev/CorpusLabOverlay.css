@@ -46,6 +46,22 @@
     opacity: 0.6;
 }
 
+/* The overlay takes over the whole unmodified keyboard, so it has to say which keys it answers to
+   and that the app's own shortcuts have stopped working. */
+.corpus-keys {
+    flex: 1 1 auto;
+    font-size: 0.66rem;
+    line-height: 1.5;
+    opacity: 0.65;
+    text-align: right;
+}
+
+.corpus-keys kbd {
+    padding: 0 0.2em;
+    font-size: 0.95em;
+    opacity: 0.9;
+}
+
 .corpus-close {
     background: none;
     border: none;
