@@ -9,13 +9,16 @@ Key facts:
 - Grid: flat-top hexagons, six neighbors per cell, toroidal wrapping
 - Rulesets: a center cell plus 6 neighbors give 2^7 = 128 local configurations, so a ruleset is exactly 128 bits, written as a 32-character hex string; every ruleset also gets a deterministic two-word mnemonic name
 - Nine worlds run side-by-side for comparing rulesets and seeds in real time
-- Auto-Explore scores candidate rulesets on structure, criticality (damage spreading, sigma near 1), block-entropy dynamics, transport (gliders), heterogeneity, and optional CLIP-embedding novelty (ASAL-style)
-- Features: rule-based cell coloring, scrub-back history, hex-aware pattern copy/paste, PNG/WebM export, share links, mobile UI, guided onboarding
+- Auto-Explore scores candidate rulesets on structure, criticality (damage spreading, sigma near 1), block-entropy dynamics, transport (gliders), and heterogeneity; those statistics screen and hard-kill candidates, then survivors are ranked by a small HexLife-native interest model (beta) that runs entirely in the browser from the app's own origin — no third-party host, no CDN, nothing downloaded at runtime. A "statistical only" objective restores the deterministic, model-free ranking
+- Features: rule-based cell coloring, 3D torus view, scrub-back history, hex-aware pattern copy/paste, PNG/WebM/GIF export, share links, portable HXW1 world codes, a unified curated + personal ruleset library, mobile UI, guided onboarding
+- Embeddable: the @hexlife/embed npm package ships a <hexlife-world> custom element for running a single world in any page, plus a DOM-free world-code API
 
 ## Docs
 
 - [README](https://github.com/Sidem/HexLife/blob/main/README.md): features, architecture, ruleset format, keyboard shortcuts, how to contribute rulesets to the public library
 - [Public ruleset library](https://github.com/Sidem/HexLife/blob/main/src/core/library/rulesets.json): curated, PR-based collection of community rulesets
+- [Changelog](https://github.com/Sidem/HexLife/blob/main/CHANGELOG.md): release notes, and the reproducibility invariants (ruleset codes, world codes, share links, determinism) that define a breaking change
+- [@hexlife/embed](https://www.npmjs.com/package/@hexlife/embed): npm package for the embeddable single-world custom element
 
 ## Topics
 

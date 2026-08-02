@@ -8,13 +8,14 @@
 
 Design rules, paint and preserve patterns, compare nine worlds, and watch complex behavior emerge.
 
-[**▶ Try the Live Demo**](https://sidem.github.io/HexLife/) · [**r/hexlife**](https://www.reddit.com/r/hexlife/) · [Releases](https://github.com/Sidem/HexLife/releases)
+[**▶ Try the Live Demo**](https://sidem.github.io/HexLife/) · [**r/hexlife**](https://www.reddit.com/r/hexlife/) · [Releases](https://github.com/Sidem/HexLife/releases) · [Changelog](CHANGELOG.md)
 
-![Release](https://img.shields.io/github/v/release/Sidem/HexLife?sort=semver)
-![License](https://img.shields.io/badge/license-MIT-blue)
+[![Build](https://github.com/Sidem/HexLife/actions/workflows/deploy.yml/badge.svg)](https://github.com/Sidem/HexLife/actions/workflows/deploy.yml)
+[![Release](https://img.shields.io/github/v/release/Sidem/HexLife?sort=semver)](https://github.com/Sidem/HexLife/releases)
+[![@hexlife/embed](https://img.shields.io/npm/v/@hexlife/embed?logo=npm&label=%40hexlife%2Fembed&color=CB3837)](https://www.npmjs.com/package/@hexlife/embed)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Rust](https://img.shields.io/badge/Rust-WebAssembly-orange?logo=rust&logoColor=white)
 ![WebGL2](https://img.shields.io/badge/WebGL2-instanced-990000?logo=webgl&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 
 <br>
 
@@ -35,136 +36,31 @@ The simulation core is written in **Rust → WebAssembly**. Each of the nine wor
 **Web Worker**, while **WebGL2 instancing** keeps rendering responsive as rules, seeds, and grid
 sizes change.
 
-## ✨ What you can do
+## ✨ Highlights
 
-### Run and compare worlds
+- **Nine worlds at once** — a 3×3 grid with one world enlarged, so you can compare rules, seeds, and
+  mutations side by side in real time.
+- **Rulesets as first-class objects** — edit all 128 transitions through three lenses, mutate, breed,
+  undo, and name them; every ruleset is a 32-character hex code with a deterministic mnemonic name.
+- **Deep pattern tooling** — hex-aware brushes, region copy/paste with 60° rotation and mirroring,
+  saved starting states, and a personal pattern library.
+- **See the rules, not just the cells** — rule-based coloring, curated and color-vision-friendly
+  palettes, live entropy and population plots, and per-rule firing analysis.
+- **Rewind and branch** — scrub the selected world back 240 ticks, replay it, and fork from any
+  earlier state.
+- **3D torus view** — project the selected world onto a live torus and orbit it without changing the
+  simulation.
+- **Export anything** — PNG/JPEG, WebM, animated GIF, seamless cycle loops, share links, and portable
+  `HXW1.…` world codes.
+- **Auto-Explore** *(alpha)* — an evolutionary search for interesting rulesets, ranked by a
+  HexLife-native model that runs entirely in your browser.
 
-- Run **nine independent worlds** in a 3×3 grid, with one world enlarged for inspection.
-- Select, enable, disable, or ruleset-lock worlds; copy a ruleset or exact cell state between them.
-- Play, pause, single-step, change simulation speed, reset, or clear one world or all enabled worlds.
-- Rewind the selected world through a **240-tick scrub history**, replay it, and branch by editing
-  any earlier state.
-- Switch among four grid-size presets, from a quick small world to a huge 576×666-cell world.
-- Zoom and pan the flat grid, reset the camera from the on-canvas zoom chip, or hold `H` and drag to
-  re-center a pattern across the wrap-around boundary.
-- Switch the selected world to a live **3D torus view** on desktop. Orbit, dolly, tumble through the
-  poles, auto-rotate, and adjust rotation speed, ring openness, and off-cell transparency without
-  changing the underlying world.
+## 🚀 Quick start
 
-### Design and evolve rulesets
+The easiest way in is the [**live demo**](https://sidem.github.io/HexLife/) — no install, no account.
 
-- Work with the complete **128-rule transition table** as a 32-character hexadecimal ruleset.
-- Edit rules through three lenses: all 128 configurations, 14 center/neighbor-count groups, or 28
-  rotational-symmetry groups.
-- Generate random, neighbor-count, totalistic, or rotationally symmetric rulesets with an adjustable
-  output bias.
-- Mutate by bit or structural group, invert rules, clone them across worlds, or mark any worlds as
-  parents and breed new offspring from the genepool.
-- Choose whether a rule operation affects the selected world or all worlds, whether it resets cells,
-  and whether ruleset-locked worlds are protected.
-- Undo and redo ruleset changes, inspect recent ruleset history, or paste a hex code directly.
-- Read deterministic mnemonic names plus compact `B2/S35`-style or rotational-orbit notation when a
-  ruleset has that structure.
-- When saving a ruleset, see its nearest named relatives and optionally continue an existing family
-  name.
-
-### Create starting states and patterns
-
-- Give each world its own **random fill**, configurable **clumps**, or an exact **saved start**.
-- Use presets and live previews, reproduce seeded resets, or apply the same starting state to all
-  nine worlds for controlled comparisons.
-- Paint while the simulation runs or pauses, with adjustable hex-radius brushes in invert, draw, or
-  erase mode.
-- Select and copy a rectangular region, then stamp it without losing the staggered hex phase.
-- Rotate patterns in 60° steps, mirror them horizontally or vertically, and keep a personal pattern
-  library with names, tags, and a link back to the source ruleset.
-- Save a selected world—cells, ruleset, and tick count—to JSON, load it later, or capture its cells
-  as a reusable starting state for any world.
-
-### Visualize and measure behavior
-
-- Toggle between plain active/inactive cells and **rule-based coloring**, where color reveals which
-  transition fired.
-- Use Chroma Lab's ready-made and color-vision-friendly palettes, global hue shift, custom gradients,
-  or hand-picked colors for neighbor-count and symmetry families.
-- Overlay ruleset glyphs, breeding-parent and lock indicators, and extinct, saturated, or cycling
-  status badges on the minimaps.
-- Plot live population ratio, binary entropy, and hex-block entropy.
-- Measure the selected world's behavior with the same interestingness metrics used by Auto-Explore,
-  and inspect which birth and survival rules are firing most often.
-
-### Keep, export, and share discoveries
-
-- Browse one unified **Ruleset Library** containing the curated public catalog and your personal
-  saves, with generated previews, paired starting states, search, sorting, source filters, tags, and
-  structural-constraint filters.
-- Save names, descriptions, tags, thumbnails, seeds, and paired starting states. Import or export
-  personal rulesets as sanitized, versioned `hexlife-pack` JSON files.
-- Share a lightweight URL for a ruleset/setup, copy a portable initial-condition code, or copy an
-  **`HXW1.…` world code** containing the selected world's exact ruleset, cells, grid, brush, and
-  palette settings.
-- Use Capture Studio to export the selected world or the full canvas as **PNG/JPEG**, **WebM**, or
-  **animated GIF** at preset or custom resolutions.
-- Export a detected cycle as a seamless GIF, or arm a perfect-run recording that starts from the
-  current state and closes on a detected cycle.
-- Turn a world code into a playable **Live Specimen** on Reddit. The separate
-  [HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit) app supports play, restart, zoom,
-  drawing, ruleset inspection, and posting an exact remix from inside Reddit.
-
-### Learn and work efficiently
-
-- Follow guided missions, experiments, and feature tours in the Learning Hub.
-- Use the desktop command palette (`Ctrl`/`⌘`+`K`) or the full keyboard shortcut system.
-- Use a dedicated responsive mobile interface with touch drawing, pinch zoom, world navigation, and
-  a bottom tab bar.
-- Keep preferences, panels, palettes, personal libraries, saved starts, patterns, and world setup in
-  local browser storage.
-- Get actionable hardware-acceleration guidance if WebGL2 is available but disabled.
-
-## 🧭 Auto-Explore (experimental)
-
-Auto-Explore is an **alpha** evolutionary search for rulesets with potentially interesting
-behavior. It can run candidate populations, bank promising finds into a gallery, and hand those
-finds back to the normal save/share/breed workflow. The panel keeps the run status and the
-Start / Pause / Stop / Stop &amp; Keep controls always in view, with everything else behind three tabs:
-
-- **Setup** — mutation rate and mode, population size, initial conditions, evaluation length, budget.
-- **Objective** — how candidates are ranked, plus the scoring weights.
-- **Finds** — the gallery, head-to-head rating, and pack import/export.
-
-Two objectives are available:
-
-- **Native beta** (default) — statistics screen and hard-kill candidates cheaply; every survivor then
-  gets an exact 32-frame trajectory scored by a small HexLife-native model that runs entirely in your
-  browser from `public/models/hexlife-interest/`. Nothing is downloaded from a third party. Its
-  displayed 0–1 score is the model's percentile against a frozen reference corpus, so it is stable
-  across sessions. If the model fails to load, times out, or errors, the run silently falls back to
-  the statistical score rather than stalling.
-- **Statistical only** — the deterministic, model-free objective. Byte-identical to the pre-model
-  search, and the right choice for reproducibility work.
-
-The native model is explicitly a **beta**: it clearly beats the statistical objective on a curated
-sanity panel, but it has not passed the project's strict corpus-acceptance gates (owner hard-pair
-votes, locked test cases, mixed-grid corpus coverage, quantization). Treat all rankings as
-suggestions, not ground truth, and expect the controls and scoring behavior to keep evolving.
-
-## 🧠 How HexLife rules work
-
-- **Hexagonal neighborhood** — every cell has six neighbors. Consecutive columns are staggered by
-  half a hex.
-- **Toroidal world** — opposite edges connect. Activity leaving one side re-enters from the other.
-- **Two states** — a cell is active or inactive.
-- **128 local configurations** — the center cell plus its six neighbors contain seven binary values,
-  giving 2⁷ possible inputs. One output bit for each input makes a ruleset exactly 128 bits, or 32
-  hexadecimal characters.
-
-That encoding is the project's reproducibility contract: the same ruleset, starting state, and seed
-produce the same trajectory.
-
-## 🚀 Run it locally
-
-**Prerequisites:** [Node.js 20](https://nodejs.org/) and a browser with WebGL2 and hardware
-acceleration enabled.
+To run it locally you need [Node.js 20](https://nodejs.org/) and a browser with WebGL2 and hardware
+acceleration enabled:
 
 ```bash
 git clone https://github.com/Sidem/HexLife.git
@@ -200,12 +96,170 @@ npm run build:wasm
 
 </details>
 
-## 🧩 Reusable world element
+## 🧠 How HexLife rules work
+
+- **Hexagonal neighborhood** — every cell has six neighbors. Consecutive columns are staggered by
+  half a hex.
+- **Toroidal world** — opposite edges connect. Activity leaving one side re-enters from the other.
+- **Two states** — a cell is active or inactive.
+- **128 local configurations** — the center cell plus its six neighbors contain seven binary values,
+  giving 2⁷ possible inputs. One output bit for each input makes a ruleset exactly 128 bits, or 32
+  hexadecimal characters.
+
+That encoding is the project's reproducibility contract: the same ruleset, starting state, and seed
+produce the same trajectory.
+
+## 🧪 What you can do
+
+Each section below expands to the full feature list.
+
+<details>
+<summary><b>Run and compare worlds</b> — nine worlds, scrub history, zoom/pan, 3D torus view</summary>
+
+<br>
+
+- Run **nine independent worlds** in a 3×3 grid, with one world enlarged for inspection.
+- Select, enable, disable, or ruleset-lock worlds; copy a ruleset or exact cell state between them.
+- Play, pause, single-step, change simulation speed, reset, or clear one world or all enabled worlds.
+- Rewind the selected world through a **240-tick scrub history**, replay it, and branch by editing
+  any earlier state.
+- Switch among four grid-size presets, from a quick small world to a huge 576×666-cell world.
+- Zoom and pan the flat grid, reset the camera from the on-canvas zoom chip, or hold `H` and drag to
+  re-center a pattern across the wrap-around boundary.
+- Switch the selected world to a live **3D torus view** on desktop. Orbit, dolly, tumble through the
+  poles, auto-rotate, and adjust rotation speed, ring openness, and off-cell transparency without
+  changing the underlying world.
+
+</details>
+
+<details>
+<summary><b>Design and evolve rulesets</b> — 128-rule editing, mutation, breeding, naming</summary>
+
+<br>
+
+- Work with the complete **128-rule transition table** as a 32-character hexadecimal ruleset.
+- Edit rules through three lenses: all 128 configurations, 14 center/neighbor-count groups, or 28
+  rotational-symmetry groups.
+- Generate random, neighbor-count, totalistic, or rotationally symmetric rulesets with an adjustable
+  output bias.
+- Mutate by bit or structural group, invert rules, clone them across worlds, or mark any worlds as
+  parents and breed new offspring from the genepool.
+- Choose whether a rule operation affects the selected world or all worlds, whether it resets cells,
+  and whether ruleset-locked worlds are protected.
+- Undo and redo ruleset changes, inspect recent ruleset history, or paste a hex code directly.
+- Read deterministic mnemonic names plus compact `B2/S35`-style or rotational-orbit notation when a
+  ruleset has that structure.
+- When saving a ruleset, see its nearest named relatives and optionally continue an existing family
+  name.
+
+</details>
+
+<details>
+<summary><b>Create starting states and patterns</b> — seeds, brushes, hex-aware copy/paste</summary>
+
+<br>
+
+- Give each world its own **random fill**, configurable **clumps**, or an exact **saved start**.
+- Use presets and live previews, reproduce seeded resets, or apply the same starting state to all
+  nine worlds for controlled comparisons.
+- Paint while the simulation runs or pauses, with adjustable hex-radius brushes in invert, draw, or
+  erase mode.
+- Select and copy a rectangular region, then stamp it without losing the staggered hex phase.
+- Rotate patterns in 60° steps, mirror them horizontally or vertically, and keep a personal pattern
+  library with names, tags, and a link back to the source ruleset.
+- Save a selected world—cells, ruleset, and tick count—to JSON, load it later, or capture its cells
+  as a reusable starting state for any world.
+
+</details>
+
+<details>
+<summary><b>Visualize and measure behavior</b> — rule-based coloring, palettes, live metrics</summary>
+
+<br>
+
+- Toggle between plain active/inactive cells and **rule-based coloring**, where color reveals which
+  transition fired.
+- Use Chroma Lab's ready-made and color-vision-friendly palettes, global hue shift, custom gradients,
+  or hand-picked colors for neighbor-count and symmetry families.
+- Overlay ruleset glyphs, breeding-parent and lock indicators, and extinct, saturated, or cycling
+  status badges on the minimaps.
+- Plot live population ratio, binary entropy, and hex-block entropy.
+- Measure the selected world's behavior with the same interestingness metrics used by Auto-Explore,
+  and inspect which birth and survival rules are firing most often.
+
+</details>
+
+<details>
+<summary><b>Keep, export, and share discoveries</b> — library, capture studio, world codes, Reddit</summary>
+
+<br>
+
+- Browse one unified **Ruleset Library** containing the curated public catalog and your personal
+  saves, with generated previews, paired starting states, search, sorting, source filters, tags, and
+  structural-constraint filters.
+- Save names, descriptions, tags, thumbnails, seeds, and paired starting states. Import or export
+  personal rulesets as sanitized, versioned `hexlife-pack` JSON files.
+- Share a lightweight URL for a ruleset/setup, copy a portable initial-condition code, or copy an
+  **`HXW1.…` world code** containing the selected world's exact ruleset, cells, grid, brush, and
+  palette settings.
+- Use Capture Studio to export the selected world or the full canvas as **PNG/JPEG**, **WebM**, or
+  **animated GIF** at preset or custom resolutions.
+- Export a detected cycle as a seamless GIF, or arm a perfect-run recording that starts from the
+  current state and closes on a detected cycle.
+- Turn a world code into a playable **Live Specimen** on Reddit. The separate
+  [HexLife-Devvit](https://github.com/Sidem/HexLife-Devvit) app supports play, restart, zoom,
+  drawing, ruleset inspection, and posting an exact remix from inside Reddit.
+
+</details>
+
+<details>
+<summary><b>Learn and work efficiently</b> — guided missions, command palette, mobile UI</summary>
+
+<br>
+
+- Follow guided missions, experiments, and feature tours in the Learning Hub.
+- Use the desktop command palette (`Ctrl`/`⌘`+`K`) or the full keyboard shortcut system.
+- Use a dedicated responsive mobile interface with touch drawing, pinch zoom, world navigation, and
+  a bottom tab bar.
+- Keep preferences, panels, palettes, personal libraries, saved starts, patterns, and world setup in
+  local browser storage.
+- Get actionable hardware-acceleration guidance if WebGL2 is available but disabled.
+
+</details>
+
+## 🧭 Auto-Explore (experimental)
+
+Auto-Explore is an **alpha** evolutionary search for rulesets with potentially interesting
+behavior. It runs candidate populations, banks promising finds into a gallery, and hands those finds
+back to the normal save/share/breed workflow. The panel keeps the run status and the
+Start / Pause / Stop / Stop &amp; Keep controls always in view, with everything else behind three tabs:
+**Setup** (mutation rate and mode, population size, initial conditions, evaluation length, budget),
+**Objective** (how candidates are ranked, plus the scoring weights), and **Finds** (the gallery,
+head-to-head rating, and pack import/export).
+
+Two objectives are available:
+
+- **Native beta** (default) — statistics screen and hard-kill candidates cheaply; every survivor then
+  gets an exact 32-frame trajectory scored by a small HexLife-native model that runs entirely in your
+  browser from `public/models/hexlife-interest/`. Nothing is downloaded from a third party. Its
+  displayed 0–1 score is the model's percentile against a frozen reference corpus, so it is stable
+  across sessions. If the model fails to load, times out, or errors, the run silently falls back to
+  the statistical score rather than stalling.
+- **Statistical only** — the deterministic, model-free objective. Byte-identical to the pre-model
+  search, and the right choice for reproducibility work.
+
+> [!NOTE]
+> The native model is explicitly a **beta**. It clearly beats the statistical objective on a curated
+> sanity panel, but it has not passed the project's strict corpus-acceptance gates (owner hard-pair
+> votes, locked test cases, mixed-grid corpus coverage, quantization). Treat all rankings as
+> suggestions, not ground truth, and expect the controls and scoring behavior to keep evolving.
+
+## 🧩 Embed a world in your own page
 
 The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides the
-`<hexlife-world>` custom element used by the Reddit app. It accepts a
-ruleset or exact world code, seed, density, rows, speed, palette, paused/drawing/zoom policies, and
-also exposes play, pause, reset, tick, brush-size, checksum, and world-code APIs.
+`<hexlife-world>` custom element used by the Reddit app. It accepts a ruleset or exact world code,
+seed, density, rows, speed, palette, and paused/drawing/zoom policies, and exposes play, pause,
+reset, tick, brush-size, checksum, and world-code APIs.
 
 ```bash
 npm install @hexlife/embed
@@ -260,7 +314,7 @@ through the versioned `@hexlife/embed` package.
 
 ## 🤝 Share and contribute rulesets
 
-To post a Live Specimen:
+**To post a Live Specimen:**
 
 1. In the Explorer, open **Share** and choose **Copy post kit & open r/hexlife**.
 2. On the subreddit, use **⋯ → New HexLife post**.
@@ -269,7 +323,7 @@ To post a Live Specimen:
 Reddit does not provide a public URL that opens an installed app's creation form, so this handoff
 cannot be completed automatically from the Explorer.
 
-To propose a ruleset for the bundled public catalog:
+**To propose a ruleset for the bundled public catalog:**
 
 1. Save it to your personal library with a name, a description, at least one standard tag, and a
    paired starting condition. Those four are what turn a personal save into a usable catalog entry,
@@ -286,7 +340,9 @@ which puts the exact committed entry shape on your clipboard. Either way, leave 
 the app bakes and caches those locally from the paired start.
 
 General bug reports and feature proposals are welcome in
-[GitHub Issues](https://github.com/Sidem/HexLife/issues).
+[GitHub Issues](https://github.com/Sidem/HexLife/issues). Code contributions should pass
+`npm run lint`, `npm run typecheck`, `npm run test:run`, and the Rust tests — the same quality gate
+CI enforces on every push.
 
 ## ⌨️ Keyboard shortcuts
 
@@ -298,18 +354,27 @@ It supports modifier layers, full-registry search, and a categorized mobile list
 | `Ctrl`/`⌘`+`K` | Open the desktop command palette |
 | `P` or `Space` | Play / pause |
 | `V` | Toggle flat / 3D torus view |
-| `Shift`+`V` | Start recording with the last settings / stop and save |
-| `Ctrl`/`⌘`+`Shift`+`V` | Pause / resume the active recording |
 | `↑` / `↓` | Change speed; hold to ramp |
 | `←` / `→` | Step backward / forward while paused |
-| Hold `H` + drag | Shift the world across its wrap-around boundary |
 | `1`–`9` | Select a world in the 3×3 layout |
 | `Shift`+`1`–`9` | Enable / disable a world |
+| `G` / `M` / `Shift`+`M` | Generate / clone-and-mutate / mutate |
+| `R` / `Shift`+`R` | Reset all / reset selected |
+| `Escape` | Close the active popout or top-most panel |
+
+<details>
+<summary>More shortcuts</summary>
+
+<br>
+
+| Keys | Action |
+| :--- | :--- |
+| `Shift`+`V` | Start recording with the last settings / stop and save |
+| `Ctrl`/`⌘`+`Shift`+`V` | Pause / resume the active recording |
+| Hold `H` + drag | Shift the world across its wrap-around boundary |
 | `L` | Lock / unlock the selected world's ruleset |
 | `B` / `Shift`+`B` | Mark a breeding parent / breed offspring |
-| `G` / `M` / `Shift`+`M` | Generate / clone-and-mutate / mutate |
 | `O` / `I` | Clone the selected ruleset to all / invert it |
-| `R` / `Shift`+`R` | Reset all / reset selected |
 | `C` / `Shift`+`C` | Clear all / clear selected |
 | `D` / `Shift`+`D` | Restore default starts / copy selected start to all, then reset |
 | `T` / `Shift`+`T` | Capture a saved start for selected / all worlds |
@@ -319,7 +384,8 @@ It supports modifier layers, full-registry search, and a categorized mobile list
 | `F` / `Shift`+`F` while placing | Mirror a pattern horizontally / vertically |
 | `Ctrl`/`⌘`+`Z` / `Ctrl`/`⌘`+`Shift`+`Z` | Undo / redo a ruleset change |
 | `N` / `E` / `S` / `A` | Open Ruleset Actions / Editor / World Setup / Analysis |
-| `Escape` | Close the active popout or top-most panel |
+
+</details>
 
 ## 🏷️ Versioning & releases
 
