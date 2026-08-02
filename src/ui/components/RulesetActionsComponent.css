@@ -598,6 +598,133 @@ button.tag-chip.tag-filter.active {
     background-color: rgba(160, 160, 168, 0.1);
 }
 
+/* ── Direct pane: the ruleset code converter ─────────────────────────────────────────────────
+   One input that accepts all three ways of writing a ruleset, with the other two derived live
+   below it. The rows are a readout, not a form: monospace, selectable, each with its own copy. */
+.ruleset-converter {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.converter-status {
+    margin: 0;
+    font-size: 0.78em;
+    line-height: 1.4;
+    min-height: 1.4em;
+}
+
+.converter-status.is-hint { color: var(--text-muted); }
+.converter-status.is-ok { color: #8fd694; }
+.converter-status.is-error { color: var(--error, #ff8080); }
+
+.ruleset-converter.is-invalid .hex-input {
+    border-color: var(--error, #ff8080);
+}
+
+.ruleset-converter .ruleset-primary-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.converter-table {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background-color: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.converter-row {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    background-color: var(--surface-1);
+}
+
+.converter-row-label {
+    font-size: 0.74em;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    cursor: help;
+}
+
+.converter-row-value {
+    font-family: monospace;
+    font-size: 0.86em;
+    color: var(--text-primary);
+    /* Long hex must wrap rather than widen the panel; short codes then sit on one line. */
+    word-break: break-all;
+    user-select: all;
+}
+
+.converter-row.is-empty .converter-row-value,
+.converter-row.is-redundant .converter-row-value {
+    color: var(--text-muted);
+    font-style: italic;
+    user-select: none;
+}
+
+.converter-copy {
+    font-size: 0.9em;
+    line-height: 1;
+    padding: 4px 6px;
+}
+
+.converter-copy:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.converter-explain {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.converter-explain:empty {
+    display: none;
+}
+
+.converter-explain-head {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+}
+
+.converter-explain-class {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.converter-explain-summary {
+    margin: 0;
+    font-size: 0.82em;
+    line-height: 1.45;
+    color: var(--text-primary);
+}
+
+.converter-legend {
+    margin: 0;
+    padding-left: 9px;
+    border-left: 2px solid var(--border);
+    font-size: 0.78em;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.converter-legend strong {
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
 .library-card .description {
     font-size: 0.85em;
     color: #aaa;

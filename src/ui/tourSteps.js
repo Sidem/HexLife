@@ -299,7 +299,7 @@ export const getTours = (appContext) => {
     const ruleset_library = [{
         element: () => appContext.uiManager.isMobile() ? '.tab-bar-button[data-view="library"]' : '[data-tour-id="library-button"]',
         title: 'Tutorial: Ruleset Library',
-        content: "Load curated rulesets, revisit your own saved rules, or paste a 32-character hex code <span class=\"onboarding-highlight-text\">Directly</span>. Open the highlighted Library to continue.",
+        content: "Load curated rulesets, revisit your own saved rules, or paste a ruleset code <span class=\"onboarding-highlight-text\">Directly</span>. Open the highlighted Library to continue.",
         condition: () => !isViewOpen({ desktop: { type: 'panel', name: 'library' }, mobile: { view: 'library' } }),
         onBeforeShow: resetUIState,
         advanceOn: { type: 'event', eventName: EVENTS.VIEW_SHOWN, condition: (data) => data.contentComponentType === RulesetLibraryComponent }
@@ -320,7 +320,7 @@ export const getTours = (appContext) => {
     }, {
         element: '[data-pane="direct"]',
         title: 'Direct',
-        content: "Already have a 32-character hex code? Paste it here to set the ruleset instantly.",
+        content: "Already have a code? Paste it here to set the ruleset instantly — a 32-character hex, a short code like <span class=\"onboarding-highlight-text\">R3000081</span>, or <span class=\"onboarding-highlight-text\">B2/S35</span> notation. It converts between all three as you type.",
         primaryAction: { text: 'Finish' },
         onBeforeShow: (step) => { document.querySelector(step.element)?.click(); },
         advanceOn: { type: 'click' }

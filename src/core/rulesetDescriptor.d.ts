@@ -56,3 +56,10 @@ export function satisfiesRulesetConstraint(
 
 /** Classify a ruleset hex; null when `hex` is not a 32-char hex string. */
 export function describeRuleset(hex: string): RulesetDescription | null
+
+/**
+ * Parse `B…/S…` notation into a 128-entry rule table — the inverse of `describeRuleset`.
+ * Null when the notation is not well-formed. The result is always r-sym or stricter, since
+ * notation can only name whole rotation orbits.
+ */
+export function parseRulesetNotation(notation: string): Uint8Array | null

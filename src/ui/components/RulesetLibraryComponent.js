@@ -1,7 +1,7 @@
 import { BaseComponent } from './BaseComponent.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { SwitchComponent } from './SwitchComponent.js';
-import { RulesetDirectInput } from './RulesetDirectInput.js';
+import { RulesetCodeConverter } from './RulesetCodeConverter.js';
 import { ICONS } from '../icons.js';
 import { rulesetName, downloadFile } from '../../utils/utils.js';
 import {
@@ -353,7 +353,8 @@ export class RulesetLibraryComponent extends BaseComponent {
     _renderDirectPane() {
         const mountPoint = this.panes.direct;
         mountPoint.innerHTML = '';
-        new RulesetDirectInput(mountPoint, this.appContext, { context: 'ruleset-library-direct' });
+        this.converter?.destroy();
+        this.converter = new RulesetCodeConverter(mountPoint, this.appContext, { context: 'ruleset-library-direct' });
     }
 
     attachEventListeners() {
@@ -732,6 +733,10 @@ export class RulesetLibraryComponent extends BaseComponent {
 
     destroy() {
         this._backfillHandle?.cancel();
+        // The converter subscribes to RULESET_CHANGED / SELECTED_WORLD_CHANGED to stay a live
+        // readout; those subscriptions outlive the panel unless we tear it down explicitly.
+        this.converter?.destroy();
+        this.converter = null;
         super.destroy?.();
     }
 

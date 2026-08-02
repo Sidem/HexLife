@@ -315,6 +315,78 @@ export function describeRuleset(hex) {
     };
 }
 
+/** Notation label → canonical orbit representative — the inverse of {@link ORBIT_LABELS}. */
+const LABEL_TO_REP = new Map([...ORBIT_LABELS].map(([rep, label]) => [label, rep]));
+
+/**
+ * Orbit representatives named by one side (the `B…` or `S…` half) of a notation string.
+ * A bare digit stands for *every* orbit of that count — the collapsed form {@link activeLabels}
+ * emits, and the only form an `n-count` rule ever uses.
+ * @param {string} side
+ * @returns {Set<number>|null} null on any token this notation does not define.
+ */
+function parseNotationSide(side) {
+    const reps = new Set();
+    let i = 0;
+    while (i < side.length) {
+        const digit = side[i];
+        if (!/[0-6]/.test(digit)) return null;
+        i++;
+        let suffix = '';
+        if (i < side.length && /[omp]/i.test(side[i])) {
+            suffix = side[i].toLowerCase();
+            i++;
+            if (side[i] === "'") {
+                suffix += "'";
+                i++;
+            }
+        }
+        if (suffix) {
+            const rep = LABEL_TO_REP.get(digit + suffix);
+            // Rejects arrangements that do not exist, e.g. `1o` or `2m'` — a count of 1 has a single
+            // orbit, and the chiral prime only distinguishes the two count-3 mirror arrangements.
+            if (rep === undefined) return null;
+            reps.add(rep);
+        } else {
+            const count = Number(digit);
+            for (const [rep, label] of ORBIT_LABELS) {
+                if (labelCount(label) === count) reps.add(rep);
+            }
+        }
+    }
+    return reps;
+}
+
+/**
+ * Parse a `B…/S…` notation string back into a rule table — the inverse of {@link describeRuleset}.
+ *
+ * Accepts every form this module *emits* plus the obvious typing conveniences: any case for the
+ * arrangement suffixes, curly apostrophes for `3m'`, and interior whitespace. Because notation can
+ * only name whole rotation orbits, the result is always r-sym or stricter; a `free` rule has no
+ * notation and cannot be typed. Empty sides are legal — `B/S` is the all-dead rule.
+ *
+ * @param {string} notation e.g. `B2/S35`, `B2o2m/S3m6`, `B/S`.
+ * @returns {Uint8Array|null} 128-entry table, or null when `notation` is not well-formed.
+ */
+export function parseRulesetNotation(notation) {
+    if (typeof notation !== 'string') return null;
+    const compact = notation.replace(/\s+/g, '').replace(/[‘’´`]/g, "'");
+    const parts = /^B([0-6omp']*)\/S([0-6omp']*)$/i.exec(compact);
+    if (!parts) return null;
+    const birth = parseNotationSide(parts[1]);
+    const survival = parseNotationSide(parts[2]);
+    if (!birth || !survival) return null;
+
+    const perState = [birth, survival];
+    const rules = new Uint8Array(128);
+    for (let cs = 0; cs < 2; cs++) {
+        for (let mask = 0; mask < 64; mask++) {
+            rules[(cs << 6) | mask] = perState[cs].has(getCanonicalRepresentative(mask)) ? 1 : 0;
+        }
+    }
+    return rules;
+}
+
 /**
  * "2, 3 or 5" / "3" / "no" — for the plain-English n-count summary.
  * @param {string[]} labels
