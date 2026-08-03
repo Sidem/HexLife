@@ -15,7 +15,8 @@
         "lint:fix": "eslint . --ext .js --fix",
         "typecheck": "tsc --noEmit",
         "test": "vitest",
-        "test:run": "vitest run"
+        "test:run": "vitest run",
+        "library:merge": "node scripts/merge-library-pack.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^9.30.0",
