@@ -256,7 +256,9 @@ export const EVENTS = {
     /** @param {{targetState: 0|1, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set all rules to a specific state. */
     COMMAND_EDITOR_SET_ALL_RULES_STATE: 'command:editorSetAllRulesState', 
     /** @param {{centerState: 0|1, numActive: number, outputState: 0|1, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set rules based on neighbor count. */
-    COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:editorSetRulesForNeighborCount', 
+    COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT: 'command:editorSetRulesForNeighborCount',
+    /** @param {{sum: number, outputState: 0|1, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set every rule whose totalistic sum (centerState + active neighbors, 0-7) matches. */
+    COMMAND_EDITOR_SET_RULES_FOR_TOTALISTIC_SUM: 'command:editorSetRulesForTotalisticSum',
     /** @param {{canonicalBitmask: number, centerState: 0|1, outputState: 0|1, symmetryMode?: 'r_sym'|'d_sym', modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - Parameters to set rules based on their canonical representative. */
     COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE: 'command:editorSetRulesForCanonicalRep', 
     /** @param {{hexString: string, modificationScope: 'all'|'selected', conditionalResetScope: 'all'|'selected'|'none'}} data - The ruleset hex string to apply from the editor. */

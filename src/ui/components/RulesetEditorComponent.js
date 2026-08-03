@@ -4,6 +4,12 @@ import { EventBus, EVENTS } from '../../services/EventBus.js';
 import * as PersistenceService from '../../services/PersistenceService.js';
 import { getRuleIndexColor, createOrUpdateRuleVizElement } from '../../utils/ruleVizUtils.js';
 
+/**
+ * Highest totalistic sum: centre state (0/1) plus active neighbours (0–6). The 8 buckets are the
+ * whole totalistic subspace, which is why it is the coarsest editor mode.
+ */
+const TOTALISTIC_MAX_SUM = 7;
+
 export class RulesetEditorComponent extends BaseComponent {
     constructor(appContext, options = {}) {
         super(null, options);
@@ -20,6 +26,7 @@ export class RulesetEditorComponent extends BaseComponent {
         this.element.className = 'ruleset-editor-component-content';
 
         this.cachedDetailedRules = [];
+        this.cachedTotalisticRules = [];
         this.cachedNeighborCountRules = [];
         this.cachedDihedralSymmetryRules = [];
         this.cachedRotationalSymmetryRules = [];
@@ -49,6 +56,7 @@ export class RulesetEditorComponent extends BaseComponent {
                     title="Set all rules to inactive, or active if all are already inactive">Clear/Fill</button>
                 <select id="ruleset-editor-mode" title="Choose editor mode">
                     <option value="detailed">Detailed (128 rules)</option>
+                    <option value="totalistic">Totalistic (8 groups)</option>
                     <option value="neighborCount">Neighbor Count (14 groups)</option>
                     <option value="dihedralSymmetry">Dihedral Symmetry (26 groups)</option>
                     <option value="rotationalSymmetry" selected>Rotational Symmetry (28 groups)</option>
@@ -65,6 +73,7 @@ export class RulesetEditorComponent extends BaseComponent {
             </div>
             <div class="panel-content-area">
                 <div id="rulesetEditorGrid" class="hidden"></div>
+                <div id="totalisticRulesetEditorGrid" class="hidden"></div>
                 <div id="neighborCountRulesetEditorGrid" class="hidden"></div>
                 <div id="dihedralSymmetryRulesetEditorGrid" class="hidden"></div>
                 <div id="rotationalSymmetryRulesetEditorGrid"></div>
@@ -91,6 +100,7 @@ export class RulesetEditorComponent extends BaseComponent {
             clearRulesButton: this.element.querySelector(`#ruleset-editor-clear-button`),
             rulesetEditorMode: this.element.querySelector(`#ruleset-editor-mode`),
             rulesetEditorGrid: this.element.querySelector('#rulesetEditorGrid'),
+            totalisticRulesetEditorGrid: this.element.querySelector('#totalisticRulesetEditorGrid'),
             neighborCountRulesetEditorGrid: this.element.querySelector('#neighborCountRulesetEditorGrid'),
             dihedralSymmetryRulesetEditorGrid: this.element.querySelector('#dihedralSymmetryRulesetEditorGrid'),
             rotationalSymmetryRulesetEditorGrid: this.element.querySelector('#rotationalSymmetryRulesetEditorGrid'),
@@ -106,9 +116,10 @@ export class RulesetEditorComponent extends BaseComponent {
     }
 
     /**
-     * Mobile simplification (mobile redesign M3): default to the coarse totalistic
+     * Mobile simplification (mobile redesign M3): default to the coarse neighbor-count
      * editor and keep the full 128-cell bit grid behind the "Advanced" toggle, so
-     * default mobile tap targets stay large. No effect on desktop.
+     * default mobile tap targets stay large. No effect on desktop. The coarser
+     * `totalistic` mode is selectable on mobile too — it is 8 buckets, not 14.
      */
     _applyMobileGating() {
         const modeSelect = this.uiElements.rulesetEditorMode;
@@ -129,7 +140,7 @@ export class RulesetEditorComponent extends BaseComponent {
         const saved = PersistenceService.loadUISetting('rulesetEditorMode', null);
         if (this._isMobile()) {
             // Never open the 128-cell grid by default on a phone.
-            return (saved === 'neighborCount' || saved === 'dihedralSymmetry' || saved === 'rotationalSymmetry') ? saved : 'neighborCount';
+            return (saved === 'totalistic' || saved === 'neighborCount' || saved === 'dihedralSymmetry' || saved === 'rotationalSymmetry') ? saved : 'neighborCount';
         }
         return saved || 'rotationalSymmetry';
     }
@@ -161,6 +172,30 @@ export class RulesetEditorComponent extends BaseComponent {
             detailedFrag.appendChild(viz);
         }
         detailedGrid.appendChild(detailedFrag);
+
+        // Totalistic: 8 buckets keyed by the total live count (centre + neighbours). A bucket spans
+        // both centre states, so — unlike the neighbor-count grid — there is no single centre hex to
+        // draw; the label carries the sum instead.
+        const totalisticGrid = this.uiElements.totalisticRulesetEditorGrid;
+        const totalisticFrag = document.createDocumentFragment();
+        for (let sum = 0; sum <= TOTALISTIC_MAX_SUM; sum++) {
+            const viz = document.createElement('div');
+            viz.className = 'totalistic-rule-viz';
+            viz.dataset.totalisticSum = String(sum);
+
+            const centerHex = document.createElement('div');
+            centerHex.className = 'hexagon center-hex state-0';
+            const innerHex = document.createElement('div');
+            innerHex.className = 'hexagon inner-hex';
+            centerHex.appendChild(innerHex);
+
+            viz.innerHTML = `<div class="totalistic-label">&Sigma;${sum}/7&rarr;...</div>`;
+            viz.appendChild(centerHex);
+
+            this.cachedTotalisticRules.push({ viz, innerHex, sum, label: viz.querySelector('.totalistic-label') });
+            totalisticFrag.appendChild(viz);
+        }
+        totalisticGrid.appendChild(totalisticFrag);
 
         const neighborGrid = this.uiElements.neighborCountRulesetEditorGrid;
         const neighborFrag = document.createDocumentFragment();
@@ -386,6 +421,16 @@ export class RulesetEditorComponent extends BaseComponent {
                 selector: '.rule-viz', getDetails: (el) => ({ ruleIndex: parseInt(el.dataset.ruleIndex, 10) })
             }));
         }
+        if (this.uiElements.totalisticRulesetEditorGrid) {
+            this.uiElements.totalisticRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_TOTALISTIC_SUM, {
+                selector: '.totalistic-rule-viz',
+                getDetails: (el, wm) => {
+                    const sum = parseInt(el.dataset.totalisticSum, 10);
+                    const currentOut = wm.getEffectiveRuleForTotalisticSum(sum);
+                    return { sum, outputState: (currentOut === 1 || currentOut === 2) ? 0 : 1 };
+                }
+            }));
+        }
         if (this.uiElements.neighborCountRulesetEditorGrid) {
             this.uiElements.neighborCountRulesetEditorGrid.addEventListener('click', createRuleInteractionHandler(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_NEIGHBOR_COUNT, {
                 selector: '.neighbor-count-rule-viz',
@@ -438,6 +483,7 @@ export class RulesetEditorComponent extends BaseComponent {
         const currentMode = this.uiElements.rulesetEditorMode.value;
         const grids = {
             detailed: this.uiElements.rulesetEditorGrid,
+            totalistic: this.uiElements.totalisticRulesetEditorGrid,
             neighborCount: this.uiElements.neighborCountRulesetEditorGrid,
             dihedralSymmetry: this.uiElements.dihedralSymmetryRulesetEditorGrid,
             rotationalSymmetry: this.uiElements.rotationalSymmetryRulesetEditorGrid
@@ -452,6 +498,8 @@ export class RulesetEditorComponent extends BaseComponent {
 
         if (currentMode === 'detailed') {
             this._updateDetailedGrid(rulesetArray);
+        } else if (currentMode === 'totalistic') {
+            this._updateTotalisticGrid();
         } else if (currentMode === 'neighborCount') {
             this._updateNeighborCountGrid();
         } else if (currentMode === 'dihedralSymmetry') {
@@ -469,6 +517,27 @@ export class RulesetEditorComponent extends BaseComponent {
             const outputState = rulesetArray[i];
             const { innerHex } = this.cachedDetailedRules[i];
             innerHex.style.backgroundColor = getRuleIndexColor(i, outputState, colorSettings, symmetryData);
+        }
+    }
+
+    _updateTotalisticGrid() {
+        if (this.cachedTotalisticRules.length === 0) return;
+        const colorSettings = this.appContext.colorController.getSettings();
+        const symmetryData = this.appContext.worldManager.getSymmetryData();
+
+        for (const { innerHex, label, sum } of this.cachedTotalisticRules) {
+            const effectiveOutput = this.worldManager.getEffectiveRuleForTotalisticSum(sum);
+
+            // Pick any table entry in this bucket for the colour: sums 0–6 are reachable from a dead
+            // centre, and only sum 7 needs the live one.
+            const representativeRuleIndex = sum <= 6
+                ? (Math.pow(2, sum) - 1)
+                : (1 << 6) | 63;
+            innerHex.style.backgroundColor = getRuleIndexColor(representativeRuleIndex, effectiveOutput, colorSettings, symmetryData);
+
+            innerHex.className = `hexagon inner-hex state-${effectiveOutput}`;
+            const outputDisplay = effectiveOutput === 1 ? '<b>ON</b>' : (effectiveOutput === 0 ? 'OFF' : '<b>MIXED</b>');
+            label.innerHTML = `&Sigma;${sum}/7&rarr;${outputDisplay}`;
         }
     }
 

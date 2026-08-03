@@ -100,7 +100,7 @@
     font-size: 0.9em;
 }
 
-#rulesetEditorGrid, #neighborCountRulesetEditorGrid, #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
+#rulesetEditorGrid, #totalisticRulesetEditorGrid, #neighborCountRulesetEditorGrid, #dihedralSymmetryRulesetEditorGrid, #rotationalSymmetryRulesetEditorGrid {
     display: grid;
     margin: 0 auto 10px auto;
     gap: 2px;
@@ -118,6 +118,13 @@
 
 #neighborCountRulesetEditorGrid {
     grid-template-columns: repeat(7, 13.6%);
+    width: 98%;
+    gap: 5px;
+}
+
+/* 8 totalistic buckets on one row — the coarsest editor, so the widest tap targets. */
+#totalisticRulesetEditorGrid {
+    grid-template-columns: repeat(8, 11.8%);
     width: 98%;
     gap: 5px;
 }
@@ -215,18 +222,18 @@
 .neighbor-4 { top: 70%; left: 78%; }
 .neighbor-5 { top: 88%; left: 50%; }
 
-.neighbor-count-rule-viz {
+.neighbor-count-rule-viz, .totalistic-rule-viz {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     padding: 8px 5px; border: 1px solid #444; border-radius: 4px; cursor: pointer;
     background-color: #282828; transition: background-color 0.2s ease;
     min-height: 80px; box-sizing: border-box;
 }
-.neighbor-count-rule-viz:hover { background-color: #3a3a3a; }
-.neighbor-count-rule-viz .hexagon.center-hex {
+.neighbor-count-rule-viz:hover, .totalistic-rule-viz:hover { background-color: #3a3a3a; }
+.neighbor-count-rule-viz .hexagon.center-hex, .totalistic-rule-viz .hexagon.center-hex {
     position: relative; transform: scale(0.8) translate(-46px, -53px);
     margin-bottom: 5px; width: 40px; height: calc(40px * 1.154701);
 }
-.neighbor-count-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
+.neighbor-count-label, .totalistic-label { font-size: 0.75em; text-align: center; color: #ccc; margin-top: 3px; line-height: 1.2; }
 
 .r-sym-rule-viz {
     position: relative;
@@ -290,7 +297,7 @@
 
 /* Mobile Overrides */
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 900px)), (max-width: 768px) {
-    .neighbor-count-rule-viz .hexagon.center-hex {
+    .neighbor-count-rule-viz .hexagon.center-hex, .totalistic-rule-viz .hexagon.center-hex {
         transform: scale(0.8) translate(-23px, -53px);
     }
     #rulesetEditorGrid {
@@ -299,6 +306,7 @@
     }
     .editor-controls .editor-hex-input { font-size: 1.2em; width: 250px; }
     #neighborCountRulesetEditorGrid { grid-template-columns: repeat(7, 13.6%); }
+    #totalisticRulesetEditorGrid { grid-template-columns: repeat(4, 23.5%); }
 }
 
 @media screen and ((hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 700px)), (max-width: 600px) {

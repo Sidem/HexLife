@@ -403,6 +403,28 @@ export class RulesetService {
      * @param {number} sum - Totalistic sum in [0, 7].
      * @returns {0|1|2}
      */
+    /**
+     * Write `outputState` to every rule entry in one totalistic bucket, in place.
+     *
+     * A bucket spans BOTH centre states — `(cs=1, n)` and `(cs=0, n+1)` share a total live count and
+     * must agree — which is exactly what makes `totalistic` stricter than `n_count`. Driving all 8
+     * buckets therefore lands any rule in the totalistic subspace, which is what the editor's
+     * Totalistic mode relies on.
+     * @param {Uint8Array} rules 128-entry table, mutated in place.
+     * @param {number} sum Totalistic sum in [0, 7].
+     * @param {0|1} outputState
+     * @returns {Uint8Array} `rules`, for chaining.
+     */
+    static setRulesForTotalisticSum(rules, sum, outputState) {
+        for (let cs = 0; cs <= 1; cs++) {
+            for (let mask = 0; mask < 64; mask++) {
+                if (cs + Symmetry.countSetBits(mask) !== sum) continue;
+                rules[(cs << 6) | mask] = outputState;
+            }
+        }
+        return rules;
+    }
+
     static getEffectiveRuleForTotalisticSum(ruleset, sum) {
         if (!ruleset) return 2;
         let firstOutput = -1;

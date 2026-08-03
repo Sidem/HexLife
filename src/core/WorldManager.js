@@ -441,6 +441,13 @@ export class WorldManager {
                 return rulesetToHex(rules);
             }, data.conditionalResetScope);
         });
+        EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_TOTALISTIC_SUM, (data) => {
+            this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
+                const rules = hexToRuleset(currentRulesetHex);
+                RulesetService.setRulesForTotalisticSum(rules, data.sum, data.outputState);
+                return rulesetToHex(rules);
+            }, data.conditionalResetScope);
+        });
         EventBus.subscribe(EVENTS.COMMAND_EDITOR_SET_RULES_FOR_CANONICAL_REPRESENTATIVE, (data) => {
             this._modifyRulesetForScope(data.modificationScope, (currentRulesetHex) => {
                 const rules = hexToRuleset(currentRulesetHex);
@@ -1101,6 +1108,9 @@ export class WorldManager {
 
     getEffectiveRuleForNeighborCount = (centerState, numActiveNeighbors) =>
         RulesetService.getEffectiveRuleForNeighborCount(this._getParsedCurrentRuleset(), centerState, numActiveNeighbors);
+
+    getEffectiveRuleForTotalisticSum = (sum) =>
+        RulesetService.getEffectiveRuleForTotalisticSum(this._getParsedCurrentRuleset(), sum);
 
     getCanonicalRuleDetails = (mode = 'r_sym') =>
         this.rulesetService.getCanonicalRuleDetails(this._getParsedCurrentRuleset(), mode);

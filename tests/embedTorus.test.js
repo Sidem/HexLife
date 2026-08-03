@@ -5,7 +5,7 @@ import path from 'node:path';
 import { clampFloat } from '../src/embed/attrs.js';
 
 /**
- * The `torus` attribute on `<hexlife-world>` (EMBED-PLAN § Public API; TORUS-VIEW Follow-up D).
+ * The `torus` attribute on `<hexlife-world>` (see `packages/hexlife-embed/README.md` § Interaction).
  *
  * The element itself needs a DOM + WebGL2 + wasm, so — as with `torusTransparency.test.js` — the GL
  * state machine and the loop wiring are pinned from source text. That is worth doing here because

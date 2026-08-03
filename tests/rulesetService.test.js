@@ -3,6 +3,7 @@ import { RulesetService } from '../src/core/RulesetService.js';
 import * as Symmetry from '../src/core/Symmetry.js';
 import { hexToRuleset, rulesetToHex } from '../src/utils/utils.js';
 import { countSetBits } from '../src/core/Symmetry.js';
+import { classifyRulesetConstraint, describeRuleset } from '../src/core/rulesetDescriptor.js';
 
 const ALL_ZERO = '0'.repeat(32);
 const ALL_ONE = 'F'.repeat(32);
@@ -103,6 +104,37 @@ describe('RulesetService.getEffectiveRuleForTotalisticSum', () => {
             if (countSetBits(mask) === 3) { rules[(0 << 6) | mask] = 1; break; }
         }
         expect(RulesetService.getEffectiveRuleForTotalisticSum(rules, 3)).toBe(2);
+    });
+});
+
+// The write side of the editor's Totalistic mode. Its whole promise is that driving all 8 buckets
+// lands ANY rule in the totalistic subspace — a per-bucket setter that touched only one centre state
+// would leave the rule at n_count and the mode would silently be a second neighbour-count editor.
+describe('RulesetService.setRulesForTotalisticSum', () => {
+    it('writes both centre states of a bucket, so a sum reads back uniform', () => {
+        const rules = hexToRuleset('12482080480080006880800180010117');
+        for (let sum = 0; sum <= 7; sum++) {
+            RulesetService.setRulesForTotalisticSum(rules, sum, sum % 2);
+            expect(RulesetService.getEffectiveRuleForTotalisticSum(rules, sum)).toBe(sum % 2);
+        }
+        expect(isTotalistic(rules)).toBe(true);
+    });
+
+    it('leaves every other bucket untouched', () => {
+        const rules = hexToRuleset(ALL_ZERO);
+        RulesetService.setRulesForTotalisticSum(rules, 3, 1);
+        for (let sum = 0; sum <= 7; sum++) {
+            expect(RulesetService.getEffectiveRuleForTotalisticSum(rules, sum)).toBe(sum === 3 ? 1 : 0);
+        }
+    });
+
+    it('produces the B/S notation the sums imply (birth at n, survival at n-1)', () => {
+        // Sums {2,3,5} on: a dead centre is born at n = sum, a live one survives at n = sum - 1.
+        const rules = hexToRuleset(ALL_ZERO);
+        for (const sum of [2, 3, 5]) RulesetService.setRulesForTotalisticSum(rules, sum, 1);
+
+        expect(classifyRulesetConstraint(rules)).toBe('totalistic');
+        expect(describeRuleset(rulesetToHex(rules)).notation).toBe('B235/S124');
     });
 });
 
