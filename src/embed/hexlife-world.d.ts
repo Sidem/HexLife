@@ -6,9 +6,9 @@
  * enforce. It also gives TypeScript hosts, including the separate Devvit repository, a declaration
  * that cannot silently drift from the element maintained here.
  *
- * **This file is documentation with teeth: it must match `docs/EMBED-PLAN.md` § Public API.** The
- * embed's API is frozen (additive changes only), so adding to it means editing the plan, the
- * element, and this file together.
+ * **This file is documentation with teeth: it must match `packages/hexlife-embed/README.md`**, which
+ * is what consumers of the published package actually read. The embed's API is frozen (additive
+ * changes only), so adding to it means editing that README, the element, and this file together.
  *
  * There is no `hexlife-world.js` — the runtime lives in `HexLifeElement.js` and registers itself
  * via `index.js`. Import this module for types only (`import type`), alongside the side-effecting
@@ -81,6 +81,17 @@ export interface HexLifeErrorDetail {
 }
 
 /**
+ * `hexlife-contextlost` / `hexlife-contextrestored` carry no detail.
+ *
+ * A lost GPU context is not an error state — the element has asked for the context back and will
+ * rebuild the world if it arrives, so `error` stays null and no `hexlife-error` fires. A host that
+ * paints its own chrome may want to say something in the gap; one that doesn't can ignore both and
+ * still be correct, because a recovery ends in a fresh `hexlife-ready` and a permanent failure ends
+ * in `hexlife-error` as usual.
+ */
+export type HexLifeContextDetail = undefined;
+
+/**
  * Events the element dispatches. All are `bubbles` + `composed`, so they escape the shadow root and
  * a host can listen on the element itself.
  */
@@ -88,10 +99,12 @@ export interface HexLifeElementEventMap {
     'hexlife-ready': CustomEvent<HexLifeReadyDetail>;
     'hexlife-playstate': CustomEvent<HexLifePlayStateDetail>;
     'hexlife-error': CustomEvent<HexLifeErrorDetail>;
+    'hexlife-contextlost': CustomEvent<HexLifeContextDetail>;
+    'hexlife-contextrestored': CustomEvent<HexLifeContextDetail>;
 }
 
 /**
- * `<hexlife-world>` — see `docs/EMBED-PLAN.md` § Public API for the attributes:
+ * `<hexlife-world>` — see `packages/hexlife-embed/README.md` § Attributes for the full contract:
  * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` · `code`
  * (`HXW1.…`, wins over the individual attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
  * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60) ·
@@ -163,6 +176,12 @@ export declare class HexLifeElement extends HTMLElement {
     readonly brushSize: number;
     /** Flat-camera zoom; 1 is the fitted "whole world" view. */
     readonly zoom: number;
+    /**
+     * Whether the world is actually on the torus right now — not merely whether `torus` was asked
+     * for. The projection is built on first use and the element stays flat if that build fails, so
+     * a host painting a pressed-state toggle should read this rather than its own intent.
+     */
+    readonly torusEnabled: boolean;
 
     addEventListener<K extends keyof HexLifeElementEventMap>(
         type: K,

@@ -195,6 +195,12 @@ generator is a recipe that re-rolls a different state on every reset, and this i
 | `userPaused` | `boolean` | Has the *user* paused, ignoring viewport/visibility gates? |
 | `brushSize` | `number` | |
 | `zoom` | `number` | |
+| `torusEnabled` | `boolean` | Is the world *actually* on the torus? See below. |
+
+`torusEnabled` is not the same question as `hasAttribute('torus')`. The projection needs a second
+shader program, built on first use, and a device that cannot compile it keeps the flat grid rather
+than showing a blank canvas. If you paint a pressed-state 3D toggle, read this after setting the
+attribute — otherwise your button will claim 3D is on over an unmistakably flat world.
 
 `sim` exposes `rows`, `cols`, `numCells`, `rulesetHex`, `tickCount`, `activeCount` (live cells),
 `speed`, `state`, and `snapshotCells()`.
@@ -207,7 +213,7 @@ generator is a recipe that re-rolls a different state on every reset, and this i
 
 ## Events
 
-All three bubble and are `composed`, so they escape the shadow root and you can listen on the
+All of these bubble and are `composed`, so they escape the shadow root and you can listen on the
 element itself.
 
 | Event | `detail` | Fires |
@@ -215,6 +221,8 @@ element itself.
 | `hexlife-ready` | `{rows, cols, numCells, brushSize}` | Once per successful boot. |
 | `hexlife-playstate` | `{playing, userPaused}` | Whenever the tuple changes (deduped). |
 | `hexlife-error` | `{message, detail}` | On entering the styled error state. |
+| `hexlife-contextlost` | — | The GPU took the drawing context back. |
+| `hexlife-contextrestored` | — | It came back; the world is being rebuilt. |
 
 ```js
 world.addEventListener('hexlife-playstate', (e) => {
@@ -229,6 +237,30 @@ scroll-offscreen auto-pause and tab switch.
 
 `hexlife-playstate` fires **before** `hexlife-ready` on boot, so attach listeners before connecting
 the element.
+
+### Losing the GPU
+
+A WebGL context is not yours to keep. The browser can reclaim it when the GPU resets, the machine
+sleeps, or — the common case on phones — something needs the memory more than a decoration in a feed
+does. The `torus` view is by a wide margin the most expensive thing this element asks for, and an
+in-app webview (Reddit's, notably) gets a far smaller budget than the same page in a standalone
+browser, so that is where you will see this.
+
+The element handles it: it stops every loop, asks for the context back, and rebuilds the world from
+scratch when it arrives — a recovery ends in a fresh `hexlife-ready`. **A lost context is not an
+error state**, so `error` stays null and no `hexlife-error` fires while a recovery is pending.
+
+Two cases end in `hexlife-error` instead, and a host that only listens for that will still behave
+correctly — it just won't know about the gap:
+
+- The browser never restores the context (a few seconds' grace, then the styled error box).
+- The context drops again within ten seconds of a recovery. Rebuilding is what lost it the first
+  time, so asking again would only buy another blank canvas at the price of a fresh Wasm world and a
+  shader compile on a device that has already said it has nothing to spare.
+
+If you host your own 3D toggle, the cheapest thing you can do for a struggling device is cap
+`max-dpr` while the torus is up. Framebuffer bytes scale with the square of the DPR, and the torus
+needs a depth attachment and multisampled color that the flat grid never touches.
 
 ---
 

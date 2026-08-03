@@ -77,6 +77,28 @@ const TORUS_SPIN_DEFAULT = 14;
 const TORUS_ORBIT_RADIANS_PER_PX = 0.007;
 
 /**
+ * How long to wait for `webglcontextrestored` before giving up and entering the error state.
+ *
+ * Cancelling `webglcontextlost` is a *request* for restoration, not a guarantee of one: a browser
+ * that lost the context to genuine memory pressure may never find room to hand one back, and some
+ * simply never fire the event. Without this the viewer would sit in front of a permanently blank
+ * canvas that still reports itself as a healthy world. Generous, because a restore that does arrive
+ * usually arrives within a frame or two and the cost of waiting is only a blank canvas either way.
+ */
+const CONTEXT_RESTORE_TIMEOUT_MS = 4000;
+
+/**
+ * A loss this soon after a restore means recovering *caused* the next loss.
+ *
+ * The loop is real and cheap to fall into: a `torus` world that costs more memory than the device
+ * has drops the context, we rebuild it, `_syncTorus` puts it straight back on the torus, and it
+ * drops again — each turn paying for a fresh wasm world and a shader compile on hardware that has
+ * already said it has nothing to spare. Past this window a second loss is treated as a new event
+ * (a laptop that sleeps twice is not a loop); inside it, we stop asking and show the error box.
+ */
+const CONTEXT_LOSS_LOOP_MS = 10_000;
+
+/**
  * Flat-camera zoom range. 1 is the fitted "whole world" view and the hard floor — below it the grid
  * would letterbox inside empty canvas, which is never what anyone means by zooming out.
  */
@@ -392,6 +414,21 @@ export class HexLifeElement extends HTMLElement {
         this._intersectionObserver = null;
         this._motionQuery = null;
         this._onMotionChange = null;
+
+        // --- GPU context loss (see `_onContextLost`) ---
+        /** Is the drawing context currently gone? Gates every path that would call into it. */
+        this._contextLost = false;
+        /** Deadline for a restore that may never come. */
+        this._contextRestoreTimer = 0;
+        /** When the last restore finished, so a loss right afterwards reads as a loop. */
+        this._contextRestoredAt = 0;
+        this._onContextLost = this._onContextLost.bind(this);
+        this._onContextRestored = this._onContextRestored.bind(this);
+        // Bound here rather than in `_boot`, and never unbound: a rebuild runs `_teardown` before
+        // `_boot`, and a context that went missing during that window would find nobody listening.
+        // The canvas lives and dies with the element, so these leak nothing.
+        this._canvas.addEventListener('webglcontextlost', this._onContextLost);
+        this._canvas.addEventListener('webglcontextrestored', this._onContextRestored);
     }
 
     // --- lifecycle ------------------------------------------------------------
@@ -632,6 +669,17 @@ export class HexLifeElement extends HTMLElement {
     get brushSize() { return this._brushSize; }
 
     /**
+     * @returns {boolean} Whether the world is actually being drawn on the torus right now.
+     *
+     * Not the same question as `hasAttribute('torus')`, which is only what the host *asked* for. The
+     * projection needs a second shader program built on first use, and on a device that cannot
+     * compile it the element stays flat by design (a blank canvas would be the worse answer). Before
+     * this getter existed a host had no way to notice, so its own 3D button would sit there reading
+     * "pressed" over an unmistakably flat grid.
+     */
+    get torusEnabled() { return this._torusActive(); }
+
+    /**
      * @param {number} size Clamped to 0 (single cell) … `MAX_BRUSH_SIZE`.
      *
      * Does not reflect into the `brush` attribute, so a host that drives brush size through the
@@ -799,6 +847,9 @@ export class HexLifeElement extends HTMLElement {
     _teardown() {
         this._stopLoop();
         if (this._spinRafId) { cancelAnimationFrame(this._spinRafId); this._spinRafId = 0; }
+        // A disconnect while the context is away must not leave a deadline that fires `_fail` on a
+        // detached element. The recovery path clears this itself before it gets here.
+        if (this._contextRestoreTimer) { clearTimeout(this._contextRestoreTimer); this._contextRestoreTimer = 0; }
         this._orbitPointerId = null;
         this._orbitLast = null;
         // No restore: the sim is about to be freed, and a reset on the way out is pure work.
@@ -835,6 +886,100 @@ export class HexLifeElement extends HTMLElement {
         // Forget the announced state: the next boot must report its own starting point, even if it
         // happens to match whatever the torn-down world was doing.
         this._lastPlayState = null;
+    }
+
+    // --- GPU context loss -----------------------------------------------------
+    // A WebGL context is not ours to keep. The browser can take it back whenever the GPU is reset,
+    // the machine sleeps, or — the common case on phones — something needs the memory more than a
+    // decoration in a feed does. An in-app webview (Reddit's, most notably) gets a far smaller
+    // budget than the same page in a standalone browser, and the `torus` view is by a wide margin
+    // the most expensive thing this element ever asks for: three depth-tested passes against a
+    // multisampled framebuffer, where the flat grid needs one pass and no depth at all.
+    //
+    // Without the two handlers below the failure is silent and total. Every GL call on a lost
+    // context is a no-op that does not throw, so `_frame` keeps running, `playing` stays true, the
+    // canvas stays blank, and nothing — not `hexlife-error`, not a console line — ever says why.
+    // Rule 1 says we do not throw into the host page; it does not say we get to say nothing.
+
+    /**
+     * The context went away. Stop everything that would keep drawing into it, then either ask for it
+     * back or — if asking is what got us here — give up and say so.
+     *
+     * @param {WebGLContextEvent} event
+     */
+    _onContextLost(event) {
+        if (this._contextLost) return;   // Drivers can fire this more than once.
+        this._contextLost = true;
+
+        // The loops are the urgent part: a rAF spinning against a dead context is invisible work on
+        // a device that just told us it is out of resources.
+        this._stopLoop();
+        if (this._spinRafId) { cancelAnimationFrame(this._spinRafId); this._spinRafId = 0; }
+        this._cancelPreviewBurst(false);
+        this._endDrawStroke(false);
+        this._endOrbit();
+
+        // Rebuilding is what lost it last time. Asking again would just buy another blank canvas at
+        // the price of a wasm world and a shader compile, on a device with nothing to spare.
+        const looping = this._contextRestoredAt > 0
+            && (performance.now() - this._contextRestoredAt) < CONTEXT_LOSS_LOOP_MS;
+        if (looping) {
+            this._fail(
+                'This device ran out of graphics memory.',
+                'The GPU dropped this world twice in a row. If the 3D view was on, the flat grid '
+                + 'costs far less — reopen this post and leave it flat.',
+            );
+            return;
+        }
+
+        // Load-bearing, not conventional: the spec only fires `webglcontextrestored` for a
+        // *cancelled* `webglcontextlost`. Deliberately after the loop check above, so the give-up
+        // path does not also ask for a context it has decided not to use.
+        event.preventDefault();
+
+        console.warn('<hexlife-world>: WebGL context lost; waiting for the browser to restore it.');
+        this.dispatchEvent(new CustomEvent('hexlife-contextlost', { bubbles: true, composed: true }));
+
+        // A restore we asked for may never arrive. Don't leave a blank canvas claiming to be a world.
+        clearTimeout(this._contextRestoreTimer);
+        this._contextRestoreTimer = setTimeout(() => {
+            this._contextRestoreTimer = 0;
+            if (!this._contextLost) return;
+            this._fail(
+                'The GPU dropped this world.',
+                'The graphics context was lost and the browser did not restore it. '
+                + 'Closing other tabs or apps and reopening this usually brings it back.',
+            );
+        }, CONTEXT_RESTORE_TIMEOUT_MS);
+    }
+
+    /**
+     * The browser handed a context back. It is a *blank* one — every buffer, texture, VAO and
+     * program the old renderer held died with the old context — so the only correct response is to
+     * build the world again from scratch, which is exactly what `_teardown` + `_boot` already do.
+     *
+     * Bumping `_generation` first is what voids the in-flight boot, if any: a context that dropped
+     * mid-boot would otherwise leave that boot racing this one to install a renderer.
+     */
+    _onContextRestored() {
+        if (!this._contextLost) return;
+        clearTimeout(this._contextRestoreTimer);
+        this._contextRestoreTimer = 0;
+        this._contextLost = false;
+
+        // Disconnected while the context was away: `connectedCallback` will boot us if we come back,
+        // and booting a detached element now would allocate a world nobody can see.
+        if (!this.isConnected) return;
+
+        console.warn('<hexlife-world>: WebGL context restored; rebuilding the world.');
+        this.dispatchEvent(new CustomEvent('hexlife-contextrestored', { bubbles: true, composed: true }));
+
+        // Stamped before the rebuild, so the window covers the rebuild itself — a torus world that
+        // dies while booting is the loop this guards, and it never reaches the far side of `_boot`.
+        this._contextRestoredAt = performance.now();
+        this._generation++;
+        this._teardown();
+        this._boot(this._generation);
     }
 
     // --- attributes -----------------------------------------------------------
@@ -937,7 +1082,9 @@ export class HexLifeElement extends HTMLElement {
      * disagree with each other.
      */
     _syncPlayback() {
-        if (!this.sim || !this.renderer || this.error) { this._stopLoop(); return; }
+        // `_contextLost` sits with the other "there is nothing to run against" gates rather than
+        // with the viewport ones: it is not a reason to pause, it is a reason there is no world.
+        if (!this.sim || !this.renderer || this.error || this._contextLost) { this._stopLoop(); return; }
 
         // Reduced motion means: never autoplay. The poster frame + a play button is the escape
         // hatch, and pressing it is the user asking for motion, which we honor.
@@ -1264,11 +1411,11 @@ export class HexLifeElement extends HTMLElement {
 
     /** Render the current generation exactly once (poster frames, resizes, `tick()`, `reset()`). */
     _drawOnce() {
-        if (this.sim && this.renderer && !this.error) this.renderer.draw(this.sim);
+        if (this.sim && this.renderer && !this.error && !this._contextLost) this.renderer.draw(this.sim);
     }
 
     _resize() {
-        if (!this.renderer) return;
+        if (!this.renderer || this._contextLost) return;
         const rect = this.getBoundingClientRect();
         this.renderer.resize(rect.width || 1, rect.height || 1, this._readParams().maxDpr);
         this._applyView();
@@ -1352,7 +1499,8 @@ export class HexLifeElement extends HTMLElement {
             && this._onScreen
             && this._docVisible
             && (!this._reducedMotion || this._playRequested)
-            && !this.error;
+            && !this.error
+            && !this._contextLost;
         if (wants) {
             if (this._spinRafId) return;
             this._spinLastTime = performance.now();
