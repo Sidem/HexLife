@@ -7,9 +7,10 @@ This is the shared runtime behind HexLife Explorer and HexLife on Reddit. The sa
 `(ruleset, seed, density, rows)` produces a byte-identical tick sequence in all three, which is what
 makes an embed a *recording* of a world rather than something that merely resembles one.
 
-**[▶ Live demo: the complete totalistic class](https://sidem.github.io/HexLife/totalistic-256.html)**
-— all 256 totalistic rules running at once on one 16×16 map, built entirely with this package. It is
-the clearest single demonstration of what `<hexlife-grid>` is for.
+**[▶ Live demo: 256 worlds, one rule class](https://sidem.github.io/HexLife/totalistic-256.html)**
+— all 256 totalistic rules running at once on one 16×16 map, or the same map as a random subset of
+any wider constraint class, built entirely with this package. It is the clearest single demonstration
+of what `<hexlife-grid>` is for.
 
 ```bash
 npm install @hexlife/embed

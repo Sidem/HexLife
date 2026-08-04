@@ -286,12 +286,14 @@ stops being a wall at sixteen; the grid puts N simulations behind one context an
 its own viewport instead. Every world shares one grid, seed, density, palette and clock, so the only
 difference between two tiles is the rule.
 
-> ### [**▶ The complete totalistic class**](https://sidem.github.io/HexLife/totalistic-256.html)
+> ### [**▶ 256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html)
 >
 > All **256** totalistic rules at once — a hex cell plus six neighbours has eight possible live
 > counts, so a rule keyed on that total has exactly 2⁸ forms. The whole class, not a sample, on one
-> 16×16 map of 96×112-cell worlds sharing an initial condition. Built entirely with this package;
-> the 2.75M cells it draws each frame cost about 0.8 ms.
+> 16×16 map of 96×112-cell worlds sharing an initial condition. Switch the constraint and the same
+> map becomes a random slice of a space too big to draw: 256 of the 2¹⁴ outer-totalistic rules, of
+> the 2²⁶ dihedral or 2²⁸ rotational ones, or of all 2¹²⁸. Built entirely with this package; the
+> 2.75M cells it draws each frame cost about 0.8 ms.
 
 ```html
 <hexlife-grid layout="16x16" rows="96" seed="12345" palette="monochrome" flicker-proof></hexlife-grid>
