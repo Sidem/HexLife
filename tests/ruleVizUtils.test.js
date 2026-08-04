@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateThumbnailLUT, rotateHue, generateColorLUT } from '../src/utils/ruleVizUtils.js';
+import { precomputeSymmetryGroups, rotateBitmaskClockwise } from '../src/core/Symmetry.js';
 
 // The baked-thumbnail LUT must be palette-independent and CVD-proof: pure grayscale (zero hue),
 // luminance rising monotonically with rule index within each band, and a hard gap between the OFF
@@ -83,5 +84,33 @@ describe('generateColorLUT hueShift', () => {
         expect(px(shifted, 1, 0)).toEqual([0, 0, 0]);
         // a chromatic ON cell must actually change hue.
         expect(px(shifted, 1, 40)).not.toEqual(px(unshifted, 1, 40));
+    });
+});
+
+describe('rule-aware preset palettes', () => {
+    const symmetryData = precomputeSymmetryGroups();
+    const px = (lut, outputState, ruleIndex) => {
+        const i = (outputState * 128 + ruleIndex) * 4;
+        return [lut[i], lut[i + 1], lut[i + 2]];
+    };
+
+    it('keys Neighbor Counts by center state plus live-neighbor count, not arrangement', () => {
+        const lut = generateColorLUT({
+            mode: 'preset', activePreset: 'neighborGradient', hueShift: 0,
+        }, symmetryData);
+        expect(px(lut, 1, 0b000011)).toEqual(px(lut, 1, 0b001001));
+        expect(px(lut, 1, 0b000011)).not.toEqual(px(lut, 1, 0b000001));
+        expect(px(lut, 1, 0b000011)).not.toEqual(px(lut, 1, 0b1000011));
+    });
+
+    it('keys Symmetry Groups by center state plus C6 orbit', () => {
+        const lut = generateColorLUT({
+            mode: 'preset', activePreset: 'symmetryGradient', hueShift: 0,
+        }, symmetryData);
+        const mask = 0b001011;
+        const rotated = rotateBitmaskClockwise(mask);
+        expect(px(lut, 1, mask)).toEqual(px(lut, 1, rotated));
+        expect(px(lut, 1, mask)).not.toEqual(px(lut, 1, 0b000001));
+        expect(px(lut, 1, mask)).not.toEqual(px(lut, 1, mask | 0b1000000));
     });
 });

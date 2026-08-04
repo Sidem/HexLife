@@ -26,7 +26,7 @@
 
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
-import { clampInt, clampFloat, readSeed, readGradient } from './attrs.js';
+import { clampInt, clampFloat, readSeed, readGradient, readHueShift } from './attrs.js';
 import { readLayout, resolveRulesetCode, splitRulesetList } from './gridAttrs.js';
 
 /**
@@ -59,7 +59,7 @@ const MAX_WORLDS = 1024;
 
 /** Attributes that reconfigure the live grid instead of rebuilding its worlds. */
 const LIVE_ATTRS = new Set([
-    'speed', 'paused', 'palette', 'palette-on', 'palette-off', 'flicker-proof', 'max-dpr', 'gap',
+    'speed', 'paused', 'palette', 'palette-on', 'palette-off', 'hue-shift', 'flicker-proof', 'max-dpr', 'gap',
     'layout', 'link', 'seed', 'density',
 ]);
 
@@ -146,7 +146,7 @@ const CONTEXT_LOSS_LOOP_MS = 10_000;
 export class HexLifeGridElement extends HTMLElement {
     static get observedAttributes() {
         return ['rulesets', 'layout', 'rows', 'seed', 'density', 'speed', 'palette',
-            'palette-on', 'palette-off', 'flicker-proof', 'paused', 'max-dpr', 'gap', 'link'];
+            'palette-on', 'palette-off', 'hue-shift', 'flicker-proof', 'paused', 'max-dpr', 'gap', 'link'];
     }
 
     constructor() {
@@ -274,6 +274,7 @@ export class HexLifeGridElement extends HTMLElement {
             case 'palette':
             case 'palette-on':
             case 'palette-off':
+            case 'hue-shift':
             case 'flicker-proof':
                 this.renderer.setPalette(this._paletteOptions());
                 this._drawOnce();
@@ -512,6 +513,7 @@ export class HexLifeGridElement extends HTMLElement {
         return {
             palette: this.getAttribute('palette') || DEFAULTS.palette,
             customGradient: readGradient(this.getAttribute('palette-on'), this.getAttribute('palette-off')),
+            hueShift: readHueShift(this.getAttribute('hue-shift')),
             flickerProof: this.hasAttribute('flicker-proof'),
         };
     }

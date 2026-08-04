@@ -95,7 +95,7 @@ describe('live-reconfigurable attributes', () => {
     it('exempts everything that is not part of the world from the re-boot guard', () => {
         // A re-boot re-decodes the code and replays tick 0. Anything here that stopped being
         // exempt would silently discard the viewer's drawing every time it changed.
-        for (const attr of ['brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'flicker-proof',
+        for (const attr of ['brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'hue-shift', 'flicker-proof',
             'torus', 'speed', 'draw', 'paused', 'preview', 'wheel-zoom', 'link', 'max-dpr']) {
             expect(liveAttrs).toContain(`'${attr}'`);
         }
@@ -106,6 +106,18 @@ describe('live-reconfigurable attributes', () => {
             expect(liveAttrs).not.toContain(`'${attr}'`);
         }
         expect(element).toContain("if (name === 'code' || (this._world && !LIVE_ATTRS.has(name)))");
+    });
+
+    it('threads hue-shift through both public elements without rebuilding their sims', () => {
+        const grid = read('src/embed/HexLifeGridElement.js');
+        const renderer = read('src/embed/EmbedRenderer.js');
+        for (const source of [element, grid]) {
+            expect(source).toContain("'hue-shift'");
+            expect(source).toContain("readHueShift(this.getAttribute('hue-shift'))");
+            expect(source).toMatch(/case 'hue-shift':\s*\n\s*case 'flicker-proof':/);
+        }
+        expect(renderer).toMatch(/constructor\(canvas, \{[^}]*hueShift = null \}\)/);
+        expect(renderer).toContain('_setupLUT({ palette, customGradient, colorSettings, lut, flickerProof, hueShift })');
     });
 });
 
@@ -119,7 +131,7 @@ describe('palette override', () => {
         // Every color-bearing attribute falls through to the same one call. Adding one to the group
         // and forgetting it here is the drift this pin exists to catch.
         expect(element).toMatch(
-            /case 'palette':\s*\n\s*case 'palette-on':\s*\n\s*case 'palette-off':\s*\n\s*case 'flicker-proof':\s*\n\s*this\.renderer\.setPalette\(this\._paletteOptions\(\)\)/,
+            /case 'palette':\s*\n\s*case 'palette-on':\s*\n\s*case 'palette-off':\s*\n\s*case 'hue-shift':\s*\n\s*case 'flicker-proof':\s*\n\s*this\.renderer\.setPalette\(this\._paletteOptions\(\)\)/,
         );
     });
 
@@ -138,7 +150,7 @@ describe('palette override', () => {
             element.indexOf('async worldCode()'),
             element.indexOf('get tickCount()'),
         );
-        expect(worldCode).toContain('const source = this._paletteOverridden() ? null : this._world;');
+        expect(worldCode).toContain("this._paletteOverridden() || this.hasAttribute('hue-shift')");
         expect(worldCode).toContain('colorSettings: source ? source.colorSettings : null');
     });
 });
@@ -175,5 +187,23 @@ describe('declarations', () => {
         // a TypeScript host could not use the one number that says how alive a world is.
         expect(declaration).toContain('readonly activeCount: number;');
         expect(read('src/embed/EmbedSim.js')).toContain('this.activeCount');
+    });
+});
+
+describe('totalistic showcase navigation and palette controls', () => {
+    it('offers the rule atlas from both Explorer menus', () => {
+        const index = read('index.html');
+        expect(index).toContain('href="totalistic-256.html"');
+        expect(index).toContain('class="app-menu-chevron"');
+        expect(index).toContain('aria-controls="appMenuPopout"');
+        expect(read('src/ui/views/MoreView.js')).toContain('href="totalistic-256.html"');
+    });
+
+    it('labels structure-aware palettes and applies the live hue attribute to grid and detail', () => {
+        const showcase = read('totalistic-256.html');
+        expect(showcase).toContain("label: 'Rule-aware'");
+        expect(showcase).toContain('id="hueShift"');
+        expect(showcase).toContain("grid.setAttribute('hue-shift', hueShiftInput.value)");
+        expect(showcase).toContain("detailWorld()?.setAttribute('hue-shift', hueShiftInput.value)");
     });
 });

@@ -25,7 +25,7 @@
  */
 
 import * as WebGLUtils from '../rendering/webglUtils.js';
-import { generateColorLUT } from '../utils/ruleVizUtils.js';
+import { generateColorLUT, rotateHue } from '../utils/ruleVizUtils.js';
 import { PRESET_PALETTES } from '../core/colorPalettes.js';
 import { precomputeSymmetryGroups } from '../core/Symmetry.js';
 import { lookAt, multiply, perspective } from '../rendering/mat4.js';
@@ -155,9 +155,10 @@ export class EmbedRenderer {
      * @param {boolean} [opts.flickerProof=false] Suppress the birth/death flash in *preset* mode —
      *   the explorer's "Prevent birth/death flash". Ignored by the other palette forms; see
      *   `_resolveLUT`.
+     * @param {number|null} [opts.hueShift=null] Optional global chromatic hue rotation in degrees.
      * @throws {Error} If WebGL2 is unavailable — the caller renders a fallback note instead.
      */
-    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false }) {
+    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false, hueShift = null }) {
         this.canvas = canvas;
         this.cols = cols;
         this.rows = rows;
@@ -191,7 +192,7 @@ export class EmbedRenderer {
         };
 
         this._setupGeometry();
-        this._setupLUT({ palette, customGradient, colorSettings, lut, flickerProof });
+        this._setupLUT({ palette, customGradient, colorSettings, lut, flickerProof, hueShift });
 
         // Hover factors are fixed (embed has no hover). Zoom/pan are live — see setView().
         gl.useProgram(this.program);
@@ -318,7 +319,7 @@ export class EmbedRenderer {
      * only exists as a preset name or a gradient pair until it is resolved into this table, and
      * `worldCode()` has to write real colors into the code. See {@link getLut}.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean, hueShift?: number|null}} opts
      * @returns {Uint8Array}
      */
     _buildLUT(opts) {
@@ -331,14 +332,25 @@ export class EmbedRenderer {
      * Precedence: a decoded world's `colorSettings`, then a baked `lut`, then the element's
      * `palette-on/off` gradient attributes, then the `palette` preset name.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean, hueShift?: number|null}} opts
      * @returns {Uint8Array}
      */
-    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false }) {
-        if (colorSettings) return generateColorLUT(colorSettings, SYMMETRY_DATA);
-        if (lut && lut.length === 128 * 2 * 4) return lut;
+    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false, hueShift = null }) {
+        if (colorSettings) {
+            const settings = hueShift === null ? colorSettings : { ...colorSettings, hueShift };
+            return generateColorLUT(settings, SYMMETRY_DATA);
+        }
+        if (lut && lut.length === 128 * 2 * 4) {
+            if (!hueShift) return lut;
+            const shifted = new Uint8Array(lut);
+            for (let i = 0; i < shifted.length; i += 4) {
+                const rgb = rotateHue([shifted[i], shifted[i + 1], shifted[i + 2]], hueShift);
+                shifted[i] = rgb[0]; shifted[i + 1] = rgb[1]; shifted[i + 2] = rgb[2];
+            }
+            return shifted;
+        }
         if (customGradient) {
-            return generateColorLUT({ mode: 'gradient', customGradient, hueShift: 0 }, SYMMETRY_DATA);
+            return generateColorLUT({ mode: 'gradient', customGradient, hueShift: hueShift || 0 }, SYMMETRY_DATA);
         }
         let activePreset = palette;
         if (!PRESET_PALETTES[activePreset]) {
@@ -354,7 +366,7 @@ export class EmbedRenderer {
         // means anything in preset mode there too: the branches above are a host's own colors, and
         // silently rewriting two of them is not ours to do.
         return generateColorLUT(
-            { mode: 'preset', activePreset, flickerProofPresets: !!flickerProof, hueShift: 0 },
+            { mode: 'preset', activePreset, flickerProofPresets: !!flickerProof, hueShift: hueShift || 0 },
             SYMMETRY_DATA,
         );
     }
@@ -371,7 +383,7 @@ export class EmbedRenderer {
     /**
      * Swap the palette on a live renderer (no sim disruption — the LUT is a pure recolor).
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean, hueShift?: number|null}} opts
      */
     setPalette(opts) {
         const gl = this.gl;

@@ -106,6 +106,7 @@ export interface HexLifeElementEventMap {
 /**
  * `<hexlife-world>` — see `packages/hexlife-embed/README.md` § Attributes for the full contract:
  * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` ·
+ * `hue-shift` (0–359 degrees; rotates chromatic colors) ·
  * `flicker-proof` (suppress the birth/death flash; preset palettes only) · `code`
  * (`HXW1.…`, wins over the individual attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
  * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60) ·
@@ -115,7 +116,8 @@ export interface HexLifeElementEventMap {
  * `brush` (draw radius, 0–40; overrides a code's own value — it is a tool setting, not part of the
  * world) · `zoom` (flat camera, 1–8; 1 is the fitted view).
  *
- * `palette` / `palette-on` / `palette-off` **override** the colors a `code` carries, and apply to a
+ * `palette` / `palette-on` / `palette-off` **override** the colors a `code` carries; `hue-shift`
+ * modifies whichever palette is active. All apply to a
  * live world without re-booting it. Removing them restores the world's own colors — which is the
  * only way back, since decoded colors have no preset name to ask for. While overridden,
  * {@link HexLifeElement.worldCode} encodes what is on screen rather than what arrived.

@@ -99,6 +99,7 @@ export class PopoutPanel extends Panel {
             this._reposition();
             super.show(); 
             this.triggerElement.classList.add('active');
+            this.triggerElement.setAttribute('aria-expanded', 'true');
         }
     }
 
@@ -106,6 +107,7 @@ export class PopoutPanel extends Panel {
         if (this.popoutElement) {
             super.hide();
             this.triggerElement.classList.remove('active');
+            this.triggerElement.setAttribute('aria-expanded', 'false');
         }
     }
 

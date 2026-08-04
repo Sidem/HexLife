@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampInt, clampFloat, readSeed, readGradient, wheelZoomAllowed } from '../src/embed/attrs.js';
+import { clampInt, clampFloat, readSeed, readGradient, readHueShift, wheelZoomAllowed } from '../src/embed/attrs.js';
 
 /**
  * Attribute coercion for `<hexlife-world>` (#25 Phase 2).
@@ -84,6 +84,20 @@ describe('readGradient', () => {
 
     it('defaults the off-gradient so a one-sided override still looks deliberate', () => {
         expect(readGradient('#fff', null)).toEqual({ on: ['#fff'], off: ['#111111'] });
+    });
+});
+
+describe('readHueShift', () => {
+    it('preserves absence so a world code can keep its authored hue', () => {
+        expect(readHueShift(null)).toBeNull();
+        expect(readHueShift('')).toBeNull();
+    });
+
+    it('accepts and clamps live hue rotations', () => {
+        expect(readHueShift('137')).toBe(137);
+        expect(readHueShift('-20')).toBe(0);
+        expect(readHueShift('720')).toBe(359);
+        expect(readHueShift('nope')).toBe(0);
     });
 });
 

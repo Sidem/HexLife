@@ -117,7 +117,7 @@
     </div>
     <div id="app-container">
         <div id="top-info-bar">
-            <div id="appMenuButton" class="button-like" tabindex="0">
+            <button id="appMenuButton" type="button" class="button-like" title="Menu and links" aria-expanded="false" aria-controls="appMenuPopout">
                 <div id="appLogo" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="28" height="28">
                         <defs>
@@ -141,7 +141,8 @@
                     </svg>
                 </div>
                 <span id="appTitle">HexLife Explorer</span>
-            </div>
+                <span class="app-menu-chevron" aria-hidden="true">⌄</span>
+            </button>
 
             <div id="rulesetDisplayContainer" data-tour-id="ruleset-display-container">
                 <span class="ruleset-viz-container"></span>
@@ -210,6 +211,16 @@
                         </span>
                         Settings
                     </button>
+                </li>
+                <li>
+                    <a href="totalistic-256.html" target="_blank" rel="noopener">
+                        <span class="icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16" aria-hidden="true">
+                                <rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/>
+                            </svg>
+                        </span>
+                        256-rule atlas
+                    </a>
                 </li>
                 <li>
                     <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener">

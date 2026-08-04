@@ -61,7 +61,7 @@ export interface HexLifeGridElementEventMap {
  * See `packages/hexlife-embed/README.md` § `<hexlife-grid>` for the full contract:
  * `rulesets` (required; comma/space-separated 32-char hexes or short codes) · `layout` (`COLSxROWS`,
  * default squarest) · `rows` (16–512, default 48) · `seed` · `density` · `speed` · `paused` ·
- * `palette` / `palette-on` / `palette-off` · `flicker-proof` · `gap` (0–32 CSS px) · `max-dpr` ·
+ * `palette` / `palette-on` / `palette-off` / `hue-shift` · `flicker-proof` · `gap` (0–32 CSS px) · `max-dpr` ·
  * `link`.
  *
  * Every world shares one grid, one seed, one density, one palette and one clock — the element is a

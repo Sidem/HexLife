@@ -311,6 +311,9 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
   <div class="group">
     <label for="palette">Palette</label>
     <select id="palette"></select>
+    <label for="hueShift" title="Rotate chromatic palette colors while keeping blacks, grays, and whites unchanged.">Hue</label>
+    <input type="range" id="hueShift" min="0" max="359" step="1" value="0">
+    <span class="readout" id="hueShiftOut">0°</span>
     <label class="switch" title="Blacks out the two LUT entries that make a preset strobe — rule 0 firing a birth and rule 127 firing a death. The Explorer's “Prevent birth/death flash”.">
       <input type="checkbox" id="flicker" checked>
       <span>No flash</span>
@@ -691,6 +694,8 @@ const densityInput = document.getElementById('density');
 const densityOut = document.getElementById('densityOut');
 const densityGroup = document.getElementById('densityGroup');
 const paletteSelect = document.getElementById('palette');
+const hueShiftInput = document.getElementById('hueShift');
+const hueShiftOut = document.getElementById('hueShiftOut');
 const classSelect = document.getElementById('classSelect');
 const biasInput = document.getElementById('bias');
 const biasOut = document.getElementById('biasOut');
@@ -765,17 +770,28 @@ densityInput.addEventListener('input', () => {
   writeUrl();
 });
 
+const paletteGroups = {
+  visual: Object.assign(document.createElement('optgroup'), {label: 'Color ramps'}),
+  logic: Object.assign(document.createElement('optgroup'), {label: 'Rule-aware'}),
+};
 for (const p of listPresetPalettes()) {
   const opt = document.createElement('option');
   opt.value = p.key;
-  opt.textContent = p.name + (p.cvdSafe ? ' ✓' : '');
-  paletteSelect.append(opt);
+  opt.textContent = p.name + (p.logic ? ' · by rule group' : '') + (p.cvdSafe ? ' ✓' : '');
+  paletteGroups[p.logic ? 'logic' : 'visual'].append(opt);
 }
+paletteSelect.append(paletteGroups.visual, paletteGroups.logic);
 paletteSelect.value = 'monochrome';
 paletteSelect.addEventListener('change', () => {
   // Live on both: a palette is a recolor, not a new world.
   grid.setAttribute('palette', paletteSelect.value);
   detailWorld()?.setAttribute('palette', paletteSelect.value);
+});
+
+hueShiftInput.addEventListener('input', () => {
+  hueShiftOut.textContent = `${hueShiftInput.value}°`;
+  grid.setAttribute('hue-shift', hueShiftInput.value);
+  detailWorld()?.setAttribute('hue-shift', hueShiftInput.value);
 });
 
 const flicker = document.getElementById('flicker');
@@ -1017,7 +1033,7 @@ async function openDetail(rulesetHex) {
         mode: 'preset',
         activePreset: paletteSelect.value,
         flickerProofPresets: flicker.checked,
-        hueShift: 0,
+        hueShift: Number(hueShiftInput.value),
       },
     });
     if (token !== detailToken) return;    // Closed, or superseded by another tile, mid-encode.
@@ -1035,6 +1051,7 @@ async function openDetail(rulesetHex) {
   // Playback and appearance are not part of the world, so these apply either way.
   w.setAttribute('speed', speedInput.value);
   w.setAttribute('palette', paletteSelect.value);
+  w.setAttribute('hue-shift', hueShiftInput.value);
   if (flicker.checked) w.setAttribute('flicker-proof', '');
 
   detailMount.append(w);

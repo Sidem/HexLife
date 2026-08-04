@@ -74,6 +74,17 @@ export function readGradient(on, off) {
 }
 
 /**
+ * Optional global palette hue rotation. Absence stays `null` so a decoded world code can keep its
+ * authored hue; a present but unusable value safely falls back to 0 like the other embed knobs.
+ * @param {string|null} raw
+ * @returns {number|null} Degrees in [0,359], or null when the attribute is absent.
+ */
+export function readHueShift(raw) {
+    if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+    return clampFloat(raw, 0, 359, 0);
+}
+
+/**
  * Should a wheel event zoom the embed, or belong to the page it sits on?
  *
  * `wheel-zoom="ctrl"` is for embeds inside a scrollable feed: swallowing the wheel there traps a

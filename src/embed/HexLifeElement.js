@@ -23,7 +23,7 @@
 
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
-import { clampInt, clampFloat, readSeed, readGradient, wheelZoomAllowed } from './attrs.js';
+import { clampInt, clampFloat, readSeed, readGradient, readHueShift, wheelZoomAllowed } from './attrs.js';
 import { decodeWorldCode, encodeWorldCode } from '../core/WorldCodec.js';
 import { clampBrushSize, DEFAULT_BRUSH_SIZE } from '../core/hexBrush.js';
 
@@ -116,7 +116,7 @@ const ZOOM_MAX = 8;
  */
 const LIVE_ATTRS = new Set([
     'paused', 'max-dpr', 'link', 'speed', 'draw', 'wheel-zoom', 'preview',
-    'torus', 'brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'flicker-proof',
+    'torus', 'brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'hue-shift', 'flicker-proof',
 ]);
 
 const RULESET_RE = /^[0-9a-fA-F]{32}$/;
@@ -232,7 +232,7 @@ const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
-            'palette-on', 'palette-off', 'flicker-proof', 'paused', 'max-dpr', 'link', 'draw',
+            'palette-on', 'palette-off', 'hue-shift', 'flicker-proof', 'paused', 'max-dpr', 'link', 'draw',
             'wheel-zoom', 'preview', 'torus', 'brush', 'zoom'];
     }
 
@@ -507,6 +507,7 @@ export class HexLifeElement extends HTMLElement {
             case 'palette':
             case 'palette-on':
             case 'palette-off':
+            case 'hue-shift':
             case 'flicker-proof':
                 this.renderer.setPalette(this._paletteOptions());
                 this._drawOnce();
@@ -639,7 +640,7 @@ export class HexLifeElement extends HTMLElement {
         // arrived with — "what you see is what posts" is the whole contract of this method, and it
         // covers the palette exactly as much as it covers painted cells. So an override drops the
         // decoded settings and encodes the table the renderer actually drew with.
-        const source = this._paletteOverridden() ? null : this._world;
+        const source = (this._paletteOverridden() || this.hasAttribute('hue-shift')) ? null : this._world;
         return encodeWorldCode({
             rows: this.sim.rows,
             cols: this.sim.cols,
@@ -1034,6 +1035,7 @@ export class HexLifeElement extends HTMLElement {
             customGradient: p.customGradient,
             colorSettings: world ? world.colorSettings : null,
             lut: world ? world.lut : null,
+            hueShift: p.hueShift,
             flickerProof: this.hasAttribute('flicker-proof'),
         };
     }
@@ -1072,6 +1074,7 @@ export class HexLifeElement extends HTMLElement {
             speed: clampFloat(this.getAttribute('speed'), 0, 1000, DEFAULTS.speed),
             palette: (this.getAttribute('palette') || DEFAULTS.palette).trim(),
             customGradient: readGradient(this.getAttribute('palette-on'), this.getAttribute('palette-off')),
+            hueShift: readHueShift(this.getAttribute('hue-shift')),
             maxDpr: clampFloat(this.getAttribute('max-dpr'), MAX_DPR_MIN, MAX_DPR_MAX, DEFAULTS.maxDpr),
         };
     }

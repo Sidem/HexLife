@@ -123,6 +123,7 @@ the play control**.
 | `palette` | preset key | `default` | ✅ See `listPresetPalettes()`. |
 | `palette-on` | comma-separated hex | — | ✅ Custom gradient for live cells. |
 | `palette-off` | comma-separated hex | dark neutral | ✅ Only meaningful with `palette-on`. |
+| `hue-shift` | 0–359 degrees | `0` | ✅ Rotates chromatic colors; black, gray, and white stay put. |
 | `flicker-proof` | boolean | absent | ✅ Suppress the birth/death flash. |
 | `link` | `on` \| `off` | `on` | ✅ The small attribution link in the corner. |
 | `max-dpr` | 1–4 | `1.5` | ✅ Caps `devicePixelRatio`; a phone at DPR 3 would otherwise pay 9× the fragment cost. |
@@ -138,6 +139,10 @@ The palette attributes **override the colors a `code` carries**, and apply to a 
 re-booting it. *Presence* is what overrides, so removing them restores the world's own colors — the
 only way back, since decoded colors have no preset name to ask for. While overridden,
 `worldCode()` encodes what is on screen rather than what arrived.
+
+`hue-shift` is a modifier rather than a replacement: without another palette attribute it rotates
+the colors carried by a `code`. Removing it restores the authored hue, and `worldCode()` still
+captures the shifted colors currently on screen.
 
 ### "Live" means
 
@@ -341,7 +346,7 @@ two tiles is the rule. At generation N, every tile is showing generation N.
 | `density` | 0–1 | `0.5` | ✅ |
 | `speed` | 0–1000 | `20` | ✅ |
 | `paused` | boolean | absent | ✅ |
-| `palette` / `palette-on` / `palette-off` | as `<hexlife-world>` | `default` | ✅ |
+| `palette` / `palette-on` / `palette-off` / `hue-shift` | as `<hexlife-world>` | `default` | ✅ |
 | `flicker-proof` | boolean | absent | ✅ As `<hexlife-world>`. Worth it here: N tiles strobing at once is N times the problem. |
 | `gap` | 0–32 CSS px | `2` | ✅ Gutter between tiles. |
 | `max-dpr` | 1–4 | `1.5` | ✅ |
