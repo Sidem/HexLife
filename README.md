@@ -256,10 +256,10 @@ Two objectives are available:
 
 ## 🧩 Embed a world in your own page
 
-The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides the
-`<hexlife-world>` custom element used by the Reddit app. It accepts a ruleset or exact world code,
-seed, density, rows, speed, palette, and paused/drawing/zoom policies, and exposes play, pause,
-reset, tick, brush-size, checksum, and world-code APIs.
+The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides two custom
+elements. `<hexlife-world>` is a single world — a ruleset or exact world code, seed, density, rows,
+speed, palette, and paused/drawing/zoom policies, with play, pause, reset, tick, brush-size,
+checksum and world-code APIs. It is the element the Reddit app uses.
 
 ```bash
 npm install @hexlife/embed
@@ -280,6 +280,29 @@ import '@hexlife/embed';
 </hexlife-world>
 ```
 
+`<hexlife-grid>` is many worlds in **one** WebGL context. A browser gives a page about sixteen
+contexts and force-loses the oldest past that, so a wall of `<hexlife-world>` elements silently
+stops being a wall at sixteen; the grid puts N simulations behind one context and draws each into
+its own viewport instead. Every world shares one grid, seed, density, palette and clock, so the only
+difference between two tiles is the rule.
+
+> ### [**▶ The complete totalistic class**](https://sidem.github.io/HexLife/totalistic-256.html)
+>
+> All **256** totalistic rules at once — a hex cell plus six neighbours has eight possible live
+> counts, so a rule keyed on that total has exactly 2⁸ forms. The whole class, not a sample, on one
+> 16×16 map of 96×112-cell worlds sharing an initial condition. Built entirely with this package;
+> the 2.75M cells it draws each frame cost about 0.8 ms.
+
+```html
+<hexlife-grid layout="16x16" rows="96" seed="12345" palette="monochrome" flicker-proof></hexlife-grid>
+```
+
+```js
+// T00–TFF *is* the totalistic class — nothing sampled away.
+grid.rulesets = Array.from({length: 256}, (_, i) => 'T' + i.toString(16).padStart(2, '0'));
+```
+
+Full attribute and API reference: [`packages/hexlife-embed/README.md`](packages/hexlife-embed/README.md).
 The package is built from `src/embed/` with `npm run build:embed`; the standalone CDN and in-app
 “Copy embed code” workflows remain open.
 

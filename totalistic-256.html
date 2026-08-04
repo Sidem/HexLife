@@ -281,7 +281,7 @@ grid.rulesets = Array.from({length: 256},   <span class="c">// T00–TFF *is* th
 // package's two entry points.
 import './src/embed/index.js';
 import {
-  listPresetPalettes, describeRuleset, rulesetName, explorerUrlForRuleset,
+  listPresetPalettes, describeRuleset, rulesetName, explorerUrlForRuleset, encodeWorldCode,
 } from './src/embed/api.js';
 
 const grid = document.getElementById('grid');
@@ -326,6 +326,12 @@ const IC = {
 
 let icMode = 'random';
 
+/**
+ * The exact cells currently seeded into every world, or null while the seed + density generator is
+ * in charge. Kept because the detail view has to reproduce *this* initial condition — see openDetail.
+ */
+let icTemplate = null;
+
 /** Re-seed every world with the current IC, from generation 0. */
 function applyIC() {
   if (!grid.count) return;
@@ -333,11 +339,13 @@ function applyIC() {
   if (!paint) {
     // Null hands the worlds back to the seed + density generator — and, since they share a seed,
     // that is still one identical initial condition across all 256.
+    icTemplate = null;
     grid.setInitialCells(null);
   } else {
     const {cols, rows} = grid.worldAt(0);
     const template = new Uint8Array(cols * rows);
     paint(template, cols, rows);
+    icTemplate = template;
     grid.setInitialCells(template);
   }
   syncStatus();
@@ -431,22 +439,64 @@ const detailMount = document.getElementById('detailMount');
 /** The live detail world, or null while the dialog is closed. */
 const detailWorld = () => detailMount.firstElementChild;
 
-/** Mount a full-size world for one rule. Removing it on close frees its WebGL context. */
-function openDetail(rulesetHex) {
+/** Guards against a close (or a second click) landing while an encode is still in flight. */
+let detailToken = 0;
+
+/**
+ * Mount a full-size world for one rule, **on the initial condition currently selected**.
+ *
+ * The two ICs get there by different routes, and the reason is worth stating: `seed` + `density`
+ * is a *recipe*, so a world given the same ruleset, rows, seed and density regenerates the grid
+ * tile's exact tick 0 for free — determinism is the package's whole contract. A painted IC (single
+ * seed, clusters) is not a recipe and no attribute can express it, so it travels as an `HXW1.` world
+ * code carrying the exact cells. That also makes the element's own reset button replay the seed
+ * rather than rolling a random fill, which is what "open this tile" should mean.
+ *
+ * Removing the element on close frees its WebGL context — the scarce resource this whole page is
+ * about.
+ */
+async function openDetail(rulesetHex) {
+  const token = ++detailToken;
   detailMount.replaceChildren();
   const w = document.createElement('hexlife-world');
-  w.setAttribute('ruleset', rulesetHex);
-  w.setAttribute('rows', '96');
-  w.setAttribute('seed', '12345');
-  w.setAttribute('density', densityInput.value);
+
+  if (icTemplate) {
+    const {rows, cols} = grid.worldAt(0);
+    const code = await encodeWorldCode({
+      rows, cols, rulesetHex,
+      cells: icTemplate,
+      speed: Number(speedInput.value),
+      // A palette is mandatory (encodeWorldCode returns null without one). The `palette` attribute
+      // below overrides it anyway, but the code has to be a complete world on its own.
+      colorSettings: {
+        mode: 'preset',
+        activePreset: paletteSelect.value,
+        flickerProofPresets: flicker.checked,
+        hueShift: 0,
+      },
+    });
+    if (token !== detailToken) return;    // Closed, or superseded by another tile, mid-encode.
+    // A null code means the codec refused the inputs; the recipe below is still a real world, so
+    // fall through to it rather than showing nothing.
+    if (code) w.setAttribute('code', code);
+  }
+
+  if (!w.hasAttribute('code')) {
+    w.setAttribute('ruleset', rulesetHex);
+    w.setAttribute('rows', '96');
+    w.setAttribute('seed', '12345');
+    w.setAttribute('density', densityInput.value);
+  }
+  // Playback and appearance are not part of the world, so these apply either way.
   w.setAttribute('speed', speedInput.value);
   w.setAttribute('palette', paletteSelect.value);
   if (flicker.checked) w.setAttribute('flicker-proof', '');
+
   detailMount.append(w);
-  detail.showModal();
+  if (!detail.open) detail.showModal();
 }
 
-detail.addEventListener('close', () => detailMount.replaceChildren());
+detail.addEventListener('close', () => { detailToken++; detailMount.replaceChildren(); });
 
 grid.addEventListener('hexlife-worldselect', (e) => {
   const {index, rulesetHex} = e.detail;
