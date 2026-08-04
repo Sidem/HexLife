@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HexLife — the complete totalistic class</title>
+<style>
+  :root {
+    --bg: #101215;
+    --panel: #1a1e23;
+    --line: #2c333b;
+    --ink: #d7dadc;
+    --dim: #8a929b;
+    --accent: #e0b341;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px 20px 40px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.55 system-ui, -apple-system, sans-serif;
+  }
+  header { max-width: 1180px; margin: 0 auto 16px; }
+  h1 { font-size: 19px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { margin: 0; color: var(--dim); font-size: 13px; }
+  .sub code, .credit code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .credit {
+    margin: 10px 0 0;
+    padding: 9px 12px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    color: var(--dim);
+    font-size: 12.5px;
+  }
+  .credit a { color: var(--accent); }
+  .snippet {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    background: #14171b;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #c8ccd1;
+  }
+  .snippet .c { color: #6b7681; }
+
+  .bar {
+    max-width: 1180px;
+    margin: 0 auto 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .group + .group { padding-left: 14px; border-left: 1px solid var(--line); }
+  .group > label { color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+  button, select {
+    font: inherit;
+    font-size: 13px;
+    background: #262c33;
+    color: var(--ink);
+    border: 1px solid #38414a;
+    border-radius: 6px;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+  button:hover, select:hover { background: #313941; }
+  button[aria-pressed="true"] {
+    background: rgba(224, 179, 65, 0.14);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  button.primary { min-width: 92px; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 120px; accent-color: var(--accent); }
+  .switch { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; color: var(--dim); }
+  .switch input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+  .switch:hover span { color: var(--ink); }
+  .readout {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--dim);
+    min-width: 4.5ch;
+    text-align: right;
+  }
+
+  .stage { max-width: 1180px; margin: 0 auto; position: relative; }
+  hexlife-grid {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 16;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  /* The grid draws no selection chrome of its own — that is the host's job, positioned with
+     tileRect(). */
+  #marker {
+    position: absolute;
+    border: 2px solid var(--accent);
+    border-radius: 3px;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.7), 0 0 12px rgba(224,179,65,0.35);
+    transition: all 0.12s ease;
+  }
+  #marker[hidden] { display: none; }
+
+  .status {
+    max-width: 1180px;
+    margin: 12px auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .status b { color: var(--ink); font-weight: 600; }
+  .status a { color: var(--accent); }
+  .footer {
+    max-width: 1180px;
+    margin: 18px auto 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--dim);
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+
+  dialog {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 0;
+    max-width: 92vw;
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.7); }
+  .detail-head {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid var(--line);
+  }
+  .detail-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+  .detail-head .code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; color: var(--accent);
+  }
+  .detail-head .spacer { flex: 1; }
+  .detail-body { padding: 14px; }
+  .detail-body hexlife-world { width: min(70vh, 560px); border-radius: 8px; }
+  #detailMount:empty { display: none; }
+  .detail-meta { margin: 10px 0 0; font-size: 12px; color: var(--dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The complete totalistic class — all 256 rules, one context</h1>
+  <p class="sub">
+    A hex cell and its six neighbours make eight possible live counts, so a rule that depends only on
+    that total has exactly 2<sup>8</sup> = <b>256</b> forms — codes <code>T00</code> through
+    <code>TFF</code>. That is the whole class, not a sample, and it fits a 16×16 grid with nothing
+    left over. Every world is <code>96 × 112</code> cells and shares one initial condition, so the
+    only difference between any two tiles is the rule. Click a tile to open it full size.
+  </p>
+  <p class="credit">
+    Built entirely with
+    <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer"><code>@hexlife/embed</code></a>
+    — two custom elements and a DOM-free API, no other dependencies. The map is one
+    <code>&lt;hexlife-grid&gt;</code>; each tile you open is a <code>&lt;hexlife-world&gt;</code>;
+    the rule names, <code>B/S</code> notation, palette list and Explorer links all come from
+    <code>@hexlife/embed/api</code>.
+  </p>
+  <pre class="snippet"><code>npm install @hexlife/embed</code>
+
+<code>import '@hexlife/embed'                     <span class="c">// registers both elements</span>
+
+grid.rulesets = Array.from({length: 256},   <span class="c">// T00–TFF *is* the totalistic class</span>
+  (_, i) =&gt; 'T' + i.toString(16).padStart(2, '0'))</code></pre>
+</header>
+
+<div class="bar">
+  <div class="group">
+    <button id="playBtn" class="primary">Play</button>
+    <button id="resetBtn">Reset</button>
+    <button id="stepBtn" title="Advance one generation">Step</button>
+  </div>
+
+  <div class="group">
+    <label>Initial condition</label>
+    <button class="ic" data-ic="single" aria-pressed="false">Single seed</button>
+    <button class="ic" data-ic="random" aria-pressed="true">Random</button>
+    <button class="ic" data-ic="clusters" aria-pressed="false">Clusters</button>
+  </div>
+
+  <div class="group" id="densityGroup">
+    <label for="density">Density</label>
+    <input type="range" id="density" min="0.02" max="0.98" step="0.02" value="0.5">
+    <span class="readout" id="densityOut">0.50</span>
+  </div>
+
+  <div class="group">
+    <label for="speed">Speed</label>
+    <input type="range" id="speed" min="0" max="60" step="1" value="15">
+    <span class="readout" id="speedOut">15/s</span>
+  </div>
+
+  <div class="group">
+    <label for="palette">Palette</label>
+    <select id="palette"></select>
+    <label class="switch" title="Blacks out the two LUT entries that make a preset strobe — rule 0 firing a birth and rule 127 firing a death. The Explorer's “Prevent birth/death flash”.">
+      <input type="checkbox" id="flicker" checked>
+      <span>No flash</span>
+    </label>
+  </div>
+</div>
+
+<div class="stage">
+  <!-- Monochrome + flicker-proof are the Explorer's own defaults: at 71px a tile is a texture, and
+       a rule-index rainbow reads as noise where plain luminance reads as structure. -->
+  <hexlife-grid id="grid"
+    layout="16x16"
+    rows="96"
+    seed="12345"
+    density="0.5"
+    speed="15"
+    gap="2"
+    palette="monochrome"
+    flicker-proof
+    paused
+  ></hexlife-grid>
+  <div id="marker" hidden></div>
+</div>
+
+<div class="status">
+  <span>generation <b id="gen">0</b></span>
+  <span>worlds <b id="worlds">—</b></span>
+  <span>cells/world <b id="cells">—</b></span>
+  <span>1 WebGL context (a page gets ~16)</span>
+  <span id="selected"></span>
+</div>
+
+<p class="footer">
+  <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">@hexlife/embed on npm</a> ·
+  <a href="https://github.com/Sidem/HexLife" target="_blank" rel="noopener noreferrer">source</a> ·
+  <a href="https://sidem.github.io/HexLife/" target="_blank" rel="noopener noreferrer">HexLife Explorer</a>
+</p>
+
+<dialog id="detail">
+  <div class="detail-head">
+    <h2 id="detailTitle">—</h2>
+    <span class="code" id="detailCode"></span>
+    <span class="spacer"></span>
+    <a id="detailLink" href="#" target="_blank" rel="noopener noreferrer">Open in Explorer</a>
+    <button id="detailClose">Close</button>
+  </div>
+  <div class="detail-body">
+    <!-- The <hexlife-world> is created on open and removed on close. It is a second WebGL context,
+         and the whole reason <hexlife-grid> exists is that those are scarce. -->
+    <div id="detailMount"></div>
+    <p class="detail-meta" id="detailMeta"></p>
+  </div>
+</dialog>
+
+<script type="module">
+import '/HexLife/src/embed/index.js';
+import {
+  listPresetPalettes, describeRuleset, rulesetName, explorerUrlForRuleset,
+} from '/HexLife/src/embed/api.js';
+
+const grid = document.getElementById('grid');
+const marker = document.getElementById('marker');
+
+// --- the class itself --------------------------------------------------------
+// Not a curated list: `T00`–`TFF` enumerated in order *is* the totalistic class. The element
+// resolves each short code to its 32-char hex, so nothing here has to know the bit layout.
+const TOTALISTIC = Array.from({length: 256}, (_, i) => 'T' + i.toString(16).toUpperCase().padStart(2, '0'));
+grid.rulesets = TOTALISTIC;
+
+// --- initial conditions ------------------------------------------------------
+// `random` is the element's own density fill. The other two are painted on top of a cleared grid,
+// identically in every world — the tiles must differ by rule alone, so the IC is computed once from
+// a fixed seed and replayed into each sim rather than re-rolled per world.
+const IC = {
+  random: null,   // handled by reset() + the density attribute
+  single: (cells, cols, rows) => {
+    cells[Math.floor(rows / 2) * cols + Math.floor(cols / 2)] = 1;
+  },
+  clusters: (cells, cols, rows) => {
+    // Seven blobs on a fixed lattice — deterministic, and dense enough that most rules have
+    // something to chew on without being a full random fill.
+    const spots = [[0.5, 0.5], [0.22, 0.28], [0.78, 0.28], [0.22, 0.72], [0.78, 0.72], [0.5, 0.12], [0.5, 0.88]];
+    const radius = Math.max(3, Math.round(rows * 0.06));
+    let n = 0x9e3779b9;
+    const rand = () => ((n = (n * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (const [fx, fy] of spots) {
+      const cx = Math.round(fx * cols), cy = Math.round(fy * rows);
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (dx * dx + dy * dy > radius * radius) continue;
+          if (rand() > 0.6) continue;
+          const c = ((cx + dx) % cols + cols) % cols;
+          const r = ((cy + dy) % rows + rows) % rows;
+          cells[r * cols + c] = 1;
+        }
+      }
+    }
+  },
+};
+
+let icMode = 'random';
+
+/** Re-seed every world with the current IC, from generation 0. */
+function applyIC() {
+  if (!grid.count) return;
+  const paint = IC[icMode];
+  if (!paint) {
+    // Null hands the worlds back to the seed + density generator — and, since they share a seed,
+    // that is still one identical initial condition across all 256.
+    grid.setInitialCells(null);
+  } else {
+    const {cols, rows} = grid.worldAt(0);
+    const template = new Uint8Array(cols * rows);
+    paint(template, cols, rows);
+    grid.setInitialCells(template);
+  }
+  syncStatus();
+}
+
+// --- controls ----------------------------------------------------------------
+const playBtn = document.getElementById('playBtn');
+const speedInput = document.getElementById('speed');
+const speedOut = document.getElementById('speedOut');
+const densityInput = document.getElementById('density');
+const densityOut = document.getElementById('densityOut');
+const densityGroup = document.getElementById('densityGroup');
+const paletteSelect = document.getElementById('palette');
+
+playBtn.addEventListener('click', () => (grid.userPaused ? grid.play() : grid.pause()));
+document.getElementById('resetBtn').addEventListener('click', applyIC);
+document.getElementById('stepBtn').addEventListener('click', () => { grid.tick(1); syncStatus(); });
+
+for (const btn of document.querySelectorAll('.ic')) {
+  btn.addEventListener('click', () => {
+    icMode = btn.dataset.ic;
+    for (const b of document.querySelectorAll('.ic')) {
+      b.setAttribute('aria-pressed', String(b === btn));
+    }
+    // Density only means anything for the random fill.
+    densityGroup.style.opacity = icMode === 'random' ? '1' : '0.4';
+    densityInput.disabled = icMode !== 'random';
+    applyIC();
+  });
+}
+
+speedInput.addEventListener('input', () => {
+  speedOut.textContent = `${speedInput.value}/s`;
+  grid.setAttribute('speed', speedInput.value);
+  detailWorld()?.setAttribute('speed', speedInput.value);
+});
+
+densityInput.addEventListener('input', () => {
+  densityOut.textContent = Number(densityInput.value).toFixed(2);
+  grid.setAttribute('density', densityInput.value);
+  detailWorld()?.setAttribute('density', densityInput.value);
+  // The density attribute re-seeds the worlds itself; re-apply so a non-random IC is not lost.
+  if (icMode !== 'random') applyIC();
+});
+
+for (const p of listPresetPalettes()) {
+  const opt = document.createElement('option');
+  opt.value = p.key;
+  opt.textContent = p.name + (p.cvdSafe ? ' ✓' : '');
+  paletteSelect.append(opt);
+}
+paletteSelect.value = 'monochrome';
+paletteSelect.addEventListener('change', () => {
+  // Live on both: a palette is a recolor, not a new world.
+  grid.setAttribute('palette', paletteSelect.value);
+  detailWorld()?.setAttribute('palette', paletteSelect.value);
+});
+
+const flicker = document.getElementById('flicker');
+flicker.addEventListener('change', () => {
+  // Presence is what counts — `flicker-proof` is a boolean attribute, and it only means anything
+  // for preset palettes (a custom gradient is the host's own colors, not ours to rewrite).
+  for (const el of [grid, detailWorld()]) {
+    if (!el) continue;
+    if (flicker.checked) el.setAttribute('flicker-proof', '');
+    else el.removeAttribute('flicker-proof');
+  }
+});
+
+// --- status ------------------------------------------------------------------
+const genOut = document.getElementById('gen');
+const selectedOut = document.getElementById('selected');
+
+function syncStatus() {
+  genOut.textContent = grid.generation.toLocaleString();
+}
+grid.addEventListener('hexlife-playstate', (e) => {
+  playBtn.textContent = e.detail.userPaused ? 'Play' : 'Pause';
+});
+grid.addEventListener('hexlife-ready', (e) => {
+  document.getElementById('worlds').textContent = e.detail.worlds;
+  document.getElementById('cells').textContent = `${e.detail.rows}×${e.detail.cols}`;
+  applyIC();
+});
+setInterval(syncStatus, 250);
+
+// --- selection ---------------------------------------------------------------
+const detail = document.getElementById('detail');
+const detailMount = document.getElementById('detailMount');
+
+/** The live detail world, or null while the dialog is closed. */
+const detailWorld = () => detailMount.firstElementChild;
+
+/** Mount a full-size world for one rule. Removing it on close frees its WebGL context. */
+function openDetail(rulesetHex) {
+  detailMount.replaceChildren();
+  const w = document.createElement('hexlife-world');
+  w.setAttribute('ruleset', rulesetHex);
+  w.setAttribute('rows', '96');
+  w.setAttribute('seed', '12345');
+  w.setAttribute('density', densityInput.value);
+  w.setAttribute('speed', speedInput.value);
+  w.setAttribute('palette', paletteSelect.value);
+  if (flicker.checked) w.setAttribute('flicker-proof', '');
+  detailMount.append(w);
+  detail.showModal();
+}
+
+detail.addEventListener('close', () => detailMount.replaceChildren());
+
+grid.addEventListener('hexlife-worldselect', (e) => {
+  const {index, rulesetHex} = e.detail;
+  const code = TOTALISTIC[index];
+
+  const rect = grid.tileRect(index);
+  if (rect) {
+    Object.assign(marker.style, {
+      left: `${rect.x}px`, top: `${rect.y}px`,
+      width: `${rect.width}px`, height: `${rect.height}px`,
+    });
+    marker.hidden = false;
+  }
+
+  const desc = describeRuleset(rulesetHex);
+  selectedOut.innerHTML = `selected <b>${code}</b> · ${desc?.notation || 'no B/S form'} · ${rulesetName(rulesetHex)}`;
+
+  document.getElementById('detailTitle').textContent = `${code} — ${rulesetName(rulesetHex)}`;
+  document.getElementById('detailCode').textContent = desc?.notation || rulesetHex;
+  document.getElementById('detailLink').href = explorerUrlForRuleset(rulesetHex, {rows: 96});
+  document.getElementById('detailMeta').textContent =
+    `${rulesetHex} · generation ${e.detail.tick} · ${e.detail.activeCount.toLocaleString()} live cells when clicked`;
+
+  openDetail(rulesetHex);
+});
+
+document.getElementById('detailClose').addEventListener('click', () => detail.close());
+
+grid.addEventListener('hexlife-error', (e) => {
+  selectedOut.innerHTML = `<b style="color:#e06c5a">${e.detail.message}</b> ${e.detail.detail}`;
+});
+
+// Debug handle, in the house style.
+window.__totalistic = {grid, TOTALISTIC, applyIC, get icMode() { return icMode; }};
+</script>
+</body>
+</html>

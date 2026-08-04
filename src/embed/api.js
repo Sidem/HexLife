@@ -22,6 +22,11 @@
 
 export { describeRuleset, ORBIT_LABELS } from '../core/rulesetDescriptor.js';
 export { rulesetName } from '../core/rulesetName.js';
+// Constraint-aware short codes (`T21`, `N080C`, `M…`, `R…`). A host that builds a `<hexlife-grid>`
+// list is almost always enumerating a *constraint class* rather than naming individual rules, and
+// these codes are the notation for that: the totalistic class is exactly `T00`–`TFF`. Pure math over
+// the rule table — no DOM, no wasm.
+export { codeToHex, codeToRuleset, isRulesetCode, rulesetToCode } from '../core/rulesetCode.js';
 export { decodeWorldCode, encodeWorldCode, explorerUrlForRuleset } from '../core/WorldCodec.js';
 // Just the key + label projection, not the gradient table — a host building a palette picker needs
 // the names the `palette` attribute accepts, and nothing here should make a ramp's stops a

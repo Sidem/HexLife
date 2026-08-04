@@ -14,6 +14,14 @@
  * The shaders expect hover and ghost attributes. The embed has neither, and both are neutral at 0
  * (see fragment.glsl), so we leave those attribute arrays *disabled* and feed the constant 0 —
  * cheaper than uploading two more per-cell buffers, and it avoids forking the GLSL.
+ *
+ * **Two draw paths, one context.** `draw(sim)` fills the canvas with a single world;
+ * `drawGrid(sims)` tiles many worlds of the *same* `(cols, rows)` across it, one `gl.viewport` +
+ * instanced draw each. The second exists because a browser hands a page ~16 WebGL contexts total
+ * (Chrome force-loses the oldest past that), so "256 worlds" can never mean 256 canvases. Every
+ * world shares this renderer's geometry, offsets, LUT and program — a tile differs only by which
+ * two instance buffers were uploaded and where the viewport was pointing, which is why the marginal
+ * cost of a world is one buffer upload rather than a context.
  */
 
 import * as WebGLUtils from '../rendering/webglUtils.js';
@@ -144,9 +152,12 @@ export class EmbedRenderer {
      *   included (see SYMMETRY_DATA).
      * @param {Uint8Array|null} [opts.lut=null] A pre-baked 128×2 RGBA LUT (1024 bytes) — the escape
      *   hatch for a caller that has a table but no settings. Beaten by `colorSettings`.
+     * @param {boolean} [opts.flickerProof=false] Suppress the birth/death flash in *preset* mode —
+     *   the explorer's "Prevent birth/death flash". Ignored by the other palette forms; see
+     *   `_resolveLUT`.
      * @throws {Error} If WebGL2 is unavailable — the caller renders a fallback note instead.
      */
-    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
+    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false }) {
         this.canvas = canvas;
         this.cols = cols;
         this.rows = rows;
@@ -180,7 +191,7 @@ export class EmbedRenderer {
         };
 
         this._setupGeometry();
-        this._setupLUT({ palette, customGradient, colorSettings, lut });
+        this._setupLUT({ palette, customGradient, colorSettings, lut, flickerProof });
 
         // Hover factors are fixed (embed has no hover). Zoom/pan are live — see setView().
         gl.useProgram(this.program);
@@ -199,6 +210,16 @@ export class EmbedRenderer {
         this._viewZoom = 1;
         this._viewPanX = 0;
         this._viewPanY = 0;
+
+        // --- tiled multi-world layout (opt-in; see setGridLayout) ---
+        /** @type {{cols: number, rows: number, gap: number}|null} Null ⇒ the single-world path. */
+        this._layout = null;
+        /** Forces a refit on the next `resize` even when the backing store did not change. */
+        this._layoutDirty = false;
+        /** Tile rects in *device* px, GL convention (y up from the bottom). @type {Array<{x,y,w,h}>} */
+        this._tiles = [];
+        /** The same rects in CSS px, y down from the top — what a host positions DOM chrome with. */
+        this._cssTiles = [];
 
         // --- torus view (opt-in; see setTorus) ---
         /**
@@ -297,7 +318,7 @@ export class EmbedRenderer {
      * only exists as a preset name or a gradient pair until it is resolved into this table, and
      * `worldCode()` has to write real colors into the code. See {@link getLut}.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
      * @returns {Uint8Array}
      */
     _buildLUT(opts) {
@@ -310,10 +331,10 @@ export class EmbedRenderer {
      * Precedence: a decoded world's `colorSettings`, then a baked `lut`, then the element's
      * `palette-on/off` gradient attributes, then the `palette` preset name.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
      * @returns {Uint8Array}
      */
-    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null }) {
+    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false }) {
         if (colorSettings) return generateColorLUT(colorSettings, SYMMETRY_DATA);
         if (lut && lut.length === 128 * 2 * 4) return lut;
         if (customGradient) {
@@ -322,12 +343,18 @@ export class EmbedRenderer {
         let activePreset = palette;
         if (!PRESET_PALETTES[activePreset]) {
             if (activePreset !== 'default') {
-                console.warn(`<hexlife-world>: unknown palette "${palette}", using "default".`);
+                // No element name: this renderer backs both `<hexlife-world>` and `<hexlife-grid>`.
+                console.warn(`HexLife: unknown palette "${palette}", using "default".`);
             }
             activePreset = 'default';
         }
+        // `flickerProofPresets` blacks out the two entries that make a palette strobe — rule 0 firing
+        // a birth and rule 127 firing a death — so a cell that is about to change does not flash a
+        // full-brightness frame first. It is the explorer's "Prevent birth/death flash", and it only
+        // means anything in preset mode there too: the branches above are a host's own colors, and
+        // silently rewriting two of them is not ours to do.
         return generateColorLUT(
-            { mode: 'preset', activePreset, flickerProofPresets: false, hueShift: 0 },
+            { mode: 'preset', activePreset, flickerProofPresets: !!flickerProof, hueShift: 0 },
             SYMMETRY_DATA,
         );
     }
@@ -344,7 +371,7 @@ export class EmbedRenderer {
     /**
      * Swap the palette on a live renderer (no sim disruption — the LUT is a pure recolor).
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
-     *   lut?: Uint8Array|null}} opts
+     *   lut?: Uint8Array|null, flickerProof?: boolean}} opts
      */
     setPalette(opts) {
         const gl = this.gl;
@@ -367,7 +394,7 @@ export class EmbedRenderer {
         const h = Math.max(1, Math.round(cssHeight * dpr));
         this._cssWidth = Math.max(1, cssWidth);
         this._cssHeight = Math.max(1, cssHeight);
-        if (this.canvas.width === w && this.canvas.height === h) {
+        if (this.canvas.width === w && this.canvas.height === h && !this._layoutDirty) {
             // Still re-apply the view — pan is in CSS pixels and the mapping depends on size.
             this._uploadView();
             return;
@@ -375,17 +402,163 @@ export class EmbedRenderer {
 
         this.canvas.width = w;
         this.canvas.height = h;
+        this._refit(w, h);
+    }
 
-        this._hexSize = fitHexSize(this.cols, this.rows, w, h);
+    /**
+     * Fit the hex size to whatever a world is drawn *into* — the whole canvas, or one tile when a
+     * grid layout is set — and push the geometry uniforms that follow from it.
+     * @param {number} w Backing-store width in device px.
+     * @param {number} h Backing-store height in device px.
+     */
+    _refit(w, h) {
+        this._layoutDirty = false;
+        this._computeTiles(w, h);
+        // Every tile is the same size, so one fit serves all of them; without a layout the "tile" is
+        // the canvas and this is the original single-world behavior, unchanged.
+        const fitW = this._layout ? this._tiles[0].w : w;
+        const fitH = this._layout ? this._tiles[0].h : h;
+
+        this._hexSize = fitHexSize(this.cols, this.rows, fitW, fitH);
         this._rebuildOffsets(this._hexSize);
         this._center = gridCenter(this.cols, this.rows, this._hexSize);
 
         const gl = this.gl;
         gl.viewport(0, 0, w, h);
         gl.useProgram(this.program);
-        gl.uniform2f(this.uniforms.resolution, w, h);
+        gl.uniform2f(this.uniforms.resolution, fitW, fitH);
         gl.uniform1f(this.uniforms.hexSize, this._hexSize);
         this._uploadView();
+    }
+
+    // --- tiled multi-world layout ---------------------------------------------
+
+    /**
+     * Draw many worlds of this renderer's `(cols, rows)` as a grid of tiles in this one context,
+     * instead of one world filling the canvas.
+     *
+     * @param {{cols: number, rows: number, gap?: number}|null} layout Tiles across × down, and the
+     *   gutter between them in CSS px. Null restores the single-world path.
+     */
+    setGridLayout(layout) {
+        if (!layout || !(layout.cols > 0) || !(layout.rows > 0)) {
+            this._layout = null;
+        } else {
+            this._layout = {
+                cols: Math.max(1, Math.floor(layout.cols)),
+                rows: Math.max(1, Math.floor(layout.rows)),
+                gap: Math.max(0, Number(layout.gap) || 0),
+            };
+        }
+        // A layout change refits without a size change, which `resize`'s fast path would skip.
+        this._layoutDirty = true;
+        if (this.canvas.width && this.canvas.height) this._refit(this.canvas.width, this.canvas.height);
+    }
+
+    /** @returns {number} How many tiles the current layout has (0 without one). */
+    get tileCount() {
+        return this._layout ? this._layout.cols * this._layout.rows : 0;
+    }
+
+    /**
+     * Rebuild the tile rects for a backing store of `w`×`h` device px.
+     *
+     * Rects are laid out in *CSS* terms (index 0 top-left, reading order) and then flipped into GL's
+     * bottom-up y for the viewport calls, so a host and the GPU agree on which tile is which.
+     */
+    _computeTiles(w, h) {
+        this._tiles = [];
+        this._cssTiles = [];
+        if (!this._layout) return;
+
+        const { cols: lc, rows: lr, gap } = this._layout;
+        const dprX = w / this._cssWidth;
+        const dprY = h / this._cssHeight;
+        const gapX = gap * dprX;
+        const gapY = gap * dprY;
+        // Floor to whole device pixels: a fractional viewport would let neighbouring tiles claim the
+        // same pixel row and shimmer against each other as the canvas resizes.
+        const tw = Math.max(1, Math.floor((w - (lc - 1) * gapX) / lc));
+        const th = Math.max(1, Math.floor((h - (lr - 1) * gapY) / lr));
+
+        for (let i = 0; i < lc * lr; i++) {
+            const col = i % lc;
+            const row = Math.floor(i / lc);
+            const x = Math.round(col * (tw + gapX));
+            const yTop = Math.round(row * (th + gapY));
+            this._tiles.push({ x, y: h - yTop - th, w: tw, h: th });
+            this._cssTiles.push({
+                x: x / dprX, y: yTop / dprY, width: tw / dprX, height: th / dprY,
+            });
+        }
+    }
+
+    /**
+     * The tile's position within the canvas in CSS px (y down from the top) — what a host needs to
+     * park a selection outline or a label over a world.
+     * @param {number} index
+     * @returns {{x: number, y: number, width: number, height: number}|null}
+     */
+    tileRect(index) {
+        const r = this._cssTiles[index];
+        return r ? { ...r } : null;
+    }
+
+    /**
+     * Which tile is under a point, or null for a gutter / outside the grid.
+     * @param {number} cssX Pointer x relative to the canvas's left edge, in CSS px.
+     * @param {number} cssY Pointer y relative to the canvas's top edge, in CSS px.
+     * @returns {number|null}
+     */
+    tileIndexAt(cssX, cssY) {
+        for (let i = 0; i < this._cssTiles.length; i++) {
+            const r = this._cssTiles[i];
+            if (cssX >= r.x && cssX < r.x + r.width && cssY >= r.y && cssY < r.y + r.height) return i;
+        }
+        return null;
+    }
+
+    /**
+     * One frame of a tiled grid: clear once, then per world point the viewport at its tile, upload
+     * its two per-cell buffers and issue the same instanced draw the single-world path uses.
+     *
+     * Everything that decides how a cell *looks* — program, VAO, offsets, hex size, LUT — is set
+     * once outside the loop, because every world shares this renderer's grid. `gl.viewport` clips
+     * rasterization to the tile, so no scissor is needed and tiles cannot bleed into each other.
+     *
+     * @param {Array<import('./EmbedSim.js').EmbedSim|null>} sims In tile order; extra sims past the
+     *   layout's tile count are ignored, and holes (null, or a freed sim) simply leave a tile empty.
+     */
+    drawGrid(sims) {
+        const gl = this.gl;
+        if (!this._layout) return;
+        if (!this._hexSize) this.resize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1);
+
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(this.program);
+        gl.bindVertexArray(this.vao);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.lutTexture);
+        gl.uniform1i(this.uniforms.colorLUT, 1);
+
+        const n = Math.min(sims.length, this._tiles.length);
+        for (let i = 0; i < n; i++) {
+            const sim = sims[i];
+            // `state` goes null when a sim is freed; a half-torn-down grid must not upload from it.
+            if (!sim || !sim.state) continue;
+            const t = this._tiles[i];
+            gl.viewport(t.x, t.y, t.w, t.h);
+            // Views into wasm memory — uploaded straight from them, no copy.
+            WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
+            WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+        }
+
+        gl.bindVertexArray(null);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     /**

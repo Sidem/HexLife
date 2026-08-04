@@ -14,6 +14,13 @@ export {
 } from '../core/rulesetDescriptor.js'
 export {rulesetName} from '../core/rulesetName.js'
 export {
+  codeToHex,
+  codeToRuleset,
+  isRulesetCode,
+  rulesetToCode,
+  type RulesetInputFormat,
+} from '../core/rulesetCode.js'
+export {
   listPresetPalettes,
   type PresetPaletteInfo,
 } from '../core/colorPalettes.js'
@@ -31,5 +38,6 @@ export {
   type GraphicsPath,
   type GraphicsStatus,
 } from '../utils/gpuSupport.js'
-/** The element `index.js` registers. Type-only: registration is that module's side effect. */
+/** The elements `index.js` registers. Type-only: registration is that module's side effect. */
 export type {HexLifeElement} from './hexlife-world.js'
+export type {HexLifeGridElement} from './hexlife-grid.js'

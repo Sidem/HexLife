@@ -19,14 +19,21 @@
  */
 
 import { HexLifeElement } from './HexLifeElement.js';
+import { HexLifeGridElement } from './HexLifeGridElement.js';
 
 export const TAG_NAME = 'hexlife-world';
+/** `<hexlife-grid>` — many worlds in one WebGL context. See HexLifeGridElement's header for why. */
+export const GRID_TAG_NAME = 'hexlife-grid';
 
 if (typeof customElements !== 'undefined' && !customElements.get(TAG_NAME)) {
     customElements.define(TAG_NAME, HexLifeElement);
 }
+if (typeof customElements !== 'undefined' && !customElements.get(GRID_TAG_NAME)) {
+    customElements.define(GRID_TAG_NAME, HexLifeGridElement);
+}
 
 export { HexLifeElement };
+export { HexLifeGridElement };
 export { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 export { EmbedRenderer } from './EmbedRenderer.js';
 // A `code` attribute carries a whole world (grid + ruleset + exact cells + exact colors). Consumers

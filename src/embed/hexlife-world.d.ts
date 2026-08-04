@@ -105,7 +105,8 @@ export interface HexLifeElementEventMap {
 
 /**
  * `<hexlife-world>` — see `packages/hexlife-embed/README.md` § Attributes for the full contract:
- * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` · `code`
+ * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` ·
+ * `flicker-proof` (suppress the birth/death flash; preset palettes only) · `code`
  * (`HXW1.…`, wins over the individual attrs) · `paused` · `max-dpr` · `link` (`on`/`off`) ·
  * `draw` · `wheel-zoom` (`free` | `ctrl`) · `preview` (poster burst tick count, 1–60) ·
  * `torus` (wrap the world onto its own 3D surface; value = auto-rotation °/s, 0–45, default 14,

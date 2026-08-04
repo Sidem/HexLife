@@ -95,8 +95,8 @@ describe('live-reconfigurable attributes', () => {
     it('exempts everything that is not part of the world from the re-boot guard', () => {
         // A re-boot re-decodes the code and replays tick 0. Anything here that stopped being
         // exempt would silently discard the viewer's drawing every time it changed.
-        for (const attr of ['brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'torus',
-            'speed', 'draw', 'paused', 'preview', 'wheel-zoom', 'link', 'max-dpr']) {
+        for (const attr of ['brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'flicker-proof',
+            'torus', 'speed', 'draw', 'paused', 'preview', 'wheel-zoom', 'link', 'max-dpr']) {
             expect(liveAttrs).toContain(`'${attr}'`);
         }
     });
@@ -116,7 +116,11 @@ describe('palette override', () => {
         // The boot used to pass the decoded colors directly; if it drifts back, a world booted with
         // a `palette` attribute shows something different from the same world given one a second later.
         expect(element).toMatch(/new EmbedRenderer\(this\._canvas, \{[\s\S]*\.\.\.this\._paletteOptions\(\)/);
-        expect(element).toMatch(/case 'palette-off':\s*\n\s*this\.renderer\.setPalette\(this\._paletteOptions\(\)\)/);
+        // Every color-bearing attribute falls through to the same one call. Adding one to the group
+        // and forgetting it here is the drift this pin exists to catch.
+        expect(element).toMatch(
+            /case 'palette':\s*\n\s*case 'palette-on':\s*\n\s*case 'palette-off':\s*\n\s*case 'flicker-proof':\s*\n\s*this\.renderer\.setPalette\(this\._paletteOptions\(\)\)/,
+        );
     });
 
     it('treats presence, not value, as the override — so removing it is a real undo', () => {

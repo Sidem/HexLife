@@ -116,7 +116,7 @@ const ZOOM_MAX = 8;
  */
 const LIVE_ATTRS = new Set([
     'paused', 'max-dpr', 'link', 'speed', 'draw', 'wheel-zoom', 'preview',
-    'torus', 'brush', 'zoom', 'palette', 'palette-on', 'palette-off',
+    'torus', 'brush', 'zoom', 'palette', 'palette-on', 'palette-off', 'flicker-proof',
 ]);
 
 const RULESET_RE = /^[0-9a-fA-F]{32}$/;
@@ -232,8 +232,8 @@ const RESET_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V1
 export class HexLifeElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'ruleset', 'seed', 'density', 'rows', 'speed', 'palette',
-            'palette-on', 'palette-off', 'paused', 'max-dpr', 'link', 'draw', 'wheel-zoom',
-            'preview', 'torus', 'brush', 'zoom'];
+            'palette-on', 'palette-off', 'flicker-proof', 'paused', 'max-dpr', 'link', 'draw',
+            'wheel-zoom', 'preview', 'torus', 'brush', 'zoom'];
     }
 
     constructor() {
@@ -507,6 +507,7 @@ export class HexLifeElement extends HTMLElement {
             case 'palette':
             case 'palette-on':
             case 'palette-off':
+            case 'flicker-proof':
                 this.renderer.setPalette(this._paletteOptions());
                 this._drawOnce();
                 break;
@@ -1033,6 +1034,7 @@ export class HexLifeElement extends HTMLElement {
             customGradient: p.customGradient,
             colorSettings: world ? world.colorSettings : null,
             lut: world ? world.lut : null,
+            flickerProof: this.hasAttribute('flicker-proof'),
         };
     }
 
