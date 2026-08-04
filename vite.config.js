@@ -36,5 +36,22 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      /**
+       * Vite builds only `index.html` unless told otherwise, so every root demo page was a
+       * dev-server-only artifact — `embed-demo.html` has never existed on the deployed site.
+       *
+       * `totalistic-256.html` is a *showcase* for the published `@hexlife/embed` package rather
+       * than a scratch page, and a showcase reachable only on localhost is not one. Listing it
+       * here builds and hashes its module graph like any other entry.
+       *
+       * **`index.html` must stay in this list.** Naming any input replaces Vite's default instead
+       * of adding to it, so dropping it here silently ships a Pages deploy with no app in it.
+       */
+      input: {
+        index: 'index.html',
+        totalistic: 'totalistic-256.html',
+      },
+    },
   },
 }));

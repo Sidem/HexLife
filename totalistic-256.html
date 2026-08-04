@@ -275,10 +275,14 @@ grid.rulesets = Array.from({length: 256},   <span class="c">// T00–TFF *is* th
 </dialog>
 
 <script type="module">
-import '/HexLife/src/embed/index.js';
+// Relative, not `/HexLife/…`: an absolute path works under the dev server's base but is not
+// rewritten at build time, so it would 404 on the deployed site. This is the same source tree the
+// npm package publishes — `@hexlife/embed` ships `src/`, so these two imports are exactly the
+// package's two entry points.
+import './src/embed/index.js';
 import {
   listPresetPalettes, describeRuleset, rulesetName, explorerUrlForRuleset,
-} from '/HexLife/src/embed/api.js';
+} from './src/embed/api.js';
 
 const grid = document.getElementById('grid');
 const marker = document.getElementById('marker');
