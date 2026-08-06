@@ -17,6 +17,7 @@ export {
   codeToHex,
   codeToRuleset,
   isRulesetCode,
+  normalizeRulesetHex,
   rulesetToCode,
   type RulesetInputFormat,
 } from '../core/rulesetCode.js'

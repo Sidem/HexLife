@@ -138,7 +138,7 @@ export class EmbedSim {
      *   not), `reset()` produces a *fresh* state from it each time — so the in-post reset button varies.
      * @param {number} [opts.speed=10] Target ticks/second.
      */
-    constructor({ rulesetHex, rows = 64, cols, density = 0.5, seed = null, initialCells = null, generator = null, speed = 10 }) {
+    constructor({ rulesetHex, rows = 64, columns, cols = columns, density = 0.5, seed = null, initialCells = null, generator = null, speed = 10 }) {
         if (!wasmExports) {
             throw new Error('EmbedSim: await initEmbedWasm() before constructing a sim.');
         }
@@ -146,6 +146,7 @@ export class EmbedSim {
         const dims = deriveGridDimensions(rows);
         this.rows = dims.rows;
         this.cols = Number.isInteger(cols) && cols >= 2 ? cols : dims.cols;
+        this.columns = this.cols;
         this.numCells = this.rows * this.cols;
 
         if (initialCells && initialCells.length !== this.numCells) {
@@ -246,12 +247,47 @@ export class EmbedSim {
      *
      * @returns {number} Active cells in the new generation.
      */
-    tick() {
-        this.activeCount = this.world.run_tick();
-        [this.state, this.nextState] = [this.nextState, this.state];
-        [this.ruleIndices, this.nextRuleIndices] = [this.nextRuleIndices, this.ruleIndices];
-        this.tickCount++;
+    tick(count = 1) {
+        const ticks = Math.max(0, Math.floor(count));
+        for (let i = 0; i < ticks; i++) {
+            this.activeCount = this.world.run_tick();
+            [this.state, this.nextState] = [this.nextState, this.state];
+            [this.ruleIndices, this.nextRuleIndices] = [this.nextRuleIndices, this.ruleIndices];
+            this.tickCount++;
+        }
         return this.activeCount;
+    }
+
+    /**
+     * Apply explicit, idempotent cell assignments. Network protocols must use this instead of
+     * inversion so a retried operation cannot silently undo itself.
+     *
+     * @param {Iterable<{index: number, value: 0|1}>} edits
+     * @returns {number} Number of cells whose value changed.
+     */
+    setCells(edits) {
+        if (!this.state || !this.ruleIndices) throw new Error('EmbedSim: simulation is disposed.');
+        let changed = 0;
+        for (const edit of edits) {
+            if (!Number.isInteger(edit.index) || edit.index < 0 || edit.index >= this.numCells) {
+                throw new RangeError(`EmbedSim: cell index ${edit.index} is outside the grid.`);
+            }
+            if (edit.value !== 0 && edit.value !== 1) {
+                throw new TypeError(`EmbedSim: cell value must be 0 or 1, received ${edit.value}.`);
+            }
+            const previous = this.state[edit.index];
+            if (previous === edit.value) continue;
+            this.state[edit.index] = edit.value;
+            this.ruleIndices[edit.index] = RULE_INDEX_INITIAL;
+            this.activeCount += edit.value ? 1 : -1;
+            changed++;
+        }
+        return changed;
+    }
+
+    /** Canonical generation counter name used by headless hosts. */
+    get generation() {
+        return this.tickCount;
     }
 
     /**
@@ -397,6 +433,11 @@ export class EmbedSim {
         this.world = null;
         this.state = this.nextState = this.ruleIndices = this.nextRuleIndices = null;
         this.ruleset = this.ruleUsageCounters = null;
+    }
+
+    /** Public headless-API spelling; `free()` remains for existing element callers. */
+    dispose() {
+        this.free();
     }
 }
 

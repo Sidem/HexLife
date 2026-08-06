@@ -1,6 +1,6 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.3.1",
+  "version": "1.5.0",
   "description": "Embeddable HexLife cellular automaton world and host-safe world-code API",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,16 @@
       "types": "./src/embed/api.d.ts",
       "import": "./src/embed/api.js",
       "default": "./src/embed/api.js"
+    },
+    "./sim": {
+      "types": "./src/embed/sim.d.ts",
+      "import": "./src/embed/sim.js",
+      "default": "./src/embed/sim.js"
+    },
+    "./render": {
+      "types": "./src/embed/render.d.ts",
+      "import": "./src/embed/render.js",
+      "default": "./src/embed/render.js"
     }
   },
   "files": [

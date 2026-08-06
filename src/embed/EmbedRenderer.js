@@ -11,9 +11,9 @@
  * (`webglUtils.js`, pure), and the color LUT (`generateColorLUT`). Those are imported, so the embed
  * and the app can never drift visually.
  *
- * The shaders expect hover and ghost attributes. The embed has neither, and both are neutral at 0
- * (see fragment.glsl), so we leave those attribute arrays *disabled* and feed the constant 0 —
- * cheaper than uploading two more per-cell buffers, and it avoids forking the GLSL.
+ * The shaders expect hover and ghost attributes. Custom-element callers keep the zero-allocation
+ * constant-attribute path; the renderer-only public entry opts into separate selection and sparse
+ * draft buffers without mutating its host-owned verified state.
  *
  * **Two draw paths, one context.** `draw(sim)` fills the canvas with a single world;
  * `drawGrid(sims)` tiles many worlds of the *same* `(cols, rows)` across it, one `gl.viewport` +
@@ -30,6 +30,7 @@ import { PRESET_PALETTES } from '../core/colorPalettes.js';
 import { precomputeSymmetryGroups } from '../core/Symmetry.js';
 import { lookAt, multiply, perspective } from '../rendering/mat4.js';
 import { getTorusPeriods, torusOrbitCamera, wrapAngle } from '../rendering/torusMath.js';
+import { repeatOffsetsForViewport } from './repeatToroidal.js';
 
 // eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
@@ -108,11 +109,12 @@ function gridToPixel(col, row, hexSize) {
  * `utils.calculateHexSizeForTexture` (which fits into a square RENDER_TEXTURE_SIZE); fitting to the
  * canvas's real dimensions instead means a non-square embed letterboxes rather than clipping.
  */
-function fitHexSize(cols, rows, width, height) {
+function fitHexSize(cols, rows, width, height, cover = false) {
     const gridPixelWidth = cols * ((HEX_WIDTH * 3) / 4) + HEX_WIDTH / 4;
     const gridPixelHeight = rows * HEX_HEIGHT + HEX_HEIGHT / 2;
     if (gridPixelWidth === 0 || gridPixelHeight === 0) return HEX_SIZE;
-    const scale = Math.min(width / gridPixelWidth, height / gridPixelHeight) * 0.98;
+    const scaleForViewport = cover ? Math.max : Math.min;
+    const scale = scaleForViewport(width / gridPixelWidth, height / gridPixelHeight) * 0.98;
     return HEX_SIZE * scale;
 }
 
@@ -156,13 +158,17 @@ export class EmbedRenderer {
      *   the explorer's "Prevent birth/death flash". Ignored by the other palette forms; see
      *   `_resolveLUT`.
      * @param {number|null} [opts.hueShift=null] Optional global chromatic hue rotation in degrees.
+     * @param {boolean} [opts.repeatToroidal=false] Map every cell to its nearest flat toroidal copy.
+     * @param {boolean} [opts.overlays=false] Allocate selection and sparse draft overlay buffers.
      * @throws {Error} If WebGL2 is unavailable — the caller renders a fallback note instead.
      */
-    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false, hueShift = null }) {
+    constructor(canvas, { cols, rows, palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false, hueShift = null, repeatToroidal = false, overlays = false }) {
         this.canvas = canvas;
         this.cols = cols;
         this.rows = rows;
         this.numCells = cols * rows;
+        this._repeatToroidal = !!repeatToroidal;
+        this._overlays = !!overlays;
 
         // `depth` is on by default, but the torus view depends on it (three depth-resolved passes),
         // so it is asked for explicitly rather than inherited from a default that could change.
@@ -189,6 +195,9 @@ export class EmbedRenderer {
             colorLUT: gl.getUniformLocation(this.program, 'u_colorLUT'),
             hoverFilledDarkenFactor: gl.getUniformLocation(this.program, 'u_hoverFilledDarkenFactor'),
             hoverInactiveLightenFactor: gl.getUniformLocation(this.program, 'u_hoverInactiveLightenFactor'),
+            repeatToroidal: gl.getUniformLocation(this.program, 'u_repeatToroidal'),
+            repeatPeriod: gl.getUniformLocation(this.program, 'u_repeatPeriod'),
+            repeatOffset: gl.getUniformLocation(this.program, 'u_repeatOffset'),
         };
 
         this._setupGeometry();
@@ -199,6 +208,8 @@ export class EmbedRenderer {
         gl.uniform1f(this.uniforms.hoverFilledDarkenFactor, 0.66);
         gl.uniform1f(this.uniforms.hoverInactiveLightenFactor, 1.5);
         gl.uniform1f(this.uniforms.zoom, 1.0);
+        gl.uniform1i(this.uniforms.repeatToroidal, this._repeatToroidal ? 1 : 0);
+        gl.uniform2f(this.uniforms.repeatOffset, 0, 0);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -273,12 +284,29 @@ export class EmbedRenderer {
         gl.vertexAttribPointer(this.attribs.instanceRuleIndex, 1, gl.UNSIGNED_BYTE, false, 0, 0);
         gl.vertexAttribDivisor(this.attribs.instanceRuleIndex, 1);
 
-        // No hover / ghost buffers: leave the arrays disabled and supply the constant 0, which both
-        // shaders treat as "neither highlighted nor ghosted".
-        gl.disableVertexAttribArray(this.attribs.instanceHoverState);
-        gl.disableVertexAttribArray(this.attribs.instanceGhostState);
-        gl.vertexAttrib1f(this.attribs.instanceHoverState, 0);
-        gl.vertexAttrib1f(this.attribs.instanceGhostState, 0);
+        if (this._overlays) {
+            this.hoverBytes = new Uint8Array(this.numCells);
+            this.ghostBytes = new Uint8Array(this.numCells);
+            this.hoverBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, this.hoverBytes, gl.DYNAMIC_DRAW);
+            this.ghostBuffer = WebGLUtils.createBuffer(gl, gl.ARRAY_BUFFER, this.ghostBytes, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.hoverBuffer);
+            gl.enableVertexAttribArray(this.attribs.instanceHoverState);
+            gl.vertexAttribPointer(this.attribs.instanceHoverState, 1, gl.UNSIGNED_BYTE, false, 0, 0);
+            gl.vertexAttribDivisor(this.attribs.instanceHoverState, 1);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.ghostBuffer);
+            gl.enableVertexAttribArray(this.attribs.instanceGhostState);
+            gl.vertexAttribPointer(this.attribs.instanceGhostState, 1, gl.UNSIGNED_BYTE, false, 0, 0);
+            gl.vertexAttribDivisor(this.attribs.instanceGhostState, 1);
+        } else {
+            // The custom elements do not expose per-cell overlays, so they retain the zero-allocation
+            // constant-attribute path. Renderer-only hosts opt into buffers above.
+            gl.disableVertexAttribArray(this.attribs.instanceHoverState);
+            gl.disableVertexAttribArray(this.attribs.instanceGhostState);
+            gl.vertexAttrib1f(this.attribs.instanceHoverState, 0);
+            gl.vertexAttrib1f(this.attribs.instanceGhostState, 0);
+        }
 
         gl.bindVertexArray(null);
     }
@@ -394,6 +422,80 @@ export class EmbedRenderer {
     }
 
     /**
+     * Upload host-owned externally verified cells. Unlike `draw(sim)`, this is the only external
+     * state-buffer upload path, so camera changes and draw-on-demand frames stay upload-free.
+     * @param {Uint8Array} cells Row-major 0/1 cell values.
+     * @param {Uint8Array|null} [ruleIndices=null] Optional row-major rule indices.
+     */
+    setExternalState(cells, ruleIndices = null) {
+        if (!(cells instanceof Uint8Array) || cells.length !== this.numCells) {
+            throw new RangeError(`Expected ${this.numCells} external cell bytes.`);
+        }
+        if (ruleIndices !== null && (!(ruleIndices instanceof Uint8Array) || ruleIndices.length !== this.numCells)) {
+            throw new RangeError(`Expected ${this.numCells} external rule-index bytes.`);
+        }
+        const gl = this.gl;
+        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, cells);
+        if (ruleIndices) WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, ruleIndices);
+    }
+
+    /** @param {number|null} index Row-major selected-cell index. */
+    setSelectionIndex(index) {
+        if (!this._overlays) return;
+        const next = Number.isSafeInteger(index) && index >= 0 && index < this.numCells ? index : null;
+        const gl = this.gl;
+        if (this._selectionIndex !== undefined && this._selectionIndex !== null) {
+            this.hoverBytes[this._selectionIndex] = 0;
+            WebGLUtils.updateBuffer(gl, this.hoverBuffer, gl.ARRAY_BUFFER, this.hoverBytes.subarray(this._selectionIndex, this._selectionIndex + 1), this._selectionIndex);
+        }
+        if (next !== null) {
+            this.hoverBytes[next] = 1;
+            WebGLUtils.updateBuffer(gl, this.hoverBuffer, gl.ARRAY_BUFFER, this.hoverBytes.subarray(next, next + 1), next);
+        }
+        this._selectionIndex = next;
+    }
+
+    /**
+     * Replace the sparse draft overlay. Value 1 previews a live target; value 0 previews a dead
+     * target. Overlay bytes are separate from the verified state buffer.
+     * @param {Array<{index: number, value: 0|1}>} edits
+     */
+    setDraftPreview(edits) {
+        if (!this._overlays) return;
+        const changed = new Set(this._draftIndices || []);
+        for (const index of this._draftIndices || []) this.ghostBytes[index] = 0;
+        const next = [];
+        for (const edit of edits || []) {
+            if (!Number.isSafeInteger(edit.index) || edit.index < 0 || edit.index >= this.numCells) continue;
+            this.ghostBytes[edit.index] = edit.value === 0 ? 2 : 1;
+            changed.add(edit.index);
+            next.push(edit.index);
+        }
+        const gl = this.gl;
+        const ordered = [...changed].sort((a, b) => a - b);
+        let start = null;
+        let end = null;
+        const flush = () => {
+            if (start === null || end === null) return;
+            WebGLUtils.updateBuffer(gl, this.ghostBuffer, gl.ARRAY_BUFFER, this.ghostBytes.subarray(start, end + 1), start);
+        };
+        for (const index of ordered) {
+            if (start === null) {
+                start = index;
+                end = index;
+            } else if (index === end + 1) {
+                end = index;
+            } else {
+                flush();
+                start = index;
+                end = index;
+            }
+        }
+        flush();
+        this._draftIndices = next;
+    }
+
+    /**
      * Size the drawing buffer and refit the grid to it.
      * @param {number} cssWidth  Element width in CSS pixels.
      * @param {number} cssHeight Element height in CSS pixels.
@@ -431,7 +533,7 @@ export class EmbedRenderer {
         const fitW = this._layout ? this._tiles[0].w : w;
         const fitH = this._layout ? this._tiles[0].h : h;
 
-        this._hexSize = fitHexSize(this.cols, this.rows, fitW, fitH);
+        this._hexSize = fitHexSize(this.cols, this.rows, fitW, fitH, this._repeatToroidal);
         this._rebuildOffsets(this._hexSize);
         this._center = gridCenter(this.cols, this.rows, this._hexSize);
 
@@ -440,6 +542,11 @@ export class EmbedRenderer {
         gl.useProgram(this.program);
         gl.uniform2f(this.uniforms.resolution, fitW, fitH);
         gl.uniform1f(this.uniforms.hexSize, this._hexSize);
+        this._repeatPeriod = {
+            x: this.cols * this._hexSize * 1.5,
+            y: this.rows * this._hexSize * Math.sqrt(3),
+        };
+        gl.uniform2f(this.uniforms.repeatPeriod, this._repeatPeriod.x, this._repeatPeriod.y);
         this._uploadView();
     }
 
@@ -585,6 +692,23 @@ export class EmbedRenderer {
         this._viewPanX = panX;
         this._viewPanY = panY;
         this._uploadView();
+    }
+
+    /**
+     * Center a canonical row/column in the viewport using the nearest repeated copy.
+     * @returns {{panX: number, panY: number}}
+     */
+    centerOnCell(row, col) {
+        const normalizedRow = ((row % this.rows) + this.rows) % this.rows;
+        const normalizedCol = ((col % this.cols) + this.cols) % this.cols;
+        const point = gridToPixel(normalizedCol, normalizedRow, this._hexSize);
+        const dprX = this.canvas.width / this._cssWidth;
+        const dprY = this.canvas.height / this._cssHeight;
+        const z = this._viewZoom || 1;
+        this._viewPanX = ((this._center.x - point.x) * z) / dprX;
+        this._viewPanY = ((this._center.y - point.y) * z) / dprY;
+        this._uploadView();
+        return { panX: this._viewPanX, panY: this._viewPanY };
     }
 
     /**
@@ -796,10 +920,10 @@ export class EmbedRenderer {
 
         // Approximate col from x, then row accounting for odd-column stagger.
         let col = Math.round(worldX / horizSpacing);
-        col = Math.max(0, Math.min(this.cols - 1, col));
+        if (!this._repeatToroidal) col = Math.max(0, Math.min(this.cols - 1, col));
         const yOffset = col % 2 !== 0 ? vertSpacing / 2 : 0;
         let row = Math.round((worldY - yOffset) / vertSpacing);
-        row = Math.max(0, Math.min(this.rows - 1, row));
+        if (!this._repeatToroidal) row = Math.max(0, Math.min(this.rows - 1, row));
 
         // Refine among the approximate cell and its neighbors (hex centers aren't on a square lattice).
         let best = null;
@@ -808,12 +932,15 @@ export class EmbedRenderer {
             for (let dr = -1; dr <= 1; dr++) {
                 const c = col + dc;
                 const r = row + dr;
-                if (c < 0 || r < 0 || c >= this.cols || r >= this.rows) continue;
+                if (!this._repeatToroidal && (c < 0 || r < 0 || c >= this.cols || r >= this.rows)) continue;
                 const p = gridToPixel(c, r, hexSize);
                 const d = (p.x - worldX) ** 2 + (p.y - worldY) ** 2;
                 if (d < bestDist) {
                     bestDist = d;
-                    best = { col: c, row: r };
+                    best = {
+                        col: this._repeatToroidal ? ((c % this.cols) + this.cols) % this.cols : c,
+                        row: this._repeatToroidal ? ((r % this.rows) + this.rows) % this.rows : r,
+                    };
                 }
             }
         }
@@ -835,6 +962,18 @@ export class EmbedRenderer {
             return;
         }
 
+        // The views are windows onto wasm memory — upload straight from them, no copy.
+        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
+        WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+
+        this.drawCurrent();
+    }
+
+    /** Draw the already-uploaded external state without touching either state buffer. */
+    drawCurrent() {
+        const gl = this.gl;
+        if (!this._hexSize) this.resize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1);
+
         gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -844,11 +983,23 @@ export class EmbedRenderer {
         gl.bindTexture(gl.TEXTURE_2D, this.lutTexture);
         gl.uniform1i(this.uniforms.colorLUT, 1);
 
-        // The views are windows onto wasm memory — upload straight from them, no copy.
-        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
-        WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
-
-        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+        if (this._repeatToroidal) {
+            const offsets = repeatOffsetsForViewport(
+                this.canvas.width,
+                this.canvas.height,
+                this._viewZoom,
+                this._repeatPeriod.x,
+                this._repeatPeriod.y,
+                this._hexSize,
+            );
+            for (const offset of offsets) {
+                gl.uniform2f(this.uniforms.repeatOffset, offset.x, offset.y);
+                gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+            }
+            gl.uniform2f(this.uniforms.repeatOffset, 0, 0);
+        } else {
+            gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+        }
         gl.bindVertexArray(null);
     }
 
@@ -859,6 +1010,8 @@ export class EmbedRenderer {
         gl.deleteBuffer(this.offsetBuffer);
         gl.deleteBuffer(this.stateBuffer);
         gl.deleteBuffer(this.ruleIndexBuffer);
+        if (this.hoverBuffer) gl.deleteBuffer(this.hoverBuffer);
+        if (this.ghostBuffer) gl.deleteBuffer(this.ghostBuffer);
         gl.deleteVertexArray(this.vao);
         gl.deleteTexture(this.lutTexture);
         gl.deleteProgram(this.program);

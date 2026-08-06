@@ -25,6 +25,26 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.5.0 — 2026-08-06
+
+#### Added
+
+- **Host-driven simulation and rendering entries.** `@hexlife/embed/sim` exposes the shared Wasm
+  runtime with explicit dimensions, exact initial cells, idempotent cell assignments, multi-tick
+  stepping, snapshots, disposal, and canonical LSB-first cell packing. `@hexlife/embed/render` draws
+  externally owned state with the shared WebGL2 renderer, camera, toroidal repetition, hit-testing,
+  selection, draft previews, and context recovery without owning a simulation.
+- **Canonical host primitives.** `createDensityState()` gives Node and browser hosts HexLife's exact
+  seeded density initialization without initializing Wasm, including deterministic seed `0` and the
+  density `0`/`1` center-cell rule. The host-safe API now exports `normalizeRulesetHex()` for exact
+  128-bit ruleset identities.
+
+#### Changed
+
+- **HexWorlds is the practical reference host.** Reusable simulation, rendering, geometry, and
+  determinism behavior is developed and tested in this package before the application consumes an
+  exact release.
+
 ## [1.2.0] — 2026-07-30
 
 Auto-Explore now ranks with a model that was trained on this cellular automaton, instead of one

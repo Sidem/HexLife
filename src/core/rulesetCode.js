@@ -168,6 +168,17 @@ function normalizeCode(code) {
 }
 
 /**
+ * Normalize an exact 128-bit ruleset hex without accepting short codes or notation.
+ * This is the canonical storage/wire identity used by external hosts.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeRulesetHex(value) {
+    const normalized = normalizeCode(value);
+    return /^[0-9A-F]{32}$/.test(normalized) ? normalized : null;
+}
+
+/**
  * The canonical shortest code for a ruleset.
  *
  * Always tags with the strictest constraint class the table satisfies, so this is a function of the
@@ -208,7 +219,8 @@ export function rulesetToCode(source) {
  */
 export function codeToRuleset(code) {
     const normalized = normalizeCode(code);
-    if (/^[0-9A-F]{32}$/.test(normalized)) return hexToRuleset(normalized);
+    const fullHex = normalizeRulesetHex(normalized);
+    if (fullHex) return hexToRuleset(fullHex);
 
     const spec = RULESET_CODE_SPEC[normalized[0]];
     if (!spec) return null;

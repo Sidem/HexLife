@@ -7,6 +7,7 @@ import {
     codeToRuleset,
     codeToHex,
     isRulesetCode,
+    normalizeRulesetHex,
     parseRulesetInput,
 } from '../src/core/rulesetCode.js';
 import {
@@ -90,6 +91,14 @@ describe('code space', () => {
 });
 
 describe('rulesetToCode / codeToRuleset', () => {
+    it('normalizes only exact full ruleset hex identities', () => {
+        const hex = '16284880608080000010024004082001';
+        expect(normalizeRulesetHex(`  ${hex.toLowerCase()}  `)).toBe(hex);
+        expect(normalizeRulesetHex('R3000081')).toBeNull();
+        expect(normalizeRulesetHex('nope')).toBeNull();
+        expect(normalizeRulesetHex(null)).toBeNull();
+    });
+
     it('round-trips every totalistic and n-count payload exhaustively', () => {
         for (const tag of ['T', 'N']) {
             const { bits } = RULESET_CODE_SPEC[tag];

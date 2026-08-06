@@ -116,7 +116,7 @@ describe('live-reconfigurable attributes', () => {
             expect(source).toContain("readHueShift(this.getAttribute('hue-shift'))");
             expect(source).toMatch(/case 'hue-shift':\s*\n\s*case 'flicker-proof':/);
         }
-        expect(renderer).toMatch(/constructor\(canvas, \{[^}]*hueShift = null \}\)/);
+        expect(renderer).toMatch(/constructor\(canvas, \{[^}]*hueShift = null[^}]*\}\)/);
         expect(renderer).toContain('_setupLUT({ palette, customGradient, colorSettings, lut, flickerProof, hueShift })');
     });
 });

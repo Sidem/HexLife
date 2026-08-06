@@ -16,6 +16,9 @@ export const RULESET_CODE_SPEC: Readonly<
 /** Matches any well-formed ruleset code (shape only — {@link isRulesetCode} is the real validator). */
 export const RULESET_CODE_PATTERN: RegExp
 
+/** Normalize an exact 128-bit ruleset hex, or return null. Short codes are not accepted. */
+export function normalizeRulesetHex(value: unknown): string | null
+
 /**
  * The canonical shortest code for a ruleset — always the strictest class its table satisfies, so a
  * ruleset has exactly one code. Rules with no structure keep the 32-char hex.

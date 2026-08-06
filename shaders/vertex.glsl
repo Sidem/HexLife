@@ -20,8 +20,19 @@ uniform float u_hexSize;
 
 uniform vec2 u_pan;
 uniform float u_zoom;
+uniform bool u_repeatToroidal;
+uniform vec2 u_repeatPeriod;
+uniform vec2 u_repeatOffset;
 void main() {
-  vec2 pos = (a_position * u_hexSize) + a_instance_offset;
+  vec2 center = a_instance_offset;
+  if (u_repeatToroidal) {
+    vec2 period = max(u_repeatPeriod, vec2(0.0001));
+    // Wrap the centre once for the whole primitive. Wrapping each vertex independently tears a
+    // seam-crossing hex into viewport-long triangles.
+    center -= round((center - u_pan) / period) * period;
+    center += u_repeatOffset;
+  }
+  vec2 pos = (a_position * u_hexSize) + center;
   vec2 transformedPos = (pos - u_pan) * u_zoom + (u_resolution / 2.0);
   vec2 zeroToOne = transformedPos / u_resolution;
   vec2 zeroToTwo = zeroToOne * 2.0;

@@ -16,6 +16,8 @@ export default defineConfig({
       entry: {
         index: 'src/embed/index.js',
         api: 'src/embed/api.js',
+        sim: 'src/embed/sim.js',
+        render: 'src/embed/render.js',
       },
       formats: ['es'],
     },

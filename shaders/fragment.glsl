@@ -37,6 +37,9 @@ void main() {
     if (v_ghost_state == 1.0) {
         base_color_rgb = vec3(1.0, 1.0, 1.0);
         alpha = 0.5;
+    } else if (v_ghost_state == 2.0) {
+        base_color_rgb = vec3(0.0, 0.0, 0.0);
+        alpha = 0.72;
     }
 
     outColor = vec4(base_color_rgb, alpha);

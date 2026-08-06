@@ -26,7 +26,7 @@ export { rulesetName } from '../core/rulesetName.js';
 // list is almost always enumerating a *constraint class* rather than naming individual rules, and
 // these codes are the notation for that: the totalistic class is exactly `T00`–`TFF`. Pure math over
 // the rule table — no DOM, no wasm.
-export { codeToHex, codeToRuleset, isRulesetCode, rulesetToCode } from '../core/rulesetCode.js';
+export { codeToHex, codeToRuleset, isRulesetCode, normalizeRulesetHex, rulesetToCode } from '../core/rulesetCode.js';
 export { decodeWorldCode, encodeWorldCode, explorerUrlForRuleset } from '../core/WorldCodec.js';
 // Just the key + label projection, not the gradient table — a host building a palette picker needs
 // the names the `palette` attribute accepts, and nothing here should make a ramp's stops a

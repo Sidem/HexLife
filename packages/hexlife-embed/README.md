@@ -1,5 +1,35 @@
 # `@hexlife/embed`
 
+The DOM-free `@hexlife/embed/sim` entry exposes the same Wasm evolution engine used by the custom
+element for Node.js and browser-worker computation:
+
+```js
+import {createDensityState, createSimulation, packCells} from '@hexlife/embed/sim'
+
+const initialCells = createDensityState({rows: 64, columns: 74, seed: 12345, density: 0.5})
+const sim = await createSimulation({rulesetHex, rows: 64, columns: 74, initialCells})
+sim.setCells([{index: 42, value: 1}])
+sim.tick(10)
+const packed = packCells(sim.snapshotCells())
+sim.dispose()
+```
+
+The renderer-only `@hexlife/embed/render` entry draws host-owned, externally verified state with the
+same WebGL2 instanced hexes and shared shaders, without allocating or advancing a simulation:
+
+```js
+import {createRenderer} from '@hexlife/embed/render'
+
+const renderer = createRenderer(canvas, {
+  rows: 1152,
+  columns: 1332,
+  repeatToroidal: true,
+  maxDpr: 2,
+})
+renderer.setState(verifiedCells)
+renderer.draw()
+```
+
 A live [HexLife](https://sidem.github.io/HexLife/) world as a custom element — a hexagonal cellular
 automaton running on WebGL2, with the Rust/Wasm tick engine bundled in.
 
@@ -35,18 +65,74 @@ touch the host.
 
 ---
 
-## Two entry points
+## Public entry points
 
 | Import | Needs | Use for |
 |---|---|---|
 | `@hexlife/embed` | DOM, WebGL2, Wasm | The browser. Importing it registers `<hexlife-world>` and `<hexlife-grid>`. |
 | `@hexlife/embed/api` | Nothing | Node and browsers alike: world codes, ruleset metadata, palette names, GPU probing. No DOM at module scope. |
+| `@hexlife/embed/sim` | Wasm | Node and browser workers: deterministic host-driven simulation without DOM or rendering. |
+| `@hexlife/embed/render` | DOM, WebGL2 | Browser hosts: draw externally supplied state without allocating or ticking a simulation. |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
 
 The browser bundle **inlines the Wasm binary** as a data URI rather than fetching a side-car asset,
 because a strict host CSP (a Reddit webview, for instance) is not something an embed can widen.
+
+`createDensityState()` is the pure host-side initializer for canonical seeded density worlds. It does
+not initialize Wasm, takes explicit rows and columns, preserves HexLife's special center cell at
+density `0` or `1`, and treats every safe-integer seed—including `0`—deterministically. The custom
+element's `seed="0"` attribute remains nondeterministic for backward compatibility.
+
+---
+
+## `@hexlife/embed/render`
+
+The renderer-only entry is for applications that already own their simulation, verification,
+networking, and history. It accepts row-major byte arrays (`index = row * columns + column`) and owns
+only the WebGL lifecycle and camera. `setState()` is the state-buffer upload boundary; `panBy()`,
+`setZoom()`, `resize()`, and `draw()` do not upload cell state.
+
+```js
+const renderer = createRenderer(canvas, {
+  rows,
+  columns,
+  palette: 'default',
+  flickerProof: true,
+  repeatToroidal: true,
+  minZoom: 0.3,
+  maxZoom: 5,
+  onContextLost: () => showGpuRecoveryNotice(),
+  onContextRestored: () => hideGpuRecoveryNotice(),
+})
+
+renderer.setState(cells)                 // Uint8Array(rows * columns), values 0/1
+renderer.setSelection(42)                // null clears it
+renderer.setDraftPreview([{index: 9, value: 1}])
+renderer.panBy(24, -8)                   // CSS pixels
+renderer.setZoom(1.5, {x: 400, y: 300}) // keep the cell under this canvas point fixed
+renderer.centerOnCell(42)
+renderer.draw()                          // draw on demand
+```
+
+`hitTest(x, y)` takes CSS pixels relative to the canvas and returns
+`{row, column, index}`. With `repeatToroidal: true`, every repeated visual copy resolves to the same
+canonical index. The repeated flat view covers the viewport and maps each cell to its nearest
+toroidal copy, so continuous pan does not require a second state buffer.
+
+The live state and draft preview are separate GPU attributes. Draft value `1` is a translucent live
+preview and `0` is a translucent erase preview; neither mutates the verified state passed to
+`setState()`.
+
+`renderer.stats` reports draws, explicit state uploads and bytes, and context losses. These counters
+make it possible to assert that camera-only gestures perform no full state-buffer upload.
+
+The canvas emits `hexlife-renderer-contextlost`, `hexlife-renderer-contextrestored`, and
+`hexlife-renderer-error`. Context loss is prevented so the browser may restore it; on restoration the
+renderer rebuilds its shared shader resources and re-uploads the latest state, selection, and draft.
+Networking and history stay entirely under host control throughout. Call `destroy()` to remove event
+listeners and release GPU resources.
 
 ---
 
@@ -428,10 +514,23 @@ DOM-free, safe in Node.
 import {
   decodeWorldCode, encodeWorldCode, explorerUrlForRuleset,
   describeRuleset, rulesetName, ORBIT_LABELS,
+  normalizeRulesetHex,
   listPresetPalettes,
   detectGraphicsPath, createGpuHelpPanel,
 } from '@hexlife/embed/api'
 ```
+
+`normalizeRulesetHex(value)` trims and uppercases an exact 32-character ruleset identity, returning
+`null` for short codes, notation, or malformed input. Use `codeToHex()` when those short codes should
+also be accepted.
+
+### Reference application
+
+HexWorlds is the package's practical reference host: it exercises externally owned simulation,
+verified state rendering, Node/browser determinism, and large-world operation. Reusable HexLife
+behavior discovered there is implemented and tested in this package first, then consumed through an
+exact packed or published version. HexWorlds retains its collaboration protocol, networking, history,
+and application UI; it must not carry copies of HexLife determinism or rendering primitives.
 
 ### World codes
 
