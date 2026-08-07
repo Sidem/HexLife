@@ -39,4 +39,9 @@ describe('@hexlife/embed/render package boundary', () => {
     expect(source).toContain('setDraftPreview(edits)')
     expect(source).toContain('this.ghostBytes[edit.index]')
   })
+
+  it('performs the initial geometry fit when reusing an already-sized canvas', () => {
+    const source = read('src/embed/EmbedRenderer.js')
+    expect(source).toContain('!this._layoutDirty && this._hexSize > 0')
+  })
 })

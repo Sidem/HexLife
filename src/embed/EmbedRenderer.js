@@ -508,7 +508,7 @@ export class EmbedRenderer {
         const h = Math.max(1, Math.round(cssHeight * dpr));
         this._cssWidth = Math.max(1, cssWidth);
         this._cssHeight = Math.max(1, cssHeight);
-        if (this.canvas.width === w && this.canvas.height === h && !this._layoutDirty) {
+        if (this.canvas.width === w && this.canvas.height === h && !this._layoutDirty && this._hexSize > 0) {
             // Still re-apply the view — pan is in CSS pixels and the mapping depends on size.
             this._uploadView();
             return;

@@ -25,6 +25,14 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.5.1 — 2026-08-07
+
+#### Fixed
+
+- **Renderer recreation on a reused canvas.** A renderer now performs its initial geometry fit even
+  when the canvas backing dimensions already match, so repeated-toroidal drawing and host-driven
+  resize/recreation never start with undefined repeat geometry.
+
 ### `@hexlife/embed` 1.5.0 — 2026-08-06
 
 #### Added
