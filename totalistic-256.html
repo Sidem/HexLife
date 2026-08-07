@@ -12,16 +12,23 @@
     --ink: #d7dadc;
     --dim: #8a929b;
     --accent: #e0b341;
+    /* Reading width for the prose and the control bars. The stage is deliberately *not* held to
+       it — see `.stage`. */
+    --shell: 1180px;
+    --pad: clamp(10px, 1.6vw, 20px);
   }
   * { box-sizing: border-box; }
+  /* Flex column purely so the narrow layout can reorder it — see the `order` block at the end. */
   body {
     margin: 0;
-    padding: 20px 20px 40px;
+    padding: var(--pad) var(--pad) 32px;
+    display: flex;
+    flex-direction: column;
     background: var(--bg);
     color: var(--ink);
     font: 14px/1.55 system-ui, -apple-system, sans-serif;
   }
-  header { max-width: 1180px; margin: 0 auto 16px; }
+  header { max-width: var(--shell); margin: 0 auto 16px; }
   h1 { font-size: 19px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
   .sub { margin: 0; color: var(--dim); font-size: 13px; }
   .sub code, .credit code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -50,8 +57,28 @@
   }
   .snippet .c { color: #6b7681; }
 
+  /* How the page was built is worth saying once and then folding away: on a laptop every line of
+     prose above the map is a line the map does not get. Opened by default only where there is room
+     (see `about.open` at boot). */
+  .about > summary {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 6px;
+    color: var(--dim);
+    font-size: 13px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .about > summary code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .about .sub { margin-top: 8px; }
+  .about > summary::-webkit-details-marker { display: none; }
+  .about > summary::before { content: '▸'; color: var(--accent); }
+  .about[open] > summary::before { content: '▾'; }
+  .about > summary:hover { color: var(--ink); }
+
   .bar {
-    max-width: 1180px;
+    max-width: var(--shell);
     margin: 0 auto 14px;
     display: flex;
     flex-wrap: wrap;
@@ -85,8 +112,22 @@
     color: var(--accent);
   }
   button.primary { min-width: 92px; font-variant-numeric: tabular-nums; }
-  #classSelect { min-width: 250px; }
+  #classSelect { min-width: 250px; max-width: 100%; }
   input[type="range"] { width: 120px; accent-color: var(--accent); }
+  input[type="number"] {
+    font: inherit;
+    font-size: 13px;
+    width: 4.2em;
+    padding: 5px 4px 5px 7px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    background: #262c33;
+    color: var(--ink);
+    border: 1px solid #38414a;
+    border-radius: 6px;
+  }
+  input[type="number"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .times { color: var(--dim); font-size: 12px; }
   .switch { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; color: var(--dim); }
   .switch input { accent-color: var(--accent); margin: 0; cursor: pointer; }
   .switch:hover span { color: var(--ink); }
@@ -100,7 +141,7 @@
 
   /* The one sentence the whole page is about: what fraction of a rule space is on screen. */
   .sample {
-    max-width: 1180px;
+    max-width: var(--shell);
     margin: 0 auto 14px;
     padding: 10px 13px;
     background: #14171b;
@@ -115,7 +156,7 @@
 
   /* Mini version of the Explorer's cluster tool — same param names, same ranges, same generator. */
   #clusterPanel {
-    max-width: 1180px;
+    max-width: var(--shell);
     margin: 0 auto 14px;
     padding: 12px 14px;
     background: var(--panel);
@@ -148,11 +189,22 @@
     letter-spacing: 0.06em;
   }
 
-  .stage { max-width: 1180px; margin: 0 auto; position: relative; }
+  /* The map is sized by the *shorter* constraint, and on nearly every screen that is the height,
+     not the width — a 1180px-wide square needs 1180px of viewport below the controls, which almost
+     nothing has. `--stage-max-w` is the width that makes the grid exactly as tall as the space
+     that is actually left (see `fitStage`), so the whole class stays on one screen. It is not held
+     to `--shell`: on a tall display the instrument should get the room, even though the prose
+     beside it stops at a readable measure. */
+  .stage {
+    width: min(100%, var(--stage-max-w, var(--shell)));
+    margin: 0 auto;
+    position: relative;
+  }
   hexlife-grid {
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 16;
+    /* Set from the tile layout, so a 24×8 strip is a 24×8 box rather than a squashed square. */
+    aspect-ratio: var(--tile-cols, 16) / var(--tile-rows, 16);
     border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
@@ -170,7 +222,7 @@
   #marker[hidden] { display: none; }
 
   .status {
-    max-width: 1180px;
+    max-width: var(--shell);
     margin: 12px auto 0;
     display: flex;
     flex-wrap: wrap;
@@ -182,7 +234,7 @@
   .status b { color: var(--ink); font-weight: 600; }
   .status a { color: var(--accent); }
   .footer {
-    max-width: 1180px;
+    max-width: var(--shell);
     margin: 18px auto 0;
     padding-top: 14px;
     border-top: 1px solid var(--line);
@@ -211,10 +263,12 @@
     color: var(--ink);
     padding: 0;
     max-width: 92vw;
+    max-height: 92dvh;
+    overflow: auto;
   }
   dialog::backdrop { background: rgba(0,0,0,0.7); }
   .detail-head {
-    display: flex; align-items: baseline; gap: 10px;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
     padding: 12px 14px; border-bottom: 1px solid var(--line);
   }
   .detail-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
@@ -224,24 +278,57 @@
   }
   .detail-head .spacer { flex: 1; }
   .detail-body { padding: 14px; }
-  .detail-body hexlife-world { width: min(70vh, 560px); border-radius: 8px; }
+  /* Square, so the third constraint matters: on a phone the dialog is width-bound, not height-bound. */
+  .detail-body hexlife-world { width: min(70dvh, 82vw, 560px); border-radius: 8px; }
   #detailMount:empty { display: none; }
   .detail-meta { margin: 10px 0 0; font-size: 12px; color: var(--dim); }
+
+  /* Narrow screens: the separators between control groups become noise the moment the groups wrap
+     onto their own lines, and the code sample is the first thing worth its space.
+
+     The reorder is the important part. Every control group wraps onto its own line at 375 px, so
+     the two bars alone are ~400 px of chrome — the map used to start below the fold on a phone,
+     which is the same failure as the desktop one and worse. Map first, then what it says, then the
+     knobs. `fitStage` measures the stage wherever it lands, so nothing else has to know. */
+  @media (max-width: 720px) {
+    header { order: 0; margin-bottom: 10px; }
+    .stage { order: 1; }
+    .status { order: 2; gap: 6px 14px; }
+    .sample { order: 3; margin: 12px auto 0; }
+    .bar { order: 4; margin: 12px auto 0; gap: 8px 10px; padding: 10px; }
+    #clusterPanel { order: 5; margin: 12px auto 0; }
+    .footer { order: 6; }
+    h1 { font-size: 17px; }
+    .sub { font-size: 12.5px; }
+    .group + .group { padding-left: 0; border-left: 0; }
+    .snippet { font-size: 11px; }
+    input[type="range"] { width: 96px; }
+    #classSelect { min-width: 0; flex: 1 1 180px; }
+  }
+  @media (max-width: 480px) {
+    .snippet { display: none; }
+    .group { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>256 worlds, one rule class — a sampler for hex rule space</h1>
+  <!-- Folded by default below a tall screen, and the reason is the map: every line of prose here is
+       a line the grid does not get, and the class banner under the controls already says what is on
+       screen. Opened at boot where there is room for both. -->
+  <details class="about">
+  <summary>Why 256 is the whole class, and how this page is built with <code>@hexlife/embed</code></summary>
   <p class="sub">
     A hex cell and its six neighbours make eight possible live counts, so a rule that depends only on
     that total has exactly 2<sup>8</sup> = <b>256</b> forms — codes <code>T00</code> through
-    <code>TFF</code>. That is the whole class, not a sample, and it fits a 16×16 grid with nothing
-    left over. <b>Every wider constraint is too big to draw</b>, so the same 16×16 grid becomes a
+    <code>TFF</code>. That is the whole class, not a sample, and at 16×16 all of it is on screen with
+    nothing left over. <b>Every wider constraint is too big to draw</b>, so the same grid becomes a
     random slice of it: 256 of the 16,384 outer-totalistic rules, of the 2<sup>28</sup> rotationally
     symmetric ones, or of all 2<sup>128</sup>. Every world is <code>96 × 112</code> cells and shares
-    one initial condition, so the only difference between any two tiles is the rule. Click a tile to
-    open it full size.
+    one initial condition, so the only difference between any two tiles is the rule. Set the grid to
+    whatever your screen can hold, and click a tile to open it full size.
   </p>
   <p class="credit">
     Built entirely with
@@ -260,9 +347,18 @@ grid.rulesets = Array.from({length: 256},   <span class="c">// T00–TFF *is* th
 
 grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 2^28 rotational ones —</span>
                                             <span class="c">// a tag letter + a random payload is a rule</span></code></pre>
+  </details>
 </header>
 
 <div class="bar">
+  <div class="group">
+    <label for="gridCols" title="Tiles across × tiles down. 16 × 16 is 256 — exactly the totalistic class; anything smaller is a sample of it.">Grid</label>
+    <input type="number" id="gridCols" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles across">
+    <span class="times">×</span>
+    <input type="number" id="gridRows" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles down">
+    <span class="readout" id="tileCount" title="Worlds on screen">256</span>
+  </div>
+
   <div class="group">
     <label for="classSelect">Rule class</label>
     <select id="classSelect"></select>
@@ -394,9 +490,73 @@ import {
 
 const grid = document.getElementById('grid');
 const marker = document.getElementById('marker');
+const stage = document.querySelector('.stage');
 
-/** Tiles on the map. 16×16 is not arbitrary: it is exactly the size of the totalistic class. */
-const SIZE = 256;
+/*
+ * Tiles on the map, as columns × rows.
+ *
+ * 16×16 is not arbitrary — 256 tiles is exactly the size of the totalistic class, so at that layout
+ * the page shows a complete rule space rather than a sample of one. But it is a *default*, not a
+ * constant: a phone cannot draw 256 legible tiles, and on a wide screen a 24×8 strip is a perfectly
+ * good way to read a class. Everything downstream asks `tileCount()`, and the banner always says
+ * which of the two situations you are in.
+ */
+
+/** Most tiles on one axis. Past this the tiles are smaller than the gap between them. */
+const AXIS_MAX = 24;
+/**
+ * Worlds, not tiles. Each one is its own wasm grid of 96×112 cells ticking every frame, so the cap
+ * is about what a laptop can actually animate — the element's own backstop is four times higher.
+ */
+const MAX_TILES = 400;
+/** A tile below this many CSS px is a smudge rather than a world; used to pick the default only. */
+const MIN_TILE_PX = 26;
+
+const tileCount = () => layoutCols * layoutRows;
+/** How many rulesets the class contains — `Infinity`-large for `free`, which is the whole point. */
+const classSize = (cls) => 2 ** cls.bits;
+/** True when the class fits on the map with nothing sampled away. */
+const isExhaustive = () => classSize(currentClass()) <= tileCount();
+
+const clampAxis = (v) => Math.min(AXIS_MAX, Math.max(1, Math.floor(Number(v)) || 1));
+
+/**
+ * Both axes in range, and never more worlds than {@link MAX_TILES}.
+ * @param {'cols'|'rows'} shrink Which axis yields when the product is too big — the *other* one is
+ *   the one the viewer just typed, and an input that silently rewrites what you typed is a bad
+ *   control.
+ */
+function clampLayout(cols, rows, shrink = 'rows') {
+  let c = clampAxis(cols);
+  let r = clampAxis(rows);
+  if (c * r > MAX_TILES) {
+    if (shrink === 'cols') c = Math.max(1, Math.floor(MAX_TILES / r));
+    else r = Math.max(1, Math.floor(MAX_TILES / c));
+  }
+  return {cols: c, rows: r};
+}
+
+/**
+ * `g=COLSxROWS` off the query string, or the largest square this screen can draw legibly.
+ *
+ * The default is responsive rather than pinned at 16×16 because 256 tiles on a phone is 21 px of
+ * world each: the honest answer there is fewer, larger tiles plus a banner that says it is showing
+ * 144 of the 256. Every link carries `g`, so a view that was worth sharing is reproduced exactly,
+ * whatever it is opened on.
+ */
+function readLayoutParam(raw) {
+  const m = /^(\d+)\s*[x×*]\s*(\d+)$/.exec(String(raw || '').trim());
+  if (m) return clampLayout(m[1], m[2]);
+  // Deliberately rough: this only picks a starting point, and `fitStage` does the real sizing.
+  const side = Math.min(
+    document.documentElement.clientWidth - 40,
+    document.documentElement.clientHeight - 280,
+  );
+  for (const n of [16, 12, 8, 6, 4]) {
+    if (side / n >= MIN_TILE_PX) return {cols: n, rows: n};
+  }
+  return {cols: 4, rows: 4};
+}
 
 // --- the rule classes --------------------------------------------------------
 /**
@@ -478,39 +638,44 @@ function drawCode(cls, rng, bias) {
 }
 
 /**
- * The `SIZE` codes to put on the map.
+ * The `size` codes to put on the map.
  *
- * A class no bigger than the grid is *enumerated*, not sampled — the totalistic class is 256 rules
- * and 256 tiles, so showing anything other than all of them in code order would be a worse map. Bias
- * is ignored there for the same reason: there is nothing to choose.
+ * A class no bigger than the grid is *enumerated*, not sampled — 256 totalistic rules on 256 tiles,
+ * and showing anything other than all of them in code order would be a worse map. Bias is ignored
+ * there for the same reason: there is nothing to choose. Shrink the grid below the class and it
+ * stops being a complete map and becomes a sample of one, which is exactly what the wider classes
+ * always were; the code path they share says so.
  *
  * Otherwise: draw without replacement. Duplicates are not merely untidy, they are a lie about how
- * much of the space you are looking at. An extreme bias can shrink the reachable set below `SIZE`
+ * much of the space you are looking at. An extreme bias can shrink the reachable set below `size`
  * (bias 0.05 draws the all-dead rule very often), so the guard gives up rather than spinning, and
  * the banner reports how many distinct rules actually made it.
  *
  * @returns {{codes: string[], distinct: number}}
  */
-function drawSample(cls, seed, bias) {
-  if (cls.bits <= 8) {
-    return {
-      codes: Array.from({length: 2 ** cls.bits}, (_, i) => cls.tag + i.toString(16).toUpperCase().padStart(cls.chars, '0')),
-      distinct: 2 ** cls.bits,
-    };
+function drawSample(cls, seed, bias, size) {
+  if (classSize(cls) <= size) {
+    const all = Array.from(
+      {length: classSize(cls)},
+      (_, i) => cls.tag + i.toString(16).toUpperCase().padStart(cls.chars, '0'),
+    );
+    const codes = all.slice(0, size);
+    for (let i = 0; codes.length < size; i++) codes.push(all[i % all.length]);
+    return {codes, distinct: all.length};
   }
   const rng = mulberry32(seed);
   const seen = new Set();
   const codes = [];
-  for (let guard = 0; codes.length < SIZE && guard < SIZE * 60; guard++) {
+  for (let guard = 0; codes.length < size && guard < size * 60; guard++) {
     const code = drawCode(cls, rng, bias);
     if (seen.has(code)) continue;
     seen.add(code);
     codes.push(code);
   }
   const distinct = codes.length;
-  // Pad rather than shrink the grid: a short list would rebuild the worlds (a different tile count),
-  // and the comparison instrument is worth more than the tail.
-  for (let i = 0; codes.length < SIZE; i++) codes.push(codes[i % distinct]);
+  // Pad rather than shrink the grid: a short list would leave the last tiles blank, and every tile
+  // showing a rule is worth more than the tail being unique.
+  for (let i = 0; codes.length < size; i++) codes.push(codes[i % distinct]);
   return {codes, distinct};
 }
 
@@ -532,8 +697,11 @@ let sampleSeed = /^[0-9a-z]+$/.test(q.get('s') || '') ? parseInt(q.get('s'), 36)
 let bias = num(q.get('b'), 0.05, 0.95, 0.5);
 let icMode = ['single', 'random', 'clusters'].includes(q.get('ic')) ? q.get('ic') : 'random';
 let clusterSeed = /^[0-9a-z]+$/.test(q.get('cs') || '') ? parseInt(q.get('cs'), 36) >>> 0 : 0x9e3779b9;
+let {cols: layoutCols, rows: layoutRows} = readLayoutParam(q.get('g'));
 let currentCodes = [];
-let distinctCount = SIZE;
+let distinctCount = 0;
+/** The tile the marker is parked on, or -1. Kept because a resize moves every tile. */
+let selectedIndex = -1;
 
 /**
  * Read one numeric knob out of the query string. An absent or unparseable value takes `fallback`
@@ -706,6 +874,9 @@ const rerollBtn = document.getElementById('rerollBtn');
 const seedOut = document.getElementById('seedOut');
 const sampleOut = document.getElementById('sample');
 const clusterPanel = document.getElementById('clusterPanel');
+const gridColsInput = document.getElementById('gridCols');
+const gridRowsInput = document.getElementById('gridRows');
+const tileCountOut = document.getElementById('tileCount');
 
 const resetBtn = document.getElementById('resetBtn');
 const stepBtn = document.getElementById('stepBtn');
@@ -713,6 +884,104 @@ const stepBtn = document.getElementById('stepBtn');
 playBtn.addEventListener('click', () => (grid.userPaused ? grid.play() : grid.pause()));
 resetBtn.addEventListener('click', applyIC);
 stepBtn.addEventListener('click', () => { grid.tick(1); syncStatus(); });
+
+// --- map size ----------------------------------------------------------------
+/**
+ * Fit the map to the room that is actually left below the controls.
+ *
+ * A square that is `width: 100%` of a 1180 px column is 1180 px tall, and almost no screen has that
+ * much viewport under a header and two control bars — which is why the page used to demand scrolling
+ * to see a grid whose entire premise is that you see it at once. The height is the binding
+ * constraint on nearly every display, so it is the one we solve for: take the space between the top
+ * of the stage and the bottom of the viewport, and give the box the width that makes it exactly that
+ * tall at the current tile aspect ratio.
+ *
+ * `clientHeight` rather than `visualViewport`: the layout viewport does not twitch as mobile browser
+ * chrome slides in and out, and a map that resizes while you scroll is worse than one that is 60 px
+ * short of perfect.
+ */
+const STAGE_RESERVE = 56;
+/** Past this the map is too small to read; scrolling is the better trade. */
+const STAGE_MIN_H = 260;
+
+/**
+ * Synchronous on purpose. It is one `getBoundingClientRect` and one custom-property write, its
+ * callers (`ResizeObserver`, the `resize` event) are already coalesced by the browser, and the box
+ * it writes to is below everything it measures — so there is no loop to break. Deferring it to
+ * `requestAnimationFrame` would only mean the map stays unsized in a tab that loads in the
+ * background, where rAF never runs.
+ */
+function fitStage() {
+  const top = stage.getBoundingClientRect().top;
+  const avail = Math.max(STAGE_MIN_H, document.documentElement.clientHeight - top - STAGE_RESERVE);
+  stage.style.setProperty('--stage-max-w', `${Math.round(avail * (layoutCols / layoutRows))}px`);
+  positionMarker();
+}
+
+/** Park the selection outline on its tile, wherever that tile is now. */
+function positionMarker() {
+  const rect = selectedIndex >= 0 ? grid.tileRect(selectedIndex) : null;
+  if (!rect) { marker.hidden = true; return; }
+  Object.assign(marker.style, {
+    left: `${rect.x}px`, top: `${rect.y}px`,
+    width: `${rect.width}px`, height: `${rect.height}px`,
+  });
+  marker.hidden = false;
+}
+
+// Anything that can push the map down has to re-run the fit: the class banner rewraps, the cluster
+// panel opens, the credit folds away, a control bar gains a row. Observing each of them rather than
+// a wrapper is what keeps the narrow layout free to reorder them around the stage — and none of
+// them contains the stage, so there is no observer feeding itself.
+{
+  const observer = new ResizeObserver(fitStage);
+  for (const el of document.querySelectorAll('header, .bar, .sample, #clusterPanel')) observer.observe(el);
+}
+window.addEventListener('resize', fitStage);
+
+/** Push the tile grid into the element and into the box that holds it. */
+function applyGridShape() {
+  grid.setAttribute('layout', `${layoutCols}x${layoutRows}`);
+  grid.style.setProperty('--tile-cols', String(layoutCols));
+  grid.style.setProperty('--tile-rows', String(layoutRows));
+  selectedIndex = -1;
+  marker.hidden = true;
+  fitStage();
+}
+
+function syncGridInputs() {
+  gridColsInput.value = String(layoutCols);
+  gridRowsInput.value = String(layoutRows);
+  tileCountOut.textContent = String(tileCount());
+}
+
+/**
+ * Re-tile the map.
+ *
+ * `layout` is a live attribute — the renderer just re-divides the canvas — but the tile *count* is
+ * not: a ruleset list of a different length rebuilds the worlds, which is what `applySample` goes on
+ * to do. Setting the attribute first means the rebuilt grid boots straight into the right shape
+ * instead of laying itself out twice.
+ */
+function setLayout(cols, rows, shrink) {
+  const next = clampLayout(cols, rows, shrink);
+  if (next.cols === layoutCols && next.rows === layoutRows) {
+    syncGridInputs();   // Snap a rejected keystroke back to what is actually on screen.
+    return;
+  }
+  layoutCols = next.cols;
+  layoutRows = next.rows;
+  syncGridInputs();
+  applyGridShape();
+  applySample();
+}
+
+gridColsInput.max = String(AXIS_MAX);
+gridRowsInput.max = String(AXIS_MAX);
+// `change`, not `input`: mid-typing a cleared field reads as 1, and rebuilding 400 worlds for a
+// value nobody meant is expensive as well as jarring.
+gridColsInput.addEventListener('change', () => setLayout(gridColsInput.value, layoutRows, 'rows'));
+gridRowsInput.addEventListener('change', () => setLayout(layoutCols, gridRowsInput.value, 'cols'));
 
 for (const cls of CLASSES) {
   const opt = document.createElement('option');
@@ -898,7 +1167,10 @@ document.getElementById('reshuffleBtn').addEventListener('click', () => {
 /** Redraw the class sample, push it to the grid, and restate what is on screen. */
 function applySample() {
   const cls = currentClass();
-  const exhaustive = cls.bits <= 8;
+  // Not a property of the class any more: 256 totalistic rules are the whole map at 16×16 and a
+  // space to sample at 8×8, so bias and reroll switch on the moment the grid gets smaller than the
+  // class — the same controls, doing the same thing they do for every wider class.
+  const exhaustive = isExhaustive();
 
   biasGroup.classList.toggle('off', exhaustive);
   biasInput.disabled = exhaustive;
@@ -906,7 +1178,7 @@ function applySample() {
   rerollBtn.disabled = exhaustive;
   seedOut.textContent = exhaustive ? '' : sampleSeed.toString(36);
 
-  const {codes, distinct} = drawSample(cls, sampleSeed, bias);
+  const {codes, distinct} = drawSample(cls, sampleSeed, bias, tileCount());
   currentCodes = codes;
   distinctCount = distinct;
 
@@ -917,6 +1189,7 @@ function applySample() {
   grid.rulesets = codes;
 
   // The rule under the marker is not the rule that was clicked any more.
+  selectedIndex = -1;
   marker.hidden = true;
   selectedOut.textContent = '';
 
@@ -927,26 +1200,45 @@ function applySample() {
 
 function renderSample() {
   const cls = currentClass();
+  const size = tileCount();
   const total = 1n << BigInt(cls.bits);
-  if (cls.bits <= 8) {
-    sampleOut.innerHTML = `<b>${cls.label.replace(/ —.*/, '')}</b> — showing <b>all ${SIZE}</b> of the `
-      + `${fmtBig(total)} rulesets in the class (2<sup>${cls.bits}</sup>). This is the complete class, `
-      + `not a sample: every totalistic rule is on screen exactly once.`
+  const short = cls.label.replace(/ —.*/, '');
+  const shape = `${layoutCols}×${layoutRows}`;
+
+  if (classSize(cls) <= size) {
+    // The spare tiles are repeats, and saying so is the whole reason this line exists: a map that
+    // quietly showed the same rule twice would be indistinguishable from one that did not.
+    const spare = size - classSize(cls);
+    sampleOut.innerHTML = `<b>${short}</b> — showing <b>all ${fmtBig(total)}</b> rulesets in the class `
+      + `(2<sup>${cls.bits}</sup>) on a ${shape} grid. This is the complete class, not a sample: every `
+      + `totalistic rule is on screen`
+      + (spare ? `, and the ${spare} tiles left over repeat from the start.` : ' exactly once.')
       + `<span class="note">${cls.note}</span>`;
     return;
   }
-  const ratio = 1n << BigInt(cls.bits - 8);
-  const short = cls.label.replace(/ —.*/, '');
+
+  // BigInt division truncates, which turns "1 in 1.8" into the nonsense "1 in 1" as soon as the
+  // grid is a large fraction of the class — reachable now that the grid is a knob. Float is exact
+  // enough for the small ratios and only the big ones need BigInt anyway.
+  const ratioNum = Number(total) / size;
+  const ratioText = ratioNum < 100
+    ? ratioNum.toFixed(ratioNum < 10 ? 1 : 0)
+    : fmtBig(total / BigInt(size));
   const biasNote = bias === 0.5
     ? 'drawn uniformly'
     : `drawn with each ${cls.unit} live at <em>p</em> = ${bias.toFixed(2)}, so the sample is biased toward `
       + `${bias < 0.5 ? 'sparse, quiet' : 'dense, saturating'} rules rather than uniform`;
-  const shortfall = distinctCount < SIZE
-    ? ` <b>Only ${distinctCount} distinct rules were reachable at this bias</b>, so ${SIZE - distinctCount} tiles repeat.`
+  const shortfall = distinctCount < size
+    ? ` <b>Only ${distinctCount} distinct rules were reachable at this bias</b>, so ${size - distinctCount} tiles repeat.`
     : '';
-  sampleOut.innerHTML = `<b>${short}</b> — showing a random subset of <b>${SIZE}</b> of the `
+  // A class that would fit a bigger grid gets told so, because that is a knob away rather than a
+  // fact of the universe — unlike the 2^128 the free class is a slice of.
+  const roomier = classSize(cls) <= MAX_TILES
+    ? ` The whole class fits a ${Math.ceil(Math.sqrt(classSize(cls)))}×${Math.ceil(Math.sqrt(classSize(cls)))} grid.`
+    : '';
+  sampleOut.innerHTML = `<b>${short}</b> — showing a random subset of <b>${size}</b> of the `
     + `<b>${fmtBig(total)}</b> rulesets (2<sup>${cls.bits}</sup>) that satisfy this constraint: `
-    + `1 in ${fmtBig(ratio)}.${shortfall}`
+    + `1 in ${ratioText}, on a ${shape} grid.${shortfall}${roomier}`
     + `<span class="note">${cls.note} Sample <code>${sampleSeed.toString(36)}</code>, ${biasNote}.</span>`;
 }
 
@@ -963,7 +1255,10 @@ function writeUrl() {
     urlPending = 0;
     const p = new URLSearchParams();
     p.set('c', classKey);
-    if (currentClass().bits > 8) {
+    // Always written, even when it matches the default: the default is now whatever the screen that
+    // opened the link could draw, so leaving it out would reshape somebody else's view of it.
+    p.set('g', `${layoutCols}x${layoutRows}`);
+    if (!isExhaustive()) {
       p.set('s', sampleSeed.toString(36));
       if (bias !== 0.5) p.set('b', bias.toFixed(2));
     }
@@ -990,6 +1285,8 @@ grid.addEventListener('hexlife-playstate', (e) => {
 grid.addEventListener('hexlife-ready', (e) => {
   document.getElementById('worlds').textContent = e.detail.worlds;
   document.getElementById('cells').textContent = `${e.detail.rows}×${e.detail.cols}`;
+  // A rebuild is the one thing that moves every tile without the page resizing.
+  fitStage();
   applyIC();
 });
 setInterval(syncStatus, 250);
@@ -1067,14 +1364,8 @@ grid.addEventListener('hexlife-worldselect', (e) => {
   // satisfies, so a draw from the C6 class that happens to be totalistic says so.
   const code = rulesetToCode(rulesetHex) || rulesetHex;
 
-  const rect = grid.tileRect(index);
-  if (rect) {
-    Object.assign(marker.style, {
-      left: `${rect.x}px`, top: `${rect.y}px`,
-      width: `${rect.width}px`, height: `${rect.height}px`,
-    });
-    marker.hidden = false;
-  }
+  selectedIndex = index;
+  positionMarker();
 
   const desc = describeRuleset(rulesetHex);
   selectedOut.innerHTML = `selected <b>${code}</b> · ${desc?.notation || 'no B/S form'} · ${rulesetName(rulesetHex)}`;
@@ -1130,16 +1421,24 @@ window.addEventListener('keydown', (e) => {
 densityInput.value = String(num(q.get('d'), 0.02, 0.98, 0.5));
 densityOut.textContent = Number(densityInput.value).toFixed(2);
 grid.setAttribute('density', densityInput.value);
+// Where there is room for it the argument is worth reading; where there is not, those eight lines
+// are eight lines the map does not get — and the class banner makes the same point in two.
+document.querySelector('.about').open =
+  window.matchMedia('(min-width: 900px) and (min-height: 940px)').matches;
 syncICButtons();
 syncPresetChips();
+syncGridInputs();
+applyGridShape();
 applySample();
 
 // Debug handle, in the house style.
 window.__totalistic = {
-  grid, CLASSES, applyIC, applySample, clusterParams,
+  grid, CLASSES, applyIC, applySample, clusterParams, setLayout, fitStage,
   get codes() { return currentCodes; },
   get icMode() { return icMode; },
   get classKey() { return classKey; },
+  get layout() { return {cols: layoutCols, rows: layoutRows, tiles: tileCount()}; },
+  get distinct() { return distinctCount; },
 };
 </script>
 </body>

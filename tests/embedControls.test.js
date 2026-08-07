@@ -207,6 +207,38 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(showcase).toContain("detailWorld()?.setAttribute('hue-shift', hueShiftInput.value)");
     });
 
+    it('sizes the map to the room left below the controls, not to the column width', () => {
+        const showcase = read('totalistic-256.html');
+        // A `width: 100%` square in an 1180px column is 1180px tall, and almost no viewport is —
+        // which made a page whose whole premise is "see the class at once" demand scrolling.
+        expect(showcase).toContain('width: min(100%, var(--stage-max-w, var(--shell)))');
+        expect(showcase).toContain("stage.style.setProperty('--stage-max-w'");
+        // Synchronous on purpose: rAF never runs in a tab that loads in the background, and a
+        // deferred fit would leave the map at its unfitted size until the viewer switched to it.
+        expect(showcase).toMatch(/function fitStage\(\) \{\n\s+const top = stage\.getBoundingClientRect\(\)\.top;/);
+        expect(showcase).toContain('new ResizeObserver(fitStage)');
+        expect(showcase).toContain("window.addEventListener('resize', fitStage)");
+    });
+
+    it('re-tiles the map on demand, and stops claiming to be complete when it is not', () => {
+        const showcase = read('totalistic-256.html');
+        expect(showcase).toContain('id="gridCols"');
+        expect(showcase).toContain('id="gridRows"');
+        // `layout` is a live attribute, so the box reshapes without a rebuild; the tile *count*
+        // changes the ruleset list length, which is what rebuilds the worlds.
+        expect(showcase).toContain("grid.setAttribute('layout', `${layoutCols}x${layoutRows}`)");
+        expect(showcase).toContain('aspect-ratio: var(--tile-cols, 16) / var(--tile-rows, 16)');
+        // "The whole class is on screen" is now a fact about the class *and* the grid: 256
+        // totalistic rules are the complete map at 16×16 and a sample of it at 8×8, and the bias
+        // and reroll controls have to switch on with it.
+        expect(showcase).toContain('const isExhaustive = () => classSize(currentClass()) <= tileCount()');
+        expect(showcase).toContain('const exhaustive = isExhaustive();');
+        expect(showcase).toContain('drawSample(cls, sampleSeed, bias, tileCount())');
+        // A shared link has to reproduce the view, and the default is now whatever the screen that
+        // opened it could draw.
+        expect(showcase).toContain("p.set('g', `${layoutCols}x${layoutRows}`)");
+    });
+
     it('ships a reproducible single-file offline build', () => {
         const packageJson = JSON.parse(read('package.json'));
         const config = read('vite.totalistic-standalone.config.js');
