@@ -16,19 +16,21 @@
        it — see `.stage`. */
     --shell: 1180px;
     --pad: clamp(10px, 1.6vw, 20px);
+    /* Width of the control rail on a landscape screen. */
+    --rail: 22rem;
   }
   * { box-sizing: border-box; }
-  /* Flex column purely so the narrow layout can reorder it — see the `order` block at the end. */
   body {
     margin: 0;
     padding: var(--pad) var(--pad) 32px;
-    display: flex;
-    flex-direction: column;
     background: var(--bg);
     color: var(--ink);
     font: 14px/1.55 system-ui, -apple-system, sans-serif;
   }
-  header { max-width: var(--shell); margin: 0 auto 16px; }
+  header { max-width: var(--shell); margin: 0 auto 12px; }
+  .title-row { display: flex; align-items: baseline; gap: 12px; }
+  .title-row h1 { flex: 1 1 auto; }
+  #panelToggle { flex: 0 0 auto; padding: 4px 10px; font-size: 12px; }
   h1 { font-size: 19px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
   .sub { margin: 0; color: var(--dim); font-size: 13px; }
   .sub code, .credit code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -154,14 +156,14 @@
   .sample .note { display: block; margin-top: 4px; color: var(--dim); font-size: 12px; }
   .sample .note code { color: #b6bec7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-  /* Mini version of the Explorer's cluster tool — same param names, same ranges, same generator. */
+  /* Mini version of the Explorer's cluster tool — same param names, same ranges, same generator.
+     It lives inside the Initial condition fold, so it is a section of that card rather than a card
+     of its own: nine sliders that only mean anything while the cluster mode is selected. */
   #clusterPanel {
-    max-width: var(--shell);
-    margin: 0 auto 14px;
-    padding: 12px 14px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    flex: 1 1 100%;
+    min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
   }
   #clusterPanel[hidden] { display: none; }
   .panel-head {
@@ -173,7 +175,7 @@
   .panel-head button { padding: 4px 9px; font-size: 12px; }
   .sliders {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 8px 20px;
   }
   .slider { display: flex; align-items: center; gap: 8px; }
@@ -200,6 +202,84 @@
     margin: 0 auto;
     position: relative;
   }
+
+  /* --- workspace: the map, and the controls beside it ------------------------
+     The controls used to sit above the map, so every section you opened pushed
+     the map down and shrank it — the nine cluster sliders could halve it. On a
+     landscape screen the map is bound by height and there is width going spare,
+     so the controls become a rail alongside: opening a section scrolls the rail
+     instead of stealing the map's height. Under 1000px they stack *below* the
+     map, where they push the page rather than the grid. */
+  .workspace {
+    width: 100%;
+    max-width: min(100%, max(var(--shell), calc(var(--stage-max-w, 0px) + var(--rail) + 16px)));
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .workspace .status { margin: 0; max-width: none; }
+  @media (min-width: 1000px) {
+    .workspace {
+      grid-template-columns: minmax(0, 1fr) var(--rail);
+      align-items: start;
+      column-gap: 16px;
+      row-gap: 10px;
+    }
+    .stage { grid-column: 1; grid-row: 1; }
+    .workspace .status { grid-column: 1; grid-row: 2; }
+    .panel {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      /* The rail scrolls itself rather than growing the page: whatever is open in it, the map is
+         still exactly as tall as the viewport allows. */
+      max-height: var(--panel-max-h, none);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    body.no-panel .workspace { grid-template-columns: minmax(0, 1fr); }
+  }
+  body.no-panel .panel { display: none; }
+
+  .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .panel > * { max-width: none; margin: 0; }
+  /* Wrapped groups in a narrow rail do not want vertical rules between them. */
+  .panel .group + .group { padding-left: 0; border-left: 0; }
+
+  .fold {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .fold > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    list-style: none;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::before { content: '▸'; color: var(--accent); font-weight: 400; }
+  .fold[open] > summary::before { content: '▾'; }
+  .fold > summary:hover { color: var(--accent); }
+  /* What the section is set to, without opening it. A fold you have to open to read is a fold you
+     stop closing. */
+  .fold .hint {
+    margin-left: auto;
+    font-weight: 400;
+    font-size: 11.5px;
+    color: var(--dim);
+    text-align: right;
+  }
+  .fold-body { display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 0 12px 12px; }
+  /* `<details>` hides its non-summary children with a *UA* `display` rule, and any author `display`
+     outranks it — including the flex line above. Restate the hiding as an author rule, or every
+     fold renders permanently open while looking closed. */
+  .fold:not([open]) > .fold-body { display: none; }
   hexlife-grid {
     display: block;
     width: 100%;
@@ -283,23 +363,14 @@
   #detailMount:empty { display: none; }
   .detail-meta { margin: 10px 0 0; font-size: 12px; color: var(--dim); }
 
-  /* Narrow screens: the separators between control groups become noise the moment the groups wrap
-     onto their own lines, and the code sample is the first thing worth its space.
-
-     The reorder is the important part. Every control group wraps onto its own line at 375 px, so
-     the two bars alone are ~400 px of chrome — the map used to start below the fold on a phone,
-     which is the same failure as the desktop one and worse. Map first, then what it says, then the
-     knobs. `fitStage` measures the stage wherever it lands, so nothing else has to know. */
+  /* Narrow screens. The map is already first in the DOM, so nothing needs reordering — what is
+     left is that separators between control groups become noise the moment the groups wrap onto
+     their own lines, and the code sample is the first thing worth its space. */
   @media (max-width: 720px) {
-    header { order: 0; margin-bottom: 10px; }
-    .stage { order: 1; }
-    .status { order: 2; gap: 6px 14px; }
-    .sample { order: 3; margin: 12px auto 0; }
-    .bar { order: 4; margin: 12px auto 0; gap: 8px 10px; padding: 10px; }
-    #clusterPanel { order: 5; margin: 12px auto 0; }
-    .footer { order: 6; }
     h1 { font-size: 17px; }
     .sub { font-size: 12.5px; }
+    .status { gap: 6px 14px; }
+    .bar { gap: 8px 10px; padding: 10px; }
     .group + .group { padding-left: 0; border-left: 0; }
     .snippet { font-size: 11px; }
     input[type="range"] { width: 96px; }
@@ -314,7 +385,10 @@
 <body>
 
 <header>
-  <h1>256 worlds, one rule class — a sampler for hex rule space</h1>
+  <div class="title-row">
+    <h1>256 worlds, one rule class — a sampler for hex rule space</h1>
+    <button id="panelToggle" aria-pressed="true" title="Show or hide the control panel  (C). Space, R and → keep working either way.">Controls</button>
+  </div>
   <!-- Folded by default below a tall screen, and the reason is the map: every line of prose here is
        a line the grid does not get, and the class banner under the controls already says what is on
        screen. Opened at boot where there is room for both. -->
@@ -350,82 +424,7 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
   </details>
 </header>
 
-<div class="bar">
-  <div class="group">
-    <label for="gridCols" title="Tiles across × tiles down. 16 × 16 is 256 — exactly the totalistic class; anything smaller is a sample of it.">Grid</label>
-    <input type="number" id="gridCols" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles across">
-    <span class="times">×</span>
-    <input type="number" id="gridRows" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles down">
-    <span class="readout" id="tileCount" title="Worlds on screen">256</span>
-  </div>
-
-  <div class="group">
-    <label for="classSelect">Rule class</label>
-    <select id="classSelect"></select>
-  </div>
-
-  <div class="group" id="biasGroup">
-    <label for="bias" title="Probability that any one bucket/orbit/entry of the rule outputs a live cell. 0.50 samples the class uniformly; lower values bias the draw toward sparse, quiet rules.">Bias</label>
-    <input type="range" id="bias" min="0.05" max="0.95" step="0.01" value="0.5">
-    <span class="readout" id="biasOut">0.50</span>
-  </div>
-
-  <div class="group" id="rerollGroup">
-    <button id="rerollBtn" title="Draw a fresh random subset of this class  (G)">Reroll</button>
-    <span class="readout" id="seedOut"></span>
-  </div>
-</div>
-
-<p class="sample" id="sample">…</p>
-
-<div class="bar">
-  <div class="group">
-    <button id="playBtn" class="primary" title="Play / pause  (Space or P)">Play</button>
-    <button id="resetBtn" title="Re-seed every world from the current initial condition  (R)">Reset</button>
-    <button id="stepBtn" title="Advance one generation  (→ or .)">Step</button>
-  </div>
-
-  <div class="group">
-    <label>Initial condition</label>
-    <button class="ic" data-ic="single" aria-pressed="false">Single seed</button>
-    <button class="ic" data-ic="random" aria-pressed="true">Random</button>
-    <button class="ic" data-ic="clusters" aria-pressed="false">Clusters</button>
-  </div>
-
-  <div class="group" id="densityGroup">
-    <label for="density">Density</label>
-    <input type="range" id="density" min="0.02" max="0.98" step="0.02" value="0.5">
-    <span class="readout" id="densityOut">0.50</span>
-  </div>
-
-  <div class="group">
-    <label for="speed">Speed</label>
-    <input type="range" id="speed" min="0" max="60" step="1" value="15">
-    <span class="readout" id="speedOut">15/s</span>
-  </div>
-
-  <div class="group">
-    <label for="palette">Palette</label>
-    <select id="palette"></select>
-    <label for="hueShift" title="Rotate chromatic palette colors while keeping blacks, grays, and whites unchanged.">Hue</label>
-    <input type="range" id="hueShift" min="0" max="359" step="1" value="0">
-    <span class="readout" id="hueShiftOut">0°</span>
-    <label class="switch" title="Blacks out the two LUT entries that make a preset strobe — rule 0 firing a birth and rule 127 firing a death. The Explorer's “Prevent birth/death flash”.">
-      <input type="checkbox" id="flicker" checked>
-      <span>No flash</span>
-    </label>
-  </div>
-</div>
-
-<div id="clusterPanel" hidden>
-  <div class="panel-head">
-    <label>Cluster presets</label>
-    <div id="clusterPresets" class="group"></div>
-    <span class="spacer"></span>
-    <button id="reshuffleBtn" title="Same knobs, new random placement">Reshuffle</button>
-  </div>
-  <div class="sliders" id="clusterSliders"></div>
-</div>
+<div class="workspace">
 
 <div class="stage">
   <!-- Monochrome + flicker-proof are the Explorer's own defaults: at 71px a tile is a texture, and
@@ -452,9 +451,112 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
   <span id="selected"></span>
 </div>
 
+<!-- The rail. Transport and grid size stay visible because they are what you touch between every
+     look; everything else folds, and each fold says what it is set to while closed. -->
+<aside class="panel" id="panel">
+
+  <div class="bar toolbar">
+    <div class="group">
+      <button id="playBtn" class="primary" title="Play / pause  (Space or P)">Play</button>
+      <button id="resetBtn" title="Re-seed every world from the current initial condition  (R)">Reset</button>
+      <button id="stepBtn" title="Advance one generation  (→ or .)">Step</button>
+    </div>
+
+    <div class="group">
+      <label for="gridCols" title="Tiles across × tiles down. 16 × 16 is 256 — exactly the totalistic class; anything smaller is a sample of it.">Grid</label>
+      <input type="number" id="gridCols" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles across">
+      <span class="times">×</span>
+      <input type="number" id="gridRows" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles down">
+      <span class="readout" id="tileCount" title="Worlds on screen">256</span>
+    </div>
+
+    <div class="group">
+      <label for="speed">Speed</label>
+      <input type="range" id="speed" min="0" max="60" step="1" value="15">
+      <span class="readout" id="speedOut">15/s</span>
+    </div>
+  </div>
+
+  <p class="sample" id="sample">…</p>
+
+  <details class="fold" id="foldRules" open>
+    <summary>Rule space <span class="hint" id="hintRules"></span></summary>
+    <div class="fold-body">
+      <div class="group">
+        <label for="classSelect">Class</label>
+        <select id="classSelect"></select>
+      </div>
+
+      <div class="group" id="biasGroup">
+        <label for="bias" title="Probability that any one bucket/orbit/entry of the rule outputs a live cell. 0.50 samples the class uniformly; lower values bias the draw toward sparse, quiet rules.">Bias</label>
+        <input type="range" id="bias" min="0.05" max="0.95" step="0.01" value="0.5">
+        <span class="readout" id="biasOut">0.50</span>
+      </div>
+
+      <div class="group" id="rerollGroup">
+        <button id="rerollBtn" title="Draw a fresh random subset of this class  (G)">Reroll</button>
+        <span class="readout" id="seedOut"></span>
+      </div>
+    </div>
+  </details>
+
+  <details class="fold" id="foldIC">
+    <summary>Initial condition <span class="hint" id="hintIC"></span></summary>
+    <div class="fold-body">
+      <div class="group">
+        <button class="ic" data-ic="single" aria-pressed="false">Single seed</button>
+        <button class="ic" data-ic="random" aria-pressed="true">Random</button>
+        <button class="ic" data-ic="clusters" aria-pressed="false">Clusters</button>
+      </div>
+
+      <div class="group" id="densityGroup">
+        <label for="density">Density</label>
+        <input type="range" id="density" min="0.02" max="0.98" step="0.02" value="0.5">
+        <span class="readout" id="densityOut">0.50</span>
+      </div>
+
+      <div id="clusterPanel" hidden>
+        <div class="panel-head">
+          <label>Cluster presets</label>
+          <div id="clusterPresets" class="group"></div>
+          <span class="spacer"></span>
+          <button id="reshuffleBtn" title="Same knobs, new random placement">Reshuffle</button>
+        </div>
+        <div class="sliders" id="clusterSliders"></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="fold" id="foldLook">
+    <summary>Appearance <span class="hint" id="hintLook"></span></summary>
+    <div class="fold-body">
+      <div class="group">
+        <label for="palette">Palette</label>
+        <select id="palette"></select>
+      </div>
+
+      <div class="group">
+        <label for="hueShift" title="Rotate chromatic palette colors while keeping blacks, grays, and whites unchanged.">Hue</label>
+        <input type="range" id="hueShift" min="0" max="359" step="1" value="0">
+        <span class="readout" id="hueShiftOut">0°</span>
+      </div>
+
+      <div class="group">
+        <label class="switch" title="Blacks out the two LUT entries that make a preset strobe — rule 0 firing a birth and rule 127 firing a death. The Explorer's “Prevent birth/death flash”.">
+          <input type="checkbox" id="flicker" checked>
+          <span>No flash</span>
+        </label>
+      </div>
+    </div>
+  </details>
+
+</aside>
+
+</div><!-- .workspace -->
+
 <p class="footer">
   <b>Keys</b> <kbd>Space</kbd>/<kbd>P</kbd> play·pause · <kbd>R</kbd> reset · <kbd>G</kbd> reroll ·
-  <kbd>→</kbd>/<kbd>.</kbd> step<br>
+  <kbd>→</kbd>/<kbd>.</kbd> step · <kbd>C</kbd> show·hide controls<br>
   <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">@hexlife/embed on npm</a> ·
   <a href="totalistic-256-standalone.html" download>Download offline version</a> ·
   <a href="https://github.com/Sidem/HexLife" target="_blank" rel="noopener noreferrer">source</a> ·
@@ -570,31 +672,31 @@ function readLayoutParam(raw) {
 const CLASSES = [
   {
     key: 'totalistic', tag: 'T', bits: 8, chars: 2,
-    label: 'Totalistic — all 256',
+    label: 'Totalistic — all 256', chip: 'Totalistic',
     unit: 'total-count bucket',
     note: 'The output depends only on the <b>total</b> live count, centre included: 8 buckets, and every one of the 2<sup>8</sup> assignments is on screen.',
   },
   {
     key: 'n_count', tag: 'N', bits: 14, chars: 4,
-    label: 'Outer-totalistic (neighbour count)',
+    label: 'Outer-totalistic (neighbour count)', chip: 'Outer-totalistic',
     unit: 'neighbour-count bucket',
     note: 'The output depends on the centre state <em>and</em> how many of the six neighbours are alive, but not on <em>which</em>: 2 × 7 = 14 buckets. The totalistic class is the subset where bucket <code>(1, n)</code> always equals <code>(0, n+1)</code>.',
   },
   {
     key: 'd_sym', tag: 'M', bits: 26, chars: 7,
-    label: 'Dihedral-symmetric (D6)',
+    label: 'Dihedral-symmetric (D6)', chip: 'Dihedral D6',
     unit: 'D6 orbit',
     note: 'The output is invariant under all 12 rotations <em>and</em> reflections of the hex — the 64 neighbourhoods collapse into 13 orbits, × 2 centre states = 26 free bits. Tagged <code>M</code> for mirror, because <code>D</code> is a hex digit.',
   },
   {
     key: 'r_sym', tag: 'R', bits: 28, chars: 7,
-    label: 'Rotationally symmetric (C6)',
+    label: 'Rotationally symmetric (C6)', chip: 'Rotational C6',
     unit: 'C6 orbit',
     note: 'The output is invariant under the 6 rotations of the hex but not under reflection — 14 orbits × 2 centre states = 28 free bits. This is the widest class that still looks the same whichever way you turn the paper.',
   },
   {
     key: 'free', tag: null, bits: 128, chars: 32,
-    label: 'Unconstrained — the whole space',
+    label: 'Unconstrained — the whole space', chip: 'Unconstrained',
     unit: 'rule entry',
     note: 'No constraint at all: each of the 128 neighbourhood entries is drawn on its own. Almost everything here is chaos — that is the honest shape of rule space, and why the constrained classes above are where the interesting rules live.',
   },
@@ -914,7 +1016,11 @@ const STAGE_MIN_H = 260;
 function fitStage() {
   const top = stage.getBoundingClientRect().top;
   const avail = Math.max(STAGE_MIN_H, document.documentElement.clientHeight - top - STAGE_RESERVE);
-  stage.style.setProperty('--stage-max-w', `${Math.round(avail * (layoutCols / layoutRows))}px`);
+  // On the root, not on the stage: the workspace needs the same number to decide how wide the
+  // two-column layout may grow, and a custom property only travels downwards.
+  const root = document.documentElement.style;
+  root.setProperty('--stage-max-w', `${Math.round(avail * (layoutCols / layoutRows))}px`);
+  root.setProperty('--panel-max-h', `${Math.round(avail)}px`);
   positionMarker();
 }
 
@@ -929,15 +1035,55 @@ function positionMarker() {
   marker.hidden = false;
 }
 
-// Anything that can push the map down has to re-run the fit: the class banner rewraps, the cluster
-// panel opens, the credit folds away, a control bar gains a row. Observing each of them rather than
-// a wrapper is what keeps the narrow layout free to reorder them around the stage — and none of
-// them contains the stage, so there is no observer feeding itself.
-{
-  const observer = new ResizeObserver(fitStage);
-  for (const el of document.querySelectorAll('header, .bar, .sample, #clusterPanel')) observer.observe(el);
-}
+// The header is the only thing left above the map — everything else is beside it or below it,
+// which is the entire point of the rail. Folding the credit away is therefore the one page change
+// that moves the map, and this is what notices. It cannot observe the stage it sizes, so there is
+// no observer feeding itself.
+new ResizeObserver(fitStage).observe(document.querySelector('header'));
 window.addEventListener('resize', fitStage);
+
+/**
+ * Hide the whole rail.
+ *
+ * On a landscape screen this does not make the map bigger — it is bound by height, and the rail
+ * costs it nothing — so this is for looking at the thing without the instrument around it. The four
+ * hotkeys keep working while it is hidden, which is why they are on the button's tooltip.
+ */
+const panelToggle = document.getElementById('panelToggle');
+panelToggle.addEventListener('click', () => {
+  const hidden = document.body.classList.toggle('no-panel');
+  panelToggle.setAttribute('aria-pressed', String(!hidden));
+  fitStage();
+});
+
+// --- folds -------------------------------------------------------------------
+const hintRules = document.getElementById('hintRules');
+const hintIC = document.getElementById('hintIC');
+const hintLook = document.getElementById('hintLook');
+
+/** The class name without its trailing gloss — "Totalistic", not "Totalistic — all 256". */
+const shortLabel = (cls) => cls.label.replace(/ —.*/, '');
+
+/**
+ * Say what each closed section is set to, in its own summary.
+ *
+ * This is what makes the folds usable rather than merely tidy: a control you have to open the
+ * drawer to read is a control you stop putting away. Every one of these is a setting you would
+ * otherwise have to remember you changed.
+ */
+function syncHints() {
+  const cls = currentClass();
+  // `chip`, not the full label: a summary line in a 22rem rail has room for about twenty characters
+  // before it starts wrapping under its own heading.
+  hintRules.textContent = `${cls.chip} · ${isExhaustive() ? 'complete' : sampleSeed.toString(36)}`;
+  hintIC.textContent = icMode === 'single' ? 'Single seed'
+    : icMode === 'clusters' ? `Clusters · ${clusterParams.count} clumps`
+      : `Random · ${Number(densityInput.value).toFixed(2)}`;
+  const palette = paletteSelect.selectedOptions[0];
+  hintLook.textContent = (palette ? palette.textContent.replace(/ ·.*/, '').replace(' ✓', '') : '')
+    + (Number(hueShiftInput.value) ? ` · ${hueShiftInput.value}°` : '')
+    + (flicker.checked ? '' : ' · flash');
+}
 
 /** Push the tile grid into the element and into the box that holds it. */
 function applyGridShape() {
@@ -1025,6 +1171,7 @@ function syncICButtons() {
   densityGroup.classList.toggle('off', icMode !== 'random');
   densityInput.disabled = icMode !== 'random';
   clusterPanel.hidden = icMode !== 'clusters';
+  syncHints();
 }
 
 speedInput.addEventListener('input', () => {
@@ -1037,6 +1184,7 @@ densityInput.addEventListener('input', () => {
   densityOut.textContent = Number(densityInput.value).toFixed(2);
   grid.setAttribute('density', densityInput.value);
   detailWorld()?.setAttribute('density', densityInput.value);
+  syncHints();
   writeUrl();
 });
 
@@ -1056,12 +1204,14 @@ paletteSelect.addEventListener('change', () => {
   // Live on both: a palette is a recolor, not a new world.
   grid.setAttribute('palette', paletteSelect.value);
   detailWorld()?.setAttribute('palette', paletteSelect.value);
+  syncHints();
 });
 
 hueShiftInput.addEventListener('input', () => {
   hueShiftOut.textContent = `${hueShiftInput.value}°`;
   grid.setAttribute('hue-shift', hueShiftInput.value);
   detailWorld()?.setAttribute('hue-shift', hueShiftInput.value);
+  syncHints();
 });
 
 const flicker = document.getElementById('flicker');
@@ -1073,6 +1223,7 @@ flicker.addEventListener('change', () => {
     if (flicker.checked) el.setAttribute('flicker-proof', '');
     else el.removeAttribute('flicker-proof');
   }
+  syncHints();
 });
 
 // --- cluster panel -----------------------------------------------------------
@@ -1114,6 +1265,7 @@ const clusterInputs = new Map();
       clusterParams[def.key] = Number(input.value);
       show();
       syncPresetChips();
+      syncHints();
       applyICSoon();
       writeUrl();
     });
@@ -1140,6 +1292,7 @@ const presetButtons = [];
         show();
       }
       syncPresetChips();
+      syncHints();
       applyIC();
       writeUrl();
     });
@@ -1194,6 +1347,7 @@ function applySample() {
   selectedOut.textContent = '';
 
   renderSample();
+  syncHints();
   writeUrl();
   syncStatus();
 }
@@ -1202,7 +1356,7 @@ function renderSample() {
   const cls = currentClass();
   const size = tileCount();
   const total = 1n << BigInt(cls.bits);
-  const short = cls.label.replace(/ —.*/, '');
+  const short = shortLabel(cls);
   const shape = `${layoutCols}×${layoutRows}`;
 
   if (classSize(cls) <= size) {
@@ -1401,6 +1555,7 @@ const HOTKEYS = {
   p: playBtn,
   r: resetBtn,
   g: rerollBtn,
+  c: panelToggle,
   arrowright: stepBtn,
   '.': stepBtn,
 };
@@ -1425,6 +1580,9 @@ grid.setAttribute('density', densityInput.value);
 // are eight lines the map does not get — and the class banner makes the same point in two.
 document.querySelector('.about').open =
   window.matchMedia('(min-width: 900px) and (min-height: 940px)').matches;
+// A link that arrives with cluster params is a link about the clusters; the other two IC modes are
+// one button each and do not need the drawer opened for them.
+if (icMode === 'clusters') document.getElementById('foldIC').open = true;
 syncICButtons();
 syncPresetChips();
 syncGridInputs();

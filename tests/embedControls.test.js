@@ -212,12 +212,41 @@ describe('totalistic showcase navigation and palette controls', () => {
         // A `width: 100%` square in an 1180px column is 1180px tall, and almost no viewport is —
         // which made a page whose whole premise is "see the class at once" demand scrolling.
         expect(showcase).toContain('width: min(100%, var(--stage-max-w, var(--shell)))');
-        expect(showcase).toContain("stage.style.setProperty('--stage-max-w'");
+        // On the root element: the workspace grid reads the same number to decide how wide it may
+        // grow, and a custom property set on the stage would never reach its own parent.
+        expect(showcase).toContain("root.setProperty('--stage-max-w'");
         // Synchronous on purpose: rAF never runs in a tab that loads in the background, and a
         // deferred fit would leave the map at its unfitted size until the viewer switched to it.
         expect(showcase).toMatch(/function fitStage\(\) \{\n\s+const top = stage\.getBoundingClientRect\(\)\.top;/);
         expect(showcase).toContain('new ResizeObserver(fitStage)');
         expect(showcase).toContain("window.addEventListener('resize', fitStage)");
+    });
+
+    it('puts the controls beside the map, so opening one cannot shrink it', () => {
+        const showcase = read('totalistic-256.html');
+        // The rail caps itself at the map's own height and scrolls: nine cluster sliders used to
+        // push the map down the page, which is what made the worlds tiny.
+        expect(showcase).toContain('max-height: var(--panel-max-h, none)');
+        expect(showcase).toContain('overflow-y: auto');
+        expect(showcase).toContain("root.setProperty('--panel-max-h'");
+        // Below the rail width they stack *under* the map — never above it.
+        expect(showcase).toMatch(/<div class="workspace">[\s\S]*<div class="stage">[\s\S]*<aside class="panel"/);
+        expect(showcase).toContain('body.no-panel .panel { display: none; }');
+    });
+
+    it('keeps a collapsed section readable and actually collapsed', () => {
+        const showcase = read('totalistic-256.html');
+        // `<details>` hides its children with a *UA* display rule that any author `display` outranks
+        // — `.fold-body` is a flex row, so without this the folds render permanently open while
+        // looking closed. Same failure as the Explorer's Scoring disclosure (#29).
+        expect(showcase).toContain('.fold:not([open]) > .fold-body { display: none; }');
+        // A fold you must open to read is a fold nobody closes, so each summary states its setting.
+        expect(showcase).toContain('function syncHints()');
+        for (const id of ['hintRules', 'hintIC', 'hintLook']) {
+            expect(showcase).toContain(`id="${id}"`);
+        }
+        // Every class needs the short form the summary uses, or the hint reads "undefined".
+        expect(showcase.match(/chip: '/g) || []).toHaveLength(5);
     });
 
     it('re-tiles the map on demand, and stops claiming to be complete when it is not', () => {
