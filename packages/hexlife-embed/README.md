@@ -110,6 +110,16 @@ Vacuum-stable rulesets are exactly those whose hex begins `0`–`7`, which is ha
 It is also what makes sparse *evaluation* sound: a dead cell with six dead neighbours evaluates rule
 `0`, so under a stable vacuum it is provably unchanged.
 
+The engine cashes that in. Each tick classifies the grid into 8×8 blocks of uniform cells and
+resolves every block whose neighbouring blocks share its value in closed form — one rule index, one
+fill — instead of gathering six neighbours per cell. Nothing needs enabling, and it is exact rather
+than approximate: identical states, counters and checksums, so the byte-identity contract with the
+app is untouched. On a 383k-cell grid the fast path ticks a world that has died out or saturated
+**≈13× faster**, an `occupancy: 0.002` sparse world **≈2.4× faster**, and a fully mixed grid slightly
+ahead of parity, so a host sweeping rulesets pays for the worlds that are actually doing something.
+Vacuum stability is not required for the speedup — an igniting vacuum is still uniform, just
+uniformly live — but it is what keeps a sparse world sparse enough to benefit for more than one tick.
+
 ---
 
 ## `@hexlife/embed/render`

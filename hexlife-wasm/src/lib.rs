@@ -69,7 +69,59 @@ pub struct World {
     // mass contributes to the transport speed.
     centroid_col_concentration: f64,
     centroid_row_concentration: f64,
+    // --- Sparse-world block fast path (see `scan_block_uniformity` / `run_tick`) ---
+    // The grid is tiled into BLOCK_SIZE x BLOCK_SIZE blocks; these are the tile counts per axis
+    // (ceil, so the last block of a row/column may be partial). Fixed for the World's lifetime.
+    block_cols: usize,
+    block_rows: usize,
+    // One classification byte per block, refreshed at the top of every `run_tick`:
+    // BLOCK_MIXED / BLOCK_ALL_DEAD / BLOCK_ALL_LIVE. Allocated once, here, and reused — `run_tick`
+    // must never allocate, or it would grow Wasm memory and detach every JS view.
+    block_uniform: Vec<u8>,
+    // `block_uniform` dilated by the 8-block Moore halo: a block is marked uniform here only if it
+    // AND its whole neighbourhood are, which is the actual precondition for the fast path. Kept as a
+    // separate materialized pass so the tick loop reads one byte per block instead of re-testing
+    // nine for every grid row it crosses.
+    block_fast: Vec<u8>,
 }
+
+/// Side length in cells of the uniformity tiles used by `run_tick`'s sparse fast path.
+///
+/// The tuning knob, and the trade-off is not one-sided: a live cell spoils its block AND the six
+/// its cells can read (see `halo_offsets`), so the area one structure costs grows as
+/// `7 * BLOCK_SIZE^2`, while the per-block
+/// bookkeeping the fast path pays everywhere grows as `1 / BLOCK_SIZE^2`. Big blocks are cheap to
+/// administer but are spoiled wholesale by a scattering of structures; small blocks survive the
+/// scattering but spend more on administration than they save when the grid is uniform anyway.
+///
+/// Measured on a 665x576 grid (383k cells), speedup over the dense loop (the 4/16 rows were taken
+/// before the halo was tightened from nine blocks to seven, so their sparse columns are pessimistic
+/// by roughly the same margin the 8 row gained — 2.27x to 2.44x, 1.07x to 1.35x):
+///
+/// | BLOCK_SIZE | empty/saturated | 0.2% scattered | 1% scattered | 50% noise |
+/// |-----------:|----------------:|---------------:|-------------:|----------:|
+/// |          4 |           4.6x  |          2.84x |        1.41x |     1.22x |
+/// |          8 |          13.2x  |          2.44x |        1.35x |     1.19x |
+/// |         16 |          22.0x  |          1.18x |        1.08x |     1.05x |
+///
+/// 8 is the balanced pick. 16 collapses on exactly the occupancy `createSparseState` defaults to
+/// (0.002), which is the case this whole path exists for; 4 wins the sparse columns but puts a
+/// 0.4 ms floor under an empty grid that 8 does in 0.16 ms, and a world that has died out or
+/// saturated is the single most common thing a host sweeping rulesets has to tick through.
+///
+/// Being even is load-bearing, not incidental: `halo_offsets` relies on a block starting on an even
+/// column. 8 also makes a block row-segment exactly one `u64`, which is what the scan below wants.
+const BLOCK_SIZE: usize = 8;
+
+/// A block holding both live and dead cells (or a stray non-binary byte) — no fast path.
+const BLOCK_MIXED: u8 = 0;
+/// Every cell in the block is 0.
+const BLOCK_ALL_DEAD: u8 = 1;
+/// Every cell in the block is 1.
+const BLOCK_ALL_LIVE: u8 = 2;
+
+/// Eight 0/1 cells packed into one `u64`, i.e. what a fully live 8-cell run reads as.
+const LIVE_RUN_U64: u64 = 0x0101_0101_0101_0101;
 
 /// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Called once
 /// from the constructor; see the `neighbor_indices` field for the layout.
@@ -104,10 +156,14 @@ impl World {
         // Optional: Sets up a panic hook to log errors to the console.
         // panic::set_hook(Box::new(console_error_panic_hook::hook));
         let num_cells = (grid_cols.max(0) * grid_rows.max(0)) as usize;
+        let cols = grid_cols.max(0) as usize;
+        let rows = grid_rows.max(0) as usize;
+        let block_cols = cols.div_ceil(BLOCK_SIZE);
+        let block_rows = rows.div_ceil(BLOCK_SIZE);
         World {
             num_cells,
-            grid_cols: grid_cols.max(0) as usize,
-            grid_rows: grid_rows.max(0) as usize,
+            grid_cols: cols,
+            grid_rows: rows,
             state: vec![0; num_cells],
             next_state: vec![0; num_cells],
             rule_indices: vec![0; num_cells],
@@ -124,6 +180,10 @@ impl World {
             centroid_row_angle: 0.0,
             centroid_col_concentration: 0.0,
             centroid_row_concentration: 0.0,
+            block_cols,
+            block_rows,
+            block_uniform: vec![BLOCK_MIXED; block_cols * block_rows],
+            block_fast: vec![BLOCK_MIXED; block_cols * block_rows],
         }
     }
 
@@ -167,37 +227,128 @@ impl World {
     /// per-rule usage counters. The current/next buffers are then swapped internally, so after the
     /// call the new generation lives in `state` (and JavaScript must mirror the swap of its views).
     /// Returns the number of active cells in the new generation.
+    ///
+    /// **Sparse fast path.** Sparse worlds (`createSparseState` genesis on a vacuum-stable rule) are
+    /// mostly vacuum, and a vacuum cell's next state is not worth deriving: every cell of a
+    /// BLOCK_SIZE-square block whose halo (see `halo_offsets`) is uniformly `u` has center `u` and
+    /// all six neighbours `u`, hence rule index `0` (u=0) or `127` (u=1) and the same next state,
+    /// for the whole block. Such blocks are filled with two `memset`s instead of six dependent loads
+    /// through the neighbour table per cell, and their contribution to the active/changed counts
+    /// and the usage histogram is added in closed form. The classification covers uniformly *live*
+    /// regions as well as empty ones, and does not assume the rule is vacuum-stable — an igniting
+    /// vacuum simply fills the block with 1s.
+    ///
+    /// This is an exact rewrite of the dense loop, not an approximation: same values, same counters,
+    /// byte-identical evolution (`sparse_fast_path_matches_dense_reference` pins that against a
+    /// reference implementation, and the golden checksums below pin it against recorded history).
+    /// It is also *stateless across ticks* — the classification is recomputed from `state` every
+    /// tick — so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
+    /// load) cannot leave it stale. What that costs on a grid with nothing to skip is one
+    /// sequential `u64` pass over `state`, which measures at parity or slightly ahead of the old
+    /// dense loop; see `BLOCK_SIZE` for the numbers.
     pub fn run_tick(&mut self) -> u32 {
+        self.scan_block_uniformity();
+        self.dilate_block_uniformity();
+
         let mut active: u32 = 0;
         let mut changed: u32 = 0;
+        let cols = self.grid_cols;
+        let grid_rows = self.grid_rows;
+        let block_cols = self.block_cols;
 
-        for i in 0..self.num_cells {
-            let c_state = self.state[i];
+        // Disjoint field borrows, so each run's buffers can be sliced once. The old loop was
+        // `for i in 0..self.num_cells`, which let the compiler hoist the bounds checks on `state`,
+        // `next_state` and `next_rule_indices` out entirely; a run's `end` comes from block
+        // arithmetic instead, which it cannot prove in range, and paying those three checks per cell
+        // cost ~30% on a grid with nothing to skip. Slicing the run restores the hoist.
+        let state = &self.state;
+        let ruleset = &self.ruleset;
+        let neighbor_indices = &self.neighbor_indices;
+        let block_fast = &self.block_fast;
+        let next_state = &mut self.next_state;
+        let next_rule_indices = &mut self.next_rule_indices;
+        let rule_usage_counters = &mut self.rule_usage_counters;
 
-            let mut neighbor_mask: u8 = 0;
-
-            // Neighbor indices (with toroidal wrapping) are precomputed once at construction, so the
-            // mask is just six array reads — no parity branch or modulo arithmetic in the hot loop.
-            let nbase = i * 6;
-            for n_order in 0..6 {
-                let neighbor_index = self.neighbor_indices[nbase + n_order] as usize;
-                if self.state[neighbor_index] == 1 {
-                    neighbor_mask |= 1 << n_order;
+        // Walk the grid ROW by row, splitting each row into maximal runs of blocks that share a
+        // disposition, rather than walking block by block. Both orders are correct, but block order
+        // makes the dense path jump `grid_cols * 6 * 4` bytes through `neighbor_indices` on every
+        // row step, which defeats the sequential prefetch of a table far larger than L2 and cost a
+        // further ~25%. Row order keeps the cell index strictly increasing across the whole grid —
+        // the original linear traversal, with holes punched in it — and collapses to exactly one
+        // full-width run per row when no block qualifies.
+        for row in 0..grid_rows {
+            let row_base = row * cols;
+            let block_row_base = (row / BLOCK_SIZE) * block_cols;
+            let mut block_col = 0;
+            while block_col < block_cols {
+                let class = block_fast[block_row_base + block_col];
+                let mut run_end = block_col + 1;
+                while run_end < block_cols && block_fast[block_row_base + run_end] == class {
+                    run_end += 1;
                 }
-            }
+                let start = row_base + block_col * BLOCK_SIZE;
+                let end = row_base + (run_end * BLOCK_SIZE).min(cols);
+                block_col = run_end;
 
-            // Determine the rule index and get the result from the ruleset.
-            let rule_idx = ((c_state << 6) | neighbor_mask) as usize;
-            let next_state_value = self.ruleset[rule_idx];
+                if class != BLOCK_MIXED {
+                    // Every cell in this run has centre `uniform` and six neighbours of the same
+                    // value, so all of them share one rule index — 0 (dead centre, empty
+                    // neighbourhood) or 127 (live centre, all six neighbours live) — and therefore
+                    // one next state. Two `fill`s replace the per-cell neighbour gather, and the
+                    // run's contribution to every counter is closed-form.
+                    let uniform = u8::from(class == BLOCK_ALL_LIVE);
+                    let rule_idx = if uniform == 1 { 127 } else { 0 };
+                    let next_state_value = ruleset[rule_idx];
+                    let cell_count = (end - start) as u32;
 
-            self.next_state[i] = next_state_value;
-            self.next_rule_indices[i] = rule_idx as u8;
-            self.rule_usage_counters[rule_idx] += 1;
-            if next_state_value == 1 {
-                active += 1;
-            }
-            if next_state_value != c_state {
-                changed += 1;
+                    next_state[start..end].fill(next_state_value);
+                    next_rule_indices[start..end].fill(rule_idx as u8);
+
+                    rule_usage_counters[rule_idx] += cell_count;
+                    if next_state_value == 1 {
+                        active += cell_count;
+                    }
+                    if next_state_value != uniform {
+                        changed += cell_count;
+                    }
+                    continue;
+                }
+
+                let current = &state[start..end];
+                let neighbors = &neighbor_indices[start * 6..end * 6];
+                let out_state = &mut next_state[start..end];
+                let out_rule_indices = &mut next_rule_indices[start..end];
+
+                for offset in 0..current.len() {
+                    let c_state = current[offset];
+
+                    let mut neighbor_mask: u8 = 0;
+
+                    // Neighbor indices (with toroidal wrapping) are precomputed once at construction,
+                    // so the mask is just six array reads — no parity branch or modulo arithmetic in
+                    // the hot loop.
+                    let nbase = offset * 6;
+                    for n_order in 0..6 {
+                        let neighbor_index = neighbors[nbase + n_order] as usize;
+                        if state[neighbor_index] == 1 {
+                            neighbor_mask |= 1 << n_order;
+                        }
+                    }
+
+                    // Determine the rule index and get the result from the ruleset.
+                    let rule_idx = ((c_state << 6) | neighbor_mask) as usize;
+                    let next_state_value = ruleset[rule_idx];
+
+                    out_state[offset] = next_state_value;
+                    out_rule_indices[offset] = rule_idx as u8;
+                    rule_usage_counters[rule_idx] += 1;
+                    if next_state_value == 1 {
+                        active += 1;
+                    }
+                    if next_state_value != c_state {
+                        changed += 1;
+                    }
+                }
             }
         }
 
@@ -528,6 +679,134 @@ impl World {
 
 // Private helpers (kept out of the `#[wasm_bindgen]` block so they aren't exported to JS).
 impl World {
+    /// Classify every BLOCK_SIZE-square block of the *current* state as all-dead, all-live, or
+    /// mixed, into `block_uniform`. Called once at the top of each `run_tick`; see that method for
+    /// why the result is derived fresh each tick rather than carried across ticks.
+    ///
+    /// Each block row-segment is contiguous, so it is read eight cells at a time as a `u64`: a run
+    /// is dead iff the word is `0` and live iff it is `LIVE_RUN_U64`. Comparing whole words (rather
+    /// than OR/AND-reducing bytes) also means a stray non-binary byte classifies as mixed and falls
+    /// through to the dense path instead of being silently treated as live.
+    ///
+    /// The scan walks the grid in row-major order and narrows a whole row of blocks at a time,
+    /// rather than finishing one block before starting the next. Per-block order allows an early
+    /// exit as soon as a block is known mixed, but it reads `state` in a stride pattern and pays
+    /// slice setup per block-row-segment; row-major order reads `state` straight through, which the
+    /// prefetcher handles at memory bandwidth — a whole 383k-cell grid is a few tens of microseconds
+    /// even with no early exit at all.
+    fn scan_block_uniformity(&mut self) {
+        // "Still a candidate for" bits, ANDed down as segments are read. They cannot both survive a
+        // non-empty block, so the final mapping to a class is unambiguous.
+        const CANDIDATE_DEAD: u8 = 0b01;
+        const CANDIDATE_LIVE: u8 = 0b10;
+
+        let cols = self.grid_cols;
+        let block_cols = self.block_cols;
+        let state = &self.state;
+        let block_uniform = &mut self.block_uniform;
+
+        block_uniform.fill(CANDIDATE_DEAD | CANDIDATE_LIVE);
+        for row in 0..self.grid_rows {
+            let base = row * cols;
+            let block_row_base = (row / BLOCK_SIZE) * block_cols;
+            for (block_col, segment) in state[base..base + cols].chunks(BLOCK_SIZE).enumerate() {
+                let mut all_dead = true;
+                let mut all_live = true;
+                let mut words = segment.chunks_exact(8);
+                for word in &mut words {
+                    let packed = u64::from_le_bytes(word.try_into().unwrap());
+                    all_dead &= packed == 0;
+                    all_live &= packed == LIVE_RUN_U64;
+                }
+                for &cell in words.remainder() {
+                    all_dead &= cell == 0;
+                    all_live &= cell == 1;
+                }
+                let candidates =
+                    if all_dead { CANDIDATE_DEAD } else { 0 } | if all_live { CANDIDATE_LIVE } else { 0 };
+                block_uniform[block_row_base + block_col] &= candidates;
+            }
+        }
+
+        for class in block_uniform.iter_mut() {
+            *class = if *class & CANDIDATE_DEAD != 0 {
+                BLOCK_ALL_DEAD
+            } else if *class & CANDIDATE_LIVE != 0 {
+                BLOCK_ALL_LIVE
+            } else {
+                BLOCK_MIXED
+            };
+        }
+    }
+
+    /// Every block offset a block's cells can reach, as `(delta_block_col, delta_block_row)`,
+    /// including `(0, 0)` itself.
+    ///
+    /// **Seven, not nine.** The tempting answer is the 3x3 Moore square, on the grounds that each
+    /// hex offset in `NEIGHBOR_DIRS_*` moves at most one column and one row. That is true and it is
+    /// safe, but it is loose: a hex cell has six neighbours, not eight, and in offset coordinates
+    /// those six are a parity-dependent SUBSET of the eight. Reading off the tables:
+    ///
+    /// - from an EVEN column, the sideways neighbours are `(±1, -1)` and `(±1, 0)`;
+    /// - from an ODD column, they are `(±1, 0)` and `(±1, +1)`.
+    ///
+    /// Only a block's leftmost and rightmost columns escape it sideways at all, and `BLOCK_SIZE` is
+    /// even, so a block always starts on an even column: the left-hand reach is fixed at
+    /// `(-1, -1)` and `(-1, 0)`. The right-hand reach follows the parity of the block's LAST column,
+    /// which is odd for every full block but takes the grid's parity for a partial final block —
+    /// hence the branch. Vertically both parities carry `(0, ±1)`, and interior columns stay home.
+    ///
+    /// So the halo is hex-shaped at block scale too, and skipping the two unreachable corners is
+    /// worth having: an isolated structure spoils 7 blocks instead of 9. `halo_covers_every_real_
+    /// neighbour` pins the covering against the neighbour table rather than against this reasoning.
+    fn halo_offsets(&self, block_col: usize) -> [(isize, isize); 7] {
+        let last_col = ((block_col + 1) * BLOCK_SIZE).min(self.grid_cols) - 1;
+        let (right_first, right_second) = if last_col % 2 != 0 { (0, 1) } else { (-1, 0) };
+        [
+            (0, 0),
+            (0, -1),
+            (0, 1),
+            (-1, -1),
+            (-1, 0),
+            (1, right_first),
+            (1, right_second),
+        ]
+    }
+
+    /// Dilate `block_uniform` by that halo into `block_fast`: a block keeps its class only if every
+    /// block its cells can read shares it, and becomes `BLOCK_MIXED` otherwise.
+    ///
+    /// Wrapping is `rem_euclid` rather than range-checked so it stays correct on grids only one or
+    /// two blocks wide, where a block's left and right neighbours are the same block, possibly
+    /// itself — checking a block against itself is harmless.
+    ///
+    /// Requires `scan_block_uniformity` to have run for the current state.
+    fn dilate_block_uniformity(&mut self) {
+        let block_cols = self.block_cols as isize;
+        let block_rows = self.block_rows as isize;
+        for block_row in 0..self.block_rows {
+            for block_col in 0..self.block_cols {
+                let index = block_row * self.block_cols + block_col;
+                let class = self.block_uniform[index];
+                let mut fast = class;
+                if class != BLOCK_MIXED {
+                    for (delta_col, delta_row) in self.halo_offsets(block_col) {
+                        let neighbor_col =
+                            (block_col as isize + delta_col).rem_euclid(block_cols) as usize;
+                        let neighbor_row =
+                            (block_row as isize + delta_row).rem_euclid(block_rows) as usize;
+                        if self.block_uniform[neighbor_row * self.block_cols + neighbor_col] != class
+                        {
+                            fast = BLOCK_MIXED;
+                            break;
+                        }
+                    }
+                }
+                self.block_fast[index] = fast;
+            }
+        }
+    }
+
     /// Advance the probe lane by one generation using the same ruleset + neighbor table as the main
     /// lane. Mirrors `run_tick`'s core but writes only `probe_next_state` and touches neither the
     /// usage counters nor the main-lane buffers — so a running probe never perturbs the simulation.
@@ -595,6 +874,47 @@ mod tests {
             w.state[i] = (xorshift32(&mut s) & 1) as u8;
         }
         w
+    }
+
+    /// Fill a world's state so that roughly `per_mille` cells in every thousand are live.
+    fn fill_state(w: &mut World, per_mille: u32, seed: &mut u32) {
+        for i in 0..w.num_cells {
+            w.state[i] = u8::from(xorshift32(seed) % 1000 < per_mille);
+        }
+    }
+
+    /// Recompute one generation the plain dense way — every cell, no block classification, no fast
+    /// path. This is the oracle `run_tick`'s sparse fast path is checked against; it is deliberately
+    /// a transcription of the pre-optimization loop rather than a call into any shared helper, so a
+    /// bug in the block logic cannot hide by being present on both sides.
+    ///
+    /// Returns `(next_state, next_rule_indices, active, changed, usage_delta)`.
+    fn dense_reference_tick(w: &World) -> (Vec<u8>, Vec<u8>, u32, u32, Vec<u32>) {
+        let mut next_state = vec![0u8; w.num_cells];
+        let mut next_rule_indices = vec![0u8; w.num_cells];
+        let mut usage = vec![0u32; 128];
+        let (mut active, mut changed) = (0u32, 0u32);
+        for i in 0..w.num_cells {
+            let c_state = w.state[i];
+            let mut neighbor_mask: u8 = 0;
+            for n_order in 0..6 {
+                if w.state[w.neighbor_indices[i * 6 + n_order] as usize] == 1 {
+                    neighbor_mask |= 1 << n_order;
+                }
+            }
+            let rule_idx = ((c_state << 6) | neighbor_mask) as usize;
+            let value = w.ruleset[rule_idx];
+            next_state[i] = value;
+            next_rule_indices[i] = rule_idx as u8;
+            usage[rule_idx] += 1;
+            if value == 1 {
+                active += 1;
+            }
+            if value != c_state {
+                changed += 1;
+            }
+        }
+        (next_state, next_rule_indices, active, changed, usage)
     }
 
     #[test]
@@ -723,6 +1043,152 @@ mod tests {
         }
         assert_eq!(a.state, b.state);
         assert_eq!(a.checksum_state(), b.checksum_state());
+    }
+
+    #[test]
+    fn sparse_fast_path_matches_dense_reference() {
+        // The whole claim of the block fast path is that skipping cells changes nothing. Check it
+        // exhaustively against `dense_reference_tick`: every observable `run_tick` produces — both
+        // buffers, the active and changed counts, and the usage histogram — over grids that cross
+        // each block-tiling edge case, occupancies from empty to full, and rulesets including one
+        // whose vacuum ignites (so a uniformly dead block must flip to uniformly live, not stay).
+        let grids = [
+            (32, 32),   // exact multiple of BLOCK_SIZE
+            (37, 29),   // partial blocks on both edges
+            (8, 8),     // smaller than one block: a single block that is its own whole halo
+            (17, 33),   // two blocks wide — a block's left and right neighbour are the same block
+            (64, 16),   // one block tall
+            (48, 96),   // several blocks each way, the shape a real grid has
+        ];
+        let occupancies = [0, 2, 20, 500, 980, 1000];
+        let mut seed = 0x5EED_1234u32;
+
+        for &(cols, rows) in &grids {
+            for &per_mille in &occupancies {
+                for ruleset_variant in 0..4 {
+                    let mut w = World::new(cols, rows);
+                    fill_state(&mut w, per_mille, &mut seed);
+                    match ruleset_variant {
+                        0 => w.ruleset.copy_from_slice(&parse_hex_ruleset(DEFAULT_RULESET_HEX)),
+                        1 => {
+                            for r in w.ruleset.iter_mut() {
+                                *r = (xorshift32(&mut seed) & 1) as u8;
+                            }
+                        }
+                        2 => {} // all-zero: vacuum-stable, everything dies
+                        _ => {
+                            // Vacuum-unstable: rule index 0 fires, so empty space ignites on tick 1.
+                            for r in w.ruleset.iter_mut() {
+                                *r = 1;
+                            }
+                        }
+                    }
+
+                    let label = format!("{cols}x{rows} occ={per_mille} rules={ruleset_variant}");
+                    for tick in 0..6 {
+                        let (want_state, want_rules, want_active, want_changed, usage_delta) =
+                            dense_reference_tick(&w);
+                        let counters_before = w.rule_usage_counters.clone();
+
+                        let active = w.run_tick();
+
+                        assert_eq!(w.state, want_state, "state diverged: {label} tick {tick}");
+                        assert_eq!(w.rule_indices, want_rules, "rule indices diverged: {label} tick {tick}");
+                        assert_eq!(active, want_active, "active count diverged: {label} tick {tick}");
+                        assert_eq!(
+                            w.last_changed_count(),
+                            want_changed,
+                            "changed count diverged: {label} tick {tick}"
+                        );
+                        let want_counters: Vec<u32> = counters_before
+                            .iter()
+                            .zip(&usage_delta)
+                            .map(|(before, delta)| before + delta)
+                            .collect();
+                        assert_eq!(
+                            w.rule_usage_counters, want_counters,
+                            "usage counters diverged: {label} tick {tick}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+
+    #[test]
+    fn halo_covers_every_real_neighbour() {
+        // THE safety property of the fast path: if a cell's neighbour lives in a block the halo does
+        // not check, the fast path can read that block as uniform while the neighbour is not, and
+        // silently produce a wrong generation. Assert the covering directly against the neighbour
+        // table — for every cell of every block, on grids whose last block column is a full block,
+        // a partial block ending on an odd column, and a partial block ending on an even column
+        // (which flips the right-hand pair of offsets).
+        for &(cols, rows) in &[(64i32, 64i32), (67, 64), (64, 67), (67, 67), (12, 40), (8, 8)] {
+            let w = World::new(cols, rows);
+            for i in 0..w.num_cells {
+                let block_col = (i % w.grid_cols) / BLOCK_SIZE;
+                let block_row = (i / w.grid_cols) / BLOCK_SIZE;
+                let halo: Vec<usize> = w
+                    .halo_offsets(block_col)
+                    .iter()
+                    .map(|&(delta_col, delta_row)| {
+                        let neighbor_col = (block_col as isize + delta_col)
+                            .rem_euclid(w.block_cols as isize) as usize;
+                        let neighbor_row = (block_row as isize + delta_row)
+                            .rem_euclid(w.block_rows as isize) as usize;
+                        neighbor_row * w.block_cols + neighbor_col
+                    })
+                    .collect();
+                for k in 0..6 {
+                    let j = w.neighbor_indices[i * 6 + k] as usize;
+                    let target = ((j / w.grid_cols) / BLOCK_SIZE) * w.block_cols
+                        + (j % w.grid_cols) / BLOCK_SIZE;
+                    assert!(
+                        halo.contains(&target),
+                        "{cols}x{rows}: cell {i} neighbour {k} lands in block {target}, \
+                         outside the halo of block ({block_col}, {block_row})"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn block_classification_confines_a_lone_cell_to_its_neighbourhood() {
+        // `halo_covers_every_real_neighbour` proves the halo is not too TIGHT; this one proves it is
+        // not too wide, which is where the performance lives: one live cell in a vacuum must spoil
+        // its own block and the six its cells can read, and no others. Sized in blocks rather than
+        // cells so retuning BLOCK_SIZE does not invalidate the arithmetic.
+        let side = (6 * BLOCK_SIZE) as i32;
+        let mut w = World::new(side, side);
+        assert_eq!((w.block_cols, w.block_rows), (6, 6));
+
+        // Interior of block (2, 2), away from every block seam.
+        let cell = (2 * BLOCK_SIZE + BLOCK_SIZE / 2) * (side as usize) + 2 * BLOCK_SIZE + BLOCK_SIZE / 2;
+        w.state[cell] = 1;
+        w.scan_block_uniformity();
+        w.dilate_block_uniformity();
+        assert_eq!(w.block_uniform[2 * 6 + 2], BLOCK_MIXED);
+        assert_eq!(w.block_uniform[0], BLOCK_ALL_DEAD);
+
+        let fast_blocks = w.block_fast.iter().filter(|&&c| c != BLOCK_MIXED).count();
+        assert_eq!(fast_blocks, 36 - 7, "one live cell must spoil exactly seven blocks, not nine");
+
+        // A saturated grid is uniformly live, and every block takes the fast path from the other end.
+        let mut full = World::new(side, side);
+        full.state.fill(1);
+        full.scan_block_uniformity();
+        full.dilate_block_uniformity();
+        assert!(full.block_uniform.iter().all(|&c| c == BLOCK_ALL_LIVE));
+        assert!(full.block_fast.iter().all(|&c| c == BLOCK_ALL_LIVE));
+
+        // A stray non-binary byte must classify as mixed and fall through to the dense path rather
+        // than being read as "live".
+        let mut odd = World::new(side, side);
+        odd.state[5] = 3;
+        odd.scan_block_uniformity();
+        assert_eq!(odd.block_uniform[0], BLOCK_MIXED);
     }
 
     #[test]

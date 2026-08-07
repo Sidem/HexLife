@@ -220,6 +220,25 @@ export class World {
      * per-rule usage counters. The current/next buffers are then swapped internally, so after the
      * call the new generation lives in `state` (and JavaScript must mirror the swap of its views).
      * Returns the number of active cells in the new generation.
+     *
+     * **Sparse fast path.** Sparse worlds (`createSparseState` genesis on a vacuum-stable rule) are
+     * mostly vacuum, and a vacuum cell's next state is not worth deriving: every cell of a
+     * BLOCK_SIZE-square block whose halo (see `halo_offsets`) is uniformly `u` has center `u` and
+     * all six neighbours `u`, hence rule index `0` (u=0) or `127` (u=1) and the same next state,
+     * for the whole block. Such blocks are filled with two `memset`s instead of six dependent loads
+     * through the neighbour table per cell, and their contribution to the active/changed counts
+     * and the usage histogram is added in closed form. The classification covers uniformly *live*
+     * regions as well as empty ones, and does not assume the rule is vacuum-stable — an igniting
+     * vacuum simply fills the block with 1s.
+     *
+     * This is an exact rewrite of the dense loop, not an approximation: same values, same counters,
+     * byte-identical evolution (`sparse_fast_path_matches_dense_reference` pins that against a
+     * reference implementation, and the golden checksums below pin it against recorded history).
+     * It is also *stateless across ticks* — the classification is recomputed from `state` every
+     * tick — so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
+     * load) cannot leave it stale. What that costs on a grid with nothing to skip is one
+     * sequential `u64` pass over `state`, which measures at parity or slightly ahead of the old
+     * dense loop; see `BLOCK_SIZE` for the numbers.
      * @returns {number}
      */
     run_tick() {
