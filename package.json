@@ -6,7 +6,8 @@
     "scripts": {
         "dev": "vite",
         "build:wasm": "wasm-pack build ./hexlife-wasm --target web --out-dir ../src/core/wasm-engine --out-name hexlife_wasm",
-        "build": "npm run build:wasm && vite build",
+        "build": "npm run build:wasm && vite build && npm run build:standalone",
+        "build:standalone": "vite build --config vite.totalistic-standalone.config.js && node scripts/inline-totalistic-standalone.mjs",
         "build:embed": "vite build --config vite.embed.config.js && node scripts/prepare-embed-package.mjs",
         "pack:embed": "npm run build:embed && npm pack ./dist/embed-package --pack-destination dist",
         "publish:embed": "npm run build:embed && npm publish ./dist/embed-package --access public",

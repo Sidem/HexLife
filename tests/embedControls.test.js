@@ -206,4 +206,19 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(showcase).toContain("grid.setAttribute('hue-shift', hueShiftInput.value)");
         expect(showcase).toContain("detailWorld()?.setAttribute('hue-shift', hueShiftInput.value)");
     });
+
+    it('ships a reproducible single-file offline build', () => {
+        const packageJson = JSON.parse(read('package.json'));
+        const config = read('vite.totalistic-standalone.config.js');
+        const inliner = read('scripts/inline-totalistic-standalone.mjs');
+        const showcase = read('totalistic-256.html');
+
+        expect(packageJson.scripts['build:standalone']).toContain('vite.totalistic-standalone.config.js');
+        expect(packageJson.scripts.build).toContain('npm run build:standalone');
+        expect(config).toContain('assetsInlineLimit: Number.MAX_SAFE_INTEGER');
+        expect(config).toContain('inlineDynamicImports: true');
+        expect(inliner).toContain("data:application/wasm;base64,");
+        expect(inliner).toContain('Standalone HTML still references runtime assets');
+        expect(showcase).toContain('href="totalistic-256-standalone.html" download');
+    });
 });

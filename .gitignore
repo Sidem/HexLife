@@ -27,6 +27,11 @@ docs/*-AUDIT-*.md
 # Local dev helper, not part of the app (Vite serves the app; see `npm run dev`).
 server.py
 
+# CDN-loaded variant of the showcase page, kept locally for hand-testing the published package.
+# The shipped offline build is `npm run build:standalone` (inlined, no network) — this one only
+# proves the jsDelivr path still works, and a second near-copy of the page in git would rot.
+totalistic-256-cdn.html
+
 # ─── Environment ──────────────────────────────────────────────────────────────
 .env
 .env.*

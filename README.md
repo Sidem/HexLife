@@ -308,6 +308,10 @@ Full attribute and API reference: [`packages/hexlife-embed/README.md`](packages/
 The package is built from `src/embed/` with `npm run build:embed`; the standalone CDN and in-app
 “Copy embed code” workflows remain open.
 
+For an offline copy of the 256-world sampler, run `npm run build:standalone` and open
+`dist/totalistic-256-standalone.html` directly in a browser. It is one self-contained file: the
+page code and Wasm engine are inlined, so it does not need a server or a network connection.
+
 ## 🏗️ Architecture
 
 | Layer | Implementation |
