@@ -27,6 +27,10 @@ export { rulesetName } from '../core/rulesetName.js';
 // these codes are the notation for that: the totalistic class is exactly `T00`–`TFF`. Pure math over
 // the rule table — no DOM, no wasm.
 export { codeToHex, codeToRuleset, isRulesetCode, normalizeRulesetHex, rulesetToCode } from '../core/rulesetCode.js';
+// Whether a rule leaves empty space empty. A host that curates *inhabitable* worlds — rather than
+// merely valid ones — needs this before it allocates anything, and it is a property of the rule
+// table, not of any host's room protocol. Pure arithmetic over one hex character; server-safe.
+export { isVacuumStable, VACUUM_RULE_INDEX } from '../core/rulesetHex.js';
 export { decodeWorldCode, encodeWorldCode, explorerUrlForRuleset } from '../core/WorldCodec.js';
 // Just the key + label projection, not the gradient table — a host building a palette picker needs
 // the names the `palette` attribute accepts, and nothing here should make a ramp's stops a

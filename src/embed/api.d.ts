@@ -21,6 +21,7 @@ export {
   rulesetToCode,
   type RulesetInputFormat,
 } from '../core/rulesetCode.js'
+export {isVacuumStable, VACUUM_RULE_INDEX} from '../core/rulesetHex.js'
 export {
   listPresetPalettes,
   type PresetPaletteInfo,

@@ -6,6 +6,7 @@
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
 import { mulberry32 } from '../core/rng.js';
 import { DensityStrategy } from '../core/initialStateStrategies/DensityStrategy.js';
+import { createSparseStructureState } from '../core/sparseStructures.js';
 
 const densityStrategy = new DensityStrategy();
 
@@ -46,6 +47,25 @@ export function createDensityState({ rows, columns, seed, density = 0.5 }) {
         NUM_CELLS: cells.length,
     });
     return cells;
+}
+
+/**
+ * Create the canonical seeded **sparse structured** state without initializing Wasm: empty space
+ * with small connected structures scattered into it.
+ *
+ * The initializer for worlds meant to be inhabited rather than observed. `createDensityState` fills
+ * every cell, so a later edit is a perturbation the rule erases; this leaves a vacuum, so a placed
+ * cluster is an object with a causal wake. It is only meaningful for a vacuum-stable ruleset — see
+ * `isVacuumStable` in `@hexlife/embed/api` — because an unstable rule ignites empty space on tick one.
+ *
+ * Exactly `round(occupancy * rows * columns)` cells are live. Deterministic for every safe-integer
+ * seed, including zero, and identical across Node and browser workers like every other seeded path.
+ *
+ * @param {{rows: number, columns: number, seed: number, occupancy?: number}} options
+ * @returns {Uint8Array}
+ */
+export function createSparseState(options) {
+    return createSparseStructureState(options);
 }
 
 /**

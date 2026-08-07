@@ -85,6 +85,31 @@ not initialize Wasm, takes explicit rows and columns, preserves HexLife's specia
 density `0` or `1`, and treats every safe-integer seed—including `0`—deterministically. The custom
 element's `seed="0"` attribute remains nondeterministic for backward compatibility.
 
+`createSparseState()` is its opposite number: empty space with small connected structures scattered
+into it. Same determinism contract, same explicit dimensions, and exactly
+`round(occupancy × rows × columns)` live cells.
+
+```js
+import {createSparseState} from '@hexlife/embed/sim'
+import {isVacuumStable} from '@hexlife/embed/api'
+
+isVacuumStable(rulesetHex) // → does empty space stay empty?
+const cells = createSparseState({rows: 1152, columns: 1332, seed, occupancy: 0.002})
+```
+
+The two go together. A density fill asks what a rule does to *noise*, and everything a viewer adds
+afterwards is a perturbation the rule erases within a few generations. A sparse structured state asks
+what a rule does to *things* — but only if the rule leaves the vacuum alone. If the empty
+neighbourhood fires, every dead cell ignites on tick one and the world saturates from any start, so
+`isVacuumStable()` is the precondition, not a suggestion.
+
+The predicate is exact and costs one character: the engine indexes its table as
+`(centerState << 6) | neighbourMask`, so the empty neighbourhood is rule index `0`, and the 128-bit
+hex is laid out most-significant-bit first — index `0` is the high bit of the first hex character.
+Vacuum-stable rulesets are exactly those whose hex begins `0`–`7`, which is half the ruleset space.
+It is also what makes sparse *evaluation* sound: a dead cell with six dead neighbours evaluates rule
+`0`, so under a stable vacuum it is provably unchanged.
+
 ---
 
 ## `@hexlife/embed/render`
@@ -514,7 +539,7 @@ DOM-free, safe in Node.
 import {
   decodeWorldCode, encodeWorldCode, explorerUrlForRuleset,
   describeRuleset, rulesetName, ORBIT_LABELS,
-  normalizeRulesetHex,
+  normalizeRulesetHex, isVacuumStable, VACUUM_RULE_INDEX,
   listPresetPalettes,
   detectGraphicsPath, createGpuHelpPanel,
 } from '@hexlife/embed/api'
@@ -523,6 +548,12 @@ import {
 `normalizeRulesetHex(value)` trims and uppercases an exact 32-character ruleset identity, returning
 `null` for short codes, notation, or malformed input. Use `codeToHex()` when those short codes should
 also be accepted.
+
+`isVacuumStable(value)` takes a 32-char hex or a 128-entry rule table and answers whether empty space
+stays empty — see `@hexlife/embed/sim` above for what that buys and why it is one character of the
+hex. It returns `false` for anything malformed, so a host can use it as an admission gate without a
+separate validity branch. `VACUUM_RULE_INDEX` is the rule index it reads (`0`), named so a host
+asserting the bit-order claim does not have to restate the literal.
 
 ### Reference application
 

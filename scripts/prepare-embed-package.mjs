@@ -12,6 +12,7 @@ const copies = [
   ['src/embed/hexlife-grid.d.ts', 'dist/embed-package/src/embed/hexlife-grid.d.ts'],
   ['src/core/rulesetDescriptor.d.ts', 'dist/embed-package/src/core/rulesetDescriptor.d.ts'],
   ['src/core/rulesetCode.d.ts', 'dist/embed-package/src/core/rulesetCode.d.ts'],
+  ['src/core/rulesetHex.d.ts', 'dist/embed-package/src/core/rulesetHex.d.ts'],
   ['src/core/rulesetName.d.ts', 'dist/embed-package/src/core/rulesetName.d.ts'],
   ['src/core/colorPalettes.d.ts', 'dist/embed-package/src/core/colorPalettes.d.ts'],
   ['src/core/WorldCodec.d.ts', 'dist/embed-package/src/core/WorldCodec.d.ts'],

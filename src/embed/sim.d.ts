@@ -21,6 +21,15 @@ export interface DensityStateOptions {
   density?: number
 }
 
+export interface SparseStateOptions {
+  rows: number
+  columns: number
+  /** Deterministic for every safe integer, including zero. */
+  seed: number
+  /** Fraction of the grid left live. Useful range for an inhabitable world: 1e-3 to 1e-2. */
+  occupancy?: number
+}
+
 export interface HexLifeSimulation {
   readonly rows: number
   readonly cols: number
@@ -37,5 +46,10 @@ export interface HexLifeSimulation {
 export function createSimulation(options: SimulationOptions): Promise<HexLifeSimulation>
 /** Create HexLife's canonical seeded density state without initializing Wasm. */
 export function createDensityState(options: DensityStateOptions): Uint8Array
+/**
+ * Create the canonical seeded sparse structured state without initializing Wasm: empty space with
+ * small connected structures placed in it. Exactly `round(occupancy * rows * columns)` cells live.
+ */
+export function createSparseState(options: SparseStateOptions): Uint8Array
 export function packCells(cells: ArrayLike<number>): Uint8Array
 export function unpackCells(packed: Uint8Array, cellCount: number): Uint8Array
