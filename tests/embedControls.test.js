@@ -199,6 +199,37 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(read('src/ui/views/MoreView.js')).toContain('href="totalistic-256.html"');
     });
 
+    it('offers the coffee extraction lab from both Explorer menus', () => {
+        expect(read('index.html')).toContain('href="coffee-percolation.html"');
+        expect(read('src/ui/views/MoreView.js')).toContain('href="coffee-percolation.html"');
+    });
+
+    it('ships the coffee lab from public/ rather than as a Vite input', () => {
+        // The page consumes the PUBLISHED package through a browser import map, and Vite resolves
+        // bare specifiers in inline module scripts at transform time — so listing it as a build
+        // input would fail on `@hexlife/embed/ca` before a browser ever saw the map. `public/` is
+        // copied verbatim, which is what keeps the deployed page an honest test of the real package.
+        const config = read('vite.config.js');
+        expect(config).not.toMatch(/input:[\s\S]*coffee-percolation\.html'/);
+        const page = read('public/coffee-percolation.html');
+        expect(page).toContain('<script type="importmap">');
+        // Pinned, never `@latest`: jsDelivr caches that alias for hours after a publish, and it
+        // would go on resolving to a version where `/ca-element` does not exist.
+        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/ca\/\+esm/);
+        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/ca-element\/\+esm/);
+        expect(page).not.toContain('@hexlife/embed@latest');
+    });
+
+    it('keeps every grid size the lab offers legal for the block partition', () => {
+        // Block mode needs `rows % 3 == 0` or the 3-phase triangular partition has a seam at the
+        // row wrap, and the element throws rather than rounding. A size preset that violated it
+        // would put the page into its error box the moment somebody picked it.
+        const page = read('public/coffee-percolation.html');
+        const options = [...page.matchAll(/<option value="(\d+)"[^>]*>\s*\d+ × \d+/g)].map((m) => Number(m[1]));
+        expect(options.length).toBeGreaterThanOrEqual(4);
+        for (const rows of options) expect(rows % 3).toBe(0);
+    });
+
     it('labels structure-aware palettes and applies the live hue attribute to grid and detail', () => {
         const showcase = read('totalistic-256.html');
         expect(showcase).toContain("label: 'Rule-aware'");

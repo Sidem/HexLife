@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HexLife — coffee extraction lab</title>
+<style>
+  :root {
+    --bg: #101215;
+    --panel: #1a1e23;
+    --line: #2c333b;
+    --ink: #d7dadc;
+    --dim: #8a929b;
+    --accent: #e0b341;
+    --good: #5fd08a;
+    --bad: #e06c5a;
+
+    /* The six states of the extraction model, shared by the palette attribute and every legend
+       swatch, so a swatch can never disagree with what is on the grid. */
+    --air: #12161a;
+    --water: #3aa0ff;
+    --saturated: #7a4b1e;
+    --dry: #8a6d55;
+    --wet: #5c452f;
+    --spent: #33281f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 22px 20px 48px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.55 system-ui, -apple-system, sans-serif;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+  h1 { font-size: 21px; font-weight: 650; margin: 0 0 5px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 640; margin: 30px 0 9px; }
+  h3 { font-size: 14px; font-weight: 640; margin: 0; }
+  p { margin: 0 0 10px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 14px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); font-size: 12.5px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  a { color: var(--accent); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 34px 0 0; }
+
+  .lede {
+    padding: 11px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 16px;
+  }
+  .lede p:last-child { margin-bottom: 0; }
+
+  /* --- lab layout: controls | world | dashboard --- */
+  .lab { display: grid; grid-template-columns: 250px minmax(0, 1fr) 250px; gap: 14px; align-items: start; }
+  @media (max-width: 1040px) { .lab { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 13px;
+  }
+  .card > h3 { margin-bottom: 9px; }
+
+  .field { margin-bottom: 11px; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+  .field .val { float: right; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 0; }
+  select, button {
+    font: inherit; font-size: 13px;
+    background: #262c33; color: var(--ink);
+    border: 1px solid #38414a; border-radius: 6px;
+    padding: 5px 10px; cursor: pointer;
+  }
+  select { width: 100%; }
+  button:hover, select:hover { background: #313941; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .row { display: flex; gap: 7px; }
+  .row > button { flex: 1; }
+  .check { display: flex; align-items: center; gap: 7px; color: var(--dim); font-size: 12px; }
+  .check input { accent-color: var(--accent); }
+
+  hexlife-ca { width: 100%; border-radius: 8px; overflow: hidden; display: block; }
+  /* The lab element is `paused` because THIS PAGE owns the stepping — it has to interleave the pour
+     and the drip around each tick, which the element's own loop knows nothing about. So its poster
+     play button must not be offered: pressing it would start a second loop ticking the same world.
+     `::part(overlay)` is the element's supported hook for a host that owns its own transport. */
+  hexlife-ca#lab::part(overlay) { display: none; }
+  .stage { padding: 0; overflow: hidden; }
+  .stagebar {
+    display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
+    padding: 9px 12px; border-bottom: 1px solid var(--line);
+    font-size: 12px; color: var(--dim);
+  }
+  .stagebar b { color: var(--ink); font-weight: 600; }
+  .stagefoot { padding: 8px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+
+  /* --- the score --- */
+  .score { text-align: center; padding: 4px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .score .n { font-size: 34px; font-weight: 680; line-height: 1.05; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .score .l { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.07em; }
+  .score .best { font-size: 11.5px; color: var(--dim); margin-top: 5px; }
+  .score .best b { color: var(--good); }
+
+  table.stat { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.stat th { text-align: left; color: var(--dim); font-weight: 500; padding: 3px 0; }
+  table.stat td { text-align: right; padding: 3px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  table.stat tr.sep { border-top: 1px solid var(--line); }
+  table.stat tr.sep th, table.stat tr.sep td { padding-top: 7px; }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; border: 1px solid rgba(255,255,255,0.16); }
+
+  .meter { height: 6px; background: #262c33; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+  .meter > span { display: block; height: 100%; background: var(--accent); }
+  .meter.good > span { background: var(--good); }
+  .meter.bad > span { background: var(--bad); }
+
+  /* --- the k=4 comparison below --- */
+  .verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 12px; }
+  .verdict div { padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .verdict .label { color: var(--dim); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .verdict .value { font-size: 18px; font-weight: 650; margin-top: 3px; }
+  .verdict .note { color: var(--dim); font-size: 12.5px; margin-top: 3px; }
+  .held { border-color: rgba(95,208,138,0.45); } .held .value { color: var(--good); }
+  .leaked { border-color: rgba(224,108,90,0.45); } .leaked .value { color: var(--bad); }
+  .worlds { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 780px) { .worlds, .verdict { grid-template-columns: 1fr; } }
+  .world .why { color: var(--dim); font-size: 12.5px; margin: 4px 0 10px; }
+  td.delta { width: 5.5em; color: var(--dim); }
+  tr.total th, tr.total td { font-weight: 640; color: var(--ink); }
+  td.delta.zero { color: var(--good); } td.delta.drift { color: var(--bad); }
+  .facts { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .facts b { color: var(--ink); font-weight: 600; }
+  .boot { color: var(--dim); font-size: 12px; }
+  .boot.failed { color: var(--bad); }
+</style>
+
+<!--
+  Bare specifiers plus one import map, rather than jsDelivr URLs written into every import: the
+  module code below is then identical whether it runs against the published package or a local
+  build, and switching between them is a change to this block alone.
+
+  Pinned to an exact version rather than `@latest`. That is not a style preference — `/ca` and
+  `/ca-element` were both introduced in 1.7.0, and jsDelivr caches its `@latest` alias for hours
+  after a publish, so the alias goes on resolving to a version where these two entries do not exist
+  and the page 404s. Bump it deliberately when there is a reason to.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca/+esm",
+    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca-element/+esm"
+  }
+}
+</script>
+<!--
+  Local build (`npm run build:embed`). Swap the map above for this one to run against uncommitted
+  engine changes; nothing else in the page changes:
+
+  <script type="importmap">
+  {
+    "imports": {
+      "@hexlife/embed/ca": "./dist/embed-package/src/embed/ca.js",
+      "@hexlife/embed/ca-element": "./dist/embed-package/src/embed/ca-element.js"
+    }
+  }
+  </script>
+
+  This file lives in `public/` so Vite copies it to the deploy VERBATIM. It cannot be a
+  `rollupOptions.input` entry like `totalistic-256.html`: Vite resolves bare specifiers in inline
+  module scripts itself, at transform time, and would fail on "@hexlife/embed/ca" before the browser
+  ever saw the import map. Being static also means `npm run dev` serves it unchanged, so it works
+  there too.
+-->
+</head>
+<body>
+<div class="wrap">
+
+<h1>Coffee extraction lab</h1>
+<p class="sub">
+  A six-state lattice model of water moving through a bed of coffee grounds, built on
+  <code>&lt;hexlife-ca&gt;</code> from <code>@hexlife/embed</code>. Pull the levers; get the yield up.
+</p>
+
+<div class="lede">
+  <p>
+    <b>The goal is to spend every ground.</b> Water picks up solubles as it passes through wetted
+    coffee, and once it is saturated it cannot pick up any more — it just runs through. So the way to
+    a high yield is to make the water meet as much of the bed as possible before it saturates. Send
+    it all down one path and you get a <b>channel</b>: that column extracts fully, everything either
+    side of it stays dry, and the cup is both weak and bitter.
+  </p>
+  <p>
+    Every quantity here is conserved <em>exactly</em>, which is what makes the score mean something.
+    Fluid is never created or destroyed by the rule, grounds are never created or destroyed, and the
+    only things crossing the boundary are what you pour in at the top and what drips out of the
+    bottom into the cup — both counted. That is the block backend's doing, and the section at the
+    bottom of this page shows what happens without it.
+  </p>
+</div>
+
+<div class="lab">
+
+  <!-- ---------------- controls ---------------- -->
+  <div class="card">
+    <h3>The brew</h3>
+    <div class="field">
+      <label for="pour">Pour pattern</label>
+      <select id="pour">
+        <option value="shower">Shower — even, across the bed</option>
+        <option value="pulse">Pulse — bloom, rest, then pour</option>
+        <option value="centre">Centre stream — one spot</option>
+        <option value="dump">Dump — all of it at once</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="flow"><span class="val" id="flow-v">6</span>Flow rate <span style="opacity:.7">cells/tick</span></label>
+      <input type="range" id="flow" min="1" max="40" value="6">
+    </div>
+    <div class="field">
+      <label for="water"><span class="val" id="water-v">18%</span>Water volume <span style="opacity:.7">of grid</span></label>
+      <input type="range" id="water" min="2" max="60" value="18">
+    </div>
+
+    <h3 style="margin-top:16px">The puck</h3>
+    <div class="field">
+      <label for="pack"><span class="val" id="pack-v">0.45</span>Packing density</label>
+      <input type="range" id="pack" min="20" max="75" value="45">
+    </div>
+    <div class="field">
+      <label for="depth"><span class="val" id="depth-v">62%</span>Bed depth</label>
+      <input type="range" id="depth" min="20" max="90" value="62">
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="uneven"> Uneven puck (a loose patch)</label>
+    </div>
+
+    <h3 style="margin-top:16px">The rig</h3>
+    <div class="field">
+      <label for="size">Grid size</label>
+      <select id="size">
+        <option value="66">66 × 76 — 5k cells</option>
+        <option value="150" selected>150 × 174 — 26k cells</option>
+        <option value="300">300 × 346 — 104k cells</option>
+        <option value="450">450 × 520 — 234k cells</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="speed"><span class="val" id="speed-v">4</span>Ticks per frame</label>
+      <input type="range" id="speed" min="1" max="16" value="4">
+    </div>
+    <div class="field row">
+      <button id="run">Pause</button>
+      <button id="brew">New brew</button>
+    </div>
+  </div>
+
+  <!-- ---------------- the world ---------------- -->
+  <div class="card stage">
+    <div class="stagebar">
+      <span>tick <b id="tick">0</b></span>
+      <span>poured <b id="poured">0</b></span>
+      <span>in bed <b id="inbed">0</b></span>
+      <span>in cup <b id="incup">0</b></span>
+      <span id="phase" style="color:var(--accent)">pouring</span>
+    </div>
+    <hexlife-ca id="lab" states="6" rows="150" backend="block" paused link="off"
+                palette="#12161a,#3aa0ff,#7a4b1e,#8a6d55,#5c452f,#33281f"></hexlife-ca>
+    <div class="stagefoot" id="stagefoot"></div>
+  </div>
+
+  <!-- ---------------- dashboard ---------------- -->
+  <div class="card">
+    <div class="score">
+      <div class="n" id="yield">0.0%</div>
+      <div class="l">extraction yield</div>
+      <div class="best">best this session <b id="best">—</b></div>
+    </div>
+    <table class="stat" id="bed"></table>
+    <table class="stat" id="cup" style="margin-top:10px"></table>
+    <p class="facts" id="diag"></p>
+  </div>
+</div>
+
+<h2>How the rule works</h2>
+<p>
+  Six states, in two families. <b>Fluid</b> is <span class="swatch" style="background:var(--air)"></span>air 0,
+  <span class="swatch" style="background:var(--water)"></span>water 1 and
+  <span class="swatch" style="background:var(--saturated)"></span>saturated water 2 — numbered in density
+  order, so gravity is literally “sort the mobile cells ascending, lightest on top”.
+  <b>Grounds</b> are <span class="swatch" style="background:var(--dry)"></span>dry 3,
+  <span class="swatch" style="background:var(--wet)"></span>wet 4 and
+  <span class="swatch" style="background:var(--spent)"></span>spent 5 — numbered in the order a ground
+  passes through them. Grounds never move.
+</p>
+<p>
+  Each tick, every 3-cell triangle of the partition is rewritten at once, in three steps:
+  <b>extract</b> (a water cell sharing a block with a wet ground becomes saturated, and that ground
+  becomes spent), then <b>wet</b> (a dry ground sharing a block with any fluid becomes wet), then
+  <b>fall</b> (the mobile cells are re-laid heaviest at the bottom). Extraction runs before wetting on
+  purpose: grounds must be wet for at least one tick before they will give anything up, which is what
+  makes a pre-infusion pause worth doing.
+</p>
+<p>
+  Saturated water is inert — it cannot extract again. That single clause is what turns channelling
+  from a cosmetic problem into a scoring one, and it is why pouring faster is not the same as
+  extracting more.
+</p>
+<p class="facts">
+  Note what the library reports about this rule: <b>not conservative</b> and <b>not isotropic</b>.
+  Both are correct. <code>isConservative</code> tests the strict multiset property, and extraction
+  changes which states exist (water→saturated, wet→spent); what it preserves is fluid count and
+  ground count separately, which the page checks exhaustively over all 216 block entries before
+  running a tick. <code>isIsotropic</code> is false because gravity has to single out a direction.
+  Both are <em>reported, never enforced</em> — reactions and gravity are legitimate physics.
+</p>
+
+<h2>Why six states means one backend</h2>
+<p>
+  <code>@hexlife/embed/ca</code> has two backends, and they are two different ways of writing a rule
+  down rather than two speeds. The <code>neighborhood</code> backend is the direct generalisation of
+  HexLife's rule space: a dense table indexed by a cell and all six of its neighbours, so
+  <code>k⁷</code> entries — 16 KB at k=4, but 279,936 entries at k=6 and 268 MB at k=16. It is
+  hard-capped at four states. The <code>block</code> backend rewrites a whole 3-cell triangle from a
+  <code>k³</code> table — 216 entries here — and scales to sixteen.
+</p>
+<p>
+  So this model does not <em>choose</em> block mode; six states is more than the other table can hold.
+  The comparison below is at four states because that is the largest <code>k</code> that fits both.
+</p>
+
+<hr>
+
+<h2>Why block mode exists at all</h2>
+<p class="sub">
+  The same four-state model — air, water, dry ground, wet ground — run under both backends from
+  byte-identical cells. Watch the bottom row of each table.
+</p>
+
+<div class="lede">
+  <p>
+    <b>A radius-1 synchronous cellular automaton cannot conserve mass, at any number of states.</b>
+    Two water cells sitting diagonally above one empty cell each independently see “empty below me”
+    and vacate; the empty cell sees water above and fills. Two in, one out. Preventing that needs the
+    losing cell to know it lost — to see its competitor, two cells away — and radius 2 on a hex grid
+    is 18 neighbours, so an anisotropic rule table would be <code>k¹⁹</code>. It is not a bug in the
+    rule; it is a property of the neighbourhood.
+  </p>
+  <p>
+    Block partitioning fixes it by construction: arbitration happens <em>inside</em> the block, so a
+    rule that permutes multisets is exactly conservative with no bookkeeping. This is the lattice-gas
+    approach, and FHP is the hexagonal precedent.
+  </p>
+  <p>
+    The failure mode does not look like one. The right-hand grid stays perfectly plausible — water
+    beads, soaks in, spreads down. Only the number moves, and it moves in <em>both</em> directions:
+    two sources feeding one destination lose mass, one source feeding three duplicates it. This seed
+    loses ~4% on the first tick and then runs away upward to roughly <b>4.5× the water it started
+    with</b> — an espresso puck that brews more coffee than you poured.
+  </p>
+</div>
+
+<div class="verdict">
+  <div id="verdict-block">
+    <div class="label">Block · total water (free + bound)</div>
+    <div class="value" id="verdict-block-value">—</div>
+    <div class="note" id="verdict-block-note">waiting for the engine</div>
+  </div>
+  <div id="verdict-nbhd">
+    <div class="label">Neighborhood · total water (free + bound)</div>
+    <div class="value" id="verdict-nbhd-value">—</div>
+    <div class="note" id="verdict-nbhd-note">waiting for the engine</div>
+  </div>
+</div>
+
+<div class="worlds">
+  <div class="world card">
+    <h3>block — 3-cell triangle, k³ table</h3>
+    <p class="why">
+      Transport and wetting are both rewrites of a whole triangle, so no two cells can ever claim the
+      same destination. Total water is held to the count, forever — then it comes to rest.
+    </p>
+    <hexlife-ca id="ca-block" states="4" rows="66" backend="block" speed="18"
+                palette="#12161a,#3aa0ff,#8a6d55,#5c452f" link="off"></hexlife-ca>
+    <table class="stat" id="census-block" style="margin-top:10px"></table>
+    <p class="facts" id="facts-block"></p>
+  </div>
+  <div class="world card">
+    <h3>neighborhood — radius 1, k⁷ table</h3>
+    <p class="why">
+      The most natural radius-1 expression of the same model: water vacates when there is somewhere
+      below to go, open space fills from above, ground wets on contact. Nothing arbitrates.
+    </p>
+    <hexlife-ca id="ca-nbhd" states="4" rows="66" backend="neighborhood" speed="18"
+                palette="#12161a,#3aa0ff,#8a6d55,#5c452f" link="off"></hexlife-ca>
+    <table class="stat" id="census-nbhd" style="margin-top:10px"></table>
+    <p class="facts" id="facts-nbhd"></p>
+  </div>
+</div>
+<p class="boot" id="boot" style="margin-top:10px">loading @hexlife/embed…</p>
+
+<h2>Why 66 rows and not 64</h2>
+<p>
+  Block mode partitions the grid into up-triangles in three phases, cycling
+  <code>φ = tick mod 3</code>. The partition is seamless only if the sublattice residue survives the
+  row wrap, which needs <code>rows ≡ 0 (mod 3)</code>. The embed's usual default of 64 does not
+  qualify, and <code>&lt;hexlife-ca&gt;</code> shows an error box rather than rounding it — the grid
+  you asked for should not silently become a different one. Every grid size offered above is a
+  multiple of three for the same reason.
+</p>
+
+<h2>Why this lattice</h2>
+<p>
+  A hex grid has one neighbour class — six neighbours, all equidistant. A square grid has two, and
+  the anisotropy that follows is not cosmetic: six-fold symmetry is sufficient for a lattice gas to
+  recover isotropic hydrodynamics in the continuum limit and four-fold is not, which is why
+  square-lattice automata grow diamond-shaped fronts where physics wants circles. Hex cell centres
+  also form a triangular lattice, where site percolation has <code>p_c = 1/2</code> <em>exactly</em>
+  — on the square lattice it is ≈0.5927, known only numerically.
+</p>
+<p>
+  That is not decoration here; it is what the packing slider is measuring. Sweeping it at an
+  otherwise fixed brew (shower, flow 6, 62% bed) gives:
+</p>
+<table class="stat" style="max-width:520px">
+  <tr><th>packing</th><th style="text-align:right">pore space</th><th style="text-align:right">yield</th><th style="text-align:right">never wetted</th></tr>
+  <tr><th>0.25</th><td>0.75</td><td>68.0%</td><td>25.5%</td></tr>
+  <tr><th>0.35</th><td>0.65</td><td>48.5%</td><td>38.9%</td></tr>
+  <tr><th>0.45</th><td>0.55</td><td>25.4%</td><td>57.9%</td></tr>
+  <tr class="sep"><th>0.55</th><td>0.45</td><td>9.0%</td><td>83.9%</td></tr>
+  <tr><th>0.65</th><td>0.35</td><td>5.6%</td><td>90.6%</td></tr>
+</table>
+<p style="margin-top:10px">
+  The floor drops out between 0.45 and 0.55 — which is pore space crossing <b>0.5</b>. Below the
+  threshold there is usually no connected path from the top of the bed to the bottom, so most of the
+  water never gets in and most of the grounds are never touched. The default sits at 0.45 on purpose:
+  right on the interesting edge.
+</p>
+
+<h2>Running this page</h2>
+<p class="facts">
+  It resolves <code>@hexlife/embed</code> from jsDelivr through the import map in the page source, so
+  it needs a network but no build. To point it at a local <code>npm run build:embed</code> instead,
+  swap that one block for the commented-out map beside it — nothing else changes, which is why it is
+  written with bare specifiers rather than URLs. The file ships from <code>public/</code>, so the
+  deploy serves exactly the bytes in the repository.
+</p>
+
+</div>
+
+<script type="module">
+import {
+    blockRuleFromTable,
+    isConservative,
+    isIsotropic,
+    ruleFromTable,
+} from '@hexlife/embed/ca';
+import '@hexlife/embed/ca-element';
+
+// ===========================================================================
+// PART 1 — the six-state extraction lab
+// ===========================================================================
+
+// Fluid phases, numbered in DENSITY order so gravity is a plain ascending sort.
+const AIR = 0, WATER = 1, SAT = 2;
+// Ground phases, numbered in the order a ground passes through them. Grounds never move.
+const DRY = 3, WET = 4, SPENT = 5;
+/** Everything below this is mobile; everything at or above it is fixed. */
+const MOBILE = 3;
+
+const LAB_NAMES = ['air', 'water', 'saturated', 'dry ground', 'wet ground', 'spent ground'];
+const LAB_VARS = ['--air', '--water', '--saturated', '--dry', '--wet', '--spent'];
+
+/**
+ * The extraction rule. `block` is the partition triangle in vertex order, which runs top -> middle
+ * -> bottom: the base cell, its down-right neighbour, and the cell directly below it. That ordering
+ * is the same in all three partition phases, which is what lets "sort toward index 2" mean gravity.
+ *
+ * Three steps, and the order of the first two is load-bearing.
+ */
+const extractionRule = blockRuleFromTable(6, (block) => {
+    const out = [block[0], block[1], block[2]];
+
+    // 1. EXTRACT. Unsaturated water meeting an already-wet ground takes its solubles: the water
+    //    saturates and the ground is spent. Fluid count and ground count are both unchanged, so
+    //    this is a reaction that still conserves each family exactly.
+    const water = out.indexOf(WATER);
+    const wet = out.indexOf(WET);
+    if (water !== -1 && wet !== -1) {
+        out[water] = SAT;
+        out[wet] = SPENT;
+    }
+
+    // 2. WET. Dry grounds in contact with any fluid dampen. Deliberately AFTER extraction, so a
+    //    ground cannot be wetted and spent in the same tick — grounds need a tick of contact first,
+    //    which is exactly what makes a pre-infusion pause a real strategy rather than a ritual.
+    const hasFluid = out.some((v) => v < MOBILE && v !== AIR);
+    if (hasFluid) {
+        for (let i = 0; i < 3; i++) if (out[i] === DRY) out[i] = WET;
+    }
+
+    // 3. FALL. The mobile slots are re-laid in density order, lightest on top. A permutation of the
+    //    mobile multiset, so it is exactly conservative on its own.
+    const slots = [];
+    for (let i = 0; i < 3; i++) if (out[i] < MOBILE) slots.push(i);
+    const values = slots.map((i) => out[i]).sort((a, b) => a - b);
+    slots.forEach((slot, n) => { out[slot] = values[n]; });
+    return out;
+});
+
+/**
+ * The rule's actual claim, checked exhaustively over all 6^3 = 216 entries before a tick runs.
+ *
+ * `isConservative` is the strict multiset property and is false here — extraction changes which
+ * states exist. What the rule does preserve is the two FAMILY counts separately, and that is what
+ * makes the score meaningful: nothing but the pour and the drip can change how much fluid is in the
+ * grid, and nothing at all can change how much coffee is.
+ */
+function preservesBothFamilies(rule) {
+    const fluid = (b) => b.filter((v) => v < MOBILE).length;
+    const ground = (b) => b.filter((v) => v >= MOBILE).length;
+    for (let i = 0; i < 216; i++) {
+        const inB = [Math.floor(i / 36), Math.floor(i / 6) % 6, i % 6];
+        const p = rule[i];
+        const outB = [Math.floor(p / 36), Math.floor(p / 6) % 6, p % 6];
+        if (fluid(inB) !== fluid(outB) || ground(inB) !== ground(outB)) return false;
+    }
+    return true;
+}
+
+function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+const lab = document.getElementById('lab');
+const ui = {
+    pour: document.getElementById('pour'),
+    flow: document.getElementById('flow'),
+    water: document.getElementById('water'),
+    pack: document.getElementById('pack'),
+    depth: document.getElementById('depth'),
+    uneven: document.getElementById('uneven'),
+    size: document.getElementById('size'),
+    speed: document.getElementById('speed'),
+    run: document.getElementById('run'),
+    brew: document.getElementById('brew'),
+};
+
+/** Everything the host owns: the boundary conditions and the tallies the rule cannot see. */
+const brew = {
+    tick: 0,
+    poured: 0,          // fluid cells injected at the top
+    budget: 0,          // how many we are allowed to inject in total
+    cupWater: 0,        // drained fresh water — the channelling signature
+    cupSat: 0,          // drained saturated water — the actual coffee
+    groundTotal: 0,
+    running: true,
+    best: 0,
+};
+
+const pct = (n) => `${(n * 100).toFixed(1)}%`;
+
+/** Lay a fresh puck. Seeded, so a parameter change is the only difference between two runs. */
+function packPuck() {
+    const rows = lab.rows, cols = lab.columns;
+    const random = mulberry32(0xC0FFEE);
+    const cells = new Uint8Array(rows * cols);
+    const density = Number(ui.pack.value) / 100;
+    const bedTop = Math.floor(rows * (1 - Number(ui.depth.value) / 100));
+    // A loose patch: a soft column of reduced density, which is how a real channel starts.
+    const loose = ui.uneven.checked;
+    const looseAt = Math.floor(cols * 0.34);
+    const looseWidth = Math.max(3, Math.floor(cols * 0.09));
+
+    for (let row = bedTop; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            let d = density;
+            if (loose) {
+                const dist = Math.abs(col - looseAt);
+                if (dist < looseWidth) d = density * (0.30 + 0.70 * (dist / looseWidth));
+            }
+            if (random() < d) cells[row * cols + col] = DRY;
+        }
+    }
+    return cells;
+}
+
+/** Which top-row columns receive water this tick, per the chosen pour pattern. */
+function injectionColumns() {
+    const cols = lab.columns;
+    const flow = Number(ui.flow.value);
+    const mode = ui.pour.value;
+    const out = [];
+
+    if (mode === 'dump') {
+        // As fast as the top row will physically take it, every tick, until the budget is gone.
+        // Deliberately not "the whole budget on tick 0": only open cells accept water, so a one-shot
+        // dump would silently drop most of the pour the moment the top row backed up.
+        const remaining = brew.budget - brew.poured;
+        for (let i = 0; i < Math.min(remaining, cols); i++) out.push(i);
+        return out;
+    }
+
+    if (mode === 'centre') {
+        const half = Math.max(1, Math.floor(cols * 0.04));
+        for (let i = 0; i < flow; i++) {
+            out.push(Math.floor(cols / 2) - half + ((i * 2 + brew.tick) % (half * 2 || 1)));
+        }
+        return out;
+    }
+
+    // `pulse` is the shower with the flow modulated: a small bloom, a rest while it soaks in, then
+    // the full pour. The rest is the whole point — grounds must be wet a tick before they extract.
+    let rate = flow;
+    if (mode === 'pulse') {
+        const bloom = 40, rest = 60;
+        if (brew.tick < bloom) rate = Math.max(1, Math.round(flow * 0.35));
+        else if (brew.tick < bloom + rest) rate = 0;
+    }
+
+    // Evenly spaced, with the phase advanced each tick so the same columns are not always hit.
+    for (let i = 0; i < rate; i++) {
+        out.push(Math.floor(((i + (brew.tick * 0.37)) % rate) * (cols / Math.max(1, rate))) % cols);
+    }
+    return out;
+}
+
+/** Pour in at the top and let the cup catch whatever falls out of the bottom. */
+function boundaryStep() {
+    const world = lab.world;
+    if (!world) return;
+    const cols = world.columns, rows = world.rows;
+    const state = world.state;
+
+    // --- pour ---
+    if (brew.poured < brew.budget) {
+        for (const col of injectionColumns()) {
+            if (brew.poured >= brew.budget) break;
+            const index = col % cols;
+            // Only into open space. A backed-up top row means the puck is choking, which is a real
+            // outcome worth seeing rather than something to force water through.
+            if (state[index] === AIR) {
+                world.setCell(index, WATER);
+                brew.poured++;
+            }
+        }
+    }
+
+    // --- drip ---
+    // The grid is a torus, so without this the bottom row would wrap around to the top and the bed
+    // would recirculate forever. Draining every tick means nothing is ever sitting on the bottom row
+    // when the next tick runs, so nothing can wrap.
+    const base = (rows - 1) * cols;
+    for (let col = 0; col < cols; col++) {
+        const v = state[base + col];
+        if (v === WATER) { brew.cupWater++; world.setCell(base + col, AIR); }
+        else if (v === SAT) { brew.cupSat++; world.setCell(base + col, AIR); }
+    }
+}
+
+function renderLab() {
+    const world = lab.world;
+    if (!world) return;
+    const c = world.census();
+    const grounds = c[DRY] + c[WET] + c[SPENT];
+    const fluidInBed = c[WATER] + c[SAT];
+    const cup = brew.cupWater + brew.cupSat;
+    const yieldFrac = grounds ? c[SPENT] / grounds : 0;
+
+    if (yieldFrac > brew.best) brew.best = yieldFrac;
+
+    document.getElementById('yield').textContent = pct(yieldFrac);
+    document.getElementById('best').textContent = brew.best ? pct(brew.best) : '—';
+    document.getElementById('tick').textContent = brew.tick.toLocaleString();
+    document.getElementById('poured').textContent = brew.poured.toLocaleString();
+    document.getElementById('inbed').textContent = fluidInBed.toLocaleString();
+    document.getElementById('incup').textContent = cup.toLocaleString();
+
+    const pouring = brew.poured < brew.budget;
+    const choked = brew.finished && pouring;
+    const phase = document.getElementById('phase');
+    phase.textContent = choked ? 'choked' : brew.finished ? 'finished' : pouring ? 'pouring' : 'draining';
+    phase.style.color = choked ? 'var(--bad)' : 'var(--accent)';
+
+    const rowFor = (state) => `<tr>
+        <th><span class="swatch" style="background: var(${LAB_VARS[state]})"></span>${LAB_NAMES[state]}</th>
+        <td>${c[state].toLocaleString()}</td></tr>`;
+    document.getElementById('bed').innerHTML =
+        rowFor(DRY) + rowFor(WET) + rowFor(SPENT)
+        + `<tr class="sep"><th>grounds untouched</th><td>${grounds ? pct(c[DRY] / grounds) : '—'}</td></tr>`
+        + `<tr><th>grounds spent</th><td>${grounds ? pct(c[SPENT] / grounds) : '—'}</td></tr>`;
+
+    const strength = cup ? brew.cupSat / cup : 0;
+    document.getElementById('cup').innerHTML =
+        `<tr class="sep"><th>in the cup</th><td>${cup.toLocaleString()}</td></tr>`
+        + `<tr><th>strength <span style="opacity:.7">saturated</span></th><td>${cup ? pct(strength) : '—'}</td></tr>`
+        + `<tr><td colspan="2"><span class="meter ${strength > 0.6 ? 'good' : 'bad'}"><span style="width:${(strength * 100).toFixed(1)}%"></span></span></td></tr>`
+        + `<tr><th>ran through unused</th><td>${cup ? pct(1 - strength) : '—'}</td></tr>`;
+
+    const activity = world.chunkActivity;
+    document.getElementById('diag').innerHTML =
+        `<b>${world.rows}×${world.columns}</b> = ${(world.rows * world.columns).toLocaleString()} cells`
+        + ` · table <b>216</b> entries`
+        + ` · chunks active <b>${activity.active}/${activity.total}</b>`
+        + (lab.isSettled ? ' · <b>settled</b>' : '');
+
+    document.getElementById('stagefoot').innerHTML = !brew.finished
+        ? 'Grounds only give up solubles once they are wet, and water only takes them once. '
+          + 'Spread the contact out.'
+        : choked
+        ? `<b style="color:var(--bad)">The puck choked.</b> ${(brew.budget - brew.poured).toLocaleString()} `
+          + 'cells of water never got in — the bed came to rest with the top row still full. Pore '
+          + 'space below ~0.5 is under the percolation threshold for this lattice, so above a '
+          + 'packing of about 0.5 there is often no connected path down at all.'
+        : c[DRY] > grounds * 0.5
+            ? '<b style="color:var(--bad)">The water found a way around most of the bed.</b> '
+              + 'More than half the grounds were never even wetted — try a slower flow, a shower '
+              + 'rather than a stream, or a looser pack.'
+            : `<b style="color:var(--good)">Brew finished.</b> `
+              + `${fluidInBed.toLocaleString()} cells of liquid stayed held in the puck — that is `
+              + `retained water, not a leak: the pour and the drip are the only things that cross `
+              + `the boundary, and they balance to the cell.`;
+}
+
+let rafId = 0;
+function frame() {
+    rafId = requestAnimationFrame(frame);
+    if (!brew.running || !lab.world) return;
+
+    // A settled world is a fixed point it can never leave, so there is nothing to compute or draw —
+    // stepping a settled 234k-cell world every frame would be pure waste. This is `isSettled`'s
+    // whole purpose, and any parameter change re-seeds and clears the flag.
+    //
+    // Settling is the right test on its own, not "settled AND the budget is spent". If there is
+    // water still to pour, the injection dirties a chunk every tick and the world cannot be settled;
+    // so a settled world with budget left over means the top row is permanently full and the pour
+    // has nowhere to go. That is a CHOKED puck, and it has to end the run rather than spin forever.
+    if (lab.isSettled) {
+        if (!brew.finished) { brew.finished = true; renderLab(); }
+        return;
+    }
+    brew.finished = false;
+
+    const steps = Number(ui.speed.value);
+    for (let i = 0; i < steps; i++) {
+        boundaryStep();
+        // Straight to the engine, not `lab.tick()`: that redraws on every call, and at 234k cells a
+        // per-step buffer upload would dominate the frame. One draw at the end is enough.
+        lab.world.tick(1);
+        brew.tick++;
+    }
+    lab.tick(0);        // tick nothing, draw once — the supported "just repaint" call.
+    renderLab();
+}
+
+/** Install the rule and lay a fresh puck. Runs on every boot, including a `rows` change. */
+function startBrew() {
+    if (!lab.world) return;
+    lab.setRule(extractionRule);
+    lab.setCells(packPuck());
+    const c = lab.world.census();
+    brew.tick = 0;
+    brew.poured = 0;
+    brew.cupWater = 0;
+    brew.cupSat = 0;
+    brew.groundTotal = c[DRY] + c[WET] + c[SPENT];
+    brew.budget = Math.round(lab.rows * lab.columns * (Number(ui.water.value) / 100));
+    brew.finished = false;
+    renderLab();
+}
+
+// The element re-boots when `rows` changes, which builds a new world — so the rule and the puck are
+// installed from the ready event rather than once at startup.
+lab.addEventListener('hexlife-ca-ready', () => startBrew());
+
+const bind = (input, out, fmt, restart) => {
+    const sync = () => { if (out) document.getElementById(out).textContent = fmt(input.value); };
+    input.addEventListener('input', () => { sync(); if (restart) startBrew(); });
+    sync();
+};
+bind(ui.flow, 'flow-v', (v) => v, false);
+bind(ui.water, 'water-v', (v) => `${v}%`, true);
+bind(ui.pack, 'pack-v', (v) => (v / 100).toFixed(2), true);
+bind(ui.depth, 'depth-v', (v) => `${v}%`, true);
+bind(ui.speed, 'speed-v', (v) => v, false);
+ui.uneven.addEventListener('change', startBrew);
+ui.pour.addEventListener('change', startBrew);
+ui.brew.addEventListener('click', startBrew);
+ui.size.addEventListener('change', () => lab.setAttribute('rows', ui.size.value));
+ui.run.addEventListener('click', () => {
+    brew.running = !brew.running;
+    ui.run.textContent = brew.running ? 'Pause' : 'Run';
+});
+
+// ===========================================================================
+// PART 2 — the four-state backend comparison
+// ===========================================================================
+// Four states, because that is the largest k the `neighborhood` table can hold: its k^7 entries are
+// 16 KB at k=4 and 279,936 at k=6. The extraction model above cannot be run here at all.
+
+const C_AIR = 0, C_WATER = 1, C_DRY = 2, C_WET = 3;
+const C_NAMES = ['air', 'water', 'dry ground', 'wet ground'];
+const C_VARS = ['--air', '--water', '--dry', '--wet'];
+
+/** Downward and upward neighbour slots in the engine's canonical order (`neighbor-dirs.json`). */
+const DOWNWARD = [0, 4, 5];
+const UPWARD = [1, 2, 3];
+
+const cmpBlockRule = blockRuleFromTable(4, (block) => {
+    const out = [block[0], block[1], block[2]];
+    const w = out.indexOf(C_WATER);
+    const d = out.indexOf(C_DRY);
+    if (w !== -1 && d !== -1) { out[w] = C_AIR; out[d] = C_WET; }
+    const slots = [];
+    for (let i = 0; i < 3; i++) if (out[i] === C_AIR || out[i] === C_WATER) slots.push(i);
+    const values = slots.map((i) => out[i]).sort((a, b) => a - b);
+    slots.forEach((slot, n) => { out[slot] = values[n]; });
+    return out;
+});
+
+const cmpNbhdRule = ruleFromTable(4, (centre, n) => {
+    if (centre === C_WET) return C_WET;
+    if (centre === C_DRY) return n.some((v) => v === C_WATER) ? C_WET : C_DRY;
+    if (centre === C_WATER) {
+        if (n.some((v) => v === C_DRY)) return C_AIR;
+        if (DOWNWARD.some((i) => n[i] === C_AIR)) return C_AIR;
+        return C_WATER;
+    }
+    if (UPWARD.some((i) => n[i] === C_WATER)) return C_WATER;
+    return C_AIR;
+});
+
+function brewCells(rows, columns, seed = 20260808) {
+    const random = mulberry32(seed);
+    const cells = new Uint8Array(rows * columns);
+    const groundsTop = Math.floor(rows * 0.30);
+    const waterBand = Math.floor(rows * 0.12);
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < columns; col++) {
+            const index = row * columns + col;
+            if (row < waterBand) cells[index] = C_WATER;
+            else if (row >= groundsTop) cells[index] = random() < 0.45 ? C_DRY : C_AIR;
+        }
+    }
+    return cells;
+}
+
+const cmp = { block: document.getElementById('ca-block'), nbhd: document.getElementById('ca-nbhd') };
+const baseline = { block: null, nbhd: null };
+const signed = (n) => (n === 0 ? '±0' : (n > 0 ? `+${n.toLocaleString()}` : n.toLocaleString()));
+
+function renderCensus(target, counts, base) {
+    const rows = counts.map((count, state) => {
+        const drift = base ? count - base[state] : 0;
+        return `<tr>
+            <th><span class="swatch" style="background: var(${C_VARS[state]})"></span>${C_NAMES[state]}</th>
+            <td>${count.toLocaleString()}</td>
+            <td class="delta">${base ? signed(drift) : ''}</td></tr>`;
+    });
+    const total = counts[C_WATER] + counts[C_WET];
+    const totalBase = base ? base[C_WATER] + base[C_WET] : total;
+    const drift = total - totalBase;
+    rows.push(`<tr class="sep total">
+        <th>total water — free + bound</th>
+        <td>${total.toLocaleString()}</td>
+        <td class="delta ${drift === 0 ? 'zero' : 'drift'}">${signed(drift)}</td></tr>`);
+    target.innerHTML = rows.join('');
+    return drift;
+}
+
+function renderVerdict(which, drift, el) {
+    const card = document.getElementById(`verdict-${which}`);
+    const held = drift === 0;
+    card.classList.toggle('held', held);
+    card.classList.toggle('leaked', !held);
+    // "leaked +1,877" would read as nonsense, and the sign is the interesting part.
+    document.getElementById(`verdict-${which}-value`).textContent =
+        held ? 'held exactly' : `drifted ${signed(drift)}`;
+    document.getElementById(`verdict-${which}-note`).textContent = held
+        ? `unchanged across ${el.generation.toLocaleString()} generations`
+        : `${drift > 0 ? 'manufactured' : 'lost'} by generation ${el.generation.toLocaleString()}`;
+}
+
+function seedComparison() {
+    for (const [which, el] of Object.entries(cmp)) {
+        if (!el.world) continue;
+        el.setCells(brewCells(el.rows, el.columns));
+        baseline[which] = Array.from(el.census());
+    }
+}
+
+function refreshComparison() {
+    for (const [which, el] of Object.entries(cmp)) {
+        if (!el.world || el.error) continue;
+        const counts = Array.from(el.census());
+        const drift = renderCensus(document.getElementById(`census-${which}`), counts, baseline[which]);
+        renderVerdict(which, drift, el);
+        const rule = which === 'block' ? cmpBlockRule : cmpNbhdRule;
+        const parts = [
+            `<b>${el.rows}×${el.columns}</b> cells`,
+            `table <b>${rule.length.toLocaleString()}</b> entries`,
+        ];
+        if (which === 'block') {
+            parts.push(`conservative <b>${isConservative(4, rule)}</b>`);
+            parts.push(`isotropic <b>${isIsotropic(4, rule)}</b>`);
+        }
+        const activity = el.chunkActivity;
+        if (activity) parts.push(`chunks active <b>${activity.active}/${activity.total}</b>`);
+        if (el.isSettled) parts.push('<b>settled</b> — a fixed point, so the loop has stopped');
+        document.getElementById(`facts-${which}`).innerHTML = parts.join(' · ');
+    }
+}
+
+// ===========================================================================
+// boot
+// ===========================================================================
+
+/**
+ * Resolve once an element has a live world.
+ *
+ * Not just the ready event: this module is deferred, and while the element's boot awaits a wasm init
+ * that in practice takes longer than parsing, "in practice" is not a guarantee.
+ */
+function whenReady(el) {
+    if (el.world) return Promise.resolve(el);
+    if (el.error) return Promise.reject(new Error(el.error));
+    return new Promise((resolve, reject) => {
+        el.addEventListener('hexlife-ca-ready', () => resolve(el), { once: true });
+        el.addEventListener('hexlife-ca-error', (e) => reject(new Error(e.detail.message)), { once: true });
+    });
+}
+
+const boot = document.getElementById('boot');
+
+(async () => {
+    try {
+        await Promise.all([whenReady(lab), whenReady(cmp.block), whenReady(cmp.nbhd)]);
+    } catch (e) {
+        boot.textContent = `failed: ${e.message}`;
+        boot.classList.add('failed');
+        return;
+    }
+
+    const ok = preservesBothFamilies(extractionRule);
+    boot.textContent = ok
+        ? 'extraction rule checked over all 216 entries: fluid and grounds are each conserved exactly'
+        : 'extraction rule FAILED its own conservation check';
+    boot.classList.toggle('failed', !ok);
+
+    startBrew();
+    rafId = requestAnimationFrame(frame);
+
+    cmp.block.setRule(cmpBlockRule);
+    cmp.nbhd.setRule(cmpNbhdRule);
+    seedComparison();
+    refreshComparison();
+    setInterval(refreshComparison, 200);
+})();
+</script>
+</body>
+</html>

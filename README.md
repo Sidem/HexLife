@@ -299,6 +299,20 @@ difference between two tiles is the rule.
 <hexlife-grid layout="16x16" rows="96" seed="12345" palette="monochrome" flicker-proof></hexlife-grid>
 ```
 
+> ### [**▶ Coffee extraction lab**](https://sidem.github.io/HexLife/coffee-percolation.html)
+>
+> The k-state half of the package, on `<hexlife-ca>`. Six states — air, water, saturated water, and
+> dry, wet and spent grounds — where fluid and grounds are each conserved **exactly** and the only
+> things crossing the boundary are the pour and the drip. Set the packing, the bed and the pour
+> pattern, and try to spend the whole puck. The packing slider is really a percolation experiment:
+> yield collapses from 68% to 9% as pore space crosses 0.5, which is `p_c` for site percolation on
+> the triangular lattice — exactly, and on no other common grid. The page also runs a four-state
+> version under both backends at once, which is the shortest statement of why `'block'` exists at all.
+
+```html
+<hexlife-ca states="6" rows="150" backend="block"></hexlife-ca>
+```
+
 ```js
 // T00–TFF *is* the totalistic class — nothing sampled away.
 grid.rulesets = Array.from({length: 256}, (_, i) => 'T' + i.toString(16).padStart(2, '0'));

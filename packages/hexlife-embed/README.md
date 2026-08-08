@@ -42,6 +42,12 @@ makes an embed a *recording* of a world rather than something that merely resemb
 any wider constraint class, built entirely with this package. It is the clearest single demonstration
 of what `<hexlife-grid>` is for.
 
+**[▶ Live demo: coffee extraction lab](https://sidem.github.io/HexLife/coffee-percolation.html)** —
+the same for the k-state half: a six-state model of water percolating through coffee grounds on
+`<hexlife-ca>`, where fluid and grounds are each conserved *exactly* and the goal is to spend the
+whole puck. It also runs the four-state version under both backends side by side, which is the
+shortest demonstration of why `'block'` exists.
+
 ```bash
 npm install @hexlife/embed
 ```

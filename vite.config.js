@@ -51,6 +51,15 @@ export default defineConfig(({ command }) => ({
       input: {
         index: 'index.html',
         totalistic: 'totalistic-256.html',
+        /**
+         * `public/coffee-percolation.html` is deliberately NOT here.
+         *
+         * It consumes the *published* `@hexlife/embed` from a CDN through a browser import map, and
+         * Vite resolves bare specifiers in inline module scripts itself, at transform time — so
+         * listing it as an input fails the build on `@hexlife/embed/ca` before a browser ever sees
+         * the map. Living in `public/` gets it copied to the deploy verbatim at the same URL, which
+         * is also the only way it stays an honest test that the shipped package works.
+         */
       },
     },
   },
