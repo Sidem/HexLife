@@ -215,9 +215,13 @@
   </p>
   <p>
     The <b>dual-porosity lab</b> is the same idea taken to sixteen states after the six-state model
-    was checked against the coffee-percolation literature. Two things were wrong with it, and both
-    are visible on screen: its grains are impermeable, so water pools on them and pockets of brew
-    sit trapped forever; and its gravity is not vertical. That tab has the measurements.
+    was checked against the coffee-percolation literature. What is wrong with the six-state model is
+    that its grains are impermeable: water can only ever sit in the gaps between them, so it pools
+    on the surface, pockets of brew stay trapped forever, and at the packing a real puck runs at,
+    most of the bed is never touched at all. Grains that hold liquid fix that, and that tab has the
+    measurements. It also carries the write-up of a transport bug both rules used to share —
+    gravity pointing 60° to the left — because the fix is the same three lines in all three rules on
+    this page.
   </p>
 </div>
 
@@ -254,8 +258,8 @@
 
     <h3 style="margin-top:16px">The puck</h3>
     <div class="field">
-      <label for="pack"><span class="val" id="pack-v">0.45</span>Packing density</label>
-      <input type="range" id="pack" min="20" max="75" value="45">
+      <label for="pack"><span class="val" id="pack-v">0.30</span>Packing density</label>
+      <input type="range" id="pack" min="12" max="75" value="30">
     </div>
     <div class="field">
       <label for="depth"><span class="val" id="depth-v">62%</span>Bed depth</label>
@@ -317,7 +321,7 @@
   Six states, in two families. <b>Fluid</b> is <span class="swatch" style="background:var(--air)"></span>air 0,
   <span class="swatch" style="background:var(--water)"></span>water 1 and
   <span class="swatch" style="background:var(--saturated)"></span>saturated water 2 — numbered in density
-  order, so gravity is literally “sort the mobile cells ascending, lightest on top”.
+  order, so gravity only ever has to ask which of two cells is the heavier.
   <b>Grounds</b> are <span class="swatch" style="background:var(--dry)"></span>dry 3,
   <span class="swatch" style="background:var(--wet)"></span>wet 4 and
   <span class="swatch" style="background:var(--spent)"></span>spent 5 — numbered in the order a ground
@@ -327,9 +331,15 @@
   Each tick, every 3-cell triangle of the partition is rewritten at once, in three steps:
   <b>extract</b> (a water cell sharing a block with a wet ground becomes saturated, and that ground
   becomes spent), then <b>wet</b> (a dry ground sharing a block with any fluid becomes wet), then
-  <b>fall</b> (the mobile cells are re-laid heaviest at the bottom). Extraction runs before wetting on
-  purpose: grounds must be wet for at least one tick before they will give anything up, which is what
-  makes a pre-infusion pause worth doing.
+  <b>fall</b> (the heavier of two mobile cells takes the lower slot, along the triangle's vertical
+  bond — see <b>Gravity points down</b> on the next tab for why it is a bond and not a sort).
+  Extraction runs before wetting on purpose: grounds must be wet for at least one tick before they
+  will give anything up, which is what makes a pre-infusion pause worth doing.
+</p>
+<p>
+  There is no lateral transport at all beyond that — nothing spreads sideways, nothing wicks, and
+  water can only enter a ground it happens to fall past. That is the model's real limitation, and
+  the packing slider is where you meet it.
 </p>
 <p>
   Saturated water is inert — it cannot extract again. That single clause is what turns channelling
@@ -497,68 +507,78 @@
   <b>Drainage is downward-only while imbibition accepts from any direction.</b> That asymmetry is
   capillary retention, and it is the one free parameter with a real experimental target: a brewed bed
   holds about 2&nbsp;mL of liquid per gram of coffee, which for a pour-over is roughly 12% of what
-  you pour. At the defaults this model retains 15–19%.
+  you pour. At the defaults this model retains 18%, and 5–21% across the packing slider.
 </p>
 
-<h2>Gravity was pointing sideways</h2>
+<h2>Gravity points down</h2>
 <p>
-  Before any of the coffee physics, a transport bug. Slots 0 and 2 of the partition triangle share a
-  column while slot 1 sits one column to the right, so <code>0→2</code> is a pure vertical bond and
-  <code>0→1</code> and <code>1→2</code> are its two mirror-image half bonds. A plain density sort
-  always sends the heaviest cell to slot 2 — which means a parcel <em>phase-locks</em> onto the
-  <code>1→2</code> bond and descends at about 50° to the left, forever, in an empty world with no
-  obstacles at all. Dropping one cell of water into a void and measuring:
+  Before any of the coffee physics, a transport bug — and it was in every rule on this page, not just
+  this one. Slots 0 and 2 of the partition triangle share a column while slot 1 sits one column to
+  the right, so <code>0→2</code> is a pure vertical bond and <code>0→1</code> and <code>1→2</code>
+  are its two mirror-image half bonds. A plain density sort always sends the heaviest cell to
+  slot&nbsp;2 — which means a parcel <em>phase-locks</em> onto the <code>1→2</code> bond and descends
+  to the left, forever, in an empty world with no obstacles at all. Dropping one cell of fluid into a
+  void and following it for 60 ticks:
 </p>
-<table class="stat" style="max-width:560px">
-  <tr><th>rule</th><th style="text-align:right">rows fallen</th><th style="text-align:right">columns drifted</th><th style="text-align:right">angle from vertical</th></tr>
-  <tr><th>six-state, sorted by density</th><td>30</td><td>−40</td><td>≈50°</td></tr>
-  <tr class="sep"><th>this rule</th><td>30</td><td>0</td><td>0°</td></tr>
+<table class="stat" style="max-width:600px">
+  <tr><th>fall step</th><th style="text-align:right">rows fallen</th><th style="text-align:right">columns drifted</th><th style="text-align:right">angle from vertical</th></tr>
+  <tr><th>sorted by density <span style="opacity:.7">— what all three rules used to do</span></th><td>30</td><td>−60</td><td>59–60°</td></tr>
+  <tr class="sep"><th>routed through the bonds <span style="opacity:.7">— all three now</span></th><td>30</td><td>0</td><td>0.0°</td></tr>
 </table>
 <p style="margin-top:10px">
-  The fix is to route gravity through those bonds explicitly: take the vertical bond whenever it
-  exists, and offer a half bond <em>only when the far end of the vertical bond is solid</em> — right
-  when slot 2 is a ground, left when slot 0 is. Those two conditions are mirror images, so in a bed
-  with no left/right structure they arise equally often; in open air neither is offered and the fall
-  is exactly vertical. Verified at zero columns of drift from every starting parity.
+  The angle is measured in the plane, not in grid indices: hex columns are 1.5 apart where rows are
+  √3 apart, so 60 columns per 30 rows really is 60° off vertical. It is also completely
+  parameter-free — no bed, no obstacles, nothing but one parcel and a void.
+</p>
+<p>
+  The fix is to route gravity through those bonds explicitly: take the vertical bond whenever both
+  its ends are mobile, and offer a half bond <em>only when the far end of the vertical bond is
+  solid</em> — right when slot 2 is a ground, left when slot 0 is. Those two conditions are mirror
+  images, so in a bed with no left/right structure they arise equally often; in open air neither is
+  offered and the fall is exactly vertical. Verified at zero columns of drift from all six starting
+  parities, in the six-state rule, this one, and the four-state pair on the next tab.
 </p>
 <p class="facts">
   <b>What is not fixed.</b> The partition uses a single triangle handedness, so slot 1's two bonds
   both point left while slots 0 and 2 have one rightward bond each. No pure function of the triple
-  can make the <em>transfer</em> steps exactly symmetric — only gravity, which has a vertical bond to
-  fall back on. Each transfer therefore declines to act whenever a left/right choice would be forced,
-  which leaves a measured residual of <b>0.03 columns per tick</b> in a wetting front against the
-  six-state rule's <b>0.67</b>. Removing it entirely needs alternating up- and down-triangle
-  partitions in the engine — the standard Margolus construction — which is an engine change, not a
-  rule change.
+  can make the <em>transfer</em> steps — imbibe, wick, drain — exactly symmetric; only gravity can,
+  because only gravity has a vertical bond to fall back on. Each transfer therefore declines to act
+  whenever a left/right choice would be forced, which still leaves a residual: driving a wetting
+  front out of a single inlet for 900 ticks walks its centre of mass <b>0.027 columns per tick</b>
+  sideways here, against <b>0.001</b> for the six-state rule, which has no transfer steps to be
+  asymmetric about. Removing it entirely needs alternating up- and down-triangle partitions in the
+  engine — the standard Margolus construction — which is an engine change, not a rule change.
 </p>
 
 <h2>What changes</h2>
 <p>
-  Measured in a standalone harness on a 150×150 grid — shower pour, 30% water, coarse grind, 4,000
-  ticks — running the same sweep the six-state model is scored on in the other tab:
+  Measured in a standalone harness on the 150×174 grid this tab runs — shower pour, 30% water, coarse
+  grind, each row the mean of three pucks, every run carried to its own finish — sweeping the same
+  packing slider the six-state model is scored on in the other tab:
 </p>
 <table class="stat" style="max-width:620px">
   <tr><th>packing</th><th style="text-align:right">extracted</th><th style="text-align:right">never wetted</th><th style="text-align:right">retained</th><th style="text-align:right">cup strength</th></tr>
-  <tr><th>0.25</th><td>61.7%</td><td>11.6%</td><td>5.2%</td><td>32.2%</td></tr>
-  <tr><th>0.35</th><td>76.5%</td><td>3.9%</td><td>11.8%</td><td>58.6%</td></tr>
-  <tr><th>0.45</th><td>83.8%</td><td>1.4%</td><td>18.7%</td><td>80.2%</td></tr>
-  <tr><th>0.55</th><td>69.1%</td><td>0.4%</td><td>27.0%</td><td>83.9%</td></tr>
-  <tr><th>0.65</th><td>68.0%</td><td>0.6%</td><td>24.9%</td><td>89.4%</td></tr>
-  <tr class="sep"><th>0.75</th><td>61.1%</td><td>1.4%</td><td>20.5%</td><td>93.8%</td></tr>
+  <tr><th>0.25</th><td>56.7%</td><td>12.4%</td><td>5.0%</td><td>29.8%</td></tr>
+  <tr><th>0.35</th><td>73.8%</td><td>3.8%</td><td>11.7%</td><td>57.2%</td></tr>
+  <tr><th>0.45</th><td>82.2%</td><td>1.5%</td><td>18.1%</td><td>88.0%</td></tr>
+  <tr><th>0.55</th><td>74.9%</td><td>1.0%</td><td>20.9%</td><td>98.9%</td></tr>
+  <tr><th>0.65</th><td>65.5%</td><td>1.8%</td><td>18.5%</td><td>99.4%</td></tr>
+  <tr class="sep"><th>0.75</th><td>59.5%</td><td>3.7%</td><td>11.7%</td><td>98.8%</td></tr>
 </table>
 <p style="margin-top:10px">
-  <b>The puck no longer chokes.</b> The six-state model delivers nothing at all to the cup above a
-  packing of 0.55, because its pore space has crossed the site-percolation threshold and there is no
-  connected path down. This one is still pouring at 0.75 — which is what a real puck does, since a
-  real intergranular porosity of ~0.1 is far below any 2D threshold and the bed conducts anyway.
-  <b>And the bed gets wetted.</b> Never-wetted sits around 1%. Turn wicking off with the checkbox,
-  press <em>New brew</em>, and on the defaults above it jumps to <b>29%</b> while extraction falls
-  from 87% to 47% — the single clearest demonstration on this page of what grain-to-grain transport
-  is for, and of why a model whose grains are walls cannot reach most of its own bed.
+  <b>The puck no longer chokes.</b> The six-state model stops delivering anything at all to the cup
+  once its packing passes about 0.35, because it needs an unbroken pore path pointing downhill and
+  runs out of them. This one pours the whole 30% through at every packing on its slider, up to 0.85
+  — which is what a real puck does, since a real intergranular porosity of ~0.1 is far below any 2D
+  threshold and the bed conducts anyway. <b>And the bed gets wetted.</b> Never-wetted sits between
+  1 and 2% across the useful range, against 62% next door. Turn wicking off with the checkbox, press
+  <em>New brew</em>, and at the defaults it jumps to <b>31%</b> while extraction falls from 82% to
+  <b>45%</b> — the single clearest demonstration on this page of what grain-to-grain transport is
+  for, and of why a model whose grains are walls cannot reach most of its own bed.
 </p>
 <p class="facts">
   Grind is the cleanest control here, and it is the one the six-state model could not express at all:
-  at packing 0.45 it moves extraction 83.8% → 89.4% → 90.5% across coarse, medium and fine, purely by
+  at packing 0.45 it moves extraction 82.2% → 88.1% → 89.1% across coarse, medium and fine, purely by
   changing how fast solubles leave the solid, with the flow field untouched.
 </p>
 
@@ -653,25 +673,39 @@
   — on the square lattice it is ≈0.5927, known only numerically.
 </p>
 <p>
-  That is not decoration here; it is what the packing slider on the <b>six-state</b> lab is
-  measuring. Sweeping it at an otherwise fixed brew (shower, flow 6, 62% bed) gives:
+  That is the frame the packing slider on the <b>six-state</b> lab is working in. Sweeping it at an
+  otherwise fixed brew (shower, flow 6, 62% bed, 18% water, mean of three pucks, each run to its
+  fixed point) gives:
 </p>
-<table class="stat" style="max-width:520px">
-  <tr><th>packing</th><th style="text-align:right">pore space</th><th style="text-align:right">yield</th><th style="text-align:right">never wetted</th></tr>
-  <tr><th>0.25</th><td>0.75</td><td>68.0%</td><td>25.5%</td></tr>
-  <tr><th>0.35</th><td>0.65</td><td>48.5%</td><td>38.9%</td></tr>
-  <tr><th>0.45</th><td>0.55</td><td>25.4%</td><td>57.9%</td></tr>
-  <tr class="sep"><th>0.55</th><td>0.45</td><td>9.0%</td><td>83.9%</td></tr>
-  <tr><th>0.65</th><td>0.35</td><td>5.6%</td><td>90.6%</td></tr>
+<table class="stat" style="max-width:600px">
+  <tr><th>packing</th><th style="text-align:right">pore space</th><th style="text-align:right">yield</th><th style="text-align:right">never wetted</th><th style="text-align:right">reached the cup</th></tr>
+  <tr><th>0.20</th><td>0.80</td><td>49.0%</td><td>45.1%</td><td>2,819</td></tr>
+  <tr><th>0.25</th><td>0.75</td><td>38.6%</td><td>51.8%</td><td>1,832</td></tr>
+  <tr><th>0.30</th><td>0.70</td><td>25.7%</td><td>62.3%</td><td>511</td></tr>
+  <tr class="sep"><th>0.35</th><td>0.65</td><td>16.8%</td><td>72.3%</td><td>77</td></tr>
+  <tr><th>0.40</th><td>0.60</td><td>9.5%</td><td>83.3%</td><td>0</td></tr>
+  <tr><th>0.45</th><td>0.55</td><td>6.2%</td><td>88.4%</td><td>0</td></tr>
 </table>
 <p style="margin-top:10px">
-  The floor drops out between 0.45 and 0.55 — which is pore space crossing <b>0.5</b>. Below the
-  threshold there is usually no connected path from the top of the bed to the bottom, so most of the
-  water never gets in and most of the grounds are never touched. The default sits at 0.45 on purpose:
-  right on the interesting edge.
+  The cup empties out between pore space 0.65 and 0.60 — <em>well above</em> <code>p_c = 1/2</code>,
+  and that gap is the interesting part. The exact threshold is about a connected cluster: at pore
+  space 0.55 a spanning cluster of open sites almost certainly exists. But this rule cannot walk one.
+  Gravity moves a parcel straight down, or half a step sideways when the cell below it is blocked,
+  and never upward or level — so what it needs is not a connected path but a <em>monotone downhill</em>
+  one, and directed paths run out long before undirected ones do. The number above is measured for
+  this rule on this bed, not a known constant.
+</p>
+<p style="margin-top:10px">
+  The default sits at 0.30, right where the last of the water is still getting through. It used to
+  sit at 0.45, which was the interesting edge back when this rule's gravity drifted 60° to the left:
+  a parcel marching sideways as it fell swept far more of the bed than one falling straight, so the
+  bed looked far more permeable than the model actually says it is. Fixing the gravity moved the
+  edge. That is the honest version — and it is also the sharpest possible statement of why the
+  <b>dual-porosity</b> tab exists, since a bed whose grains are walls has nothing but pore paths to
+  offer.
 </p>
 <p>
-  <b>That is a correct statement about this lattice and a false one about coffee</b>, and the
+  <b>Percolation is a correct frame for this lattice and a poor one for coffee</b>, and the
   distinction is worth being precise about. The <code>p_c = 1/2</code> is exact, and percolation
   really is the right frame for a coffee bed — Wadsworth et&nbsp;al. (2026) fit lattice-Boltzmann
   flow through X-ray micro-CT scans of real ground coffee and found a percolation-theory permeability
@@ -684,10 +718,10 @@
 </p>
 <p>
   Which is exactly what the <b>dual-porosity</b> tab demonstrates: once grains can carry liquid
-  themselves, the hard threshold at 0.5 turns into a smooth decline in throughput and the bed is
-  still brewing at a packing of 0.75. That is a strictly better story than this one, not a worse one
-  — the lattice mathematics above is untouched, it simply stops being asked to carry a claim about
-  coffee that it cannot support.
+  themselves, the cliff turns into a smooth decline in throughput and the bed is still brewing at a
+  packing of 0.85, with barely 1% of it never wetted. That is a strictly better story than this one,
+  not a worse one — the lattice mathematics above is untouched, it simply stops being asked to carry
+  a claim about coffee that it cannot support.
 </p>
 
 </section>
@@ -719,7 +753,7 @@ import '@hexlife/embed/ca-element';
 // PART 1 — the six-state extraction lab
 // ===========================================================================
 
-// Fluid phases, numbered in DENSITY order so gravity is a plain ascending sort.
+// Fluid phases, numbered in DENSITY order, so gravity only has to compare two slots.
 const AIR = 0, WATER = 1, SAT = 2;
 // Ground phases, numbered in the order a ground passes through them. Grounds never move.
 const DRY = 3, WET = 4, SPENT = 5;
@@ -732,7 +766,7 @@ const LAB_VARS = ['--air', '--water', '--saturated', '--dry', '--wet', '--spent'
 /**
  * The extraction rule. `block` is the partition triangle in vertex order, which runs top -> middle
  * -> bottom: the base cell, its down-right neighbour, and the cell directly below it. That ordering
- * is the same in all three partition phases, which is what lets "sort toward index 2" mean gravity.
+ * is the same in all three partition phases, which is what lets slot 2 mean "below".
  *
  * Three steps, and the order of the first two is load-bearing.
  */
@@ -757,14 +791,35 @@ const extractionRule = blockRuleFromTable(6, (block) => {
         for (let i = 0; i < 3; i++) if (out[i] === DRY) out[i] = WET;
     }
 
-    // 3. FALL. The mobile slots are re-laid in density order, lightest on top. A permutation of the
-    //    mobile multiset, so it is exactly conservative on its own.
-    const slots = [];
-    for (let i = 0; i < 3; i++) if (out[i] < MOBILE) slots.push(i);
-    const values = slots.map((i) => out[i]).sort((a, b) => a - b);
-    slots.forEach((slot, n) => { out[slot] = values[n]; });
+    // 3. FALL. Gravity, routed through the partition's bonds rather than sorted — see "Gravity
+    //    points down" below for why a plain density sort sends every parcel off at 60 degrees to
+    //    the left. Take the vertical bond 0->2 whenever both ends are mobile, and offer a half bond
+    //    only when the far end of the vertical one is a ground. A swap of two mobile slots, so it is
+    //    exactly conservative on its own.
+    fall(out, (v) => v < MOBILE);
     return out;
 });
+
+/**
+ * One step of gravity on a partition triangle, shared by all three rules on this page.
+ *
+ * Slots 0 and 2 share a column and slot 1 sits one column to the right, so `0->2` is a pure
+ * vertical bond and `0->1` / `1->2` are its two mirror-image half bonds. Sorting the mobile cells
+ * by density always drives the heaviest to slot 2, which phase-locks a lone parcel onto the `1->2`
+ * bond and walks it downhill to the LEFT forever. Routing through the bonds instead — vertical
+ * first, half bonds only when the vertical one is blocked by a solid — is exactly vertical in open
+ * air and mirror-symmetric inside a bed.
+ *
+ * @param {number[]} out The block, rewritten in place.
+ * @param {(state: number) => boolean} mobile Which states gravity may move.
+ */
+function fall(out, mobile) {
+    const m0 = mobile(out[0]), m1 = mobile(out[1]), m2 = mobile(out[2]);
+    const swap = (i, j) => { const t = out[i]; out[i] = out[j]; out[j] = t; };
+    if (m0 && m2) { if (out[0] > out[2]) swap(0, 2); }
+    else if (!m2 && m0 && m1) { if (out[0] > out[1]) swap(0, 1); }
+    else if (!m0 && m1 && m2) { if (out[1] > out[2]) swap(1, 2); }
+}
 
 /**
  * The rule's actual claim, checked exhaustively over all 6^3 = 216 entries before a tick runs.
@@ -820,14 +875,29 @@ const brew = {
     groundTotal: 0,
     running: true,
     best: 0,
+    seed: 0xC0FFEE,     // the puck's grain layout; re-rolled by New brew, held across slider moves
 };
 
 const pct = (n) => `${(n * 100).toFixed(1)}%`;
 
-/** Lay a fresh puck. Seeded, so a parameter change is the only difference between two runs. */
+/** A fresh puck layout. Two brews at identical settings should not be the same puck. */
+const rollSeed = () => ((Math.random() * 0xFFFFFFFF) >>> 0) || 1;
+
+/**
+ * Lay a fresh puck.
+ *
+ * Seeded from `brew.seed`, which only moves when you press *New brew* — so pulling a slider still
+ * changes exactly one thing about the run and two settings stay comparable, while asking for a new
+ * brew really does give you a different puck rather than the same one again.
+ *
+ * The last row never holds grounds. The grid is a torus and the partition wraps with it, so a block
+ * whose top slot is in the last row has its bottom slot in row 0; leaving that row empty is what
+ * stops the seam acting as a bond between the bottom of the bed and the top of the headspace. See
+ * `boundaryStep` for the other half of the argument.
+ */
 function packPuck() {
     const rows = lab.rows, cols = lab.columns;
-    const random = mulberry32(0xC0FFEE);
+    const random = mulberry32(brew.seed);
     const cells = new Uint8Array(rows * cols);
     const density = Number(ui.pack.value) / 100;
     const bedTop = Math.floor(rows * (1 - Number(ui.depth.value) / 100));
@@ -836,7 +906,7 @@ function packPuck() {
     const looseAt = Math.floor(cols * 0.34);
     const looseWidth = Math.max(3, Math.floor(cols * 0.09));
 
-    for (let row = bedTop; row < rows; row++) {
+    for (let row = bedTop; row < rows - 1; row++) {
         for (let col = 0; col < cols; col++) {
             let d = density;
             if (loose) {
@@ -973,12 +1043,12 @@ function renderLab() {
           + 'Spread the contact out.'
         : choked
         ? `<b style="color:var(--bad)">The puck choked.</b> ${(brew.budget - brew.poured).toLocaleString()} `
-          + 'cells of water never got in — the bed came to rest with the top row still full. Pore '
-          + 'space below ~0.5 is under the percolation threshold for this lattice, so above a '
-          + 'packing of about 0.5 there is often no connected path down at all.'
-        : c[DRY] > grounds * 0.5
-            ? '<b style="color:var(--bad)">The water found a way around most of the bed.</b> '
-              + 'More than half the grounds were never even wetted — try a slower flow, a shower '
+          + 'cells of water never got in — the bed came to rest with the top row still full. This '
+          + 'rule needs an unbroken path that runs <em>downhill</em> the whole way, and those give '
+          + 'out well before the pore space itself stops percolating.'
+        : c[DRY] > grounds * 0.8
+            ? '<b style="color:var(--bad)">The water found a way around nearly all of the bed.</b> '
+              + 'Four grounds in five were never even wetted — try a slower flow, a shower '
               + 'rather than a stream, or a looser pack.'
             : `<b style="color:var(--good)">Brew finished.</b> `
               + `${fluidInBed.toLocaleString()} cells of liquid stayed held in the puck — that is `
@@ -1080,7 +1150,9 @@ bind(ui.depth, 'depth-v', (v) => `${v}%`, true);
 bind(ui.speed, 'speed-v', (v) => v, false);
 ui.uneven.addEventListener('change', startBrew);
 ui.pour.addEventListener('change', startBrew);
-ui.brew.addEventListener('click', startBrew);
+// The one control that re-rolls the puck. Everything else re-lays the SAME grains at new settings,
+// which is what makes two slider positions comparable.
+ui.brew.addEventListener('click', () => { brew.seed = rollSeed(); startBrew(); });
 ui.size.addEventListener('change', () => lab.setAttribute('rows', ui.size.value));
 ui.run.addEventListener('click', () => {
     brew.running = !brew.running;
@@ -1205,17 +1277,9 @@ function buildDualRule(grindSlots, wicking) {
         }
         if (lo !== -1 && hi !== lo && out[hi] - out[lo] >= 2) { out[lo]++; out[hi]--; }
 
-        // 6. FALL — gravity. Declining is not enough here, because a lone parcel in open air can
-        //    only ever take the L bond and there is no mirror case to balance it against; that is
-        //    the six-state model's 50-degree leftward drift. So a half bond is offered only when the
-        //    far end of the vertical bond is SOLID — right when slot 2 is a ground, left when slot 0
-        //    is. Mirror-image conditions, and in open air neither is offered, so the fall is exactly
-        //    vertical. Measured at zero columns of drift from every starting parity.
-        const f0 = dFree(out[0]), f1 = dFree(out[1]), f2 = dFree(out[2]);
-        const swap = (i, j) => { const t = out[i]; out[i] = out[j]; out[j] = t; };
-        if (f0 && f2) { if (out[0] > out[2]) swap(0, 2); }
-        else if (!f2 && f0 && f1) { if (out[0] > out[1]) swap(0, 1); }
-        else if (!f0 && f1 && f2) { if (out[1] > out[2]) swap(1, 2); }
+        // 6. FALL — gravity, through the same shared bond routing as the other two rules on this
+        //    page. Measured at zero columns of drift from every starting parity.
+        fall(out, dFree);
 
         return out;
     });
@@ -1263,12 +1327,24 @@ const dBrew = {
     tick: 0, poured: 0, budget: 0, cupLiquid: 0, cupSolute: 0,
     grounds: 0, solute0: 0, running: true, best: 0,
     finished: false, choked: false, quiet: 0, everWet: null,
+    seed: 0xC0FFEE,     // as in the six-state lab: New brew re-rolls it, sliders do not
+    wetted: 0,          // grains that have ever held liquid — monotone, so it measures progress
+    progress: -1,       // last frame's progress total; see stepDual
 };
 
-/** Lay a fresh puck. Same seed every time, so a parameter change is the only difference. */
+/**
+ * Lay a fresh puck, seeded from `dBrew.seed` — see `packPuck` for why that only moves on New brew.
+ *
+ * The last row holds no grounds, and that is load-bearing rather than tidy. The grid is a torus and
+ * the partition wraps with it, so a block whose top slot sits in the last row has its bottom slot in
+ * row 0. A wet grain down there would then satisfy DRAIN across the seam and push liquid straight
+ * into the inlet row — brown brew raining from the top of the world, out of nowhere. An empty last
+ * row cannot be a source for any of the transfer steps, and gravity cannot lift the air sitting in
+ * it into row 0 either, so the seam goes quiet.
+ */
 function packPuck2() {
     const rows = lab2.rows, cols = lab2.columns;
-    const random = mulberry32(0xC0FFEE);
+    const random = mulberry32(dBrew.seed);
     const cells = new Uint8Array(rows * cols);
     const density = Number(d.pack.value) / 100;
     const bedTop = Math.floor(rows * (1 - Number(d.depth.value) / 100));
@@ -1276,7 +1352,7 @@ function packPuck2() {
     const looseAt = Math.floor(cols * 0.34);
     const looseWidth = Math.max(3, Math.floor(cols * 0.09));
 
-    for (let row = bedTop; row < rows; row++) {
+    for (let row = bedTop; row < rows - 1; row++) {
         for (let col = 0; col < cols; col++) {
             let p = density;
             if (loose) {
@@ -1325,42 +1401,48 @@ function boundaryStep2() {
     const cols = world.columns, rows = world.rows;
     const state = world.state;
 
-    let accepted = 0;
     if (dBrew.poured < dBrew.budget) {
         for (const col of injectionColumns2()) {
             if (dBrew.poured >= dBrew.budget) break;
             const index = col % cols;
-            if (state[index] === D_AIR) { world.setCell(index, D_LIQ[0]); dBrew.poured++; accepted++; }
+            if (state[index] === D_AIR) { world.setCell(index, D_LIQ[0]); dBrew.poured++; }
         }
     }
 
     // "Never wetted" is tracked rather than inferred: a grain that was wetted and then drained is
     // indistinguishable from one that was never touched, so reading it off the final census would
-    // badly overstate how much of the bed the water missed.
+    // badly overstate how much of the bed the water missed. The running count is also one of the
+    // four progress terms in `stepDual`, which is why the flip is counted rather than just set.
     const everWet = dBrew.everWet;
-    for (let i = 0; i < state.length; i++) if (state[i] >= 7) everWet[i] = 1;
+    for (let i = 0; i < state.length; i++) {
+        if (state[i] >= 7 && !everWet[i]) { everWet[i] = 1; dBrew.wetted++; }
+    }
 
+    // The grid is a torus and the last row is the outlet, so it has to be emptied every tick: a
+    // drop still sitting there when the tick runs is a drop the partition can carry across the seam
+    // into row 0. Together with the grain-free last row `packPuck2` lays, that is what keeps the
+    // top of the world an inlet rather than also being an exit.
     const base = (rows - 1) * cols;
-    let dripped = 0;
     for (let col = 0; col < cols; col++) {
         const v = state[base + col];
         if (dLiquid(v)) {
             dBrew.cupLiquid++;
             dBrew.cupSolute += dConc(v);
             world.setCell(base + col, D_AIR);
-            dripped++;
         }
     }
-
-    // The finish test cannot be `isSettled` here. Wicking keeps handing liquid between grains long
-    // after the cup has stopped filling, so a bed at rest is not a fixed point of the rule. What
-    // ends a brew is the drip stopping, which is also what ends a real one.
-    if (dripped === 0 && accepted === 0) dBrew.quiet++; else dBrew.quiet = 0;
 }
 
+/**
+ * Paint the dashboard, and return this frame's PROGRESS total for the finish test in `stepDual`.
+ *
+ * The four terms are each monotone non-decreasing over a brew — water poured, liquid caught, grains
+ * ever wetted, solute dissolved out of the solid — so the total can only stand still or climb, and
+ * standing still is a fact about the brew rather than about the frame rate.
+ */
 function renderDual() {
     const world = lab2.world;
-    if (!world) return;
+    if (!world) return 0;
     const c = world.census();
 
     let grounds = 0, chargeLeft = 0, bound = 0, free = 0, untouchedNow = 0;
@@ -1380,10 +1462,7 @@ function renderDual() {
     const extracted = solute0 ? (solute0 - chargeLeft) / solute0 : 0;
     if (extracted > dBrew.best) dBrew.best = extracted;
 
-    let neverWet = 0;
-    const state = world.state, everWet = dBrew.everWet;
-    for (let i = 0; i < state.length; i++) if (dGround(state[i]) && !everWet[i]) neverWet++;
-
+    const neverWet = grounds - dBrew.wetted;
     const cup = dBrew.cupLiquid;
     const retained = dBrew.poured ? (free + bound) / dBrew.poured : 0;
     const strength = cup ? dBrew.cupSolute / (cup * 2) : 0;
@@ -1434,8 +1513,9 @@ function renderDual() {
         : `<b style="color:var(--bad)">imbalance</b> — liquid ${signed(liquidBalance)}, grounds ${signed(groundBalance)}`;
 
     document.getElementById('d-stagefoot').innerHTML = dBrew.choked
-        ? '<b style="color:var(--bad)">The puck choked.</b> Even with grains conducting, there is a '
-          + 'packing above which the bed cannot take water as fast as you pour it.'
+        ? '<b style="color:var(--bad)">The puck choked.</b> The bed stopped taking water with some '
+          + 'of the pour still to go. It takes some doing — across the whole packing slider at the '
+          + 'default pour, this model gets all 30% of it through.'
         : !dBrew.finished
         ? 'Water goes <em>into</em> the grains, dissolves solubles from the inside on its own clock, '
           + 'and drains back out below. Turn wicking off to see how much of the bed that reaches.'
@@ -1443,7 +1523,18 @@ function renderDual() {
           + `${bound.toLocaleString()} cells of liquid are still held inside grains and `
           + `${free.toLocaleString()} sit in the pores — ${pct(retained)} of the pour. A real bed `
           + `holds about 2 mL per gram of coffee, roughly 12% of a pour-over.`;
+
+    return dBrew.poured + cup + dBrew.wetted + (solute0 - chargeLeft);
 }
+
+/**
+ * How many ticks of no progress at all end a brew.
+ *
+ * The longest legitimate stall in the parameter space is the `pulse` pattern's rest, 60 ticks with
+ * the tap off and the bed merely soaking. This leaves four times that in hand, and it is counted in
+ * TICKS rather than frames so the ticks-per-frame slider cannot change what "finished" means.
+ */
+const D_QUIET_TICKS = 240;
 
 function stepDual() {
     if (!lab2.world) return;
@@ -1456,11 +1547,24 @@ function stepDual() {
         dBrew.tick++;
     }
     lab2.tick(0);
+    const progress = renderDual();
 
-    if (dBrew.quiet > 240) {
+    // The finish test cannot be `isSettled` here: wicking keeps handing liquid back and forth
+    // between grains long after the cup has stopped filling, so a finished bed is not a fixed point
+    // of the rule. Nor can it be "nothing poured and nothing dripped", which is what this used to
+    // be — under a `dump` the inlet row backs up on the first tick and accepts nothing more for
+    // hundreds of ticks while the bed underneath is percolating hard, and the brew was being called
+    // finished with an empty cup and half the grounds still dry.
+    //
+    // So the test is PROGRESS, not motion: four monotone tallies that a brew still doing something
+    // must move. A dump stalls the pour without stalling any of the other three.
+    if (progress === dBrew.progress) dBrew.quiet += steps; else dBrew.quiet = 0;
+    dBrew.progress = progress;
+
+    if (dBrew.quiet > D_QUIET_TICKS) {
         if (dBrew.poured < dBrew.budget) dBrew.choked = true; else dBrew.finished = true;
+        renderDual();       // once more, so the phase label and the footer switch over
     }
-    renderDual();
 }
 
 /** Rebuild and install the rule. Cheap — 4096 entries — so grind and wicking can be live controls. */
@@ -1471,6 +1575,13 @@ function installDualRule() {
     // Chunk skipping decides what to recompute from what changed, so a rule swapped underneath a
     // quiet region would not be applied there until something else woke it.
     lab2.world.markAllDirty();
+    // A finished brew is finished under the OLD rule. Switching wicking on hands a stalled bed a
+    // transport mechanism it did not have, so give it the chance to use it — if there is nothing
+    // there after all, the quiet counter simply lands on "finished" again.
+    dBrew.finished = false;
+    dBrew.choked = false;
+    dBrew.quiet = 0;
+    dBrew.progress = -1;
 }
 
 function startBrew2() {
@@ -1490,6 +1601,8 @@ function startBrew2() {
     dBrew.finished = false;
     dBrew.choked = false;
     dBrew.quiet = 0;
+    dBrew.progress = -1;
+    dBrew.wetted = 0;
     dBrew.everWet = new Uint8Array(lab2.rows * lab2.columns);
     lab2.tick(0);
     renderDual();
@@ -1509,7 +1622,7 @@ bindD(d.depth, 'd-depth-v', (v) => `${v}%`, true);
 bindD(d.speed, 'd-speed-v', (v) => v, false);
 d.uneven.addEventListener('change', startBrew2);
 d.pour.addEventListener('change', startBrew2);
-d.brew.addEventListener('click', startBrew2);
+d.brew.addEventListener('click', () => { dBrew.seed = rollSeed(); startBrew2(); });
 // Grind and wicking only change the rule, so they apply live to the brew in progress.
 d.grind.addEventListener('change', installDualRule);
 d.wick.addEventListener('change', installDualRule);
@@ -1538,10 +1651,9 @@ const cmpBlockRule = blockRuleFromTable(4, (block) => {
     const w = out.indexOf(C_WATER);
     const d = out.indexOf(C_DRY);
     if (w !== -1 && d !== -1) { out[w] = C_AIR; out[d] = C_WET; }
-    const slots = [];
-    for (let i = 0; i < 3; i++) if (out[i] === C_AIR || out[i] === C_WATER) slots.push(i);
-    const values = slots.map((i) => out[i]).sort((a, b) => a - b);
-    slots.forEach((slot, n) => { out[slot] = values[n]; });
+    // The same shared gravity as the other two rules — a swap of two mobile slots, so the exact
+    // conservation this whole panel is about is untouched by it.
+    fall(out, (v) => v === C_AIR || v === C_WATER);
     return out;
 });
 
