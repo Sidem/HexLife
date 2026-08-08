@@ -287,11 +287,321 @@ export class World {
     }
 }
 if (Symbol.dispose) World.prototype[Symbol.dispose] = World.prototype.free;
+
+/**
+ * A k-state hexagonal cellular automaton on the same toroidal grid as [`crate::World`].
+ *
+ * Cells are `u8` state values in `0..k`. Unlike `World` there are no `rule_indices` and no
+ * `rule_usage_counters`: a k=3 rule index already exceeds `u8`, the rule-index colouring they exist
+ * for does not survive `k > 2` (colour by *state* instead), and dropping them saves a store per
+ * cell in the k-state path.
+ */
+export class WorldK {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WorldKFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_worldk_free(ptr, 0);
+    }
+    /**
+     * Chunks recomputed during the last tick, out of `chunk_count()`. Diagnostic: it is the
+     * measured pay-off of the skipping path, and a host tuning a model can watch it settle.
+     * @returns {number}
+     */
+    active_chunk_count() {
+        const ret = wasm.worldk_active_chunk_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    backend() {
+        const ret = wasm.worldk_backend(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Occupancy of one state as of the last [`WorldK::compute_census`].
+     * @param {number} state
+     * @returns {number}
+     */
+    census_of(state) {
+        const ret = wasm.worldk_census_of(this.__wbg_ptr, state);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    census_ptr() {
+        const ret = wasm.worldk_census_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Rolling hash of the current generation, using the same mixing constant as
+     * `World::checksum_state` so the two are directly comparable at `k = 2`.
+     * @returns {number}
+     */
+    checksum_state() {
+        const ret = wasm.worldk_checksum_state(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {number}
+     */
+    chunk_count() {
+        const ret = wasm.worldk_chunk_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Refresh the per-state occupancy counts behind `census_ptr` (one pass, no allocation).
+     *
+     * This is how conservation is checked from the outside: a conservative block rule must hold
+     * every entry of this histogram fixed forever.
+     */
+    compute_census() {
+        wasm.worldk_compute_census(this.__wbg_ptr);
+    }
+    /**
+     * Fill every cell with `value`.
+     * @param {number} value
+     */
+    fill(value) {
+        const ret = wasm.worldk_fill(this.__wbg_ptr, value);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {number}
+     */
+    grid_cols() {
+        const ret = wasm.worldk_grid_cols(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    grid_rows() {
+        const ret = wasm.worldk_grid_rows(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Whether `run_tick` swaps `state` and `next_state` internally, so JavaScript knows whether it
+     * must mirror the swap on its views. True for [`BACKEND_NEIGHBORHOOD`] only: block mode
+     * rewrites disjoint blocks in place and has no second buffer at all.
+     * @returns {boolean}
+     */
+    is_double_buffered() {
+        const ret = wasm.worldk_is_double_buffered(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Whether the world has reached a fixed point it can never leave.
+     *
+     * The rule is deterministic and time-invariant, so once a full partition cycle passes with no
+     * change the configuration maps to itself forever. One comparison per tick catches every still
+     * life; hosts use it to stop scheduling frames entirely.
+     * @returns {boolean}
+     */
+    is_settled() {
+        const ret = wasm.worldk_is_settled(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Cells that changed in the last `run_tick`.
+     * @returns {number}
+     */
+    last_changed_count() {
+        const ret = wasm.worldk_last_changed_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Force every chunk to be recomputed on the next tick.
+     *
+     * **Any write that bypasses the methods above — including a poke through the JS `state` view —
+     * must be followed by this**, or the activity tracker will happily skip the region that
+     * changed. `@hexlife/embed/ca` calls it for you on every mutation path.
+     */
+    mark_all_dirty() {
+        wasm.worldk_mark_all_dirty(this.__wbg_ptr);
+    }
+    /**
+     * Allocate a world. Every buffer is allocated here and never reallocated, so the pointers
+     * handed to JavaScript stay valid as long as Wasm memory is not grown.
+     *
+     * Fails rather than silently producing a wrong simulation:
+     *
+     * - `states` outside `2..=MAX_*_STATES` for the chosen backend;
+     * - odd `grid_cols`, which breaks the column wrap's parity (`World` inherits the same
+     *   requirement from `deriveGridDimensions`);
+     * - `grid_rows` not a multiple of 3 in [`BACKEND_BLOCK`], which puts a seam in the partition.
+     *   The embed's default of 64 rows fails this; block worlds need 63 or 66.
+     * @param {number} grid_cols
+     * @param {number} grid_rows
+     * @param {number} states
+     * @param {number} backend
+     */
+    constructor(grid_cols, grid_rows, states, backend) {
+        const ret = wasm.worldk_new(grid_cols, grid_rows, states, backend);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        this.__wbg_ptr = ret[0];
+        WorldKFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @returns {number}
+     */
+    next_state_ptr() {
+        const ret = wasm.worldk_next_state_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    num_cells() {
+        const ret = wasm.worldk_num_cells(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * The block-partition phase the *next* `run_tick` will use, in `0..BLOCK_PHASES`. Meaningless
+     * for [`BACKEND_NEIGHBORHOOD`].
+     * @returns {number}
+     */
+    phase() {
+        const ret = wasm.worldk_phase(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Number of entries the rule table for this world's backend must have (`k⁷` or `k³`).
+     * @returns {number}
+     */
+    rule_len() {
+        const ret = wasm.worldk_rule_len(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Advance one generation and return the number of cells whose state changed.
+     *
+     * In [`BACKEND_NEIGHBORHOOD`] the current/next buffers are swapped internally, so JavaScript
+     * must mirror the swap on its views (`is_double_buffered` reports this). In [`BACKEND_BLOCK`]
+     * the grid is rewritten in place and no swap happens.
+     * @returns {number}
+     */
+    run_tick() {
+        const ret = wasm.worldk_run_tick(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Install the `k³` block rule for [`BACKEND_BLOCK`].
+     *
+     * Both the index and the stored value pack a triple as `s0·k² + s1·k + s2` in the block's
+     * vertex order (base, `+q` mate, `+r` mate). Conservation and isotropy are *reported*, not
+     * enforced — non-conservative rules are legitimate (reactions, sources, sinks) and breaking
+     * isotropy is how you get gravity.
+     *
+     * **Allocates** — see [`WorldK::set_neighborhood_rule`].
+     * @param {Uint16Array} rule
+     */
+    set_block_rule(rule) {
+        const ptr0 = passArray16ToWasm0(rule, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.worldk_set_block_rule(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Set one cell, marking its chunk (and therefore its readers) active again.
+     * @param {number} index
+     * @param {number} value
+     */
+    set_cell(index, value) {
+        const ret = wasm.worldk_set_cell(this.__wbg_ptr, index, value);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Overwrite every cell. **The only supported bulk write**: it validates the states and resets
+     * the activity tracker, which a direct poke through the `state_ptr` view would not.
+     *
+     * **Allocates** — see [`WorldK::set_neighborhood_rule`].
+     * @param {Uint8Array} cells
+     */
+    set_cells(cells) {
+        const ptr0 = passArray8ToWasm0(cells, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.worldk_set_cells(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Install the dense anisotropic rule for [`BACKEND_NEIGHBORHOOD`].
+     *
+     * Entry `self·k⁶ + Σ neighbourⱼ·kʲ` (`j` in canonical neighbour order) holds the centre cell's
+     * next state. At `k = 2` this is bit-for-bit HexLife's own 128-entry ruleset indexing, which is
+     * what `k2_neighborhood_matches_binary_world` exploits.
+     *
+     * **Allocates** (the slice is copied in from JS), so callers holding typed-array views over the
+     * Wasm heap must rebuild them afterwards.
+     * @param {Uint8Array} rule
+     */
+    set_neighborhood_rule(rule) {
+        const ptr0 = passArray8ToWasm0(rule, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.worldk_set_neighborhood_rule(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Turn the chunk-skipping fast path off (or back on). Off is the dense reference behaviour;
+     * results are identical either way, which is the whole claim the fast-path tests check.
+     * @param {boolean} enabled
+     */
+    set_skipping_enabled(enabled) {
+        wasm.worldk_set_skipping_enabled(this.__wbg_ptr, enabled);
+    }
+    /**
+     * @returns {number}
+     */
+    state_ptr() {
+        const ret = wasm.worldk_state_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    states() {
+        const ret = wasm.worldk_states(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Generations elapsed since construction. Also selects the block partition phase.
+     * @returns {bigint}
+     */
+    tick_count() {
+        const ret = wasm.worldk_tick_count(this.__wbg_ptr);
+        return BigInt.asUintN(64, ret);
+    }
+}
+if (Symbol.dispose) WorldK.prototype[Symbol.dispose] = WorldK.prototype.free;
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
         __wbg___wbindgen_throw_bbadd78c1bac3a77: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
+        },
+        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(String) -> Externref`.
+            const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
@@ -312,6 +622,9 @@ function __wbg_get_imports() {
 const WorldFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_world_free(ptr, 1));
+const WorldKFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_worldk_free(ptr, 1));
 
 function getArrayF64FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
@@ -330,12 +643,40 @@ function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);
 }
 
+let cachedUint16ArrayMemory0 = null;
+function getUint16ArrayMemory0() {
+    if (cachedUint16ArrayMemory0 === null || cachedUint16ArrayMemory0.byteLength === 0) {
+        cachedUint16ArrayMemory0 = new Uint16Array(wasm.memory.buffer);
+    }
+    return cachedUint16ArrayMemory0;
+}
+
 let cachedUint8ArrayMemory0 = null;
 function getUint8ArrayMemory0() {
     if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function passArray16ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 2, 2) >>> 0;
+    getUint16ArrayMemory0().set(arg, ptr / 2);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
@@ -352,12 +693,15 @@ function decodeText(ptr, len) {
     return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
+let WASM_VECTOR_LEN = 0;
+
 let wasmModule, wasmInstance, wasm;
 function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
     cachedFloat64ArrayMemory0 = null;
+    cachedUint16ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

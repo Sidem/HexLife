@@ -40,6 +40,10 @@ import hexFragmentShaderSource from '../../shaders/fragment.glsl?raw';
 import torusVertexShaderSource from '../../shaders/torus_vertex.glsl?raw';
 // eslint-disable-next-line import/no-unresolved
 import torusFragmentShaderSource from '../../shaders/torus_fragment.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import stateVertexShaderSource from '../../shaders/state_vertex.glsl?raw';
+// eslint-disable-next-line import/no-unresolved
+import stateFragmentShaderSource from '../../shaders/state_fragment.glsl?raw';
 
 // Same base hex geometry constants the app uses (config.js). Copied rather than imported because
 // config.js runs setGridDimensions() at import time; these three are inert numbers. The absolute
@@ -247,6 +251,20 @@ export class EmbedRenderer {
             pitch: TORUS_CAMERA.pitch,
             distance: TORUS_CAMERA.distance,
         };
+
+        // --- k-state view (opt-in; see setStatePalette / drawStates) ---
+        /**
+         * Built on first use, exactly like `_torusProgram` and for the same reason: a binary
+         * `<hexlife-world>` — which is nearly every instance of this renderer — must not pay for a
+         * program it will never draw with.
+         * @type {WebGLProgram|null}
+         */
+        this._stateProgram = null;
+        this._stateUniforms = null;
+        /** @type {WebGLTexture|null} The k-entry palette. */
+        this._statePaletteTexture = null;
+        /** `k` — the palette's width in texels, and what puts a state on its texel centre. */
+        this._statePaletteSize = 0;
     }
 
     _setupGeometry() {
@@ -547,6 +565,12 @@ export class EmbedRenderer {
             y: this.rows * this._hexSize * Math.sqrt(3),
         };
         gl.uniform2f(this.uniforms.repeatPeriod, this._repeatPeriod.x, this._repeatPeriod.y);
+        // The k-state program draws the same geometry through the same VAO, so it needs the same fit.
+        if (this._stateProgram) {
+            gl.useProgram(this._stateProgram);
+            gl.uniform2f(this._stateUniforms.resolution, fitW, fitH);
+            gl.uniform1f(this._stateUniforms.hexSize, this._hexSize);
+        }
         this._uploadView();
     }
 
@@ -728,6 +752,11 @@ export class EmbedRenderer {
         gl.useProgram(this.program);
         gl.uniform1f(this.uniforms.zoom, z);
         gl.uniform2f(this.uniforms.pan, worldPanX, worldPanY);
+        if (this._stateProgram) {
+            gl.useProgram(this._stateProgram);
+            gl.uniform1f(this._stateUniforms.zoom, z);
+            gl.uniform2f(this._stateUniforms.pan, worldPanX, worldPanY);
+        }
     }
 
     // --- torus view -----------------------------------------------------------
@@ -894,6 +923,129 @@ export class EmbedRenderer {
         gl.bindVertexArray(null);
     }
 
+    // --- k-state view ---------------------------------------------------------
+    // `@hexlife/embed/ca` worlds hold state VALUES in `0..k`, not a 0/1 flag plus a rule index, and
+    // HexLife's rule-index colouring cannot follow them there: the k-state index needs 21 bits at
+    // k=8 while `a_instance_rule_index` is an `UNSIGNED_BYTE`. So a k-state world is coloured by
+    // state from a k-entry palette, through its own program.
+    //
+    // Everything *else* here is reused verbatim, which is the point: the instanced draw, the
+    // per-cell offsets, the fit, the camera and `hitTest` are all state-agnostic. Only the program
+    // and the palette texture differ, and both are built on first use so a binary world pays nothing.
+
+    /**
+     * Install the palette a k-state world is coloured with — one entry per state, in state order.
+     *
+     * Also declares `k` to the renderer: the palette's length *is* the state count as far as the
+     * shader is concerned, so this must be called before {@link drawStates}.
+     *
+     * @param {Array<ArrayLike<number>>} colors `k` entries of `[r, g, b]` (or `[r, g, b, a]`), each
+     *   channel 0–255. Alpha defaults to opaque.
+     * @returns {boolean} False when the program could not be built (the caller draws nothing rather
+     *   than showing a blank canvas it believes is a world) or the palette is unusable.
+     */
+    setStatePalette(colors) {
+        if (!Array.isArray(colors) || colors.length < 1) return false;
+        if (!this._ensureStateProgram()) return false;
+
+        const gl = this.gl;
+        const k = colors.length;
+        const bytes = new Uint8Array(k * 4);
+        for (let i = 0; i < k; i++) {
+            const c = colors[i] || [];
+            bytes[i * 4] = Math.min(255, Math.max(0, Math.round(Number(c[0]) || 0)));
+            bytes[i * 4 + 1] = Math.min(255, Math.max(0, Math.round(Number(c[1]) || 0)));
+            bytes[i * 4 + 2] = Math.min(255, Math.max(0, Math.round(Number(c[2]) || 0)));
+            bytes[i * 4 + 3] = c.length > 3 ? Math.min(255, Math.max(0, Math.round(Number(c[3]) || 0))) : 255;
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, this._statePaletteTexture);
+        // `texImage2D` rather than `texSubImage2D`: a live palette swap may also change `k` (a host
+        // reconfiguring the world), and that reallocates the texture rather than writing into it.
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, k, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+
+        this._statePaletteSize = k;
+        gl.useProgram(this._stateProgram);
+        gl.uniform1f(this._stateUniforms.states, k);
+        return true;
+    }
+
+    /** @returns {number} States the installed palette covers; 0 before {@link setStatePalette}. */
+    get statePaletteSize() {
+        return this._statePaletteSize;
+    }
+
+    /**
+     * Draw one generation of a k-state world.
+     *
+     * @param {Uint8Array} cells `numCells` state values in `0..k`. This is `HexCA.state` — a view
+     *   straight into wasm linear memory, uploaded without a copy exactly as `draw(sim)` does.
+     * @returns {boolean} False when there is no palette yet (nothing was drawn).
+     */
+    drawStates(cells) {
+        const gl = this.gl;
+        if (!this._stateProgram || !this._statePaletteSize) return false;
+        if (!cells || cells.length !== this.numCells) return false;
+        if (!this._hexSize) this.resize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1);
+
+        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, cells);
+
+        gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(this._stateProgram);
+        gl.bindVertexArray(this.vao);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this._statePaletteTexture);
+        gl.uniform1i(this._stateUniforms.statePalette, 1);
+
+        gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 6, this.numCells);
+        gl.bindVertexArray(null);
+        return true;
+    }
+
+    /**
+     * Compile + link the k-state program on first use, and allocate its palette texture.
+     * @returns {boolean} False if it could not be built.
+     */
+    _ensureStateProgram() {
+        if (this._stateProgram) return true;
+        const gl = this.gl;
+        const program = WebGLUtils.loadShaderProgram(gl, stateVertexShaderSource, stateFragmentShaderSource);
+        if (!program) {
+            console.warn('<hexlife-ca>: state shaders failed to compile.');
+            return false;
+        }
+        this._stateProgram = program;
+        this._stateUniforms = {
+            resolution: gl.getUniformLocation(program, 'u_resolution'),
+            hexSize: gl.getUniformLocation(program, 'u_hexSize'),
+            pan: gl.getUniformLocation(program, 'u_pan'),
+            zoom: gl.getUniformLocation(program, 'u_zoom'),
+            states: gl.getUniformLocation(program, 'u_states'),
+            statePalette: gl.getUniformLocation(program, 'u_statePalette'),
+        };
+        this._statePaletteTexture = gl.createTexture();
+
+        // The fit and the camera were pushed to `this.program` before this program existed; replay
+        // them, or the first frame draws with zeroed uniforms.
+        gl.useProgram(program);
+        gl.uniform1f(this._stateUniforms.zoom, 1.0);
+        if (this._hexSize) {
+            const fitW = this._layout ? this._tiles[0].w : this.canvas.width;
+            const fitH = this._layout ? this._tiles[0].h : this.canvas.height;
+            gl.uniform2f(this._stateUniforms.resolution, fitW, fitH);
+            gl.uniform1f(this._stateUniforms.hexSize, this._hexSize);
+            this._uploadView();
+        }
+        return true;
+    }
+
     /**
      * Map a CSS-pixel point on the canvas to a grid cell (odd-q flat-top, matching the shader).
      * Returns null if the pointer is outside the canvas or the camera isn't ready.
@@ -1019,6 +1171,16 @@ export class EmbedRenderer {
             gl.deleteProgram(this._torusProgram);
             this._torusProgram = null;
             this._torusUniforms = null;
+        }
+        if (this._stateProgram) {
+            gl.deleteProgram(this._stateProgram);
+            this._stateProgram = null;
+            this._stateUniforms = null;
+        }
+        if (this._statePaletteTexture) {
+            gl.deleteTexture(this._statePaletteTexture);
+            this._statePaletteTexture = null;
+            this._statePaletteSize = 0;
         }
     }
 }

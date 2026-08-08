@@ -116,8 +116,44 @@ export function initEmbedWasm() {
 // Beyond construction, the embed calls only non-allocating engine methods (`run_tick`, `*_ptr`,
 // `checksum_state`), so nothing else can detach them.
 
-/** @type {Set<EmbedSim>} */
+/** @type {Set<{_refreshViews: () => void}>} */
 const liveSims = new Set();
+
+/**
+ * The registry is shared with the k-state runtime (`ca.js`), because the hazard is: constructing a
+ * `WorldK` allocates in the SAME linear memory every `<hexlife-world>` on the page holds views into.
+ * A page with one k-state widget below one binary widget would otherwise silently break the binary
+ * one. Anything with a `_refreshViews()` may join; nothing else about `EmbedSim` is assumed.
+ *
+ * These are internal to `src/embed/` — the published package exposes `.`/`api`/`sim`/`render`/`ca`,
+ * not this module — so they are a shared-implementation seam, not a compatibility surface.
+ *
+ * @param {{_refreshViews: () => void}} owner
+ */
+export function registerViewOwner(owner) {
+    liveSims.add(owner);
+}
+
+/** @param {{_refreshViews: () => void}} owner */
+export function unregisterViewOwner(owner) {
+    liveSims.delete(owner);
+}
+
+/** Rebuild every registered owner's views. Call after ANY allocating wasm call. */
+export function refreshAllWasmViews() {
+    refreshAllViews();
+}
+
+/**
+ * The initialized wasm exports (notably `.memory`), for owners that build their own views.
+ * @returns {any}
+ */
+export function wasmExportsOrThrow() {
+    if (!wasmExports) {
+        throw new Error('HexLife: await the engine initializer before constructing a world.');
+    }
+    return wasmExports;
+}
 
 export class EmbedSim {
     /**

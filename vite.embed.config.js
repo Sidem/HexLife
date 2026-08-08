@@ -18,6 +18,10 @@ export default defineConfig({
         api: 'src/embed/api.js',
         sim: 'src/embed/sim.js',
         render: 'src/embed/render.js',
+        ca: 'src/embed/ca.js',
+        // Separate from `ca` on purpose: `ca.js` is DOM-free and outside "sideEffects", so the
+        // `customElements.define` for <hexlife-ca> cannot live there. See ca-element.js.
+        'ca-element': 'src/embed/ca-element.js',
       },
       formats: ['es'],
     },

@@ -10,6 +10,14 @@ use wasm_bindgen::prelude::*;
 // (in the tests module below); JS by tests/neighborDirs.test.js. Edit the JSON, never these consts.
 include!(concat!(env!("OUT_DIR"), "/neighbor_dirs.rs"));
 
+// The k-state engine. A SEPARATE struct in the same crate, deliberately: a `if self.k == 2` branch
+// inside `World` would put every future k-state edit on the code path Explorer, the #37 pipeline and
+// the frozen `<hexlife-world>` determinism contract all run on. Nothing below this line changes for
+// it — `WorldK` reuses `compute_neighbor_indices` and the canonical direction tables as-is and
+// duplicates neither. See `worldk.rs` and `docs/KSTATE-PLAN.md`.
+mod worldk;
+pub use worldk::{WorldK, BACKEND_BLOCK, BACKEND_NEIGHBORHOOD, MAX_BLOCK_STATES, MAX_NEIGHBORHOOD_STATES};
+
 // The `#[wasm_bindgen]` attribute exposes the following struct or function to JavaScript.
 //
 // The `World` owns every per-cell simulation buffer inside Wasm linear memory. JavaScript
