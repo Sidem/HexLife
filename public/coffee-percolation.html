@@ -507,7 +507,7 @@
   <b>Drainage is downward-only while imbibition accepts from any direction.</b> That asymmetry is
   capillary retention, and it is the one free parameter with a real experimental target: a brewed bed
   holds about 2&nbsp;mL of liquid per gram of coffee, which for a pour-over is roughly 12% of what
-  you pour. At the defaults this model retains <b>12.6%</b>, and 4–13% across the packing slider.
+  you pour. At the defaults this model retains <b>16%</b>, and 0.4–25% across the packing slider.
 </p>
 
 <h2>Gravity points down</h2>
@@ -538,32 +538,64 @@
   offered and the fall is exactly vertical. Verified at zero columns of drift from all six starting
   parities, in the six-state rule, this one, and the four-state pair on the next tab.
 </p>
-<p class="facts">
-  <b>What is not fixed, and it is visible.</b> Gravity is exactly vertical, but the <em>transfer</em>
-  steps still lean. Watch a centre stream soak into the bed and the wetting front does not go
-  straight down — it runs off to the left at an angle. That is not gravity; it is the partition.
+<h2>The other half of gravity: the partition was left-handed</h2>
+<p>
+  Getting the fall step vertical was not enough, and you could see it: a centre stream fell straight
+  down through the air and then, the moment it soaked into the bed, the wetting front took off to the
+  left at about 13° and stayed there. Gravity was innocent. The <em>partition</em> was not.
+</p>
+<p>
+  The engine tiles the grid with up-triangles only — <code>{cell, SE(cell), S(cell)}</code> — so
+  slots 0 and 2 share a column and <b>slot 1 is alone in the next column to the right</b>. Every
+  transfer out of slot 1 therefore carries liquid sideways whichever of its two partners it picks,
+  and every transfer into it carries liquid the other way, with no mirror image of slot 1 inside the
+  triangle to cancel against. Gravity escapes this by always having the vertical bond to fall back
+  on. Imbibe, wick and drain have no such escape, and no arbitration between the three bonds fixes
+  it — about twenty-five were tried, and every one that flattened the drift did it by strangling
+  lateral transport instead.
+</p>
+<p>
+  <b>The fix is to stop using one handedness.</b> Reflecting the grid left-to-right turns every
+  up-triangle into a down-triangle, because the reflection swaps each cell's SE and SW neighbours —
+  so mirror the grid, take one ordinary tick, and mirror back, and that tick ran on down-triangles
+  with slot 1 one column to the <em>left</em>. Alternate the two every tick and the handedness
+  cancels. This needs nothing from the engine; the reflection is a permutation of cells that the page
+  applies itself, and it maps every row onto itself, so the pour, the drip and the guard row never
+  notice.
+</p>
+<table class="stat" style="max-width:640px">
+  <tr><th>partition</th><th style="text-align:right">blob drift, 600 ticks</th><th style="text-align:right">wetting front</th></tr>
+  <tr><th>up-triangles only</th><td>−29.1 ± 4.2 cols</td><td>12.8° off vertical</td></tr>
+  <tr><th>down-triangles only</th><td>+31.1 ± 6.8 cols</td><td>17.1° the other way</td></tr>
+  <tr class="sep"><th>alternating, every tick</th><td><b>−0.1 ± 0.8 cols</b></td><td><b>1.7°</b></td></tr>
+</table>
+<p style="margin-top:10px">
+  The blob is 400 units of liquid dropped into a uniform bed and followed by centre of mass over six
+  pucks; it descends about 50 rows in that time. The two single-handed rows being equal and opposite
+  is the whole argument, and alternating them lands on zero to within the seed-to-seed scatter.
 </p>
 <p class="facts">
-  Slots 0 and 2 share a column and slot 1 is alone in the next one over, so a transfer <em>out of</em>
-  slot 1 moves liquid sideways whichever of its two partners it picks, and a transfer <em>into</em>
-  slot 1 moves it the other way. There is no mirror image of slot 1 inside the triangle to cancel
-  against — which is exactly the escape gravity has and the transfers do not, because gravity can
-  always fall back on the vertical bond. Releasing a blob of liquid into a uniform bed and following
-  every liquid unit for 600 ticks, it descends 51 rows and walks <b>31 columns</b> to the left, about
-  <b>28°</b> off vertical. Making drainage take the vertical bond before either half bond — better
-  physics anyway, since liquid leaving a grain should go straight down when it can — brings that to
-  <b>27 columns</b> and <b>22°</b>, and improves every other measure on this page at the same time.
-  It does not remove it.
+  <b>What it costs, and what it was hiding.</b> Chunk skipping goes, because a mirrored grid has no
+  region the engine can prove is unchanged — at these sizes that is not worth measuring. The real
+  cost is that the drift had been doing work: a front marching sideways as it descends sweeps far
+  more of the bed than one going straight down, so extraction at the defaults falls from 85% to
+  <b>64%</b> and never-wetted rises from 0.8% to <b>4.3%</b>. Those higher numbers were the artefact,
+  not the achievement. The centre stream is the clearest case — it now channels, leaving 87% of the
+  bed dry, which is exactly what a stream poured into one spot should do and what the six-state lab
+  next door has been saying all along.
 </p>
 <p class="facts">
-  <b>A correction.</b> This page used to claim the residual would go away under the standard Margolus
-  construction — alternating up- and down-triangle partitions, so that the odd slot sits right in one
-  family and left in the other. That was asserted, not measured. Built and measured now: with the
-  same rule table, up-triangles alone drift <b>−23</b> columns, down-triangles alone <b>+40</b>, and
-  alternating them tick by tick gives <b>−19</b>. The handedness does flip, but the two rates are not
-  equal and interleaving them does not average — the partitions are coupled through the state they
-  hand each other. So the honest position is that this is an open problem in the rule, not a known
-  fix waiting on an engine change.
+  <b>Only this lab alternates.</b> The six-state model has no transfer steps at all — gravity is its
+  entire transport — so the same measurement puts its front at about 6° rather than 13°, and it pays
+  for that with an exact settling test the alternation would take away. Its residual is left in
+  place and named here rather than quietly fixed in one lab and not the other.
+</p>
+<p class="facts">
+  <b>A retraction.</b> An earlier version of this section reported that alternating handedness had
+  been measured and did <em>not</em> cancel — up −23, down +40, alternating −19. That was one puck
+  per row. The seed-to-seed scatter is ±4 to ±7 columns and the two single-handed runs were never
+  really 23 against 40; over six pucks they are 29 against 31. The conclusion drawn from that single
+  run, that this was an open problem needing an engine change, was wrong on both counts.
 </p>
 
 <h2>What changes</h2>
@@ -574,27 +606,29 @@
 </p>
 <table class="stat" style="max-width:620px">
   <tr><th>packing</th><th style="text-align:right">extracted</th><th style="text-align:right">never wetted</th><th style="text-align:right">retained</th><th style="text-align:right">cup strength</th></tr>
-  <tr><th>0.25</th><td>58.0%</td><td>10.6%</td><td>4.2%</td><td>30.4%</td></tr>
-  <tr><th>0.35</th><td>77.3%</td><td>2.1%</td><td>9.0%</td><td>59.5%</td></tr>
-  <tr><th>0.45</th><td>85.0%</td><td>0.8%</td><td>12.6%</td><td>86.7%</td></tr>
-  <tr><th>0.55</th><td>79.8%</td><td>0.6%</td><td>12.6%</td><td>99.3%</td></tr>
-  <tr><th>0.65</th><td>70.4%</td><td>1.2%</td><td>9.1%</td><td>99.9%</td></tr>
-  <tr class="sep"><th>0.75</th><td>62.5%</td><td>4.8%</td><td>5.1%</td><td>99.6%</td></tr>
+  <tr><th>0.25</th><td>63.5%</td><td>10.2%</td><td>25.0%</td><td>33.0%</td></tr>
+  <tr><th>0.35</th><td>63.0%</td><td>6.2%</td><td>23.5%</td><td>50.3%</td></tr>
+  <tr><th>0.45</th><td>64.0%</td><td>4.3%</td><td>16.0%</td><td>64.9%</td></tr>
+  <tr><th>0.55</th><td>60.7%</td><td>3.3%</td><td>8.7%</td><td>72.1%</td></tr>
+  <tr><th>0.65</th><td>45.8%</td><td>3.8%</td><td>4.0%</td><td>62.7%</td></tr>
+  <tr class="sep"><th>0.75</th><td>24.2%</td><td>6.8%</td><td>1.6%</td><td>37.7%</td></tr>
 </table>
 <p style="margin-top:10px">
   <b>The puck no longer chokes.</b> The six-state model stops delivering anything at all to the cup
   once its packing passes about 0.35, because it needs an unbroken pore path pointing downhill and
-  runs out of them. This one pours the whole 30% through at every packing on its slider, up to 0.85
-  — which is what a real puck does, since a real intergranular porosity of ~0.1 is far below any 2D
-  threshold and the bed conducts anyway. <b>And the bed gets wetted.</b> Never-wetted sits around
-  1% across the useful range, against 62% next door. Turn wicking off with the checkbox, press
-  <em>New brew</em>, and at the defaults it jumps to <b>30%</b> while extraction falls from 85% to
-  <b>40%</b> — the single clearest demonstration on this page of what grain-to-grain transport is
-  for, and of why a model whose grains are walls cannot reach most of its own bed.
+  runs out of them. This one gets the whole 30% in at every packing on its slider, all the way to
+  0.85 — which is what a real puck does, since a real intergranular porosity of ~0.1 is far below any
+  2D threshold and the bed conducts anyway. What falls away at the top of the slider is not intake
+  but contact time: at 0.85 the water gets through and takes only 6.8% of the solubles with it.
+  <b>And the bed gets wetted.</b> Never-wetted sits between 3 and 6% across the useful range, against
+  62% next door. Turn wicking off with the checkbox, press <em>New brew</em>, and at the defaults it
+  jumps to <b>29%</b> while extraction falls from 64% to <b>39%</b> — the single clearest
+  demonstration on this page of what grain-to-grain transport is for, and of why a model whose grains
+  are walls cannot reach most of its own bed.
 </p>
 <p class="facts">
   Grind is the cleanest control here, and it is the one the six-state model could not express at all:
-  at packing 0.45 it moves extraction 85.0% → 91.1% → 92.5% across coarse, medium and fine, purely by
+  at packing 0.45 it moves extraction 64.0% → 75.9% → 86.0% across coarse, medium and fine, purely by
   changing how fast solubles leave the solid, with the flow field untouched.
 </p>
 
@@ -1217,7 +1251,8 @@ const dSolute = (s) =>
  * `verticalFirst` takes the vertical bond before either half bond is even considered. Drainage uses
  * it, and that is the one step where it is unarguable physics rather than a tuning knob: liquid
  * leaving a grain under gravity should go straight down when it can and reach sideways only when it
- * cannot. It is also worth real numbers — see <b>What is not fixed</b> below.
+ * cannot. With the handedness alternation in `dualTick` doing the symmetry work, it is worth 64%
+ * extraction against 38% without — a bed that drains rather than one that stays waterlogged.
  *
  * `locked` keeps a cell touched by an earlier transfer out of the later ones. Without it a grain
  * imbibes in one step and drains straight back in the next — the source cell is air by then, so it
@@ -1328,6 +1363,36 @@ function dualConservation(rule) {
     return true;
 }
 
+/**
+ * The horizontal mirror of the hex torus, as a cell permutation.
+ *
+ * In axial coordinates (`q = col`, `r = row − ⌊col/2⌋`) the reflection about a vertical axis is
+ * `(q, r) → (−q, q + r)`. It is an involution, and — the part that matters — it swaps a cell's SE
+ * and SW neighbours while leaving N and S alone. Since the partition triangle is
+ * `{cell, SE(cell), S(cell)}`, mirroring turns every up-triangle into a down-triangle: the odd slot
+ * moves from one column to the right of the other two to one column to the left.
+ *
+ * It also maps every row onto itself, which is what makes it usable here at all — the pour, the drip
+ * and the guard row all live on particular rows and are completely untouched by it.
+ *
+ * Converting back to offset coordinates uses the UNWRAPPED mirrored column on purpose: `⌊q/2⌋` is
+ * not periodic in `cols`, so wrapping before the floor shears the grid by half a turn for every
+ * column but zero.
+ */
+function buildMirror(rows, cols) {
+    const map = new Uint32Array(rows * cols);
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const r = row - Math.floor(col / 2);
+            const mirroredQ = -col;
+            let mirroredRow = (r + col) + Math.floor(mirroredQ / 2);
+            mirroredRow = ((mirroredRow % rows) + rows) % rows;
+            map[row * cols + col] = mirroredRow * cols + (((mirroredQ % cols) + cols) % cols);
+        }
+    }
+    return map;
+}
+
 const lab2 = document.getElementById('lab2');
 const d = {
     pour: document.getElementById('d-pour'),
@@ -1351,6 +1416,8 @@ const dBrew = {
     seed: 0xC0FFEE,     // as in the six-state lab: New brew re-rolls it, sliders do not
     wetted: 0,          // grains that have ever held liquid — monotone, so it measures progress
     progress: -1,       // last frame's progress total; see stepDual
+    mirror: null,       // cell permutation for the handedness flip; see dualTick
+    scratch: null,
 };
 
 /**
@@ -1517,11 +1584,14 @@ function renderDual() {
         + `<tr><td colspan="2"><span class="meter ${strength > 0.5 ? 'good' : 'bad'}">`
         + `<span style="width:${(strength * 100).toFixed(1)}%"></span></span></td></tr>`;
 
-    const activity = world.chunkActivity;
+    // No chunk-activity readout here, unlike the six-state lab: `dualTick` mirrors the whole grid on
+    // alternate ticks, so every chunk is dirty every tick by construction and the number would read
+    // "all of them" forever. That is the price of the handedness alternation, and it is stated
+    // rather than displayed as if it meant something.
     document.getElementById('d-diag').innerHTML =
         `<b>${world.rows}×${world.columns}</b> = ${(world.rows * world.columns).toLocaleString()} cells`
         + ` · table <b>4,096</b> entries`
-        + ` · chunks active <b>${activity.active}/${activity.total}</b>`;
+        + ` · partition <b>alternating</b> up/down triangles`;
 
     // Grounds and solute cannot cross the boundary at all, so they must match their starting values
     // to the unit, forever. Liquid can, so it is checked against the pour and the drip.
@@ -1557,6 +1627,45 @@ function renderDual() {
  */
 const D_QUIET_TICKS = 240;
 
+/** Reflect the whole grid left-to-right, in place. */
+function mirrorWorld() {
+    const world = lab2.world;
+    const state = world.state;                  // a live view into wasm memory, so write and go
+    const map = dBrew.mirror, scratch = dBrew.scratch;
+    for (let i = 0; i < state.length; i++) scratch[map[i]] = state[i];
+    state.set(scratch);
+    // Writing through the view bypasses the activity tracker, and after a mirror every chunk holds
+    // different cells, so nothing may be skipped on the tick that follows.
+    world.markAllDirty();
+}
+
+/**
+ * One generation, alternating the handedness of the partition.
+ *
+ * The engine partitions into up-triangles only — `{cell, SE(cell), S(cell)}` — so slots 0 and 2
+ * share a column and slot 1 is alone in the next one to the RIGHT. That is a left/right asymmetry
+ * built into the partition rather than into the rule, and it is why the transfer steps drift: a
+ * transfer out of slot 1 moves liquid sideways whichever partner it picks, with no mirror image
+ * inside the triangle to cancel against. Gravity escapes it by having a vertical bond to fall back
+ * on; imbibe, wick and drain have none.
+ *
+ * Mirroring the grid, ticking, and mirroring back runs that same tick on DOWN-triangles instead —
+ * slot 1 one column to the left — because the mirror swaps SE and SW. Alternate the two and the
+ * handedness cancels. Measured over six seeds: a blob of liquid dropped into a bed drifts 29 columns
+ * left on up-triangles alone and 31 columns right on down-triangles alone; alternating them every
+ * tick gives 0.1 ± 0.8, and the wetting front under a centre stream goes from 13° off vertical to
+ * under 2°.
+ *
+ * The cost is one grid permutation per tick on average, plus the loss of chunk skipping in this lab.
+ * At these grid sizes that is nothing, and it buys the one thing the rule could not.
+ */
+function dualTick() {
+    if (dBrew.tick % 2 === 0) { lab2.world.tick(1); return; }
+    mirrorWorld();
+    lab2.world.tick(1);
+    mirrorWorld();
+}
+
 function stepDual() {
     if (!lab2.world) return;
     if (dBrew.finished || dBrew.choked) return;
@@ -1564,7 +1673,7 @@ function stepDual() {
     const steps = Number(d.speed.value);
     for (let i = 0; i < steps; i++) {
         boundaryStep2();
-        lab2.world.tick(1);
+        dualTick();
         dBrew.tick++;
     }
     lab2.tick(0);
@@ -1625,6 +1734,10 @@ function startBrew2() {
     dBrew.progress = -1;
     dBrew.wetted = 0;
     dBrew.everWet = new Uint8Array(lab2.rows * lab2.columns);
+    if (!dBrew.mirror || dBrew.mirror.length !== lab2.rows * lab2.columns) {
+        dBrew.mirror = buildMirror(lab2.rows, lab2.columns);
+        dBrew.scratch = new Uint8Array(lab2.rows * lab2.columns);
+    }
     lab2.tick(0);
     renderDual();
 }
