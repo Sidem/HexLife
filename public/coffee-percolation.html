@@ -879,13 +879,26 @@ function renderCensus(target, counts, base) {
 
 function renderVerdict(which, drift, el) {
     const card = document.getElementById(`verdict-${which}`);
+    const value = document.getElementById(`verdict-${which}-value`);
+    const note = document.getElementById(`verdict-${which}-note`);
+
+    // Generation 0 is not a result. Both elements pause while they are off screen — that is the
+    // embed being a good citizen on someone's page, and these two sit below the fold — so before
+    // they are scrolled into view neither has drifted, and calling that "held exactly" would credit
+    // the radius-1 world with a property it is about to lose on its very first tick.
+    if (el.generation === 0) {
+        card.classList.remove('held', 'leaked');
+        value.textContent = 'not started';
+        note.textContent = 'scroll down — the worlds below pause while they are off screen';
+        return;
+    }
+
     const held = drift === 0;
     card.classList.toggle('held', held);
     card.classList.toggle('leaked', !held);
     // "leaked +1,877" would read as nonsense, and the sign is the interesting part.
-    document.getElementById(`verdict-${which}-value`).textContent =
-        held ? 'held exactly' : `drifted ${signed(drift)}`;
-    document.getElementById(`verdict-${which}-note`).textContent = held
+    value.textContent = held ? 'held exactly' : `drifted ${signed(drift)}`;
+    note.textContent = held
         ? `unchanged across ${el.generation.toLocaleString()} generations`
         : `${drift > 0 ? 'manufactured' : 'lost'} by generation ${el.generation.toLocaleString()}`;
 }
