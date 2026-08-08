@@ -148,14 +148,17 @@
   or against a local build: to test locally you replace ONLY this block, and nothing in the page
   changes. That is how this page was actually verified — see the note at the bottom.
 
-  `@latest` follows future releases, matching the convention of the other CDN page in this repo. Pin
-  it to an exact version (`@hexlife/embed@1.7.0/...`) if you would rather this page never move.
+  Pinned to an exact version rather than `@latest`, which is what the other CDN page in this repo
+  uses. That is not a style preference — `/ca` and `/ca-element` were both introduced in 1.7.0, and
+  jsDelivr caches its `@latest` alias for hours after a publish, so the alias goes on resolving to a
+  version where these two entries simply do not exist and the page 404s. An exact version is correct
+  the moment the release lands. Bump it deliberately when there is a reason to.
 -->
 <script type="importmap">
 {
   "imports": {
-    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@latest/ca/+esm",
-    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@latest/ca-element/+esm"
+    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca/+esm",
+    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca-element/+esm"
   }
 }
 </script>
