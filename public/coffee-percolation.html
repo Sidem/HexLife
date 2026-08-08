@@ -507,7 +507,7 @@
   <b>Drainage is downward-only while imbibition accepts from any direction.</b> That asymmetry is
   capillary retention, and it is the one free parameter with a real experimental target: a brewed bed
   holds about 2&nbsp;mL of liquid per gram of coffee, which for a pour-over is roughly 12% of what
-  you pour. At the defaults this model retains 18%, and 5–21% across the packing slider.
+  you pour. At the defaults this model retains <b>12.6%</b>, and 4–13% across the packing slider.
 </p>
 
 <h2>Gravity points down</h2>
@@ -539,15 +539,31 @@
   parities, in the six-state rule, this one, and the four-state pair on the next tab.
 </p>
 <p class="facts">
-  <b>What is not fixed.</b> The partition uses a single triangle handedness, so slot 1's two bonds
-  both point left while slots 0 and 2 have one rightward bond each. No pure function of the triple
-  can make the <em>transfer</em> steps — imbibe, wick, drain — exactly symmetric; only gravity can,
-  because only gravity has a vertical bond to fall back on. Each transfer therefore declines to act
-  whenever a left/right choice would be forced, which still leaves a residual: driving a wetting
-  front out of a single inlet for 900 ticks walks its centre of mass <b>0.027 columns per tick</b>
-  sideways here, against <b>0.001</b> for the six-state rule, which has no transfer steps to be
-  asymmetric about. Removing it entirely needs alternating up- and down-triangle partitions in the
-  engine — the standard Margolus construction — which is an engine change, not a rule change.
+  <b>What is not fixed, and it is visible.</b> Gravity is exactly vertical, but the <em>transfer</em>
+  steps still lean. Watch a centre stream soak into the bed and the wetting front does not go
+  straight down — it runs off to the left at an angle. That is not gravity; it is the partition.
+</p>
+<p class="facts">
+  Slots 0 and 2 share a column and slot 1 is alone in the next one over, so a transfer <em>out of</em>
+  slot 1 moves liquid sideways whichever of its two partners it picks, and a transfer <em>into</em>
+  slot 1 moves it the other way. There is no mirror image of slot 1 inside the triangle to cancel
+  against — which is exactly the escape gravity has and the transfers do not, because gravity can
+  always fall back on the vertical bond. Releasing a blob of liquid into a uniform bed and following
+  every liquid unit for 600 ticks, it descends 51 rows and walks <b>31 columns</b> to the left, about
+  <b>28°</b> off vertical. Making drainage take the vertical bond before either half bond — better
+  physics anyway, since liquid leaving a grain should go straight down when it can — brings that to
+  <b>27 columns</b> and <b>22°</b>, and improves every other measure on this page at the same time.
+  It does not remove it.
+</p>
+<p class="facts">
+  <b>A correction.</b> This page used to claim the residual would go away under the standard Margolus
+  construction — alternating up- and down-triangle partitions, so that the odd slot sits right in one
+  family and left in the other. That was asserted, not measured. Built and measured now: with the
+  same rule table, up-triangles alone drift <b>−23</b> columns, down-triangles alone <b>+40</b>, and
+  alternating them tick by tick gives <b>−19</b>. The handedness does flip, but the two rates are not
+  equal and interleaving them does not average — the partitions are coupled through the state they
+  hand each other. So the honest position is that this is an open problem in the rule, not a known
+  fix waiting on an engine change.
 </p>
 
 <h2>What changes</h2>
@@ -558,27 +574,27 @@
 </p>
 <table class="stat" style="max-width:620px">
   <tr><th>packing</th><th style="text-align:right">extracted</th><th style="text-align:right">never wetted</th><th style="text-align:right">retained</th><th style="text-align:right">cup strength</th></tr>
-  <tr><th>0.25</th><td>56.7%</td><td>12.4%</td><td>5.0%</td><td>29.8%</td></tr>
-  <tr><th>0.35</th><td>73.8%</td><td>3.8%</td><td>11.7%</td><td>57.2%</td></tr>
-  <tr><th>0.45</th><td>82.2%</td><td>1.5%</td><td>18.1%</td><td>88.0%</td></tr>
-  <tr><th>0.55</th><td>74.9%</td><td>1.0%</td><td>20.9%</td><td>98.9%</td></tr>
-  <tr><th>0.65</th><td>65.5%</td><td>1.8%</td><td>18.5%</td><td>99.4%</td></tr>
-  <tr class="sep"><th>0.75</th><td>59.5%</td><td>3.7%</td><td>11.7%</td><td>98.8%</td></tr>
+  <tr><th>0.25</th><td>58.0%</td><td>10.6%</td><td>4.2%</td><td>30.4%</td></tr>
+  <tr><th>0.35</th><td>77.3%</td><td>2.1%</td><td>9.0%</td><td>59.5%</td></tr>
+  <tr><th>0.45</th><td>85.0%</td><td>0.8%</td><td>12.6%</td><td>86.7%</td></tr>
+  <tr><th>0.55</th><td>79.8%</td><td>0.6%</td><td>12.6%</td><td>99.3%</td></tr>
+  <tr><th>0.65</th><td>70.4%</td><td>1.2%</td><td>9.1%</td><td>99.9%</td></tr>
+  <tr class="sep"><th>0.75</th><td>62.5%</td><td>4.8%</td><td>5.1%</td><td>99.6%</td></tr>
 </table>
 <p style="margin-top:10px">
   <b>The puck no longer chokes.</b> The six-state model stops delivering anything at all to the cup
   once its packing passes about 0.35, because it needs an unbroken pore path pointing downhill and
   runs out of them. This one pours the whole 30% through at every packing on its slider, up to 0.85
   — which is what a real puck does, since a real intergranular porosity of ~0.1 is far below any 2D
-  threshold and the bed conducts anyway. <b>And the bed gets wetted.</b> Never-wetted sits between
-  1 and 2% across the useful range, against 62% next door. Turn wicking off with the checkbox, press
-  <em>New brew</em>, and at the defaults it jumps to <b>31%</b> while extraction falls from 82% to
-  <b>45%</b> — the single clearest demonstration on this page of what grain-to-grain transport is
+  threshold and the bed conducts anyway. <b>And the bed gets wetted.</b> Never-wetted sits around
+  1% across the useful range, against 62% next door. Turn wicking off with the checkbox, press
+  <em>New brew</em>, and at the defaults it jumps to <b>30%</b> while extraction falls from 85% to
+  <b>40%</b> — the single clearest demonstration on this page of what grain-to-grain transport is
   for, and of why a model whose grains are walls cannot reach most of its own bed.
 </p>
 <p class="facts">
   Grind is the cleanest control here, and it is the one the six-state model could not express at all:
-  at packing 0.45 it moves extraction 82.2% → 88.1% → 89.1% across coarse, medium and fine, purely by
+  at packing 0.45 it moves extraction 85.0% → 91.1% → 92.5% across coarse, medium and fine, purely by
   changing how fast solubles leave the solid, with the flow field untouched.
 </p>
 
@@ -719,7 +735,7 @@
 <p>
   Which is exactly what the <b>dual-porosity</b> tab demonstrates: once grains can carry liquid
   themselves, the cliff turns into a smooth decline in throughput and the bed is still brewing at a
-  packing of 0.85, with barely 1% of it never wetted. That is a strictly better story than this one,
+  packing of 0.85, with under 1% of it never wetted. That is a strictly better story than this one,
   not a worse one — the lattice mathematics above is untouched, it simply stops being asked to carry
   a claim about coffee that it cannot support.
 </p>
@@ -1191,21 +1207,26 @@ const dSolute = (s) =>
     dLiquid(s) ? dConc(s) : dWet(s) ? dWetCharge(s) + dWetBound(s) : dDry(s) ? dDryCharge(s) : 0;
 
 /**
- * One liquid unit across one bond, chosen symmetrically.
+ * One liquid unit across one bond, chosen as symmetrically as this partition allows.
  *
  * Slots 0 and 2 share a column and slot 1 sits one column to the right, so (0,2) is a pure vertical
- * bond and (0,1) / (1,2) are its mirror-image half bonds — down-right and down-left. The two halves
- * are resolved against each other FIRST and the step declines outright when both apply, because that
- * is the exact moment a left/right choice would have to be made and any fixed choice is a net
- * sideways drift. The vertical bond, which has no lateral component at all, picks up the rest.
+ * bond and (0,1) / (1,2) are half bonds — down-right and down-left. The two halves are resolved
+ * against each other and the step declines outright when both apply, because that is the exact
+ * moment a left/right choice would have to be made and any fixed choice is a net sideways drift.
+ *
+ * `verticalFirst` takes the vertical bond before either half bond is even considered. Drainage uses
+ * it, and that is the one step where it is unarguable physics rather than a tuning knob: liquid
+ * leaving a grain under gravity should go straight down when it can and reach sideways only when it
+ * cannot. It is also worth real numbers — see <b>What is not fixed</b> below.
  *
  * `locked` keeps a cell touched by an earlier transfer out of the later ones. Without it a grain
  * imbibes in one step and drains straight back in the next — the source cell is air by then, so it
  * reads as a legitimate drain — and no grain ever stays wet long enough to dissolve anything.
  */
-function dTransfer(out, locked, can, act) {
+function dTransfer(out, locked, can, act, verticalFirst = false) {
     const open = (i, j) => !locked[i] && !locked[j];
     const take = (i, j) => { act(out, i, j); locked[i] = true; locked[j] = true; };
+    if (verticalFirst && open(0, 2) && can(out, 0, 2)) { take(0, 2); return; }
     const r = open(0, 1) && can(out, 0, 1);
     const l = open(1, 2) && can(out, 1, 2);
     if (r && !l) take(0, 1);
@@ -1262,9 +1283,9 @@ function buildDualRule(grindSlots, wicking) {
         //    direction, gravity included but not required, which is why a real wetting front spreads
         //    sideways instead of boring one channel straight down.
         dTransfer(out, locked, wicking ? dCanWick : dNever, dActWick);
-        // 4. DRAIN — downward only. Imbibition accepts from any direction and drainage from one;
-        //    that asymmetry is capillary retention.
-        dTransfer(out, locked, dCanDrain, dActDrain);
+        // 4. DRAIN — downward only, and straight down by preference. Imbibition accepts from any
+        //    direction and drainage from one; that asymmetry is capillary retention.
+        dTransfer(out, locked, dCanDrain, dActDrain, true);
 
         // 5. DISPERSE — hydrodynamic dispersion. Two free parcels two grades apart meet in the
         //    middle. Exactly conservative in solute, and it stops a column of rich brew running
