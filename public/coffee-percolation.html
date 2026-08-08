@@ -85,11 +85,24 @@
   .check input { accent-color: var(--accent); }
 
   hexlife-ca { width: 100%; border-radius: 8px; overflow: hidden; display: block; }
-  /* The lab element is `paused` because THIS PAGE owns the stepping — it has to interleave the pour
-     and the drip around each tick, which the element's own loop knows nothing about. So its poster
-     play button must not be offered: pressing it would start a second loop ticking the same world.
-     `::part(overlay)` is the element's supported hook for a host that owns its own transport. */
-  hexlife-ca#lab::part(overlay) { display: none; }
+  /* The lab elements are `paused` because THIS PAGE owns the stepping — it has to interleave the
+     pour and the drip around each tick, which the element's own loop knows nothing about. So their
+     poster play buttons must not be offered: pressing one would start a second loop ticking the
+     same world. `::part(overlay)` is the element's supported hook for a host owning its transport. */
+  hexlife-ca#lab::part(overlay), hexlife-ca#lab2::part(overlay) { display: none; }
+
+  /* --- tabs --- */
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    border: 1px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+    background: none; color: var(--dim); padding: 8px 14px; margin-bottom: -1px; font-size: 13.5px;
+  }
+  .tabs button:hover { background: var(--panel); color: var(--ink); }
+  .tabs button[aria-selected="true"] {
+    background: var(--panel); color: var(--ink); font-weight: 600;
+    border-color: var(--line); border-bottom: 1px solid var(--panel);
+  }
+  .panel[hidden] { display: none; }
   .stage { padding: 0; overflow: hidden; }
   .stagebar {
     display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center;
@@ -197,10 +210,24 @@
     Every quantity here is conserved <em>exactly</em>, which is what makes the score mean something.
     Fluid is never created or destroyed by the rule, grounds are never created or destroyed, and the
     only things crossing the boundary are what you pour in at the top and what drips out of the
-    bottom into the cup — both counted. That is the block backend's doing, and the section at the
-    bottom of this page shows what happens without it.
+    bottom into the cup — both counted. That is the block backend's doing, and the
+    <b>backend comparison</b> tab shows what happens without it.
+  </p>
+  <p>
+    The <b>dual-porosity lab</b> is the same idea taken to sixteen states after the six-state model
+    was checked against the coffee-percolation literature. Two things were wrong with it, and both
+    are visible on screen: its grains are impermeable, so water pools on them and pockets of brew
+    sit trapped forever; and its gravity is not vertical. That tab has the measurements.
   </p>
 </div>
+
+<nav class="tabs" role="tablist" id="tabs">
+  <button role="tab" id="tab-six" aria-controls="panel-six" aria-selected="true">Extraction lab · 6 states</button>
+  <button role="tab" id="tab-dual" aria-controls="panel-dual" aria-selected="false">Dual-porosity lab · 16 states</button>
+  <button role="tab" id="tab-backend" aria-controls="panel-backend" aria-selected="false">Why block mode</button>
+</nav>
+
+<section class="panel" id="panel-six" role="tabpanel" aria-labelledby="tab-six">
 
 <div class="lab">
 
@@ -329,10 +356,216 @@
 </p>
 <p>
   So this model does not <em>choose</em> block mode; six states is more than the other table can hold.
-  The comparison below is at four states because that is the largest <code>k</code> that fits both.
+  The backend comparison is at four states because that is the largest <code>k</code> that fits both.
 </p>
 
-<hr>
+</section>
+
+<!-- ================= dual-porosity lab ================= -->
+<section class="panel" id="panel-dual" role="tabpanel" aria-labelledby="tab-dual" hidden>
+
+<div class="lede">
+  <p>
+    <b>The six-state model treats a coffee grain as a solid wall.</b> It is not one. Reported
+    intragranular porosity of roasted coffee grains is 0.35–0.55, against an intergranular porosity
+    that can be as low as ~0.1 in a packed puck — so <em>most of the liquid in a real bed is inside
+    the grains, not between them</em>. A model where water can only ever occupy pore space is a bed
+    of glass beads, and it is why water pools on the surface and why pockets of brew sit trapped.
+  </p>
+  <p>
+    So here grains hold liquid. Water is imbibed into a grain, solubles dissolve into it from the
+    inside on their own clock, liquid wicks from grain to grain, and it drains back out downward.
+    Sixteen states, a 4,096-entry table, and <b>three</b> quantities conserved exactly rather than
+    two: grounds, liquid units, and dissolved solute.
+  </p>
+</div>
+
+<div class="lab">
+  <div class="card">
+    <h3>The brew</h3>
+    <div class="field">
+      <label for="d-pour">Pour pattern</label>
+      <select id="d-pour">
+        <option value="shower">Shower — even, across the bed</option>
+        <option value="pulse">Pulse — bloom, rest, then pour</option>
+        <option value="centre">Centre stream — one spot</option>
+        <option value="dump">Dump — all of it at once</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="d-flow"><span class="val" id="d-flow-v">6</span>Flow rate <span style="opacity:.7">cells/tick</span></label>
+      <input type="range" id="d-flow" min="1" max="40" value="6">
+    </div>
+    <div class="field">
+      <label for="d-water"><span class="val" id="d-water-v">30%</span>Water volume <span style="opacity:.7">of grid</span></label>
+      <input type="range" id="d-water" min="2" max="60" value="30">
+    </div>
+    <div class="field">
+      <label for="d-grind">Grind</label>
+      <select id="d-grind">
+        <option value="1" selected>Coarse — slow intraparticle diffusion</option>
+        <option value="2">Medium</option>
+        <option value="3">Fine — fast</option>
+      </select>
+    </div>
+
+    <h3 style="margin-top:16px">The puck</h3>
+    <div class="field">
+      <label for="d-pack"><span class="val" id="d-pack-v">0.45</span>Packing density</label>
+      <input type="range" id="d-pack" min="20" max="85" value="45">
+    </div>
+    <div class="field">
+      <label for="d-depth"><span class="val" id="d-depth-v">62%</span>Bed depth</label>
+      <input type="range" id="d-depth" min="20" max="90" value="62">
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="d-uneven"> Uneven puck (a loose patch)</label>
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="d-wick" checked> Grain-to-grain wicking</label>
+    </div>
+
+    <h3 style="margin-top:16px">The rig</h3>
+    <div class="field">
+      <label for="d-size">Grid size</label>
+      <select id="d-size">
+        <option value="66">66 × 76 — 5k cells</option>
+        <option value="150" selected>150 × 174 — 26k cells</option>
+        <option value="300">300 × 346 — 104k cells</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="d-speed"><span class="val" id="d-speed-v">4</span>Ticks per frame</label>
+      <input type="range" id="d-speed" min="1" max="16" value="4">
+    </div>
+    <div class="field row">
+      <button id="d-run">Pause</button>
+      <button id="d-brew">New brew</button>
+    </div>
+  </div>
+
+  <div class="card stage">
+    <div class="stagebar">
+      <span>tick <b id="d-tick">0</b></span>
+      <span>poured <b id="d-poured">0</b></span>
+      <span>free <b id="d-free">0</b></span>
+      <span>in grains <b id="d-bound">0</b></span>
+      <span>in cup <b id="d-cup">0</b></span>
+      <span id="d-phase" style="color:var(--accent)">pouring</span>
+    </div>
+    <hexlife-ca id="lab2" states="16" rows="150" backend="block" paused link="off"
+                palette="#12161a,#3aa0ff,#b0763c,#6d3f1b,#4a3c31,#7a6350,#9a7b5f,#35485c,#40382a,#422e1e,#425a72,#594c36,#5b422b,#4d6b86,#6b5b40,#6e5034"></hexlife-ca>
+    <div class="stagefoot" id="d-stagefoot"></div>
+  </div>
+
+  <div class="card">
+    <div class="score">
+      <div class="n" id="d-yield">0.0%</div>
+      <div class="l">solubles extracted</div>
+      <div class="best">best this session <b id="d-best">—</b></div>
+    </div>
+    <table class="stat" id="d-bed"></table>
+    <table class="stat" id="d-cuptable" style="margin-top:10px"></table>
+    <p class="facts" id="d-diag"></p>
+    <p class="facts" id="d-conserve"></p>
+  </div>
+</div>
+
+<h2>The sixteen states</h2>
+<p>
+  <b>Free liquid</b> is <span class="swatch" style="background:#12161a"></span>air 0 and three
+  solute grades — <span class="swatch" style="background:#3aa0ff"></span>fresh,
+  <span class="swatch" style="background:#b0763c"></span>lean and
+  <span class="swatch" style="background:#6d3f1b"></span>rich. <b>Grains</b> never move and carry two
+  independent quantities: how much soluble charge is left (2, 1 or 0) and whether they are holding a
+  unit of liquid. Three drained grains
+  (<span class="swatch" style="background:#9a7b5f"></span><span class="swatch" style="background:#7a6350"></span><span class="swatch" style="background:#4a3c31"></span>,
+  lightest = untouched) and nine wet ones, whose tint carries the concentration of the liquid inside
+  — <span class="swatch" style="background:#4d6b86"></span>bluer when it is still fresh,
+  <span class="swatch" style="background:#6e5034"></span>browner as it loads up.
+</p>
+<p>
+  Each tick rewrites every triangle through five steps. <b>Dissolve</b> moves one unit of solute from
+  a grain's solid into the liquid it already holds — no neighbour required, because this is
+  intraparticle diffusion, and it is gated on the partition slot so that a grain gets one step per
+  three ticks at a coarse grind and one per tick at a fine one. Moroney et&nbsp;al. measure that
+  timescale at 42&nbsp;s fine to 270&nbsp;s coarse against a transit time of seconds, which is why it
+  has to be decoupled from flow. Then <b>imbibe</b>, <b>wick</b> and <b>drain</b> move one liquid
+  unit each; then <b>disperse</b> mixes two free parcels two grades apart; then <b>fall</b>.
+</p>
+<p>
+  <b>Drainage is downward-only while imbibition accepts from any direction.</b> That asymmetry is
+  capillary retention, and it is the one free parameter with a real experimental target: a brewed bed
+  holds about 2&nbsp;mL of liquid per gram of coffee, which for a pour-over is roughly 12% of what
+  you pour. At the defaults this model retains 15–19%.
+</p>
+
+<h2>Gravity was pointing sideways</h2>
+<p>
+  Before any of the coffee physics, a transport bug. Slots 0 and 2 of the partition triangle share a
+  column while slot 1 sits one column to the right, so <code>0→2</code> is a pure vertical bond and
+  <code>0→1</code> and <code>1→2</code> are its two mirror-image half bonds. A plain density sort
+  always sends the heaviest cell to slot 2 — which means a parcel <em>phase-locks</em> onto the
+  <code>1→2</code> bond and descends at about 50° to the left, forever, in an empty world with no
+  obstacles at all. Dropping one cell of water into a void and measuring:
+</p>
+<table class="stat" style="max-width:560px">
+  <tr><th>rule</th><th style="text-align:right">rows fallen</th><th style="text-align:right">columns drifted</th><th style="text-align:right">angle from vertical</th></tr>
+  <tr><th>six-state, sorted by density</th><td>30</td><td>−40</td><td>≈50°</td></tr>
+  <tr class="sep"><th>this rule</th><td>30</td><td>0</td><td>0°</td></tr>
+</table>
+<p style="margin-top:10px">
+  The fix is to route gravity through those bonds explicitly: take the vertical bond whenever it
+  exists, and offer a half bond <em>only when the far end of the vertical bond is solid</em> — right
+  when slot 2 is a ground, left when slot 0 is. Those two conditions are mirror images, so in a bed
+  with no left/right structure they arise equally often; in open air neither is offered and the fall
+  is exactly vertical. Verified at zero columns of drift from every starting parity.
+</p>
+<p class="facts">
+  <b>What is not fixed.</b> The partition uses a single triangle handedness, so slot 1's two bonds
+  both point left while slots 0 and 2 have one rightward bond each. No pure function of the triple
+  can make the <em>transfer</em> steps exactly symmetric — only gravity, which has a vertical bond to
+  fall back on. Each transfer therefore declines to act whenever a left/right choice would be forced,
+  which leaves a measured residual of <b>0.03 columns per tick</b> in a wetting front against the
+  six-state rule's <b>0.67</b>. Removing it entirely needs alternating up- and down-triangle
+  partitions in the engine — the standard Margolus construction — which is an engine change, not a
+  rule change.
+</p>
+
+<h2>What changes</h2>
+<p>
+  Measured in a standalone harness on a 150×150 grid — shower pour, 30% water, coarse grind, 4,000
+  ticks — running the same sweep the six-state model is scored on in the other tab:
+</p>
+<table class="stat" style="max-width:620px">
+  <tr><th>packing</th><th style="text-align:right">extracted</th><th style="text-align:right">never wetted</th><th style="text-align:right">retained</th><th style="text-align:right">cup strength</th></tr>
+  <tr><th>0.25</th><td>61.7%</td><td>11.6%</td><td>5.2%</td><td>32.2%</td></tr>
+  <tr><th>0.35</th><td>76.5%</td><td>3.9%</td><td>11.8%</td><td>58.6%</td></tr>
+  <tr><th>0.45</th><td>83.8%</td><td>1.4%</td><td>18.7%</td><td>80.2%</td></tr>
+  <tr><th>0.55</th><td>69.1%</td><td>0.4%</td><td>27.0%</td><td>83.9%</td></tr>
+  <tr><th>0.65</th><td>68.0%</td><td>0.6%</td><td>24.9%</td><td>89.4%</td></tr>
+  <tr class="sep"><th>0.75</th><td>61.1%</td><td>1.4%</td><td>20.5%</td><td>93.8%</td></tr>
+</table>
+<p style="margin-top:10px">
+  <b>The puck no longer chokes.</b> The six-state model delivers nothing at all to the cup above a
+  packing of 0.55, because its pore space has crossed the site-percolation threshold and there is no
+  connected path down. This one is still pouring at 0.75 — which is what a real puck does, since a
+  real intergranular porosity of ~0.1 is far below any 2D threshold and the bed conducts anyway.
+  <b>And the bed gets wetted.</b> Never-wetted sits around 1%. Turn wicking off with the checkbox,
+  press <em>New brew</em>, and on the defaults above it jumps to <b>29%</b> while extraction falls
+  from 87% to 47% — the single clearest demonstration on this page of what grain-to-grain transport
+  is for, and of why a model whose grains are walls cannot reach most of its own bed.
+</p>
+<p class="facts">
+  Grind is the cleanest control here, and it is the one the six-state model could not express at all:
+  at packing 0.45 it moves extraction 83.8% → 89.4% → 90.5% across coarse, medium and fine, purely by
+  changing how fast solubles leave the solid, with the flow field untouched.
+</p>
+
+</section>
+
+<!-- ================= backend comparison ================= -->
+<section class="panel" id="panel-backend" role="tabpanel" aria-labelledby="tab-backend" hidden>
 
 <h2>Why block mode exists at all</h2>
 <p class="sub">
@@ -400,8 +633,6 @@
     <p class="facts" id="facts-nbhd"></p>
   </div>
 </div>
-<p class="boot" id="boot" style="margin-top:10px">loading @hexlife/embed…</p>
-
 <h2>Why 66 rows and not 64</h2>
 <p>
   Block mode partitions the grid into up-triangles in three phases, cycling
@@ -422,8 +653,8 @@
   — on the square lattice it is ≈0.5927, known only numerically.
 </p>
 <p>
-  That is not decoration here; it is what the packing slider is measuring. Sweeping it at an
-  otherwise fixed brew (shower, flow 6, 62% bed) gives:
+  That is not decoration here; it is what the packing slider on the <b>six-state</b> lab is
+  measuring. Sweeping it at an otherwise fixed brew (shower, flow 6, 62% bed) gives:
 </p>
 <table class="stat" style="max-width:520px">
   <tr><th>packing</th><th style="text-align:right">pore space</th><th style="text-align:right">yield</th><th style="text-align:right">never wetted</th></tr>
@@ -439,8 +670,32 @@
   water never gets in and most of the grounds are never touched. The default sits at 0.45 on purpose:
   right on the interesting edge.
 </p>
+<p>
+  <b>That is a correct statement about this lattice and a false one about coffee</b>, and the
+  distinction is worth being precise about. The <code>p_c = 1/2</code> is exact, and percolation
+  really is the right frame for a coffee bed — Wadsworth et&nbsp;al. (2026) fit lattice-Boltzmann
+  flow through X-ray micro-CT scans of real ground coffee and found a percolation-theory permeability
+  model beats Kozeny–Carman, especially at low porosity. But the threshold itself is a
+  <em>two-dimensional</em> number, and it governs the interparticle network only if the particles are
+  impermeable. Neither condition holds. In 3D the site threshold is far lower (≈0.31 on a simple
+  cubic lattice, lower still for continuum pore networks), and a packed espresso puck runs at an
+  intergranular porosity around 0.1 and conducts perfectly well. A real puck chokes through fines
+  migration and swelling-driven compaction, not by falling below a percolation threshold.
+</p>
+<p>
+  Which is exactly what the <b>dual-porosity</b> tab demonstrates: once grains can carry liquid
+  themselves, the hard threshold at 0.5 turns into a smooth decline in throughput and the bed is
+  still brewing at a packing of 0.75. That is a strictly better story than this one, not a worse one
+  — the lattice mathematics above is untouched, it simply stops being asked to carry a claim about
+  coffee that it cannot support.
+</p>
+
+</section>
+
+<hr>
 
 <h2>Running this page</h2>
+<p class="boot" id="boot">loading @hexlife/embed…</p>
 <p class="facts">
   It resolves <code>@hexlife/embed</code> from jsDelivr through the import map in the page source, so
   it needs a network but no build. To point it at a local <code>npm run build:embed</code> instead,
@@ -732,9 +987,18 @@ function renderLab() {
 }
 
 let rafId = 0;
+/** Which tab owns the transport. Only the visible lab is stepped — two 26k-cell worlds ticking so
+ *  one of them can be invisible is pure waste, and the elements pause themselves off screen anyway. */
+let activeTab = 'six';
+
 function frame() {
     rafId = requestAnimationFrame(frame);
-    if (!brew.running || !lab.world) return;
+    if (activeTab === 'six' && brew.running) stepSix();
+    else if (activeTab === 'dual' && dBrew.running) stepDual();
+}
+
+function stepSix() {
+    if (!lab.world) return;
 
     // A settled world is a fixed point it can never leave, so there is nothing to compute or draw —
     // stepping a settled 234k-cell world every frame would be pure waste. This is `isSettled`'s
@@ -782,6 +1046,28 @@ function startBrew() {
 // installed from the ready event rather than once at startup.
 lab.addEventListener('hexlife-ca-ready', () => startBrew());
 
+// --- tabs -------------------------------------------------------------------------------------
+const TABS = [
+    { tab: 'tab-six', panel: 'panel-six', key: 'six' },
+    { tab: 'tab-dual', panel: 'panel-dual', key: 'dual' },
+    { tab: 'tab-backend', panel: 'panel-backend', key: 'backend' },
+];
+function selectTab(key) {
+    activeTab = key;
+    for (const t of TABS) {
+        const on = t.key === key;
+        document.getElementById(t.tab).setAttribute('aria-selected', String(on));
+        document.getElementById(t.panel).hidden = !on;
+    }
+    // A hidden canvas has no size, so the element could not have laid itself out while the panel was
+    // display:none. Repaint once now that it can.
+    if (key === 'six' && lab.world) lab.tick(0);
+    if (key === 'dual' && lab2.world) lab2.tick(0);
+}
+for (const t of TABS) {
+    document.getElementById(t.tab).addEventListener('click', () => selectTab(t.key));
+}
+
 const bind = (input, out, fmt, restart) => {
     const sync = () => { if (out) document.getElementById(out).textContent = fmt(input.value); };
     input.addEventListener('input', () => { sync(); if (restart) startBrew(); });
@@ -799,6 +1085,438 @@ ui.size.addEventListener('change', () => lab.setAttribute('rows', ui.size.value)
 ui.run.addEventListener('click', () => {
     brew.running = !brew.running;
     ui.run.textContent = brew.running ? 'Pause' : 'Run';
+});
+
+// ===========================================================================
+// PART 1b — the sixteen-state dual-porosity lab
+// ===========================================================================
+// Grains hold liquid. Intragranular porosity of real coffee grains is 0.35–0.55 against an
+// intergranular ~0.1 in a packed puck, so most of the liquid in a bed is inside the grains — which
+// the six-state model above cannot express at all, and which is why its water pools on the surface.
+
+const D_AIR = 0;
+const D_LIQ = [1, 2, 3];                                       // free liquid by solute grade 0..2
+const D_DRY = [4, 5, 6];                                       // drained grain by charge left 0..2
+const D_WET = [[7, 8, 9], [10, 11, 12], [13, 14, 15]];         // D_WET[charge][boundGrade]
+const D_K = 16;
+
+const dFree = (s) => s <= 3;
+const dLiquid = (s) => s >= 1 && s <= 3;
+const dGround = (s) => s >= 4;
+const dDry = (s) => s >= 4 && s <= 6;
+const dWet = (s) => s >= 7;
+const dConc = (s) => s - 1;
+const dDryCharge = (s) => s - 4;
+const dWetCharge = (s) => Math.floor((s - 7) / 3);
+const dWetBound = (s) => (s - 7) % 3;
+/** Charge left in a grain, whichever kind it is. */
+const dCharge = (s) => (dWet(s) ? dWetCharge(s) : dDry(s) ? dDryCharge(s) : 0);
+
+// The three conserved quantities, per cell.
+const dGrounds = (s) => (dGround(s) ? 1 : 0);
+const dLiquidUnits = (s) => (dLiquid(s) || dWet(s) ? 1 : 0);
+const dSolute = (s) =>
+    dLiquid(s) ? dConc(s) : dWet(s) ? dWetCharge(s) + dWetBound(s) : dDry(s) ? dDryCharge(s) : 0;
+
+/**
+ * One liquid unit across one bond, chosen symmetrically.
+ *
+ * Slots 0 and 2 share a column and slot 1 sits one column to the right, so (0,2) is a pure vertical
+ * bond and (0,1) / (1,2) are its mirror-image half bonds — down-right and down-left. The two halves
+ * are resolved against each other FIRST and the step declines outright when both apply, because that
+ * is the exact moment a left/right choice would have to be made and any fixed choice is a net
+ * sideways drift. The vertical bond, which has no lateral component at all, picks up the rest.
+ *
+ * `locked` keeps a cell touched by an earlier transfer out of the later ones. Without it a grain
+ * imbibes in one step and drains straight back in the next — the source cell is air by then, so it
+ * reads as a legitimate drain — and no grain ever stays wet long enough to dissolve anything.
+ */
+function dTransfer(out, locked, can, act) {
+    const open = (i, j) => !locked[i] && !locked[j];
+    const take = (i, j) => { act(out, i, j); locked[i] = true; locked[j] = true; };
+    const r = open(0, 1) && can(out, 0, 1);
+    const l = open(1, 2) && can(out, 1, 2);
+    if (r && !l) take(0, 1);
+    else if (l && !r) take(1, 2);
+    else if (open(0, 2) && can(out, 0, 2)) take(0, 2);
+}
+
+const dCanImbibe = (o, i, j) => (dLiquid(o[i]) && dDry(o[j])) || (dLiquid(o[j]) && dDry(o[i]));
+const dActImbibe = (o, i, j) => {
+    const liq = dLiquid(o[i]) ? i : j, gnd = liq === i ? j : i;
+    o[gnd] = D_WET[dDryCharge(o[gnd])][dConc(o[liq])];
+    o[liq] = D_AIR;
+};
+const dCanWick = (o, i, j) => (dWet(o[i]) && dDry(o[j])) || (dWet(o[j]) && dDry(o[i]));
+const dActWick = (o, i, j) => {
+    const src = dWet(o[i]) ? i : j, dst = src === i ? j : i;
+    o[dst] = D_WET[dDryCharge(o[dst])][dWetBound(o[src])];
+    o[src] = D_DRY[dWetCharge(o[src])];
+};
+const dCanDrain = (o, i, j) => dWet(o[i]) && o[j] === D_AIR;   // every bond runs i above j
+const dActDrain = (o, i, j) => {
+    o[j] = D_LIQ[dWetBound(o[i])];
+    o[i] = D_DRY[dWetCharge(o[i])];
+};
+const dNever = () => false;
+
+/**
+ * @param {number} grindSlots 1 coarse .. 3 fine — how many partition slots permit a dissolve step.
+ * @param {boolean} wicking whether grain-to-grain capillary transfer is on.
+ */
+function buildDualRule(grindSlots, wicking) {
+    return blockRuleFromTable(D_K, (b) => {
+        const out = [b[0], b[1], b[2]];
+
+        // 1. DISSOLVE — intraparticle, and the only step needing no neighbour at all: solubles move
+        //    from a grain's solid into the liquid it already holds. Gated on slot index because a
+        //    block rule is stateless and time-invariant while a cell visits each slot exactly once
+        //    per partition cycle, so the slot index is the only clock available. One slot = one step
+        //    per three ticks (coarse); three = every tick (fine). Moroney et al. put intraparticle
+        //    diffusion at 42 s fine to 270 s coarse against a transit time of seconds, so this
+        //    genuinely has to run on its own clock rather than on contact.
+        for (let i = 3 - grindSlots; i < 3; i++) {
+            const s = out[i];
+            if (dWet(s) && dWetCharge(s) > 0 && dWetBound(s) < 2) {
+                out[i] = D_WET[dWetCharge(s) - 1][dWetBound(s) + 1];
+            }
+        }
+
+        const locked = [false, false, false];
+        // 2. IMBIBE — a drained grain pulls liquid out of the pore network and holds it.
+        dTransfer(out, locked, dCanImbibe, dActImbibe);
+        // 3. WICK — a wet grain hands liquid straight to a touching dry grain without ever entering
+        //    the pore network. Surface films and the connected intragranular network carry it in any
+        //    direction, gravity included but not required, which is why a real wetting front spreads
+        //    sideways instead of boring one channel straight down.
+        dTransfer(out, locked, wicking ? dCanWick : dNever, dActWick);
+        // 4. DRAIN — downward only. Imbibition accepts from any direction and drainage from one;
+        //    that asymmetry is capillary retention.
+        dTransfer(out, locked, dCanDrain, dActDrain);
+
+        // 5. DISPERSE — hydrodynamic dispersion. Two free parcels two grades apart meet in the
+        //    middle. Exactly conservative in solute, and it stops a column of rich brew running
+        //    beside a column of fresh water without the two ever mixing.
+        let lo = -1, hi = -1;
+        for (let i = 0; i < 3; i++) {
+            if (!dLiquid(out[i])) continue;
+            if (lo === -1 || out[i] < out[lo]) lo = i;
+            if (hi === -1 || out[i] > out[hi]) hi = i;
+        }
+        if (lo !== -1 && hi !== lo && out[hi] - out[lo] >= 2) { out[lo]++; out[hi]--; }
+
+        // 6. FALL — gravity. Declining is not enough here, because a lone parcel in open air can
+        //    only ever take the L bond and there is no mirror case to balance it against; that is
+        //    the six-state model's 50-degree leftward drift. So a half bond is offered only when the
+        //    far end of the vertical bond is SOLID — right when slot 2 is a ground, left when slot 0
+        //    is. Mirror-image conditions, and in open air neither is offered, so the fall is exactly
+        //    vertical. Measured at zero columns of drift from every starting parity.
+        const f0 = dFree(out[0]), f1 = dFree(out[1]), f2 = dFree(out[2]);
+        const swap = (i, j) => { const t = out[i]; out[i] = out[j]; out[j] = t; };
+        if (f0 && f2) { if (out[0] > out[2]) swap(0, 2); }
+        else if (!f2 && f0 && f1) { if (out[0] > out[1]) swap(0, 1); }
+        else if (!f0 && f1 && f2) { if (out[1] > out[2]) swap(1, 2); }
+
+        return out;
+    });
+}
+
+/**
+ * All three conservation laws, checked exhaustively over every one of the 16³ = 4096 table entries
+ * before a tick runs. Grounds, liquid units and dissolved solute each have to come out exactly as
+ * they went in; only the pour and the drip may change them.
+ */
+function dualConservation(rule) {
+    const totals = [dGrounds, dLiquidUnits, dSolute];
+    for (let i = 0; i < D_K ** 3; i++) {
+        const inB = [Math.floor(i / 256), Math.floor(i / 16) % 16, i % 16];
+        const p = rule[i];
+        const outB = [Math.floor(p / 256), Math.floor(p / 16) % 16, p % 16];
+        for (const f of totals) {
+            const a = inB.reduce((n, s) => n + f(s), 0);
+            const c = outB.reduce((n, s) => n + f(s), 0);
+            if (a !== c) return false;
+        }
+        // A cell must never change phase: grains do not move and liquid does not become solid.
+        for (let v = 0; v < 3; v++) if (dGround(inB[v]) !== dGround(outB[v])) return false;
+    }
+    return true;
+}
+
+const lab2 = document.getElementById('lab2');
+const d = {
+    pour: document.getElementById('d-pour'),
+    flow: document.getElementById('d-flow'),
+    water: document.getElementById('d-water'),
+    grind: document.getElementById('d-grind'),
+    pack: document.getElementById('d-pack'),
+    depth: document.getElementById('d-depth'),
+    uneven: document.getElementById('d-uneven'),
+    wick: document.getElementById('d-wick'),
+    size: document.getElementById('d-size'),
+    speed: document.getElementById('d-speed'),
+    run: document.getElementById('d-run'),
+    brew: document.getElementById('d-brew'),
+};
+
+const dBrew = {
+    tick: 0, poured: 0, budget: 0, cupLiquid: 0, cupSolute: 0,
+    grounds: 0, solute0: 0, running: true, best: 0,
+    finished: false, choked: false, quiet: 0, everWet: null,
+};
+
+/** Lay a fresh puck. Same seed every time, so a parameter change is the only difference. */
+function packPuck2() {
+    const rows = lab2.rows, cols = lab2.columns;
+    const random = mulberry32(0xC0FFEE);
+    const cells = new Uint8Array(rows * cols);
+    const density = Number(d.pack.value) / 100;
+    const bedTop = Math.floor(rows * (1 - Number(d.depth.value) / 100));
+    const loose = d.uneven.checked;
+    const looseAt = Math.floor(cols * 0.34);
+    const looseWidth = Math.max(3, Math.floor(cols * 0.09));
+
+    for (let row = bedTop; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            let p = density;
+            if (loose) {
+                const dist = Math.abs(col - looseAt);
+                if (dist < looseWidth) p = density * (0.30 + 0.70 * (dist / looseWidth));
+            }
+            if (random() < p) cells[row * cols + col] = D_DRY[2];   // virgin grain, full charge
+        }
+    }
+    return cells;
+}
+
+function injectionColumns2() {
+    const cols = lab2.columns;
+    const flow = Number(d.flow.value);
+    const mode = d.pour.value;
+    const out = [];
+    if (mode === 'dump') {
+        const remaining = dBrew.budget - dBrew.poured;
+        for (let i = 0; i < Math.min(remaining, cols); i++) out.push(i);
+        return out;
+    }
+    if (mode === 'centre') {
+        const half = Math.max(1, Math.floor(cols * 0.04));
+        for (let i = 0; i < flow; i++) {
+            out.push(Math.floor(cols / 2) - half + ((i * 2 + dBrew.tick) % (half * 2 || 1)));
+        }
+        return out;
+    }
+    let rate = flow;
+    if (mode === 'pulse') {
+        const bloom = 40, rest = 60;
+        if (dBrew.tick < bloom) rate = Math.max(1, Math.round(flow * 0.35));
+        else if (dBrew.tick < bloom + rest) rate = 0;
+    }
+    for (let i = 0; i < rate; i++) {
+        out.push(Math.floor(((i + (dBrew.tick * 0.37)) % rate) * (cols / Math.max(1, rate))) % cols);
+    }
+    return out;
+}
+
+/** Pour at the top, drip out of the bottom, and remember which grains have ever held liquid. */
+function boundaryStep2() {
+    const world = lab2.world;
+    if (!world) return;
+    const cols = world.columns, rows = world.rows;
+    const state = world.state;
+
+    let accepted = 0;
+    if (dBrew.poured < dBrew.budget) {
+        for (const col of injectionColumns2()) {
+            if (dBrew.poured >= dBrew.budget) break;
+            const index = col % cols;
+            if (state[index] === D_AIR) { world.setCell(index, D_LIQ[0]); dBrew.poured++; accepted++; }
+        }
+    }
+
+    // "Never wetted" is tracked rather than inferred: a grain that was wetted and then drained is
+    // indistinguishable from one that was never touched, so reading it off the final census would
+    // badly overstate how much of the bed the water missed.
+    const everWet = dBrew.everWet;
+    for (let i = 0; i < state.length; i++) if (state[i] >= 7) everWet[i] = 1;
+
+    const base = (rows - 1) * cols;
+    let dripped = 0;
+    for (let col = 0; col < cols; col++) {
+        const v = state[base + col];
+        if (dLiquid(v)) {
+            dBrew.cupLiquid++;
+            dBrew.cupSolute += dConc(v);
+            world.setCell(base + col, D_AIR);
+            dripped++;
+        }
+    }
+
+    // The finish test cannot be `isSettled` here. Wicking keeps handing liquid between grains long
+    // after the cup has stopped filling, so a bed at rest is not a fixed point of the rule. What
+    // ends a brew is the drip stopping, which is also what ends a real one.
+    if (dripped === 0 && accepted === 0) dBrew.quiet++; else dBrew.quiet = 0;
+}
+
+function renderDual() {
+    const world = lab2.world;
+    if (!world) return;
+    const c = world.census();
+
+    let grounds = 0, chargeLeft = 0, bound = 0, free = 0, untouchedNow = 0;
+    const freeByGrade = [0, 0, 0];
+    for (let s = 0; s < D_K; s++) {
+        const n = c[s];
+        if (!n) continue;
+        if (dLiquid(s)) { free += n; freeByGrade[dConc(s)] += n; }
+        if (dGround(s)) {
+            grounds += n;
+            chargeLeft += n * dCharge(s);
+            if (dCharge(s) === 2) untouchedNow += n;
+        }
+        if (dWet(s)) bound += n;
+    }
+    const solute0 = dBrew.solute0 || grounds * 2;
+    const extracted = solute0 ? (solute0 - chargeLeft) / solute0 : 0;
+    if (extracted > dBrew.best) dBrew.best = extracted;
+
+    let neverWet = 0;
+    const state = world.state, everWet = dBrew.everWet;
+    for (let i = 0; i < state.length; i++) if (dGround(state[i]) && !everWet[i]) neverWet++;
+
+    const cup = dBrew.cupLiquid;
+    const retained = dBrew.poured ? (free + bound) / dBrew.poured : 0;
+    const strength = cup ? dBrew.cupSolute / (cup * 2) : 0;
+
+    document.getElementById('d-yield').textContent = pct(extracted);
+    document.getElementById('d-best').textContent = dBrew.best ? pct(dBrew.best) : '—';
+    document.getElementById('d-tick').textContent = dBrew.tick.toLocaleString();
+    document.getElementById('d-poured').textContent = dBrew.poured.toLocaleString();
+    document.getElementById('d-free').textContent = free.toLocaleString();
+    document.getElementById('d-bound').textContent = bound.toLocaleString();
+    document.getElementById('d-cup').textContent = cup.toLocaleString();
+
+    const pouring = dBrew.poured < dBrew.budget;
+    const phase = document.getElementById('d-phase');
+    phase.textContent = dBrew.choked ? 'choked' : dBrew.finished ? 'finished' : pouring ? 'pouring' : 'draining';
+    phase.style.color = dBrew.choked ? 'var(--bad)' : 'var(--accent)';
+
+    const sw = (col) => `<span class="swatch" style="background:${col}"></span>`;
+    document.getElementById('d-bed').innerHTML =
+        `<tr><th>${sw('#3aa0ff')}fresh water</th><td>${freeByGrade[0].toLocaleString()}</td></tr>`
+        + `<tr><th>${sw('#b0763c')}lean brew</th><td>${freeByGrade[1].toLocaleString()}</td></tr>`
+        + `<tr><th>${sw('#6d3f1b')}rich brew</th><td>${freeByGrade[2].toLocaleString()}</td></tr>`
+        + `<tr class="sep"><th>held inside grains</th><td>${bound.toLocaleString()}</td></tr>`
+        + `<tr><th>retained <span style="opacity:.7">of poured</span></th><td>${dBrew.poured ? pct(retained) : '—'}</td></tr>`
+        + `<tr class="sep"><th>grains untouched now</th><td>${grounds ? pct(untouchedNow / grounds) : '—'}</td></tr>`
+        + `<tr><th>grains never wetted</th><td>${grounds ? pct(neverWet / grounds) : '—'}</td></tr>`;
+
+    document.getElementById('d-cuptable').innerHTML =
+        `<tr class="sep"><th>in the cup</th><td>${cup.toLocaleString()}</td></tr>`
+        + `<tr><th>cup strength</th><td>${cup ? pct(strength) : '—'}</td></tr>`
+        + `<tr><td colspan="2"><span class="meter ${strength > 0.5 ? 'good' : 'bad'}">`
+        + `<span style="width:${(strength * 100).toFixed(1)}%"></span></span></td></tr>`;
+
+    const activity = world.chunkActivity;
+    document.getElementById('d-diag').innerHTML =
+        `<b>${world.rows}×${world.columns}</b> = ${(world.rows * world.columns).toLocaleString()} cells`
+        + ` · table <b>4,096</b> entries`
+        + ` · chunks active <b>${activity.active}/${activity.total}</b>`;
+
+    // Grounds and solute cannot cross the boundary at all, so they must match their starting values
+    // to the unit, forever. Liquid can, so it is checked against the pour and the drip.
+    const liquidBalance = free + bound + cup - dBrew.poured;
+    const groundBalance = grounds - dBrew.grounds;
+    const okBooks = liquidBalance === 0 && groundBalance === 0;
+    document.getElementById('d-conserve').innerHTML = okBooks
+        ? `<b style="color:var(--good)">books balance</b> — free + held + cup = poured, to the cell, `
+          + `and ${grounds.toLocaleString()} grains unchanged`
+        : `<b style="color:var(--bad)">imbalance</b> — liquid ${signed(liquidBalance)}, grounds ${signed(groundBalance)}`;
+
+    document.getElementById('d-stagefoot').innerHTML = dBrew.choked
+        ? '<b style="color:var(--bad)">The puck choked.</b> Even with grains conducting, there is a '
+          + 'packing above which the bed cannot take water as fast as you pour it.'
+        : !dBrew.finished
+        ? 'Water goes <em>into</em> the grains, dissolves solubles from the inside on its own clock, '
+          + 'and drains back out below. Turn wicking off to see how much of the bed that reaches.'
+        : `<b style="color:var(--good)">Brew finished.</b> `
+          + `${bound.toLocaleString()} cells of liquid are still held inside grains and `
+          + `${free.toLocaleString()} sit in the pores — ${pct(retained)} of the pour. A real bed `
+          + `holds about 2 mL per gram of coffee, roughly 12% of a pour-over.`;
+}
+
+function stepDual() {
+    if (!lab2.world) return;
+    if (dBrew.finished || dBrew.choked) return;
+
+    const steps = Number(d.speed.value);
+    for (let i = 0; i < steps; i++) {
+        boundaryStep2();
+        lab2.world.tick(1);
+        dBrew.tick++;
+    }
+    lab2.tick(0);
+
+    if (dBrew.quiet > 240) {
+        if (dBrew.poured < dBrew.budget) dBrew.choked = true; else dBrew.finished = true;
+    }
+    renderDual();
+}
+
+/** Rebuild and install the rule. Cheap — 4096 entries — so grind and wicking can be live controls. */
+function installDualRule() {
+    if (!lab2.world) return;
+    const rule = buildDualRule(Number(d.grind.value), d.wick.checked);
+    lab2.setRule(rule);
+    // Chunk skipping decides what to recompute from what changed, so a rule swapped underneath a
+    // quiet region would not be applied there until something else woke it.
+    lab2.world.markAllDirty();
+}
+
+function startBrew2() {
+    if (!lab2.world) return;
+    installDualRule();
+    lab2.setCells(packPuck2());
+    const c = lab2.world.census();
+    let grounds = 0;
+    for (let s = 4; s < D_K; s++) grounds += c[s];
+    dBrew.tick = 0;
+    dBrew.poured = 0;
+    dBrew.cupLiquid = 0;
+    dBrew.cupSolute = 0;
+    dBrew.grounds = grounds;
+    dBrew.solute0 = grounds * 2;
+    dBrew.budget = Math.round(lab2.rows * lab2.columns * (Number(d.water.value) / 100));
+    dBrew.finished = false;
+    dBrew.choked = false;
+    dBrew.quiet = 0;
+    dBrew.everWet = new Uint8Array(lab2.rows * lab2.columns);
+    lab2.tick(0);
+    renderDual();
+}
+
+lab2.addEventListener('hexlife-ca-ready', () => startBrew2());
+
+const bindD = (input, out, fmt, restart) => {
+    const sync = () => { if (out) document.getElementById(out).textContent = fmt(input.value); };
+    input.addEventListener('input', () => { sync(); if (restart) startBrew2(); });
+    sync();
+};
+bindD(d.flow, 'd-flow-v', (v) => v, false);
+bindD(d.water, 'd-water-v', (v) => `${v}%`, true);
+bindD(d.pack, 'd-pack-v', (v) => (v / 100).toFixed(2), true);
+bindD(d.depth, 'd-depth-v', (v) => `${v}%`, true);
+bindD(d.speed, 'd-speed-v', (v) => v, false);
+d.uneven.addEventListener('change', startBrew2);
+d.pour.addEventListener('change', startBrew2);
+d.brew.addEventListener('click', startBrew2);
+// Grind and wicking only change the rule, so they apply live to the brew in progress.
+d.grind.addEventListener('change', installDualRule);
+d.wick.addEventListener('change', installDualRule);
+d.size.addEventListener('change', () => lab2.setAttribute('rows', d.size.value));
+d.run.addEventListener('click', () => {
+    dBrew.running = !dBrew.running;
+    d.run.textContent = dBrew.running ? 'Pause' : 'Run';
 });
 
 // ===========================================================================
@@ -956,27 +1674,32 @@ const boot = document.getElementById('boot');
 
 (async () => {
     try {
-        await Promise.all([whenReady(lab), whenReady(cmp.block), whenReady(cmp.nbhd)]);
+        await Promise.all([whenReady(lab), whenReady(lab2), whenReady(cmp.block), whenReady(cmp.nbhd)]);
     } catch (e) {
         boot.textContent = `failed: ${e.message}`;
         boot.classList.add('failed');
         return;
     }
 
-    const ok = preservesBothFamilies(extractionRule);
-    boot.textContent = ok
-        ? 'extraction rule checked over all 216 entries: fluid and grounds are each conserved exactly'
-        : 'extraction rule FAILED its own conservation check';
-    boot.classList.toggle('failed', !ok);
+    const sixOk = preservesBothFamilies(extractionRule);
+    const dualOk = dualConservation(buildDualRule(Number(d.grind.value), d.wick.checked));
+    boot.innerHTML = `six-state rule over all 216 entries: fluid and grounds conserved `
+        + `<b>${sixOk}</b> · sixteen-state rule over all 4,096 entries: grounds, liquid and solute `
+        + `conserved <b>${dualOk}</b>`;
+    boot.classList.toggle('failed', !(sixOk && dualOk));
 
     startBrew();
+    startBrew2();
+    selectTab('six');
     rafId = requestAnimationFrame(frame);
 
     cmp.block.setRule(cmpBlockRule);
     cmp.nbhd.setRule(cmpNbhdRule);
     seedComparison();
     refreshComparison();
-    setInterval(refreshComparison, 200);
+    // Only while its tab is open: these two elements pause themselves off screen, so polling a
+    // census that cannot have changed just burns main-thread time on the other two tabs.
+    setInterval(() => { if (activeTab === 'backend') refreshComparison(); }, 200);
 })();
 </script>
 </body>
