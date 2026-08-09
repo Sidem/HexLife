@@ -23,22 +23,6 @@ import { buildHexMirror } from "./coffee-percolation-physics.js";
 const PACKAGE_VERSION = "1.7.1";
 const NEIGHBOR_LABELS = ["SW", "NW", "N", "NE", "SE", "S"];
 const BLOCK_LABELS = ["top", "down-right", "below"];
-const SLOT_POSITIONS = Object.freeze({
-  neighborhood: Object.freeze({
-    centre: [50, 50],
-    SW: [20, 69],
-    NW: [20, 31],
-    N: [50, 13],
-    NE: [80, 31],
-    SE: [80, 69],
-    S: [50, 87],
-  }),
-  block: Object.freeze({
-    top: [35, 18],
-    "down-right": [67, 50],
-    below: [35, 82],
-  }),
-});
 
 const byId = (id) => document.getElementById(id);
 const ui = {
@@ -99,6 +83,9 @@ let quietTicks = 0;
 let mirrorMap = null;
 let mirrorScratch = null;
 let workbenchEnabled = false;
+let statePicker = null;
+let activePickerSelect = null;
+let activePickerCell = null;
 const overrides = new Map();
 
 for (const preset of CA_PRESETS) {
@@ -134,10 +121,11 @@ function setWorkbenchEnabled(enabled) {
     control.disabled = !enabled;
   }
   for (const control of document.querySelectorAll(
-    ".transition-diagram select",
+    ".transition-diagram select, .transition-diagram button",
   )) {
     control.disabled = !enabled;
   }
+  if (!enabled) closeStatePicker(false);
   ui.undoTransition.disabled = !enabled || overrides.size === 0;
   updateTransitionEditState();
 }
@@ -214,25 +202,27 @@ function stateInk(colour) {
     : "#f7fafc";
 }
 
-function placeRuleCell(cell, backend, slot) {
-  const [left, top] = SLOT_POSITIONS[backend][slot];
-  cell.style.left = `${left}%`;
-  cell.style.top = `${top}%`;
+function placeRuleCell(cell, slot) {
   cell.dataset.slot = slot;
 }
 
-function addCellVisual(cell, label) {
+function addCellVisual(cell, label, interactive = false) {
   const location = document.createElement("span");
   location.className = "rule-cell-location";
   location.textContent = label;
-  const hex = document.createElement("span");
+  const hex = document.createElement(interactive ? "button" : "span");
   hex.className = "rule-hex";
+  if (interactive) {
+    hex.type = "button";
+    hex.setAttribute("aria-haspopup", "dialog");
+  }
   const value = document.createElement("strong");
   value.className = "rule-hex-value";
   const name = document.createElement("span");
   name.className = "rule-hex-name";
   hex.append(value, name);
   cell.append(location, hex);
+  return hex;
 }
 
 function updateCellVisual(cell, state) {
@@ -240,6 +230,133 @@ function updateCellVisual(cell, state) {
   cell.style.setProperty("--cell-ink", stateInk(palette[state]));
   cell.querySelector(".rule-hex-value").textContent = String(state);
   cell.querySelector(".rule-hex-name").textContent = stateNames[state];
+  if (!cell.classList.contains("is-ghost")) {
+    cell.title = `${cell.dataset.slot}: ${stateNames[state]}. Click to change.`;
+    const button = cell.querySelector("button.rule-hex");
+    button?.setAttribute(
+      "aria-label",
+      `${cell.dataset.slot}: ${stateNames[state]}. Change state`,
+    );
+  }
+}
+
+function closeStatePicker(restoreFocus = true) {
+  if (!statePicker || statePicker.hidden) return;
+  const button = activePickerCell?.querySelector("button.rule-hex");
+  activePickerCell?.classList.remove("is-picker-open");
+  statePicker.hidden = true;
+  activePickerSelect = null;
+  activePickerCell = null;
+  if (restoreFocus) button?.focus();
+}
+
+function positionStatePicker() {
+  if (!statePicker || statePicker.hidden || !activePickerCell) return;
+  if (window.innerWidth <= 760) {
+    statePicker.style.removeProperty("left");
+    statePicker.style.removeProperty("top");
+    statePicker.style.removeProperty("width");
+    return;
+  }
+  const anchor = activePickerCell.getBoundingClientRect();
+  const width = Math.min(360, window.innerWidth - 24);
+  statePicker.style.width = `${width}px`;
+  const height = statePicker.offsetHeight;
+  const left = Math.min(
+    window.innerWidth - width - 12,
+    Math.max(12, anchor.left + anchor.width / 2 - width / 2),
+  );
+  let top = anchor.bottom + 10;
+  if (top + height > window.innerHeight - 12) {
+    top = Math.max(12, anchor.top - height - 10);
+  }
+  statePicker.style.left = `${left}px`;
+  statePicker.style.top = `${top}px`;
+}
+
+function ensureStatePicker() {
+  if (statePicker) return statePicker;
+  statePicker = document.createElement("div");
+  statePicker.id = "state-picker";
+  statePicker.className = "state-picker";
+  statePicker.hidden = true;
+  statePicker.setAttribute("role", "dialog");
+  statePicker.setAttribute("aria-modal", "false");
+  document.body.append(statePicker);
+  document.addEventListener("pointerdown", (event) => {
+    if (
+      statePicker.hidden ||
+      statePicker.contains(event.target) ||
+      activePickerCell?.contains(event.target)
+    )
+      return;
+    closeStatePicker(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !statePicker.hidden) {
+      event.preventDefault();
+      closeStatePicker();
+    }
+  });
+  window.addEventListener("resize", positionStatePicker);
+  window.addEventListener("scroll", positionStatePicker, true);
+  return statePicker;
+}
+
+function openStatePicker(select, cell) {
+  if (!workbenchEnabled || select.disabled) return;
+  closeStatePicker(false);
+  const picker = ensureStatePicker();
+  activePickerSelect = select;
+  activePickerCell = cell;
+  cell.classList.add("is-picker-open");
+  picker.replaceChildren();
+
+  const heading = document.createElement("div");
+  heading.className = "state-picker-heading";
+  const headingCopy = document.createElement("div");
+  const eyebrow = document.createElement("span");
+  eyebrow.textContent = "Choose a state";
+  const title = document.createElement("strong");
+  title.id = "state-picker-title";
+  title.textContent = `${cell.dataset.slot} cell`;
+  headingCopy.append(eyebrow, title);
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "state-picker-close";
+  close.setAttribute("aria-label", "Close state picker");
+  close.textContent = "×";
+  close.addEventListener("click", () => closeStatePicker());
+  heading.append(headingCopy, close);
+
+  const options = document.createElement("div");
+  options.className = "state-picker-options";
+  options.setAttribute("aria-labelledby", title.id);
+  stateNames.forEach((name, state) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "state-picker-option";
+    option.classList.toggle("is-selected", Number(select.value) === state);
+    option.style.setProperty("--option-colour", palette[state]);
+    option.setAttribute("aria-pressed", String(Number(select.value) === state));
+    const swatch = document.createElement("span");
+    swatch.className = "state-picker-swatch";
+    const number = document.createElement("strong");
+    number.textContent = String(state);
+    const label = document.createElement("span");
+    label.textContent = name;
+    option.append(swatch, number, label);
+    option.addEventListener("click", () => {
+      activePickerSelect.value = String(state);
+      activePickerSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      closeStatePicker();
+    });
+    options.append(option);
+  });
+  picker.append(heading, options);
+  picker.hidden = false;
+  positionStatePicker();
+  options.querySelector(".is-selected")?.focus();
 }
 
 function refreshStateOptions() {
@@ -305,28 +422,31 @@ function materializeRule(config) {
     : ruleFromTable(config.states, transition);
 }
 
-function selectFor(label, states, backend, output = false) {
-  const wrapper = document.createElement("label");
+function selectFor(label, states, output = false) {
+  const wrapper = document.createElement("div");
   wrapper.className = "rule-cell";
-  placeRuleCell(wrapper, backend, label);
-  addCellVisual(wrapper, label);
+  placeRuleCell(wrapper, label);
+  const hex = addCellVisual(wrapper, label, true);
   const select = document.createElement("select");
   select.setAttribute(
     "aria-label",
     `${output ? "Next" : "Current"} state at ${label}`,
   );
+  select.tabIndex = -1;
+  select.setAttribute("aria-hidden", "true");
   for (let state = 0; state < states; state++)
     select.append(stateOption(state));
   wrapper.append(select);
+  hex.addEventListener("click", () => openStatePicker(select, wrapper));
   updateCellVisual(wrapper, 0);
   return { wrapper, select };
 }
 
-function ghostCell(label, backend, sourceIndex) {
+function ghostCell(label, sourceIndex) {
   const cell = document.createElement("div");
   cell.className = "rule-cell is-ghost";
   cell.dataset.sourceIndex = String(sourceIndex);
-  placeRuleCell(cell, backend, label);
+  placeRuleCell(cell, label);
   addCellVisual(cell, label);
   updateCellVisual(cell, 0);
   cell.setAttribute("aria-hidden", "true");
@@ -503,29 +623,29 @@ function renderTransitionEditor() {
   const outputLabels = config.backend === "block" ? BLOCK_LABELS : ["centre"];
   ui.ruleHelp.textContent =
     config.backend === "block"
-      ? "A block rule replaces all three cells together. Their screen positions below are their real relative positions in the triangular partition."
-      : "A neighborhood rule reads the centre and its six equidistant hex neighbours, then writes one new state into the centre.";
+      ? "The rule reads one three-cell tile and replaces all three cells together. Position is meaning: the left pair share a column; the third cell sits down-right."
+      : "The rule reads the centre and its six touching hex neighbours, then writes one new state into the centre.";
   ui.inputCaption.textContent =
     config.backend === "block"
-      ? "Pick the three states the engine sees together."
-      : "Pick the centre and every surrounding neighbour.";
+      ? "Tap a hex to set the state the engine sees."
+      : "Tap any hex to set the neighbourhood.";
   ui.outputCaption.textContent =
     config.backend === "block"
-      ? "All three cells are rewritten in the same positions."
-      : "Only the centre is written; faded cells are context.";
+      ? "Tap a hex to choose what appears in that same place."
+      : "Tap the solid centre to choose its next state.";
   for (const label of inputLabels) {
-    const field = selectFor(label, config.states, config.backend);
+    const field = selectFor(label, config.states);
     field.select.addEventListener("change", readTransition);
     inputSelects.push(field.select);
     ui.inputs.append(field.wrapper);
   }
   if (config.backend === "neighborhood") {
     NEIGHBOR_LABELS.forEach((label, index) =>
-      ui.outputs.append(ghostCell(label, config.backend, index + 1)),
+      ui.outputs.append(ghostCell(label, index + 1)),
     );
   }
   for (const label of outputLabels) {
-    const field = selectFor(label, config.states, config.backend, true);
+    const field = selectFor(label, config.states, true);
     field.wrapper.classList.add("is-focus");
     field.select.addEventListener("change", refreshTransitionVisuals);
     outputSelects.push(field.select);

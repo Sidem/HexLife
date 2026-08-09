@@ -179,14 +179,25 @@ describe("k-state CA builder package boundary", () => {
     expect(html).toContain('id="next-cells-title">Next cells');
     expect(html).toContain('id="transition-summary"');
     expect(html).toContain('id="transition-edit-status"');
-    expect(script).toContain("const SLOT_POSITIONS");
-    expect(script).toContain("centre: [50, 50]");
-    expect(script).toContain("N: [50, 13]");
-    expect(script).toContain('"down-right": [67, 50]');
     expect(script).toContain('cell.className = "rule-cell is-ghost"');
     expect(script).toContain('classList.toggle(\n        "is-changed"');
+    expect(script).toContain("Tap a hex to set the state the engine sees.");
+    expect(script).toContain("function openStatePicker(select, cell)");
+    expect(script).toContain(
+      'document.createElement(interactive ? "button" : "span")',
+    );
     expect(styles).toContain('.transition-diagram[data-backend="block"]');
+    expect(styles).toContain('.rule-cell[data-slot="down-right"]');
+    expect(styles).toContain('.rule-cell[data-slot="NW"]');
+    expect(styles).toMatch(/\.rule-cell select \{[\s\S]*?opacity: 0;/);
     expect(styles).toContain(".rule-cell.is-changed");
+    expect(styles).toContain(".state-picker[hidden]");
+    expect(styles).toContain(".state-picker-option.is-selected");
+  });
+
+  it("cache-busts the public builder assets as one compatible UI bundle", () => {
+    expect(html).toContain("./ca-builder.css?v=20260809-hex-ui");
+    expect(html).toContain("./ca-builder.js?v=20260809-hex-ui");
   });
 
   it("keeps the builder and full coffee labs on the same transition functions", () => {
