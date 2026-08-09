@@ -151,42 +151,98 @@
         </section>
 
         <aside class="panel rule-panel">
-          <div class="section-head">
-            <h2>Transition editor</h2>
-            <button class="quiet" id="undo-transition" disabled>
-              Undo edits
-            </button>
-          </div>
-          <p id="rule-help" class="hint"></p>
-          <div id="transition-inputs" class="transition-grid"></div>
-          <div class="arrow" aria-hidden="true">↓</div>
-          <div id="transition-outputs" class="transition-grid"></div>
-          <button class="primary" id="apply-transition">
-            Write this table entry
-          </button>
-          <p id="transition-index" class="micro"></p>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">One lookup-table entry</p>
+                <h2>See and edit a transition</h2>
+              </div>
+              <button class="quiet" id="undo-transition" disabled>
+                Undo edits
+              </button>
+            </div>
+            <p id="rule-help" class="hint"></p>
 
-          <h3>Physics checks</h3>
-          <dl class="checks">
-            <div>
-              <dt>Preset invariant</dt>
-              <dd id="invariant">—</dd>
+            <div class="transition-workbench">
+              <section
+                class="transition-stage"
+                aria-labelledby="current-cells-title"
+              >
+                <div class="stage-heading">
+                  <span class="stage-number" aria-hidden="true">1</span>
+                  <div>
+                    <h3 id="current-cells-title">Current cells</h3>
+                    <p id="input-caption">Choose a state for every location.</p>
+                  </div>
+                </div>
+                <div
+                  id="transition-inputs"
+                  class="transition-diagram"
+                  aria-label="Current cell states"
+                ></div>
+              </section>
+
+              <div class="transition-flow" aria-hidden="true">
+                <span>after one tick</span>
+                <strong>→</strong>
+              </div>
+
+              <section
+                class="transition-stage next-stage"
+                aria-labelledby="next-cells-title"
+              >
+                <div class="stage-heading">
+                  <span class="stage-number" aria-hidden="true">2</span>
+                  <div>
+                    <h3 id="next-cells-title">Next cells</h3>
+                    <p id="output-caption">Choose what the rule writes.</p>
+                  </div>
+                </div>
+                <div
+                  id="transition-outputs"
+                  class="transition-diagram"
+                  aria-label="Next cell states"
+                ></div>
+              </section>
             </div>
-            <div>
-              <dt>Strict census conservation</dt>
-              <dd id="conservative">—</dd>
+
+            <div
+              id="transition-summary"
+              class="transition-summary"
+              aria-live="polite"
+            ></div>
+            <div class="transition-actions">
+              <div>
+                <span id="transition-edit-status" class="edit-status"
+                  >Saved rule</span
+                >
+                <p id="transition-index" class="micro"></p>
+              </div>
+              <button class="primary" id="apply-transition">
+                Save this transition
+              </button>
             </div>
-            <div>
-              <dt>Rotational isotropy</dt>
-              <dd id="isotropic">—</dd>
-            </div>
-          </dl>
-          <p class="hint">
-            These are reported, never enforced. Gravity should break isotropy;
-            reactions can change individual states while preserving physical
-            families.
-          </p>
-        </aside>
+
+            <h3 class="checks-title">Whole-rule physics checks</h3>
+            <dl class="checks">
+              <div>
+                <dt>Preset invariant</dt>
+                <dd id="invariant">—</dd>
+              </div>
+              <div>
+                <dt>Strict census conservation</dt>
+                <dd id="conservative">—</dd>
+              </div>
+              <div>
+                <dt>Rotational isotropy</dt>
+                <dd id="isotropic">—</dd>
+              </div>
+            </dl>
+            <p class="hint">
+              These are reported, never enforced. Gravity should break isotropy;
+              reactions can change individual states while preserving physical
+              families.
+            </p>
+          </aside>
       </div>
 
       <section class="panel export-panel">

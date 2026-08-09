@@ -133,6 +133,10 @@ describe("k-state CA builder package boundary", () => {
     new URL("../public/ca-builder.js", import.meta.url),
     "utf8",
   );
+  const styles = readFileSync(
+    new URL("../public/ca-builder.css", import.meta.url),
+    "utf8",
+  );
   const coffee = readFileSync(
     new URL("../public/coffee-percolation.html", import.meta.url),
     "utf8",
@@ -168,6 +172,21 @@ describe("k-state CA builder package boundary", () => {
       'import { buildHexMirror } from "./coffee-percolation-physics.js"',
     );
     expect(script).toContain("function reflectWorld()");
+  });
+
+  it("renders transitions as spatial before-and-after cell diagrams", () => {
+    expect(html).toContain('id="current-cells-title">Current cells');
+    expect(html).toContain('id="next-cells-title">Next cells');
+    expect(html).toContain('id="transition-summary"');
+    expect(html).toContain('id="transition-edit-status"');
+    expect(script).toContain("const SLOT_POSITIONS");
+    expect(script).toContain("centre: [50, 50]");
+    expect(script).toContain("N: [50, 13]");
+    expect(script).toContain('"down-right": [67, 50]');
+    expect(script).toContain('cell.className = "rule-cell is-ghost"');
+    expect(script).toContain('classList.toggle(\n        "is-changed"');
+    expect(styles).toContain('.transition-diagram[data-backend="block"]');
+    expect(styles).toContain(".rule-cell.is-changed");
   });
 
   it("keeps the builder and full coffee labs on the same transition functions", () => {

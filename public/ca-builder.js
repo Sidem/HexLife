@@ -23,6 +23,22 @@ import { buildHexMirror } from "./coffee-percolation-physics.js";
 const PACKAGE_VERSION = "1.7.1";
 const NEIGHBOR_LABELS = ["SW", "NW", "N", "NE", "SE", "S"];
 const BLOCK_LABELS = ["top", "down-right", "below"];
+const SLOT_POSITIONS = Object.freeze({
+  neighborhood: Object.freeze({
+    centre: [50, 50],
+    SW: [20, 69],
+    NW: [20, 31],
+    N: [50, 13],
+    NE: [80, 31],
+    SE: [80, 69],
+    S: [50, 87],
+  }),
+  block: Object.freeze({
+    top: [35, 18],
+    "down-right": [67, 50],
+    below: [35, 82],
+  }),
+});
 
 const byId = (id) => document.getElementById(id);
 const ui = {
@@ -48,10 +64,14 @@ const ui = {
   ruleSize: byId("rule-size"),
   census: byId("census"),
   ruleHelp: byId("rule-help"),
+  inputCaption: byId("input-caption"),
+  outputCaption: byId("output-caption"),
   inputs: byId("transition-inputs"),
   outputs: byId("transition-outputs"),
   applyTransition: byId("apply-transition"),
   undoTransition: byId("undo-transition"),
+  transitionSummary: byId("transition-summary"),
+  transitionEditStatus: byId("transition-edit-status"),
   transitionIndex: byId("transition-index"),
   invariant: byId("invariant"),
   conservative: byId("conservative"),
@@ -78,6 +98,7 @@ let modelTickParity = 0;
 let quietTicks = 0;
 let mirrorMap = null;
 let mirrorScratch = null;
+let workbenchEnabled = false;
 const overrides = new Map();
 
 for (const preset of CA_PRESETS) {
@@ -95,6 +116,7 @@ function toast(message) {
 }
 
 function setWorkbenchEnabled(enabled) {
+  workbenchEnabled = enabled;
   for (const control of [
     ui.applyTransition,
     ui.play,
@@ -112,11 +134,12 @@ function setWorkbenchEnabled(enabled) {
     control.disabled = !enabled;
   }
   for (const control of document.querySelectorAll(
-    "#transition-inputs select, #transition-outputs select",
+    ".transition-diagram select",
   )) {
     control.disabled = !enabled;
   }
   ui.undoTransition.disabled = !enabled || overrides.size === 0;
+  updateTransitionEditState();
 }
 
 function markConfigurationDirty() {
@@ -182,6 +205,55 @@ function stateOption(state) {
   return option;
 }
 
+function stateInk(colour) {
+  const red = Number.parseInt(colour.slice(1, 3), 16);
+  const green = Number.parseInt(colour.slice(3, 5), 16);
+  const blue = Number.parseInt(colour.slice(5, 7), 16);
+  return red * 0.299 + green * 0.587 + blue * 0.114 > 156
+    ? "#11161c"
+    : "#f7fafc";
+}
+
+function placeRuleCell(cell, backend, slot) {
+  const [left, top] = SLOT_POSITIONS[backend][slot];
+  cell.style.left = `${left}%`;
+  cell.style.top = `${top}%`;
+  cell.dataset.slot = slot;
+}
+
+function addCellVisual(cell, label) {
+  const location = document.createElement("span");
+  location.className = "rule-cell-location";
+  location.textContent = label;
+  const hex = document.createElement("span");
+  hex.className = "rule-hex";
+  const value = document.createElement("strong");
+  value.className = "rule-hex-value";
+  const name = document.createElement("span");
+  name.className = "rule-hex-name";
+  hex.append(value, name);
+  cell.append(location, hex);
+}
+
+function updateCellVisual(cell, state) {
+  cell.style.setProperty("--cell-colour", palette[state]);
+  cell.style.setProperty("--cell-ink", stateInk(palette[state]));
+  cell.querySelector(".rule-hex-value").textContent = String(state);
+  cell.querySelector(".rule-hex-name").textContent = stateNames[state];
+}
+
+function refreshStateOptions() {
+  for (const select of document.querySelectorAll(
+    ".transition-diagram select",
+  )) {
+    for (const option of select.options) {
+      const state = Number(option.value);
+      option.textContent = `${state} · ${stateNames[state]}`;
+    }
+  }
+  refreshTransitionVisuals();
+}
+
 function renderStateEditor() {
   ui.stateEditor.replaceChildren();
   stateNames.forEach((name, state) => {
@@ -202,6 +274,7 @@ function renderStateEditor() {
     colour.addEventListener("input", () => {
       palette[state] = colour.value;
       ui.world.setAttribute("palette", palette.join(","));
+      refreshTransitionVisuals();
       renderCensus();
       renderGeneratedCode();
     });
@@ -211,7 +284,7 @@ function renderStateEditor() {
     label.setAttribute("aria-label", `State ${state} name`);
     label.addEventListener("change", () => {
       stateNames[state] = label.value.trim() || `state ${state}`;
-      renderTransitionEditor();
+      refreshStateOptions();
       renderCensus();
     });
     row.append(draw, colour, label);
@@ -232,14 +305,32 @@ function materializeRule(config) {
     : ruleFromTable(config.states, transition);
 }
 
-function selectFor(label, states) {
+function selectFor(label, states, backend, output = false) {
   const wrapper = document.createElement("label");
-  wrapper.textContent = label;
+  wrapper.className = "rule-cell";
+  placeRuleCell(wrapper, backend, label);
+  addCellVisual(wrapper, label);
   const select = document.createElement("select");
+  select.setAttribute(
+    "aria-label",
+    `${output ? "Next" : "Current"} state at ${label}`,
+  );
   for (let state = 0; state < states; state++)
     select.append(stateOption(state));
   wrapper.append(select);
+  updateCellVisual(wrapper, 0);
   return { wrapper, select };
+}
+
+function ghostCell(label, backend, sourceIndex) {
+  const cell = document.createElement("div");
+  cell.className = "rule-cell is-ghost";
+  cell.dataset.sourceIndex = String(sourceIndex);
+  placeRuleCell(cell, backend, label);
+  addCellVisual(cell, label);
+  updateCellVisual(cell, 0);
+  cell.setAttribute("aria-hidden", "true");
+  return cell;
 }
 
 function transitionIndex() {
@@ -268,8 +359,130 @@ function readTransition() {
   });
   ui.transitionIndex.textContent =
     backend === "block"
-      ? `table[${index}] · ordered triangle, not a square-grid 2×2 block`
-      : `table[${index}] · centre occupies the k⁶ place; neighbour slot j occupies kʲ`;
+      ? `Lookup entry ${index.toLocaleString()} · one ordered three-cell triangle`
+      : `Lookup entry ${index.toLocaleString()} · centre plus six neighbours`;
+  refreshTransitionVisuals();
+}
+
+function refreshTransitionVisuals() {
+  for (const select of [...inputSelects, ...outputSelects]) {
+    const cell = select.closest(".rule-cell");
+    if (cell) updateCellVisual(cell, Number(select.value));
+  }
+  for (const ghost of ui.outputs.querySelectorAll(".is-ghost")) {
+    updateCellVisual(
+      ghost,
+      Number(inputSelects[Number(ghost.dataset.sourceIndex)]?.value || 0),
+    );
+  }
+  const backend = ui.backend.value;
+  outputSelects.forEach((select, index) => {
+    const inputIndex = backend === "block" ? index : 0;
+    select
+      .closest(".rule-cell")
+      ?.classList.toggle(
+        "is-changed",
+        Number(select.value) !== Number(inputSelects[inputIndex]?.value),
+      );
+  });
+  renderTransitionSummary();
+  updateTransitionEditState();
+}
+
+function appendSummaryChange(container, location, before, after = null) {
+  const item = document.createElement("span");
+  item.className = "summary-change";
+  if (after != null && before !== after) item.classList.add("is-changed");
+  const label = document.createElement("span");
+  label.className = "summary-location";
+  label.textContent = location;
+  const beforeSwatch = document.createElement("span");
+  beforeSwatch.className = "summary-swatch";
+  beforeSwatch.style.setProperty("--summary-colour", palette[before]);
+  const beforeName = document.createElement("span");
+  beforeName.textContent = stateNames[before];
+  item.append(label, beforeSwatch, beforeName);
+  if (after != null) {
+    const arrow = document.createElement("span");
+    arrow.className = "summary-arrow";
+    arrow.textContent = "→";
+    const afterSwatch = document.createElement("span");
+    afterSwatch.className = "summary-swatch";
+    afterSwatch.style.setProperty("--summary-colour", palette[after]);
+    const afterName = document.createElement("span");
+    afterName.textContent = stateNames[after];
+    item.append(arrow, afterSwatch, afterName);
+  }
+  container.append(item);
+}
+
+function renderTransitionSummary() {
+  if (!ui.transitionSummary || !inputSelects.length || !outputSelects.length)
+    return;
+  ui.transitionSummary.replaceChildren();
+  const lead = document.createElement("span");
+  lead.className = "summary-lead";
+  lead.textContent = "This entry says";
+  ui.transitionSummary.append(lead);
+  if (ui.backend.value === "block") {
+    BLOCK_LABELS.forEach((label, index) =>
+      appendSummaryChange(
+        ui.transitionSummary,
+        label,
+        Number(inputSelects[index].value),
+        Number(outputSelects[index].value),
+      ),
+    );
+    return;
+  }
+  appendSummaryChange(
+    ui.transitionSummary,
+    "centre",
+    Number(inputSelects[0].value),
+    Number(outputSelects[0].value),
+  );
+  const context = document.createElement("span");
+  context.className = "summary-lead";
+  context.textContent = "when surrounded by";
+  ui.transitionSummary.append(context);
+  NEIGHBOR_LABELS.forEach((label, index) =>
+    appendSummaryChange(
+      ui.transitionSummary,
+      label,
+      Number(inputSelects[index + 1].value),
+    ),
+  );
+}
+
+function pendingTransitionValue() {
+  if (!rule || !outputSelects.length) return null;
+  const config = normalizedConfig();
+  return config.backend === "block"
+    ? packBlock(
+        config.states,
+        outputSelects.map((select) => Number(select.value)),
+      )
+    : Number(outputSelects[0].value);
+}
+
+function updateTransitionEditState() {
+  if (!ui.transitionEditStatus) return;
+  let dirty = false;
+  if (rule && inputSelects.length && outputSelects.length) {
+    try {
+      dirty = pendingTransitionValue() !== rule[transitionIndex()];
+    } catch {
+      dirty = false;
+    }
+  }
+  ui.transitionEditStatus.classList.toggle("is-dirty", dirty);
+  ui.transitionEditStatus.textContent = dirty
+    ? "Unsaved next state"
+    : "Matches the saved rule";
+  ui.applyTransition.disabled = !workbenchEnabled || !dirty;
+  ui.applyTransition.textContent = dirty
+    ? "Save this transition"
+    : "Transition is saved";
 }
 
 function renderTransitionEditor() {
@@ -283,22 +496,38 @@ function renderTransitionEditor() {
   outputSelects = [];
   ui.inputs.replaceChildren();
   ui.outputs.replaceChildren();
+  ui.inputs.dataset.backend = config.backend;
+  ui.outputs.dataset.backend = config.backend;
   const inputLabels =
     config.backend === "block" ? BLOCK_LABELS : ["centre", ...NEIGHBOR_LABELS];
-  const outputLabels =
-    config.backend === "block" ? BLOCK_LABELS : ["new centre"];
+  const outputLabels = config.backend === "block" ? BLOCK_LABELS : ["centre"];
   ui.ruleHelp.textContent =
     config.backend === "block"
-      ? "Choose one ordered partition triangle and its replacement. The engine visits a different perfect triangle partition on each phase."
-      : "Choose the centre and all six neighbours. Slot order is the package’s canonical odd-q hex order, shared with the Wasm engine.";
+      ? "A block rule replaces all three cells together. Their screen positions below are their real relative positions in the triangular partition."
+      : "A neighborhood rule reads the centre and its six equidistant hex neighbours, then writes one new state into the centre.";
+  ui.inputCaption.textContent =
+    config.backend === "block"
+      ? "Pick the three states the engine sees together."
+      : "Pick the centre and every surrounding neighbour.";
+  ui.outputCaption.textContent =
+    config.backend === "block"
+      ? "All three cells are rewritten in the same positions."
+      : "Only the centre is written; faded cells are context.";
   for (const label of inputLabels) {
-    const field = selectFor(label, config.states);
+    const field = selectFor(label, config.states, config.backend);
     field.select.addEventListener("change", readTransition);
     inputSelects.push(field.select);
     ui.inputs.append(field.wrapper);
   }
+  if (config.backend === "neighborhood") {
+    NEIGHBOR_LABELS.forEach((label, index) =>
+      ui.outputs.append(ghostCell(label, config.backend, index + 1)),
+    );
+  }
   for (const label of outputLabels) {
-    const field = selectFor(label, config.states);
+    const field = selectFor(label, config.states, config.backend, true);
+    field.wrapper.classList.add("is-focus");
+    field.select.addEventListener("change", refreshTransitionVisuals);
     outputSelects.push(field.select);
     ui.outputs.append(field.wrapper);
   }
@@ -609,15 +838,8 @@ for (const control of [ui.states, ui.rows, ui.speed]) {
 ui.rebuild.addEventListener("click", rebuildWorld);
 ui.applyTransition.addEventListener("click", () => {
   if (!rule || ui.applyTransition.disabled) return;
-  const config = normalizedConfig();
   const index = transitionIndex();
-  const value =
-    config.backend === "block"
-      ? packBlock(
-          config.states,
-          outputSelects.map((select) => Number(select.value)),
-        )
-      : Number(outputSelects[0].value);
+  const value = pendingTransitionValue();
   rule[index] = value;
   overrides.set(index, value);
   ui.world.setRule(rule);
