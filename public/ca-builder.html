@@ -9,34 +9,45 @@
     />
     <title>HexLife · k-state CA builder</title>
     <link rel="stylesheet" href="./ca-builder.css" />
+    <link rel="stylesheet" href="./embed-demo-shell.css" />
     <script type="importmap">
       {
         "imports": {
-          "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca/+esm",
-          "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca-element/+esm"
+          "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.1/ca/+esm",
+          "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.1/ca-element/+esm"
         }
       }
     </script>
   </head>
-  <body>
-    <header class="hero">
+  <body class="demo-page">
+    <div class="demo-shell" style="--demo-shell-width: 1540px">
+    <header class="demo-masthead">
+      <div class="demo-topbar">
+        <a class="demo-brand" href="./"><span>HexLife</span> embed demos</a>
+        <nav class="demo-nav" aria-label="HexLife embed demos">
+          <a href="./totalistic-256.html">Rule atlas</a>
+          <a href="./coffee-percolation.html">Coffee lab</a>
+          <a href="./ca-builder.html" aria-current="page">CA builder</a>
+        </nav>
+      </div>
+      <div class="demo-hero-grid">
       <div>
-        <a class="eyebrow" href="./">HexLife Explorer</a>
+        <p class="demo-kicker">Editable k-state reference host</p>
         <h1>k-state CA builder</h1>
-        <p>
+        <p class="demo-deck">
           Author the exact lookup table the Wasm engine runs, inspect its
           physical invariants, and export a standalone npm-package example.
         </p>
       </div>
-      <div class="runtime-card" aria-label="Runtime boundary">
-        <strong>Published runtime</strong>
-        <span><i class="ok"></i><code>@hexlife/embed@1.7.0</code></span>
-        <span><i class="ok"></i>Wasm <code>WorldK</code> engine</span>
-        <span><i class="ok"></i>WebGL2 state-palette shader</span>
+      <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
+        <span>Built with the published npm package</span>
+        <strong>@hexlife/embed@1.7.1</strong>
+        <small><code>/ca</code> + <code>/ca-element</code> · Wasm + WebGL2</small>
+      </a>
       </div>
     </header>
 
-    <main>
+    <main class="demo-content">
       <section class="callout">
         <div>
           <strong>Hexagonal by construction.</strong> Neighborhood rules expose
@@ -228,16 +239,16 @@
       </section>
     </main>
 
-    <footer>
-      <a href="https://www.npmjs.com/package/@hexlife/embed">npm package</a>
-      <span>·</span>
-      <a
-        href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed"
-        >API documentation</a
-      >
-      <span>·</span>
-      <a href="./coffee-percolation.html">coffee percolation labs</a>
+    <footer class="demo-footer">
+      <p>Built with <strong>@hexlife/embed</strong> from npm.</p>
+      <nav aria-label="Demo resources">
+        <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">npm package</a>
+        <a href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed" target="_blank" rel="noopener noreferrer">API docs</a>
+        <a href="./coffee-percolation.html">coffee lab</a>
+        <a href="./">HexLife Explorer</a>
+      </nav>
     </footer>
+    </div>
 
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="./ca-builder.js"></script>

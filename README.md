@@ -256,8 +256,9 @@ Two objectives are available:
 
 ## 🧩 Embed a world in your own page
 
-The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides two custom
-elements. `<hexlife-world>` is a single world — a ruleset or exact world code, seed, density, rows,
+The [`@hexlife/embed`](https://www.npmjs.com/package/@hexlife/embed) package provides three focused
+custom elements plus DOM-free simulation, metadata, codec, and renderer entrypoints.
+`<hexlife-world>` is a single binary world — a ruleset or exact world code, seed, density, rows,
 speed, palette, and paused/drawing/zoom policies, with play, pause, reset, tick, brush-size,
 checksum and world-code APIs. It is the element the Reddit app uses.
 
@@ -285,6 +286,12 @@ contexts and force-loses the oldest past that, so a wall of `<hexlife-world>` el
 stops being a wall at sixteen; the grid puts N simulations behind one context and draws each into
 its own viewport instead. Every world shares one grid, seed, density, palette and clock, so the only
 difference between two tiles is the rule.
+
+The three live pages below form one package showcase with a shared visual shell and direct navigation
+between them. Each makes a different case for the package: large parallel comparison, a host-owned
+physical model, and an editable reference integration. The k-state pages load the exact published
+npm version through jsDelivr, so they are also end-to-end checks that a consumer can use the package
+without Explorer internals or a local build.
 
 > ### [**▶ 256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html)
 >
@@ -332,6 +339,14 @@ The package is built from `src/embed/` with `npm run build:embed`; the standalon
 For an offline copy of the 256-world sampler, run `npm run build:standalone` and open
 `dist/totalistic-256-standalone.html` directly in a browser. It is one self-contained file: the
 page code and Wasm engine are inlined, so it does not need a server or a network connection.
+
+### Demo source layout
+
+The atlas remains a root Vite entry because its module graph and Wasm are also compiled into the
+offline single-file build. The coffee lab and CA builder live in `public/` with their support files
+and the shared `embed-demo-shell.css`; Vite copies those package-consumer pages verbatim so their
+jsDelivr import maps remain an honest test of the published npm package. All three deploy at stable
+top-level URLs.
 
 ## 🏗️ Architecture
 

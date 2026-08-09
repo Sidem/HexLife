@@ -381,14 +381,39 @@
     .group { flex-wrap: wrap; }
   }
 </style>
+<link rel="stylesheet" href="./public/embed-demo-shell.css">
 </head>
-<body>
+<body class="demo-page">
+<div class="demo-shell" style="--demo-shell-width: var(--shell)">
 
-<header>
-  <div class="title-row">
-    <h1>256 worlds, one rule class — a sampler for hex rule space</h1>
-    <button id="panelToggle" aria-pressed="true" title="Show or hide the control panel  (C). Space, R and → keep working either way.">Controls</button>
+<header class="demo-masthead">
+  <div class="demo-topbar">
+    <a class="demo-brand" href="./"><span>HexLife</span> embed demos</a>
+    <nav class="demo-nav" aria-label="HexLife embed demos">
+      <a href="./totalistic-256.html" aria-current="page">Rule atlas</a>
+      <a href="./coffee-percolation.html">Coffee lab</a>
+      <a href="./ca-builder.html">CA builder</a>
+    </nav>
   </div>
+
+  <div class="demo-hero-grid">
+    <div>
+      <p class="demo-kicker">Binary rule-space showcase</p>
+      <div class="demo-title-row">
+        <h1>256 worlds, one rule class</h1>
+        <button id="panelToggle" aria-pressed="true" title="Show or hide the control panel (C). Space, R and → keep working either way.">Controls</button>
+      </div>
+      <p class="demo-deck">Run an entire cellular-automaton class at once, then sample rule spaces too large to enumerate.</p>
+    </div>
+    <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
+      <span>Built with the published npm package</span>
+      <strong>@hexlife/embed</strong>
+      <small><code>&lt;hexlife-grid&gt;</code> · one WebGL2 context for every tile</small>
+    </a>
+  </div>
+</header>
+
+<main class="demo-content">
   <!-- Folded by default below a tall screen, and the reason is the map: every line of prose here is
        a line the grid does not get, and the class banner under the controls already says what is on
        screen. Opened at boot where there is room for both. -->
@@ -422,7 +447,6 @@ grid.rulesets = Array.from({length: 256},   <span class="c">// T00–TFF *is* th
 grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 2^28 rotational ones —</span>
                                             <span class="c">// a tag letter + a random payload is a rule</span></code></pre>
   </details>
-</header>
 
 <div class="workspace">
 
@@ -554,14 +578,7 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
 
 </div><!-- .workspace -->
 
-<p class="footer">
-  <b>Keys</b> <kbd>Space</kbd>/<kbd>P</kbd> play·pause · <kbd>R</kbd> reset · <kbd>G</kbd> reroll ·
-  <kbd>→</kbd>/<kbd>.</kbd> step · <kbd>C</kbd> show·hide controls<br>
-  <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">@hexlife/embed on npm</a> ·
-  <a href="totalistic-256-standalone.html" download>Download offline version</a> ·
-  <a href="https://github.com/Sidem/HexLife" target="_blank" rel="noopener noreferrer">source</a> ·
-  <a href="https://sidem.github.io/HexLife/" target="_blank" rel="noopener noreferrer">HexLife Explorer</a>
-</p>
+<p class="footer"><b>Keys</b> <kbd>Space</kbd>/<kbd>P</kbd> play·pause · <kbd>R</kbd> reset · <kbd>G</kbd> reroll · <kbd>→</kbd>/<kbd>.</kbd> step · <kbd>C</kbd> show·hide controls</p>
 
 <dialog id="detail">
   <div class="detail-head">
@@ -578,6 +595,18 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
     <p class="detail-meta" id="detailMeta"></p>
   </div>
 </dialog>
+</main>
+
+<footer class="demo-footer">
+  <p>Built with <strong>@hexlife/embed</strong> from npm.</p>
+  <nav aria-label="Demo resources">
+    <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">npm package</a>
+    <a href="totalistic-256-standalone.html" download>offline version</a>
+    <a href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed" target="_blank" rel="noopener noreferrer">API docs</a>
+    <a href="./">HexLife Explorer</a>
+  </nav>
+</footer>
+</div>
 
 <script type="module">
 // Relative, not `/HexLife/…`: an absolute path works under the dev server's base but is not

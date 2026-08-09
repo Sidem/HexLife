@@ -1,52 +1,16 @@
 # `@hexlife/embed`
 
-The DOM-free `@hexlife/embed/sim` entry exposes the same Wasm evolution engine used by the custom
-element for Node.js and browser-worker computation:
+Fast, deterministic hexagonal cellular automata for ordinary web pages, browser workers, and Node.
+The package bundles the Rust/Wasm tick engine and WebGL2 renderer used by
+[HexLife Explorer](https://sidem.github.io/HexLife/), then exposes them at the level a host needs:
+custom elements for the quickest integration, or DOM-free simulation and renderer-only entrypoints
+for applications that own more of the stack.
 
-```js
-import {createDensityState, createSimulation, packCells} from '@hexlife/embed/sim'
+The same `(ruleset, seed, density, rows)` produces a byte-identical tick sequence in HexLife
+Explorer, an embed, and HexLife on Reddit. An embed is therefore a reproducible world, not a visual
+approximation of one.
 
-const initialCells = createDensityState({rows: 64, columns: 74, seed: 12345, density: 0.5})
-const sim = await createSimulation({rulesetHex, rows: 64, columns: 74, initialCells})
-sim.setCells([{index: 42, value: 1}])
-sim.tick(10)
-const packed = packCells(sim.snapshotCells())
-sim.dispose()
-```
-
-The renderer-only `@hexlife/embed/render` entry draws host-owned, externally verified state with the
-same WebGL2 instanced hexes and shared shaders, without allocating or advancing a simulation:
-
-```js
-import {createRenderer} from '@hexlife/embed/render'
-
-const renderer = createRenderer(canvas, {
-  rows: 1152,
-  columns: 1332,
-  repeatToroidal: true,
-  maxDpr: 2,
-})
-renderer.setState(verifiedCells)
-renderer.draw()
-```
-
-A live [HexLife](https://sidem.github.io/HexLife/) world as a custom element — a hexagonal cellular
-automaton running on WebGL2, with the Rust/Wasm tick engine bundled in.
-
-This is the shared runtime behind HexLife Explorer and HexLife on Reddit. The same
-`(ruleset, seed, density, rows)` produces a byte-identical tick sequence in all three, which is what
-makes an embed a *recording* of a world rather than something that merely resembles one.
-
-**[▶ Live demo: 256 worlds, one rule class](https://sidem.github.io/HexLife/totalistic-256.html)**
-— all 256 totalistic rules running at once on one 16×16 map, or the same map as a random subset of
-any wider constraint class, built entirely with this package. It is the clearest single demonstration
-of what `<hexlife-grid>` is for.
-
-**[▶ Live demo: coffee extraction lab](https://sidem.github.io/HexLife/coffee-percolation.html)** —
-the same for the k-state half: a six-state model of water percolating through coffee grounds on
-`<hexlife-ca>`, where fluid and grounds are each conserved *exactly* and the goal is to spend the
-whole puck. It also runs the four-state version under both backends side by side, which is the
-shortest demonstration of why `'block'` exists.
+## Quick start
 
 ```bash
 npm install @hexlife/embed
@@ -68,6 +32,35 @@ import '@hexlife/embed' // registers <hexlife-world>
 The element is `display: block` with a `1 / 1` aspect ratio by default; give it a width and it sizes
 itself. Everything lives in a shadow root, so the host page's CSS cannot break it and its CSS cannot
 touch the host.
+
+## Live package showcases
+
+Every page below is a package consumer with the same presentation shell. The k-state pages resolve
+the exact published npm version through jsDelivr; they do not reach into Explorer internals.
+
+| Demo | What it demonstrates | Package surface |
+|---|---|---|
+| [**256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html) | All 256 totalistic rules simultaneously, or an equally sized sample of a larger rule class. One shared clock, initial condition, palette, and GPU context make rule-to-rule comparison direct. | `<hexlife-grid>`, `<hexlife-world>`, `/api` |
+| [**Coffee extraction lab**](https://sidem.github.io/HexLife/coffee-percolation.html) | Six- and sixteen-state physical models with exact conservation, host-driven boundaries, and both rule backends side by side. | `/ca`, `/ca-element`, `<hexlife-ca>` |
+| [**k-state CA builder**](https://sidem.github.io/HexLife/ca-builder.html) | Edit exact transition tables, paint and run the Wasm world, inspect invariants, and export a standalone npm-package example. | `/ca`, `/ca-element`, `<hexlife-ca>` |
+
+The atlas is also a performance demonstration: `<hexlife-grid>` runs hundreds of simulations but
+draws them through one WebGL2 context, avoiding the browser context limit that makes a wall of
+independent canvases fail. For sparse or settled worlds, exact uniform-block skipping makes the
+383k-cell binary engine about **13× faster** at a fixed point and about **2.4× faster** at 0.2%
+occupancy on the project benchmark machine. No approximation or separate “fast” result is involved.
+
+For host-owned computation, use the same engine without mounting a DOM element:
+
+```js
+import {createDensityState, createSimulation, packCells} from '@hexlife/embed/sim'
+
+const initialCells = createDensityState({rows: 64, columns: 74, seed: 12345, density: 0.5})
+const sim = await createSimulation({rulesetHex, rows: 64, columns: 74, initialCells})
+sim.tick(10)
+const packed = packCells(sim.snapshotCells())
+sim.dispose()
+```
 
 ---
 

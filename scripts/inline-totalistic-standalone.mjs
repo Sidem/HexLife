@@ -28,7 +28,25 @@ if (relativeScriptPath.startsWith(`..${sep}`) || relativeScriptPath === '..') {
 
 const javascript = (await readFile(scriptPath, 'utf8')).replaceAll('</script', '<\\/script')
 const inlineModule = `<script type="module">\n${javascript}\n</script>`
-const standaloneHtml = html.replace(moduleScripts[0][0], inlineModule)
+let standaloneHtml = html.replace(moduleScripts[0][0], inlineModule)
+
+// The live demos share one presentation shell. Vite emits that stylesheet as a local asset, so the
+// offline atlas must inline it alongside the module rather than quietly becoming network-dependent.
+const stylesheetPattern = /<link\b(?=[^>]*\brel="stylesheet")(?=[^>]*\bhref="([^"]+)")[^>]*>/g
+const stylesheets = [...standaloneHtml.matchAll(stylesheetPattern)]
+for (const stylesheet of stylesheets) {
+  const stylesheetUrl = stylesheet[1]
+  if (/^(?:[a-z]+:|\/\/)/i.test(stylesheetUrl)) {
+    throw new Error(`Generated stylesheet is not local: ${stylesheetUrl}`)
+  }
+  const stylesheetPath = resolve(dirname(builtHtmlPath), stylesheetUrl.split(/[?#]/, 1)[0])
+  const relativeStylesheetPath = relative(stagingDir, stylesheetPath)
+  if (relativeStylesheetPath.startsWith(`..${sep}`) || relativeStylesheetPath === '..') {
+    throw new Error(`Generated stylesheet escaped the staging directory: ${stylesheetUrl}`)
+  }
+  const css = (await readFile(stylesheetPath, 'utf8')).replaceAll('</style', '<\\/style')
+  standaloneHtml = standaloneHtml.replace(stylesheet[0], `<style>\n${css}\n</style>`)
+}
 
 const externalResourcePattern = /<(?:script|link|img|source|audio|video|object|embed|iframe)\b[^>]*\b(?:src|href|data)="(?!data:|#)([^"]+)"[^>]*>/gi
 const externalResources = [...standaloneHtml.matchAll(externalResourcePattern)].map((match) => match[1])

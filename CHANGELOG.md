@@ -25,6 +25,17 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.7.1 — 2026-08-09
+
+#### Changed
+
+- **One coherent package showcase.** The totalistic atlas, coffee extraction lab, and editable
+  k-state CA builder now share a responsive presentation shell, cross-demo navigation, explicit npm
+  attribution, and resource links. Both public READMEs present the three demos as one suite and
+  explain the package surfaces, performance characteristics, and deliberate source/build layout.
+- **Offline atlas keeps the same presentation.** Its single-file build now inlines the shared demo
+  stylesheet alongside the JavaScript and Wasm, preserving the no-runtime-assets contract.
+
 ### `@hexlife/embed` 1.5.1 — 2026-08-07
 
 #### Fixed

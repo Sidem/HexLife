@@ -1,6 +1,6 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Embeddable HexLife cellular automaton world, k-state simulation engine, and host-safe world-code API",
   "type": "module",
   "license": "MIT",

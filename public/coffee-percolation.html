@@ -150,6 +150,7 @@
   .boot { color: var(--dim); font-size: 12px; }
   .boot.failed { color: var(--bad); }
 </style>
+<link rel="stylesheet" href="./embed-demo-shell.css">
 
 <!--
   Bare specifiers plus one import map, rather than jsDelivr URLs written into every import: the
@@ -164,8 +165,8 @@
 <script type="importmap">
 {
   "imports": {
-    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca/+esm",
-    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca-element/+esm"
+    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.1/ca/+esm",
+    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.1/ca-element/+esm"
   }
 }
 </script>
@@ -189,14 +190,33 @@
   there too.
 -->
 </head>
-<body>
-<div class="wrap">
+<body class="demo-page">
+<div class="wrap demo-shell">
 
-<h1>Coffee extraction lab</h1>
-<p class="sub">
-  A six-state lattice model of water moving through a bed of coffee grounds, built on
-  <code>&lt;hexlife-ca&gt;</code> from <code>@hexlife/embed</code>. Pull the levers; get the yield up.
-</p>
+<header class="demo-masthead">
+  <div class="demo-topbar">
+    <a class="demo-brand" href="./"><span>HexLife</span> embed demos</a>
+    <nav class="demo-nav" aria-label="HexLife embed demos">
+      <a href="./totalistic-256.html">Rule atlas</a>
+      <a href="./coffee-percolation.html" aria-current="page">Coffee lab</a>
+      <a href="./ca-builder.html">CA builder</a>
+    </nav>
+  </div>
+  <div class="demo-hero-grid">
+    <div>
+      <p class="demo-kicker">k-state physical-model showcase</p>
+      <h1>Coffee extraction lab</h1>
+      <p class="demo-deck">A six- and sixteen-state model of water moving through coffee grounds. Pull the levers, preserve the physics, and try to spend the whole puck.</p>
+    </div>
+    <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
+      <span>Built with the published npm package</span>
+      <strong>@hexlife/embed@1.7.1</strong>
+      <small><code>&lt;hexlife-ca&gt;</code> · jsDelivr import map · no build step</small>
+    </a>
+  </div>
+</header>
+
+<main class="demo-content">
 
 <div class="lede">
   <p>
@@ -872,6 +892,18 @@
   <a href="./ca-builder.html">k-state CA builder</a>; these same six- and sixteen-state transition
   functions are its two physical-process starters.
 </p>
+
+</main>
+
+<footer class="demo-footer">
+  <p>Built with <strong>@hexlife/embed</strong> from npm.</p>
+  <nav aria-label="Demo resources">
+    <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">npm package</a>
+    <a href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed" target="_blank" rel="noopener noreferrer">API docs</a>
+    <a href="./ca-builder.html">CA builder</a>
+    <a href="./">HexLife Explorer</a>
+  </nav>
+</footer>
 
 </div>
 
