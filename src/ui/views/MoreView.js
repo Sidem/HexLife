@@ -34,6 +34,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="learning" data-tour-id="mobile-help-button" title="Tutorials, tours and help — replay the orientation any time" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.graduationCap} Learning Hub · Tours &amp; Help</button>
         <a href="totalistic-256.html" target="_blank" rel="noopener" class="button">Explore the 256-rule atlas</a>
         <a href="coffee-percolation.html" target="_blank" rel="noopener" class="button">Coffee extraction lab</a>
+        <a href="ca-builder.html" target="_blank" rel="noopener" class="button">Build a k-state CA</a>
         <a href="https://github.com/Sidem/HexLife/" target="_blank" rel="noopener" class="button">View on GitHub</a>
         <a href="https://www.reddit.com/r/hexlife/" target="_blank" rel="noopener" class="button">Community · r/hexlife</a>
     </div>

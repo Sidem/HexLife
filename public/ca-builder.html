@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Build and inspect k-state cellular automata on HexLife's hexagonal Wasm engine."
+    />
+    <title>HexLife · k-state CA builder</title>
+    <link rel="stylesheet" href="./ca-builder.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca/+esm",
+          "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.7.0/ca-element/+esm"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <a class="eyebrow" href="./">HexLife Explorer</a>
+        <h1>k-state CA builder</h1>
+        <p>
+          Author the exact lookup table the Wasm engine runs, inspect its
+          physical invariants, and export a standalone npm-package example.
+        </p>
+      </div>
+      <div class="runtime-card" aria-label="Runtime boundary">
+        <strong>Published runtime</strong>
+        <span><i class="ok"></i><code>@hexlife/embed@1.7.0</code></span>
+        <span><i class="ok"></i>Wasm <code>WorldK</code> engine</span>
+        <span><i class="ok"></i>WebGL2 state-palette shader</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="callout">
+        <div>
+          <strong>Hexagonal by construction.</strong> Neighborhood rules expose
+          the canonical six equidistant slots
+          <code>SW · NW · N · NE · SE · S</code>. Block rules rewrite a
+          three-cell triangle <code>top · down-right · below</code>, cycling a
+          seamless three-phase partition.
+        </div>
+        <a href="./coffee-percolation.html">Open the full coffee labs →</a>
+      </section>
+
+      <div class="workspace">
+        <aside class="panel project-panel">
+          <h2>Project</h2>
+          <label for="preset">Starter</label>
+          <select id="preset"></select>
+          <p class="hint" id="preset-description"></p>
+
+          <div class="two-fields">
+            <label
+              >Backend
+              <select id="backend">
+                <option value="block">Block · k³</option>
+                <option value="neighborhood">Neighborhood · k⁷</option>
+              </select>
+            </label>
+            <label
+              >States · k
+              <input id="states" type="number" min="2" max="16" value="6" />
+            </label>
+            <label
+              >Rows
+              <input
+                id="rows"
+                type="number"
+                min="6"
+                max="512"
+                step="3"
+                value="66"
+              />
+            </label>
+            <label
+              >Ticks / sec
+              <input id="speed" type="number" min="1" max="120" value="18" />
+            </label>
+          </div>
+          <p class="constraint" id="geometry-note"></p>
+          <button class="primary" id="rebuild">Rebuild world</button>
+
+          <div class="section-head">
+            <h2>States</h2>
+            <span class="micro">name · colour · draw</span>
+          </div>
+          <div id="state-editor" class="state-editor"></div>
+        </aside>
+
+        <section class="panel preview-panel">
+          <div class="section-head">
+            <h2>Live Wasm preview</h2>
+            <span id="world-status" class="status" aria-live="polite"
+              >booting…</span
+            >
+          </div>
+          <hexlife-ca
+            id="world"
+            states="6"
+            rows="66"
+            backend="block"
+            speed="18"
+            paused
+            draw
+            draw-state="1"
+            link="off"
+          ></hexlife-ca>
+          <div class="transport" aria-label="Simulation controls">
+            <button id="play">Run</button>
+            <button id="step">Step</button>
+            <button id="reset">Reset</button>
+            <button id="reseed">New seed</button>
+            <button id="clear">Clear</button>
+          </div>
+          <dl class="stats">
+            <div>
+              <dt>Generation</dt>
+              <dd id="generation">0</dd>
+            </div>
+            <div>
+              <dt>Grid</dt>
+              <dd id="dimensions">—</dd>
+            </div>
+            <div>
+              <dt>Active chunks</dt>
+              <dd id="chunks">—</dd>
+            </div>
+            <div>
+              <dt>Rule table</dt>
+              <dd id="rule-size">—</dd>
+            </div>
+          </dl>
+          <div class="census" id="census" aria-label="State census"></div>
+        </section>
+
+        <aside class="panel rule-panel">
+          <div class="section-head">
+            <h2>Transition editor</h2>
+            <button class="quiet" id="undo-transition" disabled>
+              Undo edits
+            </button>
+          </div>
+          <p id="rule-help" class="hint"></p>
+          <div id="transition-inputs" class="transition-grid"></div>
+          <div class="arrow" aria-hidden="true">↓</div>
+          <div id="transition-outputs" class="transition-grid"></div>
+          <button class="primary" id="apply-transition">
+            Write this table entry
+          </button>
+          <p id="transition-index" class="micro"></p>
+
+          <h3>Physics checks</h3>
+          <dl class="checks">
+            <div>
+              <dt>Preset invariant</dt>
+              <dd id="invariant">—</dd>
+            </div>
+            <div>
+              <dt>Strict census conservation</dt>
+              <dd id="conservative">—</dd>
+            </div>
+            <div>
+              <dt>Rotational isotropy</dt>
+              <dd id="isotropic">—</dd>
+            </div>
+          </dl>
+          <p class="hint">
+            These are reported, never enforced. Gravity should break isotropy;
+            reactions can change individual states while preserving physical
+            families.
+          </p>
+        </aside>
+      </div>
+
+      <section class="panel export-panel">
+        <div class="section-head">
+          <div>
+            <h2>Standalone package example</h2>
+            <p class="hint">
+              The generated page uses only the published npm entrypoints. Custom
+              transition edits are appended as table overrides.
+            </p>
+          </div>
+          <div class="export-actions">
+            <button id="copy-code">Copy HTML</button>
+            <button id="download-code">Download HTML</button>
+            <button id="copy-code-world">Copy HXK1 world</button>
+          </div>
+        </div>
+        <pre><code id="generated-code"></code></pre>
+      </section>
+
+      <section class="explainers">
+        <article class="panel">
+          <h2>Why two backends?</h2>
+          <p>
+            <code>neighborhood</code> is a dense anisotropic
+            <code>k⁷</code> table: centre plus six hex neighbours. It is capped
+            at four states. <code>block</code> is a <code>k³</code> triangle
+            rewrite, scales to sixteen states, and can arbitrate transport
+            without creating or deleting competing particles.
+          </p>
+        </article>
+        <article class="panel">
+          <h2>Why hexagons?</h2>
+          <p>
+            All six neighbours are equidistant, so direction-independent rules
+            inherit six-fold lattice symmetry. Direction enters only when the
+            model asks for it—gravity in the coffee examples—not because
+            diagonal cells are farther away.
+          </p>
+        </article>
+        <article class="panel">
+          <h2>Where host physics lives</h2>
+          <p>
+            The rule owns local transport and reactions. Initial conditions,
+            pour schedules and cup outlets belong to the host page and call
+            <code>setCells</code> or <code>setCell</code>, which wakes the
+            engine's exact chunk-activity tracker.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://www.npmjs.com/package/@hexlife/embed">npm package</a>
+      <span>·</span>
+      <a
+        href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed"
+        >API documentation</a
+      >
+      <span>·</span>
+      <a href="./coffee-percolation.html">coffee percolation labs</a>
+    </footer>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./ca-builder.js"></script>
+  </body>
+</html>

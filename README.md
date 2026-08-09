@@ -313,6 +313,13 @@ difference between two tiles is the rule.
 <hexlife-ca states="6" rows="150" backend="block"></hexlife-ca>
 ```
 
+> ### [**▶ Build a k-state physical CA**](https://sidem.github.io/HexLife/ca-builder.html)
+>
+> Start from either coffee model or a blank block/neighborhood table, edit exact transitions in the
+> engine's canonical hex ordering, paint and run the Wasm world, and inspect conservation and
+> isotropy. The builder exports a standalone HTML page whose import map resolves the published
+> `@hexlife/embed/ca` and `/ca-element` npm entrypoints—no Explorer internals or build step.
+
 ```js
 // T00–TFF *is* the totalistic class — nothing sampled away.
 grid.rulesets = Array.from({length: 256}, (_, i) => 'T' + i.toString(16).padStart(2, '0'));

@@ -867,6 +867,11 @@
   written with bare specifiers rather than URLs. The file ships from <code>public/</code>, so the
   deploy serves exactly the bytes in the repository.
 </p>
+<p class="facts">
+  Want to change the transition table yourself? Open the
+  <a href="./ca-builder.html">k-state CA builder</a>; these same six- and sixteen-state transition
+  functions are its two physical-process starters.
+</p>
 
 </div>
 
@@ -883,6 +888,11 @@ import {
     injectionColumns as scheduledInjectionColumns,
     quietTickLimit,
 } from './coffee-percolation-physics.js';
+import {
+    coffeeDualTransition,
+    coffeeFall as fall,
+    coffeeSixTransition,
+} from './ca-builder-models.js';
 
 // ===========================================================================
 // PART 1 — the six-state extraction lab
@@ -908,37 +918,9 @@ const LAB_VARS = ['--air', '--water', '--saturated', '--dry', '--wet', '--spent'
  *
  * Three steps, and the order of the first two is load-bearing.
  */
-const extractionRule = blockRuleFromTable(6, (block) => {
-    const out = [block[0], block[1], block[2]];
+const extractionRule = blockRuleFromTable(6, coffeeSixTransition);
 
-    // 1. EXTRACT. Unsaturated water meeting an already-wet ground takes its solubles: the water
-    //    saturates and the ground is spent. Fluid count and ground count are both unchanged, so
-    //    this is a reaction that still conserves each family exactly.
-    const water = out.indexOf(WATER);
-    const wet = out.indexOf(WET);
-    if (water !== -1 && wet !== -1) {
-        out[water] = SAT;
-        out[wet] = SPENT;
-    }
-
-    // 2. WET. Dry grounds in contact with any fluid dampen. Deliberately AFTER extraction, so a
-    //    ground cannot be wetted and spent in the same tick — grounds need a tick of contact first,
-    //    which is exactly what makes a pre-infusion pause a real strategy rather than a ritual.
-    const hasFluid = out.some((v) => v < MOBILE && v !== AIR);
-    if (hasFluid) {
-        for (let i = 0; i < 3; i++) if (out[i] === DRY) out[i] = WET;
-    }
-
-    // 3. FALL. Gravity, routed through the partition's bonds rather than sorted — see "Gravity
-    //    points down" below for why a plain density sort sends every parcel off at 60 degrees to
-    //    the left. Take the vertical bond 0->2 whenever both ends are mobile, and offer a half bond
-    //    only when the far end of the vertical one is occupied. A swap of two mobile slots, so it is
-    //    exactly conservative on its own.
-    fall(out, (v) => v < MOBILE);
-    return out;
-});
-
-/**
+/*
  * One step of gravity on a partition triangle, shared by all three rules on this page.
  *
  * Slots 0 and 2 share a column and slot 1 sits one column to the right, so `0->2` is a pure
@@ -961,17 +943,9 @@ const extractionRule = blockRuleFromTable(6, (block) => {
  * A half bond is one column sideways, so it is handed. `sixTick` and `dualTick` alternate the
  * partition's handedness to cancel that; see `buildHexMirror`.
  *
- * @param {number[]} out The block, rewritten in place.
- * @param {(state: number) => boolean} mobile Which states gravity may move.
+ * The implementation lives in `ca-builder-models.js`, so the builder and this full lab cannot
+ * disagree about any of these bonds.
  */
-function fall(out, mobile) {
-    const m0 = mobile(out[0]), m1 = mobile(out[1]), m2 = mobile(out[2]);
-    const swap = (i, j) => { const t = out[i]; out[i] = out[j]; out[j] = t; };
-    if (m0 && m2 && out[0] > out[2]) { swap(0, 2); return; }
-    if (m0 && m1 && out[2] !== EMPTY && out[0] > out[1]) { swap(0, 1); return; }
-    if (m1 && m2 && out[0] !== EMPTY && out[1] > out[2]) { swap(1, 2); return; }
-}
-
 /*
  * A left-to-right reflection of the grid, as a permutation of cell indices.
  *
@@ -1370,7 +1344,6 @@ const D_DRY = [4, 5, 6];                                       // drained grain 
 const D_WET = [[7, 8, 9], [10, 11, 12], [13, 14, 15]];         // D_WET[charge][boundGrade]
 const D_K = 16;
 
-const dFree = (s) => s <= 3;
 const dLiquid = (s) => s >= 1 && s <= 3;
 const dGround = (s) => s >= 4;
 const dDry = (s) => s >= 4 && s <= 6;
@@ -1389,104 +1362,13 @@ const dSolute = (s) =>
     dLiquid(s) ? dConc(s) : dWet(s) ? dWetCharge(s) + dWetBound(s) : dDry(s) ? dDryCharge(s) : 0;
 
 /**
- * One liquid unit across one bond, chosen as symmetrically as this partition allows.
- *
- * Slots 0 and 2 share a column and slot 1 sits one column to the right, so (0,2) is a pure vertical
- * bond and (0,1) / (1,2) are half bonds — down-right and down-left. The two halves are resolved
- * against each other and the step declines outright when both apply, because that is the exact
- * moment a left/right choice would have to be made and any fixed choice is a net sideways drift.
- *
- * `verticalFirst` takes the vertical bond before either half bond is even considered. Drainage uses
- * it, and that is the one step where it is unarguable physics rather than a tuning knob: liquid
- * leaving a grain under gravity should go straight down when it can and reach sideways only when it
- * cannot. With the handedness alternation in `dualTick` doing the symmetry work, it is worth 64%
- * extraction against 38% without — a bed that drains rather than one that stays waterlogged.
- *
- * `locked` keeps a cell touched by an earlier transfer out of the later ones. Without it a grain
- * imbibes in one step and drains straight back in the next — the source cell is air by then, so it
- * reads as a legitimate drain — and no grain ever stays wet long enough to dissolve anything.
- */
-function dTransfer(out, locked, can, act, verticalFirst = false) {
-    const open = (i, j) => !locked[i] && !locked[j];
-    const take = (i, j) => { act(out, i, j); locked[i] = true; locked[j] = true; };
-    if (verticalFirst && open(0, 2) && can(out, 0, 2)) { take(0, 2); return; }
-    const r = open(0, 1) && can(out, 0, 1);
-    const l = open(1, 2) && can(out, 1, 2);
-    if (r && !l) take(0, 1);
-    else if (l && !r) take(1, 2);
-    else if (open(0, 2) && can(out, 0, 2)) take(0, 2);
-}
-
-const dCanImbibe = (o, i, j) => (dLiquid(o[i]) && dDry(o[j])) || (dLiquid(o[j]) && dDry(o[i]));
-const dActImbibe = (o, i, j) => {
-    const liq = dLiquid(o[i]) ? i : j, gnd = liq === i ? j : i;
-    o[gnd] = D_WET[dDryCharge(o[gnd])][dConc(o[liq])];
-    o[liq] = D_AIR;
-};
-const dCanWick = (o, i, j) => (dWet(o[i]) && dDry(o[j])) || (dWet(o[j]) && dDry(o[i]));
-const dActWick = (o, i, j) => {
-    const src = dWet(o[i]) ? i : j, dst = src === i ? j : i;
-    o[dst] = D_WET[dDryCharge(o[dst])][dWetBound(o[src])];
-    o[src] = D_DRY[dWetCharge(o[src])];
-};
-const dCanDrain = (o, i, j) => dWet(o[i]) && o[j] === D_AIR;   // every bond runs i above j
-const dActDrain = (o, i, j) => {
-    o[j] = D_LIQ[dWetBound(o[i])];
-    o[i] = D_DRY[dWetCharge(o[i])];
-};
-const dNever = () => false;
-
-/**
+ * The local transition is shared with `ca-builder.html`; this host still owns the grind/wicking
+ * controls, initial puck, pour and outlet boundary.
  * @param {number} grindSlots 1 coarse .. 3 fine — how many partition slots permit a dissolve step.
  * @param {boolean} wicking whether grain-to-grain capillary transfer is on.
  */
 function buildDualRule(grindSlots, wicking) {
-    return blockRuleFromTable(D_K, (b) => {
-        const out = [b[0], b[1], b[2]];
-
-        // 1. DISSOLVE — intraparticle, and the only step needing no neighbour at all: solubles move
-        //    from a grain's solid into the liquid it already holds. Gated on slot index because a
-        //    block rule is stateless and time-invariant while a cell visits each slot exactly once
-        //    per partition cycle, so the slot index is the only clock available. One slot = one step
-        //    per three ticks (coarse); three = every tick (fine). Moroney et al. put intraparticle
-        //    diffusion at 42 s fine to 270 s coarse against a transit time of seconds, so this
-        //    genuinely has to run on its own clock rather than on contact.
-        for (let i = 3 - grindSlots; i < 3; i++) {
-            const s = out[i];
-            if (dWet(s) && dWetCharge(s) > 0 && dWetBound(s) < 2) {
-                out[i] = D_WET[dWetCharge(s) - 1][dWetBound(s) + 1];
-            }
-        }
-
-        const locked = [false, false, false];
-        // 2. IMBIBE — a drained grain pulls liquid out of the pore network and holds it.
-        dTransfer(out, locked, dCanImbibe, dActImbibe);
-        // 3. WICK — a wet grain hands liquid straight to a touching dry grain without ever entering
-        //    the pore network. Surface films and the connected intragranular network carry it in any
-        //    direction, gravity included but not required, which is why a real wetting front spreads
-        //    sideways instead of boring one channel straight down.
-        dTransfer(out, locked, wicking ? dCanWick : dNever, dActWick);
-        // 4. DRAIN — downward only, and straight down by preference. Imbibition accepts from any
-        //    direction and drainage from one; that asymmetry is capillary retention.
-        dTransfer(out, locked, dCanDrain, dActDrain, true);
-
-        // 5. DISPERSE — hydrodynamic dispersion. Two free parcels two grades apart meet in the
-        //    middle. Exactly conservative in solute, and it stops a column of rich brew running
-        //    beside a column of fresh water without the two ever mixing.
-        let lo = -1, hi = -1;
-        for (let i = 0; i < 3; i++) {
-            if (!dLiquid(out[i])) continue;
-            if (lo === -1 || out[i] < out[lo]) lo = i;
-            if (hi === -1 || out[i] > out[hi]) hi = i;
-        }
-        if (lo !== -1 && hi !== lo && out[hi] - out[lo] >= 2) { out[lo]++; out[hi]--; }
-
-        // 6. FALL — gravity, through the same shared bond routing as the other two rules on this
-        //    page. Measured at zero columns of drift from every starting parity.
-        fall(out, dFree);
-
-        return out;
-    });
+    return blockRuleFromTable(D_K, (block) => coffeeDualTransition(block, { grindSlots, wicking }));
 }
 
 /**

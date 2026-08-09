@@ -738,6 +738,11 @@ rounding it would mean the grid you asked for is not the grid you got.
 activity tracker**. A poke straight through `el.world.state` does neither, and a skipped chunk will
 not notice it — call `el.world.markAllDirty()` if you must.
 
+The [k-state CA builder](https://sidem.github.io/HexLife/ca-builder.html) is an editable reference
+host for this surface. Its six- and sixteen-state coffee starters materialize physical transition
+functions with `blockRuleFromTable`, edit the exact `k³` table, run it through `<hexlife-ca>`, and
+export a standalone page that imports only the published `/ca` and `/ca-element` entrypoints.
+
 Readonly: `world` (the live `HexCA`, so a model needing `setSkippingEnabled` or `phase` can reach it
 directly), `states`, `rows`, `columns`, `backend`, `generation`, `checksum`, `isSettled`,
 `chunkActivity`, `playing`, `userPaused`, `error`.
