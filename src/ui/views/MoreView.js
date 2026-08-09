@@ -32,6 +32,7 @@ export class MoreView extends BaseComponent {
         <button class="button" data-action="settings" title="Settings &amp; preferences" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.cog} Settings</button>
         <button class="button" data-action="shortcuts" title="Keyboard shortcut reference" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.keyboard} Keyboard Shortcuts</button>
         <button class="button" data-action="learning" data-tour-id="mobile-help-button" title="Tutorials, tours and help — replay the orientation any time" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">${ICONS.graduationCap} Learning Hub · Tours &amp; Help</button>
+        <a href="embed-demos.html" target="_blank" rel="noopener" class="button">Explore the embed demo library</a>
         <a href="totalistic-256.html" target="_blank" rel="noopener" class="button">Explore the 256-rule atlas</a>
         <a href="coffee-percolation.html" target="_blank" rel="noopener" class="button">Coffee extraction lab</a>
         <a href="ca-builder.html" target="_blank" rel="noopener" class="button">Build a k-state CA</a>

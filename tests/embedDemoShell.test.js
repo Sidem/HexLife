@@ -21,6 +21,7 @@ describe('embed demo presentation shell', () => {
     expect(page).toMatch(/class="[^"]*\bdemo-shell\b[^"]*"/)
     expect(page).toContain('class="demo-masthead"')
     expect(page).toContain('class="demo-nav"')
+    expect(page).toContain('href="./embed-demos.html"')
     expect(page).toContain(`href="./${route}" aria-current="page"`)
     expect(page).toContain('href="./totalistic-256.html"')
     expect(page).toContain('href="./coffee-percolation.html"')
@@ -49,6 +50,7 @@ describe('embed demo presentation shell', () => {
       expect(readme).toContain('totalistic-256.html')
       expect(readme).toContain('coffee-percolation.html')
       expect(readme).toContain('ca-builder.html')
+      expect(readme).toContain('embed-demos.html')
       expect(readme).toContain('@hexlife/embed')
     }
   })

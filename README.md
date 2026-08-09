@@ -287,11 +287,18 @@ stops being a wall at sixteen; the grid puts N simulations behind one context an
 its own viewport instead. Every world shares one grid, seed, density, palette and clock, so the only
 difference between two tiles is the rule.
 
-The three live pages below form one package showcase with a shared visual shell and direct navigation
-between them. Each makes a different case for the package: large parallel comparison, a host-owned
-physical model, and an editable reference integration. The k-state pages load the exact published
-npm version through jsDelivr, so they are also end-to-end checks that a consumer can use the package
-without Explorer internals or a local build.
+The [interactive demo library](https://sidem.github.io/HexLife/embed-demos.html) adds twelve dedicated
+applications, ordered from a living-postcard studio through crystal growth, ecology, excitable
+tissue, conserved mixing, wildfire and outbreak interventions, a butterfly-effect microscope,
+a shareable puzzle, a cellular synthesizer, parallel rule evolution, and an eight-state matter
+sandbox. They share one maintainable host while every page supplies a distinct model, measurement,
+challenge, or creative interaction.
+
+The three reference instruments below share that presentation shell and direct navigation. Each
+makes a different case for the package: large parallel comparison, a host-owned physical model, and
+an editable reference integration. The k-state pages and the twelve concept apps load the exact
+published npm version through jsDelivr, so they are also end-to-end checks that a consumer can use
+the package without Explorer internals or a local build.
 
 > ### [**▶ 256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html)
 >

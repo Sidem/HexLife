@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Twelve interactive applications built with the published HexLife embed npm package, ordered from simple creative tools to advanced simulation labs." />
+    <title>HexLife · embed demo library</title>
+    <link rel="stylesheet" href="./embed-demo-shell.css" />
+    <link rel="stylesheet" href="./embed-concept-lab.css?v=20260809-concepts" />
+  </head>
+  <body class="demo-page">
+    <div class="demo-shell" style="--demo-shell-width: 1320px">
+      <header class="demo-masthead">
+        <div class="demo-topbar">
+          <a class="demo-brand" href="./"><span>HexLife</span> embed demos</a>
+          <nav class="demo-nav" aria-label="HexLife embed demos">
+            <a href="./embed-demos.html" aria-current="page">Demo library</a>
+            <a href="./totalistic-256.html">Rule atlas</a>
+            <a href="./coffee-percolation.html">Coffee lab</a>
+            <a href="./ca-builder.html">CA builder</a>
+          </nav>
+        </div>
+        <div class="demo-hero-grid">
+          <div>
+            <p class="demo-kicker">Twelve package-powered experiments</p>
+            <h1>From living postcard to matter sandbox</h1>
+            <p class="demo-deck">Creative tools, scientific experiments, games, instruments, and rule search—ordered by implementation and interaction complexity.</p>
+          </div>
+          <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
+            <span>Every page consumes the published package</span>
+            <strong>@hexlife/embed@1.7.1</strong>
+            <small>binary · k-state · renderer · grid · exact world codes</small>
+          </a>
+        </div>
+      </header>
+      <main class="demo-content">
+        <p class="demo-library-intro">Start with a single editable world and move upward through custom transition tables, host-owned interventions, paired deterministic experiments, scoring, sound, population search, and multi-material reactions. Every card opens a dedicated application with its own controls and measurements.</p>
+        <section class="demo-library-grid" aria-label="Concept demos ordered by complexity">
+          <a class="demo-card" href="./living-postcard.html" style="--card-accent:#f2b36f"><span class="rank">01 · SIMPLEST</span><h2>Living Postcard Studio</h2><p>Paint, evolve, recolour, project, and copy an exact living composition.</p><span class="surface">&lt;hexlife-world&gt; · HXW1</span></a>
+          <a class="demo-card" href="./crystal-garden.html" style="--card-accent:#8ad5ff"><span class="rank">02</span><h2>Crystal Garden</h2><p>Grow sixfold crystals through vapor, boundaries, seeds, and impurities.</p><span class="surface">neighborhood k⁷ · k = 4</span></a>
+          <a class="demo-card" href="./hex-ecology.html" style="--card-accent:#89e49f"><span class="rank">03</span><h2>Hex Ecology</h2><p>Watch a cyclic spatial food web form waves, refuges, and extinctions.</p><span class="surface">census() · host seeding</span></a>
+          <a class="demo-card" href="./excitable-tissue.html" style="--card-accent:#ff7e9d"><span class="rank">04</span><h2>Excitable Tissue Lab</h2><p>Launch impulses, spiral waves, and scar-anchored re-entry.</p><span class="surface">isotropic neighborhood rule</span></a>
+          <a class="demo-card" href="./mixing-chamber.html" style="--card-accent:#d7a7ff"><span class="rank">05</span><h2>Diffusion &amp; Mixing Chamber</h2><p>Open a membrane while every particle count remains exactly conserved.</p><span class="surface">block k³ · isConservative()</span></a>
+          <a class="demo-card" href="./wildfire-command.html" style="--card-accent:#ff8a55"><span class="rank">06</span><h2>Wildfire Command</h2><p>Cut a firebreak ahead of a directionally wind-biased front.</p><span class="surface">anisotropic neighborhood rule</span></a>
+          <a class="demo-card" href="./outbreak-counterfactuals.html" style="--card-accent:#65d7d0"><span class="rank">07</span><h2>Outbreak Counterfactuals</h2><p>Replay an identical outbreak with and without a vaccination ring.</p><span class="surface">exact reset · policy host</span></a>
+          <a class="demo-card" href="./butterfly-microscope.html" style="--card-accent:#ae9cff"><span class="rank">08</span><h2>Butterfly Microscope</h2><p>Flip one cell, tick two worlds together, and measure their XOR divergence.</p><span class="surface">2 worlds · snapshotCells()</span></a>
+          <a class="demo-card" href="./containment.html" style="--card-accent:#f0cc68"><span class="rank">09</span><h2>Containment</h2><p>Spend eight edits, run an eighty-tick trial, and share the exact outcome.</p><span class="surface">draw · scoring · HXW1</span></a>
+          <a class="demo-card" href="./cellular-synth.html" style="--card-accent:#ff85c8"><span class="rank">10</span><h2>Cellular Synthesizer</h2><p>Map newly born cells onto pitch, octave, and deterministic musical time.</p><span class="surface">exact ticks · Web Audio host</span></a>
+          <a class="demo-card" href="./evolution-arena.html" style="--card-accent:#93e86f"><span class="rank">11</span><h2>Evolution Arena</h2><p>Breed a population of sixteen rule genomes toward a target activity.</p><span class="surface">&lt;hexlife-grid&gt; · one context</span></a>
+          <a class="demo-card" href="./hex-matter.html" style="--card-accent:#5cc8ff"><span class="rank">12 · MOST COMPLEX</span><h2>Hex Matter</h2><p>Mix eight materials with gravity, buoyancy, obstacles, fire, and quenching.</p><span class="surface">block k³ · k = 8 · reactions</span></a>
+        </section>
+        <section class="reference-demos">
+          <p class="demo-kicker">Reference instruments</p>
+          <div class="reference-links"><a href="./totalistic-256.html"><strong>256-world rule atlas</strong><br />Parallel binary rule comparison</a><a href="./coffee-percolation.html"><strong>Coffee extraction lab</strong><br />Validated host-owned physical model</a><a href="./ca-builder.html"><strong>k-state CA builder</strong><br />Exact transition-table authoring</a></div>
+        </section>
+      </main>
+      <footer class="demo-footer"><p>Built with <strong>@hexlife/embed</strong> from npm.</p><nav><a href="https://www.npmjs.com/package/@hexlife/embed">npm package</a><a href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed">Package API</a><a href="./">HexLife Explorer</a></nav></footer>
+    </div>
+  </body>
+</html>
