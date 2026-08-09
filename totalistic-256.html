@@ -241,6 +241,11 @@
   }
   body.no-panel .panel { display: none; }
 
+  /* The floating escape hatch only belongs to focus mode. Without this base rule it renders in the
+     normal article and looks like the primary fullscreen control, even though clicking it can only
+     request an exit. */
+  .fullscreen-exit { display: none; }
+
   /* Fullscreen is an instrument view, not a stretched copy of the whole article. The explanatory
      shell disappears and the workspace gets the complete viewport; the stage still obeys both its
      height and width constraints, while the rail uses the remaining landscape width. The same class
@@ -268,7 +273,6 @@
     margin: 0;
   }
   body.atlas-fullscreen .fullscreen-exit {
-    display: none;
     position: fixed;
     z-index: 20;
     top: 10px;

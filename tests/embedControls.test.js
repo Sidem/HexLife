@@ -270,6 +270,7 @@ describe('totalistic showcase navigation and palette controls', () => {
 
         expect(showcase).toContain('id="fullscreenToggle"');
         expect(showcase).toContain('id="fullscreenExit"');
+        expect(showcase).toContain('.fullscreen-exit { display: none; }');
         expect(showcase).toContain('body.demo-page.atlas-fullscreen');
         expect(showcase).toContain('body.atlas-fullscreen .demo-masthead');
         expect(showcase).toContain('body.atlas-fullscreen .demo-footer');
