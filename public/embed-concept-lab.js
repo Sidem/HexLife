@@ -9,6 +9,11 @@ import {
 } from '@hexlife/embed/ca';
 import '@hexlife/embed/ca-element';
 /* eslint-enable import/no-unresolved */
+import {
+  openCentralMembrane,
+  sealPerimeter,
+  sealVerticalSeam,
+} from './embed-concept-boundaries.js';
 
 const PACKAGE_VERSION = '1.7.1';
 const DEFAULT_BINARY_RULE = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6';
@@ -30,8 +35,8 @@ const concepts = [
     id: 'crystal-garden', href: 'crystal-garden.html', title: 'Crystal Garden',
     kicker: 'Four-state growth model', deck: 'Grow sixfold crystals from vapor, boundaries, seeds, and impurities.',
     complexity: '02 · gentle', accent: '#8ad5ff', rgb: '138, 213, 255', kind: 'ca', surface: '<hexlife-ca> · neighborhood k⁷',
-    experiment: 'A crystal advances only through its boundary layer. Impurities pin the front, while the supersaturation control changes how much local support a vapor cell needs before joining it.',
-    packageNote: 'A four-state radius-one table is materialized once in JavaScript and then executed entirely in Wasm.',
+    experiment: 'A crystal advances only through its boundary layer. Impurities pin the front, while the supersaturation control changes how much local support a vapor cell needs before joining it. A static impurity rim isolates the garden from the engine’s toroidal wrap.',
+    packageNote: 'A four-state radius-one table is materialized once in JavaScript and then executed entirely in Wasm.', topology: 'sealed impurity rim',
     states: 4, rows: 72, backend: 'neighborhood', speed: 18,
     palette: ['#08121a', '#dff5ff', '#5ab9e8', '#735f8d'], names: ['vapor', 'crystal', 'growth front', 'impurity'], focusState: 1,
     parameter: {label: 'Supersaturation', min: 1, max: 3, value: 2, suffix: ' neighbors'}, actionLabel: 'Add crystal seed',
@@ -41,8 +46,8 @@ const concepts = [
     id: 'hex-ecology', href: 'hex-ecology.html', title: 'Hex Ecology',
     kicker: 'Cyclic spatial ecosystem', deck: 'Watch three species chase one another through migration waves and refuges.',
     complexity: '03 · gentle', accent: '#89e49f', rgb: '137, 228, 159', kind: 'ca', surface: '<hexlife-ca> · census()',
-    experiment: 'Lichen, grazers, and hunters form a cyclic food web. Local invasion makes rotating fronts; empty refuges let a species survive a wave that would erase it in a perfectly mixed population.',
-    packageNote: 'The state census turns the automaton into a population experiment without copying or interpreting Wasm memory.',
+    experiment: 'Lichen, grazers, and hunters form a cyclic food web. Local invasion makes rotating fronts; empty refuges let a species survive a wave that would erase it in a perfectly mixed population. Here the torus is intentional: it removes privileged edge refuges.',
+    packageNote: 'The state census turns the automaton into a population experiment without copying or interpreting Wasm memory.', topology: 'intentional toroidal habitat',
     states: 4, rows: 72, backend: 'neighborhood', speed: 20,
     palette: ['#0a1116', '#68d391', '#f6c85f', '#ef7185'], names: ['empty refuge', 'lichen', 'grazer', 'hunter'], focusState: 2,
     parameter: {label: 'Invasion pressure', min: 1, max: 4, value: 2, suffix: ' predators'}, actionLabel: 'Migration pulse',
@@ -52,8 +57,8 @@ const concepts = [
     id: 'excitable-tissue', href: 'excitable-tissue.html', title: 'Excitable Tissue Lab',
     kicker: 'Wave and refractory dynamics', deck: 'Launch pulses, make spiral waves, and interrupt them with inert scars.',
     complexity: '04 · moderate', accent: '#ff7e9d', rgb: '255, 126, 157', kind: 'ca', surface: '<hexlife-ca> · host interventions',
-    experiment: 'Excited tissue fires once, becomes refractory, then recovers. The refractory delay prevents a wave from immediately turning back; scars split fronts and can anchor persistent spirals.',
-    packageNote: 'Directional slots are available, but this model deliberately treats all six neighbors equally to preserve the lattice’s sixfold symmetry.',
+    experiment: 'Excited tissue fires once, becomes refractory, then recovers. The refractory delay prevents a wave from immediately turning back; scars split fronts and can anchor persistent spirals. A scar rim makes this a finite tissue sheet rather than a hidden torus.',
+    packageNote: 'Directional slots are available, but this model deliberately treats all six neighbors equally to preserve the lattice’s sixfold symmetry.', topology: 'sealed scar rim',
     states: 4, rows: 72, backend: 'neighborhood', speed: 24,
     palette: ['#15121c', '#fff08a', '#e44d7d', '#4b5365'], names: ['resting', 'excited', 'refractory', 'scar'], focusState: 1,
     parameter: {label: 'Excitation threshold', min: 1, max: 3, value: 1, suffix: ' neighbors'}, actionLabel: 'Stimulate edge',
@@ -63,8 +68,8 @@ const concepts = [
     id: 'mixing-chamber', href: 'mixing-chamber.html', title: 'Diffusion & Mixing Chamber',
     kicker: 'Exactly conserved block dynamics', deck: 'Open a membrane and watch two particle populations mix without losing a single particle.',
     complexity: '05 · moderate', accent: '#d7a7ff', rgb: '215, 167, 255', kind: 'ca', surface: '/ca block backend · conservation',
-    experiment: 'Amber and cyan particles begin on opposite sides of a wall. Triangle rewrites are permutations, so every per-state count remains exact while local rotations produce macroscopic mixing.',
-    packageNote: 'isConservative() verifies the complete k³ rule table before the model starts; census() checks the invariant while it runs.',
+    experiment: 'Amber and cyan particles begin on opposite sides of a wall. A second wall seals the invisible torus seam, so the reservoirs meet only when the visible gate opens. Triangle rewrites are permutations, preserving every particle count exactly.',
+    packageNote: 'isConservative() verifies the complete k³ rule table before the model starts; census() checks the invariant while it runs.', topology: 'two sealed reservoirs',
     states: 4, rows: 72, backend: 'block', speed: 20,
     palette: ['#0b1118', '#f0ad5f', '#57c7ff', '#606a78'], names: ['empty', 'amber particle', 'cyan particle', 'membrane'], focusState: 1,
     parameter: {label: 'Agitation', min: 1, max: 4, value: 3, suffix: ''}, actionLabel: 'Open membrane',
@@ -74,8 +79,8 @@ const concepts = [
     id: 'wildfire-command', href: 'wildfire-command.html', title: 'Wildfire Command',
     kicker: 'Directional intervention sandbox', deck: 'Race a wind-driven fire front by cutting a break into the forest.',
     complexity: '06 · involved', accent: '#ff8a55', rgb: '255, 138, 85', kind: 'ca', surface: '<hexlife-ca> · anisotropic rule',
-    experiment: 'The neighbor table knows which of the six directions contains fire, so wind can bias spread without changing the lattice. A firebreak is a direct host edit to the exact state.',
-    packageNote: 'This deliberately uses the neighborhood backend’s anisotropy: physical symmetry is broken only where the wind says it should be.',
+    experiment: 'The neighbor table knows which of the six directions contains fire, so wind can bias spread without changing the lattice. A persistent clearing rim prevents the front from wrapping behind the firebreak.',
+    packageNote: 'This deliberately uses the neighborhood backend’s anisotropy: physical symmetry is broken only where the wind says it should be.', topology: 'sealed clearing rim',
     states: 4, rows: 72, backend: 'neighborhood', speed: 16,
     palette: ['#0d1216', '#2f9e56', '#ffcf4d', '#6b5047'], names: ['clearing', 'forest', 'fire', 'ash'], focusState: 2,
     parameter: {label: 'Wind strength', min: 0, max: 3, value: 2, suffix: ''}, actionLabel: 'Cut firebreak',
@@ -85,8 +90,8 @@ const concepts = [
     id: 'outbreak-counterfactuals', href: 'outbreak-counterfactuals.html', title: 'Outbreak Counterfactuals',
     kicker: 'Deterministic intervention study', deck: 'Vaccinate a ring, replay the identical outbreak, and measure what the intervention changed.',
     complexity: '07 · involved', accent: '#65d7d0', rgb: '101, 215, 208', kind: 'ca', surface: '<hexlife-ca> · exact reset',
-    experiment: 'Susceptible cells become infectious from local exposure, then recover. Because reset restores the authored initial state exactly, intervention and no-intervention runs are true counterfactuals.',
-    packageNote: 'The host owns policy timing while the package owns deterministic stepping, cell validation, rendering, and state census.',
+    experiment: 'Susceptible cells become infectious from local exposure, then recover. Because reset restores the authored initial state exactly, intervention and no-intervention runs are true counterfactuals. The toroidal population is intentional, avoiding an artificial safe edge.',
+    packageNote: 'The host owns policy timing while the package owns deterministic stepping, cell validation, rendering, and state census.', topology: 'intentional toroidal population',
     states: 4, rows: 72, backend: 'neighborhood', speed: 14,
     palette: ['#4c94c6', '#ff6577', '#4e5662', '#76d68d'], names: ['susceptible', 'infectious', 'recovered', 'vaccinated'], focusState: 1,
     parameter: {label: 'Exposure threshold', min: 1, max: 3, value: 2, suffix: ' contacts'}, actionLabel: 'Vaccinate ring',
@@ -96,36 +101,36 @@ const concepts = [
     id: 'butterfly-microscope', href: 'butterfly-microscope.html', title: 'Butterfly Microscope',
     kicker: 'Paired deterministic experiment', deck: 'Flip one cell and measure how quickly two otherwise identical worlds disagree.',
     complexity: '08 · advanced', accent: '#ae9cff', rgb: '174, 156, 255', kind: 'butterfly', surface: '2 × <hexlife-world> · snapshotCells()',
-    experiment: 'Both simulations use the same rule, seed, density, and clock. The right world receives one controlled perturbation; every later difference is causally downstream of that edit.',
+    experiment: 'Both simulations use the same rule, seed, density, clock, and toroidal topology. The right world receives one controlled perturbation; every later difference is causally downstream of that edit.',
     packageNote: 'Snapshots make a stable XOR measurement while checksums prove when the worlds are identical without transferring Wasm memory.',
   },
   {
     id: 'containment', href: 'containment.html', title: 'Containment',
     kicker: 'Shareable cellular puzzle', deck: 'Spend a tiny intervention budget, then survive an eighty-generation deterministic trial.',
     complexity: '09 · advanced', accent: '#f0cc68', rgb: '240, 204, 104', kind: 'containment', surface: '<hexlife-world> · draw · HXW1',
-    experiment: 'Every pointer stroke costs one intervention. Remove or add cells, then lock the board and run the trial. The resulting exact world can be copied as a challenge or solution code.',
+    experiment: 'Every pointer stroke costs one intervention. The board wraps, so an edge is not a free shelter. Remove or add cells, then lock the board and run the trial; the exact result can be copied as a challenge or solution code.',
     packageNote: 'Drawing, exact stepping, activeCount, reset, and world-code capture provide the complete puzzle substrate; scoring remains host-owned.',
   },
   {
     id: 'cellular-synth', href: 'cellular-synth.html', title: 'Cellular Synthesizer',
     kicker: 'Deterministic generative instrument', deck: 'Turn births across the hex lattice into a repeatable stream of notes.',
     complexity: '10 · advanced', accent: '#ff85c8', rgb: '255, 133, 200', kind: 'synth', surface: '<hexlife-world> · Web Audio host',
-    experiment: 'Horizontal position chooses pitch, vertical position chooses octave, and newly born cells trigger the notes. The automaton is the score; the browser’s audio graph is only its instrument.',
+    experiment: 'Horizontal position chooses pitch, vertical position chooses octave, and newly born cells trigger the notes. The score wraps continuously with its world; the browser’s audio graph is only its instrument.',
     packageNote: 'The host diffs safe snapshots after each exact tick. No audio concern or timing policy leaks into the simulation package.',
   },
   {
     id: 'evolution-arena', href: 'evolution-arena.html', title: 'Evolution Arena',
     kicker: 'Parallel ruleset search', deck: 'Breed sixteen rule genomes toward a chosen activity level on one shared initial condition.',
     complexity: '11 · expert', accent: '#93e86f', rgb: '147, 232, 111', kind: 'evolution', surface: '<hexlife-grid> · 1 WebGL context',
-    experiment: 'Every candidate receives the same cells and tick budget. The four rules closest to the target activity reproduce with bit mutations, making selection visible as an evolving wall of worlds.',
+    experiment: 'Every candidate receives the same toroidal cells and tick budget, so no rule receives an edge advantage. The four rules closest to the target activity reproduce with bit mutations.',
     packageNote: 'One shared WebGL2 context keeps a population experiment viable where sixteen independent canvas elements would hit the browser context limit.',
   },
   {
     id: 'hex-matter', href: 'hex-matter.html', title: 'Hex Matter',
     kicker: 'Eight-state material sandbox', deck: 'Pour sand, water, oil, steam, ember, plants, and stone into a conservative particle world with local reactions.',
     complexity: '12 · most complex', accent: '#5cc8ff', rgb: '92, 200, 255', kind: 'ca', surface: '/ca block backend · k = 8',
-    experiment: 'Dense materials fall through lighter ones, steam rises, embers consume oil and plants, and water quenches heat. Static stone shapes the flow while the material census exposes every source and sink.',
-    packageNote: 'The 8³ block table combines conservative transport with explicit reactions. The model reports when it intentionally stops conserving per-state counts.',
+    experiment: 'Dense materials fall through lighter ones, steam rises, embers consume oil and plants, and water quenches heat. A stone vessel seals every wrap seam while the material census exposes each source and sink.',
+    packageNote: 'The 8³ block table combines conservative transport with explicit reactions. The model reports when it intentionally stops conserving per-state counts.', topology: 'sealed stone vessel',
     states: 8, rows: 72, backend: 'block', speed: 24,
     palette: ['#091018', '#3ba7ff', '#e5a84b', '#d6bd78', '#65717f', '#ff654f', '#d9f2ff', '#61ae5b'],
     names: ['air', 'water', 'oil', 'sand', 'stone', 'ember', 'steam', 'plant'], focusState: 3,
@@ -251,7 +256,7 @@ function setupCaLab(item) {
   world.addEventListener('hexlife-ca-ready', () => {
     installModel();
     ready = true;
-    setText('stage-status', `${item.backend} · k = ${item.states} · ${world.rows} × ${world.columns}`);
+    setText('stage-status', `${item.backend} · k = ${item.states} · ${world.rows} × ${world.columns} · ${item.topology}`);
     setText('control-status', 'Ready. Run, step, paint, or apply the intervention.');
     update();
   }, {once: true});
@@ -493,7 +498,7 @@ function rng(seed) { let value = seed >>> 0; return () => { value = (value + 0x6
 function indexOf(row, column, rows, columns) { return ((row + rows) % rows) * columns + ((column + columns) % columns); }
 
 function crystalRule(threshold) { return ruleFromTable(4, (center, neighbors) => { const crystals = neighbors.filter((value) => value === 1).length; const fronts = neighbors.filter((value) => value === 2).length; if (center === 1 || center === 3) return center; if (center === 2) return crystals || fronts >= 2 ? 1 : 2; return crystals >= threshold || (crystals && fronts >= 2) ? 2 : 0; }); }
-function seedCrystal(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xc7a57a1); for (let i = 0; i < cells.length; i++) if (random() < 0.014) cells[i] = 3; const r = Math.floor(rows / 2); const c = Math.floor(columns / 2); cells[indexOf(r, c, rows, columns)] = 1; for (let d = 0; d < 6; d++) cells[indexOf(r + (d % 2), c + d - 3, rows, columns)] = 1; return cells; }
+function seedCrystal(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xc7a57a1); for (let i = 0; i < cells.length; i++) if (random() < 0.014) cells[i] = 3; const r = Math.floor(rows / 2); const c = Math.floor(columns / 2); cells[indexOf(r, c, rows, columns)] = 1; for (let d = 0; d < 6; d++) cells[indexOf(r + (d % 2), c + d - 3, rows, columns)] = 1; return sealPerimeter(cells, rows, columns, 3); }
 function addCrystalSeed(world) { const cells = world.world.snapshotCells(); const r = Math.floor(world.rows * 0.3); const c = Math.floor(world.columns * 0.68); for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) cells[indexOf(r + dr, c + dc, world.rows, world.columns)] = 1; world.setCells(cells); }
 
 function ecologyRule(threshold) { return ruleFromTable(4, (center, neighbors) => { const counts = [0, 0, 0, 0]; neighbors.forEach((value) => counts[value]++); if (center === 0) { const best = [1, 2, 3].sort((a, b) => counts[b] - counts[a])[0]; return counts[best] >= threshold + 1 ? best : 0; } const predator = center % 3 + 1; return counts[predator] >= threshold ? predator : center; }); }
@@ -501,15 +506,15 @@ function seedEcology(rows, columns) { const cells = new Uint8Array(rows * column
 function ecologyPulse(world) { const cells = world.world.snapshotCells(); const r0 = Math.floor(world.rows * 0.25); const c0 = Math.floor(world.columns * 0.25); for (let r = r0 - 4; r <= r0 + 4; r++) for (let c = c0 - 4; c <= c0 + 4; c++) cells[indexOf(r, c, world.rows, world.columns)] = 1; world.setCells(cells); }
 
 function tissueRule(threshold) { return ruleFromTable(4, (center, neighbors) => { if (center === 3) return 3; if (center === 1) return 2; if (center === 2) return 0; const excited = neighbors.filter((value) => value === 1).length; return excited >= threshold && excited <= threshold + 2 ? 1 : 0; }); }
-function seedTissue(rows, columns) { const cells = new Uint8Array(rows * columns); for (let r = 0; r < rows; r++) { if (r % 17 === 0) cells[indexOf(r, Math.floor(columns * 0.62), rows, columns)] = 3; if (r > rows * 0.2 && r < rows * 0.8) cells[indexOf(r, Math.floor(columns * 0.68), rows, columns)] = 3; } for (let c = 0; c < columns; c++) cells[indexOf(Math.floor(rows / 2), c, rows, columns)] = c < 3 ? 1 : 0; return cells; }
-function stimulateTissue(world) { const cells = world.world.snapshotCells(); for (let r = 0; r < world.rows; r++) if (r % 2 === 0) cells[indexOf(r, 2, world.rows, world.columns)] = 1; world.setCells(cells); }
+function seedTissue(rows, columns) { const cells = new Uint8Array(rows * columns); for (let r = 0; r < rows; r++) { if (r % 17 === 0) cells[indexOf(r, Math.floor(columns * 0.62), rows, columns)] = 3; if (r > rows * 0.2 && r < rows * 0.8) cells[indexOf(r, Math.floor(columns * 0.68), rows, columns)] = 3; } sealPerimeter(cells, rows, columns, 3); for (let c = 3; c < 6; c++) cells[indexOf(Math.floor(rows / 2), c, rows, columns)] = 1; return cells; }
+function stimulateTissue(world) { const cells = world.world.snapshotCells(); for (let r = 2; r < world.rows - 2; r++) if (r % 2 === 0) cells[indexOf(r, 3, world.rows, world.columns)] = 1; world.setCells(cells); }
 
 function mixingRule(agitation) { return blockRuleFromTable(4, ([a, b, c]) => { if (a === 3 || b === 3 || c === 3) return [a, b, c]; const phase = (a * 5 + b * 3 + c + agitation) % 5; return phase < agitation ? [c, a, b] : [b, c, a]; }); }
-function seedMixing(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xd1ff05); const mid = Math.floor(columns / 2); for (let r = 0; r < rows; r++) for (let c = 0; c < columns; c++) { const index = r * columns + c; if (Math.abs(c - mid) <= 1) cells[index] = 3; else if (random() < 0.58) cells[index] = c < mid ? 1 : 2; } return cells; }
-function openMembrane(world) { const cells = world.world.snapshotCells(); const mid = Math.floor(world.columns / 2); for (let r = Math.floor(world.rows * 0.38); r < Math.ceil(world.rows * 0.62); r++) for (let dc = -1; dc <= 1; dc++) cells[indexOf(r, mid + dc, world.rows, world.columns)] = 0; world.setCells(cells); }
+function seedMixing(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xd1ff05); const mid = Math.floor(columns / 2); for (let r = 0; r < rows; r++) for (let c = 0; c < columns; c++) { const index = r * columns + c; if (Math.abs(c - mid) <= 1) cells[index] = 3; else if (random() < 0.58) cells[index] = c < mid ? 1 : 2; } return sealVerticalSeam(cells, rows, columns, 3); }
+function openMembrane(world) { const cells = world.world.snapshotCells(); openCentralMembrane(cells, world.rows, world.columns); world.setCells(cells); }
 
-function wildfireRule(wind) { return ruleFromTable(4, (center, neighbors) => { if (center === 2) return 3; if (center === 3) return neighbors.filter((value) => value === 1).length >= 5 ? 1 : 3; if (center !== 1) return center; const weights = [1, 1, 1, 1 + wind, 1 + wind, 1]; const exposure = neighbors.reduce((sum, value, index) => sum + (value === 2 ? weights[index] : 0), 0); return exposure >= 2 ? 2 : 1; }); }
-function seedWildfire(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xf1ae); for (let i = 0; i < cells.length; i++) cells[i] = random() < 0.72 ? 1 : 0; for (let r = 0; r < rows; r++) if (r % 3 !== 0) cells[indexOf(r, 4, rows, columns)] = 2; return cells; }
+function wildfireRule(wind) { return ruleFromTable(4, (center, neighbors) => { if (center === 2) return 3; if (center === 3) return neighbors.filter((value) => value === 1).length >= 5 ? 1 : 3; if (center !== 1) return center; const weights = [1 + wind, 1 + wind, 1, 1, 1, 1]; const exposure = neighbors.reduce((sum, value, index) => sum + (value === 2 ? weights[index] : 0), 0); return exposure >= 2 ? 2 : 1; }); }
+function seedWildfire(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0xf1ae); for (let i = 0; i < cells.length; i++) cells[i] = random() < 0.72 ? 1 : 0; for (let r = 2; r < rows - 2; r++) if (r % 3 !== 0) cells[indexOf(r, 4, rows, columns)] = 2; return sealPerimeter(cells, rows, columns, 0); }
 function cutFirebreak(world) { const cells = world.world.snapshotCells(); const col = Math.floor(world.columns * 0.58); for (let r = 0; r < world.rows; r++) for (let dc = -1; dc <= 1; dc++) cells[indexOf(r, col + dc, world.rows, world.columns)] = 0; world.setCells(cells); }
 
 function outbreakRule(threshold) { return ruleFromTable(4, (center, neighbors) => { if (center === 1) return 2; if (center === 2 || center === 3) return center; const infectious = neighbors.filter((value) => value === 1).length; return infectious >= threshold ? 1 : 0; }); }
@@ -517,7 +522,7 @@ function seedOutbreak(rows, columns) { const cells = new Uint8Array(rows * colum
 function vaccinateRing(world) { const cells = world.world.snapshotCells(); const rr = Math.floor(world.rows / 2); const cc = Math.floor(world.columns / 2); const radius = Math.floor(Math.min(world.rows, world.columns) * 0.21); for (let r = 0; r < world.rows; r++) for (let c = 0; c < world.columns; c++) { const distance = Math.hypot(r - rr, c - cc); if (Math.abs(distance - radius) < 1.4 && cells[r * world.columns + c] === 0) cells[r * world.columns + c] = 3; } world.setCells(cells); }
 
 function matterRule(gravity) { const density = [0, 3, 2, 5, 9, 1, -1, 8]; return blockRuleFromTable(8, (block) => { const out = [...block]; const ember = out.indexOf(5); const water = out.indexOf(1); const oil = out.indexOf(2); const plant = out.indexOf(7); if (ember !== -1 && water !== -1) { out[ember] = 6; out[water] = 4; } else if (ember !== -1 && oil !== -1) out[oil] = 5; else if (ember !== -1 && plant !== -1) out[plant] = 5; const movable = (state) => state !== 4 && state !== 7; const swap = (a, b) => { [out[a], out[b]] = [out[b], out[a]]; }; if (gravity > 0 && movable(out[0]) && movable(out[2]) && density[out[0]] > density[out[2]]) swap(0, 2); else if (gravity > 1 && movable(out[0]) && movable(out[1]) && out[2] !== 0 && density[out[0]] > density[out[1]]) swap(0, 1); else if (gravity > 2 && movable(out[1]) && movable(out[2]) && out[0] !== 0 && density[out[1]] > density[out[2]]) swap(1, 2); return out; }); }
-function seedMatter(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0x6a77e2); for (let r = Math.floor(rows * 0.82); r < rows; r++) for (let c = 0; c < columns; c++) cells[r * columns + c] = 4; for (let r = Math.floor(rows * 0.16); r < rows * 0.42; r++) for (let c = 5; c < columns - 5; c++) { const p = random(); cells[r * columns + c] = p < 0.18 ? 3 : p < 0.27 ? 1 : p < 0.34 ? 2 : 0; } for (let r = Math.floor(rows * 0.58); r < rows * 0.8; r++) cells[indexOf(r, Math.floor(columns * 0.72), rows, columns)] = 7; cells[indexOf(Math.floor(rows * 0.64), Math.floor(columns * 0.68), rows, columns)] = 5; return cells; }
+function seedMatter(rows, columns) { const cells = new Uint8Array(rows * columns); const random = rng(0x6a77e2); for (let r = Math.floor(rows * 0.82); r < rows; r++) for (let c = 0; c < columns; c++) cells[r * columns + c] = 4; for (let r = Math.floor(rows * 0.16); r < rows * 0.42; r++) for (let c = 5; c < columns - 5; c++) { const p = random(); cells[r * columns + c] = p < 0.18 ? 3 : p < 0.27 ? 1 : p < 0.34 ? 2 : 0; } for (let r = Math.floor(rows * 0.58); r < rows * 0.8; r++) cells[indexOf(r, Math.floor(columns * 0.72), rows, columns)] = 7; cells[indexOf(Math.floor(rows * 0.64), Math.floor(columns * 0.68), rows, columns)] = 5; return sealPerimeter(cells, rows, columns, 4); }
 function dropMatter(world) { const cells = world.world.snapshotCells(); const random = rng(world.generation + 99); for (let r = 2; r < 9; r++) for (let c = Math.floor(world.columns * 0.25); c < world.columns * 0.75; c++) if (random() < 0.55) cells[r * world.columns + c] = [1, 2, 3][Math.floor(random() * 3)]; world.setCells(cells); }
 
 function playBirths(context, births, columns, accent) {
