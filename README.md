@@ -300,7 +300,9 @@ without Explorer internals or a local build.
 > 16×16 map of 96×112-cell worlds sharing an initial condition. Switch the constraint and the same
 > map becomes a random slice of a space too big to draw: 256 of the 2¹⁴ outer-totalistic rules, of
 > the 2²⁶ dihedral or 2²⁸ rotational ones, or of all 2¹²⁸. Built entirely with this package; the
-> 2.75M cells it draws each frame cost about 0.8 ms.
+> 2.75M cells it draws each frame cost about 0.8 ms. Press **Fullscreen** or <kbd>F</kbd> for the
+> workspace-only instrument view; `?focus=1` opens that layout directly without requiring the
+> browser Fullscreen API.
 
 ```html
 <hexlife-grid layout="16x16" rows="96" seed="12345" palette="monochrome" flicker-proof></hexlife-grid>

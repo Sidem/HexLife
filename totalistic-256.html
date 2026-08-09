@@ -241,10 +241,76 @@
   }
   body.no-panel .panel { display: none; }
 
+  /* Fullscreen is an instrument view, not a stretched copy of the whole article. The explanatory
+     shell disappears and the workspace gets the complete viewport; the stage still obeys both its
+     height and width constraints, while the rail uses the remaining landscape width. The same class
+     is also the fallback focus mode when the browser refuses the native Fullscreen API. */
+  body.demo-page.atlas-fullscreen {
+    overflow: hidden;
+    padding: 0;
+    background: var(--bg);
+  }
+  body.atlas-fullscreen > .demo-shell {
+    width: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: clamp(8px, 1vw, 14px);
+  }
+  body.atlas-fullscreen .demo-masthead,
+  body.atlas-fullscreen .about,
+  body.atlas-fullscreen .demo-content > .footer,
+  body.atlas-fullscreen .demo-footer { display: none; }
+  body.atlas-fullscreen .demo-content { height: 100%; }
+  body.atlas-fullscreen .workspace {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+  }
+  body.atlas-fullscreen .fullscreen-exit {
+    display: none;
+    position: fixed;
+    z-index: 20;
+    top: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    border-color: var(--accent);
+    background: rgba(16, 18, 21, 0.92);
+    color: var(--accent);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  }
+  body.atlas-fullscreen.no-panel .fullscreen-exit { display: block; }
+  @media (min-width: 760px) {
+    body.atlas-fullscreen .workspace {
+      grid-template-columns: minmax(0, 1fr) clamp(18rem, 26vw, 23rem);
+      align-items: start;
+      column-gap: clamp(10px, 1vw, 16px);
+      row-gap: 8px;
+    }
+    body.atlas-fullscreen .stage { grid-column: 1; grid-row: 1; }
+    body.atlas-fullscreen .workspace .status { grid-column: 1; grid-row: 2; }
+    body.atlas-fullscreen .panel {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      max-height: var(--panel-max-h, none);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    body.atlas-fullscreen.no-panel .workspace { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 759px) {
+    body.demo-page.atlas-fullscreen { overflow: auto; }
+    body.atlas-fullscreen > .demo-shell { height: auto; min-height: 100dvh; }
+    body.atlas-fullscreen .workspace { height: auto; }
+    body.atlas-fullscreen .fullscreen-exit { display: block; }
+  }
+
   .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .panel > * { max-width: none; margin: 0; }
   /* Wrapped groups in a narrow rail do not want vertical rules between them. */
   .panel .group + .group { padding-left: 0; border-left: 0; }
+  .panel .class-group { width: 100%; min-width: 0; }
+  .panel .class-group #classSelect { flex: 1 1 0; min-width: 0; }
 
   .fold {
     background: var(--panel);
@@ -450,6 +516,8 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
 
 <div class="workspace">
 
+<button id="fullscreenExit" class="fullscreen-exit" type="button">Exit fullscreen</button>
+
 <div class="stage">
   <!-- Monochrome + flicker-proof are the Explorer's own defaults: at 71px a tile is a texture, and
        a rule-index rainbow reads as noise where plain luminance reads as structure. -->
@@ -487,6 +555,10 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
     </div>
 
     <div class="group">
+      <button id="fullscreenToggle" aria-pressed="false" title="Show only the atlas workspace and use the full screen  (F)">Fullscreen</button>
+    </div>
+
+    <div class="group">
       <label for="gridCols" title="Tiles across × tiles down. 16 × 16 is 256 — exactly the totalistic class; anything smaller is a sample of it.">Grid</label>
       <input type="number" id="gridCols" min="1" max="24" step="1" value="16" inputmode="numeric" aria-label="Tiles across">
       <span class="times">×</span>
@@ -506,7 +578,7 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
   <details class="fold" id="foldRules" open>
     <summary>Rule space <span class="hint" id="hintRules"></span></summary>
     <div class="fold-body">
-      <div class="group">
+      <div class="group class-group">
         <label for="classSelect">Class</label>
         <select id="classSelect"></select>
       </div>
@@ -578,7 +650,7 @@ grid.rulesets = draw(256, 'R', 28)          <span class="c">// …or 256 of the 
 
 </div><!-- .workspace -->
 
-<p class="footer"><b>Keys</b> <kbd>Space</kbd>/<kbd>P</kbd> play·pause · <kbd>R</kbd> reset · <kbd>G</kbd> reroll · <kbd>→</kbd>/<kbd>.</kbd> step · <kbd>C</kbd> show·hide controls</p>
+<p class="footer"><b>Keys</b> <kbd>Space</kbd>/<kbd>P</kbd> play·pause · <kbd>R</kbd> reset · <kbd>G</kbd> reroll · <kbd>→</kbd>/<kbd>.</kbd> step · <kbd>C</kbd> show·hide controls · <kbd>F</kbd> fullscreen</p>
 
 <dialog id="detail">
   <div class="detail-head">
@@ -1032,6 +1104,7 @@ stepBtn.addEventListener('click', () => { grid.tick(1); syncStatus(); });
  * short of perfect.
  */
 const STAGE_RESERVE = 56;
+const FULLSCREEN_STAGE_RESERVE = 42;
 /** Past this the map is too small to read; scrolling is the better trade. */
 const STAGE_MIN_H = 260;
 
@@ -1044,7 +1117,10 @@ const STAGE_MIN_H = 260;
  */
 function fitStage() {
   const top = stage.getBoundingClientRect().top;
-  const avail = Math.max(STAGE_MIN_H, document.documentElement.clientHeight - top - STAGE_RESERVE);
+  const reserve = document.body.classList.contains('atlas-fullscreen')
+    ? FULLSCREEN_STAGE_RESERVE
+    : STAGE_RESERVE;
+  const avail = Math.max(STAGE_MIN_H, document.documentElement.clientHeight - top - reserve);
   // On the root, not on the stage: the workspace needs the same number to decide how wide the
   // two-column layout may grow, and a custom property only travels downwards.
   const root = document.documentElement.style;
@@ -1083,6 +1159,59 @@ panelToggle.addEventListener('click', () => {
   const hidden = document.body.classList.toggle('no-panel');
   panelToggle.setAttribute('aria-pressed', String(!hidden));
   fitStage();
+});
+
+// --- workspace fullscreen ---------------------------------------------------
+const fullscreenToggle = document.getElementById('fullscreenToggle');
+const fullscreenExit = document.getElementById('fullscreenExit');
+let ownsNativeFullscreen = false;
+
+/** Apply the workspace-only layout independently of the browser's fullscreen capability. */
+function applyFullscreenLayout(active) {
+  document.body.classList.toggle('atlas-fullscreen', active);
+  fullscreenToggle.setAttribute('aria-pressed', String(active));
+  fullscreenToggle.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+  fitStage();
+  writeUrl();
+}
+
+/**
+ * Enter native fullscreen when possible, but keep the workspace focus layout if it is unavailable
+ * (notably in an iframe or a local offline copy). Exiting either mode always restores the article.
+ */
+async function setFullscreen(active) {
+  if (active) {
+    applyFullscreenLayout(true);
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+        ownsNativeFullscreen = true;
+      } catch {
+        ownsNativeFullscreen = false;
+      }
+    }
+    return;
+  }
+
+  ownsNativeFullscreen = false;
+  if (document.fullscreenElement) {
+    try { await document.exitFullscreen(); } catch { /* The focus layout can still exit. */ }
+  }
+  applyFullscreenLayout(false);
+}
+
+fullscreenToggle.addEventListener('click', () => {
+  void setFullscreen(!document.body.classList.contains('atlas-fullscreen'));
+});
+fullscreenExit.addEventListener('click', () => { void setFullscreen(false); });
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) {
+    ownsNativeFullscreen = true;
+    applyFullscreenLayout(true);
+  } else if (ownsNativeFullscreen) {
+    ownsNativeFullscreen = false;
+    applyFullscreenLayout(false);
+  }
 });
 
 // --- folds -------------------------------------------------------------------
@@ -1451,6 +1580,7 @@ function writeUrl() {
       p.set('cl', CLUSTER_KEYS.map((k) => clusterParams[k]).join(','));
       p.set('cs', clusterSeed.toString(36));
     }
+    if (document.body.classList.contains('atlas-fullscreen')) p.set('focus', '1');
     history.replaceState(null, '', `${window.location.pathname}?${p}`);
   });
 }
@@ -1585,6 +1715,7 @@ const HOTKEYS = {
   r: resetBtn,
   g: rerollBtn,
   c: panelToggle,
+  f: fullscreenToggle,
   arrowright: stepBtn,
   '.': stepBtn,
 };
@@ -1592,6 +1723,12 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const el = document.activeElement;
   if (el && (el.matches('input, select, textarea') || el.isContentEditable)) return;
+  if (e.key === 'Escape' && document.body.classList.contains('atlas-fullscreen')
+      && !document.fullscreenElement) {
+    e.preventDefault();
+    void setFullscreen(false);
+    return;
+  }
   const btn = HOTKEYS[e.key === ' ' ? ' ' : e.key.toLowerCase()];
   if (!btn) return;
   // Held keys repeat only for Step — that is scrubbing. A repeating play-pause is a strobe, and a
@@ -1617,10 +1754,13 @@ syncPresetChips();
 syncGridInputs();
 applyGridShape();
 applySample();
+// A direct workspace-only URL is useful for kiosks, captures, and hosts where native fullscreen
+// needs a user gesture. The visible button upgrades the same layout to browser fullscreen.
+if (q.get('focus') === '1') applyFullscreenLayout(true);
 
 // Debug handle, in the house style.
 window.__totalistic = {
-  grid, CLASSES, applyIC, applySample, clusterParams, setLayout, fitStage,
+  grid, CLASSES, applyIC, applySample, clusterParams, setLayout, fitStage, setFullscreen,
   get codes() { return currentCodes; },
   get icMode() { return icMode; },
   get classKey() { return classKey; },

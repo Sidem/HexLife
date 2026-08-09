@@ -265,6 +265,28 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(showcase).toContain('body.no-panel .panel { display: none; }');
     });
 
+    it('offers a workspace-only fullscreen mode with a browser-independent fallback', () => {
+        const showcase = read('totalistic-256.html');
+
+        expect(showcase).toContain('id="fullscreenToggle"');
+        expect(showcase).toContain('id="fullscreenExit"');
+        expect(showcase).toContain('body.demo-page.atlas-fullscreen');
+        expect(showcase).toContain('body.atlas-fullscreen .demo-masthead');
+        expect(showcase).toContain('body.atlas-fullscreen .demo-footer');
+        expect(showcase).toContain('body.atlas-fullscreen .workspace');
+        expect(showcase).toContain('height: 100dvh');
+        expect(showcase).toContain("document.body.classList.toggle('atlas-fullscreen', active)");
+        expect(showcase).toContain('document.documentElement.requestFullscreen()');
+        expect(showcase).toContain('document.exitFullscreen()');
+        expect(showcase).toContain("document.addEventListener('fullscreenchange'");
+        expect(showcase).toContain('FULLSCREEN_STAGE_RESERVE');
+        expect(showcase).toContain('f: fullscreenToggle');
+        expect(showcase).toContain("e.key === 'Escape'");
+        expect(showcase).toContain("q.get('focus') === '1'");
+        expect(showcase).toContain("p.set('focus', '1')");
+        expect(showcase).toContain('setFullscreen,');
+    });
+
     it('keeps a collapsed section readable and actually collapsed', () => {
         const showcase = read('totalistic-256.html');
         // `<details>` hides its children with a *UA* display rule that any author `display` outranks
@@ -311,6 +333,7 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(config).toContain('inlineDynamicImports: true');
         expect(inliner).toContain("data:application/wasm;base64,");
         expect(inliner).toContain('Standalone HTML still references runtime assets');
+        expect(inliner).toContain('() => inlineModule');
         expect(showcase).toContain('href="totalistic-256-standalone.html" download');
     });
 });

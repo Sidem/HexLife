@@ -28,7 +28,10 @@ if (relativeScriptPath.startsWith(`..${sep}`) || relativeScriptPath === '..') {
 
 const javascript = (await readFile(scriptPath, 'utf8')).replaceAll('</script', '<\\/script')
 const inlineModule = `<script type="module">\n${javascript}\n</script>`
-let standaloneHtml = html.replace(moduleScripts[0][0], inlineModule)
+// A bundled program can legitimately contain replacement tokens such as `$&`. Passing it directly
+// as the replacement string would expand those tokens and reinsert the external script tag into the
+// supposedly standalone document; a callback returns the bundle literally.
+let standaloneHtml = html.replace(moduleScripts[0][0], () => inlineModule)
 
 // The live demos share one presentation shell. Vite emits that stylesheet as a local asset, so the
 // offline atlas must inline it alongside the module rather than quietly becoming network-dependent.
@@ -45,7 +48,7 @@ for (const stylesheet of stylesheets) {
     throw new Error(`Generated stylesheet escaped the staging directory: ${stylesheetUrl}`)
   }
   const css = (await readFile(stylesheetPath, 'utf8')).replaceAll('</style', '<\\/style')
-  standaloneHtml = standaloneHtml.replace(stylesheet[0], `<style>\n${css}\n</style>`)
+  standaloneHtml = standaloneHtml.replace(stylesheet[0], () => `<style>\n${css}\n</style>`)
 }
 
 const externalResourcePattern = /<(?:script|link|img|source|audio|video|object|embed|iframe)\b[^>]*\b(?:src|href|data)="(?!data:|#)([^"]+)"[^>]*>/gi
