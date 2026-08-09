@@ -500,7 +500,8 @@
   Each tick rewrites every triangle through five steps. <b>Dissolve</b> moves one unit of solute from
   a grain's solid into the liquid it already holds — no neighbour required, because this is
   intraparticle diffusion, and it is gated on the partition slot so that a grain gets one step per
-  three ticks at a coarse grind and one per tick at a fine one. Moroney et&nbsp;al. measure that
+  three ticks at a coarse grind and one per tick at a fine one.
+  <a href="https://doi.org/10.1186/s13362-016-0024-6">Moroney et&nbsp;al.</a> measure that
   timescale at 42&nbsp;s fine to 270&nbsp;s coarse against a transit time of seconds, which is why it
   has to be decoupled from flow. Then <b>imbibe</b>, <b>wick</b> and <b>drain</b> move one liquid
   unit each; then <b>disperse</b> mixes two free parcels two grades apart; then <b>fall</b>.
@@ -509,7 +510,7 @@
   <b>Drainage is downward-only while imbibition accepts from any direction.</b> That asymmetry is
   capillary retention, and it is the one free parameter with a real experimental target: a brewed bed
   holds about 2&nbsp;mL of liquid per gram of coffee, which for a pour-over is roughly 12% of what
-  you pour. At the defaults this model retains <b>16%</b>, and 0.4–25% across the packing slider.
+  you pour. At the defaults this model retains <b>14%</b>, and 0.3–20% across the packing slider.
 </p>
 
 <h2>Gravity points down</h2>
@@ -573,7 +574,7 @@
   In a full brew the signature is the tallest standing column of free liquid left in the bed at the
   finish. At the dual lab's defaults it goes from <b>44 cells</b> to <b>9</b>, and the water that was
   standing in those towers is water that was not in a grain: retained liquid falls from 16.0% of the
-  pour to 13.9% and extraction rises slightly, 64.0% to <b>64.7%</b>. In the six-state lab, where
+  pour to 13.7% and extraction rises slightly, 64.0% to <b>65.8%</b>. In the six-state lab, where
   gravity is the only transport there is, the tallest column goes from <b>62</b> to <b>11</b>.
 </p>
 <h2>The other half of gravity: the partition was left-handed</h2>
@@ -640,7 +641,7 @@
   mirrored grid has no region the engine can prove is unchanged; at these sizes that is not worth
   measuring. The real cost is that the drift had been doing work: a front marching sideways as it
   descends sweeps far more of the bed than one going straight down, so extraction at this lab's
-  defaults fell from 85% to <b>65%</b> and never-wetted rose from 0.8% to <b>3.9%</b>. Those higher
+  defaults fell from 85% to <b>66%</b> and never-wetted rose from 0.8% to <b>3.2%</b>. Those higher
   numbers were the artefact, not the achievement. The centre stream is the clearest case — it now
   channels, leaving 84% of the bed dry, which is exactly what a stream poured into one spot should do
   and what the six-state lab next door has been saying all along.
@@ -662,12 +663,12 @@
 </p>
 <table class="stat" style="max-width:620px">
   <tr><th>packing</th><th style="text-align:right">extracted</th><th style="text-align:right">never wetted</th><th style="text-align:right">retained</th><th style="text-align:right">cup strength</th></tr>
-  <tr><th>0.25</th><td>63.0%</td><td>9.0%</td><td>18.5%</td><td>31.8%</td></tr>
-  <tr><th>0.35</th><td>65.3%</td><td>5.4%</td><td>18.1%</td><td>50.3%</td></tr>
-  <tr><th>0.45</th><td>64.7%</td><td>3.9%</td><td>13.9%</td><td>63.7%</td></tr>
-  <tr><th>0.55</th><td>60.9%</td><td>3.0%</td><td>8.3%</td><td>71.8%</td></tr>
-  <tr><th>0.65</th><td>45.9%</td><td>3.8%</td><td>4.1%</td><td>63.1%</td></tr>
-  <tr class="sep"><th>0.75</th><td>24.2%</td><td>6.9%</td><td>1.6%</td><td>37.7%</td></tr>
+  <tr><th>0.25</th><td>64.6%</td><td>8.2%</td><td>19.7%</td><td>32.0%</td></tr>
+  <tr><th>0.35</th><td>67.8%</td><td>4.3%</td><td>17.3%</td><td>51.9%</td></tr>
+  <tr><th>0.45</th><td>65.8%</td><td>3.2%</td><td>13.7%</td><td>64.6%</td></tr>
+  <tr><th>0.55</th><td>62.2%</td><td>2.3%</td><td>7.9%</td><td>73.7%</td></tr>
+  <tr><th>0.65</th><td>48.9%</td><td>2.9%</td><td>3.8%</td><td>66.9%</td></tr>
+  <tr class="sep"><th>0.75</th><td>23.1%</td><td>6.3%</td><td>1.3%</td><td>35.8%</td></tr>
 </table>
 <p style="margin-top:10px">
   <b>The puck no longer chokes.</b> The six-state model stops delivering anything at all to the cup
@@ -675,18 +676,25 @@
   them. This one gets the whole 30% in at every packing on its slider, all the way to 0.85 — which is
   what a real puck does, since a real intergranular porosity of ~0.1 is far below any 2D threshold
   and the bed conducts anyway. What falls away at the top of the slider is not intake but contact
-  time: at 0.85 the water gets through and takes only 6.8% of the solubles with it.
-  <b>And the bed gets wetted.</b> Never-wetted sits between 3 and 9% across the useful range; at the
+  time: at 0.85 the water gets through and takes only 5.3% of the solubles with it.
+  <b>And the bed gets wetted.</b> Never-wetted sits between 2 and 10% across the useful range; at the
   same packing of 0.45 the six-state model leaves <b>67%</b> of its bed untouched. Turn wicking off
   with the checkbox, press <em>New brew</em>, and at the defaults never-wetted jumps to <b>30%</b>
-  while extraction falls from 65% to <b>39%</b> — the single clearest demonstration on this page of
+  while extraction falls from 66% to <b>38%</b> — the single clearest demonstration on this page of
   what grain-to-grain transport is for, and of why a model whose grains are walls cannot reach most
   of its own bed.
 </p>
 <p class="facts">
   Grind is the cleanest control here, and it is the one the six-state model could not express at all:
-  at packing 0.45 it moves extraction 64.7% → 77.3% → 86.4% across coarse, medium and fine, purely by
+  at packing 0.45 it moves extraction 65.8% → 78.7% → 88.1% across coarse, medium and fine, purely by
   changing how fast solubles leave the solid, with the flow field untouched.
+</p>
+<p class="facts">
+  <b>Completion is transport-aware.</b> A moving parcel does not necessarily change any of the four
+  monotone progress counters while it crosses empty headspace or an already-wet path. The old fixed
+  240-tick silence test could therefore finish the 300-row, shallow-bed preset before the wetting
+  front reached the puck. The allowance now scales to one complete six-map partition/handedness
+  period per row; ticks-per-frame still changes only playback speed, never the result.
 </p>
 
 </section>
@@ -840,7 +848,7 @@
 <p>
   Which is exactly what the <b>dual-porosity</b> tab demonstrates: once grains can carry liquid
   themselves, the cliff turns into a smooth decline in throughput and the bed is still taking the
-  whole pour at a packing of 0.85, with 11% of it never wetted. This model's slider stops at 0.75,
+  whole pour at a packing of 0.85, with 12.5% of it never wetted. This model's slider stops at 0.75,
   and by then 98% of its bed has never seen water and the cup is empty. That is a strictly better
   story than this one, not a worse one — the lattice mathematics above is untouched,
   it simply stops being asked to carry a claim about coffee that it cannot support.
@@ -870,6 +878,11 @@ import {
     ruleFromTable,
 } from '@hexlife/embed/ca';
 import '@hexlife/embed/ca-element';
+import {
+    buildHexMirror,
+    injectionColumns as scheduledInjectionColumns,
+    quietTickLimit,
+} from './coffee-percolation-physics.js';
 
 // ===========================================================================
 // PART 1 — the six-state extraction lab
@@ -919,7 +932,7 @@ const extractionRule = blockRuleFromTable(6, (block) => {
     // 3. FALL. Gravity, routed through the partition's bonds rather than sorted — see "Gravity
     //    points down" below for why a plain density sort sends every parcel off at 60 degrees to
     //    the left. Take the vertical bond 0->2 whenever both ends are mobile, and offer a half bond
-    //    only when the far end of the vertical one is a ground. A swap of two mobile slots, so it is
+    //    only when the far end of the vertical one is occupied. A swap of two mobile slots, so it is
     //    exactly conservative on its own.
     fall(out, (v) => v < MOBILE);
     return out;
@@ -946,7 +959,7 @@ const extractionRule = blockRuleFromTable(6, (block) => {
  *     levelled. Letting liquid count as occupied is the entire difference between a pile and a pool.
  *
  * A half bond is one column sideways, so it is handed. `sixTick` and `dualTick` alternate the
- * partition's handedness to cancel that; see `buildMirror`.
+ * partition's handedness to cancel that; see `buildHexMirror`.
  *
  * @param {number[]} out The block, rewritten in place.
  * @param {(state: number) => boolean} mobile Which states gravity may move.
@@ -959,7 +972,7 @@ function fall(out, mobile) {
     if (m1 && m2 && out[0] !== EMPTY && out[1] > out[2]) { swap(1, 2); return; }
 }
 
-/**
+/*
  * A left-to-right reflection of the grid, as a permutation of cell indices.
  *
  * In axial coordinates — `q = col`, `r = row − ⌊col/2⌋` — reflecting about the q = 0 axis is
@@ -973,27 +986,14 @@ function fall(out, mobile) {
  *
  * Converting back to offset coordinates uses the UNWRAPPED mirrored column on purpose: `⌊q/2⌋` is
  * not periodic in `cols`, so wrapping before the floor shears the grid by half a turn for every
- * column but zero.
+ * column but zero. The pure implementation lives in `coffee-percolation-physics.js`, where the
+ * involution and all six hex-neighbour mappings are regression-tested for every grid preset.
  */
-function buildMirror(rows, cols) {
-    const map = new Uint32Array(rows * cols);
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            const r = row - Math.floor(col / 2);
-            const mirroredQ = -col;
-            let mirroredRow = (r + col) + Math.floor(mirroredQ / 2);
-            mirroredRow = ((mirroredRow % rows) + rows) % rows;
-            map[row * cols + col] = mirroredRow * cols + (((mirroredQ % cols) + cols) % cols);
-        }
-    }
-    return map;
-}
-
 /** The mirror map and its scratch buffer for a world, built once per grid size. */
 function ensureMirror(store, world) {
     const size = world.rows * world.columns;
     if (!store.mirror || store.mirror.length !== size) {
-        store.mirror = buildMirror(world.rows, world.columns);
+        store.mirror = buildHexMirror(world.rows, world.columns);
         store.scratch = new Uint8Array(size);
     }
     return store;
@@ -1124,42 +1124,13 @@ function packPuck() {
 
 /** Which top-row columns receive water this tick, per the chosen pour pattern. */
 function injectionColumns() {
-    const cols = lab.columns;
-    const flow = Number(ui.flow.value);
-    const mode = ui.pour.value;
-    const out = [];
-
-    if (mode === 'dump') {
-        // As fast as the top row will physically take it, every tick, until the budget is gone.
-        // Deliberately not "the whole budget on tick 0": only open cells accept water, so a one-shot
-        // dump would silently drop most of the pour the moment the top row backed up.
-        const remaining = brew.budget - brew.poured;
-        for (let i = 0; i < Math.min(remaining, cols); i++) out.push(i);
-        return out;
-    }
-
-    if (mode === 'centre') {
-        const half = Math.max(1, Math.floor(cols * 0.04));
-        for (let i = 0; i < flow; i++) {
-            out.push(Math.floor(cols / 2) - half + ((i * 2 + brew.tick) % (half * 2 || 1)));
-        }
-        return out;
-    }
-
-    // `pulse` is the shower with the flow modulated: a small bloom, a rest while it soaks in, then
-    // the full pour. The rest is the whole point — grounds must be wet a tick before they extract.
-    let rate = flow;
-    if (mode === 'pulse') {
-        const bloom = 40, rest = 60;
-        if (brew.tick < bloom) rate = Math.max(1, Math.round(flow * 0.35));
-        else if (brew.tick < bloom + rest) rate = 0;
-    }
-
-    // Evenly spaced, with the phase advanced each tick so the same columns are not always hit.
-    for (let i = 0; i < rate; i++) {
-        out.push(Math.floor(((i + (brew.tick * 0.37)) % rate) * (cols / Math.max(1, rate))) % cols);
-    }
-    return out;
+    return scheduledInjectionColumns({
+        columns: lab.columns,
+        flow: Number(ui.flow.value),
+        mode: ui.pour.value,
+        tick: brew.tick,
+        remaining: brew.budget - brew.poured,
+    });
 }
 
 /**
@@ -1601,32 +1572,13 @@ function packPuck2() {
 }
 
 function injectionColumns2() {
-    const cols = lab2.columns;
-    const flow = Number(d.flow.value);
-    const mode = d.pour.value;
-    const out = [];
-    if (mode === 'dump') {
-        const remaining = dBrew.budget - dBrew.poured;
-        for (let i = 0; i < Math.min(remaining, cols); i++) out.push(i);
-        return out;
-    }
-    if (mode === 'centre') {
-        const half = Math.max(1, Math.floor(cols * 0.04));
-        for (let i = 0; i < flow; i++) {
-            out.push(Math.floor(cols / 2) - half + ((i * 2 + dBrew.tick) % (half * 2 || 1)));
-        }
-        return out;
-    }
-    let rate = flow;
-    if (mode === 'pulse') {
-        const bloom = 40, rest = 60;
-        if (dBrew.tick < bloom) rate = Math.max(1, Math.round(flow * 0.35));
-        else if (dBrew.tick < bloom + rest) rate = 0;
-    }
-    for (let i = 0; i < rate; i++) {
-        out.push(Math.floor(((i + (dBrew.tick * 0.37)) % rate) * (cols / Math.max(1, rate))) % cols);
-    }
-    return out;
+    return scheduledInjectionColumns({
+        columns: lab2.columns,
+        flow: Number(d.flow.value),
+        mode: d.pour.value,
+        tick: dBrew.tick,
+        remaining: dBrew.budget - dBrew.poured,
+    });
 }
 
 /** Pour at the top, drip out of the bottom, and remember which grains have ever held liquid. */
@@ -1768,12 +1720,10 @@ function renderDual() {
 /**
  * How many ticks of no progress at all end a brew.
  *
- * The longest legitimate stall in the parameter space is the `pulse` pattern's rest, 60 ticks with
- * the tap off and the bed merely soaking. This leaves four times that in hand, and it is counted in
- * TICKS rather than frames so the ticks-per-frame slider cannot change what "finished" means.
+ * Progress also pauses while a parcel crosses empty headspace or already-wet ground. The allowance
+ * therefore scales with grid height via `quietTickLimit`, covering a full six-handedness/partition
+ * period per row. It is counted in TICKS so the speed slider cannot change what "finished" means.
  */
-const D_QUIET_TICKS = 240;
-
 /**
  * One generation, alternating the handedness of the partition.
  *
@@ -1825,7 +1775,7 @@ function stepDual() {
     if (progress === dBrew.progress) dBrew.quiet += steps; else dBrew.quiet = 0;
     dBrew.progress = progress;
 
-    if (dBrew.quiet > D_QUIET_TICKS) {
+    if (dBrew.quiet > quietTickLimit(lab2.rows)) {
         if (dBrew.poured < dBrew.budget) dBrew.choked = true; else dBrew.finished = true;
         renderDual();       // once more, so the phase label and the footer switch over
     }

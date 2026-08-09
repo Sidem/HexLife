@@ -305,7 +305,7 @@ difference between two tiles is the rule.
 > dry, wet and spent grounds — where fluid and grounds are each conserved **exactly** and the only
 > things crossing the boundary are the pour and the drip. Set the packing, the bed and the pour
 > pattern, and try to spend the whole puck. The packing slider is really a percolation experiment:
-> yield collapses from 68% to 9% as pore space crosses 0.5, which is `p_c` for site percolation on
+> yield collapses from 59% to 7% as pore space crosses 0.5, which is `p_c` for site percolation on
 > the triangular lattice — exactly, and on no other common grid. The page also runs a four-state
 > version under both backends at once, which is the shortest statement of why `'block'` exists at all.
 
