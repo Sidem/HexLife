@@ -6,11 +6,39 @@
  */
 
 import init, {
+    is_conservative_gas_rule as wasmIsConservativeGasRule,
     random_u32 as wasmRandomU32,
     WorldStochastic,
 } from '../core/stochastic-wasm/hexlife_stochastic_wasm.js';
 // eslint-disable-next-line import/no-unresolved
 import wasmUrl from '../core/stochastic-wasm/hexlife_stochastic_wasm_bg.wasm?url';
+
+// The `HXS1.` world code. Re-exported here because this is the DOM-free entry: a Node host can
+// validate a pasted code without loading the isolated stochastic artifact at all. Imported rather
+// than re-exported straight through, because `StochasticWorld.code()` uses the backend tags itself.
+import {
+    decodeStochasticCode,
+    encodeStochasticCode,
+    isStochasticCode,
+    isValidStochasticGeometry,
+    stochasticAuxiliaryBytes,
+    STOCHASTIC_BACKEND_LATTICE_GAS,
+    STOCHASTIC_BACKEND_NEIGHBORHOOD,
+    STOCHASTIC_PALETTE_NONE,
+    STOCHASTIC_PALETTE_RGB,
+} from '../core/StochasticCodec.js';
+
+export {
+    decodeStochasticCode,
+    encodeStochasticCode,
+    isStochasticCode,
+    isValidStochasticGeometry,
+    stochasticAuxiliaryBytes,
+    STOCHASTIC_BACKEND_LATTICE_GAS,
+    STOCHASTIC_BACKEND_NEIGHBORHOOD,
+    STOCHASTIC_PALETTE_NONE,
+    STOCHASTIC_PALETTE_RGB,
+};
 
 /** Version of the Philox tuple mapping used by every stochastic decision. */
 export const STOCHASTIC_RNG_VERSION = 1;
@@ -30,6 +58,19 @@ const RULE_ROW_BYTES = 272;
 const MAX_TRANSITIONS = 64;
 const NO_NEIGHBOR_STATE = 0xFF;
 const RNG_TAGS = {[RNG_LEGACY_DEMO_V0]: 0, [RNG_PHILOX_V1]: 1};
+
+/** Backend selector for {@link StochasticWorld}. */
+export const BACKEND_NEIGHBORHOOD = 'neighborhood';
+export const BACKEND_LATTICE_GAS = 'lattice-gas';
+
+const GAS_HEADER_BYTES = 12;
+const GAS_CONFIGURATIONS = 1 << 12;
+const GAS_RULE_BYTES = GAS_HEADER_BYTES + GAS_CONFIGURATIONS * 8;
+
+/** Visible states projected from the six velocity channels of a lattice-gas site. */
+export const GAS_STATES = Object.freeze({vacuum: 0, amber: 1, cyan: 2, mixed: 3, wall: 4});
+/** Species labels carried by an occupied channel. */
+export const GAS_SPECIES = Object.freeze({empty: 0, amber: 1, cyan: 2});
 
 /**
  * Build the 64 mask probabilities for independent exposure from matching neighbors.
@@ -182,6 +223,121 @@ function assertState(value, states, label) {
     return value;
 }
 
+/**
+ * The canonical two-species hexagonal collision operator.
+ *
+ * Two rules, both momentum-conserving and both sixfold rotation-equivariant:
+ *
+ * - a **head-on pair** in opposite channels rotates ±60°, which is the only genuinely ambiguous
+ *   outcome in the set and therefore the only one that consumes a random number;
+ * - a **symmetric triad** in alternating channels rotates to the other triad.
+ *
+ * Everything else streams through untouched. Species travel with their particle, so amber and cyan
+ * counts are conserved entry by entry rather than on average.
+ *
+ * @param {number[]} channels six species values in canonical direction order
+ */
+export function hexGasCollide(channels) {
+    const occupied = [];
+    for (let direction = 0; direction < 6; direction++) {
+        if (channels[direction] !== 0) occupied.push(direction);
+    }
+    if (occupied.length === 2 && occupied[1] - occupied[0] === 3) {
+        const [first, second] = occupied;
+        const primary = new Array(6).fill(0);
+        const alternate = new Array(6).fill(0);
+        primary[(first + 1) % 6] = channels[first];
+        primary[(second + 1) % 6] = channels[second];
+        alternate[(first + 5) % 6] = channels[first];
+        alternate[(second + 5) % 6] = channels[second];
+        return {primary, alternate, probability: 0.5};
+    }
+    if (
+        occupied.length === 3
+        && occupied[1] - occupied[0] === 2
+        && occupied[2] - occupied[1] === 2
+    ) {
+        const rotated = new Array(6).fill(0);
+        for (const direction of occupied) rotated[(direction + 1) % 6] = channels[direction];
+        return rotated;
+    }
+    return channels;
+}
+
+/**
+ * Compile a collision operator into canonical `HSG1` bytes.
+ *
+ * `collide` runs once per packed configuration at compile time — never per cell per tick — and may
+ * return either six outgoing channels or `{primary, alternate, probability}` for an outcome with a
+ * genuine symmetry choice. `scatter` is an optional thermal ±60° rotation applied after collision;
+ * it is deliberately not momentum-conserving, and `scatter: 0` is the momentum-conserving mode.
+ */
+export function compileGasRule({collide = hexGasCollide, scatter = 0, rng = RNG_PHILOX_V1} = {}) {
+    if (typeof collide !== 'function') {
+        throw new TypeError('compileGasRule: collide must be a function.');
+    }
+    assertProbability(scatter, 'compileGasRule');
+    if (!(rng in RNG_TAGS)) {
+        throw new RangeError(`compileGasRule: unsupported RNG '${rng}'.`);
+    }
+
+    const bytes = new Uint8Array(GAS_RULE_BYTES);
+    bytes.set([0x48, 0x53, 0x47, 0x31, 2, RNG_TAGS[rng], 0, 0]);
+    const view = new DataView(bytes.buffer);
+    // Quantized even: the tick reuses this sample's low bit as the ±60° coin, which is an exactly
+    // fair choice only when the threshold is even. The loader rejects an odd one.
+    view.setUint32(8, probabilityThreshold(scatter) & ~1, true);
+    const thresholdBase = GAS_HEADER_BYTES + GAS_CONFIGURATIONS * 4;
+
+    const channels = new Array(6);
+    for (let config = 0; config < GAS_CONFIGURATIONS; config++) {
+        let legal = true;
+        for (let direction = 0; direction < 6; direction++) {
+            channels[direction] = (config >>> (2 * direction)) & 3;
+            if (channels[direction] === 3) legal = false;
+        }
+        // Unreachable by streaming; pinned to the identity so the compiled bytes stay canonical.
+        if (!legal) {
+            view.setUint32(GAS_HEADER_BYTES + config * 4, config | (config << 16), true);
+            continue;
+        }
+        const outcome = collide([...channels], config);
+        const primary = packGasChannels(Array.isArray(outcome) ? outcome : outcome.primary, config);
+        const alternate = Array.isArray(outcome)
+            ? primary
+            : packGasChannels(outcome.alternate ?? outcome.primary, config);
+        const probability = Array.isArray(outcome) ? 0 : outcome.probability ?? 0.5;
+        view.setUint32(GAS_HEADER_BYTES + config * 4, (primary | (alternate << 16)) >>> 0, true);
+        if (primary !== alternate) {
+            view.setUint32(thresholdBase + config * 4, probabilityThreshold(probability), true);
+        }
+    }
+    return bytes;
+}
+
+function packGasChannels(outgoing, config) {
+    if (!outgoing || outgoing.length !== 6) {
+        throw new RangeError(`compileGasRule: configuration ${config} produced ${outgoing?.length ?? 0} channels, expected 6.`);
+    }
+    let packed = 0;
+    for (let direction = 0; direction < 6; direction++) {
+        const species = outgoing[direction];
+        if (!Number.isInteger(species) || species < 0 || species > 2) {
+            throw new RangeError(`compileGasRule: configuration ${config} produced species ${species}, expected 0..2.`);
+        }
+        packed |= species << (2 * direction);
+    }
+    return packed;
+}
+
+/** Whether `rule` is a well-formed `HSG1` table that conserves both species for every entry. */
+export function isConservativeGasRule(rule) {
+    if (!wasmExports) {
+        throw new Error('isConservativeGasRule: await initStochasticEngine() first.');
+    }
+    return wasmIsConservativeGasRule(rule instanceof Uint8Array ? rule : Uint8Array.from(rule));
+}
+
 /** @type {any} */
 let wasmExports = null;
 /** @type {Promise<any> | null} */
@@ -254,22 +410,41 @@ function refreshAllViews() {
 }
 
 /**
- * Phase-1 world shell. It owns geometry, seed, the visible-state buffer, and native topology but
- * has no transition rule or `tick()` until the Phase-2 neighborhood backend lands.
+ * Allocation-free stochastic-neighborhood runtime.
+ *
+ * The world owns geometry, seed, topology, visible state, state epochs, census, transition counts,
+ * and its activity metadata natively. Normal ticks copy nothing into Wasm and allocate nothing.
  */
 export class StochasticWorld {
-    /** @param {{rows: number, columns: number, seed: bigint|number, rule?: Uint8Array, cells?: ArrayLike<number>, elapsedAges?: ArrayLike<number>}} options */
-    constructor({rows, columns, seed, rule = null, cells = null, elapsedAges = null}) {
+    /** @param {{rows: number, columns: number, seed: bigint|number, backend?: string, rule?: Uint8Array, cells?: ArrayLike<number>, elapsedAges?: ArrayLike<number>, channels?: ArrayLike<number>, walls?: ArrayLike<number>}} options */
+    constructor({
+        rows,
+        columns,
+        seed,
+        backend = BACKEND_NEIGHBORHOOD,
+        rule = null,
+        cells = null,
+        elapsedAges = null,
+        channels = null,
+        walls = null,
+    }) {
         if (!wasmExports) {
             throw new Error('StochasticWorld: await initStochasticEngine() before construction.');
         }
         if (!Number.isInteger(rows) || !Number.isInteger(columns)) {
             throw new RangeError('StochasticWorld: rows and columns must be integers.');
         }
+        if (backend !== BACKEND_NEIGHBORHOOD && backend !== BACKEND_LATTICE_GAS) {
+            throw new RangeError(`StochasticWorld: unknown backend '${backend}'.`);
+        }
 
         this._wasm = wasmExports;
+        this.backend = backend;
+        this._isGas = backend === BACKEND_LATTICE_GAS;
         try {
-            this.world = new WorldStochastic(columns, rows, toU64(seed, 'seed'));
+            this.world = this._isGas
+                ? WorldStochastic.new_lattice_gas(columns, rows, toU64(seed, 'seed'))
+                : new WorldStochastic(columns, rows, toU64(seed, 'seed'));
         } catch (cause) {
             if (cause instanceof Error) throw cause;
             throw new Error(String(cause));
@@ -281,23 +456,27 @@ export class StochasticWorld {
         liveWorlds.add(this);
         refreshAllViews();
         if (rule) this.setRule(rule);
-        if (cells) this.setInitialState(cells, elapsedAges);
+        if (this._isGas) {
+            if (channels || walls) this.setInitialGasState(channels, walls);
+        } else if (cells) {
+            this.setInitialState(cells, elapsedAges);
+        }
     }
 
     _refreshViews() {
-        this.state = new Uint8Array(this._wasm.memory.buffer, this.world.state_ptr(), this.numCells);
-        this.nextState = new Uint8Array(this._wasm.memory.buffer, this.world.next_state_ptr(), this.numCells);
-        this._elapsedAges = new Uint16Array(
-            this._wasm.memory.buffer,
-            this.world.elapsed_ages_ptr(),
-            this.numCells,
-        );
-        this._census = new Uint32Array(this._wasm.memory.buffer, this.world.census_ptr(), MAX_STOCHASTIC_STATES);
+        const memory = this._wasm.memory.buffer;
+        this.state = new Uint8Array(memory, this.world.state_ptr(), this.numCells);
+        this.nextState = new Uint8Array(memory, this.world.next_state_ptr(), this.numCells);
+        this._elapsedAges = new Uint16Array(memory, this.world.elapsed_ages_ptr(), this.numCells);
+        this._census = new Uint32Array(memory, this.world.census_ptr(), MAX_STOCHASTIC_STATES);
         this._transitionCounts = new Uint32Array(
-            this._wasm.memory.buffer,
+            memory,
             this.world.transition_counts_ptr(),
             MAX_TRANSITIONS,
         );
+        if (this._isGas) {
+            this._walls = new Uint8Array(memory, this.world.walls_ptr(), this.numCells);
+        }
     }
 
     get generation() {
@@ -317,13 +496,86 @@ export class StochasticWorld {
         }
     }
 
-    /** Install canonical bytes from {@link compileStochasticRule}. May grow Wasm memory. */
+    /**
+     * Install canonical rule bytes for this world's backend — `HSN1` from
+     * {@link compileStochasticRule} or `HSG1` from {@link compileGasRule}. May grow Wasm memory.
+     */
     setRule(rule) {
         this._assertLive();
-        rethrowAsError(() => this.world.set_neighborhood_rule(
-            rule instanceof Uint8Array ? rule : Uint8Array.from(rule),
-        ));
+        const bytes = rule instanceof Uint8Array ? rule : Uint8Array.from(rule);
+        rethrowAsError(() => (this._isGas
+            ? this.world.set_gas_rule(bytes)
+            : this.world.set_neighborhood_rule(bytes)));
         refreshAllViews();
+    }
+
+    /**
+     * Replace the exact generation-zero lattice-gas state and reset snapshot.
+     *
+     * `channels` holds six species values per cell in canonical direction order; `walls` marks the
+     * reflecting sites. Both are one-shot uploads — normal ticks copy nothing into Wasm.
+     */
+    setInitialGasState(channels, walls = null) {
+        this._assertLive();
+        rethrowAsError(() => this.world.set_gas_initial_state(
+            toChannelBytes(channels, this.numCells),
+            toWallBytes(walls, this.numCells),
+        ));
+    }
+
+    /** Intervention-only bulk lattice-gas replacement at the current generation. */
+    setGasCells(channels, walls = null) {
+        this._assertLive();
+        rethrowAsError(() => this.world.set_gas_cells(
+            toChannelBytes(channels, this.numCells),
+            toWallBytes(walls, this.numCells),
+        ));
+    }
+
+    /** Open or close one barrier site. Opening a membrane edits only the native wall buffer. */
+    setWall(index, isWall) {
+        this._assertLive();
+        rethrowAsError(() => this.world.set_wall(index, Boolean(isWall)));
+    }
+
+    /** Exact particle total for one species (1 = amber, 2 = cyan). */
+    speciesCount(species) {
+        this._assertLive();
+        return this.world.species_count(species);
+    }
+
+    /** Sites the collision table rewrote on the last tick. */
+    collisionCount() {
+        this._assertLive();
+        return this.world.collision_count();
+    }
+
+    /**
+     * Six species values per cell, for export or debugging only.
+     *
+     * The live channel view is rebuilt here rather than cached: the gas tick swaps its two channel
+     * buffers, so `channels_ptr()` alternates and a stored view would silently go one tick stale.
+     */
+    snapshotChannels() {
+        this._assertLive();
+        const live = new Uint16Array(
+            this._wasm.memory.buffer,
+            this.world.channels_ptr(),
+            this.numCells,
+        );
+        const out = new Uint8Array(this.numCells * 6);
+        for (let index = 0; index < this.numCells; index++) {
+            const config = live[index];
+            for (let direction = 0; direction < 6; direction++) {
+                out[index * 6 + direction] = (config >>> (2 * direction)) & 3;
+            }
+        }
+        return out;
+    }
+
+    snapshotWalls() {
+        this._assertLive();
+        return new Uint8Array(this._walls);
     }
 
     /** Replace the exact generation-zero state and reset snapshot. */
@@ -351,14 +603,49 @@ export class StochasticWorld {
         rethrowAsError(() => this.world.set_cell(index, value));
     }
 
-    /** Advance exact dense generations; Phase 3 adds optional skipping around this reference path. */
+    /**
+     * Turn exact activity skipping off (or back on). Off forces the dense reference path, which
+     * must produce identical state, ages, census, transition counts, and checksums every tick.
+     */
+    setSkippingEnabled(enabled) {
+        this._assertLive();
+        this.world.set_skipping_enabled(Boolean(enabled));
+    }
+
+    get skippingEnabled() {
+        return this.world.skipping_enabled();
+    }
+
+    /** Chunks recomputed during the last tick — the diagnostic behind the sparse-workload gate. */
+    activeChunkCount() {
+        this._assertLive();
+        return this.world.active_chunk_count();
+    }
+
+    chunkCount() {
+        this._assertLive();
+        return this.world.chunk_count();
+    }
+
+    /**
+     * Clamp every stored epoch to at most 65,535 ticks back. Ticking does this automatically long
+     * before the `u32` distance could become ambiguous; the explicit call exists for tests.
+     */
+    rebaseEpochs() {
+        this._assertLive();
+        this.world.rebase_epochs();
+    }
+
+    /** Advance exact generations. Skipping is on by default and is exact, not an approximation. */
     tick(count = 1) {
         this._assertLive();
         const ticks = Math.max(0, Math.floor(count));
         let changed = 0;
         for (let index = 0; index < ticks; index++) {
             changed = rethrowAsError(() => this.world.run_tick());
-            [this.state, this.nextState] = [this.nextState, this.state];
+            // The neighborhood tick swaps its two visible buffers; the gas projects in place, so
+            // its live view never moves. Neither path allocates or copies a grid.
+            if (!this._isGas) [this.state, this.nextState] = [this.nextState, this.state];
         }
         return changed;
     }
@@ -406,17 +693,87 @@ export class StochasticWorld {
         return this.state ? new Uint8Array(this.state) : null;
     }
 
+    /** The canonical compiled rule bytes currently installed. */
+    ruleBytes() {
+        this._assertLive();
+        const length = this.world.rule_len();
+        return new Uint8Array(
+            new Uint8Array(this._wasm.memory.buffer, this.world.rule_ptr(), length),
+        );
+    }
+
+    /**
+     * Freeze this world into an `HXS1.` code that resumes to an identical *next tick*, not merely
+     * an identical frame: the seed, generation, compiled rule, and auxiliary state all travel.
+     */
+    async code({palette = null, speed = 10} = {}) {
+        this._assertLive();
+        const common = {
+            backend: this._isGas ? STOCHASTIC_BACKEND_LATTICE_GAS : STOCHASTIC_BACKEND_NEIGHBORHOOD,
+            rows: this.rows,
+            columns: this.columns,
+            states: this.states,
+            seed: this.seed,
+            generation: this.generation,
+            rule: this.ruleBytes(),
+            palette,
+            speed,
+        };
+        return encodeStochasticCode(this._isGas
+            ? {...common, channels: this.snapshotChannels(), walls: this.snapshotWalls()}
+            : {...common, cells: this.snapshotCells(), elapsedAges: this.snapshotElapsedAges()});
+    }
+
     dispose() {
         if (!this.world) return;
         liveWorlds.delete(this);
         this.world.free();
         this.world = null;
         this.state = this.nextState = this._elapsedAges = this._census = this._transitionCounts = null;
+        this._walls = null;
     }
 
     _assertLive() {
         if (!this.world) throw new Error('StochasticWorld: this world has been disposed.');
     }
+}
+
+/**
+ * Rebuild the exact world an `HXS1.` code describes, at its own generation.
+ *
+ * Returns `null` for anything that is not a decodable code, so a pasted string is a "no" rather
+ * than an exception. The engine must already be initialized.
+ */
+export async function createStochasticWorldFromCode(code) {
+    const decoded = await decodeStochasticCode(code);
+    if (!decoded) return null;
+    const gas = decoded.backend === STOCHASTIC_BACKEND_LATTICE_GAS;
+    const world = new StochasticWorld({
+        rows: decoded.rows,
+        columns: decoded.columns,
+        seed: decoded.seed,
+        backend: gas ? BACKEND_LATTICE_GAS : BACKEND_NEIGHBORHOOD,
+        rule: decoded.rule,
+    });
+    try {
+        if (gas) world.setInitialGasState(decoded.channels, decoded.walls);
+        else world.setInitialState(decoded.cells, decoded.elapsedAges);
+        world.world.resume_at_generation(decoded.generation);
+    } catch (cause) {
+        world.dispose();
+        throw cause;
+    }
+    return {world, palette: decoded.palette, speed: decoded.speed};
+}
+
+function toChannelBytes(channels, numCells) {
+    if (channels == null) return new Uint8Array(numCells * 6);
+    return channels instanceof Uint8Array ? channels : Uint8Array.from(channels);
+}
+
+function toWallBytes(walls, numCells) {
+    if (walls == null) return new Uint8Array(numCells);
+    return walls instanceof Uint8Array ? walls : Uint8Array.from(walls);
 }
 
 function rethrowAsError(fn) {

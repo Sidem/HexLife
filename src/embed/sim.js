@@ -4,6 +4,7 @@
  */
 
 import { EmbedSim, initEmbedWasm } from './EmbedSim.js';
+export { BIRTH_LANES, BirthLaneMeter, DifferenceMask } from './analysis.js';
 import { mulberry32 } from '../core/rng.js';
 import { DensityStrategy } from '../core/initialStateStrategies/DensityStrategy.js';
 import { createSparseStructureState } from '../core/sparseStructures.js';

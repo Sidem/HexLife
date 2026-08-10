@@ -5,6 +5,12 @@
  * installing a rule may replace only the bounded compiled row table and canonical rule bytes.
  */
 export class WorldStochastic {
+    static __wrap(ptr) {
+        const obj = Object.create(WorldStochastic.prototype);
+        obj.__wbg_ptr = ptr;
+        WorldStochasticFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -16,6 +22,21 @@ export class WorldStochastic {
         wasm.__wbg_worldstochastic_free(ptr, 0);
     }
     /**
+     * Chunks recomputed during the last tick, out of [`WorldStochastic::chunk_count`].
+     * @returns {number}
+     */
+    active_chunk_count() {
+        const ret = wasm.worldstochastic_active_chunk_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    backend() {
+        const ret = wasm.worldstochastic_backend(this.__wbg_ptr);
+        return ret;
+    }
+    /**
      * @returns {number}
      */
     census_ptr() {
@@ -23,6 +44,15 @@ export class WorldStochastic {
         return ret >>> 0;
     }
     /**
+     * @returns {number}
+     */
+    channels_ptr() {
+        const ret = wasm.worldstochastic_channels_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Hash of everything a code must restore beyond the visible state: epochs for the neighborhood
+     * backend, velocity channels and walls for the gas.
      * @returns {number}
      */
     checksum_auxiliary() {
@@ -34,6 +64,21 @@ export class WorldStochastic {
      */
     checksum_state() {
         const ret = wasm.worldstochastic_checksum_state(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    chunk_count() {
+        const ret = wasm.worldstochastic_chunk_count(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Sites whose incoming configuration was rewritten by the collision table on the last tick.
+     * @returns {number}
+     */
+    collision_count() {
+        const ret = wasm.worldstochastic_collision_count(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -82,6 +127,21 @@ export class WorldStochastic {
         return this;
     }
     /**
+     * A lattice-gas world. A separate constructor rather than a runtime switch so neither backend
+     * allocates the other's per-cell buffers.
+     * @param {number} columns
+     * @param {number} rows
+     * @param {bigint} seed
+     * @returns {WorldStochastic}
+     */
+    static new_lattice_gas(columns, rows, seed) {
+        const ret = wasm.worldstochastic_new_lattice_gas(columns, rows, seed);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return WorldStochastic.__wrap(ret[0]);
+    }
+    /**
      * @returns {number}
      */
     next_state_ptr() {
@@ -95,11 +155,28 @@ export class WorldStochastic {
         const ret = wasm.worldstochastic_num_cells(this.__wbg_ptr);
         return ret >>> 0;
     }
+    rebase_epochs() {
+        wasm.worldstochastic_rebase_epochs(this.__wbg_ptr);
+    }
     reset() {
         const ret = wasm.worldstochastic_reset(this.__wbg_ptr);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * Clamp every stored epoch to at most `u16::MAX` ticks back so the `u32` distance can never
+     * approach the half-range. Exact, because [`saturating_age`] already saturates there.
+     * Resume the current world at `generation`, preserving every elapsed age exactly.
+     *
+     * Epochs are absolute generations, so moving the clock means moving them by the same delta â€”
+     * otherwise a decoded code would restore the right cells with the wrong ages. The current
+     * world also becomes the reset target, which is the `HXS1` capture policy: a code is the exact
+     * world it was taken from, and resetting returns to that world rather than to generation zero.
+     * @param {bigint} generation
+     */
+    resume_at_generation(generation) {
+        wasm.worldstochastic_resume_at_generation(this.__wbg_ptr, generation);
     }
     /**
      * @param {number} cell_index
@@ -135,7 +212,11 @@ export class WorldStochastic {
         return ret >>> 0;
     }
     /**
-     * Advance one dense generation. Phase 3 adds temporal activity skipping around this reference.
+     * Advance one generation.
+     *
+     * The backend is dispatched exactly once, here â€” never inside a per-cell loop. For the
+     * neighborhood backend `run_tick_dense` is the reference and the skipping path must agree with
+     * it on state, ages, census, transition counts, and both checksums after every tick.
      * @returns {number}
      */
     run_tick() {
@@ -178,6 +259,52 @@ export class WorldStochastic {
         }
     }
     /**
+     * Intervention-only bulk replacement at the current generation.
+     * @param {Uint8Array} channels
+     * @param {Uint8Array} walls
+     */
+    set_gas_cells(channels, walls) {
+        const ptr0 = passArray8ToWasm0(channels, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(walls, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_gas_cells(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Replace the reset snapshot: six species channels per cell, plus the wall bitmap.
+     *
+     * Walls hold no particles, so any channel written on a wall site is dropped rather than
+     * silently leaking mass on the first tick.
+     * @param {Uint8Array} channels
+     * @param {Uint8Array} walls
+     */
+    set_gas_initial_state(channels, walls) {
+        const ptr0 = passArray8ToWasm0(channels, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(walls, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_gas_initial_state(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Install a canonical `HSG1` collision table. Allocation is allowed here; `run_tick` never
+     * allocates. The table is rejected unless every reachable entry conserves both species.
+     * @param {Uint8Array} bytes
+     */
+    set_gas_rule(bytes) {
+        const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_gas_rule(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * Replace the reset snapshot and reset the world to generation zero.
      * @param {Uint8Array} cells
      * @param {Uint16Array} elapsed_ages
@@ -203,6 +330,42 @@ export class WorldStochastic {
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * Turn exact activity skipping off (or back on). Off forces the dense reference path for every
+     * tick; re-enabling wakes the whole grid so the metadata is rebuilt from a computed generation.
+     * @param {boolean} enabled
+     */
+    set_skipping_enabled(enabled) {
+        wasm.worldstochastic_set_skipping_enabled(this.__wbg_ptr, enabled);
+    }
+    /**
+     * Open or close one lattice site's barrier. This is the whole membrane API: opening a gate
+     * edits the native wall buffer only and never replaces the grid.
+     * @param {number} index
+     * @param {boolean} is_wall
+     */
+    set_wall(index, is_wall) {
+        const ret = wasm.worldstochastic_set_wall(this.__wbg_ptr, index, is_wall);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {boolean}
+     */
+    skipping_enabled() {
+        const ret = wasm.worldstochastic_skipping_enabled(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Exact particle count for one species: 1 = amber, 2 = cyan. Conserved by every legal table.
+     * @param {number} species
+     * @returns {number}
+     */
+    species_count(species) {
+        const ret = wasm.worldstochastic_species_count(this.__wbg_ptr, species);
+        return ret >>> 0;
     }
     /**
      * @returns {number}
@@ -232,15 +395,30 @@ export class WorldStochastic {
         const ret = wasm.worldstochastic_transition_counts_ptr(this.__wbg_ptr);
         return ret >>> 0;
     }
+    /**
+     * @returns {number}
+     */
+    walls_ptr() {
+        const ret = wasm.worldstochastic_walls_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
 }
 if (Symbol.dispose) WorldStochastic.prototype[Symbol.dispose] = WorldStochastic.prototype.free;
 
 /**
- * Counter-based Philox4x32-10 sample for one stochastic decision.
- *
- * Counter words are `[cell_index, stream_id, generation_lo, generation_hi]`; key words are the
- * low/high halves of `seed`. No mutable cursor exists, so skipping a cell or reordering rule rows
- * cannot shift any other cell's stream.
+ * Whether `bytes` is a well-formed `HSG1` table that conserves both species everywhere.
+ * @param {Uint8Array} bytes
+ * @returns {boolean}
+ */
+export function is_conservative_gas_rule(bytes) {
+    const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.is_conservative_gas_rule(ptr0, len0);
+    return ret !== 0;
+}
+
+/**
+ * Counter-based Philox4x32-10 sample for one stochastic decision: word 0 of the block above.
  * @param {bigint} seed
  * @param {bigint} generation
  * @param {number} cell_index

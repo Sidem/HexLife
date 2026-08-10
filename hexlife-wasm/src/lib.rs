@@ -1,4 +1,4 @@
-#[cfg(feature = "standard")]
+﻿#[cfg(feature = "standard")]
 use wasm_bindgen::prelude::*;
 
 // This line allows Rust to print panic messages to the browser's developer console.
@@ -14,7 +14,7 @@ include!(concat!(env!("OUT_DIR"), "/neighbor_dirs.rs"));
 // The k-state engine. A SEPARATE struct in the same crate, deliberately: a `if self.k == 2` branch
 // inside `World` would put every future k-state edit on the code path Explorer, the #37 pipeline and
 // the frozen `<hexlife-world>` determinism contract all run on. Nothing below this line changes for
-// it — `WorldK` reuses `compute_neighbor_indices` and the canonical direction tables as-is and
+// it â€” `WorldK` reuses `compute_neighbor_indices` and the canonical direction tables as-is and
 // duplicates neither. See `worldk.rs` and `docs/KSTATE-PLAN.md`.
 #[cfg(feature = "standard")]
 mod worldk;
@@ -24,7 +24,9 @@ pub use worldk::{WorldK, BACKEND_BLOCK, BACKEND_NEIGHBORHOOD, MAX_BLOCK_STATES, 
 #[cfg(feature = "stochastic")]
 mod stochastic;
 #[cfg(feature = "stochastic")]
-pub use stochastic::{random_u32, WorldStochastic, STOCHASTIC_RNG_VERSION};
+pub use stochastic::{
+    is_conservative_gas_rule, random_u32, WorldStochastic, STOCHASTIC_RNG_VERSION,
+};
 
 // The `#[wasm_bindgen]` attribute exposes the following struct or function to JavaScript.
 //
@@ -49,38 +51,38 @@ pub struct World {
     rule_usage_counters: Vec<u32>,
     last_active_count: u32,
     // Number of cells whose state flipped in the last `run_tick` (`next != current`). A cheap
-    // activity/turnover proxy for the auto-explore evaluation burst — one extra compare per cell,
+    // activity/turnover proxy for the auto-explore evaluation burst â€” one extra compare per cell,
     // behavior-neutral.
     last_changed_count: u32,
     // Flattened neighbor-index lookup: 6 entries per cell (`neighbor_indices[i*6 + n_order]` is the
     // linear index of cell i's n_order-th neighbor, with toroidal wrapping already applied). The
-    // grid dimensions are fixed for the World's lifetime, so the neighborhood never changes — we
+    // grid dimensions are fixed for the World's lifetime, so the neighborhood never changes â€” we
     // compute it once here and the hot loops (`run_tick`, `block_entropy`) just index into it,
     // replacing the per-cell parity branch + 12 modulo ops with plain array reads.
     neighbor_indices: Vec<u32>,
     // --- Damage-spreading probe (auto-explore branching-parameter measure) ---
     // A second simulation lane: a copy of `state` with one cell flipped, advanced in lockstep with
     // the main lane (same ruleset, same neighbor table). The Hamming distance between the two lanes
-    // over time estimates the branching parameter σ (does a single-cell perturbation grow, hold, or
+    // over time estimates the branching parameter Ïƒ (does a single-cell perturbation grow, hold, or
     // die?). Buffers are lazily allocated on `start_probe` and freed on `stop_probe` so a non-probing
-    // World pays nothing. While `probe_active`, every `run_tick` also advances the probe lane (≈2×
-    // tick cost — evaluation-only). The probe lane never touches the usage counters or `next_state`,
+    // World pays nothing. While `probe_active`, every `run_tick` also advances the probe lane (â‰ˆ2Ã—
+    // tick cost â€” evaluation-only). The probe lane never touches the usage counters or `next_state`,
     // so probe-off ticks stay byte-identical to today.
     probe_active: bool,
     probe_state: Vec<u8>,
     probe_next_state: Vec<u8>,
     // --- Active-cell centroid (auto-explore transport / mobility measure) ---
     // The centroid of the active cells expressed as a per-axis CIRCULAR mean angle (radians, in
-    // (-π, π]). On a torus the only correct centroid is the circular mean: map each axis coordinate
-    // to an angle θ = 2π·coord/dim, accumulate Σsin/Σcos, and take atan2 of the resultant. A plain
+    // (-Ï€, Ï€]). On a torus the only correct centroid is the circular mean: map each axis coordinate
+    // to an angle Î¸ = 2Ï€Â·coord/dim, accumulate Î£sin/Î£cos, and take atan2 of the resultant. A plain
     // arithmetic mean would be wrong across the wrap seam. `compute_active_centroid` fills these in
     // one alloc-free pass; the worker samples them and turns the inter-sample displacement into a
-    // mean drift speed (`metrics.transport.meanSpeed`). Both default to 0 (no active cells ⇒ 0).
+    // mean drift speed (`metrics.transport.meanSpeed`). Both default to 0 (no active cells â‡’ 0).
     centroid_col_angle: f64,
     centroid_row_angle: f64,
-    // Per-axis CONCENTRATION = mean resultant length R = |Σ(sin,cos)|/N_active, in [0,1]. R≈1 when the
-    // active cells cluster in a narrow arc (a compact structure — the centroid angle is meaningful);
-    // R≈0 when they spread around the whole torus (a dense/uniform field — the near-zero resultant's
+    // Per-axis CONCENTRATION = mean resultant length R = |Î£(sin,cos)|/N_active, in [0,1]. Râ‰ˆ1 when the
+    // active cells cluster in a narrow arc (a compact structure â€” the centroid angle is meaningful);
+    // Râ‰ˆ0 when they spread around the whole torus (a dense/uniform field â€” the near-zero resultant's
     // angle is pure NOISE that jitters as cells flip). The worker GATES each axis's centroid
     // displacement by this so spread-out churn can't masquerade as motion; only a coherent, localized
     // mass contributes to the transport speed.
@@ -92,7 +94,7 @@ pub struct World {
     block_cols: usize,
     block_rows: usize,
     // One classification byte per block, refreshed at the top of every `run_tick`:
-    // BLOCK_MIXED / BLOCK_ALL_DEAD / BLOCK_ALL_LIVE. Allocated once, here, and reused — `run_tick`
+    // BLOCK_MIXED / BLOCK_ALL_DEAD / BLOCK_ALL_LIVE. Allocated once, here, and reused â€” `run_tick`
     // must never allocate, or it would grow Wasm memory and detach every JS view.
     block_uniform: Vec<u8>,
     // `block_uniform` dilated by the 8-block Moore halo: a block is marked uniform here only if it
@@ -113,7 +115,7 @@ pub struct World {
 ///
 /// Measured on a 665x576 grid (383k cells), speedup over the dense loop (the 4/16 rows were taken
 /// before the halo was tightened from nine blocks to seven, so their sparse columns are pessimistic
-/// by roughly the same margin the 8 row gained — 2.27x to 2.44x, 1.07x to 1.35x):
+/// by roughly the same margin the 8 row gained â€” 2.27x to 2.44x, 1.07x to 1.35x):
 ///
 /// | BLOCK_SIZE | empty/saturated | 0.2% scattered | 1% scattered | 50% noise |
 /// |-----------:|----------------:|---------------:|-------------:|----------:|
@@ -131,7 +133,7 @@ pub struct World {
 #[cfg(feature = "standard")]
 const BLOCK_SIZE: usize = 8;
 
-/// A block holding both live and dead cells (or a stray non-binary byte) — no fast path.
+/// A block holding both live and dead cells (or a stray non-binary byte) â€” no fast path.
 #[cfg(feature = "standard")]
 const BLOCK_MIXED: u8 = 0;
 /// Every cell in the block is 0.
@@ -173,7 +175,7 @@ fn compute_neighbor_indices(grid_cols: i32, grid_rows: i32, num_cells: usize) ->
 #[wasm_bindgen]
 impl World {
     /// Public constructor that can be called from JavaScript. All buffers are allocated once,
-    /// here, and never reallocated for the lifetime of the `World` — so the pointers handed to
+    /// here, and never reallocated for the lifetime of the `World` â€” so the pointers handed to
     /// JavaScript (and the views built over them) stay valid as long as Wasm memory is not grown.
     #[wasm_bindgen(constructor)]
     pub fn new(grid_cols: i32, grid_rows: i32) -> World {
@@ -259,14 +261,14 @@ impl World {
     /// for the whole block. Such blocks are filled with two `memset`s instead of six dependent loads
     /// through the neighbour table per cell, and their contribution to the active/changed counts
     /// and the usage histogram is added in closed form. The classification covers uniformly *live*
-    /// regions as well as empty ones, and does not assume the rule is vacuum-stable — an igniting
+    /// regions as well as empty ones, and does not assume the rule is vacuum-stable â€” an igniting
     /// vacuum simply fills the block with 1s.
     ///
     /// This is an exact rewrite of the dense loop, not an approximation: same values, same counters,
     /// byte-identical evolution (`sparse_fast_path_matches_dense_reference` pins that against a
     /// reference implementation, and the golden checksums below pin it against recorded history).
-    /// It is also *stateless across ticks* — the classification is recomputed from `state` every
-    /// tick — so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
+    /// It is also *stateless across ticks* â€” the classification is recomputed from `state` every
+    /// tick â€” so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
     /// load) cannot leave it stale. What that costs on a grid with nothing to skip is one
     /// sequential `u64` pass over `state`, which measures at parity or slightly ahead of the old
     /// dense loop; see `BLOCK_SIZE` for the numbers.
@@ -297,8 +299,8 @@ impl World {
         // disposition, rather than walking block by block. Both orders are correct, but block order
         // makes the dense path jump `grid_cols * 6 * 4` bytes through `neighbor_indices` on every
         // row step, which defeats the sequential prefetch of a table far larger than L2 and cost a
-        // further ~25%. Row order keeps the cell index strictly increasing across the whole grid —
-        // the original linear traversal, with holes punched in it — and collapses to exactly one
+        // further ~25%. Row order keeps the cell index strictly increasing across the whole grid â€”
+        // the original linear traversal, with holes punched in it â€” and collapses to exactly one
         // full-width run per row when no block qualifies.
         for row in 0..grid_rows {
             let row_base = row * cols;
@@ -316,8 +318,8 @@ impl World {
 
                 if class != BLOCK_MIXED {
                     // Every cell in this run has centre `uniform` and six neighbours of the same
-                    // value, so all of them share one rule index — 0 (dead centre, empty
-                    // neighbourhood) or 127 (live centre, all six neighbours live) — and therefore
+                    // value, so all of them share one rule index â€” 0 (dead centre, empty
+                    // neighbourhood) or 127 (live centre, all six neighbours live) â€” and therefore
                     // one next state. Two `fill`s replace the per-cell neighbour gather, and the
                     // run's contribution to every counter is closed-form.
                     let uniform = u8::from(class == BLOCK_ALL_LIVE);
@@ -349,7 +351,7 @@ impl World {
                     let mut neighbor_mask: u8 = 0;
 
                     // Neighbor indices (with toroidal wrapping) are precomputed once at construction,
-                    // so the mask is just six array reads — no parity branch or modulo arithmetic in
+                    // so the mask is just six array reads â€” no parity branch or modulo arithmetic in
                     // the hot loop.
                     let nbase = offset * 6;
                     for n_order in 0..6 {
@@ -386,7 +388,7 @@ impl World {
         self.last_changed_count = changed;
 
         // While a damage probe is running, advance its lane in lockstep so the Hamming distance
-        // tracks the same generation count as the main lane. Probe-off ⇒ this is skipped entirely.
+        // tracks the same generation count as the main lane. Probe-off â‡’ this is skipped entirely.
         if self.probe_active {
             self.run_probe_tick();
         }
@@ -416,7 +418,7 @@ impl World {
     /// Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
     /// one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
     /// reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range
-    /// `flip_index` is ignored (the probe then starts as an exact copy — Hamming 0).
+    /// `flip_index` is ignored (the probe then starts as an exact copy â€” Hamming 0).
     pub fn start_probe(&mut self, flip_index: usize) {
         if self.probe_state.len() != self.num_cells {
             self.probe_state = vec![0; self.num_cells];
@@ -503,13 +505,13 @@ impl World {
     /// Spatial-order join-count statistic over the current state buffer (auto-explore spatial term).
     ///
     /// One pass over the flattened `neighbor_indices` table counts the heterogeneous
-    /// (active↔inactive) unique neighbor pairs `J` — each undirected edge is counted once by only
+    /// (activeâ†”inactive) unique neighbor pairs `J` â€” each undirected edge is counted once by only
     /// considering `neighbor_idx > cell_idx`, so the total unique-edge count is `3N` on the wrapped
-    /// hex grid (6 neighbors per cell ÷ 2). With density `p = active/N`, the random-mixing
-    /// expectation is `E[J] = 3N · 2p(1−p)`. Returns `1 − J/E[J]` clamped to [−1, 1]:
-    /// positive ⇒ clustered/domain structure, negative ⇒ anti-clustered (checkerboard-like),
-    /// ≈0 ⇒ well-mixed noise. Returns 0 when `E[J] == 0` (p ∈ {0, 1}: an empty or full grid).
-    /// No allocation — safe to call on the live state without detaching JS views.
+    /// hex grid (6 neighbors per cell Ã· 2). With density `p = active/N`, the random-mixing
+    /// expectation is `E[J] = 3N Â· 2p(1âˆ’p)`. Returns `1 âˆ’ J/E[J]` clamped to [âˆ’1, 1]:
+    /// positive â‡’ clustered/domain structure, negative â‡’ anti-clustered (checkerboard-like),
+    /// â‰ˆ0 â‡’ well-mixed noise. Returns 0 when `E[J] == 0` (p âˆˆ {0, 1}: an empty or full grid).
+    /// No allocation â€” safe to call on the live state without detaching JS views.
     pub fn spatial_order(&self) -> f64 {
         if self.num_cells == 0 {
             return 0.0;
@@ -552,7 +554,7 @@ impl World {
     ///
     /// Returns zero when no cells or all cells changed, because the expected heterogeneous-edge count
     /// is then zero. Valid only after at least one tick since a reset or direct state write; evaluation
-    /// warmup guarantees that precondition. No allocation — safe to call without detaching JS views.
+    /// warmup guarantees that precondition. No allocation â€” safe to call without detaching JS views.
     pub fn change_spatial_order(&self) -> f64 {
         if self.num_cells == 0 {
             return 0.0;
@@ -585,13 +587,13 @@ impl World {
     }
 
     /// Block-pattern entropy of the current state as `[mean, variance]` (auto-explore spatial-
-    /// heterogeneity term). `mean` equals {@link World::block_entropy} — the normalized Shannon
+    /// heterogeneity term). `mean` equals {@link World::block_entropy} â€” the normalized Shannon
     /// entropy of the 7-cell block-pattern distribution, expressible as the average per-cell
-    /// surprisal `−log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
+    /// surprisal `âˆ’log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
     /// near zero when local structure is spatially uniform (every region looks the same) and large
     /// when the field mixes very-common patterns (ordered regions) with very-rare ones (disordered
     /// regions). Computed in one pass over the cells to build the 128-bucket histogram, then a
-    /// cheap 128-bucket finalize (`Var = E[s²] − E[s]²`).
+    /// cheap 128-bucket finalize (`Var = E[sÂ²] âˆ’ E[s]Â²`).
     ///
     /// NB: returning a `Vec<f64>` allocates in Wasm linear memory; callers holding typed-array
     /// views over the heap must `refreshSimViews()` afterwards (see the worker notes).
@@ -616,8 +618,8 @@ impl World {
         }
 
         let total = self.num_cells as f64;
-        // The mean surprisal equals the Shannon entropy; the variance is E[s²] − mean². Each cell of
-        // pattern k shares the same surprisal s_k = −log2(p_k)/7 (normalized by 7 bits to match
+        // The mean surprisal equals the Shannon entropy; the variance is E[sÂ²] âˆ’ meanÂ². Each cell of
+        // pattern k shares the same surprisal s_k = âˆ’log2(p_k)/7 (normalized by 7 bits to match
         // block_entropy's [0,1] scale), so we can finalize over the 128 buckets weighted by p_k.
         let mut mean = 0.0;
         let mut mean_sq = 0.0;
@@ -634,13 +636,13 @@ impl World {
     }
 
     /// Recompute the active-cell centroid as a per-axis circular mean and stash it in
-    /// `centroid_col_angle` / `centroid_row_angle` (radians, in (-π, π]). The circular mean is the
-    /// ONLY correct centroid on a torus: each axis coordinate maps to an angle θ = 2π·coord/dim,
-    /// we accumulate Σsin/Σcos, and take atan2 of the resultant vector. A simple arithmetic mean
+    /// `centroid_col_angle` / `centroid_row_angle` (radians, in (-Ï€, Ï€]). The circular mean is the
+    /// ONLY correct centroid on a torus: each axis coordinate maps to an angle Î¸ = 2Ï€Â·coord/dim,
+    /// we accumulate Î£sin/Î£cos, and take atan2 of the resultant vector. A simple arithmetic mean
     /// would jump discontinuously across the wrap seam and mis-measure a structure straddling it.
     ///
     /// One pass, NO allocation (scalar accumulators + four scalar field writes), so it never grows
-    /// Wasm linear memory and JS typed-array views stay valid — no `refreshSimViews()` needed after.
+    /// Wasm linear memory and JS typed-array views stay valid â€” no `refreshSimViews()` needed after.
     /// With no active cells the resultant is the zero vector and all four outputs default to 0.
     pub fn compute_active_centroid(&mut self) {
         self.centroid_col_angle = 0.0;
@@ -673,7 +675,7 @@ impl World {
             let n = active as f64;
             self.centroid_col_angle = sin_c.atan2(cos_c);
             self.centroid_row_angle = sin_r.atan2(cos_r);
-            // Mean resultant length per axis: |Σ(sin,cos)| / N_active, clamped to [0,1] (it already is
+            // Mean resultant length per axis: |Î£(sin,cos)| / N_active, clamped to [0,1] (it already is
             // by construction; the min guards float drift). 1 = tightly clustered, 0 = spread/uniform.
             self.centroid_col_concentration = ((sin_c * sin_c + cos_c * cos_c).sqrt() / n).min(1.0);
             self.centroid_row_concentration = ((sin_r * sin_r + cos_r * cos_r).sqrt() / n).min(1.0);
@@ -690,12 +692,12 @@ impl World {
         self.centroid_row_angle
     }
 
-    /// Column-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+    /// Column-axis centroid concentration (mean resultant length, [0,1]) â€” see the field doc.
     pub fn centroid_col_concentration(&self) -> f64 {
         self.centroid_col_concentration
     }
 
-    /// Row-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+    /// Row-axis centroid concentration (mean resultant length, [0,1]) â€” see the field doc.
     pub fn centroid_row_concentration(&self) -> f64 {
         self.centroid_row_concentration
     }
@@ -717,7 +719,7 @@ impl World {
     /// rather than finishing one block before starting the next. Per-block order allows an early
     /// exit as soon as a block is known mixed, but it reads `state` in a stride pattern and pays
     /// slice setup per block-row-segment; row-major order reads `state` straight through, which the
-    /// prefetcher handles at memory bandwidth — a whole 383k-cell grid is a few tens of microseconds
+    /// prefetcher handles at memory bandwidth â€” a whole 383k-cell grid is a few tens of microseconds
     /// even with no early exit at all.
     fn scan_block_uniformity(&mut self) {
         // "Still a candidate for" bits, ANDed down as segments are read. They cannot both survive a
@@ -772,14 +774,14 @@ impl World {
     /// safe, but it is loose: a hex cell has six neighbours, not eight, and in offset coordinates
     /// those six are a parity-dependent SUBSET of the eight. Reading off the tables:
     ///
-    /// - from an EVEN column, the sideways neighbours are `(±1, -1)` and `(±1, 0)`;
-    /// - from an ODD column, they are `(±1, 0)` and `(±1, +1)`.
+    /// - from an EVEN column, the sideways neighbours are `(Â±1, -1)` and `(Â±1, 0)`;
+    /// - from an ODD column, they are `(Â±1, 0)` and `(Â±1, +1)`.
     ///
     /// Only a block's leftmost and rightmost columns escape it sideways at all, and `BLOCK_SIZE` is
     /// even, so a block always starts on an even column: the left-hand reach is fixed at
     /// `(-1, -1)` and `(-1, 0)`. The right-hand reach follows the parity of the block's LAST column,
-    /// which is odd for every full block but takes the grid's parity for a partial final block —
-    /// hence the branch. Vertically both parities carry `(0, ±1)`, and interior columns stay home.
+    /// which is odd for every full block but takes the grid's parity for a partial final block â€”
+    /// hence the branch. Vertically both parities carry `(0, Â±1)`, and interior columns stay home.
     ///
     /// So the halo is hex-shaped at block scale too, and skipping the two unreachable corners is
     /// worth having: an isolated structure spoils 7 blocks instead of 9. `halo_covers_every_real_
@@ -803,7 +805,7 @@ impl World {
     ///
     /// Wrapping is `rem_euclid` rather than range-checked so it stays correct on grids only one or
     /// two blocks wide, where a block's left and right neighbours are the same block, possibly
-    /// itself — checking a block against itself is harmless.
+    /// itself â€” checking a block against itself is harmless.
     ///
     /// Requires `scan_block_uniformity` to have run for the current state.
     fn dilate_block_uniformity(&mut self) {
@@ -834,7 +836,7 @@ impl World {
 
     /// Advance the probe lane by one generation using the same ruleset + neighbor table as the main
     /// lane. Mirrors `run_tick`'s core but writes only `probe_next_state` and touches neither the
-    /// usage counters nor the main-lane buffers — so a running probe never perturbs the simulation.
+    /// usage counters nor the main-lane buffers â€” so a running probe never perturbs the simulation.
     fn run_probe_tick(&mut self) {
         for i in 0..self.num_cells {
             let c_state = self.probe_state[i];
@@ -852,6 +854,194 @@ impl World {
             self.probe_next_state[i] = self.ruleset[rule_idx];
         }
         std::mem::swap(&mut self.probe_state, &mut self.probe_next_state);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Optional native analysis helpers.
+//
+// Both are separate structs a consumer has to construct on purpose. `World::run_tick` gains no
+// branch, no store, and no buffer from their existence â€” which is the whole point: a demo that
+// wants a difference mask or a birth histogram should not tax every binary world that does not.
+// ---------------------------------------------------------------------------
+
+/// A persistent XOR mask over two binary worlds of the same size.
+///
+/// Replaces the Butterfly demo's two full-grid snapshots, host XOR loop, mask allocation, and
+/// mask upload with one native comparison that can write straight into the display world.
+#[cfg(feature = "standard")]
+#[wasm_bindgen]
+pub struct WorldDifference {
+    num_cells: usize,
+    mask: Vec<u8>,
+    hamming: u32,
+}
+
+/// Returned by the analysis primitives when their arguments do not match the size they were built
+/// for. They are infallible on the Wasm boundary on purpose: a `Result<_, String>` return costs
+/// formatting machinery and glue in an artifact every binary consumer downloads, and the package
+/// wrapper already knows both sizes and raises a proper error before calling.
+#[cfg(feature = "standard")]
+pub const ANALYSIS_SIZE_MISMATCH: u32 = u32::MAX;
+
+#[cfg(feature = "standard")]
+#[wasm_bindgen]
+impl WorldDifference {
+    #[wasm_bindgen(constructor)]
+    pub fn new(num_cells: usize) -> WorldDifference {
+        WorldDifference {
+            num_cells,
+            mask: vec![0; num_cells],
+            hamming: 0,
+        }
+    }
+
+    pub fn mask_ptr(&self) -> *const u8 {
+        self.mask.as_ptr()
+    }
+
+    /// Cells that differ, from the last [`WorldDifference::compare`].
+    pub fn hamming(&self) -> u32 {
+        self.hamming
+    }
+
+    /// Recompute the mask from two worlds. Allocates nothing.
+    pub fn compare(&mut self, left: &World, right: &World) -> u32 {
+        self.compare_slices(&left.state, &right.state)
+    }
+
+    /// Recompute the mask and publish it straight into a k-state world's own state buffer.
+    ///
+    /// This is what removes the last host copy from the Butterfly demo: the difference never
+    /// becomes a JavaScript array, and nothing is uploaded across the boundary to display it.
+    pub fn compare_into(&mut self, left: &World, right: &World, display: &mut WorldK) -> u32 {
+        let hamming = self.compare_slices(&left.state, &right.state);
+        if hamming != ANALYSIS_SIZE_MISMATCH {
+            display.publish_cells(&self.mask);
+        }
+        hamming
+    }
+}
+
+#[cfg(feature = "standard")]
+impl WorldDifference {
+    fn compare_slices(&mut self, left: &[u8], right: &[u8]) -> u32 {
+        if left.len() != self.num_cells || right.len() != self.num_cells {
+            return ANALYSIS_SIZE_MISMATCH;
+        }
+        let mut hamming = 0u32;
+        for index in 0..self.num_cells {
+            let differs = left[index] ^ right[index];
+            self.mask[index] = differs;
+            hamming += u32::from(differs != 0);
+        }
+        self.hamming = hamming;
+        hamming
+    }
+}
+
+/// Eight bounded birth lanes with one representative index each.
+///
+/// The Synth demo needs "which pitch lanes had a birth this beat", not the grid. One Rust scan
+/// replaces a full-grid snapshot plus an unbounded host birth-index array, and the host reads
+/// sixteen numbers instead of N cells.
+///
+/// It keeps **no** per-cell storage: `World` double-buffers, so after a tick's swap `next_state`
+/// already holds the previous generation. That is both the cheapest possible previous-generation
+/// source and the exactly right one â€” `sample` reports the births of the most recent `run_tick`.
+#[cfg(feature = "standard")]
+#[wasm_bindgen]
+pub struct BirthLanes {
+    num_cells: usize,
+    grid_cols: usize,
+    counts: [u32; BIRTH_LANES],
+    representatives: [i32; BIRTH_LANES],
+    total: u32,
+}
+
+#[cfg(feature = "standard")]
+pub const BIRTH_LANES: usize = 8;
+
+#[cfg(feature = "standard")]
+#[wasm_bindgen]
+impl BirthLanes {
+    #[wasm_bindgen(constructor)]
+    pub fn new(world: &World) -> BirthLanes {
+        BirthLanes {
+            num_cells: world.num_cells,
+            grid_cols: world.grid_cols,
+            counts: [0; BIRTH_LANES],
+            representatives: [-1; BIRTH_LANES],
+            total: 0,
+        }
+    }
+
+    pub fn counts_ptr(&self) -> *const u32 {
+        self.counts.as_ptr()
+    }
+
+    pub fn representatives_ptr(&self) -> *const i32 {
+        self.representatives.as_ptr()
+    }
+
+    /// Births in the last [`BirthLanes::sample`], across all lanes.
+    pub fn total(&self) -> u32 {
+        self.total
+    }
+
+    /// Clear the reported result without scanning.
+    pub fn clear(&mut self) {
+        self.counts = [0; BIRTH_LANES];
+        self.representatives = [-1; BIRTH_LANES];
+        self.total = 0;
+    }
+
+    /// One scan of the births the most recent `run_tick` produced.
+    ///
+    /// Cells are 0/1 bytes, so "born" is `state & !previous` â€” and eight of them fit one `u64`.
+    /// Testing whole words first is what keeps this under the analysis-overhead gate on the sparse
+    /// structure rules the Synth actually uses, where almost every word is birth-free.
+    pub fn sample(&mut self, world: &World) -> u32 {
+        if world.num_cells != self.num_cells {
+            return ANALYSIS_SIZE_MISMATCH;
+        }
+        self.counts = [0; BIRTH_LANES];
+        self.representatives = [-1; BIRTH_LANES];
+        let mut total = 0u32;
+        let cols = self.grid_cols.max(1);
+        let state = &world.state;
+        let previous = &world.next_state;
+
+        let record = |index: usize, counts: &mut [u32; BIRTH_LANES], representatives: &mut [i32; BIRTH_LANES]| {
+            let lane = ((index % cols) * BIRTH_LANES / cols).min(BIRTH_LANES - 1);
+            if representatives[lane] < 0 {
+                representatives[lane] = index as i32;
+            }
+            counts[lane] += 1;
+        };
+
+        let words = self.num_cells / 8;
+        for word in 0..words {
+            let base = word * 8;
+            let current = u64::from_le_bytes(state[base..base + 8].try_into().unwrap());
+            let before = u64::from_le_bytes(previous[base..base + 8].try_into().unwrap());
+            let mut born = current & !before;
+            while born != 0 {
+                let offset = (born.trailing_zeros() / 8) as usize;
+                record(base + offset, &mut self.counts, &mut self.representatives);
+                total += 1;
+                born &= !(0xFFu64 << (offset * 8));
+            }
+        }
+        for index in words * 8..self.num_cells {
+            if state[index] != 0 && previous[index] == 0 {
+                record(index, &mut self.counts, &mut self.representatives);
+                total += 1;
+            }
+        }
+
+        self.total = total;
+        total
     }
 }
 
@@ -908,7 +1098,7 @@ mod tests {
         }
     }
 
-    /// Recompute one generation the plain dense way — every cell, no block classification, no fast
+    /// Recompute one generation the plain dense way â€” every cell, no block classification, no fast
     /// path. This is the oracle `run_tick`'s sparse fast path is checked against; it is deliberately
     /// a transcription of the pre-optimization loop rather than a call into any shared helper, so a
     /// bug in the block logic cannot hide by being present on both sides.
@@ -989,7 +1179,7 @@ mod tests {
     fn neighbor_dirs_match_canonical() {
         // Pin the Rust copies of the hex neighbor-offset tables to their canonical values. The same
         // literals live in src/core/config.js (guarded by tests/neighborDirs.test.js). If you change
-        // one side, change the other and update both pinned tests — drift silently alters the sim.
+        // one side, change the other and update both pinned tests â€” drift silently alters the sim.
         assert_eq!(
             NEIGHBOR_DIRS_ODD_R,
             [[-1, 1], [-1, 0], [0, -1], [1, 0], [1, 1], [0, 1]],
@@ -1073,15 +1263,15 @@ mod tests {
     #[test]
     fn sparse_fast_path_matches_dense_reference() {
         // The whole claim of the block fast path is that skipping cells changes nothing. Check it
-        // exhaustively against `dense_reference_tick`: every observable `run_tick` produces — both
-        // buffers, the active and changed counts, and the usage histogram — over grids that cross
+        // exhaustively against `dense_reference_tick`: every observable `run_tick` produces â€” both
+        // buffers, the active and changed counts, and the usage histogram â€” over grids that cross
         // each block-tiling edge case, occupancies from empty to full, and rulesets including one
         // whose vacuum ignites (so a uniformly dead block must flip to uniformly live, not stay).
         let grids = [
             (32, 32),   // exact multiple of BLOCK_SIZE
             (37, 29),   // partial blocks on both edges
             (8, 8),     // smaller than one block: a single block that is its own whole halo
-            (17, 33),   // two blocks wide — a block's left and right neighbour are the same block
+            (17, 33),   // two blocks wide â€” a block's left and right neighbour are the same block
             (64, 16),   // one block tall
             (48, 96),   // several blocks each way, the shape a real grid has
         ];
@@ -1146,7 +1336,7 @@ mod tests {
         // THE safety property of the fast path: if a cell's neighbour lives in a block the halo does
         // not check, the fast path can read that block as uniform while the neighbour is not, and
         // silently produce a wrong generation. Assert the covering directly against the neighbour
-        // table — for every cell of every block, on grids whose last block column is a full block,
+        // table â€” for every cell of every block, on grids whose last block column is a full block,
         // a partial block ending on an odd column, and a partial block ending on an even column
         // (which flips the right-hand pair of offsets).
         for &(cols, rows) in &[(64i32, 64i32), (67, 64), (64, 67), (67, 67), (12, 40), (8, 8)] {
@@ -1267,7 +1457,7 @@ mod tests {
     #[test]
     fn probe_damage_holds_for_still_life() {
         // Center-preserving ruleset: every cell is frozen, so a single-cell perturbation neither
-        // spreads nor heals — Hamming distance stays pinned at 1.
+        // spreads nor heals â€” Hamming distance stays pinned at 1.
         let mut w = seeded_world(40, 46, 0xC0DE);
         for idx in 0..128 {
             w.ruleset[idx] = ((idx >> 6) & 1) as u8;
@@ -1285,7 +1475,7 @@ mod tests {
     #[test]
     fn probe_damage_holds_for_center_inverting() {
         // Center-inverting ruleset: both lanes flip in lockstep every tick, so the one perturbed
-        // cell stays perturbed — Hamming distance remains 1 across ticks.
+        // cell stays perturbed â€” Hamming distance remains 1 across ticks.
         let mut w = seeded_world(40, 46, 0xFEED);
         for idx in 0..128 {
             w.ruleset[idx] = 1 - (((idx >> 6) & 1) as u8);
@@ -1301,7 +1491,7 @@ mod tests {
     #[test]
     fn probe_damage_dies_for_saturating_ruleset() {
         // All-ones ruleset drives both lanes to a fully-active grid after a single tick, so any
-        // initial perturbation is erased — Hamming distance collapses to 0.
+        // initial perturbation is erased â€” Hamming distance collapses to 0.
         let mut w = seeded_world(40, 46, 0xABBA);
         for r in w.ruleset.iter_mut() {
             *r = 1;
@@ -1362,7 +1552,7 @@ mod tests {
 
     #[test]
     fn spatial_order_near_zero_for_random_fill() {
-        // A ~50% random fill is well-mixed: J ≈ E[J], so the statistic sits near 0.
+        // A ~50% random fill is well-mixed: J â‰ˆ E[J], so the statistic sits near 0.
         let w = seeded_world(60, 70, 0x1234);
         let v = w.spatial_order();
         assert!(v.abs() < 0.1, "random fill should be ~0, got {v}");
@@ -1394,7 +1584,7 @@ mod tests {
 
     #[test]
     fn spatial_order_zero_for_uniform_grids() {
-        // p ∈ {0, 1} ⇒ E[J] == 0 ⇒ defined as 0.
+        // p âˆˆ {0, 1} â‡’ E[J] == 0 â‡’ defined as 0.
         let empty = World::new(40, 46);
         assert_eq!(empty.spatial_order(), 0.0);
         let mut full = World::new(40, 46);
@@ -1535,7 +1725,7 @@ mod tests {
     #[test]
     fn active_centroid_circular_mean_of_known_points() {
         use std::f64::consts::PI;
-        // Empty grid ⇒ angles AND concentrations default to 0.
+        // Empty grid â‡’ angles AND concentrations default to 0.
         let mut empty = World::new(40, 46);
         empty.compute_active_centroid();
         assert_eq!(empty.centroid_col_angle(), 0.0);
@@ -1543,8 +1733,8 @@ mod tests {
         assert_eq!(empty.centroid_col_concentration(), 0.0);
         assert_eq!(empty.centroid_row_concentration(), 0.0);
 
-        // A single active cell sits exactly at its own circular-mean angle (θ = 2π·coord/dim) and is
-        // maximally concentrated (a single point ⇒ R = 1 on both axes).
+        // A single active cell sits exactly at its own circular-mean angle (Î¸ = 2Ï€Â·coord/dim) and is
+        // maximally concentrated (a single point â‡’ R = 1 on both axes).
         let cols = 40usize;
         let mut one = World::new(cols as i32, 46);
         let (col, row) = (10usize, 0usize);
@@ -1556,7 +1746,7 @@ mod tests {
         assert!((one.centroid_row_concentration() - 1.0).abs() < 1e-12);
 
         // A FULL grid spreads active cells evenly around the torus on both axes, so the resultant
-        // vector collapses to ~0 and the concentration ⇒ ~0. This is the churn-gating guarantee: a
+        // vector collapses to ~0 and the concentration â‡’ ~0. This is the churn-gating guarantee: a
         // dense/uniform field's centroid angle is meaningless noise and must not register as motion.
         let mut full = World::new(cols as i32, 46);
         for c in full.state.iter_mut() {
@@ -1571,7 +1761,7 @@ mod tests {
     fn active_centroid_tracks_translation_and_holds_for_still_life() {
         use std::f64::consts::PI;
         // Signed shortest angle between two circular-mean angles, and the torus displacement (in
-        // cells) it implies — mirrors the worker's transport accumulation exactly.
+        // cells) it implies â€” mirrors the worker's transport accumulation exactly.
         fn shortest(a: f64, b: f64) -> f64 {
             let d = b - a;
             d.sin().atan2(d.cos())
@@ -1586,7 +1776,7 @@ mod tests {
         let rows = 46i32;
 
         // A "copy neighbor-d" ruleset (next = bit d of the neighbor mask) translates a lone active
-        // cell by one fixed neighbor step each tick — the cell stays single, it just moves.
+        // cell by one fixed neighbor step each tick â€” the cell stays single, it just moves.
         let mut mover = World::new(cols, rows);
         let d = 3usize;
         for idx in 0..128 {
@@ -1603,7 +1793,7 @@ mod tests {
         let dist = displacement(cols as f64, rows as f64, c0, r0, c1, r1);
         assert!(dist > 0.5, "a translating mover yields non-zero centroid speed, got {dist}");
 
-        // A still life (center-preserving ruleset) leaves every cell — and so the centroid — put.
+        // A still life (center-preserving ruleset) leaves every cell â€” and so the centroid â€” put.
         let mut still = seeded_world(cols, rows, 0xACE5);
         for idx in 0..128 {
             still.ruleset[idx] = ((idx >> 6) & 1) as u8;
@@ -1763,6 +1953,270 @@ mod tests {
                 print_samples(tier, "WorldK-block", workload, count, &samples);
             }
         }
+    }
+
+    /// Release-native half of the Â§10 matrix for the three new analysis primitives.
+    ///
+    /// Ignored so ordinary runs do not benchmark a busy host. Every row is emitted twice where a
+    /// gate compares two paths: alternating block against the exact host mirror conjugation, and
+    /// each optional analysis against the same engine tick with the analysis absent.
+    #[test]
+    #[ignore = "manual release benchmark; run with --release --ignored --nocapture"]
+    fn phase_a_native_analysis_benchmark() {
+        use std::time::Instant;
+
+        const TIERS: [(&str, i32, i32, usize); 3] = [
+            ("demo", 84, 72, 36),
+            ("medium", 346, 300, 9),
+            ("large", 666, 576, 3),
+        ];
+        const RUNS: usize = 7;
+
+        fn measure(mut tick: impl FnMut(), ticks: usize) -> Vec<u128> {
+            for _ in 0..3 {
+                tick();
+            }
+            (0..RUNS)
+                .map(|_| {
+                    let start = Instant::now();
+                    for _ in 0..ticks {
+                        tick();
+                    }
+                    start.elapsed().as_nanos() / ticks as u128
+                })
+                .collect()
+        }
+
+        fn emit(tier: &str, engine: &str, workload: &str, mode: &str, cells: usize, samples: &[u128]) {
+            let joined = samples.iter().map(u128::to_string).collect::<Vec<_>>().join(",");
+            println!("PHASEA_NATIVE|{tier}|{engine}|{workload}|{mode}|{cells}|{joined}");
+        }
+
+        fn host_mirror(rows: usize, columns: usize) -> Vec<usize> {
+            let mut map = vec![0usize; rows * columns];
+            for row in 0..rows {
+                for col in 0..columns {
+                    let axial_r = row as i64 - (col as i64).div_euclid(2);
+                    let mirrored_q = -(col as i64);
+                    let mirrored_row =
+                        (axial_r + col as i64 + mirrored_q.div_euclid(2)).rem_euclid(rows as i64);
+                    let mirrored_col = mirrored_q.rem_euclid(columns as i64);
+                    map[row * columns + col] = mirrored_row as usize * columns + mirrored_col as usize;
+                }
+            }
+            map
+        }
+
+        for (tier, cols, rows, ticks) in TIERS {
+            let count = (cols * rows) as usize;
+            let mut seed = 0xC0FF_EE01u32;
+            let coffee_rule: Vec<u16> = (0..6usize.pow(3))
+                .map(|index| ((index * 137 + 11) % 6usize.pow(3)) as u16)
+                .collect();
+            let coffee_cells: Vec<u8> = (0..count).map(|_| (xorshift32(&mut seed) % 6) as u8).collect();
+
+            // Native alternating handedness.
+            let mut native = WorldK::new(cols, rows, 6, BACKEND_BLOCK).unwrap();
+            native.set_block_rule(&coffee_rule).unwrap();
+            native.set_cells(&coffee_cells).unwrap();
+            native.set_block_alternates(true);
+            let samples = measure(|| { std::hint::black_box(native.run_tick()); }, ticks);
+            emit(tier, "WorldK/alternating-block", "coffee-extraction", "native", count, &samples);
+
+            // The exact host conjugation it replaces: two full-grid permutations on odd ticks.
+            let mut oracle = WorldK::new(cols, rows, 6, BACKEND_BLOCK).unwrap();
+            oracle.set_block_rule(&coffee_rule).unwrap();
+            oracle.set_cells(&coffee_cells).unwrap();
+            let mirror = host_mirror(rows as usize, cols as usize);
+            let mut scratch = vec![0u8; count];
+            let mut host_tick = 0u64;
+            let samples = measure(
+                || {
+                    if host_tick % 2 == 0 {
+                        std::hint::black_box(oracle.run_tick());
+                    } else {
+                        for _ in 0..2 {
+                            for index in 0..count {
+                                scratch[mirror[index]] = oracle.state[index];
+                            }
+                            oracle.state.copy_from_slice(&scratch);
+                            oracle.mark_all_dirty();
+                            if scratch[0] == u8::MAX {
+                                unreachable!();
+                            }
+                        }
+                        std::hint::black_box(oracle.run_tick());
+                    }
+                    host_tick += 1;
+                },
+                ticks,
+            );
+            emit(tier, "WorldK/alternating-block", "coffee-extraction", "host-mirror-oracle", count, &samples);
+
+            // Butterfly: two binary ticks, with and without the native difference.
+            let butterfly = parse_hex_ruleset("D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6");
+            let binary_cells: Vec<u8> =
+                (0..count).map(|_| u8::from(xorshift32(&mut seed) % 100 < 34)).collect();
+            for analysis in [false, true] {
+                let mut left = World::new(cols, rows);
+                let mut right = World::new(cols, rows);
+                left.ruleset.copy_from_slice(&butterfly);
+                right.ruleset.copy_from_slice(&butterfly);
+                left.state.copy_from_slice(&binary_cells);
+                right.state.copy_from_slice(&binary_cells);
+                right.state[count / 2] ^= 1;
+                let mut difference = WorldDifference::new(count);
+                let samples = measure(
+                    || {
+                        std::hint::black_box(left.run_tick());
+                        std::hint::black_box(right.run_tick());
+                        if analysis {
+                            std::hint::black_box(difference.compare(&left, &right));
+                        }
+                    },
+                    ticks,
+                );
+                emit(
+                    tier,
+                    "World/difference",
+                    "butterfly-rule",
+                    if analysis { "enabled" } else { "disabled" },
+                    count,
+                    &samples,
+                );
+            }
+
+            // Synth: one binary tick, with and without the bounded birth-lane scan.
+            let synth = parse_hex_ruleset("120C11B442568E21134E30A85A40C880");
+            let sparse: Vec<u8> = (0..count).map(|_| u8::from(xorshift32(&mut seed) % 100 < 8)).collect();
+            for analysis in [false, true] {
+                let mut world = World::new(cols, rows);
+                world.ruleset.copy_from_slice(&synth);
+                world.state.copy_from_slice(&sparse);
+                let mut lanes = BirthLanes::new(&world);
+                let samples = measure(
+                    || {
+                        std::hint::black_box(world.run_tick());
+                        if analysis {
+                            std::hint::black_box(lanes.sample(&world));
+                        }
+                    },
+                    ticks,
+                );
+                emit(
+                    tier,
+                    "World/birth-lanes",
+                    "synth-rule",
+                    if analysis { "enabled" } else { "disabled" },
+                    count,
+                    &samples,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn world_difference_masks_two_worlds_without_touching_their_ticks() {
+        // 18 rows, not 16: the display world uses the block backend, whose partition needs
+        // `rows % 3 == 0` or its triangles seam.
+        let mut left = World::new(16, 18);
+        let mut right = World::new(16, 18);
+        left.ruleset.copy_from_slice(&parse_hex_ruleset(DEFAULT_RULESET_HEX));
+        right.ruleset.copy_from_slice(&parse_hex_ruleset(DEFAULT_RULESET_HEX));
+        let mut seed = 0xD1FFu32;
+        let cells: Vec<u8> = (0..288).map(|_| (xorshift32(&mut seed) % 2) as u8).collect();
+        left.state.copy_from_slice(&cells);
+        right.state.copy_from_slice(&cells);
+
+        let mut difference = WorldDifference::new(288);
+        assert_eq!(difference.compare(&left, &right), 0);
+
+        // One controlled edit, then the difference grows only where the rule carries it.
+        right.state[8 * 16 + 8] ^= 1;
+        assert_eq!(difference.compare(&left, &right), 1);
+        assert_eq!(difference.mask[8 * 16 + 8], 1);
+
+        let before = (difference.mask.as_ptr() as usize, difference.mask.capacity());
+        for _ in 0..40 {
+            left.run_tick();
+            right.run_tick();
+            let hamming = difference.compare(&left, &right);
+            let manual = (0..288).filter(|&i| left.state[i] != right.state[i]).count() as u32;
+            assert_eq!(hamming, manual);
+        }
+        assert_eq!(
+            (difference.mask.as_ptr() as usize, difference.mask.capacity()),
+            before,
+            "comparison must not reallocate"
+        );
+        assert_eq!(
+            difference.compare(&left, &World::new(8, 6)),
+            ANALYSIS_SIZE_MISMATCH
+        );
+
+        // Publishing straight into a display world replaces the host's mask upload.
+        let mut display = WorldK::new(16, 18, 2, BACKEND_BLOCK).unwrap();
+        display.set_block_rule(&(0..8u16).collect::<Vec<_>>()).unwrap();
+        let hamming = difference.compare_into(&left, &right, &mut display);
+        assert_eq!(hamming, difference.hamming());
+        let published = unsafe {
+            std::slice::from_raw_parts(display.state_ptr(), display.num_cells())
+        };
+        assert_eq!(
+            published, &difference.mask[..],
+            "the display world holds the native mask, uncopied by any host"
+        );
+    }
+
+    #[test]
+    fn birth_lanes_report_bounded_results_and_leave_run_tick_alone() {
+        let mut world = World::new(16, 16);
+        world.ruleset.copy_from_slice(&parse_hex_ruleset(DEFAULT_RULESET_HEX));
+        let mut seed = 0xB1B7u32;
+        let cells: Vec<u8> = (0..256).map(|_| u8::from(xorshift32(&mut seed) % 10 == 0)).collect();
+        world.state.copy_from_slice(&cells);
+
+        let mut lanes = BirthLanes::new(&world);
+        assert_eq!(BIRTH_LANES, 8);
+        assert_eq!(lanes.total(), 0);
+        assert!(
+            std::mem::size_of::<BirthLanes>() <= 96,
+            "the analysis owns no per-cell storage, only sixteen bounded results"
+        );
+
+        // A reference world that never sees the analysis must stay byte-identical.
+        let mut reference = World::new(16, 16);
+        reference.ruleset.copy_from_slice(&world.ruleset);
+        reference.state.copy_from_slice(&cells);
+
+        let mut previous = cells.clone();
+        for tick in 0..30 {
+            world.run_tick();
+            reference.run_tick();
+            assert_eq!(world.state, reference.state, "analysis changed the tick at {tick}");
+
+            let total = lanes.sample(&world);
+            let expected: u32 = (0..256)
+                .filter(|&i| world.state[i] != 0 && previous[i] == 0)
+                .count() as u32;
+            assert_eq!(total, expected);
+            assert_eq!(lanes.counts.iter().sum::<u32>(), expected);
+            for lane in 0..8 {
+                let representative = lanes.representatives[lane];
+                assert_eq!(representative >= 0, lanes.counts[lane] > 0);
+                if representative >= 0 {
+                    let index = representative as usize;
+                    assert_eq!((index % 16) * 8 / 16, lane);
+                    assert!(world.state[index] != 0 && previous[index] == 0);
+                }
+            }
+            previous.copy_from_slice(&world.state);
+        }
+
+        lanes.clear();
+        assert_eq!(lanes.total(), 0);
+        assert!(lanes.representatives.iter().all(|&r| r < 0));
+        assert_eq!(lanes.sample(&World::new(8, 8)), ANALYSIS_SIZE_MISMATCH);
     }
 
     #[test]

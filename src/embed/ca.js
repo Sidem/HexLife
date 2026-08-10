@@ -451,6 +451,27 @@ export class HexCA {
     }
 
     /**
+     * Alternate the block partition's handedness every tick.
+     *
+     * The up-triangle partition is left-handed — its odd slot always sits one column to the right —
+     * which biases sideways transport. Alternating with the mirrored partition cancels that while
+     * keeping gravity downward. Natively this is just a different odd slot on odd ticks, so it costs
+     * no grid permutation and keeps chunk skipping, over the six-tick period its map cycle has.
+     *
+     * Off by default: existing block worlds and their `HXK1` codes are unaffected.
+     *
+     * @param {boolean} alternates
+     */
+    setBlockAlternates(alternates) {
+        this._assertLive();
+        this.world.set_block_alternates(Boolean(alternates));
+    }
+
+    get blockAlternates() {
+        return this.world ? this.world.block_alternates() : false;
+    }
+
+    /**
      * Advance exactly `count` generations.
      *
      * The neighborhood backend swaps its buffers inside wasm, so the JS views must mirror the swap;

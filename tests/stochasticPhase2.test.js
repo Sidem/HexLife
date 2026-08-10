@@ -2,10 +2,13 @@ import {readFile} from 'node:fs/promises';
 import {beforeAll, describe, expect, it} from 'vitest';
 import {createOutbreakModel, createWildfireModel} from '../public/embed-concept-models.js';
 import {
+    outbreakStochasticRule as outbreakRule,
+    wildfireStochasticRule as wildfireRule,
+} from '../public/embed-stochastic-rules.js';
+import {
     compileStochasticRule,
     independentNeighborChance,
     initStochasticEngine,
-    RNG_LEGACY_DEMO_V0,
     RNG_PHILOX_V1,
     StochasticWorld,
 } from '../src/embed/stochastic.js';
@@ -19,56 +22,6 @@ beforeAll(async () => {
     });
     await initStochasticEngine();
 });
-
-function wildfireRule(params) {
-    const windy = {east: [0, 1], west: [3, 4], north: [5], south: [2]}[params.wind] || [];
-    const directionChance = Array.from({length: 6}, (_, direction) => {
-        const boost = windy.includes(direction) ? Number(params.windBoost) : 1;
-        return Math.min(0.95, params.spread / 100 * boost);
-    });
-    return compileStochasticRule({
-        states: 4,
-        rng: RNG_LEGACY_DEMO_V0,
-        transitions: [
-            {
-                from: 1,
-                neighborState: 2,
-                probabilityByMask: independentNeighborChance(directionChance),
-                to: 2,
-                stream: 101,
-            },
-            {from: 2, minAge: params.burnTicks, probability: 1, to: 3},
-            {from: 3, minAge: params.ashTicks, probability: params.regrowth / 100, to: 1, stream: 103},
-        ],
-    });
-}
-
-function outbreakRule(params) {
-    return compileStochasticRule({
-        states: 4,
-        rng: RNG_LEGACY_DEMO_V0,
-        transitions: [
-            {
-                from: 0,
-                neighborState: 1,
-                probabilityByMask: independentNeighborChance(params.infection / 100),
-                to: 1,
-                stream: 307,
-            },
-            {from: 1, minAge: params.infectiousTicks, probability: 1, to: 2},
-            {from: 2, minAge: params.immunityTicks, probability: 1, to: 0},
-            {
-                from: 3,
-                neighborState: 1,
-                probabilityByMask: independentNeighborChance(
-                    params.infection / 100 * (1 - params.efficacy / 100),
-                ),
-                to: 1,
-                stream: 307,
-            },
-        ],
-    });
-}
 
 function census(cells, states = 4) {
     const counts = new Array(states).fill(0);

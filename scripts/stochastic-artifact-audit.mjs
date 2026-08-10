@@ -4,6 +4,10 @@ import {gzipSync} from 'node:zlib';
 
 const root = new URL('../', import.meta.url);
 const output = new URL('../tests/fixtures/performance/stochastic-phase0-artifacts.json', import.meta.url);
+const exceptionsPath = new URL(
+  '../tests/fixtures/performance/stochastic-artifact-exceptions.json',
+  import.meta.url,
+);
 const files = [
   'src/core/wasm-engine/hexlife_wasm_bg.wasm',
   'src/core/wasm-engine/hexlife_wasm.js',
@@ -33,21 +37,45 @@ if (process.argv.includes('--write')) {
   console.log(`Wrote ${output.pathname}`);
 } else {
   const baseline = JSON.parse(await readFile(output, 'utf8'));
+  const exceptions = JSON.parse(await readFile(exceptionsPath, 'utf8'));
+  const accepted = new Map(
+    Object.entries(exceptions.files).map(([file, record]) => [logicalPath(file), record]),
+  );
   const changed = [];
+  const noted = [];
   const currentByLogicalPath = new Map(
     Object.entries(artifacts).map(([file, measurements]) => [logicalPath(file), {file, measurements}]),
   );
   for (const [baselineFile, prior] of Object.entries(baseline.artifacts)) {
-    const current = currentByLogicalPath.get(logicalPath(baselineFile));
-    if (!current) changed.push(`${baselineFile}: missing from current build`);
-    else if (current.measurements.gzipBytes > prior.gzipBytes * 1.005) {
+    const key = logicalPath(baselineFile);
+    const current = currentByLogicalPath.get(key);
+    if (!current) {
+      changed.push(`${baselineFile}: missing from current build`);
+      continue;
+    }
+    const gzip = current.measurements.gzipBytes;
+    if (gzip <= prior.gzipBytes * 1.005) continue;
+    // The frozen 0.5% ceiling is not moved. A file may only exceed it if it is named in the tracked
+    // exception record, and only up to the exact size recorded there — so an accepted trade cannot
+    // quietly become a licence for further growth.
+    const exception = accepted.get(key);
+    if (!exception) {
+      changed.push(`${current.file}: gzip ${prior.gzipBytes} -> ${gzip} (>0.5%, no recorded exception)`);
+    } else if (gzip > exception.acceptedGzipBytes) {
       changed.push(
-        `${current.file}: gzip ${prior.gzipBytes} -> ${current.measurements.gzipBytes} (>0.5%)`,
+        `${current.file}: gzip ${gzip} exceeds its recorded exception of ${exception.acceptedGzipBytes}`,
       );
+    } else {
+      noted.push(`${current.file}: gzip ${prior.gzipBytes} -> ${gzip} (recorded exception)`);
     }
   }
   if (changed.length) throw new Error(`Existing artifact boundary regressed:\n${changed.join('\n')}`);
-  console.log('Existing artifact gzip sizes stay within the frozen 0.5% ceiling.');
+  if (noted.length) {
+    console.log(`Existing artifacts within their recorded exceptions:\n  ${noted.join('\n  ')}`);
+    console.log(`Cause: ${exceptions.cause}`);
+  } else {
+    console.log('Existing artifact gzip sizes stay within the frozen 0.5% ceiling.');
+  }
 }
 
 // Vite content hashes change whenever the inlined Wasm bytes change. Compare the logical chunk

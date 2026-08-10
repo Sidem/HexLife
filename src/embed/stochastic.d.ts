@@ -51,19 +51,71 @@ export function randomU32(
   streamId: number,
 ): number
 
+export const BACKEND_NEIGHBORHOOD: 'neighborhood'
+export const BACKEND_LATTICE_GAS: 'lattice-gas'
+
+export type StochasticBackend =
+  | typeof BACKEND_NEIGHBORHOOD
+  | typeof BACKEND_LATTICE_GAS
+
+/** Visible states projected from the six velocity channels of a lattice-gas site. */
+export const GAS_STATES: {
+  readonly vacuum: 0
+  readonly amber: 1
+  readonly cyan: 2
+  readonly mixed: 3
+  readonly wall: 4
+}
+
+/** Species labels carried by an occupied velocity channel. */
+export const GAS_SPECIES: {readonly empty: 0; readonly amber: 1; readonly cyan: 2}
+
+/** Six outgoing channels, or a genuine symmetry choice between two of them. */
+export type GasCollisionOutcome =
+  | number[]
+  | {primary: number[]; alternate?: number[]; probability?: number}
+
+/**
+ * The canonical two-species hexagonal collision operator: head-on pairs rotate ±60°, symmetric
+ * triads rotate to the other triad, everything else streams through. Species-exact and sixfold
+ * rotation-equivariant.
+ */
+export function hexGasCollide(channels: number[]): GasCollisionOutcome
+
+export interface GasRuleInput {
+  /** Runs once per packed configuration at compile time, never per cell per tick. */
+  collide?: (channels: number[], configuration: number) => GasCollisionOutcome
+  /** Optional thermal ±60° rotation after collision. Not momentum-conserving; 0 disables it. */
+  scatter?: number
+  rng?: StochasticRng
+}
+
+/** Compile a collision operator into canonical `HSG1` bytes. */
+export function compileGasRule(input?: GasRuleInput): Uint8Array
+
+/** Whether `rule` is a well-formed `HSG1` table that conserves both species for every entry. */
+export function isConservativeGasRule(rule: ArrayLike<number>): boolean
+
 export interface StochasticWorldOptions {
   rows: number
   /** Must be even so odd-q torus parity closes. */
   columns: number
   seed: bigint | number
+  /** Defaults to the neighborhood backend. Chosen at construction so neither allocates the other's buffers. */
+  backend?: StochasticBackend
   rule?: Uint8Array | null
   cells?: ArrayLike<number> | null
   elapsedAges?: ArrayLike<number> | null
+  /** Lattice gas only: six species values per cell in canonical direction order. */
+  channels?: ArrayLike<number> | null
+  /** Lattice gas only: reflecting sites. A closed rim is what makes the toroidal lattice finite. */
+  walls?: ArrayLike<number> | null
 }
 
 /** Dense, allocation-free stochastic-neighborhood runtime. */
 export declare class StochasticWorld {
   constructor(options: StochasticWorldOptions)
+  readonly backend: StochasticBackend
   readonly rows: number
   readonly columns: number
   readonly numCells: number
@@ -83,6 +135,29 @@ export declare class StochasticWorld {
   setCell(index: number, value: number): void
   tick(count?: number): number
   reset(): void
+  /** Off forces the dense reference path. Both paths produce identical results every tick. */
+  setSkippingEnabled(enabled: boolean): void
+  readonly skippingEnabled: boolean
+  /** Chunks recomputed during the last tick, out of {@link chunkCount}. */
+  activeChunkCount(): number
+  chunkCount(): number
+  /** Clamp stored epochs to the saturating age horizon; ticking already does this automatically. */
+  rebaseEpochs(): void
+
+  // ---- Lattice-gas backend only ----
+  /** Replace the exact generation-zero channels and walls, and the reset snapshot. */
+  setInitialGasState(channels: ArrayLike<number> | null, walls?: ArrayLike<number> | null): void
+  /** Intervention-only bulk replacement at the current generation. */
+  setGasCells(channels: ArrayLike<number> | null, walls?: ArrayLike<number> | null): void
+  /** Open or close one barrier site. Sealing a site discards any particles standing on it. */
+  setWall(index: number, isWall: boolean): void
+  /** Exact particle total for one species (1 = amber, 2 = cyan), conserved by every legal table. */
+  speciesCount(species: number): number
+  /** Sites the collision table rewrote on the last tick. */
+  collisionCount(): number
+  /** Six species values per cell, for export or debugging only. */
+  snapshotChannels(): Uint8Array
+  snapshotWalls(): Uint8Array
   census(): Uint32Array
   /** Cumulative firings per canonical compiled row. */
   transitionCounts(): Uint32Array

@@ -74,6 +74,26 @@ const CHUNK_SIZE: usize = 1 << CHUNK_SHIFT;
 const BLOCK_MATE_Q: usize = 4;
 const BLOCK_MATE_R: usize = 5;
 
+/// The mirrored partition's odd slot: canonical direction 0, axial `(−1, +1)`.
+///
+/// **Why this is the exact conjugate of a mirrored tick, not an approximation.** Reflecting the grid
+/// left-to-right is the axial involution `M: (q, r) → (−q, q + r)`. It maps every row onto itself,
+/// preserves the base residue `(q − r) mod 3` — so the *same* cells stay bases in the *same* phase —
+/// and swaps a cell's SE and SW neighbors while fixing S. The up-triangle
+/// `{(q,r), (q+1,r), (q,r+1)}` therefore conjugates to `{(q,r), (q−1,r+1), (q,r+1)}`, which is
+/// direction 0 in place of direction 4 with direction 5 unchanged and the slot order intact.
+///
+/// So `mirror → tick → mirror` is exactly this tick, with no grid permutation and no loss of chunk
+/// activity. `alternating_block_matches_the_host_mirror_oracle` proves it against a port of the
+/// host's own mirror map rather than against this derivation.
+const BLOCK_MATE_Q_MIRRORED: usize = 0;
+
+/// A chunk must be quiet this many ticks before an alternating-handedness block world may skip it.
+///
+/// The partition has three phases and the handedness flips every tick, so the map being applied has
+/// period six rather than three: only six unchanged ticks prove all six maps fix this configuration.
+const QUIET_TICKS_BLOCK_ALTERNATING: u32 = QUIET_TICKS_NEIGHBORHOOD + 2 * BLOCK_PHASES as u32 - 1;
+
 /// A chunk must be quiet this many ticks before [`BACKEND_NEIGHBORHOOD`] may skip it — see
 /// [`WorldK::refresh_chunk_activity`] for the argument.
 const QUIET_TICKS_NEIGHBORHOOD: u32 = 1;
@@ -95,7 +115,10 @@ pub struct WorldK {
     grid_rows: usize,
     /// The current generation. In [`BACKEND_BLOCK`] this is also the write target — blocks partition
     /// the grid, so read-then-write within a block is exact and no second buffer is needed.
-    state: Vec<u8>,
+    ///
+    /// `pub(crate)` only so the crate's own benchmark can reproduce the host mirror oracle without
+    /// a public setter that would invite bypassing the activity tracker from JavaScript.
+    pub(crate) state: Vec<u8>,
     /// The write target for [`BACKEND_NEIGHBORHOOD`]; empty in [`BACKEND_BLOCK`].
     next_state: Vec<u8>,
     /// Flattened 6-entries-per-cell neighbour table with toroidal wrapping already applied — the
@@ -125,6 +148,9 @@ pub struct WorldK {
     /// Master switch for the skipping above. Off ⇒ every chunk is recomputed every tick, which is
     /// the reference behaviour every fast-path test is checked against.
     skipping_enabled: bool,
+    /// Whether [`BACKEND_BLOCK`] alternates the partition's handedness every tick. Off by default,
+    /// so existing `HXK1` block worlds are unaffected.
+    block_alternates: bool,
 }
 
 #[wasm_bindgen]
@@ -199,6 +225,7 @@ impl WorldK {
             census: vec![0; k],
             tick_count: 0,
             last_changed_count: 0,
+            block_alternates: false,
             chunk_cols,
             chunk_rows,
             // Zero quiet ticks ⇒ every chunk is active on the first tick, which is what makes the
@@ -384,6 +411,35 @@ impl WorldK {
         self.chunk_quiet.fill(0);
     }
 
+    /// Alternate the block partition's handedness every tick.
+    ///
+    /// The up-triangle partition is left-handed: its odd slot always sits one column to the right,
+    /// which biases transport sideways. Alternating with the mirrored partition cancels that bias
+    /// while keeping gravity downward. This reproduces a host `mirror → tick → mirror` sequence
+    /// exactly, without the two full-grid permutations or the `mark_all_dirty` they force.
+    ///
+    /// Off by default: existing `BACKEND_BLOCK` worlds and their `HXK1` codes are untouched.
+    pub fn set_block_alternates(&mut self, alternates: bool) {
+        if self.block_alternates != alternates {
+            self.block_alternates = alternates;
+            self.mark_all_dirty();
+        }
+    }
+
+    pub fn block_alternates(&self) -> bool {
+        self.block_alternates
+    }
+
+    /// Overwrite the whole state buffer and wake every chunk, without the length check
+    /// [`WorldK::set_cells`] performs. Only `WorldDifference::compare_into` calls it, and it has
+    /// already established that the two worlds are the same size.
+    pub(crate) fn publish_cells(&mut self, cells: &[u8]) {
+        if cells.len() == self.num_cells {
+            self.state.copy_from_slice(cells);
+            self.mark_all_dirty();
+        }
+    }
+
     /// Turn the chunk-skipping fast path off (or back on). Off is the dense reference behaviour;
     /// results are identical either way, which is the whole claim the fast-path tests check.
     pub fn set_skipping_enabled(&mut self, enabled: bool) {
@@ -435,12 +491,7 @@ impl WorldK {
     /// change the configuration maps to itself forever. One comparison per tick catches every still
     /// life; hosts use it to stop scheduling frames entirely.
     pub fn is_settled(&self) -> bool {
-        let needed = if self.backend == BACKEND_BLOCK {
-            QUIET_TICKS_BLOCK
-        } else {
-            QUIET_TICKS_NEIGHBORHOOD
-        };
-        self.chunk_quiet.iter().all(|&q| q >= needed)
+        self.chunk_quiet.iter().all(|&q| q >= self.quiet_ticks_needed())
     }
 
     // --- observables ------------------------------------------------------------------------
@@ -484,6 +535,17 @@ impl WorldK {
 
 // Private helpers, kept out of the `#[wasm_bindgen]` block so they aren't exported to JS.
 impl WorldK {
+    /// Unchanged ticks that prove a chunk's inputs repeat, for the map period this world applies.
+    fn quiet_ticks_needed(&self) -> u32 {
+        if self.backend != BACKEND_BLOCK {
+            QUIET_TICKS_NEIGHBORHOOD
+        } else if self.block_alternates {
+            QUIET_TICKS_BLOCK_ALTERNATING
+        } else {
+            QUIET_TICKS_BLOCK
+        }
+    }
+
     #[inline]
     fn chunk_of(&self, cell: usize) -> usize {
         let col = cell % self.grid_cols;
@@ -549,11 +611,7 @@ impl WorldK {
             self.chunk_active.fill(1);
             return;
         }
-        let needed = if self.backend == BACKEND_BLOCK {
-            QUIET_TICKS_BLOCK
-        } else {
-            QUIET_TICKS_NEIGHBORHOOD
-        };
+        let needed = self.quiet_ticks_needed();
         let chunk_cols = self.chunk_cols as isize;
         let chunk_rows = self.chunk_rows as isize;
         for chunk_row in 0..self.chunk_rows {
@@ -674,6 +732,13 @@ impl WorldK {
         let k = self.k;
         let k2 = k * k;
         let phase = (self.tick_count % BLOCK_PHASES) as usize;
+        // The base set and the phase are both invariant under the mirror, so alternating handedness
+        // is exactly a different odd slot — see `BLOCK_MATE_Q_MIRRORED`.
+        let mate_q_direction = if self.block_alternates && self.tick_count % 2 == 1 {
+            BLOCK_MATE_Q_MIRRORED
+        } else {
+            BLOCK_MATE_Q
+        };
         let cols = self.grid_cols;
         let chunk_cols = self.chunk_cols;
 
@@ -702,7 +767,7 @@ impl WorldK {
                 let mut col = first;
                 while col < end {
                     let base = row_base + col;
-                    let mate_q = self.neighbor_indices[base * 6 + BLOCK_MATE_Q] as usize;
+                    let mate_q = self.neighbor_indices[base * 6 + mate_q_direction] as usize;
                     let mate_r = self.neighbor_indices[base * 6 + BLOCK_MATE_R] as usize;
 
                     let s0 = self.state[base] as usize;
@@ -781,6 +846,105 @@ mod tests {
     /// The identity block rule: every block maps to itself. Trivially conservative and isotropic.
     fn identity_block_rule(k: usize) -> Vec<u16> {
         (0..(k * k * k) as u16).collect()
+    }
+
+    /// A port of the coffee lab's `buildHexMirror`, used only as the oracle below.
+    fn host_hex_mirror(rows: usize, columns: usize) -> Vec<usize> {
+        let mut map = vec![0usize; rows * columns];
+        for row in 0..rows {
+            for col in 0..columns {
+                let axial_r = row as i64 - (col as i64).div_euclid(2);
+                let mirrored_q = -(col as i64);
+                let mirrored_row = axial_r + col as i64 + mirrored_q.div_euclid(2);
+                let mirrored_row = mirrored_row.rem_euclid(rows as i64) as usize;
+                let mirrored_col = mirrored_q.rem_euclid(columns as i64) as usize;
+                map[row * columns + col] = mirrored_row * columns + mirrored_col;
+            }
+        }
+        map
+    }
+
+    /// The exact host sequence: reflect the grid, run one ordinary block tick, reflect it back.
+    fn host_mirror_tick(world: &mut WorldK, mirror: &[usize]) {
+        for buffer in [true, false] {
+            let mut scratch = vec![0u8; world.num_cells];
+            for index in 0..world.num_cells {
+                scratch[mirror[index]] = world.state[index];
+            }
+            world.state.copy_from_slice(&scratch);
+            world.mark_all_dirty();
+            if buffer {
+                world.run_tick();
+            }
+        }
+        // The host's second mirror happens after the tick, so undo the extra tick_count the loop
+        // above would otherwise imply: it ran exactly one generation, which is what we want.
+    }
+
+    /// The whole justification for `BLOCK_MATE_Q_MIRRORED`, checked rather than argued.
+    #[test]
+    fn alternating_block_matches_the_host_mirror_oracle() {
+        let mut seed = 0x1234_5678u32;
+        for (cols, rows) in [(84i32, 72i32), (48, 30), (16, 12)] {
+            let mirror = host_hex_mirror(rows as usize, cols as usize);
+            let mut native = block_world(cols, rows, 6);
+            let mut oracle = block_world(cols, rows, 6);
+            let rule: Vec<u16> = (0..6usize.pow(3))
+                .map(|index| ((index * 137 + 11) % 6usize.pow(3)) as u16)
+                .collect();
+            native.set_block_rule(&rule).unwrap();
+            oracle.set_block_rule(&rule).unwrap();
+            let mut cell_seed = seed;
+            let cells: Vec<u8> = (0..native.num_cells)
+                .map(|_| (xorshift32(&mut cell_seed) % 6) as u8)
+                .collect();
+            native.set_cells(&cells).unwrap();
+            oracle.set_cells(&cells).unwrap();
+            native.set_block_alternates(true);
+            seed = cell_seed;
+
+            for tick in 0..24 {
+                if tick % 2 == 0 {
+                    oracle.run_tick();
+                } else {
+                    host_mirror_tick(&mut oracle, &mirror);
+                }
+                native.run_tick();
+                assert_eq!(
+                    native.state, oracle.state,
+                    "{cols}x{rows}: alternating handedness diverged at tick {tick}"
+                );
+            }
+        }
+    }
+
+    /// Alternating handedness must not disturb the existing block backend or its skipping.
+    #[test]
+    fn alternating_handedness_is_opt_in_and_keeps_activity_tracking() {
+        let mut world = block_world(48, 30, 4);
+        assert!(!world.block_alternates());
+        world.set_block_rule(&identity_block_rule(4)).unwrap();
+        let mut seed = 0xC0FFEEu32;
+        seed_cells(&mut world, &mut seed);
+
+        // A default block world is byte-identical to one that never enables the flag.
+        let mut reference = block_world(48, 30, 4);
+        reference.set_block_rule(&identity_block_rule(4)).unwrap();
+        reference.set_cells(&world.state.clone()).unwrap();
+        for _ in 0..12 {
+            world.run_tick();
+            reference.run_tick();
+            assert_eq!(world.state, reference.state);
+        }
+
+        // The identity rule changes nothing, so an alternating world still settles and still skips —
+        // just over the six-tick period its map cycle actually has.
+        world.set_block_alternates(true);
+        for _ in 0..8 {
+            world.run_tick();
+        }
+        assert!(world.is_settled());
+        assert_eq!(world.active_chunk_count(), 0);
     }
 
     /// Recompute one neighborhood generation the plain dense way — every cell, no chunk activity,

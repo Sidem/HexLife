@@ -1,5 +1,82 @@
 /* @ts-self-types="./hexlife_wasm.d.ts" */
 
+/**
+ * Eight bounded birth lanes with one representative index each.
+ *
+ * The Synth demo needs "which pitch lanes had a birth this beat", not the grid. One Rust scan
+ * replaces a full-grid snapshot plus an unbounded host birth-index array, and the host reads
+ * sixteen numbers instead of N cells.
+ *
+ * It keeps **no** per-cell storage: `World` double-buffers, so after a tick's swap `next_state`
+ * already holds the previous generation. That is both the cheapest possible previous-generation
+ * source and the exactly right one â€” `sample` reports the births of the most recent `run_tick`.
+ */
+export class BirthLanes {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        BirthLanesFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_birthlanes_free(ptr, 0);
+    }
+    /**
+     * Clear the reported result without scanning.
+     */
+    clear() {
+        wasm.birthlanes_clear(this.__wbg_ptr);
+    }
+    /**
+     * @returns {number}
+     */
+    counts_ptr() {
+        const ret = wasm.birthlanes_counts_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {World} world
+     */
+    constructor(world) {
+        _assertClass(world, World);
+        const ret = wasm.birthlanes_new(world.__wbg_ptr);
+        this.__wbg_ptr = ret;
+        BirthLanesFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @returns {number}
+     */
+    representatives_ptr() {
+        const ret = wasm.birthlanes_representatives_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * One scan of the births the most recent `run_tick` produced.
+     *
+     * Cells are 0/1 bytes, so "born" is `state & !previous` â€” and eight of them fit one `u64`.
+     * Testing whole words first is what keeps this under the analysis-overhead gate on the sparse
+     * structure rules the Synth actually uses, where almost every word is birth-free.
+     * @param {World} world
+     * @returns {number}
+     */
+    sample(world) {
+        _assertClass(world, World);
+        const ret = wasm.birthlanes_sample(this.__wbg_ptr, world.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Births in the last [`BirthLanes::sample`], across all lanes.
+     * @returns {number}
+     */
+    total() {
+        const ret = wasm.birthlanes_total(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+}
+if (Symbol.dispose) BirthLanes.prototype[Symbol.dispose] = BirthLanes.prototype.free;
+
 export class World {
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
@@ -31,13 +108,13 @@ export class World {
     }
     /**
      * Block-pattern entropy of the current state as `[mean, variance]` (auto-explore spatial-
-     * heterogeneity term). `mean` equals {@link World::block_entropy} — the normalized Shannon
+     * heterogeneity term). `mean` equals {@link World::block_entropy} â€” the normalized Shannon
      * entropy of the 7-cell block-pattern distribution, expressible as the average per-cell
-     * surprisal `−log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
+     * surprisal `âˆ’log2(p(pattern))/7`. `variance` is the across-cell variance of that surprisal:
      * near zero when local structure is spatially uniform (every region looks the same) and large
      * when the field mixes very-common patterns (ordered regions) with very-rare ones (disordered
      * regions). Computed in one pass over the cells to build the 128-bucket histogram, then a
-     * cheap 128-bucket finalize (`Var = E[s²] − E[s]²`).
+     * cheap 128-bucket finalize (`Var = E[sÂ²] âˆ’ E[s]Â²`).
      *
      * NB: returning a `Vec<f64>` allocates in Wasm linear memory; callers holding typed-array
      * views over the heap must `refreshSimViews()` afterwards (see the worker notes).
@@ -58,7 +135,7 @@ export class World {
         return ret;
     }
     /**
-     * Column-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+     * Column-axis centroid concentration (mean resultant length, [0,1]) â€” see the field doc.
      * @returns {number}
      */
     centroid_col_concentration() {
@@ -74,7 +151,7 @@ export class World {
         return ret;
     }
     /**
-     * Row-axis centroid concentration (mean resultant length, [0,1]) — see the field doc.
+     * Row-axis centroid concentration (mean resultant length, [0,1]) â€” see the field doc.
      * @returns {number}
      */
     centroid_row_concentration() {
@@ -95,7 +172,7 @@ export class World {
      *
      * Returns zero when no cells or all cells changed, because the expected heterogeneous-edge count
      * is then zero. Valid only after at least one tick since a reset or direct state write; evaluation
-     * warmup guarantees that precondition. No allocation — safe to call without detaching JS views.
+     * warmup guarantees that precondition. No allocation â€” safe to call without detaching JS views.
      * @returns {number}
      */
     change_spatial_order() {
@@ -112,13 +189,13 @@ export class World {
     }
     /**
      * Recompute the active-cell centroid as a per-axis circular mean and stash it in
-     * `centroid_col_angle` / `centroid_row_angle` (radians, in (-π, π]). The circular mean is the
-     * ONLY correct centroid on a torus: each axis coordinate maps to an angle θ = 2π·coord/dim,
-     * we accumulate Σsin/Σcos, and take atan2 of the resultant vector. A simple arithmetic mean
+     * `centroid_col_angle` / `centroid_row_angle` (radians, in (-Ï€, Ï€]). The circular mean is the
+     * ONLY correct centroid on a torus: each axis coordinate maps to an angle Î¸ = 2Ï€Â·coord/dim,
+     * we accumulate Î£sin/Î£cos, and take atan2 of the resultant vector. A simple arithmetic mean
      * would jump discontinuously across the wrap seam and mis-measure a structure straddling it.
      *
      * One pass, NO allocation (scalar accumulators + four scalar field writes), so it never grows
-     * Wasm linear memory and JS typed-array views stay valid — no `refreshSimViews()` needed after.
+     * Wasm linear memory and JS typed-array views stay valid â€” no `refreshSimViews()` needed after.
      * With no active cells the resultant is the zero vector and all four outputs default to 0.
      */
     compute_active_centroid() {
@@ -134,7 +211,7 @@ export class World {
     }
     /**
      * Public constructor that can be called from JavaScript. All buffers are allocated once,
-     * here, and never reallocated for the lifetime of the `World` — so the pointers handed to
+     * here, and never reallocated for the lifetime of the `World` â€” so the pointers handed to
      * JavaScript (and the views built over them) stay valid as long as Wasm memory is not grown.
      * @param {number} grid_cols
      * @param {number} grid_rows
@@ -228,14 +305,14 @@ export class World {
      * for the whole block. Such blocks are filled with two `memset`s instead of six dependent loads
      * through the neighbour table per cell, and their contribution to the active/changed counts
      * and the usage histogram is added in closed form. The classification covers uniformly *live*
-     * regions as well as empty ones, and does not assume the rule is vacuum-stable — an igniting
+     * regions as well as empty ones, and does not assume the rule is vacuum-stable â€” an igniting
      * vacuum simply fills the block with 1s.
      *
      * This is an exact rewrite of the dense loop, not an approximation: same values, same counters,
      * byte-identical evolution (`sparse_fast_path_matches_dense_reference` pins that against a
      * reference implementation, and the golden checksums below pin it against recorded history).
-     * It is also *stateless across ticks* — the classification is recomputed from `state` every
-     * tick — so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
+     * It is also *stateless across ticks* â€” the classification is recomputed from `state` every
+     * tick â€” so the many JS paths that write cells directly (reset, brush, `setCells`, world-code
      * load) cannot leave it stale. What that costs on a grid with nothing to skip is one
      * sequential `u64` pass over `state`, which measures at parity or slightly ahead of the old
      * dense loop; see `BLOCK_SIZE` for the numbers.
@@ -249,13 +326,13 @@ export class World {
      * Spatial-order join-count statistic over the current state buffer (auto-explore spatial term).
      *
      * One pass over the flattened `neighbor_indices` table counts the heterogeneous
-     * (active↔inactive) unique neighbor pairs `J` — each undirected edge is counted once by only
+     * (activeâ†”inactive) unique neighbor pairs `J` â€” each undirected edge is counted once by only
      * considering `neighbor_idx > cell_idx`, so the total unique-edge count is `3N` on the wrapped
-     * hex grid (6 neighbors per cell ÷ 2). With density `p = active/N`, the random-mixing
-     * expectation is `E[J] = 3N · 2p(1−p)`. Returns `1 − J/E[J]` clamped to [−1, 1]:
-     * positive ⇒ clustered/domain structure, negative ⇒ anti-clustered (checkerboard-like),
-     * ≈0 ⇒ well-mixed noise. Returns 0 when `E[J] == 0` (p ∈ {0, 1}: an empty or full grid).
-     * No allocation — safe to call on the live state without detaching JS views.
+     * hex grid (6 neighbors per cell Ã· 2). With density `p = active/N`, the random-mixing
+     * expectation is `E[J] = 3N Â· 2p(1âˆ’p)`. Returns `1 âˆ’ J/E[J]` clamped to [âˆ’1, 1]:
+     * positive â‡’ clustered/domain structure, negative â‡’ anti-clustered (checkerboard-like),
+     * â‰ˆ0 â‡’ well-mixed noise. Returns 0 when `E[J] == 0` (p âˆˆ {0, 1}: an empty or full grid).
+     * No allocation â€” safe to call on the live state without detaching JS views.
      * @returns {number}
      */
     spatial_order() {
@@ -266,7 +343,7 @@ export class World {
      * Begin a damage-spreading probe: copy the current state into the probe lane and flip exactly
      * one cell (`flip_index`). Subsequent `run_tick` calls advance both lanes; `probe_hamming`
      * reports the divergence. Lazily allocates the probe buffers on first use. An out-of-range
-     * `flip_index` is ignored (the probe then starts as an exact copy — Hamming 0).
+     * `flip_index` is ignored (the probe then starts as an exact copy â€” Hamming 0).
      * @param {number} flip_index
      */
     start_probe(flip_index) {
@@ -287,6 +364,79 @@ export class World {
     }
 }
 if (Symbol.dispose) World.prototype[Symbol.dispose] = World.prototype.free;
+
+/**
+ * A persistent XOR mask over two binary worlds of the same size.
+ *
+ * Replaces the Butterfly demo's two full-grid snapshots, host XOR loop, mask allocation, and
+ * mask upload with one native comparison that can write straight into the display world.
+ */
+export class WorldDifference {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        WorldDifferenceFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_worlddifference_free(ptr, 0);
+    }
+    /**
+     * Recompute the mask from two worlds. Allocates nothing.
+     * @param {World} left
+     * @param {World} right
+     * @returns {number}
+     */
+    compare(left, right) {
+        _assertClass(left, World);
+        _assertClass(right, World);
+        const ret = wasm.worlddifference_compare(this.__wbg_ptr, left.__wbg_ptr, right.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Recompute the mask and publish it straight into a k-state world's own state buffer.
+     *
+     * This is what removes the last host copy from the Butterfly demo: the difference never
+     * becomes a JavaScript array, and nothing is uploaded across the boundary to display it.
+     * @param {World} left
+     * @param {World} right
+     * @param {WorldK} display
+     * @returns {number}
+     */
+    compare_into(left, right, display) {
+        _assertClass(left, World);
+        _assertClass(right, World);
+        _assertClass(display, WorldK);
+        const ret = wasm.worlddifference_compare_into(this.__wbg_ptr, left.__wbg_ptr, right.__wbg_ptr, display.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Cells that differ, from the last [`WorldDifference::compare`].
+     * @returns {number}
+     */
+    hamming() {
+        const ret = wasm.worlddifference_hamming(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    mask_ptr() {
+        const ret = wasm.worlddifference_mask_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {number} num_cells
+     */
+    constructor(num_cells) {
+        const ret = wasm.worlddifference_new(num_cells);
+        this.__wbg_ptr = ret;
+        WorldDifferenceFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+}
+if (Symbol.dispose) WorldDifference.prototype[Symbol.dispose] = WorldDifference.prototype.free;
 
 /**
  * A k-state hexagonal cellular automaton on the same toroidal grid as [`crate::World`].
@@ -322,6 +472,13 @@ export class WorldK {
     backend() {
         const ret = wasm.worldk_backend(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * @returns {boolean}
+     */
+    block_alternates() {
+        const ret = wasm.worldk_block_alternates(this.__wbg_ptr);
+        return ret !== 0;
     }
     /**
      * Occupancy of one state as of the last [`WorldK::compute_census`].
@@ -497,6 +654,20 @@ export class WorldK {
         return ret >>> 0;
     }
     /**
+     * Alternate the block partition's handedness every tick.
+     *
+     * The up-triangle partition is left-handed: its odd slot always sits one column to the right,
+     * which biases transport sideways. Alternating with the mirrored partition cancels that bias
+     * while keeping gravity downward. This reproduces a host `mirror → tick → mirror` sequence
+     * exactly, without the two full-grid permutations or the `mark_all_dirty` they force.
+     *
+     * Off by default: existing `BACKEND_BLOCK` worlds and their `HXK1` codes are untouched.
+     * @param {boolean} alternates
+     */
+    set_block_alternates(alternates) {
+        wasm.worldk_set_block_alternates(this.__wbg_ptr, alternates);
+    }
+    /**
      * Install the `k³` block rule for [`BACKEND_BLOCK`].
      *
      * Both the index and the stored value pack a triple as `s0·k² + s1·k + s2` in the block's
@@ -619,12 +790,24 @@ function __wbg_get_imports() {
     };
 }
 
+const BirthLanesFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_birthlanes_free(ptr, 1));
 const WorldFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_world_free(ptr, 1));
+const WorldDifferenceFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_worlddifference_free(ptr, 1));
 const WorldKFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_worldk_free(ptr, 1));
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
 
 function getArrayF64FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
