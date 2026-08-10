@@ -2,17 +2,19 @@ import {readFileSync} from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
+import {sealPerimeter} from '../public/embed-concept-boundaries.js'
 import {
-  openCentralMembrane,
-  sealPerimeter,
-  sealVerticalSeam,
-} from '../public/embed-concept-boundaries.js'
+  combinedExposureProbability,
+  createGasModel,
+  createOutbreakModel,
+  createWildfireModel,
+  neighborIndex,
+} from '../public/embed-concept-models.js'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(path.join(REPO_ROOT, relativePath), 'utf8')
 
 const CONCEPTS = [
-  ['living-postcard', 'living-postcard.html'],
   ['crystal-garden', 'crystal-garden.html'],
   ['hex-ecology', 'hex-ecology.html'],
   ['excitable-tissue', 'excitable-tissue.html'],
@@ -20,9 +22,7 @@ const CONCEPTS = [
   ['wildfire-command', 'wildfire-command.html'],
   ['outbreak-counterfactuals', 'outbreak-counterfactuals.html'],
   ['butterfly-microscope', 'butterfly-microscope.html'],
-  ['containment', 'containment.html'],
   ['cellular-synth', 'cellular-synth.html'],
-  ['evolution-arena', 'evolution-arena.html'],
   ['hex-matter', 'hex-matter.html'],
 ]
 
@@ -31,15 +31,15 @@ describe('embed concept demo library', () => {
     const page = read(`public/${route}`)
     expect(page).toContain(`data-concept="${id}"`)
     expect(page).toContain('embed-demo-shell.css')
-    expect(page).toContain('embed-concept-lab.css?v=20260809-boundaries')
-    expect(page).toContain('embed-concept-lab.js?v=20260809-boundaries')
+    expect(page).toContain('embed-concept-lab.css?v=20260810-deep-demos')
+    expect(page).toContain('embed-concept-lab.js?v=20260810-deep-demos')
     expect(page).toContain('@hexlife/embed@1.7.1/+esm')
     expect(page).toContain('@hexlife/embed@1.7.1/ca/+esm')
     expect(page).toContain('@hexlife/embed@1.7.1/ca-element/+esm')
     expect(page).not.toContain('@hexlife/embed@latest')
   })
 
-  it('orders every concept exactly once from simple to complex', () => {
+  it('orders the retained concepts exactly once from simple to complex', () => {
     const library = read('public/embed-demos.html')
     let cursor = -1
     for (const [, route] of CONCEPTS) {
@@ -49,10 +49,13 @@ describe('embed concept demo library', () => {
       cursor = next
     }
     expect(library).toContain('01 · SIMPLEST')
-    expect(library).toContain('12 · MOST COMPLEX')
+    expect(library).toContain('09 · MOST COMPLEX')
+    expect(library).not.toContain('Living Postcard')
+    expect(library).not.toContain('Containment')
+    expect(library).not.toContain('Evolution Arena')
   })
 
-  it('keeps models and application behaviors in one shared package-consumer host', () => {
+  it('keeps the models and application behaviors in one package-consumer host', () => {
     const host = read('public/embed-concept-lab.js')
     expect(host).toContain("import '@hexlife/embed'")
     expect(host).toContain("from '@hexlife/embed/ca'")
@@ -60,38 +63,37 @@ describe('embed concept demo library', () => {
     expect(host).toContain('ruleFromTable(4')
     expect(host).toContain('blockRuleFromTable(8')
     expect(host).toContain('snapshotCells()')
-    expect(host).toContain("document.createElement('hexlife-grid')")
     expect(host).toContain('world.world.lastChangedCount')
     expect(host).toContain('world.caCode()')
     expect(host).toContain('world.worldCode()')
     expect(host).toContain('new AudioContext()')
+    expect(host).toContain('createGasModel')
+    expect(host).toContain('createWildfireModel')
+    expect(host).toContain('createOutbreakModel')
+    expect(host).toContain('difference-overlay')
+    expect(host).toContain('Custom 32-character ruleset')
   })
 
-  it('seals the mixing reservoirs at the toroidal seam and opens only the visible gate', () => {
-    const rows = 12
-    const columns = 18
-    const cells = new Uint8Array(rows * columns)
-    const middle = columns / 2
-    for (let row = 0; row < rows; row++) {
-      cells.fill(1, row * columns, row * columns + middle)
-      cells.fill(2, row * columns + middle, (row + 1) * columns)
-      for (let offset = -1; offset <= 1; offset++) {
-        cells[row * columns + middle + offset] = 3
-      }
+  it('keeps the lattice gas finite and conserves each species exactly', () => {
+    const model = createGasModel(18, 24)
+    model.reset({density: 38, scatter: 12})
+    const count = (state) => model.cells.filter((cell) => cell === state).length
+    const before = [count(1), count(2)]
+    const middle = 12
+    const crossed = () => [...model.cells].filter((state, index) => (
+      (state === 1 && index % 24 > middle) || (state === 2 && index % 24 < middle)
+    )).length
+    for (let tick = 0; tick < 80; tick++) model.step()
+    expect(crossed()).toBe(0)
+    model.openMembrane()
+    for (let tick = 0; tick < 160; tick++) model.step()
+    expect([count(1), count(2)]).toEqual(before)
+    expect(crossed()).toBeGreaterThan(0)
+    for (let column = 0; column < 24; column++) {
+      expect(model.cells[column]).toBe(3)
+      expect(model.cells[17 * 24 + column]).toBe(3)
     }
-
-    sealVerticalSeam(cells, rows, columns, 3)
-    openCentralMembrane(cells, rows, columns)
-
-    for (let row = 0; row < rows; row++) {
-      expect(cells[row * columns + columns - 1]).toBe(3)
-      expect(cells[row * columns]).toBe(3)
-      expect(cells[row * columns + 1]).toBe(3)
-    }
-    for (let row = Math.floor(rows * 0.38); row < Math.ceil(rows * 0.62); row++) {
-      expect([...cells.slice(row * columns + middle - 1, row * columns + middle + 2)]).toEqual([0, 0, 0])
-    }
-    expect(cells[middle - 1]).toBe(3)
+    expect(neighborIndex(0, 0, 18, 24, false)).toBe(-1)
   })
 
   it('isolates finite demos from both row and column wraps', () => {
@@ -99,7 +101,6 @@ describe('embed concept demo library', () => {
     const columns = 12
     const cells = new Uint8Array(rows * columns).fill(1)
     sealPerimeter(cells, rows, columns, 7, 2)
-
     for (let row = 0; row < rows; row++) {
       for (let column = 0; column < columns; column++) {
         const border = row < 2 || row >= rows - 2 || column < 2 || column >= columns - 2
@@ -108,17 +109,39 @@ describe('embed concept demo library', () => {
     }
   })
 
-  it('declares which concept topologies are sealed and which intentionally wrap', () => {
+  it('declares finite and intentionally wrapped topologies without hidden seam hacks', () => {
     const host = read('public/embed-concept-lab.js')
-    expect(host).toContain("topology: 'two sealed reservoirs'")
+    expect(host).toContain("topology: 'finite reflecting vessel'")
     expect(host).toContain("topology: 'sealed clearing rim'")
     expect(host).toContain("topology: 'sealed scar rim'")
     expect(host).toContain("topology: 'sealed stone vessel'")
     expect(host).toContain("topology: 'intentional toroidal habitat'")
     expect(host).toContain("topology: 'intentional toroidal population'")
-    expect(host).toContain('return sealVerticalSeam(cells, rows, columns, 3)')
-    expect(host.match(/sealPerimeter\(cells, rows, columns, [034]\)/g)).toHaveLength(4)
-    expect(host).toContain('const weights = [1 + wind, 1 + wind, 1, 1, 1, 1]')
+    expect(host).not.toContain('sealVerticalSeam')
+  })
+
+  it('uses monotonic per-neighbor infection probability and deterministic schedules', () => {
+    expect(combinedExposureProbability(0.12, 0)).toBe(0)
+    expect(combinedExposureProbability(0.12, 3)).toBeGreaterThan(combinedExposureProbability(0.12, 2))
+    const first = createOutbreakModel(18, 24)
+    const second = createOutbreakModel(18, 24)
+    const params = {infection: 18, infectiousTicks: 5, immunityTicks: 30, coverage: 0, efficacy: 85}
+    first.reset(params)
+    second.reset(params)
+    for (let tick = 0; tick < 20; tick++) { first.step(); second.step() }
+    expect(first.cells).toEqual(second.cells)
+    expect(first.totalInfections).toBe(second.totalInfections)
+  })
+
+  it('supports wind-free spread and delayed ash recovery deterministically', () => {
+    const first = createWildfireModel(18, 24)
+    const second = createWildfireModel(18, 24)
+    const params = {forest: 90, spread: 40, wind: 'none', windBoost: 4, burnTicks: 1, ashTicks: 4, regrowth: 20}
+    first.reset(params)
+    second.reset(params)
+    for (let tick = 0; tick < 12; tick++) { first.step(); second.step() }
+    expect(first.cells).toEqual(second.cells)
+    expect(first.cells.some((cell) => cell === 2 || cell === 3)).toBe(true)
   })
 
   it('links the library from both Explorer menus', () => {

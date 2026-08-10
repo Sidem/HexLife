@@ -287,16 +287,15 @@ stops being a wall at sixteen; the grid puts N simulations behind one context an
 its own viewport instead. Every world shares one grid, seed, density, palette and clock, so the only
 difference between two tiles is the rule.
 
-The [interactive demo library](https://sidem.github.io/HexLife/embed-demos.html) adds twelve dedicated
-applications, ordered from a living-postcard studio through crystal growth, ecology, excitable
-tissue, conserved mixing, wildfire and outbreak interventions, a butterfly-effect microscope,
-a shareable puzzle, a cellular synthesizer, parallel rule evolution, and an eight-state matter
-sandbox. They share one maintainable host while every page supplies a distinct model, measurement,
-challenge, or creative interaction.
+The [interactive demo library](https://sidem.github.io/HexLife/embed-demos.html) adds nine substantial
+applications: crystal growth, cyclic ecology, excitable tissue, an exclusion lattice gas,
+probabilistic wildfire and outbreak experiments, a butterfly-effect microscope, a cellular
+synthesizer, and an eight-state matter sandbox. Each page exposes meaningful model parameters,
+interventions, and measurements rather than presenting a cosmetic variation on the same world.
 
 The three reference instruments below share that presentation shell and direct navigation. Each
 makes a different case for the package: large parallel comparison, a host-owned physical model, and
-an editable reference integration. The k-state pages and the twelve concept apps load the exact
+an editable reference integration. The k-state pages and the nine concept apps load the exact
 published npm version through jsDelivr, so they are also end-to-end checks that a consumer can use
 the package without Explorer internals or a local build.
 

@@ -90,6 +90,11 @@
 .concept-controls,
 .concept-readout { padding: 15px; }
 
+.concept-controls {
+  max-height: min(820px, calc(100vh - 32px));
+  overflow-y: auto;
+}
+
 .concept-panel h2,
 .concept-panel h3 { margin: 0; }
 
@@ -109,6 +114,7 @@
 .control-stack { display: grid; gap: 9px; margin-top: 13px; }
 .control-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
 .control-row.two { grid-template-columns: repeat(2, 1fr); }
+.parameter-grid { display: grid; gap: 10px; }
 
 .field { display: grid; gap: 6px; }
 .field label,
@@ -119,6 +125,20 @@
   font-size: 12px;
 }
 .field output { color: var(--concept-accent); font-family: ui-monospace, monospace; }
+.field small { color: var(--demo-dim); font-size: 10px; line-height: 1.4; }
+.field-wide { grid-column: 1 / -1; }
+
+.text-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--demo-line);
+  border-radius: 7px;
+  background: #0d131a;
+  color: var(--demo-text);
+}
+
+.text-input:focus { border-color: var(--concept-accent); outline: none; }
 
 .concept-status {
   min-height: 38px;
@@ -183,8 +203,22 @@
   text-align: center;
 }
 .dual-worlds hexlife-world { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
+.dual-worlds hexlife-ca { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
 .dual-worlds hexlife-world::part(overlay),
-.dual-worlds hexlife-world::part(reset) { display: none; }
+.dual-worlds hexlife-world::part(reset),
+.dual-worlds hexlife-ca::part(overlay) { display: none; }
+
+.difference-stack { position: relative; display: block; }
+.difference-stack > hexlife-world { position: relative; z-index: 1; }
+.difference-stack > .difference-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.88;
+}
 
 .metric-grid {
   display: grid;
@@ -282,7 +316,18 @@
 .reference-links a { padding: 13px; border: 1px solid var(--demo-line); border-radius: 9px; color: var(--demo-link); text-decoration: none; }
 
 .synth-keyboard { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 10px; }
-.synth-key { height: 34px; border-radius: 4px; background: rgba(var(--concept-accent-rgb), var(--key-level, .12)); }
+.synth-key {
+  display: grid;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(var(--concept-accent-rgb), .22);
+  border-radius: 4px;
+  background: rgba(var(--concept-accent-rgb), .1);
+  color: var(--demo-dim);
+  transition: background 80ms ease, box-shadow 80ms ease;
+}
+.synth-key.active { background: rgba(var(--concept-accent-rgb), .82); box-shadow: 0 0 18px rgba(var(--concept-accent-rgb), .55); color: #fff; }
+.synth-key small { font: 700 10px/1 ui-monospace, monospace; }
 
 @media (max-width: 1020px) {
   .concept-workspace { grid-template-columns: minmax(210px, 260px) minmax(0, 1fr); }
@@ -292,6 +337,7 @@
 
 @media (max-width: 700px) {
   .concept-workspace { grid-template-columns: 1fr; }
+  .concept-controls { max-height: none; }
   .world-mount { min-height: 0; padding: 8px; }
   .concept-notes { grid-template-columns: 1fr; }
   .dual-worlds { grid-template-columns: 1fr; }

@@ -40,7 +40,7 @@ the exact published npm version through jsDelivr; they do not reach into Explore
 
 | Demo | What it demonstrates | Package surface |
 |---|---|---|
-| [**Interactive demo library**](https://sidem.github.io/HexLife/embed-demos.html) | Twelve creative tools, scientific experiments, games, instruments, and advanced simulation apps, ordered from a single living world through paired experiments, rule evolution, and an eight-state matter sandbox. | Every public entrypoint, with each page consuming the published npm package |
+| [**Interactive demo library**](https://sidem.github.io/HexLife/embed-demos.html) | Nine focused experiments spanning crystal growth, ecology, excitable media, particles, seeded probability, deterministic chaos, sound, and interacting matter. | Every public entrypoint, with each page consuming the published npm package |
 | [**256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html) | All 256 totalistic rules simultaneously, or an equally sized sample of a larger rule class. One shared clock, initial condition, palette, and GPU context make rule-to-rule comparison direct; fullscreen and `?focus=1` turn the page into a workspace-only instrument. | `<hexlife-grid>`, `<hexlife-world>`, `/api` |
 | [**Coffee extraction lab**](https://sidem.github.io/HexLife/coffee-percolation.html) | Six- and sixteen-state physical models with exact conservation, host-driven boundaries, and both rule backends side by side. | `/ca`, `/ca-element`, `<hexlife-ca>` |
 | [**k-state CA builder**](https://sidem.github.io/HexLife/ca-builder.html) | Edit exact transition tables, paint and run the Wasm world, inspect invariants, and export a standalone npm-package example. | `/ca`, `/ca-element`, `<hexlife-ca>` |
