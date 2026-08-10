@@ -32,10 +32,10 @@ describe('embed concept demo library', () => {
     expect(page).toContain(`data-concept="${id}"`)
     expect(page).toContain('embed-demo-shell.css')
     expect(page).toContain('embed-concept-lab.css?v=20260810-deep-demos')
-      expect(page).toContain('embed-concept-lab.js?v=20260810-stochastic-p2')
-    expect(page).toContain('@hexlife/embed@1.8.0/+esm')
-    expect(page).toContain('@hexlife/embed@1.8.0/ca/+esm')
-    expect(page).toContain('@hexlife/embed@1.8.0/ca-element/+esm')
+    expect(page).toContain('embed-concept-lab.js?v=20260810-stochastic-native')
+    for (const entry of ['', 'ca/', 'ca-element/', 'sim/', 'stochastic/', 'stochastic-element/']) {
+      expect(page).toContain(`@hexlife/embed@1.9.0/${entry}+esm`)
+    }
     expect(page).not.toContain('@hexlife/embed@latest')
   })
 
@@ -62,16 +62,26 @@ describe('embed concept demo library', () => {
     expect(host).toContain("import '@hexlife/embed/ca-element'")
     expect(host).toContain('ruleFromTable(4')
     expect(host).toContain('blockRuleFromTable(8')
-    expect(host).toContain('snapshotCells()')
     expect(host).toContain('world.world.lastChangedCount')
     expect(host).toContain('world.caCode()')
     expect(host).toContain('world.worldCode()')
+    expect(host).toContain('world.stochasticCode()')
     expect(host).toContain('new AudioContext()')
-    expect(host).toContain('createGasModel')
-    expect(host).toContain('createWildfireModel')
-    expect(host).toContain('createOutbreakModel')
     expect(host).toContain('difference-overlay')
     expect(host).toContain('Custom 32-character ruleset')
+  })
+
+  it('runs every stochastic demo on the engine, seeded by the frozen builders', () => {
+    const host = read('public/embed-concept-lab.js')
+    // The rules, seeds and interventions all come from the one module the differential tests use.
+    expect(host).toContain("import('./embed-stochastic-rules.js')")
+    expect(host).toContain('stochastic.wildfireInitialState')
+    expect(host).toContain('stochastic.outbreakInitialState')
+    expect(host).toContain('stochastic.mixingChamber')
+    expect(host).toContain('world.seed = BigInt(stochastic[item.seedName])')
+    // Three `<hexlife-stochastic>` demos and no `<hexlife-ca>` standing in for one.
+    expect(host).toContain("document.createElement('hexlife-stochastic')")
+    expect(host.match(/kind: 'stochastic-/g)).toHaveLength(3)
   })
 
   it('keeps the lattice gas finite and conserves each species exactly', () => {

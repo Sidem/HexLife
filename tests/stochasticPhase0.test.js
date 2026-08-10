@@ -22,21 +22,54 @@ describe('WorldStochastic Phase-0 ownership freeze', () => {
     expect(EMBED_DEMO_OWNERSHIP.every(({engine}) => ['binary', 'k-state', 'stochastic'].includes(engine))).toBe(true);
   });
 
-  it('keeps every identified running-path debt explicit until migration removes it', () => {
-    const debtById = Object.fromEntries(EMBED_DEMO_OWNERSHIP.map(({id, debts}) => [id, debts]));
-    expect(debtById['coffee-percolation']).toContain('two-full-grid-permutations-on-odd-ticks');
-    expect(debtById['butterfly-microscope']).toContain('host-xor-scan');
-    expect(debtById['cellular-synth']).toContain('host-birth-scan');
-    expect(debtById['mixing-chamber']).toContain('four-tick-scratch-allocations');
-    expect(debtById['wildfire-command']).toContain('full-grid-js-to-wasm');
-    expect(debtById['outbreak-counterfactuals']).toContain('two-full-grid-js-to-wasm');
+  /**
+   * The migration's completion check, and the same test inverted.
+   *
+   * Until 2026-08-10 this asserted each recorded debt was still *present*, so that nobody could
+   * quietly declare victory in the manifest while the host loop was still running. Phase B removed
+   * them, so it now asserts the opposite — against the page sources, not the manifest, because the
+   * manifest is a claim and the source is the fact.
+   */
+  it('has removed every recorded running-path debt from the pages themselves', () => {
+    for (const {id, debts} of EMBED_DEMO_OWNERSHIP) {
+      expect(debts, `${id} still declares a running-path debt`).toEqual([]);
+    }
 
-    expect(labSource).toContain('model.step(); world.setCells(model.cells);');
-    expect(labSource).toContain('baseline.step(); intervention.step(); left.setCells(baseline.cells); right.setCells(intervention.cells);');
-    expect(labSource).toContain('mask[index] = a[index] ^ b[index]');
-    expect(labSource).toContain('for (let i = 0; i < next.length; i++) if (!previous[i] && next[i]) births.push(i)');
-    expect(coffeeSource).toContain('mirrorGrid(lab.world, brew);');
-    expect(coffeeSource).toContain('mirrorGrid(lab2.world, dBrew);');
+    // Wildfire and Mixing: no host model, no per-tick upload, no host clock.
+    expect(labSource).not.toContain('model.step()');
+    expect(labSource).not.toContain('createGasModel');
+    expect(labSource).not.toContain('createWildfireModel');
+    expect(labSource).toContain('world.setRule(item.rule(params))');
+    // Outbreak: the common random schedule is the engine's shared stream, and the arms are two
+    // native worlds. The one remaining interval only schedules ticks; it does not simulate.
+    expect(labSource).not.toContain('createOutbreakModel');
+    expect(labSource).toContain('left.tick(1); right.tick(1);');
+    expect(labSource).toContain('OUTBREAK_INFECTION_ROWS');
+    expect(labSource).not.toContain('function xorCount');
+    expect(labSource).toContain('left.world.differenceCount(right.world)');
+    // Butterfly: one persistent native mask, compared and published inside Wasm.
+    expect(labSource).not.toContain('mask[index] = a[index] ^ b[index]');
+    expect(labSource).toContain('mask.compareInto(left.sim, right.sim, diff.world)');
+    // Synth: bounded native lanes instead of a per-beat snapshot and an unbounded index array.
+    expect(labSource).not.toContain('births.push(i)');
+    // The per-beat grid snapshot specifically. `snapshotCells()` survives elsewhere on purpose —
+    // Butterfly's `perturb` reads a world out once per reset — and that is not a running path.
+    expect(labSource).not.toContain('previous = world.sim.snapshotCells()');
+    expect(labSource).toContain('meter.sample(world.sim)');
+    expect(labSource).toContain('lanes.filter((index) => index !== null).length');
+    expect(labSource).toContain('(world.checksum >>> 0).toString(16)');
+    // Coffee: the conjugation is the engine's, on both labs.
+    expect(coffeeSource).not.toContain('mirrorGrid(');
+    expect(coffeeSource).toContain('lab.world.setBlockAlternates(true)');
+    expect(coffeeSource).toContain('lab2.world.setBlockAlternates(true)');
+  });
+
+  it('loads the second Wasm artifact per demo rather than per page', () => {
+    // Nine pages share one module. A static import would put the stochastic artifact on Crystal
+    // Garden, which is the exact cost the separate artifact exists to avoid.
+    expect(labSource).not.toMatch(/^import .*@hexlife\/embed\/stochastic/m);
+    expect(labSource).toContain("import('@hexlife/embed/stochastic-element')");
+    expect(labSource).toContain("import('@hexlife/embed/sim')");
   });
 });
 

@@ -165,8 +165,8 @@
 <script type="importmap">
 {
   "imports": {
-    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.8.0/ca/+esm",
-    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.8.0/ca-element/+esm"
+    "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.9.0/ca/+esm",
+    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.9.0/ca-element/+esm"
   }
 }
 </script>
@@ -211,7 +211,7 @@
     </div>
     <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
       <span>Built with the published npm package</span>
-      <strong>@hexlife/embed@1.8.0</strong>
+      <strong>@hexlife/embed@1.9.0</strong>
       <small><code>&lt;hexlife-ca&gt;</code> · jsDelivr import map · no build step</small>
     </a>
   </div>
@@ -917,7 +917,6 @@ import {
 } from '@hexlife/embed/ca';
 import '@hexlife/embed/ca-element';
 import {
-    buildHexMirror,
     injectionColumns as scheduledInjectionColumns,
     quietTickLimit,
 } from './coffee-percolation-physics.js';
@@ -996,26 +995,19 @@ const extractionRule = blockRuleFromTable(6, coffeeSixTransition);
  * column but zero. The pure implementation lives in `coffee-percolation-physics.js`, where the
  * involution and all six hex-neighbour mappings are regression-tested for every grid preset.
  */
-/** The mirror map and its scratch buffer for a world, built once per grid size. */
-function ensureMirror(store, world) {
-    const size = world.rows * world.columns;
-    if (!store.mirror || store.mirror.length !== size) {
-        store.mirror = buildHexMirror(world.rows, world.columns);
-        store.scratch = new Uint8Array(size);
-    }
-    return store;
-}
-
-/** Reflect a whole grid left-to-right, in place. */
-function mirrorGrid(world, store) {
-    const { mirror, scratch } = ensureMirror(store, world);
-    const state = world.state;                  // a live view into wasm memory, so write and go
-    for (let i = 0; i < state.length; i++) scratch[mirror[i]] = state[i];
-    state.set(scratch);
-    // Writing through the view bypasses the activity tracker, and after a mirror every chunk holds
-    // different cells, so nothing may be skipped on the tick that follows.
-    world.markAllDirty();
-}
+/*
+ * The mirror is now the engine's, not the page's.
+ *
+ * This is where `mirrorGrid` and `ensureMirror` used to live: a permutation of every cell index,
+ * applied to the whole grid before an odd tick and again after it, to conjugate the up-triangle tick
+ * into a down-triangle one. `setBlockAlternates(true)` does the identical thing by picking a
+ * different odd slot on odd ticks — one integer, no permutation, and the activity tracker survives.
+ *
+ * "Identical" is checked rather than argued: `alternating_block_matches_the_host_mirror_oracle` in
+ * `worldk.rs` runs this exact host sequence against the native flag at three grid sizes and asserts
+ * the two states are equal after every tick. `buildHexMirror` stays in
+ * `coffee-percolation-physics.js` as the oracle that test is built from.
+ */
 
 /**
  * How many consecutive no-change ticks prove a world has stopped for good.
@@ -1255,13 +1247,9 @@ function frame() {
     else if (activeTab === 'dual' && dBrew.running) stepDual();
 }
 
-/** One generation, alternating the partition's handedness. Same argument as `dualTick`. */
+/** One generation. The handedness alternates inside the engine — see `startBrew`. */
 function sixTick() {
-    if (brew.tick % 2 === 0) return lab.world.tick(1);
-    mirrorGrid(lab.world, brew);
-    const changed = lab.world.tick(1);
-    mirrorGrid(lab.world, brew);
-    return changed;
+    return lab.world.tick(1);
 }
 
 function stepSix() {
@@ -1276,10 +1264,11 @@ function stepSix() {
     // so a settled world with budget left over means the top row is permanently full and the pour
     // has nowhere to go. That is a CHOKED puck, and it has to end the run rather than spin forever.
     //
-    // The engine's own `isSettled` cannot be used here any more: the handedness alternation writes
-    // the whole grid and dirties every chunk on every other tick, so the activity tracker it is
-    // built on never goes quiet. Counting no-change ticks is exactly as strong a claim — see
-    // `SETTLE_TICKS` — it just costs the host a counter instead of costing the engine nothing.
+    // Six consecutive no-change ticks, not the engine's `isSettled`. The alternating partition has a
+    // six-tick period, so a world can be motionless under one handedness and not under the other;
+    // a single quiet tick proves nothing here, and a whole period does. (This used to be forced —
+    // the host mirror dirtied every chunk, so the tracker never went quiet at all — and it stays by
+    // choice now that the alternation is native and the tracker works again.)
     if (brew.still >= SETTLE_TICKS) {
         if (!brew.finished) { brew.finished = true; renderLab(); }
         return;
@@ -1303,6 +1292,9 @@ function stepSix() {
 function startBrew() {
     if (!lab.world) return;
     lab.setRule(extractionRule);
+    // The partition's handedness alternates natively. Set once per world: it is a property of this
+    // model's physics, not of a run, and a world that lost it would drift sideways.
+    lab.world.setBlockAlternates(true);
     lab.setCells(packPuck());
     const c = lab.world.census();
     brew.tick = 0;
@@ -1313,7 +1305,6 @@ function startBrew() {
     brew.budget = Math.round(lab.rows * lab.columns * (Number(ui.water.value) / 100));
     brew.finished = false;
     brew.still = 0;
-    ensureMirror(brew, lab.world);
     renderLab();
 }
 
@@ -1655,14 +1646,11 @@ function renderDual() {
  * tick gives 0.1 ± 0.8, and the wetting front under a centre stream goes from 13° off vertical to
  * under 2°.
  *
- * The cost is one grid permutation per tick on average, plus the loss of chunk skipping. At these
- * grid sizes that is nothing, and it buys the one thing the rule could not.
+ * The alternation is now the engine's `setBlockAlternates(true)`: the same tick sequence, computed
+ * as its exact conjugate inside Rust, so it costs no grid permutation and keeps chunk skipping.
  */
 function dualTick() {
-    if (dBrew.tick % 2 === 0) { lab2.world.tick(1); return; }
-    mirrorGrid(lab2.world, dBrew);
     lab2.world.tick(1);
-    mirrorGrid(lab2.world, dBrew);
 }
 
 function stepDual() {
@@ -1716,6 +1704,7 @@ function installDualRule() {
 function startBrew2() {
     if (!lab2.world) return;
     installDualRule();
+    lab2.world.setBlockAlternates(true);
     lab2.setCells(packPuck2());
     const c = lab2.world.census();
     let grounds = 0;
@@ -1733,7 +1722,6 @@ function startBrew2() {
     dBrew.progress = -1;
     dBrew.wetted = 0;
     dBrew.everWet = new Uint8Array(lab2.rows * lab2.columns);
-    ensureMirror(dBrew, lab2.world);
     lab2.tick(0);
     renderDual();
 }

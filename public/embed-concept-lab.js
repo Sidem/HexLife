@@ -5,15 +5,25 @@ import {blockRuleFromTable, isConservative, isIsotropic, ruleFromTable} from '@h
 import '@hexlife/embed/ca-element';
 /* eslint-enable import/no-unresolved */
 import {sealPerimeter} from './embed-concept-boundaries.js';
+import {neighborIndex} from './embed-demo-geometry.js';
 import {demoOwnershipFor} from './embed-demo-manifest.js';
-import {
-  createGasModel,
-  createOutbreakModel,
-  createWildfireModel,
-  neighborIndex,
-} from './embed-concept-models.js';
 
-const PACKAGE_VERSION = '1.8.0';
+/**
+ * The stochastic engine and the analysis primitives are loaded **per demo**, never per page.
+ *
+ * Nine pages share this module, and a static import is eager: writing `import
+ * '@hexlife/embed/stochastic-element'` at the top would put the second Wasm artifact — the whole
+ * point of which is that it is separately loaded — onto Crystal Garden, which is a k-state world and
+ * will never stochastically anything. So the three stochastic demos and the two analysis demos pull
+ * theirs in at dispatch, and every other page requests exactly the bytes it did before.
+ *
+ * @type {any} `embed-stochastic-rules.js`'s namespace, once a stochastic demo has asked for it.
+ */
+let stochastic = null;
+/** @type {any} `@hexlife/embed/sim`'s analysis exports, once Butterfly or Synth has asked. */
+let analysis = null;
+
+const PACKAGE_VERSION = '1.9.0';
 const BUTTERFLY_RULE = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6';
 const SYNTH_RULES = {
   spinners: '120C11B442568E21134E30A85A40C880',
@@ -79,24 +89,42 @@ const concepts = [
   },
   {
     id: 'mixing-chamber', href: 'mixing-chamber.html', title: 'Diffusion & Mixing Chamber',
-    kicker: 'Exclusion lattice gas', deck: 'Open a finite chamber where particles travel, collide, reflect, and mix.',
-    complexity: '04 · moderate', accent: '#d7a7ff', rgb: '215, 167, 255', kind: 'host-gas',
-    surface: '<hexlife-ca> · particle host model', topology: 'finite reflecting vessel',
-    experiment: 'Each colored cell is now a particle with a hidden direction. It advances through empty space, reflects from walls and occupied cells, and bounces when particles claim the same destination. The outer wall removes both horizontal and vertical wrapping; the two gases cannot meet until you open the visible membrane.',
-    packageNote: 'A six-velocity gas needs more information than one visible cell state. A seeded O(N) host model owns velocity and collisions; the package validates and renders its four visible states.',
-    states: 4, rows: 60, backend: 'block', speed: 26, focusState: 1,
-    palette: ['#0b1118', '#f0ad5f', '#57c7ff', '#606a78'], names: ['vacuum', 'amber molecule', 'cyan molecule', 'reflecting wall'],
-    parameters: [range('density', 'Particle density', 8, 55, 24, '%'), range('scatter', 'Thermal scattering', 0, 30, 7, '%')],
+    kicker: 'Conserved lattice gas', deck: 'Open a finite chamber where particles travel, collide, reflect, and mix.',
+    complexity: '04 · moderate', accent: '#d7a7ff', rgb: '215, 167, 255', kind: 'stochastic-gas',
+    surface: '<hexlife-stochastic> · conserved lattice gas', topology: 'finite reflecting vessel',
+    experiment: 'Every lattice site holds six velocity channels, so a particle carries momentum rather than a hidden direction. Head-on pairs rotate, symmetric triads rotate to the other triad, and everything else streams through — each species conserved particle by particle, not on average. The outer wall removes both wraps; the two gases cannot meet until you open the membrane.',
+    packageNote: 'The whole tick is native. A compiled collision table is evaluated once per configuration at build time, the six channels live in Wasm, and the host uploads nothing after the vessel is filled — “open membrane” edits the wall buffer alone.',
+    states: 5, rows: 60, speed: 26, focusState: 1, seedName: 'MIXING_SEED',
+    palette: ['#0b1118', '#f0ad5f', '#57c7ff', '#f4f7fb', '#606a78'],
+    names: ['vacuum', 'amber molecule', 'cyan molecule', 'both species', 'reflecting wall'],
+    parameters: [range('density', 'Channel occupancy', 8, 55, 24, '%'), range('scatter', 'Thermal scattering', 0, 30, 7, '%')],
     actions: [['open', 'Open membrane'], ['restart', 'Close & refill chamber']],
+    rule: (params) => stochastic.mixingGasRule(params),
+    seedWorld: (world, params) => {
+      const {channels, walls} = stochastic.mixingChamber(world.rows, world.columns, params, stochastic.MIXING_SEED);
+      world.setInitialGasState(channels, walls);
+    },
+    intervene: (world) => {
+      // The only intervention the vessel has, and it is a wall edit: nothing else moves.
+      for (const index of stochastic.mixingMembraneSites(world.rows, world.columns)) world.setWall(index, false);
+      return 'Membrane opened — the reservoirs can now exchange particles.';
+    },
+    invariant: (params) => (params.scatter === 0
+      ? 'Momentum-conserving collision table installed; both species are exactly conserved.'
+      : `Collision table installed with ${params.scatter}% thermal scattering — species conserved, momentum deliberately not.`),
+    metrics: (world) => ({
+      change: `${world.collisionCount().toLocaleString()} collisions`,
+      checksum: `${world.speciesCount(1).toLocaleString()} / ${world.speciesCount(2).toLocaleString()} particles`,
+    }),
   },
   {
     id: 'wildfire-command', href: 'wildfire-command.html', title: 'Wildfire Command',
     kicker: 'Probabilistic fire ecology', deck: 'Shape spread, wind, burn time, ash recovery, and firefighting interventions.',
-    complexity: '05 · involved', accent: '#ff8a55', rgb: '255, 138, 85', kind: 'host-wildfire',
-    surface: '<hexlife-ca> · seeded probability', topology: 'sealed clearing rim',
+    complexity: '05 · involved', accent: '#ff8a55', rgb: '255, 138, 85', kind: 'stochastic-neighborhood',
+    surface: '<hexlife-stochastic> · compiled HSN1 rule', topology: 'sealed clearing rim',
     experiment: 'Every burning neighbor independently contributes a chance of ignition, so fire spreads naturally even with no wind. Wind boosts only aligned exposure. Trees burn for several ticks, become ash, then regrow after a configurable delay and probability—making repeated fire succession possible rather than ending in a frozen board.',
-    packageNote: 'A counter-based random value keyed by seed, cell, and tick makes every run replayable. The host performs one six-neighbor pass per tick; the package renders the validated ecosystem.',
-    states: 4, rows: 60, backend: 'block', speed: 12, focusState: 2,
+    packageNote: 'A counter-based random value keyed by seed, cell, and tick makes every run replayable. The controls compile to a native rule table — 64 integer thresholds indexed by which neighbors are burning — and the whole tick, ages included, runs in Wasm with nothing uploaded per generation.',
+    states: 4, rows: 60, speed: 12, focusState: 2, seedName: 'WILDFIRE_SEED',
     palette: ['#0d1216', '#2f9e56', '#ffcf4d', '#6b5047'], names: ['clearing', 'forest', 'fire', 'ash'],
     parameters: [
       range('forest', 'Forest cover', 45, 95, 78, '%'), range('spread', 'Spread per fire neighbor', 2, 55, 18, '%'),
@@ -105,15 +133,38 @@ const concepts = [
       range('ashTicks', 'Ash recovery delay', 4, 45, 20, ' ticks'), range('regrowth', 'Regrowth chance', 1, 20, 5, '% / tick'),
     ],
     actions: [['break', 'Cut firebreak'], ['spot', 'Ignite central spot'], ['regrow', 'Force ash regrowth']],
+    rule: (params) => stochastic.wildfireStochasticRule(params),
+    seedWorld: (world, params) => world.setInitialState(stochastic.wildfireInitialState(world.rows, world.columns, params)),
+    intervene: (world, params, action) => {
+      // Interventions read the current world out and hand it back once. The ages travel with the
+      // cells: a firebreak that quietly reset every burning cell's clock would extend the fire.
+      const cells = world.world.snapshotCells();
+      const ages = world.world.snapshotElapsedAges();
+      if (action === 'break') stochastic.wildfireCutFirebreak(cells, world.rows, world.columns);
+      else if (action === 'spot') stochastic.wildfireIgnite(cells, world.rows, world.columns, 'spot');
+      else stochastic.wildfireRegrowAsh(cells, ages);
+      world.setCells(cells, ages);
+      return null;
+    },
+    invariant: (params) => `Rule compiled: ${params.spread}% per burning neighbor`
+      + `${params.wind === 'none' ? ', no wind' : `, ${params.wind} wind ×${params.windBoost}`}`
+      + `, ${params.burnTicks}-tick burn, regrowth after ${params.ashTicks}.`,
+    metrics: (world) => {
+      const census = world.census();
+      return {
+        change: `${census[3].toLocaleString()} ash`,
+        checksum: (world.checksum >>> 0).toString(16).padStart(8, '0'),
+      };
+    },
   },
   {
     id: 'outbreak-counterfactuals', href: 'outbreak-counterfactuals.html', title: 'Outbreak Counterfactuals',
     kicker: 'Paired probabilistic intervention study', deck: 'Replay the same random exposure schedule with and without vaccination.',
-    complexity: '06 · involved', accent: '#65d7d0', rgb: '101, 215, 208', kind: 'outbreak',
-    surface: '2 × <hexlife-ca> · paired seeded model', topology: 'intentional toroidal population',
+    complexity: '06 · involved', accent: '#65d7d0', rgb: '101, 215, 208', kind: 'stochastic-outbreak',
+    surface: '2 × <hexlife-stochastic> · shared exposure stream', topology: 'intentional toroidal population',
     experiment: 'Each infectious neighbor adds an independent infection chance: p = 1 − (1 − x)ⁿ. Both populations use the same seed, initial cases, and cell-by-cell random schedule; only vaccination differs. Duration, waning immunity, coverage, and efficacy are explicit, so “cases prevented” is a genuine counterfactual measurement.',
-    packageNote: 'This is a package-compatible prototype of a probabilistic CA. Epidemiological memory and seeded chance stay in an O(6N) host model while two package elements render the paired states.',
-    states: 4, rows: 54, backend: 'block', speed: 14, focusState: 1,
+    packageNote: 'The common random numbers are now a property of the engine, not of a host loop: the susceptible and vaccinated rows compile to the same named stream, so the same cell draws the same number in both worlds. Cases prevented is read from native transition counters, and neither world uploads a grid per tick.',
+    states: 4, rows: 54, speed: 14, focusState: 1, seedName: 'OUTBREAK_SEED',
     palette: ['#4c94c6', '#ff6577', '#4e5662', '#76d68d'], names: ['susceptible', 'infectious', 'recovered', 'vaccinated'],
     parameters: [
       range('infection', 'Chance per infected neighbor', 1, 40, 12, '%'), range('infectiousTicks', 'Infectious duration', 2, 14, 6, ' ticks'),
@@ -166,12 +217,34 @@ document.documentElement.style.setProperty('--concept-accent', config.accent);
 document.documentElement.style.setProperty('--concept-accent-rgb', config.rgb);
 renderShell(config);
 
-if (config.kind === 'native') setupNativeLab(config);
-else if (config.kind === 'host-gas') setupHostLab(config, createGasModel);
-else if (config.kind === 'host-wildfire') setupHostLab(config, createWildfireModel);
-else if (config.kind === 'outbreak') setupOutbreak(config);
-else if (config.kind === 'butterfly') setupButterfly(config);
-else if (config.kind === 'synth') setupSynth(config);
+if (config.kind === 'native') {
+  setupNativeLab(config);
+} else if (config.kind === 'stochastic-gas' || config.kind === 'stochastic-neighborhood') {
+  stochastic = await loadStochastic();
+  setupStochasticLab(config);
+} else if (config.kind === 'stochastic-outbreak') {
+  stochastic = await loadStochastic();
+  setupOutbreak(config);
+} else if (config.kind === 'butterfly') {
+  analysis = await loadAnalysis();
+  setupButterfly(config);
+} else if (config.kind === 'synth') {
+  analysis = await loadAnalysis();
+  setupSynth(config);
+}
+
+/** The rules module and the element registration — the only two things that pull the second artifact. */
+async function loadStochastic() {
+  const [rules] = await Promise.all([
+    import('./embed-stochastic-rules.js'),
+    // eslint-disable-next-line import/no-unresolved
+    import('@hexlife/embed/stochastic-element'),
+  ]);
+  return rules;
+}
+
+// eslint-disable-next-line import/no-unresolved
+async function loadAnalysis() { return import('@hexlife/embed/sim'); }
 
 function range(id, label, min, max, value, suffix, step = 1) { return {id, label, type: 'range', min, max, value, suffix, step}; }
 function select(id, label, value, options) { return {id, label, type: 'select', value, options}; }
@@ -226,6 +299,21 @@ function createCaElement(item, {draw = false} = {}) {
   return world;
 }
 
+/**
+ * A `<hexlife-stochastic>` for one of the stochastic labs.
+ *
+ * The seed is assigned before the element is connected, so it is simply the seed the first world is
+ * built with rather than a reboot. It is the *demo's* seed, not the element's default: these pages
+ * publish specific runs, and `RNG_LEGACY_DEMO_V0` reproduces one only from the seed it was recorded
+ * with. Rules arrive from script once the world is up — they are far too large for an attribute.
+ */
+function createStochasticElement(item) {
+  const world = document.createElement('hexlife-stochastic');
+  world.seed = BigInt(stochastic[item.seedName]);
+  for (const [name, value] of Object.entries({rows: item.rows, speed: item.speed, palette: item.palette.join(','), paused: '', link: 'off'})) world.setAttribute(name, String(value));
+  return world;
+}
+
 function setupNativeLab(item) {
   const params = renderControls(item);
   renderLegend(item.names, item.palette);
@@ -277,90 +365,148 @@ function setupNativeLab(item) {
   }
 }
 
-function setupHostLab(item, modelFactory) {
-  const params = renderControls(item, {copyLabel: 'Copy snapshot JSON'});
+/**
+ * The single-world stochastic labs: Mixing Chamber (lattice gas) and Wildfire Command.
+ *
+ * Structurally the same shape as `setupNativeLab`, and for the same reason — there is no host model
+ * left to drive. The element owns the clock, the engine owns the state, and the page's only per-tick
+ * job is reading four numbers out for the instrument panel on its own throttle.
+ */
+function setupStochasticLab(item) {
+  const params = renderControls(item);
   renderLegend(item.names, item.palette);
   setText('metric-focus-label', item.names[item.focusState]);
-  const world = createCaElement(item);
+  const world = createStochasticElement(item);
   document.getElementById('world-mount').append(world);
-  let model = null;
-  let timer = 0;
   const trace = [];
-  world.addEventListener('hexlife-ca-ready', () => {
-    world.setRule(blockRuleFromTable(item.states, (block) => block));
-    model = modelFactory(world.rows, world.columns);
-    restart();
-    setText('stage-status', `${world.rows} × ${world.columns} · ${item.topology} · seeded host model`);
+  let ready = false;
+  let lastGeneration = -1;
+
+  world.addEventListener('hexlife-stochastic-ready', () => {
+    ready = true;
+    installModel();
+    setText('stage-status', `${world.backend} · ${world.rows} × ${world.columns} · ${item.topology}`);
+    update();
   }, {once: true});
-  document.getElementById('play').addEventListener('click', () => timer ? stop() : start());
-  document.getElementById('step').addEventListener('click', tick);
-  document.getElementById('reset').addEventListener('click', restart);
+  world.addEventListener('hexlife-stochastic-playstate', (event) => setText('play', event.detail.userPaused ? 'Play' : 'Pause'));
+  document.getElementById('play').addEventListener('click', () => { if (ready) world.userPaused ? world.play() : world.pause(); });
+  document.getElementById('step').addEventListener('click', () => { if (ready) { world.pause(); world.tick(1); update(); } });
+  document.getElementById('reset').addEventListener('click', () => { if (ready) { world.pause(); installModel(); update(); } });
   document.getElementById('action').addEventListener('click', () => {
-    if (!model) return;
+    if (!ready) return;
     const action = document.getElementById('action-choice').value;
-    if (item.kind === 'host-gas' && action === 'restart') { restart(); return; }
-    if (item.kind === 'host-gas') model.openMembrane();
-    else if (action === 'break') model.cutFirebreak(); else if (action === 'spot') model.ignite('spot'); else model.regrowNow();
-    world.setCells(model.cells);
-    setText('control-status', `${document.getElementById('action-choice').selectedOptions[0].textContent} applied.`);
+    if (action === 'restart') { world.pause(); installModel(); update(); return; }
+    const message = item.intervene(world, params, action);
+    setText('control-status', message || `${document.getElementById('action-choice').selectedOptions[0].textContent} applied at generation ${world.generation}.`);
     update();
   });
-  document.getElementById('copy').addEventListener('click', () => model && copyText(JSON.stringify({demo: item.id, generation: model.generation, params, cells: encodeCells(model.cells)}), 'Experiment snapshot JSON copied.'));
-  bindParameterControls(item, params, restart);
+  document.getElementById('copy').addEventListener('click', async () => { if (ready) await copyText(await world.stochasticCode(), 'Exact HXS1 world copied — seed, generation and all.'); });
+  bindParameterControls(item, params, () => { if (ready) { world.pause(); installModel(); update(); } });
+  window.setInterval(update, 160);
 
-  function start() { if (!model) return; timer = window.setInterval(tick, 1000 / item.speed); setText('play', 'Pause'); }
-  function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Play'); }
-  function restart() { if (!model) return; stop(); model.reset(params); world.setCells(model.cells); trace.length = 0; setText('control-status', 'Replayed from the fixed seed with the current controls.'); update(); }
-  function tick() { if (!model) return; model.step(); world.setCells(model.cells); update(); }
+  function installModel() {
+    // The rule first: an HSG1 table switches the world onto the gas backend, so the seeding call
+    // below has to happen after it or it would fill a neighborhood world's buffers.
+    world.setRule(item.rule(params));
+    item.seedWorld(world, params);
+    trace.length = 0;
+    lastGeneration = -1;
+    setText('control-status', item.invariant(params));
+  }
+
   function update() {
-    if (!model) return;
-    const census = censusOf(model.cells, item.states);
-    trace.push(census[item.focusState]); if (trace.length > 90) trace.shift();
-    setText('metric-generation', model.generation); setText('metric-focus', census[item.focusState].toLocaleString());
-    setText('metric-change', item.kind === 'host-gas' ? `${model.collisions} collisions` : `${census[3].toLocaleString()} ash`);
-    setText('metric-checksum', checksum(model.cells).toString(16).padStart(8, '0'));
-    drawTrace(trace, item.accent);
+    if (!ready || !world.world) return;
+    const census = world.census();
+    const metrics = item.metrics(world);
+    setText('metric-generation', world.generation.toLocaleString());
+    setText('metric-focus', census[item.focusState].toLocaleString());
+    setText('metric-change', metrics.change);
+    setText('metric-checksum', metrics.checksum);
+    if (world.generation !== lastGeneration) { trace.push(census[item.focusState]); if (trace.length > 90) trace.shift(); drawTrace(trace, item.accent); lastGeneration = world.generation; }
   }
 }
 
+/**
+ * Outbreak Counterfactuals: two native worlds, one clock.
+ *
+ * The one place a host clock is kept deliberately. Each element can pace itself, but two elements
+ * pacing themselves would drift — one scrolls offscreen and pauses, the other does not — and a
+ * counterfactual whose arms are at different generations is not a counterfactual. So both worlds
+ * stay `paused` and a single interval ticks them together. It schedules; it does not simulate.
+ *
+ * The common random numbers are no longer arranged by the host at all: both infection rows compile
+ * to the same named stream, so the same cell draws the same number in both worlds by construction.
+ */
 function setupOutbreak(item) {
   const params = renderControls(item, {copyLabel: 'Copy comparison snapshot'});
   renderLegend(item.names, item.palette);
   setText('metric-focus-label', 'Cases prevented');
   const mount = document.getElementById('world-mount');
   mount.innerHTML = '<div class="dual-worlds" id="dual"></div>';
-  const left = createCaElement(item); const right = createCaElement(item);
+  const left = createStochasticElement(item); const right = createStochasticElement(item);
   document.getElementById('dual').append(figure('No vaccine', left), figure('Vaccination policy', right));
-  let baseline = null; let intervention = null; let timer = 0; let ready = 0; const trace = [];
+  let running = false; let timer = 0; let ready = 0; const trace = [];
   const onReady = () => {
     if (++ready !== 2) return;
-    const identity = blockRuleFromTable(item.states, (block) => block);
-    left.setRule(identity); right.setRule(identity);
-    baseline = createOutbreakModel(left.rows, left.columns);
-    intervention = createOutbreakModel(right.rows, right.columns, {intervention: true});
-    restart(); setText('stage-status', 'Same seed · same exposure schedule · policy is the only difference');
+    running = true;
+    restart();
+    setText('stage-status', 'Same seed · same compiled exposure stream · policy is the only difference');
   };
-  left.addEventListener('hexlife-ca-ready', onReady, {once: true}); right.addEventListener('hexlife-ca-ready', onReady, {once: true});
+  left.addEventListener('hexlife-stochastic-ready', onReady, {once: true});
+  right.addEventListener('hexlife-stochastic-ready', onReady, {once: true});
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start());
   document.getElementById('step').addEventListener('click', tick);
   document.getElementById('reset').addEventListener('click', restart);
   document.getElementById('action').addEventListener('click', () => {
-    if (!intervention) return;
-    const action = document.getElementById('action-choice').value;
-    if (action === 'restart') restart(); else { intervention.vaccinateRing(); right.setCells(intervention.cells); update(); setText('control-status', 'Vaccination ring added only to the policy world.'); }
+    if (!running) return;
+    if (document.getElementById('action-choice').value === 'restart') { restart(); return; }
+    // The ring is an intervention on the policy world only: read out, edit, hand back once, with
+    // the ages carried across so nobody's infectious clock restarts.
+    const cells = right.world.snapshotCells();
+    const ages = right.world.snapshotElapsedAges();
+    right.setCells(stochastic.outbreakVaccinateRing(cells, right.rows, right.columns), ages);
+    update();
+    setText('control-status', 'Vaccination ring added only to the policy world.');
   });
-  document.getElementById('copy').addEventListener('click', () => baseline && copyText(JSON.stringify({demo: item.id, generation: baseline.generation, params, baseline: encodeCells(baseline.cells), intervention: encodeCells(intervention.cells)}), 'Paired comparison JSON copied.'));
+  document.getElementById('copy').addEventListener('click', async () => {
+    if (!running) return;
+    await copyText(JSON.stringify({
+      demo: item.id, generation: left.generation, params,
+      baseline: await left.stochasticCode(), intervention: await right.stochasticCode(),
+    }), 'Paired HXS1 comparison copied — both arms resume exactly where they are.');
+  });
   bindParameterControls(item, params, restart);
-  function start() { if (!baseline) return; timer = window.setInterval(tick, 1000 / item.speed); setText('play', 'Pause'); }
+
+  function start() { if (!running) return; timer = window.setInterval(tick, 1000 / item.speed); setText('play', 'Pause'); }
   function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Play'); }
-  function restart() { if (!baseline) return; stop(); baseline.reset(params); intervention.reset(params); left.setCells(baseline.cells); right.setCells(intervention.cells); trace.length = 0; setText('control-status', 'Counterfactual replayed from identical initial cases and random schedule.'); update(); }
-  function tick() { if (!baseline) return; baseline.step(); intervention.step(); left.setCells(baseline.cells); right.setCells(intervention.cells); update(); }
+  function restart() {
+    if (!running) return;
+    stop();
+    const rule = stochastic.outbreakStochasticRule(params);
+    left.setRule(rule); right.setRule(rule);
+    left.setInitialState(stochastic.outbreakInitialState(left.rows, left.columns, params, {intervention: false}));
+    right.setInitialState(stochastic.outbreakInitialState(right.rows, right.columns, params, {intervention: true}));
+    trace.length = 0;
+    setText('control-status', 'Counterfactual replayed from identical initial cases and the same compiled stream.');
+    update();
+  }
+  function tick() { if (!running) return; left.tick(1); right.tick(1); update(); }
   function update() {
-    if (!baseline) return;
-    const leftCensus = censusOf(baseline.cells, 4); const rightCensus = censusOf(intervention.cells, 4);
-    const prevented = baseline.totalInfections - intervention.totalInfections; const differences = xorCount(baseline.cells, intervention.cells);
+    if (!running || !left.world || !right.world) return;
+    const leftCensus = left.census(); const rightCensus = right.census();
+    const prevented = infections(left) - infections(right);
+    // One bounded scalar crosses the boundary; the full-grid comparison stays inside Wasm.
+    const differences = left.world.differenceCount(right.world);
     trace.push(Math.max(0, prevented)); if (trace.length > 90) trace.shift();
-    setText('metric-generation', baseline.generation); setText('metric-focus', prevented); setText('metric-change', `${differences.toLocaleString()} cells`); setText('metric-checksum', `${leftCensus[1]} vs ${rightCensus[1]} infectious`); drawTrace(trace, item.accent);
+    setText('metric-generation', left.generation); setText('metric-focus', prevented);
+    setText('metric-change', `${differences.toLocaleString()} cells`);
+    setText('metric-checksum', `${leftCensus[1]} vs ${rightCensus[1]} infectious`);
+    drawTrace(trace, item.accent);
+  }
+  /** Cumulative infections, straight off the engine's per-row transition counters. */
+  function infections(world) {
+    const counts = world.world.transitionCounts();
+    return stochastic.OUTBREAK_INFECTION_ROWS.reduce((sum, row) => sum + (counts[row] || 0), 0);
   }
 }
 
@@ -377,8 +523,17 @@ function setupButterfly(item) {
   for (const [key, value] of Object.entries({states: 2, rows: 72, backend: 'block', palette: '#000000,#ff304f', paused: '', link: 'off'})) diff.setAttribute(key, String(value));
   diff.className = 'difference-overlay'; rightStack.append(diff);
   document.getElementById('dual').append(figure('Reference', left), figure('Perturbed + red XOR', rightStack));
-  let ready = 0; let timer = 0; const trace = [];
-  const onReady = () => { if (++ready === 3) { diff.setRule(blockRuleFromTable(2, (block) => block)); resetPair(); setText('stage-status', 'Red = exact snapshot disagreement'); } };
+  let ready = 0; let timer = 0; const trace = []; let mask = null;
+  const onReady = () => {
+    if (++ready !== 3) return;
+    diff.setRule(blockRuleFromTable(2, (block) => block));
+    // One persistent native mask over the two worlds. It compares them inside Wasm and writes the
+    // result straight into the display world's own buffer, so the difference never becomes a
+    // JavaScript array and nothing crosses the boundary to show it.
+    mask = new analysis.DifferenceMask(left.sim.numCells);
+    resetPair();
+    setText('stage-status', 'Red = exact snapshot disagreement');
+  };
   left.addEventListener('hexlife-ready', onReady, {once: true}); right.addEventListener('hexlife-ready', onReady, {once: true}); diff.addEventListener('hexlife-ca-ready', onReady, {once: true});
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start()); document.getElementById('step').addEventListener('click', step);
   document.getElementById('reset').addEventListener('click', resetPair);
@@ -394,10 +549,12 @@ function setupButterfly(item) {
   function resetPair() { if (ready !== 3) return; stop(); left.reset(); right.reset(); perturb(right, params.radius); trace.length = 0; setText('control-status', 'Exactly one controlled edit is active; red cells are its downstream consequences.'); update(); }
   function step() { if (ready !== 3) return; left.tick(1); right.tick(1); update(); }
   function update() {
-    if (ready !== 3) return; const a = left.sim.snapshotCells(); const b = right.sim.snapshotCells(); const mask = new Uint8Array(a.length); let count = 0;
-    for (let index = 0; index < a.length; index++) { mask[index] = a[index] ^ b[index]; count += mask[index]; }
-    diff.setCells(mask); trace.push(count); if (trace.length > 90) trace.shift();
-    setText('metric-generation', left.tickCount); setText('metric-focus-label', 'Divergent cells'); setText('metric-focus', count.toLocaleString()); setText('metric-change', `${(count / a.length * 100).toFixed(1)}%`); setText('metric-checksum', count ? 'diverged' : 'identical'); drawTrace(trace, '#ff304f');
+    if (ready !== 3 || !mask) return;
+    const count = mask.compareInto(left.sim, right.sim, diff.world);
+    // The mask was written inside wasm, so the element has no idea its cells changed.
+    diff.redraw();
+    trace.push(count); if (trace.length > 90) trace.shift();
+    setText('metric-generation', left.tickCount); setText('metric-focus-label', 'Divergent cells'); setText('metric-focus', count.toLocaleString()); setText('metric-change', `${(count / left.sim.numCells * 100).toFixed(1)}%`); setText('metric-checksum', count ? 'diverged' : 'identical'); drawTrace(trace, '#ff304f');
   }
 }
 
@@ -409,17 +566,35 @@ function setupSynth(item) {
   document.getElementById('keyboard').innerHTML = Array.from({length: 8}, (_, index) => `<span class="synth-key"><small>${index + 1}</small></span>`).join('');
   renderLegend(['birth = note', 'horizontal = pitch lane', 'vertical = octave'], [item.accent, '#73d49c', '#f4be63']);
   let scoreSeed = 13579; const world = binaryWorld(SYNTH_RULES[params.rule], params.density / 100, scoreSeed); document.getElementById('world-mount').append(world);
-  let context = null; let timer = 0; let previous = null; const trace = [];
-  world.addEventListener('hexlife-ready', () => { previous = world.sim.snapshotCells(); setText('stage-status', 'Sparse structure rule · audio requires a click'); setText('control-status', 'Births light their pitch lane. Start audio or step silently.'); update(); }, {once: true});
+  let context = null; let timer = 0; let meter = null; const trace = [];
+  world.addEventListener('hexlife-ready', () => { attachMeter(); setText('stage-status', 'Sparse structure rule · audio requires a click'); setText('control-status', 'Births light their pitch lane. Start audio or step silently.'); update(); }, {once: true});
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start()); document.getElementById('step').addEventListener('click', () => musicalTick(Boolean(context)));
   document.getElementById('reset').addEventListener('click', resetScore); document.getElementById('action').addEventListener('click', () => { scoreSeed += 7919; resetScore(); });
   document.getElementById('copy').addEventListener('click', async () => copyText(await world.worldCode(), 'Exact visual score copied as HXW1.'));
   bindParameterControls(item, params, (parameter) => { if (parameter.id === 'tempo' && timer) { stop(); start(); } else resetScore(); });
   function start() { if (!world.sim) return; context ||= new AudioContext(); context.resume(); timer = window.setInterval(() => musicalTick(true), 60000 / params.tempo); setText('play', 'Stop audio'); }
   function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Start audio'); }
-  function resetScore() { if (!world.sim) return; stop(); world.setAttribute('ruleset', SYNTH_RULES[params.rule]); world.setAttribute('density', String(params.density / 100)); world.setAttribute('seed', String(scoreSeed)); window.setTimeout(() => { world.reset(scoreSeed); previous = world.sim.snapshotCells(); trace.length = 0; update(); }, 0); }
-  function musicalTick(sound) { if (!world.sim || !previous) return; world.tick(1); const next = world.sim.snapshotCells(); const births = []; for (let i = 0; i < next.length; i++) if (!previous[i] && next[i]) births.push(i); previous = next; const lanes = laneBirths(births, world.sim.cols); if (sound && context) playLanes(context, lanes, params); trace.push(births.length); if (trace.length > 90) trace.shift(); update(births.length, lanes); }
-  function update(births = 0, lanes = []) { if (!world.sim) return; setText('metric-generation', world.tickCount); setText('metric-focus-label', 'Births this beat'); setText('metric-focus', births); setText('metric-change', `${lanes.filter(Boolean).length} pitch lanes`); setText('metric-checksum', world.checksum.toString(16).padStart(8, '0')); drawTrace(trace, item.accent); lightKeys(lanes); }
+  /**
+   * Bind the native lane meter to whichever world the element currently owns.
+   *
+   * Rebound rather than kept: changing the rule or the density is a structural attribute change, so
+   * the element rebuilds its `EmbedSim` and with it the wasm world the meter points at.
+   */
+  function attachMeter() { if (meter) meter.dispose(); meter = world.sim ? new analysis.BirthLaneMeter(world.sim) : null; }
+  function resetScore() { if (!world.sim) return; stop(); world.setAttribute('ruleset', SYNTH_RULES[params.rule]); world.setAttribute('density', String(params.density / 100)); world.setAttribute('seed', String(scoreSeed)); window.setTimeout(() => { world.reset(scoreSeed); attachMeter(); trace.length = 0; update(); }, 0); }
+  function musicalTick(sound) {
+    if (!world.sim || !meter) return;
+    world.tick(1);
+    // One native scan of the tick that just happened. The engine already holds the previous
+    // generation in its own back buffer, so this owns no per-cell storage and copies no grid — it
+    // reports at most eight counts and eight representative indices.
+    const births = meter.sample(world.sim);
+    const lanes = Array.from(meter.representatives, (index) => (index < 0 ? null : index));
+    if (sound && context) playLanes(context, lanes, params);
+    trace.push(births); if (trace.length > 90) trace.shift();
+    update(births, lanes);
+  }
+  function update(births = 0, lanes = []) { if (!world.sim) return; setText('metric-generation', world.tickCount); setText('metric-focus-label', 'Births this beat'); setText('metric-focus', births); setText('metric-change', `${lanes.filter((index) => index !== null).length} pitch lanes`); setText('metric-checksum', (world.checksum >>> 0).toString(16).padStart(8, '0')); drawTrace(trace, item.accent); lightKeys(lanes); }
 }
 
 function binaryWorld(ruleset, density = 0.12, seed = 13579) { const world = document.createElement('hexlife-world'); for (const [name, value] of Object.entries({ruleset, rows: 72, seed, density, speed: 18, palette: 'monochrome', paused: '', link: 'off'})) world.setAttribute(name, String(value)); return world; }
@@ -441,18 +616,16 @@ function matterRule(params) { const density = [0, 3, 2, 5, 9, 1, -1, 8]; return 
 function seedMatter(rows, columns) { const cells = new Uint8Array(rows * columns); for (let r = Math.floor(rows * 0.17); r < rows * 0.42; r++) for (let c = 5; c < columns - 5; c++) { const p = seeded(r * columns + c, 0x6a77e2); cells[r * columns + c] = p < 0.18 ? 3 : p < 0.27 ? 1 : p < 0.34 ? 2 : 0; } for (let r = Math.floor(rows * 0.82); r < rows; r++) for (let c = 0; c < columns; c++) cells[r * columns + c] = 4; for (let r = Math.floor(rows * 0.58); r < rows * 0.8; r++) cells[r * columns + Math.floor(columns * 0.72)] = 7; cells[Math.floor(rows * 0.64) * columns + Math.floor(columns * 0.68)] = 5; return sealPerimeter(cells, rows, columns, 4); }
 function matterAction(world, params, action) { const state = {rain: 1, oil: 2, sand: 3, ignite: 5, garden: 7}[action]; const cells = world.world.snapshotCells(); if (action === 'clear') { for (let r = 2; r < world.rows - 2; r++) for (let c = 2; c < world.columns - 2; c++) cells[r * world.columns + c] = 0; } else { const start = action === 'garden' ? Math.floor(world.rows * 0.63) : 3; const end = action === 'garden' ? Math.floor(world.rows * 0.78) : action === 'ignite' ? 8 : 12; for (let r = start; r < end; r++) for (let c = Math.floor(world.columns * 0.22); c < world.columns * 0.78; c++) if (seeded(r * world.columns + c, world.generation + state * 101) < (action === 'ignite' ? 0.12 : 0.5)) cells[r * world.columns + c] = state; } world.setCells(cells); }
 
-function laneBirths(births, columns) { const lanes = Array(8).fill(null); for (const index of births) { const lane = Math.min(7, Math.floor((index % columns) / columns * 8)); if (lanes[lane] === null) lanes[lane] = index; } return lanes; }
+// `laneBirths` lived here until the meter moved into Wasm. The native lane index is the same
+// expression in integer arithmetic — `(index % cols) * 8 / cols`, clamped — and the representative
+// is still the first birth in scan order, so the score is unchanged.
 function playLanes(context, lanes, params) { const intervals = {minor: [0, 3, 5, 7, 10, 12, 15, 17], major: [0, 2, 4, 5, 7, 9, 11, 12], whole: [0, 2, 4, 6, 8, 10, 12, 14]}[params.scale]; const now = context.currentTime; lanes.forEach((index, lane) => { if (index === null) return; const oscillator = context.createOscillator(); const gain = context.createGain(); oscillator.type = params.waveform; oscillator.frequency.value = 130.81 * 2 ** (intervals[lane] / 12); gain.gain.setValueAtTime(0.0001, now); gain.gain.exponentialRampToValueAtTime(params.waveform === 'square' ? 0.025 : 0.055, now + 0.01); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2); oscillator.connect(gain).connect(context.destination); oscillator.start(now); oscillator.stop(now + 0.22); }); }
 function lightKeys(lanes) { document.querySelectorAll('.synth-key').forEach((key, index) => key.classList.toggle('active', lanes[index] !== null && lanes[index] !== undefined)); }
 
 function renderLegend(names, colors) { document.getElementById('legend').innerHTML = names.map((name, index) => `<div class="legend-item"><span class="swatch" style="background:${colors[index]}"></span><span>${index} · ${name}</span></div>`).join(''); }
 function figure(caption, content) { const element = document.createElement('figure'); element.append(content); const label = document.createElement('figcaption'); label.textContent = caption; element.append(label); return element; }
 function paintDisk(cells, rows, columns, centerRow, centerColumn, radius, state) { for (let row = Math.floor(centerRow - radius); row <= centerRow + radius; row++) for (let column = Math.floor(centerColumn - radius); column <= centerColumn + radius; column++) if (row >= 0 && row < rows && column >= 0 && column < columns && Math.hypot(row - centerRow, column - centerColumn) <= radius) cells[row * columns + column] = state; }
-function censusOf(cells, states) { const census = Array(states).fill(0); cells.forEach((state) => census[state]++); return census; }
-function xorCount(a, b) { let count = 0; for (let index = 0; index < a.length; index++) if (a[index] !== b[index]) count++; return count; }
-function checksum(cells) { let hash = 0x811c9dc5; for (const cell of cells) { hash ^= cell; hash = Math.imul(hash, 0x01000193); } return hash >>> 0; }
 function seeded(index, seed) { let value = (index ^ seed) >>> 0; value = Math.imul(value ^ value >>> 16, 0x45d9f3b); value = Math.imul(value ^ value >>> 16, 0x45d9f3b); return ((value ^ value >>> 16) >>> 0) / 4294967296; }
-function encodeCells(cells) { let binary = ''; for (const cell of cells) binary += String.fromCharCode(cell); return btoa(binary); }
 function drawTrace(values, color) { const canvas = document.getElementById('trace'); const context = canvas.getContext('2d'); const width = canvas.width; const height = canvas.height; context.clearRect(0, 0, width, height); context.strokeStyle = '#283541'; context.lineWidth = 1; for (let y = 1; y < 4; y++) { context.beginPath(); context.moveTo(0, y * height / 4); context.lineTo(width, y * height / 4); context.stroke(); } if (values.length < 2) return; const max = Math.max(1, ...values); context.strokeStyle = color; context.lineWidth = 3; context.beginPath(); values.forEach((value, index) => { const x = index * width / Math.max(1, values.length - 1); const y = height - 8 - value / max * (height - 16); index ? context.lineTo(x, y) : context.moveTo(x, y); }); context.stroke(); }
 function setText(id, value) { const element = document.getElementById(id); if (element) element.textContent = String(value); }
 function escapeHtml(value) { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
