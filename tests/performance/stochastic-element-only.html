@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Stochastic-element artifact fixture</title>
+    <style>
+      body { background: #101214; color: #d5d9de; font: 13px/1.5 system-ui, sans-serif; margin: 16px; }
+      hexlife-stochastic { width: 320px; }
+      pre { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <!-- Cold-import fixture *and* functional smoke for <hexlife-stochastic>: the element cannot be
+         exercised under vitest (it needs WebGL2), so this page is what proves it boots, ticks,
+         draws from the wasm view, and reaches the second artifact — while `root-only.html` and
+         `ca-only.html` prove nobody else does. -->
+    <hexlife-stochastic rows="72" speed="0" paused></hexlife-stochastic>
+    <pre id="result">Loading…</pre>
+    <script type="module">
+      const started = performance.now();
+      const base = '/HexLife/dist/embed-package/src/embed/';
+      const {compileStochasticRule, independentNeighborChance} = await import(`${base}stochastic.js`);
+      await import(`${base}stochastic-element.js`);
+      const importedMs = performance.now() - started;
+
+      const el = document.querySelector('hexlife-stochastic');
+      await customElements.whenDefined('hexlife-stochastic');
+      const ready = await new Promise((resolve) => {
+        if (el.world) { resolve({hasRule: el.hasRule}); return; }
+        el.addEventListener('hexlife-stochastic-ready', (e) => resolve(e.detail), {once: true});
+      });
+      const readyMs = performance.now() - started;
+
+      // The frozen wildfire shape: fuel ignites from burning neighbours, burns, then goes out.
+      const rule = compileStochasticRule({
+        states: 3,
+        transitions: [
+          {from: 0, to: 1, neighborState: 1, probabilityByMask: independentNeighborChance(0.28), stream: 'ignite'},
+          {from: 1, to: 2, minAge: 3},
+        ],
+      });
+      el.setRule(rule);
+
+      const cells = new Uint8Array(el.rows * el.columns);
+      cells.fill(0);
+      cells[Math.floor(cells.length / 2)] = 1;
+      el.setInitialState(cells);
+
+      const before = el.checksum;
+      el.tick(20);
+      const afterTwenty = {generation: el.generation, checksum: el.checksum, census: [...el.census()]};
+      el.reset();
+      const rewound = {generation: el.generation, checksum: el.checksum};
+
+      // Determinism: the same seed and the same twenty ticks must land on the same checksum.
+      el.tick(20);
+      const replay = el.checksum;
+
+      const code = await el.stochasticCode();
+
+      // An `HXS1.` must resume to an identical *next tick*, not merely an identical frame — so the
+      // round trip is checked after advancing both worlds, not just on arrival.
+      const restored = document.createElement('hexlife-stochastic');
+      restored.setAttribute('speed', '0');
+      restored.setAttribute('paused', '');
+      restored.setAttribute('code', String(code));
+      // Listeners before the append: a bad `code` is rejected synchronously inside
+      // `connectedCallback`, so an error listener attached afterwards would miss the event and this
+      // await would hang forever.
+      const readyPromise = new Promise((resolve) => {
+        restored.addEventListener('hexlife-stochastic-ready', (e) => resolve(e.detail), {once: true});
+        restored.addEventListener('hexlife-stochastic-error', (e) => resolve({error: e.detail}), {once: true});
+      });
+      document.body.append(restored);
+      const restoredReady = await readyPromise;
+      const resumeOnArrival = restored.checksum === el.checksum
+        && restored.generation === el.generation;
+      el.tick(5);
+      restored.tick(5);
+      const resumeAfterFive = restored.checksum === el.checksum;
+      restored.remove();
+
+      window.__artifactFixture = {
+        kind: 'stochastic-element-only',
+        importMs: importedMs,
+        readyMs,
+        // `ready.seed` is a bigint — `JSON.stringify` throws on one rather than coercing it.
+        ready: {...ready, seed: String(ready.seed)},
+        backend: el.backend,
+        rows: el.rows,
+        columns: el.columns,
+        states: el.states,
+        seed: String(el.seed),
+        blankChecksum: before,
+        afterTwenty,
+        rewound,
+        deterministicReplay: replay === afterTwenty.checksum,
+        codePrefix: code ? code.slice(0, 5) : null,
+        codeLength: code ? code.length : 0,
+        restoredReady: restoredReady && restoredReady.error
+          ? restoredReady
+          : {...restoredReady, seed: String(restoredReady.seed)},
+        resumeOnArrival,
+        resumeAfterFive,
+        chunkActivity: el.chunkActivity,
+        requests: performance.getEntriesByType('resource')
+          .map(({name, transferSize, encodedBodySize}) => ({name, transferSize, encodedBodySize})),
+      };
+      document.getElementById('result').textContent = JSON.stringify(window.__artifactFixture, null, 2);
+    </script>
+  </body>
+</html>

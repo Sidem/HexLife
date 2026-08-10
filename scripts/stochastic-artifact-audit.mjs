@@ -73,6 +73,10 @@ if (process.argv.includes('--write')) {
   if (noted.length) {
     console.log(`Existing artifacts within their recorded exceptions:\n  ${noted.join('\n  ')}`);
     console.log(`Cause: ${exceptions.cause}`);
+    if (exceptions.ownerDecision) {
+      console.log(`Owner ruling ${exceptions.ownerDecision.date}: ${exceptions.ownerDecision.ruling}. `
+        + exceptions.ownerDecision.scope);
+    }
   } else {
     console.log('Existing artifact gzip sizes stay within the frozen 0.5% ceiling.');
   }

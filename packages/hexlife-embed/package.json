@@ -6,7 +6,8 @@
   "license": "MIT",
   "sideEffects": [
     "./src/embed/index.js",
-    "./src/embed/ca-element.js"
+    "./src/embed/ca-element.js",
+    "./src/embed/stochastic-element.js"
   ],
   "exports": {
     ".": {
@@ -43,6 +44,11 @@
       "types": "./src/embed/ca-element.d.ts",
       "import": "./src/embed/ca-element.js",
       "default": "./src/embed/ca-element.js"
+    },
+    "./stochastic-element": {
+      "types": "./src/embed/stochastic-element.d.ts",
+      "import": "./src/embed/stochastic-element.js",
+      "default": "./src/embed/stochastic-element.js"
     }
   },
   "files": [

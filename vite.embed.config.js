@@ -24,6 +24,9 @@ export default defineConfig({
         // Separate from `ca` on purpose: `ca.js` is DOM-free and outside "sideEffects", so the
         // `customElements.define` for <hexlife-ca> cannot live there. See ca-element.js.
         'ca-element': 'src/embed/ca-element.js',
+        // Same argument one step stronger: registering <hexlife-stochastic> anywhere else would
+        // weld the isolated stochastic artifact into a bundle that must not contain it.
+        'stochastic-element': 'src/embed/stochastic-element.js',
       },
       formats: ['es'],
     },

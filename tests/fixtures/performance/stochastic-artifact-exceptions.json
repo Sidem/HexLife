@@ -6,6 +6,12 @@
   "cause": "docs/STOCHASTIC-PLAN.md §9 requires three native analysis primitives for the EXISTING engines — the alternating block partition (Coffee), WorldDifference (Butterfly) and BirthLanes (Synth). They live in the default artifact by necessity: they read World/WorldK buffers in the same Wasm memory, so they cannot be split into a separate module.",
   "notCaused": "The stochastic engine contributes zero bytes to these files. WorldStochastic and the lattice gas are behind the `stochastic` Cargo feature and the separate `src/core/stochastic-wasm` artifact; the import-boundary tests still prove root-only and ca-only consumers make zero stochastic requests and instantiate zero stochastic bytes, which is the invariant the 0.5% ceiling exists to protect.",
   "ownerDecisionRequired": "§10.3 threshold 3 reads 'existing artifact gzip size changes by ≤0.5%', and §3 frames that ceiling as build-metadata noise ('investigate any larger change'). This is the investigation. Accepting or rejecting the trade — three native demo primitives against ~3.0 KB of gzip for every binary/k-state consumer — is an owner call, not an implementation detail.",
+  "ownerDecision": {
+    "date": "2026-08-10",
+    "ruling": "accepted as recorded",
+    "scope": "The §10.3 #3 threshold text is unchanged and this record is not widened. Each listed file is enforced at its exact acceptedGzipBytes; any unlisted file, and any listed file that grows past its ceiling, still fails the audit. Adding an entry requires a new owner ruling.",
+    "alsoRuled": "§10.3 #7 (native lattice gas ≥2× medium / ≥3× large) was accepted the same day with the per-particle normalization on the record; see docs/STOCHASTIC-PLAN.md §15b. That exception is not an artifact-size matter and adds nothing to this file."
+  },
   "files": {
     "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
       "phase0GzipBytes": 24705,
