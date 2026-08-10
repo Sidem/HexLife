@@ -15,6 +15,19 @@ import {
   RNG_LEGACY_DEMO_V0,
 } from '@hexlife/embed/stochastic';
 /* eslint-enable import/no-unresolved */
+import {neighborIndex, randomAt} from './embed-demo-geometry.js';
+
+/**
+ * The seeds the frozen oracles were recorded with.
+ *
+ * Load-bearing, not decorative. `RNG_LEGACY_DEMO_V0` reproduces a published trajectory only when the
+ * world's seed is the one the recording used, so these travel with the rules rather than with the
+ * page — a page that picked its own seed would run a *different* legal model and every differential
+ * test would still pass.
+ */
+export const WILDFIRE_SEED = 0xF1AE_2026;
+export const OUTBREAK_SEED = 0x0B7B_EA4;
+export const MIXING_SEED = 0x6A5C_0111;
 
 /** Canonical direction indices boosted by each wind setting, matching the frozen host model. */
 const WIND_DIRECTIONS = {east: [0, 1], west: [3, 4], north: [5], south: [2]};
@@ -69,6 +82,70 @@ export function wildfireStochasticRule(params) {
 }
 
 /**
+ * Wildfire Command's exact generation-zero forest, including the western ignition line.
+ *
+ * A transcription of the frozen host model's `reset()`, kept here so the migrated page seeds the
+ * *same* world the oracle recorded rather than an equivalent-looking one. `stochasticDemos.test.js`
+ * asserts byte identity against that model, so a drift here fails rather than quietly re-rolling
+ * every published run.
+ */
+export function wildfireInitialState(rows, columns, params, seed = WILDFIRE_SEED) {
+  const cells = new Uint8Array(rows * columns);
+  for (let row = 1; row < rows - 1; row++) {
+    for (let column = 1; column < columns - 1; column++) {
+      const index = row * columns + column;
+      if (randomAt(seed, 0, index, 3) < params.forest / 100) cells[index] = 1;
+    }
+  }
+  wildfireIgnite(cells, rows, columns, 'west');
+  return cells;
+}
+
+/**
+ * Set fire to the western line, or to a central spot and its six neighbours.
+ *
+ * Mutates in place and leaves ages alone, exactly as the host model did — an intervention that
+ * silently reset a burning cell's age would extend its burn.
+ */
+export function wildfireIgnite(cells, rows, columns, where = 'spot') {
+  if (where === 'west') {
+    for (let row = 2; row < rows - 2; row++) {
+      if (row % 3 !== 0) cells[row * columns + 3] = WILDFIRE_STATES.fire;
+    }
+    return cells;
+  }
+  const center = Math.floor(rows / 2) * columns + Math.floor(columns / 2);
+  cells[center] = WILDFIRE_STATES.fire;
+  for (let direction = 0; direction < 6; direction++) {
+    const index = neighborIndex(center, direction, rows, columns, false);
+    if (index >= 0) cells[index] = WILDFIRE_STATES.fire;
+  }
+  return cells;
+}
+
+/** Clear a three-column firebreak at 61% of the width. */
+export function wildfireCutFirebreak(cells, rows, columns) {
+  const column = Math.floor(columns * 0.61);
+  for (let row = 1; row < rows - 1; row++) {
+    for (let offset = -1; offset <= 1; offset++) {
+      cells[row * columns + column + offset] = WILDFIRE_STATES.clearing;
+    }
+  }
+  return cells;
+}
+
+/** Turn every ash cell back into forest, resetting only those cells' ages. */
+export function wildfireRegrowAsh(cells, ages) {
+  for (let index = 0; index < cells.length; index++) {
+    if (cells[index] === WILDFIRE_STATES.ash) {
+      cells[index] = WILDFIRE_STATES.forest;
+      ages[index] = 0;
+    }
+  }
+  return cells;
+}
+
+/**
  * Outbreak Counterfactuals: one rule for both arms of the study.
  *
  * Susceptible and vaccinated cells share the `307` stream deliberately. That is what makes the two
@@ -115,6 +192,47 @@ export function outbreakStochasticRule(params) {
 
 /** Rows whose firings sum to the model's "total infections" counter. */
 export const OUTBREAK_INFECTION_ROWS = Object.freeze([0, 3]);
+
+/**
+ * The exact generation-zero population for one arm of the study.
+ *
+ * Both arms share the three index cases and the same seed; only `intervention` adds the vaccinated
+ * cohort. That is the whole design — with the exposure stream shared by the susceptible and
+ * vaccinated rows, a divergence can only come from the policy.
+ */
+export function outbreakInitialState(rows, columns, params, {intervention = false} = {}, seed = OUTBREAK_SEED) {
+  const cells = new Uint8Array(rows * columns);
+  if (intervention) {
+    for (let index = 0; index < cells.length; index++) {
+      if (randomAt(seed, 0, index, 211) < params.coverage / 100) {
+        cells[index] = OUTBREAK_STATES.vaccinated;
+      }
+    }
+  }
+  for (const [rowRatio, columnRatio] of [[0.32, 0.35], [0.57, 0.62], [0.72, 0.24]]) {
+    cells[Math.floor(rows * rowRatio) * columns + Math.floor(columns * columnRatio)] = OUTBREAK_STATES.infectious;
+  }
+  return cells;
+}
+
+/** Vaccinate a ring of still-susceptible cells around the centre. Intervention arm only. */
+export function outbreakVaccinateRing(cells, rows, columns) {
+  const centerRow = rows / 2;
+  const centerColumn = columns / 2;
+  const radius = Math.min(rows, columns) * 0.23;
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const index = row * columns + column;
+      if (
+        cells[index] === OUTBREAK_STATES.susceptible
+        && Math.abs(Math.hypot(row - centerRow, column - centerColumn) - radius) < 1.4
+      ) {
+        cells[index] = OUTBREAK_STATES.vaccinated;
+      }
+    }
+  }
+  return cells;
+}
 
 // ---- Diffusion & Mixing Chamber ---------------------------------------------------------------
 

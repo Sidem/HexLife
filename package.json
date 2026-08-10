@@ -20,7 +20,8 @@
         "test:run": "vitest run",
         "library:merge": "node scripts/merge-library-pack.mjs",
         "audit:stochastic": "node scripts/stochastic-oracle-fixtures.mjs && node scripts/stochastic-artifact-audit.mjs",
-        "benchmark:stochastic:native": "node scripts/stochastic-native-baseline.mjs"
+        "benchmark:stochastic:native": "node scripts/stochastic-native-baseline.mjs",
+        "benchmark:stochastic:release": "node scripts/stochastic-release-audit.mjs --write"
     },
     "devDependencies": {
         "@eslint/js": "^9.30.0",

@@ -1,6 +1,6 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines",
   "type": "module",
   "license": "MIT",

@@ -117,6 +117,15 @@ export declare class HexCAElement extends HTMLElement {
   tick(n?: number): number
 
   /**
+   * Draw the world's current cells, whoever wrote them.
+   *
+   * Only needed when a *native* producer fills this world's buffer inside wasm — `DifferenceMask`'s
+   * `compareInto`, for instance. Nothing crossed the boundary, so nothing told the element anything
+   * changed. Every write on this element already redraws.
+   */
+  redraw(): void
+
+  /**
    * Per-state occupancy of the current generation — `states` counts.
    *
    * The measurement the block backend exists for: under a conservative block rule every entry holds

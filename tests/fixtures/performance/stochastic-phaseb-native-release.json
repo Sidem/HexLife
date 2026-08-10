@@ -1,0 +1,2002 @@
+{
+  "schema": "hexlife-stochastic-phaseb-native-release-v1",
+  "capturedAt": "2026-08-10T16:23:02.464Z",
+  "build": "Cargo release profile; seven measured batches after warmup; frozen Phase-0 workloads",
+  "host": {
+    "platform": "win32 10.0.26200 x64",
+    "cpu": "AMD Ryzen 7 5800X 8-Core Processor             ",
+    "logicalCores": 16,
+    "node": "v20.17.0"
+  },
+  "commands": {
+    "existing": "cargo test --release --manifest-path hexlife-wasm/Cargo.toml stochastic_phase0_native_baseline -- --ignored --nocapture",
+    "stochastic": "cargo test --release --manifest-path hexlife-wasm/Cargo.toml --no-default-features --features stochastic stochastic_native_benchmark -- --ignored --nocapture",
+    "analysis": "cargo test --release --manifest-path hexlife-wasm/Cargo.toml phase_a_native_analysis_benchmark -- --ignored --nocapture"
+  },
+  "note": "The release repeat ran later on the same host under a uniformly slower thermal/power state. Existing hot loops are source-identical to Phase 0; use existingComparisons as environmental controls and the paired enabled/disabled and native/oracle rows for release decisions.",
+  "existing": [
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        5016,
+        5022,
+        5013,
+        6013,
+        4944,
+        6138,
+        4908
+      ],
+      "medianNsPerTick": 5016,
+      "p95NsPerTick": 6138,
+      "madNsPerTick": 72
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        5666,
+        5713,
+        4944,
+        4127,
+        3941,
+        3941,
+        3950
+      ],
+      "medianNsPerTick": 4127,
+      "p95NsPerTick": 5713,
+      "madNsPerTick": 186
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        29344,
+        24436,
+        25722,
+        29372,
+        28441,
+        31430,
+        24691
+      ],
+      "medianNsPerTick": 28441,
+      "p95NsPerTick": 31430,
+      "madNsPerTick": 2719
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        386,
+        386,
+        383,
+        383,
+        383,
+        436,
+        555
+      ],
+      "medianNsPerTick": 386,
+      "p95NsPerTick": 555,
+      "madNsPerTick": 3
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        563,
+        580,
+        558,
+        580,
+        480,
+        386,
+        386
+      ],
+      "medianNsPerTick": 558,
+      "p95NsPerTick": 580,
+      "madNsPerTick": 22
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        18966,
+        19480,
+        36444,
+        32302,
+        19561,
+        22491,
+        20600
+      ],
+      "medianNsPerTick": 20600,
+      "p95NsPerTick": 36444,
+      "madNsPerTick": 1634
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        21969,
+        21966,
+        25150,
+        20833,
+        30672,
+        30794,
+        27900
+      ],
+      "medianNsPerTick": 25150,
+      "p95NsPerTick": 30794,
+      "madNsPerTick": 3184
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        319,
+        311,
+        311,
+        311,
+        311,
+        311,
+        311
+      ],
+      "medianNsPerTick": 311,
+      "p95NsPerTick": 319,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        33613,
+        34636,
+        33955,
+        34325,
+        28372,
+        28330,
+        26547
+      ],
+      "medianNsPerTick": 33613,
+      "p95NsPerTick": 34636,
+      "madNsPerTick": 1023
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        23091,
+        23255,
+        23272,
+        23400,
+        23002,
+        29552,
+        23025
+      ],
+      "medianNsPerTick": 23255,
+      "p95NsPerTick": 29552,
+      "madNsPerTick": 164
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        52644,
+        46466,
+        58511,
+        53866,
+        46244,
+        46844,
+        45666
+      ],
+      "medianNsPerTick": 46844,
+      "p95NsPerTick": 58511,
+      "madNsPerTick": 1178
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        63466,
+        65900,
+        65233,
+        59644,
+        44811,
+        46200,
+        46788
+      ],
+      "medianNsPerTick": 59644,
+      "p95NsPerTick": 65900,
+      "madNsPerTick": 6256
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        501511,
+        576733,
+        619155,
+        701966,
+        585177,
+        522322,
+        493111
+      ],
+      "medianNsPerTick": 576733,
+      "p95NsPerTick": 701966,
+      "madNsPerTick": 54411
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        4555,
+        5266,
+        4288,
+        3777,
+        3777,
+        3777,
+        4255
+      ],
+      "medianNsPerTick": 4255,
+      "p95NsPerTick": 5266,
+      "madNsPerTick": 478
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        3811,
+        3811,
+        3811,
+        3966,
+        3811,
+        3811,
+        3811
+      ],
+      "medianNsPerTick": 3811,
+      "p95NsPerTick": 3966,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        347577,
+        383566,
+        389055,
+        371011,
+        490122,
+        485166,
+        592022
+      ],
+      "medianNsPerTick": 389055,
+      "p95NsPerTick": 592022,
+      "madNsPerTick": 41478
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        441288,
+        563544,
+        641533,
+        604533,
+        378788,
+        435055,
+        368033
+      ],
+      "medianNsPerTick": 441288,
+      "p95NsPerTick": 641533,
+      "madNsPerTick": 73255
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        3200,
+        3688,
+        3733,
+        3433,
+        3444,
+        3688,
+        3544
+      ],
+      "medianNsPerTick": 3544,
+      "p95NsPerTick": 3733,
+      "madNsPerTick": 144
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        427444,
+        437233,
+        422844,
+        488900,
+        424500,
+        426977,
+        425288
+      ],
+      "medianNsPerTick": 426977,
+      "p95NsPerTick": 488900,
+      "madNsPerTick": 2477
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        371266,
+        374788,
+        377766,
+        387166,
+        433800,
+        393688,
+        402622
+      ],
+      "medianNsPerTick": 387166,
+      "p95NsPerTick": 433800,
+      "madNsPerTick": 12378
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        214566,
+        163666,
+        173500,
+        171266,
+        189300,
+        196300,
+        166300
+      ],
+      "medianNsPerTick": 173500,
+      "p95NsPerTick": 214566,
+      "madNsPerTick": 9834
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        171766,
+        206200,
+        164200,
+        205433,
+        179933,
+        177700,
+        252833
+      ],
+      "medianNsPerTick": 179933,
+      "p95NsPerTick": 252833,
+      "madNsPerTick": 15733
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        2148500,
+        1964266,
+        2030633,
+        2004133,
+        2204800,
+        2067300,
+        1884400
+      ],
+      "medianNsPerTick": 2030633,
+      "p95NsPerTick": 2204800,
+      "madNsPerTick": 66367
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        19600,
+        17833,
+        13466,
+        25766,
+        17900,
+        19166,
+        17033
+      ],
+      "medianNsPerTick": 17900,
+      "p95NsPerTick": 25766,
+      "madNsPerTick": 1266
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        13100,
+        12566,
+        12600,
+        12566,
+        13233,
+        12566,
+        12566
+      ],
+      "medianNsPerTick": 12566,
+      "p95NsPerTick": 13233,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1173300,
+        1216266,
+        1227100,
+        1462833,
+        1319566,
+        1326000,
+        1319966
+      ],
+      "medianNsPerTick": 1319566,
+      "p95NsPerTick": 1462833,
+      "madNsPerTick": 92466
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1202533,
+        1366566,
+        1269966,
+        1244066,
+        1249433,
+        1321766,
+        1331000
+      ],
+      "medianNsPerTick": 1269966,
+      "p95NsPerTick": 1366566,
+      "madNsPerTick": 51800
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        9000,
+        8800,
+        8766,
+        8800,
+        8800,
+        8766,
+        8766
+      ],
+      "medianNsPerTick": 8800,
+      "p95NsPerTick": 9000,
+      "madNsPerTick": 34
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1927833,
+        1758900,
+        1616533,
+        1654533,
+        1707933,
+        1653833,
+        1611900
+      ],
+      "medianNsPerTick": 1654533,
+      "p95NsPerTick": 1927833,
+      "madNsPerTick": 42633
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1414266,
+        1410500,
+        1445100,
+        1413200,
+        1452966,
+        1459433,
+        1644766
+      ],
+      "medianNsPerTick": 1445100,
+      "p95NsPerTick": 1644766,
+      "madNsPerTick": 30834
+    }
+  ],
+  "existingComparisons": [
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "empty",
+      "baselineMedianNsPerTick": 3847,
+      "releaseMedianNsPerTick": 5016,
+      "medianChangePct": 30.387314790746032
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "baselineMedianNsPerTick": 3927,
+      "releaseMedianNsPerTick": 4127,
+      "medianChangePct": 5.092946269416854
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "baselineMedianNsPerTick": 23119,
+      "releaseMedianNsPerTick": 28441,
+      "medianChangePct": 23.020026817768937
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 363,
+      "releaseMedianNsPerTick": 386,
+      "medianChangePct": 6.336088154269981
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "baselineMedianNsPerTick": 361,
+      "releaseMedianNsPerTick": 558,
+      "medianChangePct": 54.57063711911356
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "baselineMedianNsPerTick": 19408,
+      "releaseMedianNsPerTick": 20600,
+      "medianChangePct": 6.141797197032162
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "baselineMedianNsPerTick": 21625,
+      "releaseMedianNsPerTick": 25150,
+      "medianChangePct": 16.30057803468208
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 325,
+      "releaseMedianNsPerTick": 311,
+      "medianChangePct": -4.307692307692312
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "baselineMedianNsPerTick": 25152,
+      "releaseMedianNsPerTick": 33613,
+      "medianChangePct": 33.63947201017812
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "baselineMedianNsPerTick": 22563,
+      "releaseMedianNsPerTick": 23255,
+      "medianChangePct": 3.0669680450294834
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "empty",
+      "baselineMedianNsPerTick": 46900,
+      "releaseMedianNsPerTick": 46844,
+      "medianChangePct": -0.11940298507462366
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "baselineMedianNsPerTick": 44100,
+      "releaseMedianNsPerTick": 59644,
+      "medianChangePct": 35.24716553287981
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "baselineMedianNsPerTick": 510955,
+      "releaseMedianNsPerTick": 576733,
+      "medianChangePct": 12.873540722764233
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 3955,
+      "releaseMedianNsPerTick": 4255,
+      "medianChangePct": 7.585335018963346
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "baselineMedianNsPerTick": 3888,
+      "releaseMedianNsPerTick": 3811,
+      "medianChangePct": -1.9804526748971152
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "baselineMedianNsPerTick": 346277,
+      "releaseMedianNsPerTick": 389055,
+      "medianChangePct": 12.35369371919013
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "baselineMedianNsPerTick": 331255,
+      "releaseMedianNsPerTick": 441288,
+      "medianChangePct": 33.21700804516159
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 2977,
+      "releaseMedianNsPerTick": 3544,
+      "medianChangePct": 19.046019482700704
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "baselineMedianNsPerTick": 405188,
+      "releaseMedianNsPerTick": 426977,
+      "medianChangePct": 5.37750377602495
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "baselineMedianNsPerTick": 369244,
+      "releaseMedianNsPerTick": 387166,
+      "medianChangePct": 4.8537010757114585
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "empty",
+      "baselineMedianNsPerTick": 153433,
+      "releaseMedianNsPerTick": 173500,
+      "medianChangePct": 13.078672775739243
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "baselineMedianNsPerTick": 155666,
+      "releaseMedianNsPerTick": 179933,
+      "medianChangePct": 15.589145992059915
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "baselineMedianNsPerTick": 1865566,
+      "releaseMedianNsPerTick": 2030633,
+      "medianChangePct": 8.848092214373548
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 12500,
+      "releaseMedianNsPerTick": 17900,
+      "medianChangePct": 43.199999999999996
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "baselineMedianNsPerTick": 12466,
+      "releaseMedianNsPerTick": 12566,
+      "medianChangePct": 0.8021819348628334
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "baselineMedianNsPerTick": 1270633,
+      "releaseMedianNsPerTick": 1319566,
+      "medianChangePct": 3.851072654338439
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "baselineMedianNsPerTick": 1284933,
+      "releaseMedianNsPerTick": 1269966,
+      "medianChangePct": -1.1648078148821739
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "baselineMedianNsPerTick": 8800,
+      "releaseMedianNsPerTick": 8800,
+      "medianChangePct": 0
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "baselineMedianNsPerTick": 1481266,
+      "releaseMedianNsPerTick": 1654533,
+      "medianChangePct": 11.697223861210615
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "baselineMedianNsPerTick": 1328500,
+      "releaseMedianNsPerTick": 1445100,
+      "medianChangePct": 8.776815957847205
+    }
+  ],
+  "stochastic": [
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "skipping",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        271,
+        307,
+        338,
+        421,
+        341,
+        271,
+        279
+      ],
+      "medianNsPerTick": 307,
+      "p95NsPerTick": 421,
+      "madNsPerTick": 34
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        77390,
+        77288,
+        76611,
+        75410,
+        74712,
+        75868,
+        81341
+      ],
+      "medianNsPerTick": 76611,
+      "p95NsPerTick": 81341,
+      "madNsPerTick": 779
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "skipping",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        70163,
+        65083,
+        33727,
+        280,
+        280,
+        280,
+        280
+      ],
+      "medianNsPerTick": 280,
+      "p95NsPerTick": 70163,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        80222,
+        65008,
+        43563,
+        41733,
+        41908,
+        46972,
+        42175
+      ],
+      "medianNsPerTick": 43563,
+      "p95NsPerTick": 80222,
+      "madNsPerTick": 1830
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "skipping",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        97133,
+        75969,
+        72980,
+        64022,
+        37063,
+        11286,
+        277
+      ],
+      "medianNsPerTick": 64022,
+      "p95NsPerTick": 97133,
+      "madNsPerTick": 26959
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        97955,
+        80313,
+        75097,
+        73697,
+        73988,
+        73822,
+        74802
+      ],
+      "medianNsPerTick": 74802,
+      "p95NsPerTick": 97955,
+      "madNsPerTick": 980
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "skipping",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        94047,
+        71516,
+        68561,
+        64405,
+        69127,
+        65794,
+        71152
+      ],
+      "medianNsPerTick": 69127,
+      "p95NsPerTick": 94047,
+      "madNsPerTick": 2389
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        75813,
+        71227,
+        69694,
+        67341,
+        70038,
+        66530,
+        74686
+      ],
+      "medianNsPerTick": 70038,
+      "p95NsPerTick": 75813,
+      "madNsPerTick": 2697
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "skipping",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        232758,
+        146683,
+        150422,
+        145327,
+        135272,
+        76902,
+        73133
+      ],
+      "medianNsPerTick": 145327,
+      "p95NsPerTick": 232758,
+      "madNsPerTick": 10055
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        151522,
+        146061,
+        146294,
+        143544,
+        147747,
+        146508,
+        145747
+      ],
+      "medianNsPerTick": 146294,
+      "p95NsPerTick": 151522,
+      "madNsPerTick": 547
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-8pct",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        74091,
+        73038,
+        72947,
+        72511,
+        72655,
+        72277,
+        73122
+      ],
+      "medianNsPerTick": 72947,
+      "p95NsPerTick": 74091,
+      "madNsPerTick": 292
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-24pct",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        72344,
+        72280,
+        72983,
+        72813,
+        72622,
+        72300,
+        72597
+      ],
+      "medianNsPerTick": 72597,
+      "p95NsPerTick": 72983,
+      "madNsPerTick": 253
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-60pct",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        62277,
+        65594,
+        61486,
+        61688,
+        61522,
+        67161,
+        63783
+      ],
+      "medianNsPerTick": 62277,
+      "p95NsPerTick": 67161,
+      "madNsPerTick": 791
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "open-membrane",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        78283,
+        109275,
+        110608,
+        90166,
+        75841,
+        77750,
+        78036
+      ],
+      "medianNsPerTick": 78283,
+      "p95NsPerTick": 110608,
+      "madNsPerTick": 2442
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "collision-heavy",
+      "mode": "dense",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        71591,
+        71747,
+        71294,
+        72008,
+        71975,
+        71125,
+        70702
+      ],
+      "medianNsPerTick": 71591,
+      "p95NsPerTick": 72008,
+      "madNsPerTick": 384
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "skipping",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        2780,
+        2784,
+        2790,
+        2849,
+        2795,
+        2803,
+        2827
+      ],
+      "medianNsPerTick": 2795,
+      "p95NsPerTick": 2849,
+      "madNsPerTick": 11
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1316492,
+        1324458,
+        1366067,
+        1392446,
+        1376180,
+        1355633,
+        1324485
+      ],
+      "medianNsPerTick": 1355633,
+      "p95NsPerTick": 1392446,
+      "madNsPerTick": 31148
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "skipping",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        89322,
+        97333,
+        148888,
+        209822,
+        235366,
+        265777,
+        274255
+      ],
+      "medianNsPerTick": 209822,
+      "p95NsPerTick": 274255,
+      "madNsPerTick": 60934
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1265922,
+        1260877,
+        1286044,
+        1261500,
+        1271922,
+        1282122,
+        1248522
+      ],
+      "medianNsPerTick": 1265922,
+      "p95NsPerTick": 1286044,
+      "madNsPerTick": 6000
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "skipping",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1883611,
+        2268400,
+        1656266,
+        1537400,
+        1434555,
+        1371533,
+        1427744
+      ],
+      "medianNsPerTick": 1537400,
+      "p95NsPerTick": 2268400,
+      "madNsPerTick": 118866
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1803744,
+        1828833,
+        1645533,
+        1501011,
+        1418222,
+        1374866,
+        1326977
+      ],
+      "medianNsPerTick": 1501011,
+      "p95NsPerTick": 1828833,
+      "madNsPerTick": 144522
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "skipping",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        177722,
+        228555,
+        280511,
+        304000,
+        339988,
+        402266,
+        458466
+      ],
+      "medianNsPerTick": 304000,
+      "p95NsPerTick": 458466,
+      "madNsPerTick": 75445
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1256400,
+        1296888,
+        1294866,
+        1284244,
+        1288233,
+        1300688,
+        1351422
+      ],
+      "medianNsPerTick": 1294866,
+      "p95NsPerTick": 1351422,
+      "madNsPerTick": 6633
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "skipping",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        420700,
+        502088,
+        550655,
+        640144,
+        629822,
+        783433,
+        848800
+      ],
+      "medianNsPerTick": 629822,
+      "p95NsPerTick": 848800,
+      "madNsPerTick": 127734
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        3498744,
+        3142088,
+        2787200,
+        2604855,
+        2571644,
+        2583066,
+        2608733
+      ],
+      "medianNsPerTick": 2608733,
+      "p95NsPerTick": 3498744,
+      "madNsPerTick": 37089
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-8pct",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1305255,
+        1327811,
+        1371044,
+        1537833,
+        1309555,
+        1328655,
+        1323266
+      ],
+      "medianNsPerTick": 1327811,
+      "p95NsPerTick": 1537833,
+      "madNsPerTick": 18256
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-24pct",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1313622,
+        1318222,
+        1309400,
+        1296344,
+        1335800,
+        1311600,
+        1338577
+      ],
+      "medianNsPerTick": 1313622,
+      "p95NsPerTick": 1338577,
+      "madNsPerTick": 4600
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-60pct",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1124000,
+        1101144,
+        1115566,
+        1107911,
+        1124411,
+        1127633,
+        1112500
+      ],
+      "medianNsPerTick": 1115566,
+      "p95NsPerTick": 1127633,
+      "madNsPerTick": 8434
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "open-membrane",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1533377,
+        1334033,
+        1294888,
+        1313088,
+        1306155,
+        1297211,
+        1309833
+      ],
+      "medianNsPerTick": 1309833,
+      "p95NsPerTick": 1533377,
+      "madNsPerTick": 12622
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "collision-heavy",
+      "mode": "dense",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1263933,
+        1403966,
+        1849455,
+        1524333,
+        1771211,
+        2302388,
+        1857288
+      ],
+      "medianNsPerTick": 1771211,
+      "p95NsPerTick": 2302388,
+      "madNsPerTick": 246878
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "skipping",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        10591,
+        12741,
+        10871,
+        13652,
+        14842,
+        13292,
+        9840
+      ],
+      "medianNsPerTick": 12741,
+      "p95NsPerTick": 14842,
+      "madNsPerTick": 1870
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "no-hazard",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        5084945,
+        5407267,
+        5721553,
+        5748137,
+        5553749,
+        5557690,
+        5657909
+      ],
+      "medianNsPerTick": 5557690,
+      "p95NsPerTick": 5748137,
+      "madNsPerTick": 150423
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "skipping",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        137966,
+        147533,
+        159266,
+        133700,
+        154233,
+        151033,
+        204033
+      ],
+      "medianNsPerTick": 151033,
+      "p95NsPerTick": 204033,
+      "madNsPerTick": 8233
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "sparse-fire-front",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        5189300,
+        5397133,
+        5722966,
+        7129866,
+        6374866,
+        5303500,
+        6149733
+      ],
+      "medianNsPerTick": 5722966,
+      "p95NsPerTick": 7129866,
+      "madNsPerTick": 426767
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "skipping",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        6614966,
+        7706866,
+        7092800,
+        7211566,
+        7672566,
+        6686833,
+        7994766
+      ],
+      "medianNsPerTick": 7211566,
+      "p95NsPerTick": 7994766,
+      "madNsPerTick": 495300
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "dense-fire-hazard",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        7199566,
+        7572300,
+        8271366,
+        7996733,
+        7753200,
+        7399333,
+        8123433
+      ],
+      "medianNsPerTick": 7753200,
+      "p95NsPerTick": 8271366,
+      "madNsPerTick": 353867
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "skipping",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        274266,
+        308900,
+        314466,
+        331800,
+        347566,
+        329300,
+        355266
+      ],
+      "medianNsPerTick": 329300,
+      "p95NsPerTick": 355266,
+      "madNsPerTick": 18266
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "outbreak-growth",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        6390766,
+        6204366,
+        5723266,
+        5910533,
+        5683233,
+        6332666,
+        5169700
+      ],
+      "medianNsPerTick": 5910533,
+      "p95NsPerTick": 6390766,
+      "madNsPerTick": 293833
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "skipping",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        605900,
+        674800,
+        597700,
+        624000,
+        662733,
+        611800,
+        588700
+      ],
+      "medianNsPerTick": 611800,
+      "p95NsPerTick": 674800,
+      "madNsPerTick": 14100
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/neighborhood",
+      "workload": "paired-outbreak",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        10554200,
+        12678933,
+        11779866,
+        9949700,
+        10794566,
+        9825400,
+        9646433
+      ],
+      "medianNsPerTick": 10554200,
+      "p95NsPerTick": 12678933,
+      "madNsPerTick": 728800
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-8pct",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        4986666,
+        5284366,
+        5031300,
+        5748866,
+        6153700,
+        5281866,
+        5917433
+      ],
+      "medianNsPerTick": 5284366,
+      "p95NsPerTick": 6153700,
+      "madNsPerTick": 297700
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-24pct",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        5173200,
+        5606966,
+        5385800,
+        5873000,
+        5127866,
+        5304400,
+        5126666
+      ],
+      "medianNsPerTick": 5304400,
+      "p95NsPerTick": 5873000,
+      "madNsPerTick": 176534
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "occupancy-60pct",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        5019000,
+        5313433,
+        5434466,
+        4343100,
+        4505133,
+        4924966,
+        5049566
+      ],
+      "medianNsPerTick": 5019000,
+      "p95NsPerTick": 5434466,
+      "madNsPerTick": 294433
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "open-membrane",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        6324833,
+        5978966,
+        5683966,
+        5259700,
+        5192200,
+        5140733,
+        5075833
+      ],
+      "medianNsPerTick": 5259700,
+      "p95NsPerTick": 6324833,
+      "madNsPerTick": 183867
+    },
+    {
+      "tier": "large",
+      "engine": "WorldStochastic/lattice-gas",
+      "workload": "collision-heavy",
+      "mode": "dense",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        5064566,
+        4976100,
+        5035633,
+        5066733,
+        5823333,
+        5887933,
+        5782600
+      ],
+      "medianNsPerTick": 5066733,
+      "p95NsPerTick": 5887933,
+      "madNsPerTick": 90633
+    }
+  ],
+  "analysis": [
+    {
+      "tier": "demo",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "native",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        25322,
+        25030,
+        24900,
+        25050,
+        24980,
+        24947,
+        24902
+      ],
+      "medianNsPerTick": 24980,
+      "p95NsPerTick": 25322,
+      "madNsPerTick": 70
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "host-mirror-oracle",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        33430,
+        33641,
+        33744,
+        35094,
+        34094,
+        35150,
+        35002
+      ],
+      "medianNsPerTick": 34094,
+      "p95NsPerTick": 35150,
+      "madNsPerTick": 664
+    },
+    {
+      "tier": "demo",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "disabled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        57283,
+        57072,
+        62833,
+        98327,
+        99752,
+        99522,
+        87397
+      ],
+      "medianNsPerTick": 87397,
+      "p95NsPerTick": 99752,
+      "madNsPerTick": 12355
+    },
+    {
+      "tier": "demo",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "enabled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        63005,
+        62908,
+        59736,
+        57197,
+        56702,
+        57102,
+        57563
+      ],
+      "medianNsPerTick": 57563,
+      "p95NsPerTick": 63005,
+      "madNsPerTick": 861
+    },
+    {
+      "tier": "demo",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "disabled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        15955,
+        9841,
+        6325,
+        5969,
+        5966,
+        5969,
+        6013
+      ],
+      "medianNsPerTick": 6013,
+      "p95NsPerTick": 15955,
+      "madNsPerTick": 47
+    },
+    {
+      "tier": "demo",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "enabled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        16938,
+        10566,
+        6877,
+        6477,
+        6477,
+        6530,
+        6463
+      ],
+      "medianNsPerTick": 6530,
+      "p95NsPerTick": 16938,
+      "madNsPerTick": 67
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "native",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        445644,
+        456255,
+        464133,
+        447366,
+        444288,
+        481077,
+        466422
+      ],
+      "medianNsPerTick": 456255,
+      "p95NsPerTick": 481077,
+      "madNsPerTick": 10167
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "host-mirror-oracle",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        707288,
+        605877,
+        654855,
+        596844,
+        660888,
+        603955,
+        624866
+      ],
+      "medianNsPerTick": 624866,
+      "p95NsPerTick": 707288,
+      "madNsPerTick": 28022
+    },
+    {
+      "tier": "medium",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "disabled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        974355,
+        1047522,
+        1029966,
+        1050833,
+        1072411,
+        1045433,
+        1074777
+      ],
+      "medianNsPerTick": 1047522,
+      "p95NsPerTick": 1074777,
+      "madNsPerTick": 17556
+    },
+    {
+      "tier": "medium",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "enabled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        1009577,
+        1062944,
+        1083344,
+        1011644,
+        1008877,
+        1051044,
+        1045788
+      ],
+      "medianNsPerTick": 1045788,
+      "p95NsPerTick": 1083344,
+      "madNsPerTick": 34144
+    },
+    {
+      "tier": "medium",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "disabled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        367300,
+        306155,
+        286177,
+        272666,
+        255922,
+        261344,
+        256833
+      ],
+      "medianNsPerTick": 272666,
+      "p95NsPerTick": 367300,
+      "madNsPerTick": 15833
+    },
+    {
+      "tier": "medium",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "enabled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        392755,
+        319233,
+        298077,
+        302555,
+        267755,
+        278633,
+        287655
+      ],
+      "medianNsPerTick": 298077,
+      "p95NsPerTick": 392755,
+      "madNsPerTick": 19444
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "native",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1814766,
+        1701733,
+        2174200,
+        1744333,
+        1709233,
+        2014966,
+        1691033
+      ],
+      "medianNsPerTick": 1744333,
+      "p95NsPerTick": 2174200,
+      "madNsPerTick": 53300
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK/alternating-block",
+      "workload": "coffee-extraction",
+      "mode": "host-mirror-oracle",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        2475533,
+        2075433,
+        2456800,
+        2071000,
+        2523266,
+        2684033,
+        2635766
+      ],
+      "medianNsPerTick": 2475533,
+      "p95NsPerTick": 2684033,
+      "madNsPerTick": 160233
+    },
+    {
+      "tier": "large",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "disabled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        3843600,
+        3945533,
+        3770500,
+        3712266,
+        3750500,
+        3648966,
+        3915200
+      ],
+      "medianNsPerTick": 3770500,
+      "p95NsPerTick": 3945533,
+      "madNsPerTick": 73100
+    },
+    {
+      "tier": "large",
+      "engine": "World/difference",
+      "workload": "butterfly-rule",
+      "mode": "enabled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        4023833,
+        4013233,
+        3976733,
+        4026800,
+        4109633,
+        3983666,
+        3862300
+      ],
+      "medianNsPerTick": 4013233,
+      "p95NsPerTick": 4109633,
+      "madNsPerTick": 29567
+    },
+    {
+      "tier": "large",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "disabled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1442800,
+        1442233,
+        1294766,
+        1145766,
+        1138200,
+        1159100,
+        1354733
+      ],
+      "medianNsPerTick": 1294766,
+      "p95NsPerTick": 1442800,
+      "madNsPerTick": 147467
+    },
+    {
+      "tier": "large",
+      "engine": "World/birth-lanes",
+      "workload": "synth-rule",
+      "mode": "enabled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1724433,
+        1515933,
+        1294633,
+        1176666,
+        1183733,
+        1221866,
+        1229633
+      ],
+      "medianNsPerTick": 1229633,
+      "p95NsPerTick": 1724433,
+      "madNsPerTick": 52967
+    }
+  ]
+}

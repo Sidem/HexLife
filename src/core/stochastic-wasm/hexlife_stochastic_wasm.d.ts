@@ -113,6 +113,14 @@ export class WorldStochastic {
     states(): number;
     transition_count_len(): number;
     transition_counts_ptr(): number;
+    /**
+     * Count visible-state disagreements with another native stochastic world.
+     *
+     * This is deliberately a scalar aggregate rather than two exported snapshots: paired demos
+     * may display divergence every tick without moving either full grid through JavaScript or
+     * running a host-owned per-cell loop. The pass allocates nothing.
+     */
+    visible_difference_count(other: WorldStochastic): number;
     walls_ptr(): number;
 }
 
@@ -150,6 +158,7 @@ export interface InitOutput {
     readonly worldstochastic_rule_ptr: (a: number) => number;
     readonly worldstochastic_rule_len: (a: number) => number;
     readonly worldstochastic_last_changed_count: (a: number) => number;
+    readonly worldstochastic_visible_difference_count: (a: number, b: number) => number;
     readonly worldstochastic_rng_sample: (a: number, b: number, c: number) => [number, number, number];
     readonly worldstochastic_set_neighborhood_rule: (a: number, b: number, c: number) => [number, number];
     readonly worldstochastic_set_initial_state: (a: number, b: number, c: number, d: number, e: number) => [number, number];

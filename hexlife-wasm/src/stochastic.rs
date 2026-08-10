@@ -473,6 +473,24 @@ impl WorldStochastic {
         self.last_changed_count
     }
 
+    /// Count visible-state disagreements with another native stochastic world.
+    ///
+    /// This is deliberately a scalar aggregate rather than two exported snapshots: paired demos
+    /// may display divergence every tick without moving either full grid through JavaScript or
+    /// running a host-owned per-cell loop. The pass allocates nothing.
+    pub fn visible_difference_count(&self, other: &WorldStochastic) -> u32 {
+        if self.rows != other.rows || self.columns != other.columns {
+            // A Wasm world cannot contain u32::MAX cells, so this is an unambiguous sentinel for
+            // raw-binding callers. The public JavaScript wrapper validates geometry first.
+            return u32::MAX;
+        }
+        let mut count = 0u32;
+        for index in 0..self.num_cells {
+            count += u32::from(self.visible_state[index] != other.visible_state[index]);
+        }
+        count
+    }
+
     pub fn rng_sample(&self, cell_index: u32, stream_id: u32) -> Result<u32, String> {
         if usize::try_from(cell_index).map_or(true, |index| index >= self.num_cells) {
             return Err(format!(
@@ -1694,6 +1712,25 @@ mod tests {
     }
 
     #[test]
+    fn visible_difference_is_native_allocation_free_and_geometry_checked() {
+        let rule = compiled_rule(2, RNG_PHILOX_V1, &[]);
+        let mut left = WorldStochastic::new(8, 6, 1).unwrap();
+        let mut right = WorldStochastic::new(8, 6, 1).unwrap();
+        left.set_neighborhood_rule(&rule).unwrap();
+        right.set_neighborhood_rule(&rule).unwrap();
+        left.set_initial_state(&[0; 48], &[0; 48]).unwrap();
+        right.set_initial_state(&[0; 48], &[0; 48]).unwrap();
+
+        assert_eq!(left.visible_difference_count(&right), 0);
+        right.set_cell(7, 1).unwrap();
+        right.set_cell(31, 1).unwrap();
+        assert_eq!(left.visible_difference_count(&right), 2);
+
+        let other_geometry = WorldStochastic::new(10, 6, 1).unwrap();
+        assert_eq!(left.visible_difference_count(&other_geometry), u32::MAX);
+    }
+
+    #[test]
     fn probability_endpoints_and_age_deadline_are_exact() {
         let mut never = WorldStochastic::new(8, 6, 1).unwrap();
         never
@@ -2670,7 +2707,5 @@ mod tests {
         );
     }
 }
-
-
 
 

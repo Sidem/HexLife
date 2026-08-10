@@ -25,6 +25,34 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.9.0 — 2026-08-10
+
+#### Added
+
+- **A complete native stochastic simulation surface.** `WorldStochastic` now includes exact temporal
+  activity skipping, a conserved six-channel lattice-gas backend, native census/transition metrics,
+  exact reset and intervention state, and resumable `HXS1` codes. The engine remains isolated behind
+  `@hexlife/embed/stochastic`, so binary and k-state consumers fetch and initialize zero stochastic
+  bytes.
+- **`<hexlife-stochastic>`.** The separately imported custom element renders the engine's Wasm state
+  view directly, supports both stochastic backends, and exposes deterministic seed/rule/state
+  lifecycle controls without moving the running grid through JavaScript.
+- **Native demo analysis primitives.** Alternating block partitions replace Coffee's per-tick mirror
+  permutations, `DifferenceMask` computes Butterfly's XOR view in Wasm, `BirthLaneMeter` replaces
+  Synth's full-grid birth scan, and paired stochastic worlds can return a scalar native difference
+  count.
+
+#### Performance and correctness
+
+- Wildfire, paired Outbreak, and Mixing now have native rule/initial-state builders whose real Wasm
+  trajectories are pinned against the former JavaScript models. Dense and exact-skipping execution
+  are byte-identical, and all native tick buffers remain fixed across 100,000 ticks.
+- The frozen release audit covers demo, 103,800-cell, and 383,616-cell grids with seven measured runs.
+  Native stochastic neighborhood workloads are 8.7×–64× faster at medium/large sizes, Coffee's
+  native alternating path is 4.9×/3.1× faster than the same-browser host mirror path, and the worst
+  demo engine p95 is 0.23 ms. The previously accepted six-channel gas and default-artifact size
+  exceptions remain explicitly bounded in the audit record.
+
 ### `@hexlife/embed` 1.8.0 — 2026-08-10
 
 #### Added

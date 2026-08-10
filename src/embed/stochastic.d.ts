@@ -161,6 +161,8 @@ export declare class StochasticWorld {
   census(): Uint32Array
   /** Cumulative firings per canonical compiled row. */
   transitionCounts(): Uint32Array
+  /** Visible-state disagreements, compared inside Wasm with no grid snapshots or host scan. */
+  differenceCount(other: StochasticWorld): number
   checksum(): number
   auxiliaryChecksum(): number
   snapshotCells(): Uint8Array | null

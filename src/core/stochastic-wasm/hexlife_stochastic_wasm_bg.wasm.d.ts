@@ -21,6 +21,7 @@ export const worldstochastic_transition_count_len: (a: number) => number;
 export const worldstochastic_rule_ptr: (a: number) => number;
 export const worldstochastic_rule_len: (a: number) => number;
 export const worldstochastic_last_changed_count: (a: number) => number;
+export const worldstochastic_visible_difference_count: (a: number, b: number) => number;
 export const worldstochastic_rng_sample: (a: number, b: number, c: number) => [number, number, number];
 export const worldstochastic_set_neighborhood_rule: (a: number, b: number, c: number) => [number, number];
 export const worldstochastic_set_initial_state: (a: number, b: number, c: number, d: number, e: number) => [number, number];

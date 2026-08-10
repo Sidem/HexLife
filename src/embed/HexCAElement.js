@@ -408,6 +408,21 @@ export class HexCAElement extends HTMLElement {
     }
 
     /**
+     * Draw the world's current cells, whoever wrote them.
+     *
+     * For the one case the write path cannot cover: a *native* producer — `DifferenceMask`'s
+     * `compareInto`, say — that fills this world's buffer inside wasm. Nothing crossed the boundary,
+     * so nothing told the element anything changed, and a paused element would keep showing the
+     * previous frame forever. Going through `setCells` instead would mean copying a wasm buffer out
+     * to JavaScript and straight back in, which is the cost that analysis exists to avoid.
+     *
+     * Not needed after `setCells`, `setCell`, `tick`, `reset` or `clear` — those already draw.
+     */
+    redraw() {
+        this._afterMutation();
+    }
+
+    /**
      * Per-state occupancy of the current generation.
      *
      * The measurement the block backend exists for: under a conservative block rule every entry holds

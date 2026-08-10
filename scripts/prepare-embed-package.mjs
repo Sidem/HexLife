@@ -19,6 +19,7 @@ const copies = [
   ['src/embed/ca.d.ts', 'dist/embed-package/src/embed/ca.d.ts'],
   ['src/embed/stochastic.d.ts', 'dist/embed-package/src/embed/stochastic.d.ts'],
   ['src/embed/ca-element.d.ts', 'dist/embed-package/src/embed/ca-element.d.ts'],
+  ['src/embed/stochastic-element.d.ts', 'dist/embed-package/src/embed/stochastic-element.d.ts'],
   ['src/embed/index.d.ts', 'dist/embed-package/src/embed/index.d.ts'],
   ['src/embed/hexlife-world.d.ts', 'dist/embed-package/src/embed/hexlife-world.d.ts'],
   ['src/embed/hexlife-grid.d.ts', 'dist/embed-package/src/embed/hexlife-grid.d.ts'],

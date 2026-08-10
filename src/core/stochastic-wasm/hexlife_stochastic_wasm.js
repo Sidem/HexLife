@@ -396,6 +396,20 @@ export class WorldStochastic {
         return ret >>> 0;
     }
     /**
+     * Count visible-state disagreements with another native stochastic world.
+     *
+     * This is deliberately a scalar aggregate rather than two exported snapshots: paired demos
+     * may display divergence every tick without moving either full grid through JavaScript or
+     * running a host-owned per-cell loop. The pass allocates nothing.
+     * @param {WorldStochastic} other
+     * @returns {number}
+     */
+    visible_difference_count(other) {
+        _assertClass(other, WorldStochastic);
+        const ret = wasm.worldstochastic_visible_difference_count(this.__wbg_ptr, other.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * @returns {number}
      */
     walls_ptr() {
@@ -459,6 +473,12 @@ function __wbg_get_imports() {
 const WorldStochasticFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_worldstochastic_free(ptr, 1));
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
 
 function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);

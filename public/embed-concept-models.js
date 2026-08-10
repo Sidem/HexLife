@@ -1,35 +1,13 @@
-const ODD_COLUMN = [[-1, 1], [-1, 0], [0, -1], [1, 0], [1, 1], [0, 1]];
-const EVEN_COLUMN = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [0, 1]];
+// The lattice geometry and the frozen demo hash moved to `embed-demo-geometry.js` so the migrated
+// native pages can seed exactly these worlds without also downloading the host engines below.
+// Re-exported unchanged: this file is the frozen oracle, and its public surface is part of that.
+import {
+  combinedExposureProbability,
+  neighborIndex,
+  randomAt,
+} from './embed-demo-geometry.js';
 
-export function neighborIndex(index, direction, rows, columns, wrap = false) {
-  const row = Math.floor(index / columns);
-  const column = index % columns;
-  const [dc, dr] = (column & 1 ? ODD_COLUMN : EVEN_COLUMN)[direction];
-  let nextRow = row + dr;
-  let nextColumn = column + dc;
-  if (wrap) {
-    nextRow = (nextRow + rows) % rows;
-    nextColumn = (nextColumn + columns) % columns;
-  } else if (nextRow < 0 || nextRow >= rows || nextColumn < 0 || nextColumn >= columns) {
-    return -1;
-  }
-  return nextRow * columns + nextColumn;
-}
-
-export function randomAt(seed, generation, index, salt = 0) {
-  let value = (seed ^ Math.imul(generation + 1, 0x9e3779b1) ^ Math.imul(index + 1, 0x85ebca6b) ^ salt) >>> 0;
-  value ^= value >>> 16;
-  value = Math.imul(value, 0x7feb352d);
-  value ^= value >>> 15;
-  value = Math.imul(value, 0x846ca68b);
-  value ^= value >>> 16;
-  return (value >>> 0) / 4294967296;
-}
-
-export function combinedExposureProbability(perNeighborChance, exposedNeighbors) {
-  const chance = Math.max(0, Math.min(1, perNeighborChance));
-  return 1 - (1 - chance) ** Math.max(0, exposedNeighbors);
-}
+export {combinedExposureProbability, neighborIndex, randomAt};
 
 export function createGasModel(rows, columns, options = {}) {
   const seed = options.seed ?? 0x6a5c0111;

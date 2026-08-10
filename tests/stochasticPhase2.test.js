@@ -82,6 +82,27 @@ describe('stochastic neighborhood rule compiler', () => {
     });
 });
 
+describe('stochastic native aggregate analysis', () => {
+    it('compares paired visible states without copying either grid into JavaScript', () => {
+        const left = new StochasticWorld({rows: 6, columns: 8, seed: 1n});
+        const right = new StochasticWorld({rows: 6, columns: 8, seed: 1n});
+        const otherGeometry = new StochasticWorld({rows: 6, columns: 10, seed: 1n});
+        const rule = compileStochasticRule({states: 2, transitions: []});
+        left.setRule(rule);
+        right.setRule(rule);
+        left.setInitialState(new Uint8Array(48));
+        right.setInitialState(new Uint8Array(48));
+        expect(left.differenceCount(right)).toBe(0);
+        right.setCell(7, 1);
+        right.setCell(31, 1);
+        expect(left.differenceCount(right)).toBe(2);
+        expect(() => left.differenceCount(otherGeometry)).toThrow(/equal geometry/);
+        left.dispose();
+        right.dispose();
+        otherGeometry.dispose();
+    });
+});
+
 describe('WorldStochastic dense differential parity', () => {
     it('matches every Wildfire cell and age through generation 80', () => {
         const params = {

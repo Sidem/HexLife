@@ -673,6 +673,27 @@ export class StochasticWorld {
         return new Uint32Array(this._transitionCounts.subarray(0, this.world.transition_count_len()));
     }
 
+    /**
+     * Visible cells that differ from another same-sized stochastic world.
+     *
+     * The comparison runs entirely inside Wasm and returns one scalar, so a paired instrument can
+     * update every tick without snapshotting or scanning either grid in JavaScript.
+     */
+    differenceCount(other) {
+        this._assertLive();
+        if (!(other instanceof StochasticWorld)) {
+            throw new TypeError('StochasticWorld.differenceCount: other must be a StochasticWorld.');
+        }
+        other._assertLive();
+        if (this.rows !== other.rows || this.columns !== other.columns) {
+            throw new RangeError(
+                `StochasticWorld.differenceCount: equal geometry required, received `
+                + `${this.rows}x${this.columns} and ${other.rows}x${other.columns}.`,
+            );
+        }
+        return this.world.visible_difference_count(other.world);
+    }
+
     checksum() {
         this._assertLive();
         return this.world.checksum_state();

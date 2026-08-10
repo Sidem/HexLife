@@ -839,6 +839,8 @@ Age is stored as the generation when a cell entered its current state rather tha
 every tick. `minAge`/`maxAge` are inclusive u16 bounds. `setInitialState(cells, elapsedAges)` replaces
 the exact reset snapshot; `setCells()` and `setCell()` are intervention APIs, not streaming tick
 paths. `snapshotElapsedAges()` is an explicit copy for export/debug only.
+`differenceCount(other)` compares two same-sized worlds' visible states inside Wasm and returns one
+number; paired instruments do not need two snapshots or a JavaScript per-cell scan.
 
 New rules use version-1 Philox4x32-10, addressed by `(seed, generation, cell, stream)`, so decisions
 do not depend on iteration order or on whether another cell was evaluated. `legacy-demo-v0` is an

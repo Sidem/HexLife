@@ -151,6 +151,11 @@ describe('<hexlife-stochastic> package boundary', () => {
     // Registration IS the module's job, so a bundler must not be licensed to tree-shake it away.
     expect(manifest.sideEffects).toContain('./src/embed/stochastic-element.js');
     expect(manifest.sideEffects).not.toContain('./src/embed/stochastic.js');
+
+    const prepare = await readFile(new URL('../scripts/prepare-embed-package.mjs', import.meta.url), 'utf8');
+    expect(prepare).toContain(
+      "['src/embed/stochastic-element.d.ts', 'dist/embed-package/src/embed/stochastic-element.d.ts']",
+    );
   });
 
   it('builds the element as its own bundle entry', async () => {

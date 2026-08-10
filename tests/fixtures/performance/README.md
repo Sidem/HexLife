@@ -161,14 +161,55 @@ A seven-run Node-Wasm spot check on the Phase 0 host measured the dense Wildfire
 frozen JavaScript model at 103,800 cells and 3.08× at 383,616 cells. This is early evidence, not a
 substitute for Phase 7's complete browser/render audit.
 
+## Phase B release record — 2026-08-10
+
+The final `@hexlife/embed@1.9.0` candidate repeats the frozen matrix without changing its grids,
+workloads, run counts, warmups, or thresholds:
+
+| File | Evidence |
+|---|---|
+| `stochastic-phaseb-native-release.json` | Raw release-native controls, stochastic dense/skip rows, gas rows, Coffee native/oracle pairs, and enabled/disabled Butterfly/Synth analysis pairs |
+| `stochastic-phaseb-browser-controls.json` | Raw Chrome 151 repeat of all 69 frozen Phase-0 browser/control cases, renderer frames, long tasks, and 100k-tick memory probes |
+| `stochastic-phaseb-browser-release.json` | Raw Chrome 151 final native stochastic and Coffee rows, seven runs at all three frozen tiers, compared with the frozen JavaScript medians |
+| `../../performance/stochastic-phaseb-browser.html` | Reproducible browser-Wasm release harness; it consumes the unchanged Phase-0 contract and baseline fixtures |
+
+Release results:
+
+- Native stochastic neighborhood is at least **8.66×** faster at medium size and **12.26×** at large
+  size for every nontrivial frozen workload; no-hazard collapses to the exact skipping floor. The
+  former host loops, tick allocations, and full-grid JS→Wasm writes are zero.
+- Coffee's native alternating partition is **4.88×** faster at medium and **3.14×** at large than the
+  same-browser mirror/tick/mirror oracle, while both finish with identical checksums. It also clears
+  the frozen baseline by 6.88×/2.67×.
+- Difference analysis adds 6.4% at worst across medium/large, and birth lanes add 9.3% at worst,
+  below the 10% ceiling. Disabled analysis owns no per-cell buffer and does no tick work.
+- Every demo-sized native row is below 0.23 ms p95, far inside the 16.7 ms frame ceiling and below
+  25% of each page's tick budget. The repeated existing-engine probes again show zero Wasm memory
+  growth over 100,000 ticks.
+- The lattice-gas rows retain the accepted §10.3 #7 exception: six velocity channels perform roughly
+  six times the particle work of the frozen exclusion model. Release-native per-particle throughput
+  remains 4–13× better, while the browser-Wasm rows remain below 8.84 ms p95 even at 383,616 sites.
+- The final control repeat ran while the shared workstation was under substantial concurrent load;
+  its coarse three-tick large samples move in both directions (for example, World noise −8.5%,
+  ecology −10.6%, tissue +22.2%, and reactive block +16.9%). No old hot loop changed between the
+  accepted Phase-A measurement and this candidate, so those raw controls are retained as environment
+  diagnostics rather than treated as a third code exception. The paired enabled/disabled and
+  native/oracle rows above are same-run comparisons.
+
+**Release conclusion:** correctness, zero-copy/allocation, import isolation, demo budgets, Coffee,
+and optional-analysis gates pass. The two owner-accepted exceptions remain exactly the artifact-size
+and six-channel gas cases already recorded; no threshold was moved and no third exception was added.
+
 ## Reproduction
 
 ```text
 npm run build:embed
 npm run audit:stochastic
 npm run benchmark:stochastic:native
+npm run benchmark:stochastic:release
 npm run dev -- --port 5180 --strictPort
 # Open /HexLife/tests/performance/stochastic-phase0.html and run the frozen matrix.
+# Open /HexLife/tests/performance/stochastic-phaseb-browser.html and run the release matrix.
 # Open root-only.html and ca-only.html on separate fresh origins for cold import captures.
 ```
 
