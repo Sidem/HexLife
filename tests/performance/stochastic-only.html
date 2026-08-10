@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Stochastic-only artifact fixture</title></head>
+  <body>
+    <pre id="result">Loading…</pre>
+    <script type="module">
+      const started = performance.now();
+      const entry = '/HexLife/dist/embed-package/src/embed/stochastic.js';
+      const {initStochasticEngine, StochasticWorld} = await import(entry);
+      const importedMs = performance.now() - started;
+      await initStochasticEngine();
+      const initializedMs = performance.now() - started;
+      const worldStarted = performance.now();
+      const world = new StochasticWorld({rows: 72, columns: 84, seed: 12345});
+      const firstWorldMs = performance.now() - worldStarted;
+      const instantiatedBytes = world._wasm.memory.buffer.byteLength;
+      world.dispose();
+      window.__artifactFixture = {
+        kind: 'stochastic-only',
+        rngVersion: 1,
+        importMs: importedMs,
+        initializedMs,
+        firstWorldMs,
+        instantiatedBytes,
+        requests: performance.getEntriesByType('resource')
+          .map(({name, transferSize, encodedBodySize}) => ({name, transferSize, encodedBodySize})),
+      };
+      document.getElementById('result').textContent = JSON.stringify(window.__artifactFixture, null, 2);
+    </script>
+  </body>
+</html>

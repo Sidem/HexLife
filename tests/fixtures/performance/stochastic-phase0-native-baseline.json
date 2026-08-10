@@ -1,0 +1,555 @@
+{
+  "schema": "hexlife-stochastic-phase0-native-performance-v1",
+  "frozenAt": "2026-08-10",
+  "command": "cargo test --release --manifest-path hexlife-wasm/Cargo.toml stochastic_phase0_native_baseline -- --ignored --nocapture",
+  "build": "Cargo release profile; native rlib test binary; seven measured batches after three warmups",
+  "host": {
+    "platform": "win32 10.0.26200 x64",
+    "cpu": "AMD Ryzen 7 5800X 8-Core Processor             ",
+    "logicalCores": 16,
+    "node": "v20.17.0"
+  },
+  "caveat": "coffee-table-shape-proxy isolates a k=16 block table of the same size; the authored Coffee transition and host conjugation are measured exactly by the browser baseline.",
+  "records": [
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        3847,
+        3847,
+        3844,
+        3841,
+        3844,
+        4016,
+        3902
+      ],
+      "medianNsPerTick": 3847,
+      "p95NsPerTick": 4016,
+      "madNsPerTick": 3
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        3844,
+        3847,
+        4486,
+        4122,
+        3927,
+        3927,
+        3927
+      ],
+      "medianNsPerTick": 3927,
+      "p95NsPerTick": 4486,
+      "madNsPerTick": 80
+    },
+    {
+      "tier": "demo",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        28975,
+        24163,
+        21005,
+        17725,
+        18186,
+        23119,
+        23922
+      ],
+      "medianNsPerTick": 23119,
+      "p95NsPerTick": 28975,
+      "madNsPerTick": 2114
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        363,
+        363,
+        363,
+        363,
+        361,
+        363,
+        361
+      ],
+      "medianNsPerTick": 363,
+      "p95NsPerTick": 363,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        363,
+        361,
+        361,
+        361,
+        361,
+        361,
+        361
+      ],
+      "medianNsPerTick": 361,
+      "p95NsPerTick": 363,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        19408,
+        19186,
+        18938,
+        18986,
+        21369,
+        34105,
+        25922
+      ],
+      "medianNsPerTick": 19408,
+      "p95NsPerTick": 34105,
+      "madNsPerTick": 470
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        22519,
+        22291,
+        21708,
+        21375,
+        21547,
+        21544,
+        21625
+      ],
+      "medianNsPerTick": 21625,
+      "p95NsPerTick": 22519,
+      "madNsPerTick": 83
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        333,
+        325,
+        325,
+        325,
+        325,
+        327,
+        325
+      ],
+      "medianNsPerTick": 325,
+      "p95NsPerTick": 333,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        25494,
+        25152,
+        27808,
+        25588,
+        25033,
+        25136,
+        24866
+      ],
+      "medianNsPerTick": 25152,
+      "p95NsPerTick": 27808,
+      "madNsPerTick": 286
+    },
+    {
+      "tier": "demo",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 6048,
+      "sampleNsPerTick": [
+        22119,
+        22686,
+        22961,
+        22563,
+        22088,
+        22850,
+        21922
+      ],
+      "medianNsPerTick": 22563,
+      "p95NsPerTick": 22961,
+      "madNsPerTick": 398
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        47844,
+        46900,
+        46622,
+        46688,
+        47366,
+        46900,
+        46722
+      ],
+      "medianNsPerTick": 46900,
+      "p95NsPerTick": 47844,
+      "madNsPerTick": 212
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        45711,
+        45344,
+        44433,
+        44022,
+        43933,
+        43944,
+        44100
+      ],
+      "medianNsPerTick": 44100,
+      "p95NsPerTick": 45711,
+      "madNsPerTick": 167
+    },
+    {
+      "tier": "medium",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        608733,
+        510955,
+        510344,
+        520688,
+        508866,
+        497355,
+        552377
+      ],
+      "medianNsPerTick": 510955,
+      "p95NsPerTick": 608733,
+      "madNsPerTick": 9733
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        5922,
+        5300,
+        3955,
+        3955,
+        3944,
+        3944,
+        3955
+      ],
+      "medianNsPerTick": 3955,
+      "p95NsPerTick": 5922,
+      "madNsPerTick": 11
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        3888,
+        3888,
+        3877,
+        3877,
+        3888,
+        3877,
+        3888
+      ],
+      "medianNsPerTick": 3888,
+      "p95NsPerTick": 3888,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        325800,
+        335600,
+        360622,
+        346277,
+        356300,
+        347488,
+        344711
+      ],
+      "medianNsPerTick": 346277,
+      "p95NsPerTick": 360622,
+      "madNsPerTick": 10023
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        330666,
+        315788,
+        339644,
+        325388,
+        518111,
+        331255,
+        363233
+      ],
+      "medianNsPerTick": 331255,
+      "p95NsPerTick": 518111,
+      "madNsPerTick": 8389
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        3022,
+        2977,
+        2977,
+        2977,
+        2977,
+        2977,
+        2977
+      ],
+      "medianNsPerTick": 2977,
+      "p95NsPerTick": 3022,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        446700,
+        428322,
+        411066,
+        399100,
+        396077,
+        405188,
+        396622
+      ],
+      "medianNsPerTick": 405188,
+      "p95NsPerTick": 446700,
+      "madNsPerTick": 8566
+    },
+    {
+      "tier": "medium",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 103800,
+      "sampleNsPerTick": [
+        358166,
+        375311,
+        438800,
+        375300,
+        359133,
+        359688,
+        369244
+      ],
+      "medianNsPerTick": 369244,
+      "p95NsPerTick": 438800,
+      "madNsPerTick": 9556
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "empty",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        154266,
+        153366,
+        153800,
+        153433,
+        153233,
+        153433,
+        154000
+      ],
+      "medianNsPerTick": 153433,
+      "p95NsPerTick": 154266,
+      "madNsPerTick": 200
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "sparse-0.2pct",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        213200,
+        157500,
+        154766,
+        155666,
+        156666,
+        153533,
+        153400
+      ],
+      "medianNsPerTick": 155666,
+      "p95NsPerTick": 213200,
+      "madNsPerTick": 1834
+    },
+    {
+      "tier": "large",
+      "engine": "World",
+      "workload": "noise-50pct",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1778866,
+        1819266,
+        1905533,
+        1907133,
+        1844333,
+        1884100,
+        1865566
+      ],
+      "medianNsPerTick": 1865566,
+      "p95NsPerTick": 1907133,
+      "madNsPerTick": 39967
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "settled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        12600,
+        12500,
+        12500,
+        12500,
+        12500,
+        12500,
+        12500
+      ],
+      "medianNsPerTick": 12500,
+      "p95NsPerTick": 12600,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "crystal",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        12533,
+        12466,
+        12466,
+        12466,
+        12466,
+        12500,
+        12500
+      ],
+      "medianNsPerTick": 12466,
+      "p95NsPerTick": 12533,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "ecology",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1216100,
+        1236333,
+        1269533,
+        1302466,
+        1374233,
+        1270633,
+        1271733
+      ],
+      "medianNsPerTick": 1270633,
+      "p95NsPerTick": 1374233,
+      "madNsPerTick": 31833
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-neighborhood",
+      "workload": "tissue",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1336166,
+        1250533,
+        1310566,
+        1284933,
+        1257533,
+        1337533,
+        1258400
+      ],
+      "medianNsPerTick": 1284933,
+      "p95NsPerTick": 1337533,
+      "madNsPerTick": 27400
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "settled",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        8900,
+        8800,
+        8800,
+        8800,
+        8800,
+        8800,
+        8800
+      ],
+      "medianNsPerTick": 8800,
+      "p95NsPerTick": 8900,
+      "madNsPerTick": 0
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "matter",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1469333,
+        1478800,
+        1490033,
+        1570333,
+        1498766,
+        1481266,
+        1478166
+      ],
+      "medianNsPerTick": 1481266,
+      "p95NsPerTick": 1570333,
+      "madNsPerTick": 8767
+    },
+    {
+      "tier": "large",
+      "engine": "WorldK-block",
+      "workload": "coffee-table-shape-proxy",
+      "cellCount": 383616,
+      "sampleNsPerTick": [
+        1291733,
+        1332100,
+        1315800,
+        1324833,
+        1328500,
+        1395600,
+        1392566
+      ],
+      "medianNsPerTick": 1328500,
+      "p95NsPerTick": 1395600,
+      "madNsPerTick": 12700
+    }
+  ]
+}

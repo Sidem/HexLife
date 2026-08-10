@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "frozen": "2026-08-10",
+  "method": "Vite 6.3.5 serving npm run build:embed; root-only and ca-only loaded from separate never-before-used origins so each capture has a cold HTTP cache",
+  "rootOnly": {
+    "kind": "root-only",
+    "importMs": 98.10000000149012,
+    "initializedMs": 161.10000000149012,
+    "requests": [
+      {
+        "name": "http://localhost:5181/HexLife/@vite/client",
+        "transferSize": 183027,
+        "encodedBodySize": 182727
+      },
+      {
+        "name": "http://localhost:5181/HexLife/tests/performance/root-only.html?html-proxy&index=0.js",
+        "transferSize": 5990,
+        "encodedBodySize": 5690
+      },
+      {
+        "name": "http://localhost:5181/HexLife/node_modules/vite/dist/client/env.mjs",
+        "transferSize": 4487,
+        "encodedBodySize": 4187
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/index.js?import",
+        "transferSize": 305045,
+        "encodedBodySize": 304745
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/EmbedSim-AXFgoTdH.js",
+        "transferSize": 417168,
+        "encodedBodySize": 416868
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/attrs-Beqj2fg0.js",
+        "transferSize": 9261,
+        "encodedBodySize": 8961
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/EmbedRenderer-DDGz1Led.js",
+        "transferSize": 243388,
+        "encodedBodySize": 243088
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/rulesetCode-NHt4NMaj.js",
+        "transferSize": 106564,
+        "encodedBodySize": 106264
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/hexBrush-CkCnPizp.js",
+        "transferSize": 20334,
+        "encodedBodySize": 20034
+      },
+      {
+        "name": "http://localhost:5181/favicon.ico",
+        "transferSize": 414,
+        "encodedBodySize": 114
+      },
+      {
+        "name": "http://localhost:5181/HexLife/dist/embed-package/src/embed/chunks/Symmetry-CYQ5QaUz.js",
+        "transferSize": 26214,
+        "encodedBodySize": 25914
+      }
+    ]
+  },
+  "caOnly": {
+    "kind": "ca-only",
+    "importMs": 49.5,
+    "initializedMs": 52,
+    "firstWorldMs": 0.7000000029802322,
+    "requests": [
+      {
+        "name": "http://localhost:5182/HexLife/@vite/client",
+        "transferSize": 183027,
+        "encodedBodySize": 182727
+      },
+      {
+        "name": "http://localhost:5182/HexLife/tests/performance/ca-only.html?html-proxy&index=0.js",
+        "transferSize": 5632,
+        "encodedBodySize": 5332
+      },
+      {
+        "name": "http://localhost:5182/HexLife/node_modules/vite/dist/client/env.mjs",
+        "transferSize": 4487,
+        "encodedBodySize": 4187
+      },
+      {
+        "name": "http://localhost:5182/HexLife/dist/embed-package/src/embed/ca.js?import",
+        "transferSize": 92626,
+        "encodedBodySize": 92326
+      },
+      {
+        "name": "http://localhost:5182/HexLife/dist/embed-package/src/embed/chunks/EmbedSim-AXFgoTdH.js",
+        "transferSize": 417168,
+        "encodedBodySize": 416868
+      },
+      {
+        "name": "http://localhost:5182/favicon.ico",
+        "transferSize": 414,
+        "encodedBodySize": 114
+      },
+      {
+        "name": "http://localhost:5182/HexLife/dist/embed-package/src/embed/chunks/hexBrush-CkCnPizp.js",
+        "transferSize": 20334,
+        "encodedBodySize": 20034
+      }
+    ]
+  },
+  "stochasticOnly": {
+    "available": false,
+    "reason": "Phase 0 forbids creating WorldStochastic or its artifact"
+  },
+  "assertions": {
+    "rootStochasticRequests": 0,
+    "caStochasticRequests": 0,
+    "rootStochasticInstantiatedBytes": 0,
+    "caStochasticInstantiatedBytes": 0
+  }
+}

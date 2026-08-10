@@ -5,6 +5,7 @@ import {blockRuleFromTable, isConservative, isIsotropic, ruleFromTable} from '@h
 import '@hexlife/embed/ca-element';
 /* eslint-enable import/no-unresolved */
 import {sealPerimeter} from './embed-concept-boundaries.js';
+import {demoOwnershipFor} from './embed-demo-manifest.js';
 import {
   createGasModel,
   createOutbreakModel,
@@ -155,6 +156,11 @@ const concepts = [
 
 const config = concepts.find((item) => item.id === document.body.dataset.concept);
 if (!config) throw new Error(`Unknown HexLife concept page: ${document.body.dataset.concept}`);
+const ownership = demoOwnershipFor(config.id);
+if (!ownership || ownership.section !== 'library') {
+  throw new Error(`Missing demo ownership declaration for ${config.id}.`);
+}
+config.engine = ownership.engine;
 const root = document.getElementById('concept-root');
 document.documentElement.style.setProperty('--concept-accent', config.accent);
 document.documentElement.style.setProperty('--concept-accent-rgb', config.rgb);

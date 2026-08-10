@@ -8,6 +8,15 @@ edition = "2021"
 # pure-logic unit tests in lib.rs (the tick engine compiles & runs fine off-wasm).
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# The long-standing binary + k-state artifact. `wasm-pack build` with no extra flags keeps exactly
+# this surface, so Explorer and every existing embed consumer remain on the old code path.
+default = ["standard"]
+standard = []
+# Built separately with `--no-default-features --features stochastic`; never imported by the
+# default package entries.
+stochastic = []
+
 [dependencies]
 wasm-bindgen = "0.2" # The core dependency for JS interop
 

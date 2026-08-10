@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "frozen": "2026-08-10",
+  "buildCommand": "npm run build:embed",
+  "packageVersion": "1.7.1",
+  "stochasticArtifactPresent": false,
+  "artifacts": {
+    "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
+      "rawBytes": 59727,
+      "gzipBytes": 24705,
+      "sha256": "d3b34f39958b4f98190fe379e5cc131049c689b06a1d5db7bf1b045be7047998"
+    },
+    "src/core/wasm-engine/hexlife_wasm.js": {
+      "rawBytes": 29863,
+      "gzipBytes": 8250,
+      "sha256": "aaa82ccbe57bef79dbbb23bfbd62bdda3ac28e11e2f6643cf08fa8c92c6a547d"
+    },
+    "dist/embed-package/src/embed/api.js": {
+      "rawBytes": 7121,
+      "gzipBytes": 2943,
+      "sha256": "a451b8a0815a4de3d213e1f07aff7d9b4a989f52d03cfa6dd7dbe50df1155faf"
+    },
+    "dist/embed-package/src/embed/ca-element.js": {
+      "rawBytes": 29061,
+      "gzipBytes": 8995,
+      "sha256": "def1b3f41042b130d8d2a1b25548e8168f9bd993ac4f43589e08c5a2b2f0bac5"
+    },
+    "dist/embed-package/src/embed/ca.js": {
+      "rawBytes": 17063,
+      "gzipBytes": 5856,
+      "sha256": "1132ce4858f0ada7ad718877b2750d32f87925eaffc25f15441c15223896c122"
+    },
+    "dist/embed-package/src/embed/chunks/EmbedRenderer-DDGz1Led.js": {
+      "rawBytes": 52526,
+      "gzipBytes": 15412,
+      "sha256": "c5237a1cf5369ea5f066dfa3925a92b263304a6240286f977bd98a5cb2ebbd57"
+    },
+    "dist/embed-package/src/embed/chunks/EmbedSim-AXFgoTdH.js": {
+      "rawBytes": 197294,
+      "gzipBytes": 80688,
+      "sha256": "795ea91ecb0da3b6819937ed9212dd93cd14a3ce488f6cb76bed63390f8a6976"
+    },
+    "dist/embed-package/src/embed/chunks/Symmetry-CYQ5QaUz.js": {
+      "rawBytes": 4723,
+      "gzipBytes": 1820,
+      "sha256": "0811f87d7b40fe10539c8fc6aa8adc16ae0a5253c16970c221d191f2370d711f"
+    },
+    "dist/embed-package/src/embed/chunks/attrs-Beqj2fg0.js": {
+      "rawBytes": 938,
+      "gzipBytes": 453,
+      "sha256": "1006c8704ffa98832cb2b81dbe64b0eb79fbb0e44fb3d086b7c77d9aa1eaf066"
+    },
+    "dist/embed-package/src/embed/chunks/hexBrush-CkCnPizp.js": {
+      "rawBytes": 2539,
+      "gzipBytes": 1212,
+      "sha256": "8b97ee748d8a93375c28f90a7218bfc346da77d862549b6ce2b9452f07b03f3f"
+    },
+    "dist/embed-package/src/embed/chunks/rulesetCode-NHt4NMaj.js": {
+      "rawBytes": 12831,
+      "gzipBytes": 4445,
+      "sha256": "c5c38a8b4ac3ec5ba5b2c9ee8886d6e87c2283d95a3c4b469683d678962120b8"
+    },
+    "dist/embed-package/src/embed/index.js": {
+      "rawBytes": 75710,
+      "gzipBytes": 21495,
+      "sha256": "e39b09842c36b9684446c2e74f15f8d49912c1c549711af1661702f7d206265d"
+    },
+    "dist/embed-package/src/embed/render.js": {
+      "rawBytes": 7118,
+      "gzipBytes": 2242,
+      "sha256": "b8e12159ec5687e3cf2815264abaa92ec657b70ee46ed9115ddda10d27292ee8"
+    },
+    "dist/embed-package/src/embed/sim.js": {
+      "rawBytes": 4050,
+      "gzipBytes": 1436,
+      "sha256": "4a2dd27b8e7022325c63d7bf1476a5c5dfe0a17d579360661ff3ce485af2d479"
+    }
+  }
+}

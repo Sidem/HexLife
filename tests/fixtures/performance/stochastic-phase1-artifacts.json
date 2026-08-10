@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "recorded": "2026-08-10",
+  "buildCommand": "npm run build:embed",
+  "rng": {
+    "algorithm": "Philox4x32-10",
+    "version": 1,
+    "counterWords": ["cell-index", "stream-id", "generation-low", "generation-high"],
+    "keyWords": ["seed-low", "seed-high"]
+  },
+  "artifacts": {
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm_bg.wasm": {
+      "rawBytes": 22417,
+      "gzipBytes": 9985,
+      "sha256": "b763acc775fd2a00d769c330d41a825257faf2f0cad1536783fbb31732f5eefd"
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm.js": {
+      "rawBytes": 8728,
+      "gzipBytes": 2422,
+      "sha256": "90fdcf8aab5395b5f6e660410e4a412bb7d1eb3b80f71fb93cdbcb1b36a19986"
+    },
+    "dist/embed-package/src/embed/stochastic.js": {
+      "rawBytes": 67194,
+      "gzipBytes": 16781,
+      "sha256": "36298a7e825a25401d717fb315a4051f094c4dbbe9a0cdaa50c935d17200d8d0"
+    }
+  },
+  "coldBrowser": {
+    "method": "Vite 6.3.5 serving npm run build:embed on a fresh localhost origin; in-app Chromium browser cold HTTP cache",
+    "kind": "stochastic-only",
+    "importMs": 19.4,
+    "initializedMs": 21.8,
+    "firstWorldMs": 0.8,
+    "instantiatedBytes": 1376256,
+    "requests": [
+      {
+        "name": "http://localhost:5193/HexLife/@vite/client",
+        "transferSize": 183027,
+        "encodedBodySize": 182727
+      },
+      {
+        "name": "http://localhost:5193/HexLife/tests/performance/stochastic-only.html?html-proxy&index=0.js",
+        "transferSize": 6493,
+        "encodedBodySize": 6193
+      },
+      {
+        "name": "http://localhost:5193/HexLife/node_modules/vite/dist/client/env.mjs",
+        "transferSize": 4487,
+        "encodedBodySize": 4187
+      },
+      {
+        "name": "http://localhost:5193/HexLife/dist/embed-package/src/embed/stochastic.js?import",
+        "transferSize": 136173,
+        "encodedBodySize": 135873
+      },
+      {
+        "name": "http://localhost:5193/favicon.ico",
+        "transferSize": 414,
+        "encodedBodySize": 114
+      }
+    ]
+  },
+  "isolation": {
+    "stochasticArtifactImporters": ["src/embed/stochastic.js"],
+    "rootStochasticRequests": 0,
+    "caStochasticRequests": 0,
+    "defaultWasmRawBytes": 59727,
+    "defaultWasmGzipBytes": 24703,
+    "phase0DefaultWasmGzipBytes": 24705,
+    "existingArtifactGrowthPct": -0.0081
+  }
+}

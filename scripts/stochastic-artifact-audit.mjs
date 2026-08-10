@@ -1,0 +1,69 @@
+import {createHash} from 'node:crypto';
+import {readFile, readdir, writeFile} from 'node:fs/promises';
+import {gzipSync} from 'node:zlib';
+
+const root = new URL('../', import.meta.url);
+const output = new URL('../tests/fixtures/performance/stochastic-phase0-artifacts.json', import.meta.url);
+const files = [
+  'src/core/wasm-engine/hexlife_wasm_bg.wasm',
+  'src/core/wasm-engine/hexlife_wasm.js',
+  ...(await builtJavaScriptFiles()),
+];
+const artifacts = {};
+for (const relative of files) {
+  const bytes = await readFile(new URL(relative, root));
+  artifacts[relative] = {
+    rawBytes: bytes.byteLength,
+    gzipBytes: gzipSync(bytes, {level: 9}).byteLength,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
+const report = {
+  schemaVersion: 1,
+  frozen: '2026-08-10',
+  buildCommand: 'npm run build:embed',
+  packageVersion: '1.7.1',
+  stochasticArtifactPresent: false,
+  artifacts,
+};
+const rendered = `${JSON.stringify(report, null, 2)}\n`;
+if (process.argv.includes('--write')) {
+  await writeFile(output, rendered);
+  console.log(`Wrote ${output.pathname}`);
+} else {
+  const baseline = JSON.parse(await readFile(output, 'utf8'));
+  const changed = [];
+  const currentByLogicalPath = new Map(
+    Object.entries(artifacts).map(([file, measurements]) => [logicalPath(file), {file, measurements}]),
+  );
+  for (const [baselineFile, prior] of Object.entries(baseline.artifacts)) {
+    const current = currentByLogicalPath.get(logicalPath(baselineFile));
+    if (!current) changed.push(`${baselineFile}: missing from current build`);
+    else if (current.measurements.gzipBytes > prior.gzipBytes * 1.005) {
+      changed.push(
+        `${current.file}: gzip ${prior.gzipBytes} -> ${current.measurements.gzipBytes} (>0.5%)`,
+      );
+    }
+  }
+  if (changed.length) throw new Error(`Existing artifact boundary regressed:\n${changed.join('\n')}`);
+  console.log('Existing artifact gzip sizes stay within the frozen 0.5% ceiling.');
+}
+
+// Vite content hashes change whenever the inlined Wasm bytes change. Compare the logical chunk
+// identity so the frozen size gate survives a hash-only rename without treating a new stochastic
+// entry (which correctly has no Phase-0 baseline) as an old-consumer regression.
+function logicalPath(file) {
+  return file.replace(/-[A-Za-z0-9_-]{8}\.js$/, '-<hash>.js');
+}
+
+async function builtJavaScriptFiles() {
+  const base = new URL('../dist/embed-package/src/embed/', import.meta.url);
+  const entries = (await readdir(base, {withFileTypes: true}))
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
+    .map((entry) => `dist/embed-package/src/embed/${entry.name}`);
+  const chunks = (await readdir(new URL('chunks/', base), {withFileTypes: true}))
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
+    .map((entry) => `dist/embed-package/src/embed/chunks/${entry.name}`);
+  return [...entries, ...chunks].sort();
+}

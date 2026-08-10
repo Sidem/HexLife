@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>HexLife stochastic Phase-0 benchmark</title></head>
+  <body>
+    <h1>Stochastic Phase-0 browser benchmark</h1>
+    <button id="run" type="button">Run frozen matrix</button>
+    <p id="status">Ready.</p>
+    <pre id="result"></pre>
+    <script>
+      window.addEventListener('error', (event) => { document.getElementById('status').textContent = `Failed: ${event.message}`; });
+      window.addEventListener('unhandledrejection', (event) => { document.getElementById('status').textContent = `Failed: ${event.reason?.message || event.reason}`; });
+    </script>
+    <script type="module" src="./stochastic-phase0-browser.js"></script>
+  </body>
+</html>

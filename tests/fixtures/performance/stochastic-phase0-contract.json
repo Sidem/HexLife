@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "frozen": "2026-08-10",
+  "measuredRuns": 7,
+  "batchTicks": {"demo": 36, "medium": 9, "large": 3},
+  "timingMultipliers": {"settled": 100, "empty": 10},
+  "statistics": ["median", "p95", "mad"],
+  "gridTiers": {
+    "demo": {"rows": 72, "columns": 84, "cells": 6048},
+    "medium": {"rows": 300, "columns": 346, "cells": 103800},
+    "large": {"rows": 576, "columns": 666, "cells": 383616}
+  },
+  "workloads": {
+    "World": ["empty", "sparse-0.2pct", "noise-50pct", "butterfly-rule", "synth-rule"],
+    "WorldK/neighborhood": ["settled-k4", "crystal-frontier", "cyclic-ecology", "tissue-wave"],
+    "WorldK/block": ["settled-k8", "reactive-hex-matter", "coffee-extraction"],
+    "alternating-block": ["coffee-mirror-oracle"],
+    "JavaScript/stochastic-neighborhood": ["no-hazard", "sparse-fire-front", "dense-fire-hazard", "outbreak-growth", "paired-outbreak"],
+    "JavaScript/lattice-gas": ["occupancy-8pct", "occupancy-24pct", "occupancy-60pct", "open-membrane", "collision-heavy"]
+  },
+  "measurements": [
+    "engine-ns-per-cell-tick",
+    "ticks-per-second",
+    "demo-end-to-end-frame-ms",
+    "main-thread-long-task-p50-p95",
+    "js-heap-and-gc",
+    "wasm-memory",
+    "js-wasm-bytes-per-tick",
+    "gpu-upload-bytes-per-frame",
+    "cold-import-compile-init",
+    "raw-and-gzip-artifacts"
+  ],
+  "thresholds": {
+    "oldEngineMedianRegressionPctMax": 3,
+    "oldEngineRepeatableRegressionPctMax": 5,
+    "uninvolvedStochasticRequests": 0,
+    "uninvolvedStochasticInstantiatedBytes": 0,
+    "existingArtifactGzipGrowthPctMax": 0.5,
+    "newTickAllocationsBytes": 0,
+    "stochasticFullGridJsToWasmBytesPerTick": 0,
+    "demoP95FrameMsMax": 16.7,
+    "demoSimulationTickBudgetPctMax": 25,
+    "nativeVsJsMediumSpeedupMin": 2,
+    "nativeVsJsLargeSpeedupMin": 3,
+    "denseSkippingRegressionPctMax": 5,
+    "coffeeMediumLargeSpeedupMin": 2,
+    "optionalAnalysisTickCostPctMax": 10
+  },
+  "immutability": "Changing a dimension, workload, method, or threshold requires a dated written reason before implementation results are inspected."
+}

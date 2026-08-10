@@ -836,6 +836,33 @@ mod tests {
     }
 
     #[test]
+    fn tick_buffers_stay_fixed_for_100k_ticks() {
+        fn signature(world: &WorldK) -> [(usize, usize); 7] {
+            [
+                (world.state.as_ptr() as usize, world.state.capacity()),
+                (world.next_state.as_ptr() as usize, world.next_state.capacity()),
+                (world.neighbor_indices.as_ptr() as usize, world.neighbor_indices.capacity()),
+                (world.neighborhood_rule.as_ptr() as usize, world.neighborhood_rule.capacity()),
+                (world.block_rule.as_ptr() as usize, world.block_rule.capacity()),
+                (world.chunk_quiet.as_ptr() as usize, world.chunk_quiet.capacity()),
+                (world.chunk_active.as_ptr() as usize, world.chunk_active.capacity()),
+            ]
+        }
+
+        for mut world in [neighborhood_world(8, 9, 4), block_world(8, 9, 8)] {
+            let before = signature(&world);
+            for _ in 0..100_000 {
+                std::hint::black_box(world.run_tick());
+            }
+            assert_eq!(
+                signature(&world),
+                before,
+                "a WorldK tick moved or grew a persistent buffer"
+            );
+        }
+    }
+
+    #[test]
     fn rule_and_cell_setters_reject_out_of_range_values() {
         let mut w = neighborhood_world(32, 32, 3);
         assert_eq!(w.rule_len(), 3usize.pow(7));

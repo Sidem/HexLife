@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Root-only artifact fixture</title></head>
+  <body>
+    <hexlife-world id="world" ruleset="12482080480080006880800180010117" rows="72" seed="12345" density="0.2" paused link="off"></hexlife-world>
+    <pre id="result">Loading…</pre>
+    <script type="module">
+      const started = performance.now();
+      const entry = '/HexLife/dist/embed-package/src/embed/index.js';
+      await import(entry);
+      const importedMs = performance.now() - started;
+      const world = document.getElementById('world');
+      await new Promise((resolve, reject) => {
+        world.addEventListener('hexlife-ready', resolve, {once: true});
+        world.addEventListener('hexlife-error', (event) => reject(event.detail?.error || new Error('root fixture failed')), {once: true});
+      });
+      window.__artifactFixture = {
+        kind: 'root-only',
+        importMs: importedMs,
+        initializedMs: performance.now() - started,
+        requests: performance.getEntriesByType('resource').map(({name, transferSize, encodedBodySize}) => ({name, transferSize, encodedBodySize})),
+      };
+      document.getElementById('result').textContent = JSON.stringify(window.__artifactFixture, null, 2);
+    </script>
+  </body>
+</html>

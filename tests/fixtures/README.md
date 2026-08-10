@@ -128,3 +128,13 @@ The panel's negatives came from this loop — repeat it when a stage needs harde
   six non-cycling negative controls.
 - The cheap 160-tick screen improves from 0.258 to 0.294 but remains weak, which is why finds are
   re-scored on the confirmation burst before banking.
+
+## Stochastic engine audit records
+
+The 2026-08-10 Phase 0 audit is frozen under `performance/README.md`. Its JSON fixtures pin the
+cross-engine benchmark contract, raw native/browser results, artifact hashes and gzip sizes, and
+cold import request boundary. `stochastic/js-oracles.json` pins the exact current Mixing, Wildfire,
+and paired Outbreak host trajectories used for later native differential tests. Run
+`npm run audit:stochastic` to verify the oracle and existing artifact ceiling without rewriting them.
+The Phase 1 additive artifact/RNG record is `performance/stochastic-phase1-artifacts.json`; native
+and browser-Wasm golden vectors are enforced by `tests/stochasticPhase1.test.js` plus Rust tests.

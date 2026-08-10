@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>CA-only artifact fixture</title></head>
+  <body>
+    <pre id="result">Loading…</pre>
+    <script type="module">
+      const started = performance.now();
+      const entry = '/HexLife/dist/embed-package/src/embed/ca.js';
+      const {HexCA, initEngine} = await import(entry);
+      const importedMs = performance.now() - started;
+      await initEngine();
+      const initializedMs = performance.now() - started;
+      const worldStarted = performance.now();
+      const world = new HexCA({states: 4, rows: 72, columns: 84});
+      const firstWorldMs = performance.now() - worldStarted;
+      world.dispose();
+      window.__artifactFixture = {
+        kind: 'ca-only',
+        importMs: importedMs,
+        initializedMs,
+        firstWorldMs,
+        requests: performance.getEntriesByType('resource').map(({name, transferSize, encodedBodySize}) => ({name, transferSize, encodedBodySize})),
+      };
+      document.getElementById('result').textContent = JSON.stringify(window.__artifactFixture, null, 2);
+    </script>
+  </body>
+</html>

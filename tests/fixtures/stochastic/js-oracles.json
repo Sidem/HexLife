@@ -1,0 +1,833 @@
+{
+  "schemaVersion": 1,
+  "frozen": "2026-08-10",
+  "source": "public/embed-concept-models.js",
+  "checksum": "FNV-1a/u8",
+  "selectedGenerations": [
+    0,
+    1,
+    2,
+    5,
+    10,
+    20,
+    40,
+    80
+  ],
+  "fixtures": [
+    {
+      "id": "mixing-chamber",
+      "backend": "gas",
+      "rows": 60,
+      "columns": 70,
+      "params": {
+        "density": 24,
+        "scatter": 7
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "visibleChecksum": 2202702673,
+          "auxiliaryChecksum": 3024316442,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            3
+          ],
+          "collisions": 0,
+          "membraneOpen": false
+        },
+        {
+          "generation": 1,
+          "visibleChecksum": 3052740157,
+          "auxiliaryChecksum": 2621476099,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "collisions": 356,
+          "membraneOpen": false
+        },
+        {
+          "generation": 2,
+          "visibleChecksum": 2526166583,
+          "auxiliaryChecksum": 4252701682,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "collisions": 381,
+          "membraneOpen": false
+        },
+        {
+          "generation": 5,
+          "visibleChecksum": 2653484363,
+          "auxiliaryChecksum": 3957165283,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "collisions": 348,
+          "membraneOpen": false
+        },
+        {
+          "generation": 10,
+          "visibleChecksum": 3761584837,
+          "auxiliaryChecksum": 709649703,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            3
+          ],
+          "collisions": 349,
+          "membraneOpen": false
+        },
+        {
+          "generation": 20,
+          "visibleChecksum": 3586643609,
+          "auxiliaryChecksum": 897735089,
+          "census": [
+            2969,
+            462,
+            455,
+            314
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "collisions": 368,
+          "membraneOpen": false
+        },
+        {
+          "generation": 40,
+          "visibleChecksum": 1944385917,
+          "auxiliaryChecksum": 3142161305,
+          "census": [
+            2989,
+            462,
+            455,
+            294
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            1,
+            0,
+            2,
+            1,
+            0,
+            3
+          ],
+          "collisions": 335,
+          "membraneOpen": true
+        },
+        {
+          "generation": 80,
+          "visibleChecksum": 1820869929,
+          "auxiliaryChecksum": 3108756095,
+          "census": [
+            2989,
+            462,
+            455,
+            294
+          ],
+          "excerpt": [
+            3,
+            3,
+            3,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            3
+          ],
+          "collisions": 355,
+          "membraneOpen": true
+        }
+      ]
+    },
+    {
+      "id": "wildfire-command",
+      "backend": "neighborhood",
+      "rows": 60,
+      "columns": 70,
+      "params": {
+        "forest": 78,
+        "spread": 18,
+        "wind": "none",
+        "windBoost": 2,
+        "burnTicks": 2,
+        "ashTicks": 20,
+        "regrowth": 5
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "visibleChecksum": 3257885263,
+          "auxiliaryChecksum": 3390816261,
+          "census": [
+            1107,
+            3056,
+            37
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 1,
+          "visibleChecksum": 2431822179,
+          "auxiliaryChecksum": 969064508,
+          "census": [
+            1107,
+            3030,
+            63
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            2,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 2,
+          "visibleChecksum": 874619073,
+          "auxiliaryChecksum": 3808734597,
+          "census": [
+            1107,
+            3007,
+            49,
+            37
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            2,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 5,
+          "visibleChecksum": 1919564834,
+          "auxiliaryChecksum": 2410844223,
+          "census": [
+            1107,
+            2960,
+            24,
+            109
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            3,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 10,
+          "visibleChecksum": 2980534108,
+          "auxiliaryChecksum": 2719883575,
+          "census": [
+            1107,
+            2931,
+            12,
+            150
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            3,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 20,
+          "visibleChecksum": 2654915704,
+          "auxiliaryChecksum": 1532432233,
+          "census": [
+            1107,
+            2920,
+            0,
+            173
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            3,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 40,
+          "visibleChecksum": 3156876128,
+          "auxiliaryChecksum": 2529181461,
+          "census": [
+            1107,
+            3012,
+            0,
+            81
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        },
+        {
+          "generation": 80,
+          "visibleChecksum": 3799807240,
+          "auxiliaryChecksum": 1700075988,
+          "census": [
+            1107,
+            3084,
+            0,
+            9
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outbreak-baseline",
+      "backend": "neighborhood",
+      "rows": 54,
+      "columns": 64,
+      "params": {
+        "infection": 12,
+        "infectiousTicks": 6,
+        "immunityTicks": 36,
+        "coverage": 20,
+        "efficacy": 85,
+        "intervention": false
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "visibleChecksum": 678652572,
+          "auxiliaryChecksum": 1121524165,
+          "census": [
+            3453,
+            3
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 0
+        },
+        {
+          "generation": 1,
+          "visibleChecksum": 3444978508,
+          "auxiliaryChecksum": 1155022516,
+          "census": [
+            3447,
+            9
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 6
+        },
+        {
+          "generation": 2,
+          "visibleChecksum": 3589599543,
+          "auxiliaryChecksum": 1136383655,
+          "census": [
+            3444,
+            12
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 9
+        },
+        {
+          "generation": 5,
+          "visibleChecksum": 740630288,
+          "auxiliaryChecksum": 2774088554,
+          "census": [
+            3425,
+            31
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 28
+        },
+        {
+          "generation": 10,
+          "visibleChecksum": 1961418351,
+          "auxiliaryChecksum": 1512483676,
+          "census": [
+            3359,
+            74,
+            23
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 94
+        },
+        {
+          "generation": 20,
+          "visibleChecksum": 2686305030,
+          "auxiliaryChecksum": 1794384001,
+          "census": [
+            3132,
+            151,
+            173
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 321
+        },
+        {
+          "generation": 40,
+          "visibleChecksum": 2725446165,
+          "auxiliaryChecksum": 904918628,
+          "census": [
+            2034,
+            398,
+            1024
+          ],
+          "excerpt": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            null
+          ],
+          "totalInfections": 1419
+        },
+        {
+          "generation": 80,
+          "visibleChecksum": 423712707,
+          "auxiliaryChecksum": 3943022774,
+          "census": [
+            1490,
+            110,
+            1856
+          ],
+          "excerpt": [
+            2,
+            0,
+            2,
+            2,
+            2,
+            1,
+            2,
+            2,
+            0,
+            null
+          ],
+          "totalInfections": 3251
+        }
+      ]
+    },
+    {
+      "id": "outbreak-intervention",
+      "backend": "neighborhood",
+      "rows": 54,
+      "columns": 64,
+      "params": {
+        "infection": 12,
+        "infectiousTicks": 6,
+        "immunityTicks": 36,
+        "coverage": 20,
+        "efficacy": 85,
+        "intervention": true
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "visibleChecksum": 2147776438,
+          "auxiliaryChecksum": 1121524165,
+          "census": [
+            2719,
+            3,
+            0,
+            734
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 0
+        },
+        {
+          "generation": 1,
+          "visibleChecksum": 2373406829,
+          "auxiliaryChecksum": 1155022516,
+          "census": [
+            2714,
+            9,
+            0,
+            733
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 6
+        },
+        {
+          "generation": 2,
+          "visibleChecksum": 3339008509,
+          "auxiliaryChecksum": 1136383655,
+          "census": [
+            2712,
+            11,
+            0,
+            733
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 8
+        },
+        {
+          "generation": 5,
+          "visibleChecksum": 2124028887,
+          "auxiliaryChecksum": 1505636617,
+          "census": [
+            2702,
+            21,
+            0,
+            733
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 18
+        },
+        {
+          "generation": 10,
+          "visibleChecksum": 3837939320,
+          "auxiliaryChecksum": 210351571,
+          "census": [
+            2677,
+            31,
+            18,
+            730
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 46
+        },
+        {
+          "generation": 20,
+          "visibleChecksum": 2220709820,
+          "auxiliaryChecksum": 890188438,
+          "census": [
+            2603,
+            52,
+            76,
+            725
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null
+          ],
+          "totalInfections": 125
+        },
+        {
+          "generation": 40,
+          "visibleChecksum": 3599350122,
+          "auxiliaryChecksum": 3284185703,
+          "census": [
+            2286,
+            68,
+            249,
+            853
+          ],
+          "excerpt": [
+            3,
+            0,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            null
+          ],
+          "totalInfections": 314
+        },
+        {
+          "generation": 80,
+          "visibleChecksum": 747806794,
+          "auxiliaryChecksum": 2489670205,
+          "census": [
+            1778,
+            196,
+            723,
+            759
+          ],
+          "excerpt": [
+            2,
+            0,
+            3,
+            2,
+            2,
+            0,
+            0,
+            2,
+            0,
+            null
+          ],
+          "totalInfections": 1213
+        }
+      ]
+    }
+  ]
+}

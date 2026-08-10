@@ -1,3 +1,4 @@
+#[cfg(feature = "standard")]
 use wasm_bindgen::prelude::*;
 
 // This line allows Rust to print panic messages to the browser's developer console.
@@ -15,8 +16,15 @@ include!(concat!(env!("OUT_DIR"), "/neighbor_dirs.rs"));
 // the frozen `<hexlife-world>` determinism contract all run on. Nothing below this line changes for
 // it — `WorldK` reuses `compute_neighbor_indices` and the canonical direction tables as-is and
 // duplicates neither. See `worldk.rs` and `docs/KSTATE-PLAN.md`.
+#[cfg(feature = "standard")]
 mod worldk;
+#[cfg(feature = "standard")]
 pub use worldk::{WorldK, BACKEND_BLOCK, BACKEND_NEIGHBORHOOD, MAX_BLOCK_STATES, MAX_NEIGHBORHOOD_STATES};
+
+#[cfg(feature = "stochastic")]
+mod stochastic;
+#[cfg(feature = "stochastic")]
+pub use stochastic::{random_u32, WorldStochastic, STOCHASTIC_RNG_VERSION};
 
 // The `#[wasm_bindgen]` attribute exposes the following struct or function to JavaScript.
 //
@@ -25,6 +33,7 @@ pub use worldk::{WorldK, BACKEND_BLOCK, BACKEND_NEIGHBORHOOD, MAX_BLOCK_STATES, 
 // copies the state/ruleset/output arrays back and forth across the JS<->Wasm boundary on every
 // step. The only copies that remain are the (throttled) snapshots posted to the main thread for
 // rendering.
+#[cfg(feature = "standard")]
 #[wasm_bindgen]
 pub struct World {
     num_cells: usize,
@@ -119,20 +128,26 @@ pub struct World {
 ///
 /// Being even is load-bearing, not incidental: `halo_offsets` relies on a block starting on an even
 /// column. 8 also makes a block row-segment exactly one `u64`, which is what the scan below wants.
+#[cfg(feature = "standard")]
 const BLOCK_SIZE: usize = 8;
 
 /// A block holding both live and dead cells (or a stray non-binary byte) — no fast path.
+#[cfg(feature = "standard")]
 const BLOCK_MIXED: u8 = 0;
 /// Every cell in the block is 0.
+#[cfg(feature = "standard")]
 const BLOCK_ALL_DEAD: u8 = 1;
 /// Every cell in the block is 1.
+#[cfg(feature = "standard")]
 const BLOCK_ALL_LIVE: u8 = 2;
 
 /// Eight 0/1 cells packed into one `u64`, i.e. what a fully live 8-cell run reads as.
+#[cfg(feature = "standard")]
 const LIVE_RUN_U64: u64 = 0x0101_0101_0101_0101;
 
-/// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Called once
-/// from the constructor; see the `neighbor_indices` field for the layout.
+/// Precompute the flattened 6-neighbor index table for a grid of the given dimensions. Shared by
+/// the standard and stochastic artifacts; the direction tables themselves are generated once by
+/// `build.rs` from `neighbor-dirs.json`.
 fn compute_neighbor_indices(grid_cols: i32, grid_rows: i32, num_cells: usize) -> Vec<u32> {
     let cols = grid_cols;
     let rows = grid_rows;
@@ -154,6 +169,7 @@ fn compute_neighbor_indices(grid_cols: i32, grid_rows: i32, num_cells: usize) ->
     table
 }
 
+#[cfg(feature = "standard")]
 #[wasm_bindgen]
 impl World {
     /// Public constructor that can be called from JavaScript. All buffers are allocated once,
@@ -686,6 +702,7 @@ impl World {
 }
 
 // Private helpers (kept out of the `#[wasm_bindgen]` block so they aren't exported to JS).
+#[cfg(feature = "standard")]
 impl World {
     /// Classify every BLOCK_SIZE-square block of the *current* state as all-dead, all-live, or
     /// mixed, into `block_uniform`. Called once at the top of each `run_tick`; see that method for
@@ -843,7 +860,7 @@ impl World {
 // target for this); wasm-bindgen types compile fine off-wasm. The `tests` submodule can reach
 // `World`'s private fields because child modules see their ancestors' private items.
 // ---------------------------------------------------------------------------
-#[cfg(test)]
+#[cfg(all(test, feature = "standard"))]
 mod tests {
     use super::*;
 
@@ -1600,6 +1617,177 @@ mod tests {
         let (sc1, sr1) = (still.centroid_col_angle(), still.centroid_row_angle());
         let sdist = displacement(cols as f64, rows as f64, sc0, sr0, sc1, sr1);
         assert!(sdist < 1e-9, "a still life yields ~0 centroid speed, got {sdist}");
+    }
+
+    /// Release-native half of the frozen stochastic Phase 0 performance record. Ignored so routine
+    /// test runs do not benchmark a busy CI host; the browser harness owns the exact authored demo
+    /// models, while this test isolates the existing Rust engines without Wasm/JS overhead.
+    #[test]
+    #[ignore = "manual release benchmark; run with --release --ignored --nocapture"]
+    fn stochastic_phase0_native_baseline() {
+        use std::time::Instant;
+
+        const TIERS: [(&str, i32, i32, usize); 3] = [
+            ("demo", 84, 72, 36),
+            ("medium", 346, 300, 9),
+            ("large", 666, 576, 3),
+        ];
+        const RUNS: usize = 7;
+
+        fn cells(count: usize, states: u8, active_per_thousand: u32) -> Vec<u8> {
+            let mut seed = 0x51DE_C0DEu32;
+            (0..count)
+                .map(|index| {
+                    let sample = xorshift32(&mut seed) % 1_000;
+                    if sample >= active_per_thousand {
+                        0
+                    } else if states == 2 {
+                        1
+                    } else {
+                        1 + (index % usize::from(states - 1)) as u8
+                    }
+                })
+                .collect()
+        }
+
+        fn measure(mut tick: impl FnMut() -> u32, ticks: usize) -> Vec<u128> {
+            for _ in 0..3 {
+                std::hint::black_box(tick());
+            }
+            (0..RUNS)
+                .map(|_| {
+                    let start = Instant::now();
+                    for _ in 0..ticks {
+                        std::hint::black_box(tick());
+                    }
+                    start.elapsed().as_nanos() / ticks as u128
+                })
+                .collect()
+        }
+
+        fn print_samples(tier: &str, engine: &str, workload: &str, count: usize, samples: &[u128]) {
+            let joined = samples
+                .iter()
+                .map(u128::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            println!("PHASE0_NATIVE|{tier}|{engine}|{workload}|{count}|{joined}");
+        }
+
+        let binary_rules = [
+            ("empty", vec![0; 128], 0),
+            ("sparse-0.2pct", parse_hex_ruleset(DEFAULT_RULESET_HEX), 2),
+            ("noise-50pct", parse_hex_ruleset(DEFAULT_RULESET_HEX), 500),
+        ];
+        let neighborhood_rules = [
+            ("settled", 3u8, vec![0; 3usize.pow(7)], 0),
+            (
+                "crystal",
+                3u8,
+                (0..3usize.pow(7))
+                    .map(|index| {
+                        let center = index / 3usize.pow(6);
+                        if center == 2 {
+                            if index % 3usize.pow(6) == 0 {
+                                2
+                            } else {
+                                1
+                            }
+                        } else {
+                            center as u8
+                        }
+                    })
+                    .collect(),
+                200,
+            ),
+            (
+                "ecology",
+                4u8,
+                (0..4usize.pow(7))
+                    .map(|index| ((index * 17 + index / 7) % 4) as u8)
+                    .collect(),
+                500,
+            ),
+            (
+                "tissue",
+                4u8,
+                (0..4usize.pow(7))
+                    .map(|index| ((index / 4 + index / 31) % 4) as u8)
+                    .collect(),
+                200,
+            ),
+        ];
+        let block_rules = [
+            ("settled", 4u8, (0..4u16.pow(3)).collect::<Vec<_>>(), 0),
+            (
+                "matter",
+                8u8,
+                (0..8u16.pow(3))
+                    .map(|index| (index * 73 + 19) % 8u16.pow(3))
+                    .collect(),
+                500,
+            ),
+            // The authored Coffee rule is generated in JavaScript. This shape-equivalent k=16
+            // table is explicitly only a native block-backend proxy; the browser fixture is exact.
+            (
+                "coffee-table-shape-proxy",
+                16u8,
+                (0..16u16.pow(3))
+                    .map(|index| (index * 4093 + 97) % 16u16.pow(3))
+                    .collect(),
+                500,
+            ),
+        ];
+
+        for (tier, cols, rows, ticks) in TIERS {
+            let count = (cols * rows) as usize;
+            for (workload, rule, density) in &binary_rules {
+                let mut world = World::new(cols, rows);
+                world.ruleset.copy_from_slice(rule);
+                world.state.copy_from_slice(&cells(count, 2, *density));
+                let samples = measure(|| world.run_tick(), ticks);
+                print_samples(tier, "World", workload, count, &samples);
+            }
+            for (workload, states, rule, density) in &neighborhood_rules {
+                let mut world = WorldK::new(cols, rows, *states, BACKEND_NEIGHBORHOOD).unwrap();
+                world.set_neighborhood_rule(rule).unwrap();
+                world.set_cells(&cells(count, *states, *density)).unwrap();
+                let samples = measure(|| world.run_tick(), ticks);
+                print_samples(tier, "WorldK-neighborhood", workload, count, &samples);
+            }
+            for (workload, states, rule, density) in &block_rules {
+                let mut world = WorldK::new(cols, rows, *states, BACKEND_BLOCK).unwrap();
+                world.set_block_rule(rule).unwrap();
+                world.set_cells(&cells(count, *states, *density)).unwrap();
+                let samples = measure(|| world.run_tick(), ticks);
+                print_samples(tier, "WorldK-block", workload, count, &samples);
+            }
+        }
+    }
+
+    #[test]
+    fn world_tick_buffers_stay_fixed_for_100k_ticks() {
+        let mut world = World::new(8, 8);
+        let signature = |world: &World| {
+            [
+                (world.state.as_ptr() as usize, world.state.capacity()),
+                (world.next_state.as_ptr() as usize, world.next_state.capacity()),
+                (world.rule_indices.as_ptr() as usize, world.rule_indices.capacity()),
+                (world.next_rule_indices.as_ptr() as usize, world.next_rule_indices.capacity()),
+                (world.neighbor_indices.as_ptr() as usize, world.neighbor_indices.capacity()),
+                (world.block_uniform.as_ptr() as usize, world.block_uniform.capacity()),
+                (world.block_fast.as_ptr() as usize, world.block_fast.capacity()),
+            ]
+        };
+        let before = signature(&world);
+        for _ in 0..100_000 {
+            std::hint::black_box(world.run_tick());
+        }
+        assert_eq!(
+            signature(&world),
+            before,
+            "a World tick moved or grew a persistent buffer"
+        );
     }
 
     // Golden checksums for default_ruleset_golden_checksum_regression (48x56 grid, seed 0x2468ACE).

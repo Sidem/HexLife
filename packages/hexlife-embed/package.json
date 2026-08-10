@@ -34,6 +34,11 @@
       "import": "./src/embed/ca.js",
       "default": "./src/embed/ca.js"
     },
+    "./stochastic": {
+      "types": "./src/embed/stochastic.d.ts",
+      "import": "./src/embed/stochastic.js",
+      "default": "./src/embed/stochastic.js"
+    },
     "./ca-element": {
       "types": "./src/embed/ca-element.d.ts",
       "import": "./src/embed/ca-element.js",
