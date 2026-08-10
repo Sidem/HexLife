@@ -576,12 +576,13 @@ world.census()             // → per-state occupancy
 
 | `backend` | Table | `states` | Use for |
 |---|---|---|---|
-| `'neighborhood'` (default) | `k⁷`, anisotropic, radius 1 | 2–4 | The direct generalization of HexLife's rule space. Position within the neighbourhood is part of the rule, which is how you express a direction (gravity). |
-| `'block'` | `k³`, one 3-cell triangle at a time | 2–16 | Anything that has to **conserve** something, and any `k` above 4. |
+| `'neighborhood'` (default) | `k⁷`, anisotropic, radius 1 | 2–6 | The direct generalization of HexLife's rule space. Position within the neighbourhood is part of the rule, which is how you express a direction (gravity). |
+| `'block'` | `k³`, one 3-cell triangle at a time | 2–16 | Anything that has to **conserve** something, and any `k` above 6. |
 
-The cap on `'neighborhood'` is the table: `k⁷` is 16 KB at k=4 (fits L1), 78 KB at k=5, 2 MB at k=8,
-268 MB at k=16. `'block'` has no such problem, and can express local reactions as well as transport,
-so a high-`k` model can live in it entirely.
+The cap on `'neighborhood'` is the table: `k⁷` is 16 KB at k=4 (fits L1), 273 KB at k=6 (lives in
+L2), 2 MB at k=8, 268 MB at k=16. The table is sized from the world's own `k`, so a k=2 or k=4 world
+pays nothing for the cap being 6. `'block'` has no such problem, and can express local reactions as
+well as transport, so a high-`k` model can live in it entirely.
 
 ### Why block mode is not a nicety
 
@@ -717,6 +718,7 @@ to install a rule.
 | `palette` | built-in | Comma-separated `#rrggbb`, one per state. Short lists are padded from the built-in palette and long ones truncated, so tweaking two of four colours does not mean restating the others. |
 | `draw` | absent | Boolean. Pointer paints `draw-state` into cells. |
 | `draw-state` | `1` | The state a stroke paints. It paints a *value*; with `k` states there is no "the other one" to flip. |
+| `brush` | `0` | Draw radius, 0–40; `0` is a single cell. **Not `<hexlife-world>`'s default of `2`** — this element has painted one cell since it shipped, and widening that silently would repaint every existing `<hexlife-ca draw>` embed. |
 | `max-dpr` | `1.5` | devicePixelRatio cap, 1–4. |
 | `link` | shown | `link="off"` hides the attribution. |
 
@@ -727,8 +729,8 @@ rounding it would mean the grid you asked for is not the grid you got.
 
 ### JavaScript API
 
-`setRule(rule)`, `setCells(cells)`, `setCell(index, value)`, `reset()`, `clear()`, `tick(n)`,
-`play()`, `pause()`, `census()`, `caCode()`.
+`setRule(rule)`, `setCells(cells)`, `setCell(index, value)`, `setBrushSize(size)`, `reset()`,
+`clear()`, `tick(n)`, `play()`, `pause()`, `census()`, `caCode()`.
 
 `setCells` / `setCell` are the supported writes: they validate the states **and wake the engine's
 activity tracker**. A poke straight through `el.world.state` does neither, and a skipped chunk will
@@ -950,14 +952,15 @@ that cares about the seed is already writing the script that installs the rule.
 | `palette` | built-in | Comma-separated `#rrggbb`, one per visible state. Short lists are padded and long ones truncated. The lattice-gas default is semantic (`vacuum · amber · cyan · mixed · wall`), not a hue sweep. |
 | `draw` | absent | Boolean. Pointer paints `draw-state`. |
 | `draw-state` | `1` / `wall` | The visible state a stroke paints. In the gas only `vacuum` and `wall` are legal — a single site is six velocity channels, and the barrier is the one honest per-site write — so a gas stroke defaults to painting walls. |
+| `brush` | `0` | Draw radius, 0–40; `0` is a single cell. In the gas this widens the barrier you are drawing, which is the point of having it. |
 | `link` | shown | `link="off"` hides the attribution. |
 
 ### JavaScript API
 
 `setRule(rule)`, `setInitialState(cells, ages?)`, `setCells(cells, ages?)`, `setCell(index, value)`,
 `setInitialGasState(channels, walls?)`, `setGasCells(channels, walls?)`, `setWall(index, isWall)`,
-`reset()`, `clear()`, `tick(n)`, `play()`, `pause()`, `census()`, `speciesCount(species)`,
-`collisionCount()`, `stochasticCode()`.
+`setBrushSize(size)`, `reset()`, `clear()`, `tick(n)`, `play()`, `pause()`, `census()`,
+`speciesCount(species)`, `collisionCount()`, `stochasticCode()`.
 
 `setInitialState` / `setInitialGasState` also replace the snapshot `reset()` rewinds to; the plain
 `setCells` / `setGasCells` are interventions at the current generation. `clear()` blanks the world

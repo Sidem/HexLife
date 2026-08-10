@@ -82,6 +82,14 @@ export declare class HexStochasticElement extends HTMLElement {
   readonly chunkActivity: StochasticChunkActivity | null
   readonly playing: boolean
   readonly userPaused: boolean
+  /** Brush radius used by `draw` strokes; 0 is a single cell, which is also the default. */
+  readonly brushSize: number
+
+  /**
+   * Set the brush radius from script (clamped to 0 … 40). Does not reflect into the `brush`
+   * attribute — drive it through one or the other, not both.
+   */
+  setBrushSize(size: number): void
 
   /**
    * The seed every world this element builds uses. Defaults to a **fixed** value rather than

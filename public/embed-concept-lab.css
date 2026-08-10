@@ -128,6 +128,22 @@
 .field small { color: var(--demo-dim); font-size: 10px; line-height: 1.4; }
 .field-wide { grid-column: 1 / -1; }
 
+/* Stage controls sit visually apart from the model parameters: nothing in here changes what is
+   being simulated, only how fast, how much of it, and how wide the brush is. */
+.stage-set {
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--demo-line);
+}
+.stage-set h3 {
+  color: var(--demo-dim);
+  font: 700 10px/1 ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .text-input {
   width: 100%;
   min-width: 0;
@@ -176,6 +192,7 @@
 
 .world-mount > hexlife-world,
 .world-mount > hexlife-ca,
+.world-mount > hexlife-stochastic,
 .world-mount > hexlife-grid {
   display: block;
   width: min(100%, 640px);
@@ -187,6 +204,7 @@
 .world-mount > hexlife-world::part(overlay),
 .world-mount > hexlife-world::part(reset),
 .world-mount > hexlife-ca::part(overlay),
+.world-mount > hexlife-stochastic::part(overlay),
 .world-mount > hexlife-grid::part(overlay) { display: none; }
 
 .dual-worlds {
@@ -204,8 +222,10 @@
 }
 .dual-worlds hexlife-world { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
 .dual-worlds hexlife-ca { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
+.dual-worlds hexlife-stochastic { display: block; width: 100%; border-radius: 8px; overflow: hidden; }
 .dual-worlds hexlife-world::part(overlay),
 .dual-worlds hexlife-world::part(reset),
+.dual-worlds hexlife-stochastic::part(overlay),
 .dual-worlds hexlife-ca::part(overlay) { display: none; }
 
 .difference-stack { position: relative; display: block; }

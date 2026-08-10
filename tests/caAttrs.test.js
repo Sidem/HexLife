@@ -44,8 +44,9 @@ describe('readCaBackend', () => {
 
 describe('readCaStates', () => {
     it('clamps into the backend cap, which differs between them', () => {
-        expect(readCaStates('4', 'neighborhood')).toBe(MAX_NEIGHBORHOOD_STATES);
-        // k^7 is 78 KB at k=5 and 268 MB at k=16, so the neighborhood cap is the table, not taste.
+        expect(readCaStates('4', 'neighborhood')).toBe(4);
+        expect(readCaStates('6', 'neighborhood')).toBe(MAX_NEIGHBORHOOD_STATES);
+        // k^7 is 273 KB at k=6 and 268 MB at k=16, so the neighborhood cap is the table, not taste.
         expect(readCaStates('8', 'neighborhood')).toBe(MAX_NEIGHBORHOOD_STATES);
         expect(readCaStates('8', 'block')).toBe(8);
         expect(readCaStates('99', 'block')).toBe(MAX_BLOCK_STATES);

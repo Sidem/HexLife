@@ -16,7 +16,7 @@
  *
  * `'neighborhood'` is the direct generalization of HexLife's rule space — anisotropic, radius 1,
  * a dense `k⁷` lookup indexed by the centre and all six neighbours. It is capped at
- * {@link MAX_NEIGHBORHOOD_STATES} because that table is 16 KB at k=4 and 268 MB at k=16.
+ * {@link MAX_NEIGHBORHOOD_STATES} because that table is 16 KB at k=4, 273 KB at k=6 and 268 MB at k=16.
  *
  * `'block'` rewrites a whole 3-cell triangle at once from a `k³` table. Use it when the model has
  * to conserve something, because **a radius-1 synchronous CA cannot conserve mass at any k**: two
@@ -79,9 +79,12 @@ const BACKEND_TAGS = {
 
 /**
  * State cap for the `'neighborhood'` backend. The dense table is `k⁷`: 16 KB at k=4 (fits L1),
- * 78 KB at k=5 (spills to L2), 2 MB at k=8 (a cache miss per cell).
+ * 273 KB at k=6 (lives in L2), 2 MB at k=8 (a cache miss per cell).
+ *
+ * The table is sized from the world's own `k`, so raising this cap costs a k=2 or k=4 world nothing
+ * — only a world that asks for the larger `k` pays for it.
  */
-export const MAX_NEIGHBORHOOD_STATES = 4;
+export const MAX_NEIGHBORHOOD_STATES = 6;
 
 /** State cap for the `'block'` backend, whose table is `k³` — 4096 entries at k=16. */
 export const MAX_BLOCK_STATES = 16;
@@ -140,7 +143,7 @@ function assertStates(states, max, label) {
 /**
  * Build the dense anisotropic rule for the `'neighborhood'` backend.
  *
- * `fn` is called once per `(centre, neighbours)` combination — `k⁷` times, at most 16384 — and must
+ * `fn` is called once per `(centre, neighbours)` combination — `k⁷` times, at most 279936 — and must
  * return the centre cell's next state. `neighbours` is a fresh 6-entry array in canonical neighbour
  * order, so the rule can depend on *which* neighbour holds what: that anisotropy is the point, and
  * it is how you express gravity on an otherwise isotropic lattice.

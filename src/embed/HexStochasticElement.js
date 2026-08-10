@@ -69,6 +69,7 @@ import {
     stochasticColumnsForRows,
     STOCHASTIC_DEFAULTS,
 } from './stochasticAttrs.js';
+import { clampBrushSize, collectBrushCells, getHexLine } from '../core/hexBrush.js';
 
 /** Where the attribution link points. */
 const APP_URL = 'https://sidem.github.io/HexLife/';
@@ -83,7 +84,10 @@ const MAX_TICKS_PER_FRAME = 4;
  * wrong — worse here, in fact: a re-boot rebuilds the `StochasticWorld` at generation 0 *and* drops
  * the installed rule, because the rule came from script that has already run.
  */
-const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'draw', 'draw-state']);
+const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'draw', 'draw-state', 'brush']);
+
+/** Brush radius when `brush` is absent — a single cell, matching `<hexlife-ca>`'s default. */
+const DEFAULT_STOCHASTIC_BRUSH = 0;
 
 /** `HSG1` — the lattice-gas collision table's magic. Anything else compiled is `HSN1`. */
 const GAS_RULE_MAGIC = [0x48, 0x53, 0x47, 0x31];
@@ -189,7 +193,7 @@ function unflattenPalette(flat, states) {
 
 export class HexStochasticElement extends HTMLElement {
     static get observedAttributes() {
-        return ['code', 'rows', 'speed', 'palette', 'paused', 'draw', 'draw-state', 'link'];
+        return ['code', 'rows', 'speed', 'palette', 'paused', 'draw', 'draw-state', 'brush', 'link'];
     }
 
     constructor() {
@@ -267,6 +271,12 @@ export class HexStochasticElement extends HTMLElement {
         this._drawPointerId = null;
         this._lastDrawCoords = null;
         this._resumeAfterStroke = false;
+        /** Brush radius in cells; 0 paints the cell under the pointer and nothing else. */
+        this._brushSize = DEFAULT_STOCHASTIC_BRUSH;
+        /** Cells already written during the current stroke, so a slow drag re-pokes nothing. */
+        this._strokeAffected = new Set();
+        /** Scratch for {@link collectBrushCells}, reused so a drag allocates no sets. */
+        this._brushCells = new Set();
         this._onPointerDown = this._onPointerDown.bind(this);
         this._onPointerMove = this._onPointerMove.bind(this);
         this._onPointerUp = this._onPointerUp.bind(this);
@@ -347,6 +357,9 @@ export class HexStochasticElement extends HTMLElement {
                 break;
             case 'draw-state':
                 // Nothing to apply: `_readDrawState` reads the attribute on every stroke.
+                break;
+            case 'brush':
+                this._brushSize = this._readBrushSize();
                 break;
         }
     }
@@ -630,6 +643,21 @@ export class HexStochasticElement extends HTMLElement {
     /** @returns {boolean} True when the user has paused, ignoring the viewport gates. */
     get userPaused() { return this._userPaused; }
 
+    /** @returns {number} Brush radius used by `draw` strokes; 0 is a single cell. */
+    get brushSize() { return this._brushSize; }
+
+    /**
+     * Set the brush radius from script. Clamped to 0 … `MAX_BRUSH_SIZE`.
+     *
+     * Does not reflect into the `brush` attribute — drive brush size through one or the other, since
+     * the attribute is re-read whenever it changes and would win the next time it moved.
+     *
+     * @param {number} size
+     */
+    setBrushSize(size) {
+        this._brushSize = clampBrushSize(size);
+    }
+
     // --- boot / teardown ------------------------------------------------------
 
     /**
@@ -653,6 +681,7 @@ export class HexStochasticElement extends HTMLElement {
         this._playRequested = false;
         this._docVisible = document.visibilityState !== 'hidden';
         this._speed = readStochasticSpeed(this.getAttribute('speed'));
+        this._brushSize = this._readBrushSize();
         this._accumulator = 0;
 
         this._motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -972,6 +1001,15 @@ export class HexStochasticElement extends HTMLElement {
     // --- draw (paint a state) -------------------------------------------------
 
     /**
+     * @returns {number} Brush radius for a stroke: the `brush` attribute if it names one, else a
+     *   single cell. A bare `brush` falls through rather than coercing to 0.
+     */
+    _readBrushSize() {
+        const raw = (this.getAttribute('brush') || '').trim();
+        return raw === '' ? DEFAULT_STOCHASTIC_BRUSH : clampBrushSize(raw);
+    }
+
+    /**
      * @returns {number} The visible state a stroke paints, clamped into range.
      *
      * The default differs by backend because what a single site can *be* differs. In the
@@ -1019,10 +1057,11 @@ export class HexStochasticElement extends HTMLElement {
         this._drawing = true;
         this._drawPointerId = e.pointerId;
         this._lastDrawCoords = hit;
+        this._strokeAffected.clear();
         this._resumeAfterStroke = !this._userPaused && this.playing;
         this._syncPlayback();   // Pause while drawing, without flipping the `paused` attribute.
         try { this._canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-        this._paintAt(hit);
+        this._paintLine(hit, hit);
     }
 
     _onPointerMove(e) {
@@ -1031,8 +1070,9 @@ export class HexStochasticElement extends HTMLElement {
         const hit = this._hit(e);
         if (!hit || !this._lastDrawCoords) return;
         if (hit.col === this._lastDrawCoords.col && hit.row === this._lastDrawCoords.row) return;
+        // From the previous sample, so a fast drag paints a stroke rather than a dotted line.
+        this._paintLine(this._lastDrawCoords, hit);
         this._lastDrawCoords = hit;
-        this._paintAt(hit);
     }
 
     _onPointerUp(e) {
@@ -1046,22 +1086,35 @@ export class HexStochasticElement extends HTMLElement {
         return this.renderer.hitTest(e.clientX - rect.left, e.clientY - rect.top);
     }
 
-    _paintAt(hit) {
-        const index = hit.row * this.world.columns + hit.col;
+    /**
+     * Paint one segment of a stroke: every cell within {@link _brushSize} of the hex line from
+     * `from` to `to`, each written once per stroke.
+     *
+     * @param {{col: number, row: number}} from
+     * @param {{col: number, row: number}} to
+     */
+    _paintLine(from, to) {
         const state = this._readDrawState();
-        try {
-            if (this._backend === BACKEND_LATTICE_GAS) {
-                // Only the two states a single site can honestly be set to; a `draw-state` of amber,
-                // cyan or mixed names a channel occupancy, which is not a per-site write.
-                if (state !== GAS_STATES.vacuum && state !== GAS_STATES.wall) return;
-                this.world.setWall(index, state === GAS_STATES.wall);
-            } else {
-                // Through `setCell`, never through the `state` view: the engine skips chunks that did
-                // not change, and a poke straight into the buffer is invisible to that tracker.
-                this.world.setCell(index, state);
+        const gas = this._backend === BACKEND_LATTICE_GAS;
+        // Only the two states a single site can honestly be set to in the gas; a `draw-state` of
+        // amber, cyan or mixed names a channel occupancy, which is not a per-site write.
+        if (gas && state !== GAS_STATES.vacuum && state !== GAS_STATES.wall) return;
+        const columns = this.world.columns;
+        const rows = this.world.rows;
+        for (const point of getHexLine(from.col, from.row, to.col, to.row)) {
+            collectBrushCells(point.col, point.row, this._brushSize, columns, rows, this._brushCells);
+            for (const index of this._brushCells) {
+                if (this._strokeAffected.has(index)) continue;
+                this._strokeAffected.add(index);
+                try {
+                    // Through `setCell`/`setWall`, never through the `state` view: the engine skips
+                    // chunks that did not change, and a poke into the buffer is invisible to that.
+                    if (gas) this.world.setWall(index, state === GAS_STATES.wall);
+                    else this.world.setCell(index, state);
+                } catch {
+                    return;   // A rule-less world or an out-of-range state; not worth blanking this.
+                }
             }
-        } catch {
-            return;   // A rule-less world or an out-of-range state; not worth blanking the element.
         }
         // `_drawOnce`, not `_afterMutation`: the stroke deliberately holds the loop until it ends,
         // and `_endDrawStroke` is what hands playback back.
@@ -1072,12 +1125,14 @@ export class HexStochasticElement extends HTMLElement {
         if (!this._drawing && !this._resumeAfterStroke) {
             this._drawPointerId = null;
             this._lastDrawCoords = null;
+            this._strokeAffected.clear();
             return;
         }
         this._drawing = false;
         this._drawPointerId = null;
         this._lastDrawCoords = null;
         this._resumeAfterStroke = false;
+        this._strokeAffected.clear();
         this._syncPlayback();
     }
 

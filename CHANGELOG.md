@@ -25,6 +25,55 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Embed demo library
+
+#### Added
+
+- **Stage controls on every demo:** simulation speed, a world-size preset from 48 up to 216 rows, and
+  a brush radius. They sit in their own group, apart from the model parameters, because none of them
+  changes what is being simulated. Every size preset is a multiple of 3 so the block partition stays
+  seamless, and the Cellular Synthesizer omits the speed slider because its tempo already is one.
+- **Painting on six more demos.** Crystal Garden, Diffusion & Mixing Chamber, Wildfire Command,
+  Butterfly Microscope and the Cellular Synthesizer are now drawable, joining Hex Ecology, Excitable
+  Tissue and Hex Matter. Butterfly paints the *perturbed* world only, so "red = the consequence of
+  your edit" stays true; Outbreak Counterfactuals stays unpaintable on purpose, since a stroke lands
+  on one arm and two arms differing by anything but the declared policy are not a counterfactual.
+
+#### Changed
+
+- **A parameter change no longer restarts the world unless it has to.** Every control now declares
+  whether it is a different *rule* over the same world, part of the authored generation zero, a
+  different world shape, or a host-side setting. Rule changes — propagation mode, growth geometry,
+  gravity, chemistry, wind, spread, burn and ash timing, infection and immunity, thermal scattering —
+  are installed on the running world, keeping its cells, its ages and its generation count.
+- **Crystal Garden grows crystals.** Growth now turns on an exact count of frozen neighbours, so
+  "dendritic" produces genuine branching snowflakes, "faceted" fills concave corners into hexagonal
+  plates, and "compact" keeps the solid disk the demo used to be the only version of.
+- **Hex Ecology runs a cycle of three, four or five species**, with the palette, legend, brush
+  materials and interventions all derived from the count.
+
+### `@hexlife/embed` 1.10.0 — 2026-08-10
+
+#### Added
+
+- **Brush radius on `<hexlife-ca>` and `<hexlife-stochastic>`.** Both elements take a `brush`
+  attribute (0–40) and a `setBrushSize()` call, and a stroke now paints every cell within that radius
+  of the interpolated hex line rather than only the cells a pointer event happened to land on. The
+  default stays `0` — a single cell, exactly what these two elements have always painted — so no
+  existing embed changes behaviour.
+- **`k` up to 6 on the `'neighborhood'` backend**, raised from 4. The dense table is `k⁷`, so it is
+  273 KB at k=6, and it is allocated from the world's own `k` — a k=2 or k=4 world is byte-for-byte
+  the world it was and pays nothing for the higher cap.
+
+#### Fixed
+
+- **Demo pages resolved `@hexlife/embed/sim` to a second, private copy of the engine.** jsDelivr's
+  `/+esm` alias bundles each subpath entry standalone, so `sim` carried its own `EmbedSim` module
+  state and its own Wasm instance, and the analysis primitives were inspecting an engine nobody was
+  running. Butterfly Microscope and the Cellular Synthesizer never got past "Loading Wasm…". Every
+  demo import map now names the package's own files, which keep its shared chunks and therefore one
+  engine.
+
 ### `@hexlife/embed` 1.9.0 — 2026-08-10
 
 #### Added

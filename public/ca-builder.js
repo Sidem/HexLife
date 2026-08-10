@@ -20,7 +20,7 @@ import {
 } from "./ca-builder-models.js";
 import { buildHexMirror } from "./coffee-percolation-physics.js";
 
-const PACKAGE_VERSION = "1.8.0";
+const PACKAGE_VERSION = "1.10.0";
 const NEIGHBOR_LABELS = ["SW", "NW", "N", "NE", "SE", "S"];
 const BLOCK_LABELS = ["top", "down-right", "below"];
 
@@ -907,7 +907,7 @@ requestAnimationFrame(frame);`
   hexlife-ca { width: min(92vmin, 760px); }
 </style>
 <script type="importmap">
-{"imports":{"@hexlife/embed/ca":"https://cdn.jsdelivr.net/npm/@hexlife/embed@${PACKAGE_VERSION}/ca/+esm","@hexlife/embed/ca-element":"https://cdn.jsdelivr.net/npm/@hexlife/embed@${PACKAGE_VERSION}/ca-element/+esm"}}
+{"imports":{"@hexlife/embed/ca":"https://cdn.jsdelivr.net/npm/@hexlife/embed@${PACKAGE_VERSION}/src/embed/ca.js","@hexlife/embed/ca-element":"https://cdn.jsdelivr.net/npm/@hexlife/embed@${PACKAGE_VERSION}/src/embed/ca-element.js"}}
 </script>
 <hexlife-ca states="${config.states}" rows="${config.rows}" backend="${config.backend}" speed="${config.speed}"
   palette="${palette.join(",")}" paused draw draw-state="1"></hexlife-ca>

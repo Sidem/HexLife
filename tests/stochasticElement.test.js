@@ -179,9 +179,10 @@ describe('<hexlife-stochastic> package boundary', () => {
       .match(/static get observedAttributes\(\) \{\s*return \[([\s\S]*?)\];/)[1]
       .match(/'([^']+)'/g)
       .map((quoted) => quoted.slice(1, -1));
-    // The plan fixes this set: rules and the seed are script, never HTML.
+    // The plan fixes this set: rules and the seed are script, never HTML. `brush` is a tool setting
+    // like `draw-state`, not part of any world, which is why it may join it.
     expect(observed.sort()).toEqual(
-      ['code', 'draw', 'draw-state', 'link', 'palette', 'paused', 'rows', 'speed'],
+      ['brush', 'code', 'draw', 'draw-state', 'link', 'palette', 'paused', 'rows', 'speed'],
     );
 
     const readme = await readFile(new URL('../packages/hexlife-embed/README.md', import.meta.url), 'utf8');

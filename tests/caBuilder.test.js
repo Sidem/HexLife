@@ -155,11 +155,16 @@ describe("k-state CA builder package boundary", () => {
   );
 
   it("loads both public k-state entrypoints from the published npm package", () => {
-    expect(html).toContain("npm/@hexlife/embed@1.9.0/ca/+esm");
-    expect(html).toContain("npm/@hexlife/embed@1.9.0/ca-element/+esm");
+    expect(html).toContain("npm/@hexlife/embed@1.10.0/src/embed/ca.js");
+    expect(html).toContain("npm/@hexlife/embed@1.10.0/src/embed/ca-element.js");
     expect(script).toMatch(/from ["']@hexlife\/embed\/ca["']/);
     expect(script).toMatch(/import ["']@hexlife\/embed\/ca-element["']/);
-    expect(html + script).not.toContain("src/embed/");
+    // The published package, never this checkout. The CDN URL now names `src/embed/` itself — the
+    // package's own files rather than jsDelivr's `/+esm` alias, which bundles each entry standalone
+    // and hands every one of them a private `EmbedSim` and a private Wasm instance — so the check
+    // has to be for a *local* path to it rather than for the substring.
+    expect(html + script).not.toMatch(/["'](?:\.{0,2}\/)[^"']*src\/embed\//);
+    expect(html).not.toContain("+esm");
   });
 
   it("names the canonical hex slots and the three-cell partition explicitly", () => {

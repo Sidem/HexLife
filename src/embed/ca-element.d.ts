@@ -84,6 +84,14 @@ export declare class HexCAElement extends HTMLElement {
   readonly chunkActivity: ChunkActivity | null
   readonly playing: boolean
   readonly userPaused: boolean
+  /** Brush radius used by `draw` strokes; 0 is a single cell, which is also the default. */
+  readonly brushSize: number
+
+  /**
+   * Set the brush radius from script (clamped to 0 … 40). Does not reflect into the `brush`
+   * attribute — drive it through one or the other, not both.
+   */
+  setBrushSize(size: number): void
 
   /** Start (or resume). An explicit call also overrides `prefers-reduced-motion`. */
   play(): void

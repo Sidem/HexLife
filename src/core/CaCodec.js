@@ -69,7 +69,7 @@ export const BACKEND_BLOCK = 1;
  * this module must stay free of the wasm binding so a Node host can validate a code without loading
  * an engine. `caCodec.test.js` asserts the copies agree.
  */
-const MAX_NEIGHBORHOOD_STATES = 4;
+const MAX_NEIGHBORHOOD_STATES = 6;
 const MAX_BLOCK_STATES = 16;
 
 /** The block partition needs `rows % 3 == 0`, or it has a seam at the row wrap. */

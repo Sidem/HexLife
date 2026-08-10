@@ -35,11 +35,17 @@ pub const BACKEND_NEIGHBORHOOD: u8 = 0;
 /// Block-partitioned backend: one `k³` lookup rewriting a whole 3-cell triangle at once.
 pub const BACKEND_BLOCK: u8 = 1;
 
-/// Hard cap for [`BACKEND_NEIGHBORHOOD`]. k=4 is a 16 KB table, which fits L1; k=5 is 78 KB and
-/// spills to L2, k=8 is 2 MB and costs a cache miss per cell. Raise this with measurements, not
+/// Hard cap for [`BACKEND_NEIGHBORHOOD`]. k=4 is a 16 KB table, which fits L1; k=6 is 273 KB and
+/// lives in L2, k=8 is 2 MB and costs a cache miss per cell. Raise this with measurements, not
 /// intuition — a mostly-empty grid touches only a few hundred entries whatever the table size, so
 /// the cliff is workload-dependent and the high-entropy case is the one that falls off it.
-pub const MAX_NEIGHBORHOOD_STATES: u8 = 4;
+///
+/// Raised from 4 to 6 on 2026-08-10 for the cyclic-ecology demo, which needs one state per species
+/// plus an empty one. **The raise is free for every existing world**: the table is allocated at
+/// `k.pow(7)`, so a k=2 or k=4 world is byte-for-byte the world it was — only a world that actually
+/// asks for k=5 or k=6 pays the larger table. 6 rather than 8 because k⁷ is the term that runs away:
+/// 6⁷ still fits a typical 512 KB L2 alongside the grid, and 8⁷ does not fit anything.
+pub const MAX_NEIGHBORHOOD_STATES: u8 = 6;
 
 /// Hard cap for [`BACKEND_BLOCK`]. k³ = 4096 entries at k=16, which is still nothing.
 pub const MAX_BLOCK_STATES: u8 = 16;
@@ -976,8 +982,9 @@ mod tests {
     fn construction_refuses_configurations_that_would_simulate_wrongly() {
         // k below 2 or above the backend's cap.
         assert!(WorldK::new(64, 66, 1, BACKEND_NEIGHBORHOOD).is_err());
-        assert!(WorldK::new(64, 66, 5, BACKEND_NEIGHBORHOOD).is_err(), "k^7 cap is 4");
-        assert!(WorldK::new(64, 66, 5, BACKEND_BLOCK).is_ok(), "block mode scales past 4");
+        assert!(WorldK::new(64, 66, 6, BACKEND_NEIGHBORHOOD).is_ok(), "k^7 cap is 6");
+        assert!(WorldK::new(64, 66, 7, BACKEND_NEIGHBORHOOD).is_err(), "k^7 cap is 6");
+        assert!(WorldK::new(64, 66, 7, BACKEND_BLOCK).is_ok(), "block mode scales past 6");
         assert!(WorldK::new(64, 66, 17, BACKEND_BLOCK).is_err());
         assert!(WorldK::new(64, 66, 2, 7).is_err(), "unknown backend");
 

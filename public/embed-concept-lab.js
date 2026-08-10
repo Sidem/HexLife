@@ -17,13 +17,20 @@ import {demoOwnershipFor} from './embed-demo-manifest.js';
  * will never stochastically anything. So the three stochastic demos and the two analysis demos pull
  * theirs in at dispatch, and every other page requests exactly the bytes it did before.
  *
+ * The import map on each page points at the package's **own files** (`/src/embed/*.js`), not at
+ * jsDelivr's `/+esm` aliases. That is load-bearing rather than cosmetic: `+esm` re-bundles every
+ * subpath entry standalone, so `@hexlife/embed/sim` would get a private copy of `EmbedSim` — its own
+ * module state and its own Wasm instance — and the analysis primitives would be inspecting a
+ * different engine from the one the elements are running. The raw files keep the package's shared
+ * `chunks/`, so all of it is one engine.
+ *
  * @type {any} `embed-stochastic-rules.js`'s namespace, once a stochastic demo has asked for it.
  */
 let stochastic = null;
 /** @type {any} `@hexlife/embed/sim`'s analysis exports, once Butterfly or Synth has asked. */
 let analysis = null;
 
-const PACKAGE_VERSION = '1.9.0';
+const PACKAGE_VERSION = '1.10.0';
 const BUTTERFLY_RULE = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6';
 const SYNTH_RULES = {
   spinners: '120C11B442568E21134E30A85A40C880',
@@ -31,20 +38,55 @@ const SYNTH_RULES = {
   crystals: '84304E4024A82000162D5CB263E49A49',
 };
 
+/**
+ * Grid sizes every demo offers.
+ *
+ * One list for all nine, and **every entry is a multiple of 3**, because Hex Matter runs on the
+ * block backend and the three-phase triangular partition seams on any other row count. A per-demo
+ * list would let that constraint drift out of sight; a shared one cannot.
+ */
+const SIZE_PRESETS = [
+  [48, '48 rows · compact'],
+  [72, '72 rows · standard'],
+  [108, '108 rows · large'],
+  [162, '162 rows · very large'],
+  [216, '216 rows · huge'],
+];
+
+/** Brush radii the demos expose. 0 is a single cell; 12 is a comfortable pouring nozzle. */
+const BRUSH_MIN = 0;
+const BRUSH_MAX = 12;
+
+/**
+ * Hex Ecology's full five-species vocabulary; a shorter cycle is simply a prefix of it.
+ *
+ * Up here rather than beside the ecology functions because the descriptor table below reaches it
+ * through `ecologyNames` / `ecologyPalette` *while the module is still evaluating* — the setup call
+ * is top-level, so anything it touches has to be initialized before it, and a `const` further down
+ * the file is in its temporal dead zone.
+ */
+const ECOLOGY_SPECIES = [
+  ['lichen', '#68d391'],
+  ['grazer', '#f6c85f'],
+  ['hunter', '#ef7185'],
+  ['scavenger', '#7dd3fc'],
+  ['blight', '#c084fc'],
+];
+
 const concepts = [
   {
     id: 'crystal-garden', href: 'crystal-garden.html', title: 'Crystal Garden',
-    kicker: 'Four-state growth laboratory', deck: 'Design compact, dendritic, or faceted crystals and sculpt their impurity field.',
+    kicker: 'Four-state growth laboratory', deck: 'Grow real dendrites, plates or blobs, and sculpt the impurity field they grow through.',
     complexity: '01 · simplest', accent: '#8ad5ff', rgb: '138, 213, 255', kind: 'native',
     surface: '<hexlife-ca> · neighborhood k⁷', topology: 'sealed impurity rim',
-    experiment: 'Crystal cells seed a moving growth front; vapor joins only when the selected geometry and local support agree. Seed arms determine initial symmetry, while impurities pin branches and split facets. Every control rebuilds the same deterministic garden so changes are directly comparable.',
-    packageNote: 'A four-state radius-one table is generated from the controls once, then every tick runs in the optimized Wasm k-state engine.',
-    states: 4, rows: 72, backend: 'neighborhood', speed: 18, focusState: 1,
+    experiment: 'Growth is decided by how many *frozen* neighbours a vapour cell has, and the three geometries are three different answers to how much support is the right amount. Dendritic freezes on an exact count, so tips run ahead of flanks and the crystal branches; faceted adds infilling of concave corners, which flattens the boundary into plates; compact accepts any sufficient support and fills a disk. Impurities are permanent obstacles, so branches deflect and split around them.',
+    packageNote: 'A four-state radius-one table is generated from the controls once, then every tick runs in the optimized Wasm k-state engine. Changing a growth control re-installs the table on the crystal you are already watching.',
+    states: 4, rows: 72, backend: 'neighborhood', speed: 18, focusState: 1, paintable: true, brush: 1,
     palette: ['#08121a', '#dff5ff', '#5ab9e8', '#735f8d'], names: ['vapor', 'crystal', 'growth front', 'impurity'],
     parameters: [
-      range('threshold', 'Supersaturation', 1, 3, 2, ' neighbors'),
-      select('geometry', 'Growth geometry', 'dendritic', [['compact', 'Compact'], ['dendritic', 'Dendritic'], ['faceted', 'Faceted']]),
-      range('arms', 'Seed arms', 1, 6, 6, ''),
+      range('threshold', 'Frozen neighbours needed', 1, 3, 1, '', {scope: 'rule'}),
+      select('geometry', 'Growth geometry', 'dendritic', [['dendritic', 'Dendritic'], ['faceted', 'Faceted'], ['compact', 'Compact']], {scope: 'rule'}),
+      range('arms', 'Seed arms', 0, 6, 0, ''),
       range('impurities', 'Impurity density', 0, 8, 2, '%'),
     ],
     actions: [['seed', 'Add satellite seed'], ['ring', 'Add impurity ring'], ['clear', 'Clear interior impurities']],
@@ -52,21 +94,20 @@ const concepts = [
   },
   {
     id: 'hex-ecology', href: 'hex-ecology.html', title: 'Hex Ecology',
-    kicker: 'Cyclic spatial ecosystem', deck: 'Rebalance three species, create refuges, and intervene in the waves they form.',
+    kicker: 'Cyclic spatial ecosystem', deck: 'Run a three-, four- or five-species invasion cycle and intervene in the waves it forms.',
     complexity: '02 · gentle', accent: '#89e49f', rgb: '137, 228, 159', kind: 'native',
     surface: '<hexlife-ca> · census()', topology: 'intentional toroidal habitat',
-    experiment: 'Lichen is invaded by grazers, grazers by hunters, and hunters by lichen. Local invasion creates rotating ecological fronts; empty refuges interrupt them. Change starting abundance, refuge area, or invasion pressure, then add any species as a migration pulse while the population census tracks the result.',
-    packageNote: 'The neighborhood engine owns the food-web transitions; census() turns the same world into a live population instrument without reading Wasm memory.',
-    states: 4, rows: 72, backend: 'neighborhood', speed: 20, focusState: 2, paintable: true,
-    palette: ['#0a1116', '#68d391', '#f6c85f', '#ef7185'], names: ['empty refuge', 'lichen', 'grazer', 'hunter'],
+    experiment: 'Every species is invaded by exactly one other and invades exactly one, closing a cycle of whatever length you choose — three species give the familiar rotating spirals, and five give longer-wavelength travelling bands that take much further to settle. Local invasion creates the fronts; empty refuges interrupt them. Change the cycle length, refuge area or invasion pressure, then paint any species straight onto the habitat while the population census tracks the result.',
+    packageNote: 'The neighborhood engine owns the food-web transitions; census() turns the same world into a live population instrument without reading Wasm memory. Five species need k = 6, which the dense k⁷ table now reaches — 273 KB, paid only by a world that asks for it.',
+    states: ecologyStates, rows: 72, backend: 'neighborhood', speed: 20, focusState: 2, paintable: true, brush: 3,
+    palette: ecologyPalette, names: ecologyNames,
     parameters: [
-      range('pressure', 'Invasion pressure', 1, 4, 2, ' neighbors'),
+      range('species', 'Species in the cycle', 3, 5, 3, '', {scope: 'world'}),
+      range('pressure', 'Invasion pressure', 1, 4, 2, ' neighbors', {scope: 'rule'}),
       range('refuges', 'Empty refuges', 0, 30, 9, '%'),
-      range('lichen', 'Lichen weight', 1, 8, 5, ''),
-      range('grazers', 'Grazer weight', 1, 8, 3, ''),
-      range('hunters', 'Hunter weight', 1, 8, 2, ''),
+      range('bias', 'Founder imbalance', 0, 100, 25, '%'),
     ],
-    actions: [['lichen', 'Add lichen patch'], ['grazer', 'Add grazer patch'], ['hunter', 'Add hunter patch'], ['refuge', 'Excavate refuge']],
+    actions: ecologyActions,
     rule: ecologyRule, seed: seedEcology, action: ecologyAction,
   },
   {
@@ -74,12 +115,12 @@ const concepts = [
     kicker: 'Wave and refractory dynamics', deck: 'See exactly why coherent fronts propagate while isolated sparks fail.',
     complexity: '03 · moderate', accent: '#ff7e9d', rgb: '255, 126, 157', kind: 'native',
     surface: '<hexlife-ca> · excitable medium', topology: 'sealed scar rim',
-    experiment: 'Yellow cells are excited for one tick, turn pink and refractory for one tick, then recover to dark resting tissue. Mode 1 lets a single spark transmit, mode 2 requires at least two excited neighbors, and mode 3 is a selective front detector that fires on exactly two—dense clumps suppress themselves instead of exploding. The authored presets make all three settings visibly meaningful, while scars split or anchor fronts.',
+    experiment: 'Yellow cells are excited for one tick, turn pink and refractory for one tick, then recover to dark resting tissue. Mode 1 lets a single spark transmit, mode 2 requires at least two excited neighbors, and mode 3 is a selective front detector that fires on exactly two—dense clumps suppress themselves instead of exploding. Switching mode re-installs the rule on the wave that is already running, so you can watch the same front change behaviour mid-flight.',
     packageNote: 'The rule deliberately treats all six neighbors equally. Refractory memory is represented as a state, so wave dynamics still execute entirely inside the deterministic k-state engine.',
-    states: 4, rows: 72, backend: 'neighborhood', speed: 15, focusState: 1, paintable: true,
+    states: 4, rows: 72, backend: 'neighborhood', speed: 15, focusState: 1, paintable: true, brush: 2,
     palette: ['#15121c', '#fff08a', '#e44d7d', '#4b5365'], names: ['resting tissue', 'excited', 'refractory', 'scar'],
     parameters: [
-      select('threshold', 'Propagation mode', '2', [['1', '1 · Spark-sensitive'], ['2', '2 · Coherent front'], ['3', '3 · Selective front']]),
+      select('threshold', 'Propagation mode', '2', [['1', '1 · Spark-sensitive'], ['2', '2 · Coherent front'], ['3', '3 · Selective front']], {scope: 'rule'}),
       select('stimulus', 'Initial stimulus', 'thick-front', [['thin-front', 'Thin front'], ['thick-front', 'Thick front'], ['broken-wave', 'Broken wave'], ['pacemaker', 'Pacemaker island']]),
       range('width', 'Stimulus thickness', 1, 7, 4, ' cells'),
       range('scars', 'Scar density', 0, 8, 2, '%'),
@@ -92,12 +133,15 @@ const concepts = [
     kicker: 'Conserved lattice gas', deck: 'Open a finite chamber where particles travel, collide, reflect, and mix.',
     complexity: '04 · moderate', accent: '#d7a7ff', rgb: '215, 167, 255', kind: 'stochastic-gas',
     surface: '<hexlife-stochastic> · conserved lattice gas', topology: 'finite reflecting vessel',
-    experiment: 'Every lattice site holds six velocity channels, so a particle carries momentum rather than a hidden direction. Head-on pairs rotate, symmetric triads rotate to the other triad, and everything else streams through — each species conserved particle by particle, not on average. The outer wall removes both wraps; the two gases cannot meet until you open the membrane.',
-    packageNote: 'The whole tick is native. A compiled collision table is evaluated once per configuration at build time, the six channels live in Wasm, and the host uploads nothing after the vessel is filled — “open membrane” edits the wall buffer alone.',
-    states: 5, rows: 60, speed: 26, focusState: 1, seedName: 'MIXING_SEED',
+    experiment: 'Every lattice site holds six velocity channels, so a particle carries momentum rather than a hidden direction. Head-on pairs rotate, symmetric triads rotate to the other triad, and everything else streams through — each species conserved particle by particle, not on average. The outer wall removes both wraps; the two gases cannot meet until you open the membrane, or draw your own opening with the brush.',
+    packageNote: 'The whole tick is native. A compiled collision table is evaluated once per configuration at build time, the six channels live in Wasm, and the host uploads nothing after the vessel is filled — the membrane and the brush both edit the wall buffer alone.',
+    states: 5, rows: 72, speed: 26, focusState: 1, seedName: 'MIXING_SEED', paintable: true, brush: 2, drawState: 4,
     palette: ['#0b1118', '#f0ad5f', '#57c7ff', '#f4f7fb', '#606a78'],
     names: ['vacuum', 'amber molecule', 'cyan molecule', 'both species', 'reflecting wall'],
-    parameters: [range('density', 'Channel occupancy', 8, 55, 24, '%'), range('scatter', 'Thermal scattering', 0, 30, 7, '%')],
+    parameters: [
+      range('density', 'Channel occupancy', 8, 55, 24, '%'),
+      range('scatter', 'Thermal scattering', 0, 30, 7, '%', {scope: 'rule'}),
+    ],
     actions: [['open', 'Open membrane'], ['restart', 'Close & refill chamber']],
     rule: (params) => stochastic.mixingGasRule(params),
     seedWorld: (world, params) => {
@@ -105,7 +149,7 @@ const concepts = [
       world.setInitialGasState(channels, walls);
     },
     intervene: (world) => {
-      // The only intervention the vessel has, and it is a wall edit: nothing else moves.
+      // The only scripted intervention the vessel has, and it is a wall edit: nothing else moves.
       for (const index of stochastic.mixingMembraneSites(world.rows, world.columns)) world.setWall(index, false);
       return 'Membrane opened — the reservoirs can now exchange particles.';
     },
@@ -122,15 +166,18 @@ const concepts = [
     kicker: 'Probabilistic fire ecology', deck: 'Shape spread, wind, burn time, ash recovery, and firefighting interventions.',
     complexity: '05 · involved', accent: '#ff8a55', rgb: '255, 138, 85', kind: 'stochastic-neighborhood',
     surface: '<hexlife-stochastic> · compiled HSN1 rule', topology: 'sealed clearing rim',
-    experiment: 'Every burning neighbor independently contributes a chance of ignition, so fire spreads naturally even with no wind. Wind boosts only aligned exposure. Trees burn for several ticks, become ash, then regrow after a configurable delay and probability—making repeated fire succession possible rather than ending in a frozen board.',
+    experiment: 'Every burning neighbor independently contributes a chance of ignition, so fire spreads naturally even with no wind. Wind boosts only aligned exposure. Trees burn for several ticks, become ash, then regrow after a configurable delay and probability—making repeated fire succession possible rather than ending in a frozen board. Every fire-behaviour control recompiles the rule onto the running fire, so you can turn the wind mid-burn, or cut your own firebreak with the brush.',
     packageNote: 'A counter-based random value keyed by seed, cell, and tick makes every run replayable. The controls compile to a native rule table — 64 integer thresholds indexed by which neighbors are burning — and the whole tick, ages included, runs in Wasm with nothing uploaded per generation.',
-    states: 4, rows: 60, speed: 12, focusState: 2, seedName: 'WILDFIRE_SEED',
+    states: 4, rows: 72, speed: 12, focusState: 2, seedName: 'WILDFIRE_SEED', paintable: true, brush: 2, drawState: 0,
     palette: ['#0d1216', '#2f9e56', '#ffcf4d', '#6b5047'], names: ['clearing', 'forest', 'fire', 'ash'],
     parameters: [
-      range('forest', 'Forest cover', 45, 95, 78, '%'), range('spread', 'Spread per fire neighbor', 2, 55, 18, '%'),
-      select('wind', 'Wind', 'none', [['none', 'No wind'], ['east', 'East'], ['west', 'West'], ['north', 'North'], ['south', 'South']]),
-      range('windBoost', 'Wind multiplier', 1, 4, 2, '×'), range('burnTicks', 'Burn duration', 1, 6, 2, ' ticks'),
-      range('ashTicks', 'Ash recovery delay', 4, 45, 20, ' ticks'), range('regrowth', 'Regrowth chance', 1, 20, 5, '% / tick'),
+      range('forest', 'Forest cover', 45, 95, 78, '%'),
+      range('spread', 'Spread per fire neighbor', 2, 55, 18, '%', {scope: 'rule'}),
+      select('wind', 'Wind', 'none', [['none', 'No wind'], ['east', 'East'], ['west', 'West'], ['north', 'North'], ['south', 'South']], {scope: 'rule'}),
+      range('windBoost', 'Wind multiplier', 1, 4, 2, '×', {scope: 'rule'}),
+      range('burnTicks', 'Burn duration', 1, 6, 2, ' ticks', {scope: 'rule'}),
+      range('ashTicks', 'Ash recovery delay', 4, 45, 20, ' ticks', {scope: 'rule'}),
+      range('regrowth', 'Regrowth chance', 1, 20, 5, '% / tick', {scope: 'rule'}),
     ],
     actions: [['break', 'Cut firebreak'], ['spot', 'Ignite central spot'], ['regrow', 'Force ash regrowth']],
     rule: (params) => stochastic.wildfireStochasticRule(params),
@@ -162,44 +209,51 @@ const concepts = [
     kicker: 'Paired probabilistic intervention study', deck: 'Replay the same random exposure schedule with and without vaccination.',
     complexity: '06 · involved', accent: '#65d7d0', rgb: '101, 215, 208', kind: 'stochastic-outbreak',
     surface: '2 × <hexlife-stochastic> · shared exposure stream', topology: 'intentional toroidal population',
-    experiment: 'Each infectious neighbor adds an independent infection chance: p = 1 − (1 − x)ⁿ. Both populations use the same seed, initial cases, and cell-by-cell random schedule; only vaccination differs. Duration, waning immunity, coverage, and efficacy are explicit, so “cases prevented” is a genuine counterfactual measurement.',
+    experiment: 'Each infectious neighbor adds an independent infection chance: p = 1 − (1 − x)ⁿ. Both populations use the same seed, initial cases, and cell-by-cell random schedule; only vaccination differs. Duration, waning immunity and efficacy recompile onto both running arms at once, so “cases prevented” stays a genuine counterfactual measurement. This is the one demo with no brush: a stroke would land on one arm only, and two arms differing by anything but the declared policy is not a counterfactual.',
     packageNote: 'The common random numbers are now a property of the engine, not of a host loop: the susceptible and vaccinated rows compile to the same named stream, so the same cell draws the same number in both worlds. Cases prevented is read from native transition counters, and neither world uploads a grid per tick.',
-    states: 4, rows: 54, speed: 14, focusState: 1, seedName: 'OUTBREAK_SEED',
+    states: 4, rows: 72, speed: 14, focusState: 1, seedName: 'OUTBREAK_SEED',
     palette: ['#4c94c6', '#ff6577', '#4e5662', '#76d68d'], names: ['susceptible', 'infectious', 'recovered', 'vaccinated'],
     parameters: [
-      range('infection', 'Chance per infected neighbor', 1, 40, 12, '%'), range('infectiousTicks', 'Infectious duration', 2, 14, 6, ' ticks'),
-      range('immunityTicks', 'Recovered immunity', 8, 80, 36, ' ticks'), range('coverage', 'Vaccine coverage', 0, 60, 20, '%'),
-      range('efficacy', 'Vaccine efficacy', 0, 100, 85, '%'),
+      range('infection', 'Chance per infected neighbor', 1, 40, 12, '%', {scope: 'rule'}),
+      range('infectiousTicks', 'Infectious duration', 2, 14, 6, ' ticks', {scope: 'rule'}),
+      range('immunityTicks', 'Recovered immunity', 8, 80, 36, ' ticks', {scope: 'rule'}),
+      range('coverage', 'Vaccine coverage', 0, 60, 20, '%'),
+      range('efficacy', 'Vaccine efficacy', 0, 100, 85, '%', {scope: 'rule'}),
     ],
     actions: [['ring', 'Add vaccination ring'], ['restart', 'Replay counterfactual']],
   },
   {
     id: 'butterfly-microscope', href: 'butterfly-microscope.html', title: 'Butterfly Microscope',
-    kicker: 'Paired deterministic experiment', deck: 'Flip one cell and watch every downstream disagreement glow red.',
+    kicker: 'Paired deterministic experiment', deck: 'Flip one cell — or draw a whole shape — and watch every downstream disagreement glow red.',
     complexity: '07 · advanced', accent: '#ae9cff', rgb: '174, 156, 255', kind: 'butterfly',
     surface: '2 × <hexlife-world> · red XOR overlay',
-    experiment: 'Both simulations use the same rule, seed, density, and clock. The right world receives one controlled edit; a red overlay marks the exact cells where the two snapshots disagree. Paste any valid 32-character HexLife ruleset to compare orderly, chaotic, or insensitive dynamics.',
+    experiment: 'Both simulations use the same rule, seed, density, and clock. The right world receives a controlled edit — the perturbation disk, or anything you draw on it — and a red overlay marks the exact cells where the two snapshots disagree. The reference world is deliberately not paintable, so whatever red you see is always the consequence of your edit and nothing else. Paste any valid 32-character HexLife ruleset to compare orderly, chaotic, or insensitive dynamics.',
     packageNote: 'Safe snapshots make the XOR layer and divergence curve exact. A third package renderer displays the binary difference mask without altering either experiment.',
+    rows: 72, speed: 9, paintable: true, brush: 1,
   },
   {
     id: 'cellular-synth', href: 'cellular-synth.html', title: 'Cellular Synthesizer',
     kicker: 'Pattern-driven generative instrument', deck: 'Turn sparse spinners, gliders, or crystal growth into an intelligible musical score.',
     complexity: '08 · advanced', accent: '#ff85c8', rgb: '255, 133, 200', kind: 'synth',
     surface: '<hexlife-world> · Web Audio host',
-    experiment: 'Only births—cells that were off last beat and on this beat—sound. Horizontal bands select one of eight scale notes; vertical position changes octave. Sparse, structure-forming rules keep the rhythm legible, and the lit keyboard shows exactly which lanes fired.',
+    experiment: 'Only births—cells that were off last beat and on this beat—sound. Horizontal bands select one of eight scale notes; vertical position changes octave. Sparse, structure-forming rules keep the rhythm legible, and the lit keyboard shows exactly which lanes fired. Draw on the score to play it: a stroke is a chord waiting for the next beat.',
     packageNote: 'The package supplies exact single ticks and immutable snapshots. Tempo, scale, waveform, voice limiting, and Web Audio remain clean host concerns.',
+    rows: 72, paintable: true, brush: 1,
   },
   {
     id: 'hex-matter', href: 'hex-matter.html', title: 'Hex Matter',
     kicker: 'Eight-state material sandbox', deck: 'Choose a material brush, pour substances, build vessels, and tune their reactions.',
     complexity: '09 · most complex', accent: '#5cc8ff', rgb: '92, 200, 255', kind: 'native',
     surface: '<hexlife-ca> · block k³ · k = 8', topology: 'sealed stone vessel',
-    experiment: 'Sand sinks, water and oil separate, steam rises, embers ignite oil and plants, and water quenches heat. Select any material as the drawing brush, then pour or ignite authored regions. Gravity and reaction modes rebuild the block rule so you can isolate transport from chemistry.',
+    experiment: 'Sand sinks, water and oil separate, steam rises, embers ignite oil and plants, and water quenches heat. Select any material as the drawing brush, widen it, then pour or ignite authored regions. Gravity and reaction modes rebuild the block rule without disturbing the material already in the vessel, so you can isolate transport from chemistry mid-pour.',
     packageNote: 'The 8³ Margolus-style block table combines local transport with optional reactions. Drawing and the census expose all eight states without custom renderer code.',
-    states: 8, rows: 72, backend: 'block', speed: 22, focusState: 3, paintable: true,
+    states: 8, rows: 72, backend: 'block', speed: 22, focusState: 3, paintable: true, brush: 3,
     palette: ['#091018', '#3ba7ff', '#e5a84b', '#d6bd78', '#65717f', '#ff654f', '#d9f2ff', '#61ae5b'],
     names: ['air', 'water', 'oil', 'sand', 'stone', 'ember', 'steam', 'plant'],
-    parameters: [range('gravity', 'Gravity', 0, 4, 3, ''), select('reactions', 'Chemistry', 'full', [['full', 'Full reactions'], ['no-fire', 'No combustion'], ['transport', 'Transport only']])],
+    parameters: [
+      range('gravity', 'Gravity', 0, 4, 3, '', {scope: 'rule'}),
+      select('reactions', 'Chemistry', 'full', [['full', 'Full reactions'], ['no-fire', 'No combustion'], ['transport', 'Transport only']], {scope: 'rule'}),
+    ],
     actions: [['rain', 'Rain water'], ['sand', 'Pour sand'], ['oil', 'Pour oil'], ['ignite', 'Add embers'], ['garden', 'Grow plants'], ['clear', 'Clear vessel']],
     rule: matterRule, seed: seedMatter, action: matterAction,
   },
@@ -246,8 +300,25 @@ async function loadStochastic() {
 // eslint-disable-next-line import/no-unresolved
 async function loadAnalysis() { return import('@hexlife/embed/sim'); }
 
-function range(id, label, min, max, value, suffix, step = 1) { return {id, label, type: 'range', min, max, value, suffix, step}; }
-function select(id, label, value, options) { return {id, label, type: 'select', value, options}; }
+/**
+ * A model parameter.
+ *
+ * `scope` is the whole point of the descriptor and the reason it is data rather than a closure. It
+ * says what a change to this control actually *is*:
+ *
+ * - `'rule'` — a different transition table over the same world. Installed on the running world; the
+ *   cells, the generation and whatever you have been watching for two minutes all survive.
+ * - `'seed'` — part of the authored generation zero. There is no way to apply it to a world that has
+ *   already moved on, so it reseeds. The default, because it is the safe answer.
+ * - `'world'` — a different world *shape* (Hex Ecology's `k`). Reboots the element.
+ * - `'live'` — a host-side setting the engine never sees at all.
+ */
+function range(id, label, min, max, value, suffix, {step = 1, scope = 'seed'} = {}) {
+  return {id, label, type: 'range', min, max, value, suffix, step, scope};
+}
+function select(id, label, value, options, {scope = 'seed'} = {}) {
+  return {id, label, type: 'select', value, options, scope};
+}
 
 function renderShell(item) {
   const index = concepts.indexOf(item);
@@ -262,14 +333,48 @@ function renderShell(item) {
     <footer class="demo-footer"><p>Demo ${String(index + 1).padStart(2, '0')} of ${concepts.length} · built with <strong>@hexlife/embed</strong> from npm.</p><nav><a href="./embed-demos.html">All demos</a><a href="https://github.com/Sidem/HexLife/tree/main/packages/hexlife-embed" target="_blank" rel="noopener noreferrer">Package API</a><a href="./">HexLife Explorer</a></nav></footer></div>`;
 }
 
-function renderControls(item, {playLabel = 'Play', copyLabel = 'Copy exact world'} = {}) {
+/**
+ * The control panel: model parameters, then the stage controls every demo shares.
+ *
+ * Speed, world size and brush are deliberately a *separate* group from the model parameters. They
+ * are not part of any model — nothing above them changes what is being simulated, only how fast, how
+ * much of it, and how wide your finger is — and mixing the two would make "which of these resets my
+ * world" unguessable.
+ */
+function renderControls(item, {playLabel = 'Play', copyLabel = 'Copy exact world', stage = {}} = {}) {
   const controls = document.getElementById('controls');
+  const paintable = Boolean(item.paintable);
+  // The state picker exists only where a stroke paints a *value*. On `<hexlife-world>` the brush
+  // inverts, so there is nothing to pick and offering a list would be a lie about what it does.
+  const paintsValues = paintable && Boolean(item.names);
   controls.innerHTML = `<h2>Experiment controls</h2><div class="control-stack"><div class="control-row"><button class="primary" id="play">${playLabel}</button><button id="step">Step</button><button id="reset">Reset</button></div>
     <div class="parameter-grid">${(item.parameters || []).map(parameterHtml).join('')}</div>
-    ${item.paintable ? `<div class="field"><label for="paint-state">Material brush</label><select id="paint-state">${item.names.map((name, index) => `<option value="${index}">${index} · ${name}</option>`).join('')}</select><small>Drag directly on the world to paint.</small></div>` : ''}
-    ${item.actions ? `<div class="field"><label for="action-choice">Intervention</label><select id="action-choice">${item.actions.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></div>` : ''}
-    <div class="control-row two"><button id="action">Apply intervention</button><button id="copy">${copyLabel}</button></div></div><p class="concept-status" id="control-status" aria-live="polite">Preparing the exact initial state…</p>`;
-  return valuesFromControls(item.parameters || []);
+    ${paintsValues ? `<div class="field"><label for="paint-state">Material brush</label><select id="paint-state">${paintOptions(item, valuesFromControls(item.parameters || []))}</select><small>Drag directly on the world to paint.</small></div>` : ''}
+    ${paintable && !paintsValues ? '<p class="concept-status">Drag on the world to flip cells; the brush radius is below.</p>' : ''}
+    ${item.actions ? `<div class="field"><label for="action-choice">Intervention</label><select id="action-choice">${actionOptions(item, valuesFromControls(item.parameters || []))}</select></div>` : ''}
+    <div class="control-row two"><button id="action">Apply intervention</button><button id="copy">${copyLabel}</button></div>
+    <div class="stage-set"><h3>Stage</h3><div class="parameter-grid">
+      ${stage.speed === false ? '' : `<div class="field"><div class="field-head"><label for="stage-speed">Simulation speed</label><output id="output-stage-speed">${item.speed}/s</output></div><input id="stage-speed" type="range" min="1" max="120" step="1" value="${item.speed}"></div>`}
+      ${stage.size === false ? '' : `<div class="field"><label for="stage-size">World size</label><select id="stage-size">${SIZE_PRESETS.map(([rows, label]) => `<option value="${rows}"${rows === item.rows ? ' selected' : ''}>${label}</option>`).join('')}</select><small>Changing the size rebuilds the world from its authored start.</small></div>`}
+      ${paintable ? `<div class="field"><div class="field-head"><label for="stage-brush">Brush radius</label><output id="output-stage-brush">${item.brush} cells</output></div><input id="stage-brush" type="range" min="${BRUSH_MIN}" max="${BRUSH_MAX}" step="1" value="${item.brush}"></div>` : ''}
+    </div></div></div><p class="concept-status" id="control-status" aria-live="polite">Preparing the exact initial state…</p>`;
+  return {
+    params: valuesFromControls(item.parameters || []),
+    stage: {speed: item.speed, rows: item.rows, brush: item.brush},
+  };
+}
+
+function paintOptions(item, params) {
+  return resolve(item.names, params).map((name, index) => `<option value="${index}"${index === (item.drawState ?? 1) ? ' selected' : ''}>${index} · ${name}</option>`).join('');
+}
+
+function actionOptions(item, params) {
+  return resolve(item.actions, params).map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+}
+
+/** A descriptor field that may be authored as a value or as a function of the current parameters. */
+function resolve(value, params) {
+  return typeof value === 'function' ? value(params) : value;
 }
 
 function parameterHtml(parameter) {
@@ -292,10 +397,72 @@ function bindParameterControls(item, params, onChange) {
   }
 }
 
-function createCaElement(item, {draw = false} = {}) {
+/**
+ * Wire the three stage controls. Each handler is optional; a demo that cannot honour one simply
+ * does not render it (see `renderControls`), so there is nothing to bind.
+ */
+function bindStageControls(stage, {onSpeed, onRows, onBrush} = {}) {
+  const speed = document.getElementById('stage-speed');
+  if (speed && onSpeed) {
+    speed.addEventListener('input', (event) => setText('output-stage-speed', `${event.target.value}/s`));
+    speed.addEventListener('change', (event) => {
+      stage.speed = Number(event.target.value);
+      setText('output-stage-speed', `${stage.speed}/s`);
+      onSpeed(stage.speed);
+    });
+  }
+  const size = document.getElementById('stage-size');
+  if (size && onRows) {
+    size.addEventListener('change', (event) => {
+      stage.rows = Number(event.target.value);
+      onRows(stage.rows);
+    });
+  }
+  const brush = document.getElementById('stage-brush');
+  if (brush && onBrush) {
+    brush.addEventListener('input', (event) => setText('output-stage-brush', `${event.target.value} cells`));
+    brush.addEventListener('change', (event) => {
+      stage.brush = Number(event.target.value);
+      setText('output-stage-brush', `${stage.brush} cells`);
+      onBrush(stage.brush);
+    });
+  }
+}
+
+/**
+ * Set attributes, reporting whether any of them actually moved.
+ *
+ * The return value is what makes a size change safe to drive from one place: a changed structural
+ * attribute reboots the element, and the reboot's `ready` event re-installs the model — so the caller
+ * must *not* also install it, or it installs into a world that is about to be thrown away. An
+ * unchanged one fires no callback at all, and then the caller has to do the work itself.
+ */
+function applyAttributes(element, attributes) {
+  let changed = false;
+  for (const [name, value] of Object.entries(attributes)) {
+    if (element.getAttribute(name) === String(value)) continue;
+    element.setAttribute(name, String(value));
+    changed = true;
+  }
+  return changed;
+}
+
+function createCaElement(item, stage, {draw = false} = {}) {
   const world = document.createElement('hexlife-ca');
-  for (const [name, value] of Object.entries({states: item.states, rows: item.rows, backend: item.backend, speed: item.speed, palette: item.palette.join(','), paused: '', link: 'off'})) world.setAttribute(name, String(value));
-  if (draw) { world.setAttribute('draw', ''); world.setAttribute('draw-state', '1'); }
+  for (const [name, value] of Object.entries({
+    states: resolve(item.states, valuesFromControls(item.parameters || [])),
+    rows: stage.rows,
+    backend: item.backend,
+    speed: stage.speed,
+    palette: resolve(item.palette, valuesFromControls(item.parameters || [])).join(','),
+    paused: '',
+    link: 'off',
+  })) world.setAttribute(name, String(value));
+  if (draw) {
+    world.setAttribute('draw', '');
+    world.setAttribute('draw-state', String(item.drawState ?? 1));
+    world.setAttribute('brush', String(stage.brush));
+  }
   return world;
 }
 
@@ -307,29 +474,35 @@ function createCaElement(item, {draw = false} = {}) {
  * publish specific runs, and `RNG_LEGACY_DEMO_V0` reproduces one only from the seed it was recorded
  * with. Rules arrive from script once the world is up — they are far too large for an attribute.
  */
-function createStochasticElement(item) {
+function createStochasticElement(item, stage, {draw = false} = {}) {
   const world = document.createElement('hexlife-stochastic');
   world.seed = BigInt(stochastic[item.seedName]);
-  for (const [name, value] of Object.entries({rows: item.rows, speed: item.speed, palette: item.palette.join(','), paused: '', link: 'off'})) world.setAttribute(name, String(value));
+  for (const [name, value] of Object.entries({rows: stage.rows, speed: stage.speed, palette: item.palette.join(','), paused: '', link: 'off'})) world.setAttribute(name, String(value));
+  if (draw) {
+    world.setAttribute('draw', '');
+    world.setAttribute('draw-state', String(item.drawState ?? 1));
+    world.setAttribute('brush', String(stage.brush));
+  }
   return world;
 }
 
 function setupNativeLab(item) {
-  const params = renderControls(item);
-  renderLegend(item.names, item.palette);
-  setText('metric-focus-label', item.names[item.focusState]);
-  const world = createCaElement(item, {draw: item.paintable});
+  const {params, stage} = renderControls(item);
+  refreshStateVocabulary(item, params);
+  const world = createCaElement(item, stage, {draw: item.paintable});
   document.getElementById('world-mount').append(world);
   const trace = [];
   let ready = false;
   let lastGeneration = -1;
 
+  // NOT `{once: true}`: a world-size or species change reboots the element, and the rebuilt world
+  // arrives with no rule and no cells. This event is the only signal that it is ready for them.
   world.addEventListener('hexlife-ca-ready', () => {
     ready = true;
     installModel();
-    setText('stage-status', `${item.backend} · k = ${item.states} · ${world.rows} × ${world.columns} · ${item.topology}`);
+    setText('stage-status', `${item.backend} · k = ${world.states} · ${world.rows} × ${world.columns} · ${item.topology}`);
     update();
-  }, {once: true});
+  });
   world.addEventListener('hexlife-ca-playstate', (event) => setText('play', event.detail.userPaused ? 'Play' : 'Pause'));
   document.getElementById('play').addEventListener('click', () => { if (ready) world.userPaused ? world.play() : world.pause(); });
   document.getElementById('step').addEventListener('click', () => { if (ready) { world.pause(); world.tick(1); update(); } });
@@ -342,26 +515,88 @@ function setupNativeLab(item) {
   });
   document.getElementById('copy').addEventListener('click', async () => { if (ready) await copyText(await world.caCode(), 'Exact HXK1 world copied.'); });
   if (item.paintable) document.getElementById('paint-state').addEventListener('change', (event) => world.setAttribute('draw-state', event.target.value));
-  bindParameterControls(item, params, () => { if (ready) { world.pause(); installModel(); update(); } });
+
+  bindParameterControls(item, params, (parameter) => {
+    if (!ready) return;
+    if (parameter.scope === 'rule') {
+      // The whole point: a new table over the world that is already running.
+      installModel({reseed: false});
+      setText('control-status', `${parameter.label} re-installed on the running world at generation ${world.generation} — nothing was reset.`);
+    } else if (parameter.scope === 'world') {
+      reshapeWorld(parameter);
+    } else {
+      world.pause();
+      installModel();
+    }
+    update();
+  });
+  bindStageControls(stage, {
+    onSpeed: (speed) => world.setAttribute('speed', String(speed)),
+    onRows: (rows) => rebootTo({rows: String(rows)}, `World rebuilt at ${rows} rows.`),
+    onBrush: (brush) => world.setAttribute('brush', String(brush)),
+  });
   window.setInterval(update, 160);
 
-  function installModel() {
+  /** A `'world'`-scoped parameter: a different `k`, so a different world. Ecology's species count. */
+  function reshapeWorld(parameter) {
+    refreshStateVocabulary(item, params);
+    rebootTo({
+      states: String(resolve(item.states, params)),
+      palette: resolve(item.palette, params).join(','),
+    }, `${parameter.label} changed — the habitat was rebuilt to hold them.`);
+  }
+
+  function rebootTo(attributes, message) {
+    ready = false;
+    if (applyAttributes(world, attributes)) setText('control-status', message);
+    else { installModel(); update(); ready = true; }
+  }
+
+  /**
+   * @param {{reseed?: boolean}} options `reseed: false` installs the rule alone, which is what makes
+   *   a `'rule'`-scoped control a change to the running world rather than a restart of it.
+   */
+  function installModel({reseed = true} = {}) {
     const rule = item.rule(params);
     world.setRule(rule);
-    world.setCells(item.seed(world.rows, world.columns, params));
-    trace.length = 0;
-    lastGeneration = -1;
-    const invariant = item.backend === 'block' ? `${isConservative(item.states, rule) ? 'conservative' : 'reactive'} · ${isIsotropic(item.states, rule) ? 'isotropic' : 'directional'}` : 'six-neighbor radius 1';
-    setText('control-status', `Model rebuilt from controls: ${invariant}. Paint or run when ready.`);
+    if (reseed) {
+      world.setCells(item.seed(world.rows, world.columns, params));
+      trace.length = 0;
+      lastGeneration = -1;
+      const invariant = item.backend === 'block' ? `${isConservative(world.states, rule) ? 'conservative' : 'reactive'} · ${isIsotropic(world.states, rule) ? 'isotropic' : 'directional'}` : 'six-neighbor radius 1';
+      setText('control-status', `Model rebuilt from controls: ${invariant}. Paint or run when ready.`);
+    }
   }
   function update() {
     if (!ready || !world.world) return;
     const census = world.census();
     setText('metric-generation', world.generation.toLocaleString());
-    setText('metric-focus', census[item.focusState].toLocaleString());
+    setText('metric-focus', (census[item.focusState] || 0).toLocaleString());
     setText('metric-change', world.world.lastChangedCount.toLocaleString());
     setText('metric-checksum', (world.checksum >>> 0).toString(16).padStart(8, '0'));
-    if (world.generation !== lastGeneration) { trace.push(census[item.focusState]); if (trace.length > 90) trace.shift(); drawTrace(trace, item.accent); lastGeneration = world.generation; }
+    if (world.generation !== lastGeneration) { trace.push(census[item.focusState] || 0); if (trace.length > 90) trace.shift(); drawTrace(trace, item.accent); lastGeneration = world.generation; }
+  }
+}
+
+/** Legend, focus label, brush options and intervention list, for a demo whose `k` can change. */
+function refreshStateVocabulary(item, params) {
+  const names = resolve(item.names, params);
+  renderLegend(names, resolve(item.palette, params));
+  setText('metric-focus-label', names[item.focusState] || 'Active');
+  const paint = document.getElementById('paint-state');
+  if (paint) {
+    const previous = paint.value;
+    paint.innerHTML = paintOptions(item, params);
+    // Keep the brush pointed at the same material when there still is one; a shorter cycle can
+    // retire the state that was selected, and a `draw-state` past `k` would clamp silently.
+    if (Number(previous) < names.length) paint.value = previous;
+    document.querySelector('hexlife-ca')?.setAttribute('draw-state', paint.value);
+  }
+  const actions = document.getElementById('action-choice');
+  if (actions) {
+    const previous = actions.value;
+    actions.innerHTML = actionOptions(item, params);
+    if ([...actions.options].some((option) => option.value === previous)) actions.value = previous;
   }
 }
 
@@ -373,21 +608,23 @@ function setupNativeLab(item) {
  * job is reading four numbers out for the instrument panel on its own throttle.
  */
 function setupStochasticLab(item) {
-  const params = renderControls(item);
+  const {params, stage} = renderControls(item);
   renderLegend(item.names, item.palette);
   setText('metric-focus-label', item.names[item.focusState]);
-  const world = createStochasticElement(item);
+  const world = createStochasticElement(item, stage, {draw: item.paintable});
   document.getElementById('world-mount').append(world);
   const trace = [];
   let ready = false;
   let lastGeneration = -1;
 
+  // Not `{once: true}` — a size change reboots the element, and a rebooted stochastic world has
+  // dropped its rule as well as its cells, because the rule came from script.
   world.addEventListener('hexlife-stochastic-ready', () => {
     ready = true;
     installModel();
     setText('stage-status', `${world.backend} · ${world.rows} × ${world.columns} · ${item.topology}`);
     update();
-  }, {once: true});
+  });
   world.addEventListener('hexlife-stochastic-playstate', (event) => setText('play', event.detail.userPaused ? 'Play' : 'Pause'));
   document.getElementById('play').addEventListener('click', () => { if (ready) world.userPaused ? world.play() : world.pause(); });
   document.getElementById('step').addEventListener('click', () => { if (ready) { world.pause(); world.tick(1); update(); } });
@@ -401,7 +638,29 @@ function setupStochasticLab(item) {
     update();
   });
   document.getElementById('copy').addEventListener('click', async () => { if (ready) await copyText(await world.stochasticCode(), 'Exact HXS1 world copied — seed, generation and all.'); });
-  bindParameterControls(item, params, () => { if (ready) { world.pause(); installModel(); update(); } });
+  if (item.paintable) document.getElementById('paint-state').addEventListener('change', (event) => world.setAttribute('draw-state', event.target.value));
+
+  bindParameterControls(item, params, (parameter) => {
+    if (!ready) return;
+    if (parameter.scope === 'rule') {
+      // A recompiled table on the running fire (or gas): the cells and their ages carry on.
+      world.setRule(item.rule(params));
+      setText('control-status', `${item.invariant(params)} Applied at generation ${world.generation} — nothing was reset.`);
+    } else {
+      world.pause();
+      installModel();
+    }
+    update();
+  });
+  bindStageControls(stage, {
+    onSpeed: (speed) => world.setAttribute('speed', String(speed)),
+    onRows: (rows) => {
+      ready = false;
+      if (!applyAttributes(world, {rows: String(rows)})) { ready = true; installModel(); update(); }
+      else setText('control-status', `World rebuilt at ${rows} rows.`);
+    },
+    onBrush: (brush) => world.setAttribute('brush', String(brush)),
+  });
   window.setInterval(update, 160);
 
   function installModel() {
@@ -436,24 +695,27 @@ function setupStochasticLab(item) {
  *
  * The common random numbers are no longer arranged by the host at all: both infection rows compile
  * to the same named stream, so the same cell draws the same number in both worlds by construction.
+ *
+ * No brush here, and that is a design decision rather than an omission — a stroke lands on one arm,
+ * and two arms differing by anything other than the declared policy are not a counterfactual.
  */
 function setupOutbreak(item) {
-  const params = renderControls(item, {copyLabel: 'Copy comparison snapshot'});
+  const {params, stage} = renderControls(item, {copyLabel: 'Copy comparison snapshot'});
   renderLegend(item.names, item.palette);
   setText('metric-focus-label', 'Cases prevented');
   const mount = document.getElementById('world-mount');
   mount.innerHTML = '<div class="dual-worlds" id="dual"></div>';
-  const left = createStochasticElement(item); const right = createStochasticElement(item);
+  const left = createStochasticElement(item, stage); const right = createStochasticElement(item, stage);
   document.getElementById('dual').append(figure('No vaccine', left), figure('Vaccination policy', right));
   let running = false; let timer = 0; let ready = 0; const trace = [];
   const onReady = () => {
     if (++ready !== 2) return;
     running = true;
     restart();
-    setText('stage-status', 'Same seed · same compiled exposure stream · policy is the only difference');
+    setText('stage-status', `Same seed · same compiled exposure stream · ${left.rows} × ${left.columns} · policy is the only difference`);
   };
-  left.addEventListener('hexlife-stochastic-ready', onReady, {once: true});
-  right.addEventListener('hexlife-stochastic-ready', onReady, {once: true});
+  left.addEventListener('hexlife-stochastic-ready', onReady);
+  right.addEventListener('hexlife-stochastic-ready', onReady);
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start());
   document.getElementById('step').addEventListener('click', tick);
   document.getElementById('reset').addEventListener('click', restart);
@@ -475,9 +737,31 @@ function setupOutbreak(item) {
       baseline: await left.stochasticCode(), intervention: await right.stochasticCode(),
     }), 'Paired HXS1 comparison copied — both arms resume exactly where they are.');
   });
-  bindParameterControls(item, params, restart);
 
-  function start() { if (!running) return; timer = window.setInterval(tick, 1000 / item.speed); setText('play', 'Pause'); }
+  bindParameterControls(item, params, (parameter) => {
+    if (!running) return;
+    if (parameter.scope === 'rule') {
+      // Both arms, one table: they share the exposure stream, so they must share the rule too.
+      const rule = stochastic.outbreakStochasticRule(params);
+      left.setRule(rule); right.setRule(rule);
+      setText('control-status', `${parameter.label} recompiled onto both arms at generation ${left.generation} — the study continues.`);
+      update();
+    } else {
+      restart();
+    }
+  });
+  bindStageControls(stage, {
+    onSpeed: () => { if (timer) { stop(); start(); } },
+    onRows: (rows) => {
+      // Both arms reboot; `onReady` counts to two again and replays the counterfactual.
+      ready = 0; running = false; stop();
+      const changed = applyAttributes(left, {rows: String(rows)}) | applyAttributes(right, {rows: String(rows)});
+      if (changed) setText('control-status', `Both populations rebuilt at ${rows} rows.`);
+      else { ready = 2; running = true; restart(); }
+    },
+  });
+
+  function start() { if (!running) return; timer = window.setInterval(tick, 1000 / stage.speed); setText('play', 'Pause'); }
   function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Play'); }
   function restart() {
     if (!running) return;
@@ -512,15 +796,18 @@ function setupOutbreak(item) {
 
 function setupButterfly(item) {
   item.parameters = [range('radius', 'Perturbation radius', 0, 4, 0, ' cells')];
-  const params = renderControls(item);
+  const {params, stage} = renderControls(item);
   document.querySelector('.parameter-grid').insertAdjacentHTML('beforeend', `<div class="field field-wide"><label for="custom-rule">Custom 32-character ruleset</label><input id="custom-rule" class="text-input mono" value="${BUTTERFLY_RULE}" maxlength="32" spellcheck="false"><small id="rule-help">Paste a HexLife binary rule, then Apply rule.</small></div>`);
   document.getElementById('action').textContent = 'Apply rule';
   renderLegend(['same in both worlds', 'perturbed world', 'difference (red overlay)'], ['#748399', item.accent, '#ff304f']);
   const mount = document.getElementById('world-mount'); mount.innerHTML = '<div class="dual-worlds" id="dual"></div>';
-  const left = binaryWorld(BUTTERFLY_RULE, 0.34); const right = binaryWorld(BUTTERFLY_RULE, 0.34);
+  const left = binaryWorld(BUTTERFLY_RULE, 0.34, 13579, stage);
+  // Only the perturbed world takes a brush. Painting the reference too would make "red = the
+  // consequence of your edit" false, which is the entire claim this instrument makes.
+  const right = binaryWorld(BUTTERFLY_RULE, 0.34, 13579, stage, {draw: true});
   const rightStack = document.createElement('div'); rightStack.className = 'difference-stack'; rightStack.append(right);
   const diff = document.createElement('hexlife-ca');
-  for (const [key, value] of Object.entries({states: 2, rows: 72, backend: 'block', palette: '#000000,#ff304f', paused: '', link: 'off'})) diff.setAttribute(key, String(value));
+  for (const [key, value] of Object.entries({states: 2, rows: stage.rows, backend: 'block', palette: '#000000,#ff304f', paused: '', link: 'off'})) diff.setAttribute(key, String(value));
   diff.className = 'difference-overlay'; rightStack.append(diff);
   document.getElementById('dual').append(figure('Reference', left), figure('Perturbed + red XOR', rightStack));
   let ready = 0; let timer = 0; const trace = []; let mask = null;
@@ -529,12 +816,15 @@ function setupButterfly(item) {
     diff.setRule(blockRuleFromTable(2, (block) => block));
     // One persistent native mask over the two worlds. It compares them inside Wasm and writes the
     // result straight into the display world's own buffer, so the difference never becomes a
-    // JavaScript array and nothing crosses the boundary to show it.
+    // JavaScript array and nothing crosses the boundary to show it. Rebuilt on a size change,
+    // because its buffer is sized to the worlds it was constructed for.
+    if (mask) mask.dispose();
     mask = new analysis.DifferenceMask(left.sim.numCells);
     resetPair();
-    setText('stage-status', 'Red = exact snapshot disagreement');
+    setText('stage-status', `Red = exact snapshot disagreement · ${left.sim.rows} × ${left.sim.cols}`);
   };
-  left.addEventListener('hexlife-ready', onReady, {once: true}); right.addEventListener('hexlife-ready', onReady, {once: true}); diff.addEventListener('hexlife-ca-ready', onReady, {once: true});
+  // Not `{once: true}`: all three elements reboot when the world size changes.
+  left.addEventListener('hexlife-ready', onReady); right.addEventListener('hexlife-ready', onReady); diff.addEventListener('hexlife-ca-ready', onReady);
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start()); document.getElementById('step').addEventListener('click', step);
   document.getElementById('reset').addEventListener('click', resetPair);
   document.getElementById('action').addEventListener('click', () => {
@@ -542,14 +832,25 @@ function setupButterfly(item) {
     if (!/^[0-9A-F]{32}$/.test(hex)) { setText('rule-help', 'A ruleset must contain exactly 32 hexadecimal characters.'); return; }
     left.setAttribute('ruleset', hex); right.setAttribute('ruleset', hex); setText('rule-help', 'Rule accepted. Both worlds reset before the perturbation.'); window.setTimeout(resetPair, 0);
   });
-  document.getElementById('copy').addEventListener('click', async () => ready === 3 && copyText(await right.worldCode(), 'Perturbed HXW1 world copied.'));
+  document.getElementById('copy').addEventListener('click', async () => ready >= 3 && copyText(await right.worldCode(), 'Perturbed HXW1 world copied.'));
   bindParameterControls(item, params, resetPair);
-  function start() { if (ready !== 3) return; timer = window.setInterval(step, 115); setText('play', 'Pause'); }
+  bindStageControls(stage, {
+    onSpeed: () => { if (timer) { stop(); start(); } },
+    onRows: (rows) => {
+      stop();
+      ready = 0;
+      const changed = [left, right, diff].map((element) => applyAttributes(element, {rows: String(rows)})).some(Boolean);
+      if (changed) setText('control-status', `Both worlds and the difference layer rebuilt at ${rows} rows.`);
+      else { ready = 3; resetPair(); }
+    },
+    onBrush: (brush) => right.setAttribute('brush', String(brush)),
+  });
+  function start() { if (ready < 3) return; timer = window.setInterval(step, 1000 / stage.speed); setText('play', 'Pause'); }
   function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Play'); }
-  function resetPair() { if (ready !== 3) return; stop(); left.reset(); right.reset(); perturb(right, params.radius); trace.length = 0; setText('control-status', 'Exactly one controlled edit is active; red cells are its downstream consequences.'); update(); }
-  function step() { if (ready !== 3) return; left.tick(1); right.tick(1); update(); }
+  function resetPair() { if (ready < 3) return; stop(); left.reset(); right.reset(); perturb(right, params.radius); trace.length = 0; setText('control-status', 'Exactly one controlled edit is active; red cells are its downstream consequences. Draw on the right world to make a bigger one.'); update(); }
+  function step() { if (ready < 3) return; left.tick(1); right.tick(1); update(); }
   function update() {
-    if (ready !== 3 || !mask) return;
+    if (ready < 3 || !mask) return;
     const count = mask.compareInto(left.sim, right.sim, diff.world);
     // The mask was written inside wasm, so the element has no idea its cells changed.
     diff.redraw();
@@ -559,29 +860,64 @@ function setupButterfly(item) {
 }
 
 function setupSynth(item) {
-  item.parameters = [range('tempo', 'Tempo', 45, 220, 110, ' BPM'), range('density', 'Starting density', 2, 22, 8, '%'), select('rule', 'Pattern engine', 'spinners', [['spinners', 'Spinners / oscillators'], ['gliders', 'Spontaneous gliders'], ['crystals', 'Organic crystals']]), select('scale', 'Scale', 'minor', [['minor', 'Minor pentatonic'], ['major', 'Major'], ['whole', 'Whole tone']]), select('waveform', 'Voice', 'triangle', [['triangle', 'Triangle'], ['sine', 'Sine'], ['square', 'Soft square']])];
-  const params = renderControls(item, {playLabel: 'Start audio'});
+  item.parameters = [
+    range('tempo', 'Tempo', 45, 220, 110, ' BPM', {scope: 'live'}),
+    range('density', 'Starting density', 2, 22, 8, '%'),
+    select('rule', 'Pattern engine', 'spinners', [['spinners', 'Spinners / oscillators'], ['gliders', 'Spontaneous gliders'], ['crystals', 'Organic crystals']]),
+    select('scale', 'Scale', 'minor', [['minor', 'Minor pentatonic'], ['major', 'Major'], ['whole', 'Whole tone']], {scope: 'live'}),
+    select('waveform', 'Voice', 'triangle', [['triangle', 'Triangle'], ['sine', 'Sine'], ['square', 'Soft square']], {scope: 'live'}),
+  ];
+  // Tempo *is* this instrument's speed; a second control for the same number would be a trap.
+  const {params, stage} = renderControls(item, {playLabel: 'Start audio', stage: {speed: false}});
   document.getElementById('action').textContent = 'New deterministic score';
   document.querySelector('.control-stack').insertAdjacentHTML('beforeend', '<div class="synth-keyboard" id="keyboard" aria-label="Eight pitch lanes"></div>');
   document.getElementById('keyboard').innerHTML = Array.from({length: 8}, (_, index) => `<span class="synth-key"><small>${index + 1}</small></span>`).join('');
   renderLegend(['birth = note', 'horizontal = pitch lane', 'vertical = octave'], [item.accent, '#73d49c', '#f4be63']);
-  let scoreSeed = 13579; const world = binaryWorld(SYNTH_RULES[params.rule], params.density / 100, scoreSeed); document.getElementById('world-mount').append(world);
+  let scoreSeed = 13579;
+  const world = binaryWorld(SYNTH_RULES[params.rule], params.density / 100, scoreSeed, stage, {draw: true});
+  document.getElementById('world-mount').append(world);
   let context = null; let timer = 0; let meter = null; const trace = [];
-  world.addEventListener('hexlife-ready', () => { attachMeter(); setText('stage-status', 'Sparse structure rule · audio requires a click'); setText('control-status', 'Births light their pitch lane. Start audio or step silently.'); update(); }, {once: true});
+  // Not `{once: true}`: every structural change — rule, density, seed, size — rebuilds the element's
+  // `EmbedSim`, and the meter points at the wasm world that one owns.
+  world.addEventListener('hexlife-ready', () => {
+    attachMeter();
+    trace.length = 0;
+    setText('stage-status', `Sparse structure rule · ${world.sim.rows} × ${world.sim.cols} · audio requires a click`);
+    setText('control-status', 'Births light their pitch lane. Draw a chord, then start audio or step silently.');
+    update();
+  });
   document.getElementById('play').addEventListener('click', () => timer ? stop() : start()); document.getElementById('step').addEventListener('click', () => musicalTick(Boolean(context)));
   document.getElementById('reset').addEventListener('click', resetScore); document.getElementById('action').addEventListener('click', () => { scoreSeed += 7919; resetScore(); });
   document.getElementById('copy').addEventListener('click', async () => copyText(await world.worldCode(), 'Exact visual score copied as HXW1.'));
-  bindParameterControls(item, params, (parameter) => { if (parameter.id === 'tempo' && timer) { stop(); start(); } else resetScore(); });
+  bindParameterControls(item, params, (parameter) => {
+    if (parameter.scope === 'live') { if (parameter.id === 'tempo' && timer) { stop(); start(); } return; }
+    resetScore();
+  });
+  bindStageControls(stage, {
+    onRows: (rows) => { if (!applyAttributes(world, {rows: String(rows)})) resetScore(); },
+    onBrush: (brush) => world.setAttribute('brush', String(brush)),
+  });
   function start() { if (!world.sim) return; context ||= new AudioContext(); context.resume(); timer = window.setInterval(() => musicalTick(true), 60000 / params.tempo); setText('play', 'Stop audio'); }
   function stop() { window.clearInterval(timer); timer = 0; setText('play', 'Start audio'); }
   /**
    * Bind the native lane meter to whichever world the element currently owns.
    *
-   * Rebound rather than kept: changing the rule or the density is a structural attribute change, so
-   * the element rebuilds its `EmbedSim` and with it the wasm world the meter points at.
+   * Rebound rather than kept: changing the rule, the density or the size is a structural attribute
+   * change, so the element rebuilds its `EmbedSim` and with it the wasm world the meter points at.
    */
   function attachMeter() { if (meter) meter.dispose(); meter = world.sim ? new analysis.BirthLaneMeter(world.sim) : null; }
-  function resetScore() { if (!world.sim) return; stop(); world.setAttribute('ruleset', SYNTH_RULES[params.rule]); world.setAttribute('density', String(params.density / 100)); world.setAttribute('seed', String(scoreSeed)); window.setTimeout(() => { world.reset(scoreSeed); attachMeter(); trace.length = 0; update(); }, 0); }
+  function resetScore() {
+    if (!world.sim) return;
+    stop();
+    const changed = applyAttributes(world, {
+      ruleset: SYNTH_RULES[params.rule],
+      density: String(params.density / 100),
+      seed: String(scoreSeed),
+    });
+    // A changed structural attribute reboots the element and `hexlife-ready` finishes the job. With
+    // nothing changed there is no reboot and therefore no event, so do it here instead.
+    if (!changed) { world.reset(scoreSeed); attachMeter(); trace.length = 0; update(); }
+  }
   function musicalTick(sound) {
     if (!world.sim || !meter) return;
     world.tick(1);
@@ -597,16 +933,99 @@ function setupSynth(item) {
   function update(births = 0, lanes = []) { if (!world.sim) return; setText('metric-generation', world.tickCount); setText('metric-focus-label', 'Births this beat'); setText('metric-focus', births); setText('metric-change', `${lanes.filter((index) => index !== null).length} pitch lanes`); setText('metric-checksum', (world.checksum >>> 0).toString(16).padStart(8, '0')); drawTrace(trace, item.accent); lightKeys(lanes); }
 }
 
-function binaryWorld(ruleset, density = 0.12, seed = 13579) { const world = document.createElement('hexlife-world'); for (const [name, value] of Object.entries({ruleset, rows: 72, seed, density, speed: 18, palette: 'monochrome', paused: '', link: 'off'})) world.setAttribute(name, String(value)); return world; }
+function binaryWorld(ruleset, density = 0.12, seed = 13579, stage = {rows: 72, brush: 1}, {draw = false} = {}) {
+  const world = document.createElement('hexlife-world');
+  for (const [name, value] of Object.entries({ruleset, rows: stage.rows, seed, density, speed: 18, palette: 'monochrome', paused: '', link: 'off'})) world.setAttribute(name, String(value));
+  if (draw) { world.setAttribute('draw', ''); world.setAttribute('brush', String(stage.brush)); }
+  return world;
+}
 function perturb(world, radius) { const cells = world.sim.snapshotCells(); const columns = world.sim.cols; const rows = cells.length / columns; const center = Math.floor(rows / 2) * columns + Math.floor(columns / 2); const edits = []; for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) { const index = row * columns + column; if (Math.hypot(row - rows / 2, column - columns / 2) <= radius + 0.3) edits.push({index, value: cells[index] ^ 1}); } if (radius === 0) edits.push({index: center, value: cells[center] ^ 1}); world.sim.setCells(edits); }
 
-function crystalRule(params) { return ruleFromTable(4, (center, neighbors) => { const crystals = neighbors.filter((value) => value === 1).length; const fronts = neighbors.filter((value) => value === 2).length; if (center === 1 || center === 3) return center; if (center === 2) return crystals || fronts >= 2 ? 1 : 2; const supported = params.geometry === 'compact' ? crystals + fronts >= params.threshold + 1 : params.geometry === 'faceted' ? crystals >= params.threshold && fronts >= 1 : crystals >= params.threshold || (crystals === 1 && fronts >= 2); return supported ? 2 : 0; }); }
+/**
+ * Crystal Garden's growth law.
+ *
+ * States: 0 vapour, 1 crystal, 2 growth front (crystal one tick old), 3 impurity. Only vapour ever
+ * changes, and it changes on a **count of frozen neighbours** — which is where the morphology comes
+ * from. `dendritic` freezes on an exact count, so a tip with one frozen neighbour advances while a
+ * flank with two does not, and the boundary destabilizes into branches (Packard's snowflake rule at
+ * `threshold = 1`). `faceted` adds the infill of concave corners, which stabilizes the boundary back
+ * into flat hexagonal plates. `compact` accepts any sufficient support and grows the disk that the
+ * demo used to be. Impurities are permanent, so growth routes around them and branches split.
+ */
+function crystalRule(params) {
+  const need = Number(params.threshold);
+  return ruleFromTable(4, (center, neighbors) => {
+    if (center === 1 || center === 3) return center;
+    if (center === 2) return 1;
+    let frozen = 0;
+    for (const state of neighbors) if (state === 1 || state === 2) frozen++;
+    if (frozen === 0) return 0;
+    const grows = params.geometry === 'compact' ? frozen >= need
+      : params.geometry === 'faceted' ? (frozen === need || frozen >= 4)
+        : frozen === need;
+    return grows ? 2 : 0;
+  });
+}
 function seedCrystal(rows, columns, params) { const cells = new Uint8Array(rows * columns); for (let index = 0; index < cells.length; index++) if (seeded(index, 0xc7a57a1) < params.impurities / 100) cells[index] = 3; const center = Math.floor(rows / 2) * columns + Math.floor(columns / 2); cells[center] = 1; for (let direction = 0; direction < params.arms; direction++) { let index = center; for (let length = 0; length < 4; length++) { index = neighborIndex(index, direction, rows, columns, false); if (index >= 0) cells[index] = 1; } } return sealPerimeter(cells, rows, columns, 3); }
 function crystalAction(world, params, action) { const cells = world.world.snapshotCells(); if (action === 'clear') { for (let r = 2; r < world.rows - 2; r++) for (let c = 2; c < world.columns - 2; c++) if (cells[r * world.columns + c] === 3) cells[r * world.columns + c] = 0; } else { const rr = Math.floor(world.rows * 0.31); const cc = Math.floor(world.columns * 0.68); const radius = action === 'ring' ? 7 : 2; for (let r = rr - radius - 1; r <= rr + radius + 1; r++) for (let c = cc - radius - 1; c <= cc + radius + 1; c++) { const distance = Math.hypot(r - rr, c - cc); if (action === 'ring' ? Math.abs(distance - radius) < 1 : distance <= radius) cells[r * world.columns + c] = action === 'ring' ? 3 : 1; } } world.setCells(cells); }
 
-function ecologyRule(params) { return ruleFromTable(4, (center, neighbors) => { const counts = [0, 0, 0, 0]; neighbors.forEach((state) => counts[state]++); if (center === 0) { const candidate = [1, 2, 3].sort((a, b) => counts[b] - counts[a])[0]; return counts[candidate] >= params.pressure + 1 ? candidate : 0; } const predator = center % 3 + 1; return counts[predator] >= params.pressure ? predator : center; }); }
-function seedEcology(rows, columns, params) { const cells = new Uint8Array(rows * columns); const weights = [params.lichen, params.grazers, params.hunters]; const total = weights.reduce((a, b) => a + b, 0); for (let index = 0; index < cells.length; index++) { const p = seeded(index, 0xec0109); if (p < params.refuges / 100) continue; const species = seeded(index, 0xec0117) * total; cells[index] = species < weights[0] ? 1 : species < weights[0] + weights[1] ? 2 : 3; } return cells; }
-function ecologyAction(world, params, action) { const states = {refuge: 0, lichen: 1, grazer: 2, hunter: 3}; const cells = world.world.snapshotCells(); const centerRow = Math.floor(world.rows * (0.25 + seeded(world.generation, 91) * 0.5)); const centerColumn = Math.floor(world.columns * (0.25 + seeded(world.generation, 97) * 0.5)); for (let r = centerRow - 5; r <= centerRow + 5; r++) for (let c = centerColumn - 5; c <= centerColumn + 5; c++) if (Math.hypot(r - centerRow, c - centerColumn) <= 5) cells[((r + world.rows) % world.rows) * world.columns + ((c + world.columns) % world.columns)] = states[action]; world.setCells(cells); }
+// --- Hex Ecology -------------------------------------------------------------------------------
+// The cycle length is a control, so `k`, the palette, the names and the intervention list are all
+// derived from it rather than written down. `species + 1` states: one per species, plus the refuge.
+
+function ecologySpecies(params) { return Math.max(3, Math.min(ECOLOGY_SPECIES.length, Number(params.species) || 3)); }
+function ecologyStates(params) { return ecologySpecies(params) + 1; }
+function ecologyNames(params) { return ['empty refuge', ...ECOLOGY_SPECIES.slice(0, ecologySpecies(params)).map(([name]) => name)]; }
+function ecologyPalette(params) { return ['#0a1116', ...ECOLOGY_SPECIES.slice(0, ecologySpecies(params)).map(([, color]) => color)]; }
+function ecologyActions(params) {
+  return [
+    ...ECOLOGY_SPECIES.slice(0, ecologySpecies(params)).map(([name], index) => [String(index + 1), `Add ${name} patch`]),
+    ['0', 'Excavate refuge'],
+  ];
+}
+
+/**
+ * Cyclic dominance over `n` species: species `s` is invaded by `s + 1`, and species `n` by species 1.
+ *
+ * At `n = 3` this is exactly the rock-paper-scissors ecology the demo always ran. Longer cycles are
+ * the interesting part: with five species a front has to travel four invasions to come back round,
+ * so the spirals stretch into long travelling bands that take far longer to settle.
+ */
+function ecologyRule(params) {
+  const n = ecologySpecies(params);
+  const k = n + 1;
+  return ruleFromTable(k, (center, neighbors) => {
+    const counts = new Array(k).fill(0);
+    for (const state of neighbors) counts[state]++;
+    if (center === 0) {
+      let best = 1;
+      for (let species = 2; species <= n; species++) if (counts[species] > counts[best]) best = species;
+      return counts[best] >= params.pressure + 1 ? best : 0;
+    }
+    const predator = (center % n) + 1;
+    return counts[predator] >= params.pressure ? predator : center;
+  });
+}
+
+function seedEcology(rows, columns, params) {
+  const n = ecologySpecies(params);
+  const cells = new Uint8Array(rows * columns);
+  // Founder imbalance as a geometric ramp rather than one weight slider per species: it means the
+  // same control keeps working when the cycle gets longer. 0% is an even mix.
+  const ratio = 1 - params.bias / 110;
+  const weights = Array.from({length: n}, (_, index) => ratio ** index);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  for (let index = 0; index < cells.length; index++) {
+    if (seeded(index, 0xec0109) < params.refuges / 100) continue;
+    let roll = seeded(index, 0xec0117) * total;
+    let species = 1;
+    while (species < n && roll >= weights[species - 1]) { roll -= weights[species - 1]; species++; }
+    cells[index] = species;
+  }
+  return cells;
+}
+
+function ecologyAction(world, params, action) { const state = Number(action); const cells = world.world.snapshotCells(); const centerRow = Math.floor(world.rows * (0.25 + seeded(world.generation, 91) * 0.5)); const centerColumn = Math.floor(world.columns * (0.25 + seeded(world.generation, 97) * 0.5)); const radius = Math.max(4, Math.round(world.rows / 14)); for (let r = centerRow - radius; r <= centerRow + radius; r++) for (let c = centerColumn - radius; c <= centerColumn + radius; c++) if (Math.hypot(r - centerRow, c - centerColumn) <= radius) cells[((r + world.rows) % world.rows) * world.columns + ((c + world.columns) % world.columns)] = state; world.setCells(cells); }
 
 function tissueRule(params) { return ruleFromTable(4, (center, neighbors) => { if (center === 3) return 3; if (center === 1) return 2; if (center === 2) return 0; const excited = neighbors.filter((state) => state === 1).length; const mode = Number(params.threshold); return mode === 1 ? (excited >= 1 ? 1 : 0) : mode === 2 ? (excited >= 2 ? 1 : 0) : (excited === 2 ? 1 : 0); }); }
 function seedTissue(rows, columns, params) { const cells = new Uint8Array(rows * columns); for (let index = 0; index < cells.length; index++) if (seeded(index, 0x71550e) < params.scars / 100) cells[index] = 3; sealPerimeter(cells, rows, columns, 3); const width = params.stimulus === 'thin-front' ? 1 : params.width; if (params.stimulus === 'pacemaker') paintDisk(cells, rows, columns, rows / 2, columns / 2, Math.max(2, width), 1); else { for (let r = 3; r < rows - 3; r++) for (let c = 3; c < 3 + width; c++) if (params.stimulus !== 'broken-wave' || r < rows * 0.43 || r > rows * 0.58) cells[r * columns + c] = 1; } return cells; }

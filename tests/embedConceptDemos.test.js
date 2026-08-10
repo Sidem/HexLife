@@ -31,11 +31,16 @@ describe('embed concept demo library', () => {
     const page = read(`public/${route}`)
     expect(page).toContain(`data-concept="${id}"`)
     expect(page).toContain('embed-demo-shell.css')
-    expect(page).toContain('embed-concept-lab.css?v=20260810-deep-demos')
-    expect(page).toContain('embed-concept-lab.js?v=20260810-stochastic-native')
-    for (const entry of ['', 'ca/', 'ca-element/', 'sim/', 'stochastic/', 'stochastic-element/']) {
-      expect(page).toContain(`@hexlife/embed@1.9.0/${entry}+esm`)
+    expect(page).toContain('embed-concept-lab.css?v=20260810-stage-controls')
+    expect(page).toContain('embed-concept-lab.js?v=20260810-stage-controls')
+    // The package's OWN files, never jsDelivr's `/+esm` aliases. `+esm` re-bundles each subpath
+    // entry standalone, so `@hexlife/embed/sim` would carry a private copy of `EmbedSim` — its own
+    // module state and its own Wasm instance — and the analysis primitives would be inspecting a
+    // different engine from the one the elements run. That is exactly how Butterfly and Synth broke.
+    for (const entry of ['index', 'ca', 'ca-element', 'sim', 'stochastic', 'stochastic-element']) {
+      expect(page).toContain(`@hexlife/embed@1.10.0/src/embed/${entry}.js`)
     }
+    expect(page).not.toContain('+esm')
     expect(page).not.toContain('@hexlife/embed@latest')
   })
 

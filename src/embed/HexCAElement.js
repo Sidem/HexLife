@@ -40,6 +40,7 @@ import { initEmbedWasm } from './EmbedSim.js';
 import { HexCA } from './ca.js';
 import { EmbedRenderer } from './EmbedRenderer.js';
 import { decodeCaCode, encodeCaCode, isCaCode } from '../core/CaCodec.js';
+import { clampBrushSize, collectBrushCells, getHexLine } from '../core/hexBrush.js';
 import {
     caColumnsForRows,
     readCaBackend,
@@ -61,7 +62,19 @@ const APP_URL = 'https://sidem.github.io/HexLife/';
  * evolved or the viewer had painted. What is listed here is everything that is *not* part of the
  * world — playback rate, input policy, colours, decoration.
  */
-const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'max-dpr', 'link', 'draw', 'draw-state']);
+const LIVE_ATTRS = new Set([
+    'paused', 'speed', 'palette', 'max-dpr', 'link', 'draw', 'draw-state', 'brush',
+]);
+
+/**
+ * Brush radius when `brush` is absent: a single cell.
+ *
+ * Deliberately **not** `<hexlife-world>`'s default of 2. That element has painted a disk since it
+ * shipped; this one has painted one cell, and quietly widening it would repaint every existing
+ * `<hexlife-ca draw>` embed the next time its package version moved. A host that wants a disk asks
+ * for one.
+ */
+const DEFAULT_CA_BRUSH = 0;
 
 const STYLES = `
 :host {
@@ -134,7 +147,7 @@ const PLAY_ICON = '<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" c
 export class HexCAElement extends HTMLElement {
     static get observedAttributes() {
         return ['code', 'states', 'rows', 'backend', 'speed', 'palette', 'paused', 'max-dpr',
-            'link', 'draw', 'draw-state'];
+            'link', 'draw', 'draw-state', 'brush'];
     }
 
     constructor() {
@@ -208,6 +221,12 @@ export class HexCAElement extends HTMLElement {
         this._drawPointerId = null;
         this._lastDrawCoords = null;
         this._resumeAfterStroke = false;
+        /** Brush radius in cells; 0 paints the cell under the pointer and nothing else. */
+        this._brushSize = DEFAULT_CA_BRUSH;
+        /** Cells already painted during the current stroke, so a slow drag re-pokes nothing. */
+        this._strokeAffected = new Set();
+        /** Scratch for {@link collectBrushCells}, reused so a drag allocates no sets. */
+        this._brushCells = new Set();
         this._onPointerDown = this._onPointerDown.bind(this);
         this._onPointerMove = this._onPointerMove.bind(this);
         this._onPointerUp = this._onPointerUp.bind(this);
@@ -291,6 +310,9 @@ export class HexCAElement extends HTMLElement {
                 break;
             case 'draw-state':
                 // Nothing to apply: `_readDrawState` reads the attribute on every stroke.
+                break;
+            case 'brush':
+                this._brushSize = this._readBrushSize();
                 break;
         }
     }
@@ -491,6 +513,22 @@ export class HexCAElement extends HTMLElement {
     /** @returns {boolean} True when the user has paused, ignoring the viewport gates. */
     get userPaused() { return this._userPaused; }
 
+    /** @returns {number} Brush radius used by `draw` strokes; 0 is a single cell. */
+    get brushSize() { return this._brushSize; }
+
+    /**
+     * Set the brush radius from script.
+     *
+     * @param {number} size Clamped to 0 … `MAX_BRUSH_SIZE`.
+     *
+     * Does not reflect into the `brush` attribute — same contract as `<hexlife-world>`: a host
+     * should drive brush size through one of the two, because the attribute is re-read whenever it
+     * changes and would win the next time it moved.
+     */
+    setBrushSize(size) {
+        this._brushSize = clampBrushSize(size);
+    }
+
     // --- boot / teardown ------------------------------------------------------
 
     /**
@@ -542,6 +580,7 @@ export class HexCAElement extends HTMLElement {
         this._userPaused = this.hasAttribute('paused');
         this._playRequested = false;
         this._docVisible = document.visibilityState !== 'hidden';
+        this._brushSize = this._readBrushSize();
 
         this._motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         this._reducedMotion = this._motionQuery.matches;
@@ -775,6 +814,16 @@ export class HexCAElement extends HTMLElement {
     // The k-state counterpart of `<hexlife-world>`'s invert brush. It paints a *value* rather than
     // flipping a bit, because there is nothing to flip: with k states there is no "the other one".
 
+    /**
+     * @returns {number} Brush radius for a stroke: the `brush` attribute if it names one, else a
+     *   single cell. A bare `brush` falls through rather than coercing to 0, for the same reason
+     *   `<hexlife-world>` does it — `brush=""` reading as "single cell" is a surprise, not a default.
+     */
+    _readBrushSize() {
+        const raw = (this.getAttribute('brush') || '').trim();
+        return raw === '' ? DEFAULT_CA_BRUSH : clampBrushSize(raw);
+    }
+
     /** @returns {number} The state a stroke paints; clamped into range, default 1. */
     _readDrawState() {
         const raw = parseInt(String(this.getAttribute('draw-state')), 10);
@@ -814,10 +863,11 @@ export class HexCAElement extends HTMLElement {
         this._drawing = true;
         this._drawPointerId = e.pointerId;
         this._lastDrawCoords = hit;
+        this._strokeAffected.clear();
         this._resumeAfterStroke = !this._userPaused && this.playing;
         this._syncPlayback();   // Pause while drawing, without flipping the `paused` attribute.
         try { this._canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-        this._paintAt(hit);
+        this._paintLine(hit, hit);
     }
 
     _onPointerMove(e) {
@@ -826,8 +876,10 @@ export class HexCAElement extends HTMLElement {
         const hit = this._hit(e);
         if (!hit || !this._lastDrawCoords) return;
         if (hit.col === this._lastDrawCoords.col && hit.row === this._lastDrawCoords.row) return;
+        // From the previous sample, not just at this one: a fast drag skips cells, and a brush that
+        // only stamps where the pointer was sampled leaves a dotted line instead of a stroke.
+        this._paintLine(this._lastDrawCoords, hit);
         this._lastDrawCoords = hit;
-        this._paintAt(hit);
     }
 
     _onPointerUp(e) {
@@ -841,10 +893,27 @@ export class HexCAElement extends HTMLElement {
         return this.renderer.hitTest(e.clientX - rect.left, e.clientY - rect.top);
     }
 
-    _paintAt(hit) {
-        // Through `setCell`, never through the `state` view: the engine skips chunks that did not
-        // change, and a poke straight into the buffer is invisible to that tracker.
-        this.world.setCell(hit.row * this.world.columns + hit.col, this._readDrawState());
+    /**
+     * Paint one segment of a stroke: every cell within {@link _brushSize} of the hex line from
+     * `from` to `to`, each set once per stroke.
+     *
+     * @param {{col: number, row: number}} from
+     * @param {{col: number, row: number}} to
+     */
+    _paintLine(from, to) {
+        const state = this._readDrawState();
+        const columns = this.world.columns;
+        const rows = this.world.rows;
+        for (const point of getHexLine(from.col, from.row, to.col, to.row)) {
+            collectBrushCells(point.col, point.row, this._brushSize, columns, rows, this._brushCells);
+            for (const index of this._brushCells) {
+                if (this._strokeAffected.has(index)) continue;
+                this._strokeAffected.add(index);
+                // Through `setCell`, never through the `state` view: the engine skips chunks that did
+                // not change, and a poke straight into the buffer is invisible to that tracker.
+                this.world.setCell(index, state);
+            }
+        }
         // `_drawOnce`, not `_afterMutation`: the stroke deliberately holds the loop until it ends,
         // and `_endDrawStroke` is what hands playback back.
         this._drawOnce();
@@ -854,12 +923,14 @@ export class HexCAElement extends HTMLElement {
         if (!this._drawing && !this._resumeAfterStroke) {
             this._drawPointerId = null;
             this._lastDrawCoords = null;
+            this._strokeAffected.clear();
             return;
         }
         this._drawing = false;
         this._drawPointerId = null;
         this._lastDrawCoords = null;
         this._resumeAfterStroke = false;
+        this._strokeAffected.clear();
         this._syncPlayback();
     }
 

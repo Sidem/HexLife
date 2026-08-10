@@ -26,8 +26,8 @@ export type {CaCodeInput, CaPaletteEntry, DecodedCaWorld} from '../core/CaCodec.
 /** Which rule representation a world uses. */
 export type CaBackend = 'neighborhood' | 'block'
 
-/** State cap for `'neighborhood'`, whose table is `k^7` (16 KB at k=4, 268 MB at k=16). */
-export const MAX_NEIGHBORHOOD_STATES: 4
+/** State cap for `'neighborhood'`, whose table is `k^7` (16 KB at k=4, 273 KB at k=6). */
+export const MAX_NEIGHBORHOOD_STATES: 6
 /** State cap for `'block'`, whose table is `k^3` (4096 entries at k=16). */
 export const MAX_BLOCK_STATES: 16
 /** Phases the block partition cycles through. */

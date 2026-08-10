@@ -25,7 +25,7 @@ import { clampFloat, clampInt } from './attrs.js';
 export const BLOCK_ROW_MULTIPLE = 3;
 
 /** State caps, mirroring `ca.js` (which mirrors `worldk.rs`). `caAttrs.test.js` pins them together. */
-export const MAX_NEIGHBORHOOD_STATES = 4;
+export const MAX_NEIGHBORHOOD_STATES = 6;
 export const MAX_BLOCK_STATES = 16;
 
 export const CA_DEFAULTS = Object.freeze({

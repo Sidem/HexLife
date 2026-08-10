@@ -45,7 +45,7 @@ describe('@hexlife/embed/ca rule construction', () => {
 
     it('builds a k^7 table for every allowed k and refuses the ones that would not fit', () => {
         expect(ruleFromTable(3, () => 0)).toHaveLength(3 ** 7);
-        expect(ruleFromTable(MAX_NEIGHBORHOOD_STATES, () => 0)).toHaveLength(4 ** 7);
+        expect(ruleFromTable(MAX_NEIGHBORHOOD_STATES, () => 0)).toHaveLength(MAX_NEIGHBORHOOD_STATES ** 7);
         expect(() => ruleFromTable(MAX_NEIGHBORHOOD_STATES + 1, () => 0)).toThrow(/states must be/);
         expect(() => ruleFromTable(1, () => 0)).toThrow(/states must be/);
         expect(() => ruleFromTable(3, () => 3)).toThrow(/not a state below k = 3/);

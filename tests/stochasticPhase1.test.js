@@ -86,15 +86,21 @@ describe('WorldStochastic Phase-1 artifact shell', () => {
 describe('WorldStochastic Phase-1 distribution isolation', () => {
   it('keeps the default artifact inside the frozen gate or a recorded exception', async () => {
     // The 0.5% ceiling is not moved. It may only be exceeded by a file named in the tracked
-    // exception record, and only up to the exact size recorded there — so an accepted trade cannot
-    // quietly become a licence for further growth. See `stochastic-artifact-exceptions.json`.
+    // exception record, and a recorded exception moves that file's *baseline* and nothing else —
+    // so an accepted trade cannot quietly become a licence for further growth.
+    // See `stochastic-artifact-exceptions.json`.
+    //
+    // The 0.5% still applies on top of a recorded baseline, deliberately. §3 frames that figure as
+    // build-metadata noise, and holding an exception-listed file to the exact byte would make it
+    // *stricter* than an unlisted one — a single flipped constant elsewhere in the crate shifts the
+    // compressed size by a handful of bytes, and freezing that is not what the ruling accepted.
     for (const [file, prior] of Object.entries(phase0Artifacts.artifacts)) {
       if (!file.startsWith('src/core/wasm-engine/')) continue;
       const current = await readFile(new URL(`../${file}`, import.meta.url));
       const gzip = gzipSync(current, {level: 9}).byteLength;
       const exception = artifactExceptions.files[file];
-      const ceiling = exception ? exception.acceptedGzipBytes : prior.gzipBytes * 1.005;
-      expect(gzip, `${file} gzip`).toBeLessThanOrEqual(ceiling);
+      const baseline = exception ? exception.acceptedGzipBytes : prior.gzipBytes;
+      expect(gzip, `${file} gzip`).toBeLessThanOrEqual(baseline * 1.005);
     }
     // Every recorded exception names the §9 analysis primitives, never the stochastic engine.
     expect(artifactExceptions.cause).toMatch(/§9/);

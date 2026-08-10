@@ -215,8 +215,13 @@ describe('totalistic showcase navigation and palette controls', () => {
         expect(page).toContain('<script type="importmap">');
         // Pinned, never `@latest`: jsDelivr caches that alias for hours after a publish, and it
         // would go on resolving to a version where `/ca-element` does not exist.
-        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/ca\/\+esm/);
-        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/ca-element\/\+esm/);
+        //
+        // And the package's own files, never `/+esm`: that alias bundles each subpath entry
+        // standalone, which duplicates `EmbedSim`'s module state and its Wasm instance once per
+        // entry. Any page importing two entries that must share an engine breaks on it.
+        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/src\/embed\/ca\.js/);
+        expect(page).toMatch(/@hexlife\/embed@\d+\.\d+\.\d+\/src\/embed\/ca-element\.js/);
+        expect(page).not.toContain('+esm');
         expect(page).not.toContain('@hexlife/embed@latest');
     });
 
