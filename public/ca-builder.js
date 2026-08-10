@@ -20,7 +20,7 @@ import {
 } from "./ca-builder-models.js";
 import { buildHexMirror } from "./coffee-percolation-physics.js";
 
-const PACKAGE_VERSION = "1.7.1";
+const PACKAGE_VERSION = "1.8.0";
 const NEIGHBOR_LABELS = ["SW", "NW", "N", "NE", "SE", "S"];
 const BLOCK_LABELS = ["top", "down-right", "below"];
 

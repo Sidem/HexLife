@@ -61,7 +61,7 @@ describe('WorldStochastic Phase-1 artifact shell', () => {
     expect(world.state).toBeInstanceOf(Uint8Array);
     expect([...world.state]).toEqual(new Array(48).fill(0));
     expect(world.sample(17, 4)).toBe(randomU32(world.seed, world.generation, 17, 4));
-    expect('tick' in world).toBe(false);
+    expect(() => world.tick()).toThrow(/install a neighborhood rule/);
     world.dispose();
     expect(world.state).toBeNull();
   });

@@ -2,22 +2,50 @@
 /* eslint-disable */
 
 /**
- * Phase-1 allocation and loader shell. It owns the final-size visible state and canonical neighbor
- * table, but deliberately has no transition backend: `tick` does not exist until Phase 2 installs
- * the compiled neighborhood kernel. This keeps Phase 1 focused on the artifact/RNG boundary.
+ * Dense stochastic-neighborhood world. Every per-cell buffer has final capacity at construction;
+ * installing a rule may replace only the bounded compiled row table and canonical rule bytes.
  */
 export class WorldStochastic {
     free(): void;
     [Symbol.dispose](): void;
+    census_ptr(): number;
+    checksum_auxiliary(): number;
+    checksum_state(): number;
     columns(): number;
+    compute_elapsed_ages(): void;
+    elapsed_ages_ptr(): number;
     generation(): bigint;
-    neighbor_indices_ptr(): number;
+    last_changed_count(): number;
     constructor(columns: number, rows: number, seed: bigint);
+    next_state_ptr(): number;
     num_cells(): number;
+    reset(): void;
     rng_sample(cell_index: number, stream_id: number): number;
     rows(): number;
+    rule_len(): number;
+    rule_ptr(): number;
+    /**
+     * Advance one dense generation. Phase 3 adds temporal activity skipping around this reference.
+     */
+    run_tick(): number;
     seed(): bigint;
+    set_cell(index: number, value: number): void;
+    /**
+     * Intervention-only bulk replacement at the current generation.
+     */
+    set_cells(cells: Uint8Array, elapsed_ages: Uint16Array): void;
+    /**
+     * Replace the reset snapshot and reset the world to generation zero.
+     */
+    set_initial_state(cells: Uint8Array, elapsed_ages: Uint16Array): void;
+    /**
+     * Install canonical `HSN1` bytes. Allocation is allowed here; `run_tick` never allocates.
+     */
+    set_neighborhood_rule(bytes: Uint8Array): void;
     state_ptr(): number;
+    states(): number;
+    transition_count_len(): number;
+    transition_counts_ptr(): number;
 }
 
 /**
@@ -25,7 +53,7 @@ export class WorldStochastic {
  *
  * Counter words are `[cell_index, stream_id, generation_lo, generation_hi]`; key words are the
  * low/high halves of `seed`. No mutable cursor exists, so skipping a cell or reordering rule rows
- * cannot shift any other cell's stream. The returned sample is counter word 0 after ten rounds.
+ * cannot shift any other cell's stream.
  */
 export function random_u32(seed: bigint, generation: bigint, cell_index: number, stream_id: number): number;
 
@@ -39,13 +67,31 @@ export interface InitOutput {
     readonly worldstochastic_rows: (a: number) => number;
     readonly worldstochastic_columns: (a: number) => number;
     readonly worldstochastic_num_cells: (a: number) => number;
+    readonly worldstochastic_states: (a: number) => number;
     readonly worldstochastic_seed: (a: number) => bigint;
     readonly worldstochastic_generation: (a: number) => bigint;
     readonly worldstochastic_state_ptr: (a: number) => number;
-    readonly worldstochastic_neighbor_indices_ptr: (a: number) => number;
+    readonly worldstochastic_next_state_ptr: (a: number) => number;
+    readonly worldstochastic_elapsed_ages_ptr: (a: number) => number;
+    readonly worldstochastic_census_ptr: (a: number) => number;
+    readonly worldstochastic_transition_counts_ptr: (a: number) => number;
+    readonly worldstochastic_transition_count_len: (a: number) => number;
+    readonly worldstochastic_rule_ptr: (a: number) => number;
+    readonly worldstochastic_rule_len: (a: number) => number;
+    readonly worldstochastic_last_changed_count: (a: number) => number;
     readonly worldstochastic_rng_sample: (a: number, b: number, c: number) => [number, number, number];
+    readonly worldstochastic_set_neighborhood_rule: (a: number, b: number, c: number) => [number, number];
+    readonly worldstochastic_set_initial_state: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly worldstochastic_set_cells: (a: number, b: number, c: number, d: number, e: number) => [number, number];
+    readonly worldstochastic_set_cell: (a: number, b: number, c: number) => [number, number];
+    readonly worldstochastic_reset: (a: number) => [number, number];
+    readonly worldstochastic_run_tick: (a: number) => [number, number, number];
+    readonly worldstochastic_compute_elapsed_ages: (a: number) => void;
+    readonly worldstochastic_checksum_state: (a: number) => number;
+    readonly worldstochastic_checksum_auxiliary: (a: number) => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __externref_table_dealloc: (a: number) => void;
+    readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_start: () => void;
 }
 

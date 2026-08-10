@@ -138,3 +138,6 @@ and paired Outbreak host trajectories used for later native differential tests. 
 `npm run audit:stochastic` to verify the oracle and existing artifact ceiling without rewriting them.
 The Phase 1 additive artifact/RNG record is `performance/stochastic-phase1-artifacts.json`; native
 and browser-Wasm golden vectors are enforced by `tests/stochasticPhase1.test.js` plus Rust tests.
+The Phase 2 dense-engine artifact and spot benchmark record is
+`performance/stochastic-phase2-artifacts.json`; `tests/stochasticPhase2.test.js` differentially pins
+every Wildfire and baseline/intervention Outbreak generation through 80 against the frozen oracle.

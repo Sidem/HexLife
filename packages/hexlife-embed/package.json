@@ -1,7 +1,7 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.7.1",
-  "description": "Embeddable HexLife cellular automaton world, k-state simulation engine, and host-safe world-code API",
+  "version": "1.8.0",
+  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines",
   "type": "module",
   "license": "MIT",
   "sideEffects": [

@@ -25,6 +25,32 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.8.0 — 2026-08-10
+
+#### Added
+
+- **A separately loaded stochastic engine.** `@hexlife/embed/stochastic` initializes its own Wasm
+  artifact, leaving root, binary, and k-state consumers at exactly zero stochastic download and
+  initialization cost. `StochasticWorld` owns visible state, double buffers, per-state entry epochs,
+  census, checksums, transition counts, reset state, and intervention writes in native memory.
+- **Compiled probabilistic neighborhood rules.** `compileStochasticRule()` turns bounded transition
+  rows into canonical `HSN1` bytes with 64 integer mask thresholds, inclusive age bounds, explicit
+  priorities, stable streams, and strict validation. `independentNeighborChance()` authors isotropic
+  or direction-dependent exposure without floating-point work in the tick loop.
+- **Call-order-independent randomness.** New rules use versioned Philox4x32-10 counters keyed by
+  seed, generation, cell, and stream. An explicit legacy-demo counter tag preserves the frozen
+  Wildfire and paired Outbreak trajectories during later migration; it is never selected silently.
+
+#### Performance and correctness
+
+- One Wasm call advances dense generations with no host cell loop, full-grid tick upload, or
+  tick-time allocation. Rust buffer-capacity tests cover 100,000 ticks.
+- Native/Wasm RNG goldens match, and the real Wasm engine reproduces every Wildfire, baseline
+  Outbreak, and intervention Outbreak cell and age through generation 80, including common random
+  numbers and the generation-20 vaccination ring.
+- GitHub Pages and npm publication workflows now install the pinned `wasm-pack` tool before building
+  the independently generated stochastic artifact.
+
 ### `@hexlife/embed` 1.7.1 — 2026-08-09
 
 #### Changed

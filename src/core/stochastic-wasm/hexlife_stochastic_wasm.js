@@ -1,9 +1,8 @@
 /* @ts-self-types="./hexlife_stochastic_wasm.d.ts" */
 
 /**
- * Phase-1 allocation and loader shell. It owns the final-size visible state and canonical neighbor
- * table, but deliberately has no transition backend: `tick` does not exist until Phase 2 installs
- * the compiled neighborhood kernel. This keeps Phase 1 focused on the artifact/RNG boundary.
+ * Dense stochastic-neighborhood world. Every per-cell buffer has final capacity at construction;
+ * installing a rule may replace only the bounded compiled row table and canonical rule bytes.
  */
 export class WorldStochastic {
     __destroy_into_raw() {
@@ -19,8 +18,39 @@ export class WorldStochastic {
     /**
      * @returns {number}
      */
+    census_ptr() {
+        const ret = wasm.worldstochastic_census_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    checksum_auxiliary() {
+        const ret = wasm.worldstochastic_checksum_auxiliary(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    checksum_state() {
+        const ret = wasm.worldstochastic_checksum_state(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
     columns() {
         const ret = wasm.worldstochastic_columns(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    compute_elapsed_ages() {
+        wasm.worldstochastic_compute_elapsed_ages(this.__wbg_ptr);
+    }
+    /**
+     * @returns {number}
+     */
+    elapsed_ages_ptr() {
+        const ret = wasm.worldstochastic_elapsed_ages_ptr(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -33,8 +63,8 @@ export class WorldStochastic {
     /**
      * @returns {number}
      */
-    neighbor_indices_ptr() {
-        const ret = wasm.worldstochastic_neighbor_indices_ptr(this.__wbg_ptr);
+    last_changed_count() {
+        const ret = wasm.worldstochastic_last_changed_count(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -54,9 +84,22 @@ export class WorldStochastic {
     /**
      * @returns {number}
      */
+    next_state_ptr() {
+        const ret = wasm.worldstochastic_next_state_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
     num_cells() {
         const ret = wasm.worldstochastic_num_cells(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    reset() {
+        const ret = wasm.worldstochastic_reset(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * @param {number} cell_index
@@ -78,6 +121,31 @@ export class WorldStochastic {
         return ret >>> 0;
     }
     /**
+     * @returns {number}
+     */
+    rule_len() {
+        const ret = wasm.worldstochastic_rule_len(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    rule_ptr() {
+        const ret = wasm.worldstochastic_rule_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Advance one dense generation. Phase 3 adds temporal activity skipping around this reference.
+     * @returns {number}
+     */
+    run_tick() {
+        const ret = wasm.worldstochastic_run_tick(this.__wbg_ptr);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
      * @returns {bigint}
      */
     seed() {
@@ -85,10 +153,83 @@ export class WorldStochastic {
         return BigInt.asUintN(64, ret);
     }
     /**
+     * @param {number} index
+     * @param {number} value
+     */
+    set_cell(index, value) {
+        const ret = wasm.worldstochastic_set_cell(this.__wbg_ptr, index, value);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Intervention-only bulk replacement at the current generation.
+     * @param {Uint8Array} cells
+     * @param {Uint16Array} elapsed_ages
+     */
+    set_cells(cells, elapsed_ages) {
+        const ptr0 = passArray8ToWasm0(cells, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray16ToWasm0(elapsed_ages, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_cells(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Replace the reset snapshot and reset the world to generation zero.
+     * @param {Uint8Array} cells
+     * @param {Uint16Array} elapsed_ages
+     */
+    set_initial_state(cells, elapsed_ages) {
+        const ptr0 = passArray8ToWasm0(cells, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray16ToWasm0(elapsed_ages, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_initial_state(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Install canonical `HSN1` bytes. Allocation is allowed here; `run_tick` never allocates.
+     * @param {Uint8Array} bytes
+     */
+    set_neighborhood_rule(bytes) {
+        const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.worldstochastic_set_neighborhood_rule(this.__wbg_ptr, ptr0, len0);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * @returns {number}
      */
     state_ptr() {
         const ret = wasm.worldstochastic_state_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    states() {
+        const ret = wasm.worldstochastic_states(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {number}
+     */
+    transition_count_len() {
+        const ret = wasm.worldstochastic_transition_count_len(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    transition_counts_ptr() {
+        const ret = wasm.worldstochastic_transition_counts_ptr(this.__wbg_ptr);
         return ret >>> 0;
     }
 }
@@ -99,7 +240,7 @@ if (Symbol.dispose) WorldStochastic.prototype[Symbol.dispose] = WorldStochastic.
  *
  * Counter words are `[cell_index, stream_id, generation_lo, generation_hi]`; key words are the
  * low/high halves of `seed`. No mutable cursor exists, so skipping a cell or reordering rule rows
- * cannot shift any other cell's stream. The returned sample is counter word 0 after ten rounds.
+ * cannot shift any other cell's stream.
  * @param {bigint} seed
  * @param {bigint} generation
  * @param {number} cell_index
@@ -145,12 +286,34 @@ function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);
 }
 
+let cachedUint16ArrayMemory0 = null;
+function getUint16ArrayMemory0() {
+    if (cachedUint16ArrayMemory0 === null || cachedUint16ArrayMemory0.byteLength === 0) {
+        cachedUint16ArrayMemory0 = new Uint16Array(wasm.memory.buffer);
+    }
+    return cachedUint16ArrayMemory0;
+}
+
 let cachedUint8ArrayMemory0 = null;
 function getUint8ArrayMemory0() {
     if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function passArray16ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 2, 2) >>> 0;
+    getUint16ArrayMemory0().set(arg, ptr / 2);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
 }
 
 function takeFromExternrefTable0(idx) {
@@ -173,11 +336,14 @@ function decodeText(ptr, len) {
     return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
+let WASM_VECTOR_LEN = 0;
+
 let wasmModule, wasmInstance, wasm;
 function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedUint16ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

@@ -155,8 +155,8 @@ describe("k-state CA builder package boundary", () => {
   );
 
   it("loads both public k-state entrypoints from the published npm package", () => {
-    expect(html).toContain("npm/@hexlife/embed@1.7.1/ca/+esm");
-    expect(html).toContain("npm/@hexlife/embed@1.7.1/ca-element/+esm");
+    expect(html).toContain("npm/@hexlife/embed@1.8.0/ca/+esm");
+    expect(html).toContain("npm/@hexlife/embed@1.8.0/ca-element/+esm");
     expect(script).toMatch(/from ["']@hexlife\/embed\/ca["']/);
     expect(script).toMatch(/import ["']@hexlife\/embed\/ca-element["']/);
     expect(html + script).not.toContain("src/embed/");
@@ -197,7 +197,7 @@ describe("k-state CA builder package boundary", () => {
 
   it("cache-busts the public builder assets as one compatible UI bundle", () => {
     expect(html).toContain("./ca-builder.css?v=20260809-hex-ui");
-    expect(html).toContain("./ca-builder.js?v=20260809-hex-ui");
+    expect(html).toContain("./ca-builder.js?v=20260810-stochastic-p2");
   });
 
   it("keeps the builder and full coffee labs on the same transition functions", () => {

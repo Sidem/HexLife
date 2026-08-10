@@ -13,7 +13,7 @@ import {
   neighborIndex,
 } from './embed-concept-models.js';
 
-const PACKAGE_VERSION = '1.7.1';
+const PACKAGE_VERSION = '1.8.0';
 const BUTTERFLY_RULE = 'D5F5EBB9CD2C79E4B3F1F0E6ED1D67A6';
 const SYNTH_RULES = {
   spinners: '120C11B442568E21134E30A85A40C880',

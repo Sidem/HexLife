@@ -75,6 +75,7 @@ sim.dispose()
 | `@hexlife/embed/render` | DOM, WebGL2 | Browser hosts: draw externally supplied state without allocating or ticking a simulation. |
 | `@hexlife/embed/ca` | Wasm | **k-state** worlds: multi-state simulation on the same lattice, with an optionally mass-conserving backend. A second engine — everything else here stays binary. No DOM at module scope. |
 | `@hexlife/embed/ca-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-ca>`, the k-state element. Separate from `/ca` because that entry is DOM-free, and separate from the root because a binary embed should not carry the k-state engine. |
+| `@hexlife/embed/stochastic` | Wasm | Stateful/probabilistic neighborhood worlds with compiled native rules, age epochs, counter RNG, census and checksums. A separately loaded artifact with no DOM at module scope. |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
@@ -776,6 +777,76 @@ half-read a payload where every field means something else. `HXK1.` makes the re
 Decoding never throws — a code arrives from a text field a stranger pasted, and every caller wants a
 "no" it can render. The rule blob's length is *derived* from `(k, backend)` rather than stored, so a
 truncated or padded paste fails an exact byte count instead of being half-read.
+
+---
+
+## `@hexlife/embed/stochastic` — stateful probability in native Wasm
+
+The stochastic entry is a third engine and a second Wasm artifact. Importing the package root,
+`/sim`, `/ca`, or `/ca-element` neither downloads nor initializes it. Use it for a radius-1 model
+whose transition depends on probability or time spent in a state, such as wildfire and epidemics.
+
+```js
+import {
+  compileStochasticRule,
+  independentNeighborChance,
+  initStochasticEngine,
+  StochasticWorld,
+} from '@hexlife/embed/stochastic'
+
+const rule = compileStochasticRule({
+  states: 4,
+  transitions: [
+    {
+      from: 0,
+      neighborState: 1,
+      probabilityByMask: independentNeighborChance(0.12),
+      to: 1,
+      stream: 'infection',
+    },
+    {from: 1, minAge: 6, to: 2},
+    {from: 2, minAge: 36, to: 0},
+  ],
+})
+
+await initStochasticEngine()
+const world = new StochasticWorld({
+  rows: 72,
+  columns: 84, // even, so the odd-q torus closes
+  seed: 12345,
+  rule,
+  cells: initialCells,
+})
+
+world.tick(10)
+console.log(world.generation, world.census(), world.checksum())
+world.dispose()
+```
+
+`compileStochasticRule()` canonicalizes at most 64 rows by current state and descending priority,
+rejects equal-priority ambiguity, and quantizes probability once into 64 integer thresholds indexed
+by the canonical six-direction neighbor mask. The Rust tick performs no floating-point probability
+work, host callback, grid upload, or allocation. `probability: 0` never fires and `probability: 1`
+always fires.
+
+`independentNeighborChance(p)` materializes `1 - (1 - p)ⁿ` for all masks. Pass six probabilities
+instead of one to author direction-dependent exposure such as wind. A stochastic row needs an
+explicit `stream`; strings are converted to stable FNV-1a ids, and numeric u32 ids are accepted when
+matching an existing counter schedule.
+
+Age is stored as the generation when a cell entered its current state rather than incremented on
+every tick. `minAge`/`maxAge` are inclusive u16 bounds. `setInitialState(cells, elapsedAges)` replaces
+the exact reset snapshot; `setCells()` and `setCell()` are intervention APIs, not streaming tick
+paths. `snapshotElapsedAges()` is an explicit copy for export/debug only.
+
+New rules use version-1 Philox4x32-10, addressed by `(seed, generation, cell, stream)`, so decisions
+do not depend on iteration order or on whether another cell was evaluated. `legacy-demo-v0` is an
+explicit compiler option only for byte-identical migration of HexLife's frozen Wildfire and Outbreak
+reference trajectories. It is never selected implicitly.
+
+The current surface is intentionally DOM-free and dense. Temporal activity skipping, the conserved
+lattice-gas backend, `<hexlife-stochastic>`, and `HXS1` codes are additive later phases; no placeholder
+API for those features is exported early.
 
 ---
 

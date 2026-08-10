@@ -146,6 +146,21 @@ Native Rust and real browser-Wasm tests share four Philox4x32-10 golden vectors.
 mapping is counter words `[cell, stream, generation-low, generation-high]` and key words
 `[seed-low, seed-high]`; changing that mapping is a stochastic reproducibility break.
 
+## Phase 2 dense-neighborhood record — 2026-08-10
+
+`stochastic-phase2-artifacts.json` records `@hexlife/embed@1.8.0` before publication. The native
+artifact is 41,481 raw / 17,487 gzip bytes; the self-contained `/stochastic` entry is 128,753 /
+51,998 bytes. The default artifact stays under the unchanged Phase 0 ceiling.
+
+The differential gate is stronger than selected checksums: real Wasm matches every visible cell and
+tracked age in Wildfire plus both Outbreak worlds after every generation through 80, including the
+vaccination-ring intervention and cumulative infection counts. Rust pins probability endpoints,
+age deadlines, canonical rule validation, and stable pointers/capacities over 100,000 dense ticks.
+
+A seven-run Node-Wasm spot check on the Phase 0 host measured the dense Wildfire kernel at 2.89× the
+frozen JavaScript model at 103,800 cells and 3.08× at 383,616 cells. This is early evidence, not a
+substitute for Phase 7's complete browser/render audit.
+
 ## Reproduction
 
 ```text

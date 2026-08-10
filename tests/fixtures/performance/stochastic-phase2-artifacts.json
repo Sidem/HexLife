@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "recorded": "2026-08-10",
+  "packageVersion": "1.8.0",
+  "buildCommand": "npm run build:embed",
+  "artifacts": {
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm_bg.wasm": {
+      "rawBytes": 41481,
+      "gzipBytes": 17487,
+      "sha256": "a7ce3508cd5282662dde19305fe6a109994be4c2e6d917b92d98b54fca9c75fa"
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm.js": {
+      "rawBytes": 13548,
+      "gzipBytes": 2990,
+      "sha256": "9d293b5e1ed9bf7cb26714e2303c1073560df342cbf537275fde33454b656947"
+    },
+    "dist/embed-package/src/embed/stochastic.js": {
+      "rawBytes": 128753,
+      "gzipBytes": 51998,
+      "sha256": "23abcce94dc8103397e17e179b641284dc5c1da19d368865fdcb9000ae906d1a"
+    }
+  },
+  "denseWildfireNodeWasm": {
+    "method": "Node 20.17.0, real packaged Wasm, three warmup ticks then seven evolving ticks; medians compare the frozen JavaScript Wildfire model with WorldStochastic dense legacy-parity rule on the Phase-0 host",
+    "medium": {
+      "cells": 103800,
+      "jsMs": [4.2373, 3.1169, 3.1454, 3.1478, 3.1332, 3.1255, 3.1227],
+      "wasmMs": [1.1621, 1.0865, 1.0972, 1.0851, 1.0671, 1.0771, 1.0739],
+      "medianSpeedup": 2.8875
+    },
+    "large": {
+      "cells": 383616,
+      "jsMs": [15.0887, 12.5785, 11.5707, 12.1862, 11.4987, 12.226, 13.1905],
+      "wasmMs": [4.0206, 3.9496, 3.9856, 3.9753, 3.9739, 4.0941, 3.9103],
+      "medianSpeedup": 3.0755
+    },
+    "caveat": "This Phase-2 spot check isolates dense simulation and boundary cost. The frozen final gate still requires the complete browser/render matrix in Phase 7."
+  }
+}
