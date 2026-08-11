@@ -18,8 +18,8 @@ url: "https://sidem.github.io/HexLife/"
 license: MIT
 # Keep in step with package.json and the git tag — `npm version` bumps package.json, and these
 # two lines are the manual half of a release (see README § Versioning & releases).
-version: "1.2.0"
-date-released: "2026-07-30"
+version: "1.3.0"
+date-released: "2026-08-11"
 keywords:
   - cellular automata
   - hexagonal grid

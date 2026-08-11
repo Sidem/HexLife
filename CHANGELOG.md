@@ -25,6 +25,8 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-08-11
+
 ### Printable solids
 
 #### Added
