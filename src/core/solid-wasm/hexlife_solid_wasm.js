@@ -33,6 +33,16 @@ export class WorldSolid {
         }
     }
     /**
+     * Triangles belonging to a top or bottom cap. Caps are the one thing greedy merging leaves
+     * alone (§5.5), so this is the measurement that decides whether an ear clipper is ever worth
+     * writing — the answer is "only if this dominates the total".
+     * @returns {number}
+     */
+    get capTriangleCount() {
+        const ret = wasm.worldsolid_capTriangleCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * @returns {number}
      */
     get columns() {
@@ -286,6 +296,75 @@ export class WorldSolid {
             throw takeFromExternrefTable0(ret[1]);
         }
         return ret[0] !== 0;
+    }
+    /**
+     * Members of the container the last `serializeMesh` produced, or 0 for a single-file format.
+     *
+     * This is how JavaScript learns that it is holding a 3MF and must wrap the parts in a zip:
+     * Rust emits every byte and every checksum, and JS contributes only the deflate — which is
+     * native, not a loop — and about ninety bytes of header per entry.
+     * @returns {number}
+     */
+    get zipPartCount() {
+        const ret = wasm.worldsolid_zipPartCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * CRC-32 of the part's UNCOMPRESSED bytes, which is what a zip entry header records.
+     * @param {number} index
+     * @returns {number}
+     */
+    zipPartCrc32(index) {
+        const ret = wasm.worldsolid_zipPartCrc32(this.__wbg_ptr, index);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
+     * @param {number} index
+     * @returns {number}
+     */
+    zipPartLength(index) {
+        const ret = wasm.worldsolid_zipPartLength(this.__wbg_ptr, index);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
+     * @param {number} index
+     * @returns {string}
+     */
+    zipPartName(index) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const ret = wasm.worldsolid_zipPartName(this.__wbg_ptr, index);
+            var ptr1 = ret[0];
+            var len1 = ret[1];
+            if (ret[3]) {
+                ptr1 = 0; len1 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Byte offset of part `index` within `meshPtr`.
+     * @param {number} index
+     * @returns {number}
+     */
+    zipPartOffset(index) {
+        const ret = wasm.worldsolid_zipPartOffset(this.__wbg_ptr, index);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
     }
 }
 if (Symbol.dispose) WorldSolid.prototype[Symbol.dispose] = WorldSolid.prototype.free;

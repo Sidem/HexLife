@@ -69,6 +69,13 @@ pub const MERGE_GREEDY: u8 = 1;
 
 /// Serialized formats.
 pub const FORMAT_STL: u8 = 0;
+pub const FORMAT_PLY: u8 = 1;
+pub const FORMAT_3MF: u8 = 2;
+
+/// Fractional digits written for a 3MF coordinate. The lattice is exact and the scale is one
+/// multiply, so six digits is nanometre resolution on a millimetre model — far below anything a
+/// printer can resolve, and a fixed count keeps the bytes a pure function of the inputs.
+const DECIMALS: i64 = 1_000_000;
 
 /// Sentinel for a lateral direction that leaves the grid. See the module header.
 const NO_NEIGHBOR: u32 = u32::MAX;
@@ -183,6 +190,22 @@ pub struct WorldSolid {
     /// Serialized bytes. Allocated at export time — the one place §5.1's preallocation rule does
     /// not reach, which is why JS re-views its memory after every export.
     mesh_bytes: Vec<u8>,
+    /// For container formats, the parts `mesh_bytes` holds end to end. Empty for the single-file
+    /// formats, which is exactly how JS tells the two cases apart.
+    parts: Vec<ZipPart>,
+}
+
+/// One member of a zip container: where its bytes are, and their CRC-32.
+///
+/// The checksum is computed HERE rather than in JavaScript. Deflate is the one stage the plan
+/// hands to JS, because `CompressionStream` is native and not a per-voxel loop — but a CRC is a
+/// per-byte loop over the whole model, which is precisely what §2 keeps out of JS. So Rust emits
+/// the payloads and their checksums, and JS is left with ~90 bytes of zip header per entry.
+struct ZipPart {
+    name: &'static str,
+    offset: usize,
+    length: usize,
+    crc32: u32,
 }
 
 /// An indexed surface mesh in EXACT lattice coordinates.
@@ -306,6 +329,7 @@ impl WorldSolid {
             report: Report::default(),
             mesh: Mesh::default(),
             mesh_bytes: Vec::new(),
+            parts: Vec::new(),
         };
 
         // The base plate is real matter in the volume from the start, so nothing downstream needs a
@@ -504,48 +528,10 @@ impl WorldSolid {
         if !self.finalized {
             return Err("WorldSolid.buildMesh: finalize the volume first.".into());
         }
-        if merge == MERGE_GREEDY {
-            return Err("WorldSolid.buildMesh: greedy merging arrives in Phase 3.".into());
-        }
-        if merge != MERGE_NONE {
-            return Err("WorldSolid.buildMesh: unknown merge mode.".into());
-        }
-        self.mesh.reset(self.report.kept_voxels as usize);
-
-        for layer in 0..self.total_layers {
-            let base = self.layer_base(layer);
-            for word_index in 0..self.words_per_layer {
-                let mut word = self.volume[base + word_index];
-                while word != 0 {
-                    let bit = word.trailing_zeros() as usize;
-                    word &= word - 1;
-                    let cell = word_index * 64 + bit;
-                    let col = (cell % self.columns) as i32;
-                    let row = (cell / self.columns) as i32;
-
-                    for direction in 0..6 {
-                        let neighbor = self.neighbors[cell * 6 + direction];
-                        // A seam direction has no prism on the far side, so that face is real,
-                        // exposed boundary surface and must NOT be culled.
-                        let occluded =
-                            neighbor != NO_NEIGHBOR && get_bit(&self.volume, base, neighbor as usize);
-                        if !occluded {
-                            self.mesh.emit_lateral(col, row, layer as i32, direction);
-                        }
-                    }
-
-                    let above_solid = layer + 1 < self.total_layers
-                        && get_bit(&self.volume, base + self.words_per_layer, cell);
-                    if !above_solid {
-                        self.mesh.emit_cap(col, row, layer as i32 + 1, true);
-                    }
-                    let below_solid = layer > 0
-                        && get_bit(&self.volume, base - self.words_per_layer, cell);
-                    if !below_solid {
-                        self.mesh.emit_cap(col, row, layer as i32, false);
-                    }
-                }
-            }
+        match merge {
+            MERGE_NONE => self.build_mesh_unmerged(),
+            MERGE_GREEDY => self.build_mesh_greedy(),
+            _ => return Err("WorldSolid.buildMesh: unknown merge mode.".into()),
         }
         Ok(())
     }
@@ -577,10 +563,13 @@ impl WorldSolid {
         {
             return Err("WorldSolid.serializeMesh: cellSize and layerHeight must be positive.".into());
         }
-        if format != FORMAT_STL {
-            return Err("WorldSolid.serializeMesh: only binary STL exists before Phase 3.".into());
+        self.parts.clear();
+        match format {
+            FORMAT_STL => self.write_binary_stl(cell_size, layer_height),
+            FORMAT_PLY => self.write_binary_ply(cell_size, layer_height),
+            FORMAT_3MF => self.write_3mf_parts(cell_size, layer_height),
+            _ => return Err("WorldSolid.serializeMesh: unknown format.".into()),
         }
-        self.write_binary_stl(cell_size, layer_height);
         Ok(())
     }
 
@@ -592,6 +581,50 @@ impl WorldSolid {
     #[wasm_bindgen(getter, js_name = meshLen)]
     pub fn mesh_len(&self) -> usize {
         self.mesh_bytes.len()
+    }
+
+    /// Triangles belonging to a top or bottom cap. Caps are the one thing greedy merging leaves
+    /// alone (§5.5), so this is the measurement that decides whether an ear clipper is ever worth
+    /// writing — the answer is "only if this dominates the total".
+    #[wasm_bindgen(getter, js_name = capTriangleCount)]
+    pub fn cap_triangle_count(&self) -> usize {
+        self.mesh
+            .face_normals
+            .iter()
+            .filter(|normal| **normal as usize >= NORMAL_UP)
+            .count()
+    }
+
+    /// Members of the container the last `serializeMesh` produced, or 0 for a single-file format.
+    ///
+    /// This is how JavaScript learns that it is holding a 3MF and must wrap the parts in a zip:
+    /// Rust emits every byte and every checksum, and JS contributes only the deflate — which is
+    /// native, not a loop — and about ninety bytes of header per entry.
+    #[wasm_bindgen(getter, js_name = zipPartCount)]
+    pub fn zip_part_count(&self) -> usize {
+        self.parts.len()
+    }
+
+    #[wasm_bindgen(js_name = zipPartName)]
+    pub fn zip_part_name(&self, index: usize) -> Result<String, String> {
+        Ok(self.part(index)?.name.to_string())
+    }
+
+    /// Byte offset of part `index` within `meshPtr`.
+    #[wasm_bindgen(js_name = zipPartOffset)]
+    pub fn zip_part_offset(&self, index: usize) -> Result<usize, String> {
+        Ok(self.part(index)?.offset)
+    }
+
+    #[wasm_bindgen(js_name = zipPartLength)]
+    pub fn zip_part_length(&self, index: usize) -> Result<usize, String> {
+        Ok(self.part(index)?.length)
+    }
+
+    /// CRC-32 of the part's UNCOMPRESSED bytes, which is what a zip entry header records.
+    #[wasm_bindgen(js_name = zipPartCrc32)]
+    pub fn zip_part_crc32(&self, index: usize) -> Result<u32, String> {
+        Ok(self.part(index)?.crc32)
     }
 
     /// FNV-1a over the packed volume. The mesh must be a pure function of its inputs, and this is
@@ -842,7 +875,139 @@ impl WorldSolid {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Meshing.
+//
+// Two meshers, one surface. `merge: 'none'` emits every exposed face as its own quad or fan and is
+// watertight in the half-edge sense — every directed edge appears exactly once with its opposite.
+// `merge: 'greedy'` welds runs of coplanar, contiguous, identically-oriented faces into single
+// quads, which is where almost the entire triangle budget goes. Both bound exactly the same solid;
+// §9 test 9 proves it by comparing their surface areas and enclosed volumes exactly.
+
 impl WorldSolid {
+    /// Every exposed face on its own. The reference surface, and the one a strict manifold
+    /// validator will accept.
+    fn build_mesh_unmerged(&mut self) {
+        self.mesh.reset(self.report.kept_voxels as usize);
+
+        for layer in 0..self.total_layers {
+            let base = self.layer_base(layer);
+            for word_index in 0..self.words_per_layer {
+                let mut word = self.volume[base + word_index];
+                while word != 0 {
+                    let bit = word.trailing_zeros() as usize;
+                    word &= word - 1;
+                    let cell = word_index * 64 + bit;
+                    let col = (cell % self.columns) as i32;
+                    let row = (cell / self.columns) as i32;
+
+                    for direction in 0..6 {
+                        let neighbor = self.neighbors[cell * 6 + direction];
+                        // A seam direction has no prism on the far side, so that face is real,
+                        // exposed boundary surface and must NOT be culled.
+                        let occluded =
+                            neighbor != NO_NEIGHBOR && get_bit(&self.volume, base, neighbor as usize);
+                        if !occluded {
+                            self.mesh.emit_lateral(col, row, layer as i32, direction);
+                        }
+                    }
+
+                    let above_solid = layer + 1 < self.total_layers
+                        && get_bit(&self.volume, base + self.words_per_layer, cell);
+                    if !above_solid {
+                        self.mesh.emit_cap(col, row, layer as i32 + 1, true);
+                    }
+                    let below_solid = layer > 0
+                        && get_bit(&self.volume, base - self.words_per_layer, cell);
+                    if !below_solid {
+                        self.mesh.emit_cap(col, row, layer as i32, false);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Greedy merging, which in THIS lattice is exactly vertical run merging.
+    ///
+    /// The plan (§5.5) expected the exposed faces of one lateral plane family to form a 2D grid
+    /// indexed by (position along the lattice line, layer), meshed greedily in two axes. In a
+    /// honeycomb they do not: every vertex has degree 3 and its three edges have three *different*
+    /// orientations, so no two parallel hexagon edges are ever collinear and adjacent. Two lateral
+    /// faces of the same direction can be coplanar — columns two apart share a `Y` — but a gap of
+    /// four lattice units sits between them, occupied by the slanted edges of the column in
+    /// between. Merging across it would invent surface where there is none.
+    ///
+    /// So the in-layer axis contributes nothing and the whole win is along Z, which is also where
+    /// it was always going to be: a wall exposed for `L` consecutive layers collapses from `2L`
+    /// triangles to 2, and interpolation layers make those runs long. Recorded as §15.6.
+    ///
+    /// Cell-major rather than layer-major, because a run is a property of one `(cell, direction)`
+    /// pair across layers. Caps are NOT merged (§5.5 defers that behind a measurement).
+    fn build_mesh_greedy(&mut self) {
+        self.mesh.reset(self.report.kept_voxels as usize);
+
+        for cell in 0..self.num_cells {
+            let col = (cell % self.columns) as i32;
+            let row = (cell / self.columns) as i32;
+
+            for direction in 0..6 {
+                let neighbor = self.neighbors[cell * 6 + direction];
+                let mut run_start = usize::MAX;
+                for layer in 0..self.total_layers {
+                    let base = self.layer_base(layer);
+                    // A seam direction has no prism on the far side: that face is exposed on every
+                    // layer the cell itself is solid.
+                    let exposed = get_bit(&self.volume, base, cell)
+                        && !(neighbor != NO_NEIGHBOR
+                            && get_bit(&self.volume, base, neighbor as usize));
+                    if exposed {
+                        if run_start == usize::MAX {
+                            run_start = layer;
+                        }
+                    } else if run_start != usize::MAX {
+                        self.mesh
+                            .emit_lateral_run(col, row, run_start as i32, layer as i32, direction);
+                        run_start = usize::MAX;
+                    }
+                }
+                if run_start != usize::MAX {
+                    self.mesh.emit_lateral_run(
+                        col,
+                        row,
+                        run_start as i32,
+                        self.total_layers as i32,
+                        direction,
+                    );
+                }
+            }
+
+            for layer in 0..self.total_layers {
+                let base = self.layer_base(layer);
+                if !get_bit(&self.volume, base, cell) {
+                    continue;
+                }
+                let above_solid = layer + 1 < self.total_layers
+                    && get_bit(&self.volume, base + self.words_per_layer, cell);
+                if !above_solid {
+                    self.mesh.emit_cap(col, row, layer as i32 + 1, true);
+                }
+                let below_solid =
+                    layer > 0 && get_bit(&self.volume, base - self.words_per_layer, cell);
+                if !below_solid {
+                    self.mesh.emit_cap(col, row, layer as i32, false);
+                }
+            }
+        }
+    }
+}
+
+impl WorldSolid {
+    fn part(&self, index: usize) -> Result<&ZipPart, String> {
+        self.parts
+            .get(index)
+            .ok_or_else(|| "WorldSolid: container part index out of range.".to_string())
+    }
+
     /// Binary STL: 80-byte header, `u32` triangle count, then 50 bytes per triangle. No vertex
     /// sharing at all — it is the universal fallback, not the efficient format.
     fn write_binary_stl(&mut self, cell_size: f32, layer_height: f32) {
@@ -877,6 +1042,181 @@ impl WorldSolid {
             self.mesh_bytes.extend_from_slice(&0u16.to_le_bytes());
         }
     }
+
+    /// Binary little-endian PLY, indexed. Every vertex is written once and referenced by index, so
+    /// it costs roughly a third of the STL for the same surface and is the format to reach for when
+    /// something downstream wants the topology rather than a triangle soup.
+    fn write_binary_ply(&mut self, cell_size: f32, layer_height: f32) {
+        let vertices = self.mesh.positions.len() / 3;
+        let triangles = self.mesh.face_normals.len();
+        self.mesh_bytes.clear();
+        self.mesh_bytes.reserve(256 + vertices * 12 + triangles * 13);
+
+        // The header is ASCII and ends at the newline after `end_header`; everything after it is
+        // binary. `int` rather than `uint` for the index list: it is what the format's own reference
+        // files use and what the widest set of readers accepts.
+        self.mesh_bytes.extend_from_slice(b"ply\nformat binary_little_endian 1.0\n");
+        self.mesh_bytes.extend_from_slice(b"comment HexLife solid extrusion\n");
+        self.mesh_bytes.extend_from_slice(b"element vertex ");
+        push_u64(&mut self.mesh_bytes, vertices as u64);
+        self.mesh_bytes
+            .extend_from_slice(b"\nproperty float x\nproperty float y\nproperty float z\n");
+        self.mesh_bytes.extend_from_slice(b"element face ");
+        push_u64(&mut self.mesh_bytes, triangles as u64);
+        self.mesh_bytes
+            .extend_from_slice(b"\nproperty list uchar int vertex_indices\nend_header\n");
+
+        let x_scale = cell_size * 0.5;
+        let y_scale = cell_size * SQRT3_OVER_2;
+        for vertex in 0..vertices {
+            let lattice = &self.mesh.positions[vertex * 3..vertex * 3 + 3];
+            self.mesh_bytes
+                .extend_from_slice(&(lattice[0] as f32 * x_scale).to_le_bytes());
+            self.mesh_bytes
+                .extend_from_slice(&(lattice[1] as f32 * y_scale).to_le_bytes());
+            self.mesh_bytes
+                .extend_from_slice(&(lattice[2] as f32 * layer_height).to_le_bytes());
+        }
+        for triangle in 0..triangles {
+            self.mesh_bytes.push(3);
+            for corner in 0..3 {
+                let index = self.mesh.indices[triangle * 3 + corner];
+                self.mesh_bytes.extend_from_slice(&(index as i32).to_le_bytes());
+            }
+        }
+    }
+
+    /// The three members of a 3MF container, concatenated with a part table beside them.
+    ///
+    /// 3MF is the format slicers actually prefer, and the only one of the three that carries real
+    /// units — `unit="millimeter"` on the model element, so `cellSize` and `layerHeight` mean what
+    /// they say instead of depending on an import dialog.
+    ///
+    /// The container itself is a zip, and the deflate is JavaScript's (§2): `CompressionStream` is
+    /// native, is not per-voxel work, and keeps `miniz_oxide` — and its several kilobytes — out of
+    /// an artifact whose whole justification is that it costs its consumers nothing.
+    fn write_3mf_parts(&mut self, cell_size: f32, layer_height: f32) {
+        self.mesh_bytes.clear();
+        let vertices = self.mesh.positions.len() / 3;
+        let triangles = self.mesh.face_normals.len();
+        self.mesh_bytes.reserve(self.model_upper_bound(cell_size, layer_height));
+
+        self.push_part(
+            "[Content_Types].xml",
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>"#,
+        );
+        self.push_part(
+            "_rels/.rels",
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel0" Target="/3D/3dmodel.model" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>"#,
+        );
+
+        let start = self.mesh_bytes.len();
+        self.mesh_bytes.extend_from_slice(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+<metadata name="Application">HexLife solid extrusion</metadata>
+<resources>
+<object id="1" type="model">
+<mesh>
+<vertices>
+"#,
+        );
+
+        // Coordinates are computed in f64 from the exact lattice integer — one multiply, no
+        // accumulation — and written with a fixed six fractional digits. Both halves matter for §7:
+        // the multiply is exact enough that the same lattice always yields the same decimal, and a
+        // fixed digit count means no shortest-round-trip formatter's platform quirks get in.
+        let x_scale = cell_size as f64 * 0.5;
+        let y_scale = cell_size as f64 * (SQRT3_OVER_2 as f64);
+        let z_scale = layer_height as f64;
+        for vertex in 0..vertices {
+            let lattice = &self.mesh.positions[vertex * 3..vertex * 3 + 3];
+            self.mesh_bytes.extend_from_slice(b"<vertex x=\"");
+            push_decimal(&mut self.mesh_bytes, lattice[0] as f64 * x_scale);
+            self.mesh_bytes.extend_from_slice(b"\" y=\"");
+            push_decimal(&mut self.mesh_bytes, lattice[1] as f64 * y_scale);
+            self.mesh_bytes.extend_from_slice(b"\" z=\"");
+            push_decimal(&mut self.mesh_bytes, lattice[2] as f64 * z_scale);
+            self.mesh_bytes.extend_from_slice(b"\"/>\n");
+        }
+
+        self.mesh_bytes.extend_from_slice(b"</vertices>\n<triangles>\n");
+        for triangle in 0..triangles {
+            self.mesh_bytes.extend_from_slice(b"<triangle v1=\"");
+            push_u64(&mut self.mesh_bytes, self.mesh.indices[triangle * 3] as u64);
+            self.mesh_bytes.extend_from_slice(b"\" v2=\"");
+            push_u64(&mut self.mesh_bytes, self.mesh.indices[triangle * 3 + 1] as u64);
+            self.mesh_bytes.extend_from_slice(b"\" v3=\"");
+            push_u64(&mut self.mesh_bytes, self.mesh.indices[triangle * 3 + 2] as u64);
+            self.mesh_bytes.extend_from_slice(b"\"/>\n");
+        }
+        self.mesh_bytes.extend_from_slice(
+            b"</triangles>\n</mesh>\n</object>\n</resources>\n<build>\n<item objectid=\"1\"/>\n</build>\n</model>\n",
+        );
+
+        let length = self.mesh_bytes.len() - start;
+        let crc32 = crc32(&self.mesh_bytes[start..]);
+        self.parts.push(ZipPart {
+            name: "3D/3dmodel.model",
+            offset: start,
+            length,
+            crc32,
+        });
+    }
+
+    /// An exact upper bound on the model part's length, so the buffer is reserved once.
+    ///
+    /// This matters far more than a capacity hint usually does. XML is the bulkiest of the three
+    /// formats, and a `Vec` that outgrows its reservation doubles — holding the old allocation and
+    /// the new one at the same time. On an unmerged reference volume that single spike was 80 MB of
+    /// the export's peak footprint, which is the difference between clearing §8's memory budget and
+    /// blowing through it. Reserving a true bound removes the spike outright rather than trimming it.
+    ///
+    /// The bound is exact rather than generous because the widths are all knowable: coordinates are
+    /// the mesh's own largest lattice value times a fixed scale, written with a fixed six fractional
+    /// digits, and an index is at most as wide as the vertex count.
+    fn model_upper_bound(&self, cell_size: f32, layer_height: f32) -> usize {
+        const VERTEX_MARKUP: usize = 25; // `<vertex x="` `" y="` `" z="` `"/>\n`
+        const TRIANGLE_MARKUP: usize = 30; // `<triangle v1="` `" v2="` `" v3="` `"/>\n`
+        const PREAMBLE: usize = 1024;
+
+        let vertices = self.mesh.positions.len() / 3;
+        let triangles = self.mesh.face_normals.len();
+
+        let mut extent = [0i32; 3];
+        for position in self.mesh.positions.chunks_exact(3) {
+            for (axis, slot) in extent.iter_mut().enumerate() {
+                *slot = (*slot).max(position[axis].abs());
+            }
+        }
+        let scales = [
+            cell_size as f64 * 0.5,
+            cell_size as f64 * SQRT3_OVER_2 as f64,
+            layer_height as f64,
+        ];
+        let coordinate: usize = (0..3)
+            // sign, integer digits, point, six fractional digits
+            .map(|axis| 1 + digit_width(extent[axis] as f64 * scales[axis]) + 1 + 6)
+            .sum();
+        let index = digit_width(vertices as f64);
+
+        PREAMBLE
+            + vertices * (VERTEX_MARKUP + coordinate)
+            + triangles * (TRIANGLE_MARKUP + 3 * index)
+    }
+
+    fn push_part(&mut self, name: &'static str, payload: &[u8]) {
+        let offset = self.mesh_bytes.len();
+        self.mesh_bytes.extend_from_slice(payload);
+        self.parts.push(ZipPart {
+            name,
+            offset,
+            length: payload.len(),
+            crc32: crc32(payload),
+        });
+    }
 }
 
 impl Mesh {
@@ -884,9 +1224,19 @@ impl Mesh {
         self.positions.clear();
         self.indices.clear();
         self.face_normals.clear();
-        // A voxel contributes at most 12 distinct corners; most are shared, so this is generous.
-        // Sizing once here keeps the weld table off the growth path for every realistic volume.
-        let capacity = (kept_voxels.saturating_mul(4).max(64)).next_power_of_two();
+        // Sized to grow into, not to avoid growing.
+        //
+        // Phase 2 sized this from the voxel count on the reasoning that a voxel contributes at most
+        // twelve corners. Greedy merging severed that relationship: the reference volume welds
+        // 162,703 voxels into 8,248 vertices, so a voxel-derived table over-allocates by two orders
+        // of magnitude — twelve megabytes of hash table for a quarter-megabyte mesh, and twelve of
+        // the sixteen megabytes the whole export peaked at.
+        //
+        // The vertex count cannot be known before emission, so start small and let `grow_weld`
+        // double. Rehashing costs about one extra insert per vertex amortized, and vertex indices
+        // are assigned in emission order regardless of the table's size, so nothing about the
+        // output bytes depends on this number.
+        let capacity = (kept_voxels / 8).max(1024).next_power_of_two();
         self.weld_keys.clear();
         self.weld_keys.resize(capacity, u64::MAX);
         self.weld_values.clear();
@@ -950,15 +1300,24 @@ impl Mesh {
 
     /// One lateral face: the quad swept by hexagon edge `lateral_edge(direction)` from layer plane
     /// `z` to `z + 1`.
+    fn emit_lateral(&mut self, col: i32, row: i32, z: i32, direction: usize) {
+        self.emit_lateral_run(col, row, z, z + 1, direction);
+    }
+
+    /// A run of lateral faces welded into one quad, spanning layer planes `z0`..`z1`.
     ///
     /// Wound counter-clockwise seen from outside. Corners run in increasing hexagon-vertex order,
     /// which is counter-clockwise in XY, so `(bottom_a → bottom_b) × ẑ` is the outward normal.
-    fn emit_lateral(&mut self, col: i32, row: i32, z: i32, direction: usize) {
+    ///
+    /// The unmerged mesher is the `z1 = z0 + 1` case of this, which is deliberate: one emitter
+    /// means the two meshers cannot drift in winding, in the direction→edge mapping, or in which
+    /// lattice coordinates they weld on.
+    fn emit_lateral_run(&mut self, col: i32, row: i32, z0: i32, z1: i32, direction: usize) {
         let edge = lateral_edge(direction);
-        let a = self.corner(col, row, z, edge);
-        let b = self.corner(col, row, z, (edge + 1) % 6);
-        let b_top = self.corner(col, row, z + 1, (edge + 1) % 6);
-        let a_top = self.corner(col, row, z + 1, edge);
+        let a = self.corner(col, row, z0, edge);
+        let b = self.corner(col, row, z0, (edge + 1) % 6);
+        let b_top = self.corner(col, row, z1, (edge + 1) % 6);
+        let a_top = self.corner(col, row, z1, edge);
         let normal = direction as u8;
         self.triangle(a, b, b_top, normal);
         self.triangle(a, b_top, a_top, normal);
@@ -981,6 +1340,104 @@ impl Mesh {
             }
         }
     }
+}
+
+/// Append `value` as a base-10 integer. No allocation: `format!` per coordinate would be three
+/// `String`s per vertex, and a large mesh has hundreds of thousands of them.
+fn push_u64(out: &mut Vec<u8>, mut value: u64) {
+    if value == 0 {
+        out.push(b'0');
+        return;
+    }
+    let mut digits = [0u8; 20];
+    let mut length = 0;
+    while value != 0 {
+        digits[length] = b'0' + (value % 10) as u8;
+        value /= 10;
+        length += 1;
+    }
+    for index in (0..length).rev() {
+        out.push(digits[index]);
+    }
+}
+
+/// Append `value` as a decimal with at most six fractional digits, trailing zeros trimmed.
+///
+/// Rounding once from an exact lattice product keeps the text a pure function of the inputs, which
+/// `{}`-formatting an `f32` would not be: the shortest-round-trip representation of a coordinate
+/// varies with how the value was reached, and the point of the integer lattice is that it never
+/// varies at all.
+fn push_decimal(out: &mut Vec<u8>, value: f64) {
+    let scaled = (value * DECIMALS as f64).round() as i64;
+    if scaled < 0 {
+        out.push(b'-');
+    }
+    let magnitude = scaled.unsigned_abs();
+    push_u64(out, magnitude / DECIMALS as u64);
+    let fraction = magnitude % DECIMALS as u64;
+    if fraction == 0 {
+        return;
+    }
+    let mut digits = [0u8; 6];
+    let mut rest = fraction;
+    for slot in digits.iter_mut().rev() {
+        *slot = b'0' + (rest % 10) as u8;
+        rest /= 10;
+    }
+    let end = digits.iter().rposition(|digit| *digit != b'0').unwrap_or(0) + 1;
+    out.push(b'.');
+    out.extend_from_slice(&digits[..end]);
+}
+
+/// Digits in the integer part of `value`. Sizing only — never on the output path, so the `f64` here
+/// cannot affect a single serialized byte.
+fn digit_width(value: f64) -> usize {
+    let mut whole = value.abs() as u64;
+    let mut digits = 1;
+    while whole >= 10 {
+        whole /= 10;
+        digits += 1;
+    }
+    digits
+}
+
+/// Nibble-at-a-time CRC-32 table (IEEE polynomial, reflected), built at compile time.
+///
+/// Sixteen entries rather than the usual 256: the byte-wide table would add a kilobyte of data
+/// section to an artifact that is currently 23 KB, and this engine's whole claim is that it costs
+/// its consumers nothing it does not have to.
+const CRC32_NIBBLE: [u32; 16] = {
+    let mut table = [0u32; 16];
+    let mut index = 0;
+    while index < 16 {
+        let mut value = index as u32;
+        let mut step = 0;
+        while step < 4 {
+            value = if value & 1 != 0 {
+                0xEDB8_8320 ^ (value >> 1)
+            } else {
+                value >> 1
+            };
+            step += 1;
+        }
+        table[index] = value;
+        index += 1;
+    }
+    table
+};
+
+/// CRC-32 of a zip member's uncompressed bytes.
+///
+/// In Rust, not JavaScript: the deflate JS owns is a native stream, but a checksum is a per-byte
+/// loop over the entire model — the exact shape §2 keeps out of the host.
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for byte in bytes {
+        crc ^= *byte as u32;
+        crc = (crc >> 4) ^ CRC32_NIBBLE[(crc & 0x0F) as usize];
+        crc = (crc >> 4) ^ CRC32_NIBBLE[(crc & 0x0F) as usize];
+    }
+    !crc
 }
 
 /// SplitMix64 finalizer — a fixed, platform-independent mixer for the weld table. Deliberately not
@@ -1745,17 +2202,325 @@ mod tests {
     }
 
     #[test]
-    fn refuses_to_mesh_before_finalizing_and_refuses_a_phase_three_option() {
+    fn refuses_to_mesh_before_finalizing_and_rejects_unknown_options() {
         let mut s = WorldSolid::new(4, 8, 1, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
         assert!(s.build_mesh(MERGE_NONE).is_err());
         s.staging.copy_from_slice(&vec![0u8; 32]);
         s.push_layer().unwrap();
         s.finalize_volume(KEEP_ALL).unwrap();
-        assert!(s.build_mesh(MERGE_GREEDY).is_err());
+        assert!(s.build_mesh(9).is_err());
+        s.build_mesh(MERGE_GREEDY).unwrap();
         s.build_mesh(MERGE_NONE).unwrap();
         assert!(s.serialize_mesh(9, 1.0, 1.0).is_err());
         assert!(s.serialize_mesh(FORMAT_STL, 0.0, 1.0).is_err());
         assert!(s.serialize_mesh(FORMAT_STL, 1.0, -1.0).is_err());
+    }
+
+    // ---- Phase 3: greedy merging, PLY, 3MF ----------------------------------------------------
+
+    /// The exact surface area and enclosed volume of a mesh, as INTEGERS.
+    ///
+    /// Both quantities come out of the integer lattice without a single inexact operation, which is
+    /// what makes §9 test 9 a proof rather than a tolerance check:
+    ///
+    /// * Every triangle here is either horizontal (a cap, cross product purely `±ẑ`) or vertical
+    ///   (a lateral wall, zero `ẑ` component), so the two are separable.
+    /// * A cap's area is `|Cz| · a · b / 2` for integer `Cz`, where `a = cellSize/2` and
+    ///   `b = cellSize·√3/2` are the lattice's two horizontal scales.
+    /// * A lateral triangle's area is `√(3Cx² + Cy²) · a · h / 2`, and that radicand is always a
+    ///   perfect square in this lattice — every hexagon edge has length exactly `cellSize`, whether
+    ///   it is one of the two horizontal edges (`2a`) or one of the four slanted ones
+    ///   (`√(a² + b²)`, which is the same number). The assertion below pins that.
+    /// * The enclosed volume is `Σ P₀ · (P₁ × P₂) / 6` with the scale `a·b·h` factoring out whole,
+    ///   because every term is one `x` times one `y` times one `z`.
+    fn exact_measures(mesh: &Mesh) -> (i64, i64, i128) {
+        let mut cap_cross = 0i64;
+        let mut lateral_span = 0i64;
+        let mut volume_times_six = 0i128;
+
+        for triangle in 0..mesh.face_normals.len() {
+            let mut p = [[0i64; 3]; 3];
+            for (corner, slot) in p.iter_mut().enumerate() {
+                let vertex = mesh.indices[triangle * 3 + corner] as usize;
+                for axis in 0..3 {
+                    slot[axis] = mesh.positions[vertex * 3 + axis] as i64;
+                }
+            }
+            let e1 = [p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]];
+            let e2 = [p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]];
+            let cx = e1[1] * e2[2] - e1[2] * e2[1];
+            let cy = e1[2] * e2[0] - e1[0] * e2[2];
+            let cz = e1[0] * e2[1] - e1[1] * e2[0];
+
+            if cx == 0 && cy == 0 {
+                cap_cross += cz.abs();
+            } else {
+                assert_eq!(cz, 0, "a face that is neither horizontal nor vertical");
+                let square = 3 * cx * cx + cy * cy;
+                let root = (square as f64).sqrt().round() as i64;
+                assert_eq!(root * root, square, "a hexagon edge whose length is not exact");
+                lateral_span += root;
+            }
+
+            let (a, b, c) = (p[0], p[1], p[2]);
+            volume_times_six += (a[0] as i128) * ((b[1] as i128) * (c[2] as i128) - (b[2] as i128) * (c[1] as i128))
+                - (a[1] as i128) * ((b[0] as i128) * (c[2] as i128) - (b[2] as i128) * (c[0] as i128))
+                + (a[2] as i128) * ((b[0] as i128) * (c[1] as i128) - (b[1] as i128) * (c[0] as i128));
+        }
+        (cap_cross, lateral_span, volume_times_six)
+    }
+
+    /// A pseudo-random blob built by an arbitrary sequence of layers, bridged and plate-filtered —
+    /// the messiest surface this engine produces, and therefore the one worth measuring.
+    fn blob(ticks: usize) -> WorldSolid {
+        let rows = 8;
+        let cols = 12;
+        let mut s = WorldSolid::new(rows, cols, ticks, 1, 1, 0b10, INTERPOLATE_BRIDGE).unwrap();
+        let mut rng = 0xB10Bu64;
+        for _ in 0..ticks {
+            let mut cells = vec![0u8; rows * cols];
+            for cell in cells.iter_mut() {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                *cell = (rng & 1) as u8;
+            }
+            s.staging.copy_from_slice(&cells);
+            s.push_layer().unwrap();
+        }
+        s.finalize_volume(KEEP_PLATE_CONNECTED).unwrap();
+        s
+    }
+
+    /// §9 test 9 — greedy merging preserves the surface.
+    ///
+    /// The unmerged mesher is the oracle here, not a peer: the owner's slicer opened its output
+    /// with no repair prompt, so "the merged mesh bounds exactly the same solid" is a stronger
+    /// statement than re-running the same invariants against the merged output would be.
+    #[test]
+    fn greedy_merging_preserves_surface_area_and_enclosed_volume() {
+        let mut fixtures: Vec<WorldSolid> = Vec::new();
+        fixtures.push(one_voxel(6, 8, 2 * 8 + 3));
+
+        let mut column = WorldSolid::new(6, 8, 9, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let mut layer = vec![0u8; 48];
+        layer[2 * 8 + 3] = 1;
+        for _ in 0..9 {
+            column.staging.copy_from_slice(&layer);
+            column.push_layer().unwrap();
+        }
+        column.finalize_volume(KEEP_ALL).unwrap();
+        fixtures.push(column);
+
+        let mut slab = WorldSolid::new(4, 6, 5, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let full = vec![1u8; 24];
+        for _ in 0..5 {
+            slab.staging.copy_from_slice(&full);
+            slab.push_layer().unwrap();
+        }
+        slab.finalize_volume(KEEP_ALL).unwrap();
+        fixtures.push(slab);
+
+        fixtures.push(blob(10));
+
+        for (index, world) in fixtures.iter_mut().enumerate() {
+            world.build_mesh(MERGE_NONE).unwrap();
+            let unmerged = exact_measures(&world.mesh);
+            let unmerged_triangles = world.triangle_count();
+
+            world.build_mesh(MERGE_GREEDY).unwrap();
+            let merged = exact_measures(&world.mesh);
+
+            assert_eq!(merged.0, unmerged.0, "fixture {index}: cap area changed");
+            assert_eq!(merged.1, unmerged.1, "fixture {index}: lateral area changed");
+            assert_eq!(merged.2, unmerged.2, "fixture {index}: enclosed volume changed");
+            assert!(
+                world.triangle_count() <= unmerged_triangles,
+                "fixture {index}: merging added triangles"
+            );
+        }
+    }
+
+    /// The shape of the win: a wall exposed for `L` layers costs 2 triangles, not `2L`. A tall
+    /// isolated column is therefore the same mesh as a single voxel.
+    #[test]
+    fn a_vertical_run_collapses_to_one_quad_however_tall_it_is() {
+        let mut tall = WorldSolid::new(6, 8, 40, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let mut layer = vec![0u8; 48];
+        layer[2 * 8 + 3] = 1;
+        for _ in 0..40 {
+            tall.staging.copy_from_slice(&layer);
+            tall.push_layer().unwrap();
+        }
+        tall.finalize_volume(KEEP_ALL).unwrap();
+
+        tall.build_mesh(MERGE_NONE).unwrap();
+        assert_eq!(tall.triangle_count(), 6 * 2 * 40 + 8);
+
+        tall.build_mesh(MERGE_GREEDY).unwrap();
+        // Six lateral quads spanning all forty layers, plus the two unmerged caps.
+        assert_eq!(tall.triangle_count(), 6 * 2 + 8);
+        assert_eq!(tall.vertex_count(), 12);
+        assert_eq!(tall.cap_triangle_count(), 8);
+    }
+
+    /// Merging must stop where the wall does. Two separated exposures of the same wall stay two
+    /// quads — a single quad spanning the gap would invent surface across a hole.
+    #[test]
+    fn a_broken_run_stays_broken() {
+        let rows = 6;
+        let cols = 8;
+        let cells = rows * cols;
+        let mut s = WorldSolid::new(rows, cols, 5, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let cell = 2 * cols + 3;
+        // A column with its middle layer missing: solid, solid, void, solid, solid.
+        for layer in 0..5 {
+            let mut cells_in = vec![0u8; cells];
+            if layer != 2 {
+                cells_in[cell] = 1;
+            }
+            s.staging.copy_from_slice(&cells_in);
+            s.push_layer().unwrap();
+        }
+        s.finalize_volume(KEEP_ALL).unwrap();
+        s.build_mesh(MERGE_GREEDY).unwrap();
+        // Two prisms, each six merged walls and two caps: 2 × (12 + 8).
+        assert_eq!(s.triangle_count(), 40);
+        assert_eq!(s.vertex_count(), 24);
+    }
+
+    /// Merging is a pure function of the volume too — same fixture, same triangles, same bytes, in
+    /// all three formats.
+    #[test]
+    fn every_format_is_byte_identical_across_runs() {
+        for format in [FORMAT_STL, FORMAT_PLY, FORMAT_3MF] {
+            let run = || {
+                let mut s = blob(8);
+                s.build_mesh(MERGE_GREEDY).unwrap();
+                s.serialize_mesh(format, 1.5, 0.6).unwrap();
+                (s.mesh_bytes.clone(), s.parts.iter().map(|p| p.crc32).collect::<Vec<_>>())
+            };
+            let first = run();
+            assert_eq!(first, run(), "format {format} is not reproducible");
+            assert_eq!(first, run(), "format {format} is not reproducible");
+            assert!(first.0.len() > 64);
+        }
+    }
+
+    #[test]
+    fn binary_ply_has_the_shape_the_format_promises() {
+        let mut s = one_voxel(6, 8, 2 * 8 + 3);
+        s.build_mesh(MERGE_GREEDY).unwrap();
+        s.serialize_mesh(FORMAT_PLY, 2.0, 0.8).unwrap();
+        let bytes = s.mesh_bytes.clone();
+
+        let header_end = find_bytes(&bytes, b"end_header\n").expect("a terminated header") + 11;
+        let header = core::str::from_utf8(&bytes[..header_end]).unwrap();
+        assert!(header.starts_with("ply\nformat binary_little_endian 1.0\n"));
+        assert!(header.contains("element vertex 12\n"));
+        assert!(header.contains("element face 20\n"));
+        assert!(header.contains("property list uchar int vertex_indices\n"));
+
+        // 12 vertices × 3 floats, then 20 faces of (count byte + 3 int32).
+        assert_eq!(bytes.len(), header_end + 12 * 12 + 20 * 13);
+        assert_eq!(bytes[header_end + 12 * 12], 3);
+        // PLY is indexed, so it is dramatically smaller than the same surface as an STL.
+        s.serialize_mesh(FORMAT_STL, 2.0, 0.8).unwrap();
+        assert!(bytes.len() < s.mesh_bytes.len());
+    }
+
+    #[test]
+    fn the_3mf_container_carries_three_parts_with_real_units() {
+        let mut s = one_voxel(6, 8, 2 * 8 + 3);
+        s.build_mesh(MERGE_GREEDY).unwrap();
+        s.serialize_mesh(FORMAT_3MF, 2.0, 0.8).unwrap();
+
+        assert_eq!(s.zip_part_count(), 3);
+        assert_eq!(s.zip_part_name(0).unwrap(), "[Content_Types].xml");
+        assert_eq!(s.zip_part_name(1).unwrap(), "_rels/.rels");
+        assert_eq!(s.zip_part_name(2).unwrap(), "3D/3dmodel.model");
+        assert!(s.zip_part_name(3).is_err());
+
+        // The parts tile `mesh_bytes` exactly: JS slices them out by offset, nothing else.
+        let mut expected_offset = 0usize;
+        for index in 0..3 {
+            assert_eq!(s.zip_part_offset(index).unwrap(), expected_offset);
+            let length = s.zip_part_length(index).unwrap();
+            let start = expected_offset;
+            assert_eq!(
+                s.zip_part_crc32(index).unwrap(),
+                crc32(&s.mesh_bytes[start..start + length])
+            );
+            expected_offset += length;
+        }
+        assert_eq!(expected_offset, s.mesh_bytes.len());
+
+        let model = core::str::from_utf8(
+            &s.mesh_bytes[s.zip_part_offset(2).unwrap()..],
+        )
+        .unwrap();
+        // Units are the whole reason to prefer 3MF: millimetres are declared, not guessed at import.
+        assert!(model.contains(r#"<model unit="millimeter""#));
+        assert_eq!(model.matches("<vertex ").count(), 12);
+        assert_eq!(model.matches("<triangle ").count(), 20);
+        assert!(model.contains("<item objectid=\"1\"/>"));
+        // Cell 3 of row 2, corner 0: X = 3·3 + 2 = 11 lattice units × (cellSize/2) = 11 mm.
+        assert!(model.contains(r#"x="11""#), "expected an exact whole-millimetre coordinate");
+    }
+
+    /// The reserved length must genuinely bound the written one. If it ever stops doing so the
+    /// failure is silent — a `Vec` doubling, an 80 MB spike, and a memory budget quietly missed —
+    /// so it is asserted on the widest coordinates and the largest indices available.
+    #[test]
+    fn the_3mf_reservation_bounds_what_gets_written() {
+        for (merge, cell_size, layer_height) in [
+            (MERGE_GREEDY, 2.0, 0.8),
+            (MERGE_NONE, 2.0, 0.8),
+            // Scales chosen to make the decimals as wide as they get: a large integer part on one
+            // axis and a fully populated fractional part on another.
+            (MERGE_NONE, 123.456, 0.000_7),
+            (MERGE_GREEDY, 0.001, 999.5),
+        ] {
+            let mut s = blob(12);
+            s.build_mesh(merge).unwrap();
+            let bound = s.model_upper_bound(cell_size, layer_height);
+            s.serialize_mesh(FORMAT_3MF, cell_size, layer_height).unwrap();
+            let written = s.zip_part_length(2).unwrap();
+            assert!(
+                written <= bound,
+                "3MF model of {written} bytes overran its {bound}-byte reservation"
+            );
+        }
+    }
+
+    #[test]
+    fn decimals_are_written_exactly_and_without_a_negative_zero() {
+        let render = |value: f64| {
+            let mut out = Vec::new();
+            push_decimal(&mut out, value);
+            String::from_utf8(out).unwrap()
+        };
+        assert_eq!(render(0.0), "0");
+        assert_eq!(render(-0.0000001), "0");
+        assert_eq!(render(11.0), "11");
+        assert_eq!(render(-1.5), "-1.5");
+        assert_eq!(render(0.8), "0.8");
+        assert_eq!(render(1.732051), "1.732051");
+    }
+
+    /// The CRC in a zip header is over the *uncompressed* bytes, and a wrong one makes an archive
+    /// that opens in some readers and is rejected by others. Pinned against the polynomial's own
+    /// published check value.
+    #[test]
+    fn crc32_matches_the_published_check_value() {
+        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
+        assert_eq!(crc32(b""), 0);
+    }
+
+    /// Not named `find`: the module already has one, and shadowing the union-find primitive inside
+    /// its own test module is a trap waiting for the next person.
+    fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+        haystack.windows(needle.len()).position(|window| window == needle)
     }
 
     #[test]

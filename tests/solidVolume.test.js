@@ -7,10 +7,14 @@ import {
   INTERPOLATE_NONE,
   INTERPOLATE_UNION,
   FORMAT_STL,
+  FORMAT_PLY,
+  FORMAT_3MF,
   KEEP_ALL,
   KEEP_LARGEST,
   KEEP_PLATE_CONNECTED,
+  MERGE_GREEDY,
   MERGE_NONE,
+  solidMemoryBytes,
 } from '../src/embed/solid.js';
 import {createSimulation} from '../src/embed/sim.js';
 import {isVacuumStable, rulesetToHex, VACUUM_RULE_INDEX} from '../src/core/rulesetHex.js';
@@ -355,6 +359,179 @@ describe('solid volume interpolation and components', () => {
     await expect(stack.export({merge: 'clever'})).rejects.toThrow(/merge/);
     await expect(stack.export({cellSize: 0, merge: MERGE_NONE})).rejects.toThrow(/positive/);
     stack.free();
+  });
+
+  /** An independent CRC-32, so the engine's checksum is checked rather than echoed. */
+  const crc32 = (bytes) => {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit++) {
+        crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  };
+
+  /**
+   * Read a zip container the way a slicer would: from the end-of-central-directory record
+   * backwards, never by trusting the order entries happen to appear in.
+   */
+  const readZip = async (bytes) => {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let end = bytes.length - 22;
+    while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) end--;
+    expect(end, 'no end-of-central-directory record').toBeGreaterThanOrEqual(0);
+
+    const count = view.getUint16(end + 10, true);
+    let at = view.getUint32(end + 16, true);
+    const entries = {};
+    for (let index = 0; index < count; index++) {
+      expect(view.getUint32(at, true)).toBe(0x02014b50);
+      const method = view.getUint16(at + 10, true);
+      const crc = view.getUint32(at + 16, true);
+      const compressed = view.getUint32(at + 20, true);
+      const uncompressed = view.getUint32(at + 24, true);
+      const nameLength = view.getUint16(at + 28, true);
+      const localAt = view.getUint32(at + 42, true);
+      const name = new TextDecoder().decode(bytes.subarray(at + 46, at + 46 + nameLength));
+
+      expect(view.getUint32(localAt, true)).toBe(0x04034b50);
+      const localNameLength = view.getUint16(localAt + 26, true);
+      const extraLength = view.getUint16(localAt + 28, true);
+      const dataAt = localAt + 30 + localNameLength + extraLength;
+      const payload = bytes.subarray(dataAt, dataAt + compressed);
+
+      const stream = new DecompressionStream(method === 8 ? 'deflate-raw' : 'gzip');
+      const writer = stream.writable.getWriter();
+      const written = writer.write(payload).then(() => writer.close());
+      const inflated = new Uint8Array(await new Response(stream.readable).arrayBuffer());
+      await written;
+      expect(inflated.length, `${name} inflated length`).toBe(uncompressed);
+
+      // A wrong CRC is the failure that opens in one reader and is rejected by the next, so it is
+      // recomputed here rather than taken on trust from the header that declares it.
+      expect(crc32(inflated), `${name} crc32`).toBe(crc);
+
+      entries[name] = {crc, text: new TextDecoder().decode(inflated)};
+      at += 46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+    }
+    return entries;
+  };
+
+  /** A stack whose surface is worth merging: a tall run over an irregular footprint. */
+  const tower = () => {
+    const rows = 6;
+    const cols = 8;
+    const cells = new Uint8Array(rows * cols);
+    cells[cellAt(cols, 2, 2)] = 1;
+    cells[cellAt(cols, 2, 3)] = 1;
+    cells[cellAt(cols, 3, 3)] = 1;
+    return run({rows, cols, interpolate: INTERPOLATE_NONE}, Array.from({length: 12}, () => cells));
+  };
+
+  it('merges greedily by default and collapses the vertical runs', async () => {
+    const merged = tower();
+    await merged.stack.export({format: FORMAT_STL});
+    const mergedTriangles = merged.stack.triangleCount;
+    merged.stack.free();
+
+    const bare = tower();
+    await bare.stack.export({format: FORMAT_STL, merge: MERGE_NONE});
+    const bareTriangles = bare.stack.triangleCount;
+    bare.stack.free();
+
+    // Twelve identical layers: every exposed wall is one run, so the walls cost what a single
+    // layer's walls cost and only the two caps survive per column.
+    expect(mergedTriangles).toBeLessThan(bareTriangles / 3);
+
+    const explicit = tower();
+    await explicit.stack.export({format: FORMAT_STL, merge: MERGE_GREEDY});
+    expect(explicit.stack.triangleCount).toBe(mergedTriangles);
+    explicit.stack.free();
+  });
+
+  it('reports how much of the merged mesh is caps', async () => {
+    const {stack} = tower();
+    await stack.export({format: FORMAT_STL});
+    // Merging welds walls and leaves caps alone, so after it the caps are the majority term — the
+    // measurement §5.5 defers the ear clipper behind, rather than a guess about it.
+    expect(stack.capTriangleCount).toBeGreaterThan(0);
+    expect(stack.capTriangleCount).toBeLessThanOrEqual(stack.triangleCount);
+    stack.free();
+  });
+
+  it('writes an indexed binary PLY smaller than the same surface as STL', async () => {
+    const {stack} = tower();
+    const ply = await stack.export({format: FORMAT_PLY});
+    const stl = await stack.export({format: FORMAT_STL});
+    const header = new TextDecoder().decode(ply.subarray(0, 200));
+    expect(header.startsWith('ply\nformat binary_little_endian 1.0\n')).toBe(true);
+    expect(header).toContain(`element vertex ${stack.vertexCount}\n`);
+    expect(header).toContain(`element face ${stack.triangleCount}\n`);
+    expect(ply.byteLength).toBeLessThan(stl.byteLength);
+    stack.free();
+  });
+
+  it('writes a 3MF that is a real zip carrying a real model in millimetres', async () => {
+    const {stack} = tower();
+    const bytes = await stack.export({format: FORMAT_3MF, cellSize: 2, layerHeight: 0.8});
+    const entries = await readZip(bytes);
+
+    expect(Object.keys(entries).sort()).toEqual([
+      '3D/3dmodel.model',
+      '[Content_Types].xml',
+      '_rels/.rels',
+    ]);
+    // The relationship has to point at the part that actually exists, or a slicer opens the
+    // archive, finds no model, and reports an empty file rather than an error.
+    expect(entries['_rels/.rels'].text).toContain('Target="/3D/3dmodel.model"');
+    expect(entries['[Content_Types].xml'].text).toContain('Extension="model"');
+
+    const model = entries['3D/3dmodel.model'].text;
+    expect(model).toContain('<model unit="millimeter"');
+    expect(model.match(/<vertex /g)).toHaveLength(stack.vertexCount);
+    expect(model.match(/<triangle /g)).toHaveLength(stack.triangleCount);
+    expect(model).toContain('<item objectid="1"/>');
+    // Every index the triangles reference must exist among the vertices.
+    for (const [, v1, v2, v3] of model.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"\/>/g)) {
+      for (const index of [v1, v2, v3]) {
+        expect(Number(index)).toBeLessThan(stack.vertexCount);
+      }
+    }
+    // Compression is the point of the container, not incidental to it.
+    expect(bytes.byteLength).toBeLessThan(new TextEncoder().encode(model).byteLength);
+    stack.free();
+  });
+
+  it('produces byte-identical containers for identical option blocks', async () => {
+    const build = async () => {
+      const {stack} = tower();
+      const bytes = await stack.export({format: FORMAT_3MF, cellSize: 1.5, layerHeight: 0.6});
+      stack.free();
+      return bytes;
+    };
+    const first = await build();
+    expect(Array.from(await build())).toEqual(Array.from(first));
+  });
+
+  it('keeps the merged and unmerged meshes describing the same object', async () => {
+    // The volume is what defines the solid; merging only changes how the surface is written down.
+    // So the report — components, kept matter, floating pieces — must not move at all.
+    const merged = tower();
+    await merged.stack.export({format: FORMAT_3MF});
+    const bare = tower();
+    await bare.stack.export({format: FORMAT_3MF, merge: MERGE_NONE});
+    expect(merged.report).toEqual(bare.report);
+    expect(merged.stack.volumeChecksum()).toBe(bare.stack.volumeChecksum());
+    merged.stack.free();
+    bare.stack.free();
+  });
+
+  it('exposes the artifact memory a host needs to budget a run', () => {
+    expect(solidMemoryBytes()).toBeGreaterThan(0);
+    // Its own memory, not the simulating engine's: the artifacts are separately instantiated.
+    expect(solidMemoryBytes() % 65536).toBe(0);
   });
 
   it('refuses a half-pushed finalize and rejects unknown policies', () => {

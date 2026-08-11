@@ -22,6 +22,11 @@ export interface SolidExportOptions {
   cellSize?: number
   /** Thickness of one layer in millimetres. Defaults to 0.8. */
   layerHeight?: number
+  /**
+   * Defaults to `'greedy'`, which is worth well over an order of magnitude in triangles. Use
+   * `'none'` if a strict manifold validator objects to the T-junctions merging creates; both
+   * meshes bound exactly the same solid, and slicers do not care.
+   */
   merge?: SolidMerge
 }
 
@@ -72,6 +77,12 @@ export function initSolidEngine(): Promise<void>
 
 /** Version of the volume layout, mesh, and serialized bytes. */
 export function solidEngineVersion(): number
+
+/**
+ * Bytes of linear memory the solid artifact holds. Wasm memory never shrinks, so after a run this
+ * is that run's peak. Counts this artifact alone — the engine being extruded has its own.
+ */
+export function solidMemoryBytes(): number
 
 /**
  * What `finalize()` found. A slicer will not join separate bodies, so this is the difference
@@ -133,6 +144,11 @@ export class SolidStack {
   readonly triangleCount: number
   /** Welded vertices in the last built mesh. */
   readonly vertexCount: number
+  /**
+   * Triangles belonging to a top or bottom cap. Merging welds lateral walls and leaves caps alone,
+   * so this says whether cap merging would buy anything on a given object.
+   */
+  readonly capTriangleCount: number
   /**
    * Mesh the finalized volume and serialize it. Async because the 3MF container is deflated by
    * `CompressionStream` — the only stage JavaScript owns, and only because it is not per-voxel.

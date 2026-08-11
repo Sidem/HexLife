@@ -69,7 +69,23 @@ export class WorldSolid {
      * want to inspect a fixture; the pipeline never reads the volume one voxel at a time from JS.
      */
     voxelAt(cell: number, layer: number): boolean;
+    /**
+     * CRC-32 of the part's UNCOMPRESSED bytes, which is what a zip entry header records.
+     */
+    zipPartCrc32(index: number): number;
+    zipPartLength(index: number): number;
+    zipPartName(index: number): string;
+    /**
+     * Byte offset of part `index` within `meshPtr`.
+     */
+    zipPartOffset(index: number): number;
     readonly basePlate: number;
+    /**
+     * Triangles belonging to a top or bottom cap. Caps are the one thing greedy merging leaves
+     * alone (§5.5), so this is the measurement that decides whether an ear clipper is ever worth
+     * writing — the answer is "only if this dominates the total".
+     */
+    readonly capTriangleCount: number;
     readonly columns: number;
     /**
      * Components found in the welded volume, before the retention policy.
@@ -104,6 +120,14 @@ export class WorldSolid {
      * Bytes the bit-packed volume occupies.
      */
     readonly volumeBytes: number;
+    /**
+     * Members of the container the last `serializeMesh` produced, or 0 for a single-file format.
+     *
+     * This is how JavaScript learns that it is holding a 3MF and must wrap the parts in a zip:
+     * Rust emits every byte and every checksum, and JS contributes only the deflate — which is
+     * native, not a loop — and about ninety bytes of header per entry.
+     */
+    readonly zipPartCount: number;
 }
 
 /**
@@ -143,11 +167,18 @@ export interface InitOutput {
     readonly worldsolid_serializeMesh: (a: number, b: number, c: number, d: number) => [number, number];
     readonly worldsolid_meshPtr: (a: number) => number;
     readonly worldsolid_meshLen: (a: number) => number;
+    readonly worldsolid_capTriangleCount: (a: number) => number;
+    readonly worldsolid_zipPartCount: (a: number) => number;
+    readonly worldsolid_zipPartName: (a: number, b: number) => [number, number, number, number];
+    readonly worldsolid_zipPartOffset: (a: number, b: number) => [number, number, number];
+    readonly worldsolid_zipPartLength: (a: number, b: number) => [number, number, number];
+    readonly worldsolid_zipPartCrc32: (a: number, b: number) => [number, number, number];
     readonly worldsolid_volumeChecksum: (a: number) => number;
     readonly worldsolid_voxelAt: (a: number, b: number, c: number) => [number, number, number];
     readonly solid_engine_version: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __externref_table_dealloc: (a: number) => void;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

@@ -35,7 +35,9 @@ function parseArgs(argv) {
         interpolate: 'bridge',
         keep: 'plate-connected',
         format: 'stl',
-        merge: 'none',
+        // Mirrors the engine's own default, so the harness measures the pipeline that actually
+        // ships. Pass `--merge none` to reproduce the Phase 2 baseline.
+        merge: 'greedy',
         cellSize: 2,
         layerHeight: 0.8,
         out: 'dist/solid-sample',
@@ -158,12 +160,20 @@ async function main() {
         console.log(`components    ${report.componentCount} found, ${report.keptComponents} kept, `
             + `${report.floating} floating`);
         console.log(`voxels        ${report.keptVoxels} kept, ${report.droppedVoxels} dropped`);
+        const caps = stack.capTriangleCount;
         console.log(`mesh          ${stack.triangleCount} triangles, ${stack.vertexCount} welded vertices`);
+        // §5.5 defers cap merging behind a measurement rather than a hunch, so the measurement is
+        // printed every run: caps are 4 triangles per exposed face, laterals 2 per exposed wall.
+        console.log(`  of which    ${caps} cap (${(caps * 100 / Math.max(1, stack.triangleCount)).toFixed(1)}%), `
+            + `${stack.triangleCount - caps} lateral`);
         console.log(`bytes         ${(bytes.byteLength / 1024 / 1024).toFixed(2)} MiB (${options.format}, merge=${options.merge})`);
         console.log(`timing        ingest ${(ingestedAt - startedAt).toFixed(0)} ms, `
             + `finalize ${(finalizedAt - ingestedAt).toFixed(0)} ms, `
             + `export ${(exportedAt - finalizedAt).toFixed(0)} ms, `
             + `total ${(exportedAt - startedAt).toFixed(0)} ms`);
+        // Wasm memory grows and never shrinks, so after a full run this IS the run's peak — and it
+        // is the solid artifact's own memory, not the simulating engine's.
+        console.log(`peak memory   ${(solid.solidMemoryBytes() / 1024 / 1024).toFixed(2)} MiB (solid artifact linear memory)`);
         console.log(`wrote         ${path.relative(REPO_ROOT, file)}`);
 
         stack.free();
