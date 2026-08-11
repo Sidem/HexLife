@@ -101,7 +101,9 @@ describe('solid Phase-0 geometry contract', () => {
     expect(stack.solidStates).toBe(SOLID_STATES_BINARY);
     expect(stack.interpolate).toBe(INTERPOLATE_BRIDGE);
     expect(stack.totalLayers).toBe(2 + 100 * 2);
-    expect(stack.volumeBytes).toBe(Math.ceil((1080 * 202) / 8));
+    // Layers are word-aligned so a layer is a contiguous `u64` slice and the bitwise stages stay
+    // word-parallel; the padding costs at most 63 bits per layer.
+    expect(stack.volumeBytes).toBe(Math.ceil(1080 / 64) * 8 * 202);
     stack.free();
     expect(() => stack.totalLayers).toThrow(/freed/);
   });
@@ -136,7 +138,7 @@ describe('solid Phase-0 geometry contract', () => {
     expect(solidEngineVersion()).toBe(1);
   });
 
-  it('shares the canonical neighbor table on both lattice parities', () => {
+  it('shares the canonical neighbor table on both lattice parities, with an open boundary', () => {
     // §4: the mesh's adjacency must BE the simulation's adjacency. If these disagree, every lateral
     // cull decision is silently wrong and the result is a plausible-looking broken object — the
     // worst failure mode this engine has.
@@ -144,21 +146,29 @@ describe('solid Phase-0 geometry contract', () => {
     // The parity is by COLUMN despite the `odd_r`/`even_r` key names: this is a flat-top odd-q
     // lattice, so it is the columns that step half a row. Reading those names as rows produces a
     // table that is wrong on exactly half the grid.
+    //
+    // The boundary is OPEN. The simulation wraps; a printed object cannot, and §13.3 accepts that
+    // the seam cuts features. So a direction that would wrap has no prism on the far side of that
+    // face and reports -1.
     const rows = 6;
     const cols = 8;
     const stack = createSolidStack({rows, cols, ticks: 2});
+    let seams = 0;
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const table = col % 2 === 0 ? neighborDirs.even_r : neighborDirs.odd_r;
         const cell = row * cols + col;
         for (let direction = 0; direction < 6; direction++) {
           const [dc, dr] = table[direction];
-          const expectedCol = (((col + dc) % cols) + cols) % cols;
-          const expectedRow = (((row + dr) % rows) + rows) % rows;
-          expect(stack.neighborOf(cell, direction)).toBe(expectedRow * cols + expectedCol);
+          const nc = col + dc;
+          const nr = row + dr;
+          const wraps = nc < 0 || nc >= cols || nr < 0 || nr >= rows;
+          if (wraps) seams++;
+          expect(stack.neighborOf(cell, direction)).toBe(wraps ? -1 : nr * cols + nc);
         }
       }
     }
+    expect(seams).toBeGreaterThan(0);
     expect(() => stack.neighborOf(rows * cols, 0)).toThrow(/out of range/);
     expect(() => stack.neighborOf(0, 6)).toThrow(/out of range/);
     stack.free();

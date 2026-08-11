@@ -26,12 +26,80 @@ export class WorldSolid {
         return ret >>> 0;
     }
     /**
-     * The linear index of `cell`'s neighbor in canonical `direction` 0..5 — the same table the
-     * lateral faces are culled against.
+     * Components found in the welded volume, before the retention policy.
+     * @returns {number}
+     */
+    get componentCount() {
+        const ret = wasm.worldsolid_componentCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    get droppedVoxels() {
+        const ret = wasm.worldsolid_droppedVoxels(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Weld the volume, label components, apply the retention policy, and report what happened.
      *
-     * Bounded and O(1): this is a geometry accessor for parity checks, never a data path. Layer
-     * data crosses the boundary in exactly one bulk copy per layer (§2), and it does not come
-     * through here.
+     * A slicer will not join separate bodies — it will happily print forty loose fragments — so
+     * the report exists to tell the user which case they are in *before* they find out on the
+     * build plate.
+     * @param {number} keep
+     */
+    finalizeVolume(keep) {
+        const ret = wasm.worldsolid_finalizeVolume(this.__wbg_ptr, keep);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * Components that never reach layer 0. Under a vacuum-stable rule with bridge interpolation
+     * this is provably zero; anywhere else it is the count of pieces that would print loose.
+     * @returns {number}
+     */
+    get floating() {
+        const ret = wasm.worldsolid_floating(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {boolean}
+     */
+    get isFinalized() {
+        const ret = wasm.worldsolid_isFinalized(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Components that survived the policy. One means the object prints as a single piece.
+     * @returns {number}
+     */
+    get keptComponents() {
+        const ret = wasm.worldsolid_keptComponents(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    get keptVoxels() {
+        const ret = wasm.worldsolid_keptVoxels(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Pointer to the staging layer. JS builds one `Uint8Array` over this and reuses it forever.
+     * @returns {number}
+     */
+    layerPtr() {
+        const ret = wasm.worldsolid_layerPtr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * The linear index of `cell`'s neighbor in canonical `direction` 0..5, or `-1` where that
+     * direction leaves the grid.
+     *
+     * This is the table lateral faces are culled against and components are grown over, exposed so
+     * a host can pin the mesh's adjacency against `neighbor-dirs.json` rather than trusting a
+     * second derivation of the hex geometry. Bounded and O(1) — never a data path.
      * @param {number} cell
      * @param {number} direction
      * @returns {number}
@@ -41,23 +109,24 @@ export class WorldSolid {
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
-        return ret[0] >>> 0;
+        return ret[0];
     }
     /**
-     * Validate the geometry and fix the allocation plan.
+     * Validate the geometry and allocate every buffer.
      *
-     * Every buffer sized from these numbers is allocated up front in later phases: growing the
-     * isolated linear memory after JavaScript has built a view into it detaches that view, and the
-     * whole point of the one-`set`-per-layer ingestion path is that the view is built once.
+     * Everything is allocated here, up front: growing the isolated linear memory after JavaScript
+     * has built a view into it detaches that view, and the whole point of the one-`set`-per-layer
+     * ingestion path is that the view is built exactly once.
      * @param {number} rows
      * @param {number} columns
      * @param {number} ticks
      * @param {number} sub_layers
      * @param {number} base_plate
      * @param {number} solid_states
+     * @param {number} interpolate
      */
-    constructor(rows, columns, ticks, sub_layers, base_plate, solid_states) {
-        const ret = wasm.worldsolid_new(rows, columns, ticks, sub_layers, base_plate, solid_states);
+    constructor(rows, columns, ticks, sub_layers, base_plate, solid_states, interpolate) {
+        const ret = wasm.worldsolid_new(rows, columns, ticks, sub_layers, base_plate, solid_states, interpolate);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -70,6 +139,26 @@ export class WorldSolid {
      */
     get numCells() {
         const ret = wasm.worldsolid_numCells(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Ingest the staging layer as tick `pushedLayers`.
+     *
+     * Applies the `solidStates` mask while bit-packing — one pass, no intermediate — and, from the
+     * second tick on, fills the interpolation layers that sit between this layer and the previous
+     * one now that both endpoints are known.
+     */
+    pushLayer() {
+        const ret = wasm.worldsolid_pushLayer(this.__wbg_ptr);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
+     * @returns {number}
+     */
+    get pushedLayers() {
+        const ret = wasm.worldsolid_pushedLayers(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -109,13 +198,35 @@ export class WorldSolid {
         return ret >>> 0;
     }
     /**
-     * Bytes the bit-packed volume will occupy once Phase 1 allocates it. Exposed now so a host can
-     * refuse an unprintable request before paying for it.
+     * Bytes the bit-packed volume occupies.
      * @returns {number}
      */
     get volumeBytes() {
         const ret = wasm.worldsolid_volumeBytes(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * FNV-1a over the packed volume. The mesh must be a pure function of its inputs, and this is
+     * the cheapest way for a test to hold the first half of that promise.
+     * @returns {number}
+     */
+    volumeChecksum() {
+        const ret = wasm.worldsolid_volumeChecksum(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Whether the voxel at `(cell, layer)` is solid. Bounded accessor for tests and hosts that
+     * want to inspect a fixture; the pipeline never reads the volume one voxel at a time from JS.
+     * @param {number} cell
+     * @param {number} layer
+     * @returns {boolean}
+     */
+    voxelAt(cell, layer) {
+        const ret = wasm.worldsolid_voxelAt(this.__wbg_ptr, cell, layer);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
     }
 }
 if (Symbol.dispose) WorldSolid.prototype[Symbol.dispose] = WorldSolid.prototype.free;

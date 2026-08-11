@@ -58,6 +58,26 @@ export function initSolidEngine(): Promise<void>
 /** Version of the volume layout, mesh, and serialized bytes. */
 export function solidEngineVersion(): number
 
+/**
+ * What `finalize()` found. A slicer will not join separate bodies, so this is the difference
+ * between "prints as one piece" and "prints as thirty-seven".
+ */
+export interface SolidReport {
+  /** Components in the welded volume, before the retention policy. */
+  componentCount: number
+  /** Components that survived it. One means a single printable object. */
+  keptComponents: number
+  keptVoxels: number
+  droppedVoxels: number
+  /** Components that never reach layer 0 — the pieces that would print loose. */
+  floating: number
+}
+
+export interface SolidFinalizeOptions {
+  /** Defaults to `'all'`. */
+  keepComponents?: SolidKeepComponents
+}
+
 /** A stack under construction: geometry fixed, layers accumulating. */
 export class SolidStack {
   constructor(options: SolidStackOptions)
@@ -73,8 +93,27 @@ export class SolidStack {
   readonly totalLayers: number
   /** Bytes the bit-packed volume occupies. */
   readonly volumeBytes: number
-  /** Linear index of `cell`'s neighbor in canonical `direction` 0..5. Geometry, not a data path. */
+  readonly pushedLayers: number
+  readonly isFinalized: boolean
+  /**
+   * The staging layer, as a view into Wasm memory. Build it once, outside the tick loop, and
+   * `set()` into it each tick — that copy is the only data movement this pipeline allows.
+   */
+  layerView(): Uint8Array
+  /** Ingest the staging layer as the next tick. */
+  pushLayer(): void
+  /** Weld, label components, apply the policy, and report. */
+  finalize(options?: SolidFinalizeOptions): SolidReport
+  /**
+   * Linear index of `cell`'s neighbor in canonical `direction` 0..5, or `-1` where that direction
+   * leaves the grid: the printed object has an open boundary even though the simulation is
+   * toroidal. Geometry accessor, not a data path.
+   */
   neighborOf(cell: number, direction: number): number
+  /** Whether the voxel at `(cell, layer)` is solid. For inspecting a fixture. */
+  voxelAt(cell: number, layer: number): boolean
+  /** FNV-1a over the packed volume. */
+  volumeChecksum(): number
   /** Mandatory: releases the isolated Wasm buffers. */
   free(): void
 }
