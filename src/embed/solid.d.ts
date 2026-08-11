@@ -10,6 +10,21 @@ export const FORMAT_STL: 'stl'
 export const FORMAT_PLY: 'ply'
 export const FORMAT_3MF: '3mf'
 
+export const MERGE_NONE: 'none'
+export const MERGE_GREEDY: 'greedy'
+
+export type SolidMerge = typeof MERGE_NONE | typeof MERGE_GREEDY
+
+export interface SolidExportOptions {
+  /** Defaults to `'stl'`. */
+  format?: SolidFormat
+  /** Hexagon circumradius in millimetres. Defaults to 2. */
+  cellSize?: number
+  /** Thickness of one layer in millimetres. Defaults to 0.8. */
+  layerHeight?: number
+  merge?: SolidMerge
+}
+
 /** State 1 is matter, state 0 is void — the mask for a binary `World` or `<hexlife-world>`. */
 export const SOLID_STATES_BINARY: 2
 
@@ -114,6 +129,15 @@ export class SolidStack {
   voxelAt(cell: number, layer: number): boolean
   /** FNV-1a over the packed volume. */
   volumeChecksum(): number
+  /** Triangles in the last built mesh. */
+  readonly triangleCount: number
+  /** Welded vertices in the last built mesh. */
+  readonly vertexCount: number
+  /**
+   * Mesh the finalized volume and serialize it. Async because the 3MF container is deflated by
+   * `CompressionStream` — the only stage JavaScript owns, and only because it is not per-voxel.
+   */
+  export(options?: SolidExportOptions): Promise<Uint8Array>
   /** Mandatory: releases the isolated Wasm buffers. */
   free(): void
 }

@@ -63,11 +63,76 @@ pub const KEEP_ALL: u8 = 0;
 pub const KEEP_LARGEST: u8 = 1;
 pub const KEEP_PLATE_CONNECTED: u8 = 2;
 
+/// Quad merging.
+pub const MERGE_NONE: u8 = 0;
+pub const MERGE_GREEDY: u8 = 1;
+
+/// Serialized formats.
+pub const FORMAT_STL: u8 = 0;
+
 /// Sentinel for a lateral direction that leaves the grid. See the module header.
 const NO_NEIGHBOR: u32 = u32::MAX;
 
 const FLAG_TOUCHES_PLATE: u8 = 1;
 const FLAG_KEEP: u8 = 2;
+
+// ---------------------------------------------------------------------------------------------
+// Geometry contract — single-sourced from the renderer, NOT re-derived.
+//
+// Flat-top hexagons, unit circumradius R, vertices at 0°, 60°, …, 300°
+// (`Utils.createFlatTopHexagonVertices`); centers at `x = col · 1.5R`,
+// `y = row · √3R + parityOffset` with the half-step by COLUMN parity (`Utils.gridToPixelCoords`).
+//
+// Both coordinates come out rational in R, so a vertex is addressed by exact INTEGERS and the
+// float multiply happens once, at emission:
+//
+//     x = X · (cellSize / 2)          X = 3·col + CORNER_X[k]
+//     y = Y · (cellSize · √3 / 2)     Y = 2·row + (col & 1) + CORNER_Y[k]
+//     z = Z · layerHeight             Z = layer
+//
+// That is what makes the vertex weld exact. Two prisms that share an edge produce bit-identical
+// integer keys, so there are no epsilon comparisons and no cracks — and none of it drifts with
+// grid size the way accumulated floats would.
+const CORNER_X: [i32; 6] = [2, 1, -1, -2, -1, 1];
+const CORNER_Y: [i32; 6] = [0, 1, 1, 0, -1, -1];
+
+/// Hexagon edge shared with the neighbor in canonical direction `d`.
+///
+/// Edge `k` runs from corner `k` to corner `k+1` and faces outward at `30° + 60k`; the neighbor in
+/// direction `d` lies at `150° + 60d`. Hence `edge = (d + 2) mod 6`, on BOTH column parities —
+/// which is not obvious, and is pinned by `shared_faces_have_identical_vertices` rather than
+/// asserted here.
+#[inline]
+fn lateral_edge(direction: usize) -> usize {
+    (direction + 2) % 6
+}
+
+/// Unit normals for the six lateral faces, `150° + 60d`.
+///
+/// Hardcoded rather than computed: every one is an exact multiple of 30°, so the components are
+/// only ever 0, ±1/2, ±√3/2 — and a runtime `cos`/`sin` would make the exported bytes depend on the
+/// platform's libm, which §7 forbids.
+const SQRT3_OVER_2: f32 = 0.866_025_4;
+const LATERAL_NORMALS: [[f32; 3]; 6] = [
+    [-SQRT3_OVER_2, 0.5, 0.0],
+    [-SQRT3_OVER_2, -0.5, 0.0],
+    [0.0, -1.0, 0.0],
+    [SQRT3_OVER_2, -0.5, 0.0],
+    [SQRT3_OVER_2, 0.5, 0.0],
+    [0.0, 1.0, 0.0],
+];
+const NORMAL_UP: usize = 6;
+const NORMAL_DOWN: usize = 7;
+const FACE_NORMALS: [[f32; 3]; 8] = [
+    LATERAL_NORMALS[0],
+    LATERAL_NORMALS[1],
+    LATERAL_NORMALS[2],
+    LATERAL_NORMALS[3],
+    LATERAL_NORMALS[4],
+    LATERAL_NORMALS[5],
+    [0.0, 0.0, 1.0],
+    [0.0, 0.0, -1.0],
+];
 
 #[wasm_bindgen]
 pub struct WorldSolid {
@@ -113,6 +178,31 @@ pub struct WorldSolid {
     pushed: usize,
     finalized: bool,
     report: Report,
+
+    mesh: Mesh,
+    /// Serialized bytes. Allocated at export time — the one place §5.1's preallocation rule does
+    /// not reach, which is why JS re-views its memory after every export.
+    mesh_bytes: Vec<u8>,
+}
+
+/// An indexed surface mesh in EXACT lattice coordinates.
+///
+/// Positions stay integer until serialization so the weld is exact and the geometry is a pure
+/// function of the volume. `face_normals` stores a normal id per triangle rather than a vector,
+/// because there are only eight distinct face orientations in this lattice.
+#[derive(Default)]
+struct Mesh {
+    /// Three lattice integers per vertex: `(X, Y, Z)`.
+    positions: Vec<i32>,
+    indices: Vec<u32>,
+    face_normals: Vec<u8>,
+    /// Open-addressed weld table: packed lattice key → vertex index + 1, 0 meaning empty. Never
+    /// iterated — vertex indices are assigned in emission order, so the output does not depend on
+    /// the table's layout.
+    weld_keys: Vec<u64>,
+    weld_values: Vec<u32>,
+    weld_mask: usize,
+    weld_len: usize,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -214,6 +304,8 @@ impl WorldSolid {
             pushed: 0,
             finalized: false,
             report: Report::default(),
+            mesh: Mesh::default(),
+            mesh_bytes: Vec::new(),
         };
 
         // The base plate is real matter in the volume from the start, so nothing downstream needs a
@@ -398,6 +490,108 @@ impl WorldSolid {
     #[wasm_bindgen(getter)]
     pub fn floating(&self) -> u32 {
         self.report.floating
+    }
+
+    // ---- meshing ------------------------------------------------------------------------------
+
+    /// Cull every face shared with a kept solid voxel and emit the rest as an indexed mesh.
+    ///
+    /// A lateral face becomes one quad (two triangles); a cap becomes a four-triangle fan — a
+    /// six-triangle centre fan would cost 50% more for nothing, and caps are a minority of the
+    /// surface in any tall extrusion.
+    #[wasm_bindgen(js_name = buildMesh)]
+    pub fn build_mesh(&mut self, merge: u8) -> Result<(), String> {
+        if !self.finalized {
+            return Err("WorldSolid.buildMesh: finalize the volume first.".into());
+        }
+        if merge == MERGE_GREEDY {
+            return Err("WorldSolid.buildMesh: greedy merging arrives in Phase 3.".into());
+        }
+        if merge != MERGE_NONE {
+            return Err("WorldSolid.buildMesh: unknown merge mode.".into());
+        }
+        self.mesh.reset(self.report.kept_voxels as usize);
+
+        for layer in 0..self.total_layers {
+            let base = self.layer_base(layer);
+            for word_index in 0..self.words_per_layer {
+                let mut word = self.volume[base + word_index];
+                while word != 0 {
+                    let bit = word.trailing_zeros() as usize;
+                    word &= word - 1;
+                    let cell = word_index * 64 + bit;
+                    let col = (cell % self.columns) as i32;
+                    let row = (cell / self.columns) as i32;
+
+                    for direction in 0..6 {
+                        let neighbor = self.neighbors[cell * 6 + direction];
+                        // A seam direction has no prism on the far side, so that face is real,
+                        // exposed boundary surface and must NOT be culled.
+                        let occluded =
+                            neighbor != NO_NEIGHBOR && get_bit(&self.volume, base, neighbor as usize);
+                        if !occluded {
+                            self.mesh.emit_lateral(col, row, layer as i32, direction);
+                        }
+                    }
+
+                    let above_solid = layer + 1 < self.total_layers
+                        && get_bit(&self.volume, base + self.words_per_layer, cell);
+                    if !above_solid {
+                        self.mesh.emit_cap(col, row, layer as i32 + 1, true);
+                    }
+                    let below_solid = layer > 0
+                        && get_bit(&self.volume, base - self.words_per_layer, cell);
+                    if !below_solid {
+                        self.mesh.emit_cap(col, row, layer as i32, false);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[wasm_bindgen(getter, js_name = triangleCount)]
+    pub fn triangle_count(&self) -> usize {
+        self.mesh.face_normals.len()
+    }
+
+    #[wasm_bindgen(getter, js_name = vertexCount)]
+    pub fn vertex_count(&self) -> usize {
+        self.mesh.positions.len() / 3
+    }
+
+    /// Serialize the built mesh. `cell_size` is the hexagon circumradius in millimetres and
+    /// `layer_height` the thickness of one layer; they are independent so the Z aspect ratio is a
+    /// print decision rather than a tick-count accident.
+    ///
+    /// Writes into a Wasm buffer and leaves it addressable through `meshPtr`/`meshLen`. JavaScript
+    /// never formats a triangle.
+    #[wasm_bindgen(js_name = serializeMesh)]
+    pub fn serialize_mesh(
+        &mut self,
+        format: u8,
+        cell_size: f32,
+        layer_height: f32,
+    ) -> Result<(), String> {
+        if !(cell_size.is_finite() && cell_size > 0.0 && layer_height.is_finite() && layer_height > 0.0)
+        {
+            return Err("WorldSolid.serializeMesh: cellSize and layerHeight must be positive.".into());
+        }
+        if format != FORMAT_STL {
+            return Err("WorldSolid.serializeMesh: only binary STL exists before Phase 3.".into());
+        }
+        self.write_binary_stl(cell_size, layer_height);
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = meshPtr)]
+    pub fn mesh_ptr(&self) -> *const u8 {
+        self.mesh_bytes.as_ptr()
+    }
+
+    #[wasm_bindgen(getter, js_name = meshLen)]
+    pub fn mesh_len(&self) -> usize {
+        self.mesh_bytes.len()
     }
 
     /// FNV-1a over the packed volume. The mesh must be a pure function of its inputs, and this is
@@ -646,6 +840,156 @@ impl WorldSolid {
             floating,
         };
     }
+}
+
+impl WorldSolid {
+    /// Binary STL: 80-byte header, `u32` triangle count, then 50 bytes per triangle. No vertex
+    /// sharing at all — it is the universal fallback, not the efficient format.
+    fn write_binary_stl(&mut self, cell_size: f32, layer_height: f32) {
+        let triangles = self.mesh.face_normals.len();
+        self.mesh_bytes.clear();
+        self.mesh_bytes.reserve(84 + triangles * 50);
+
+        let mut header = [0u8; 80];
+        let banner = b"HexLife solid extrusion";
+        header[..banner.len()].copy_from_slice(banner);
+        self.mesh_bytes.extend_from_slice(&header);
+        self.mesh_bytes.extend_from_slice(&(triangles as u32).to_le_bytes());
+
+        // One multiply per coordinate, from the exact lattice integer. No accumulation anywhere.
+        let x_scale = cell_size * 0.5;
+        let y_scale = cell_size * SQRT3_OVER_2;
+        for triangle in 0..triangles {
+            let normal = FACE_NORMALS[self.mesh.face_normals[triangle] as usize];
+            for component in normal {
+                self.mesh_bytes.extend_from_slice(&component.to_le_bytes());
+            }
+            for corner in 0..3 {
+                let vertex = self.mesh.indices[triangle * 3 + corner] as usize;
+                let lattice = &self.mesh.positions[vertex * 3..vertex * 3 + 3];
+                self.mesh_bytes
+                    .extend_from_slice(&(lattice[0] as f32 * x_scale).to_le_bytes());
+                self.mesh_bytes
+                    .extend_from_slice(&(lattice[1] as f32 * y_scale).to_le_bytes());
+                self.mesh_bytes
+                    .extend_from_slice(&(lattice[2] as f32 * layer_height).to_le_bytes());
+            }
+            self.mesh_bytes.extend_from_slice(&0u16.to_le_bytes());
+        }
+    }
+}
+
+impl Mesh {
+    fn reset(&mut self, kept_voxels: usize) {
+        self.positions.clear();
+        self.indices.clear();
+        self.face_normals.clear();
+        // A voxel contributes at most 12 distinct corners; most are shared, so this is generous.
+        // Sizing once here keeps the weld table off the growth path for every realistic volume.
+        let capacity = (kept_voxels.saturating_mul(4).max(64)).next_power_of_two();
+        self.weld_keys.clear();
+        self.weld_keys.resize(capacity, u64::MAX);
+        self.weld_values.clear();
+        self.weld_values.resize(capacity, 0);
+        self.weld_mask = capacity - 1;
+        self.weld_len = 0;
+    }
+
+    /// Intern a vertex by its exact lattice coordinate, assigning indices in emission order.
+    fn vertex(&mut self, x: i32, y: i32, z: i32) -> u32 {
+        // Bias into non-negative territory (corner offsets reach -2 in X and -1 in Y) and pack.
+        let key = (((x + 2) as u64) << 42) | (((y + 1) as u64) << 21) | (z as u64);
+        let mut slot = (splitmix(key) as usize) & self.weld_mask;
+        loop {
+            if self.weld_keys[slot] == u64::MAX {
+                break;
+            }
+            if self.weld_keys[slot] == key {
+                return self.weld_values[slot];
+            }
+            slot = (slot + 1) & self.weld_mask;
+        }
+        let index = (self.positions.len() / 3) as u32;
+        self.weld_keys[slot] = key;
+        self.weld_values[slot] = index;
+        self.weld_len += 1;
+        self.positions.extend_from_slice(&[x, y, z]);
+        if self.weld_len * 4 > self.weld_keys.len() * 3 {
+            self.grow_weld();
+        }
+        index
+    }
+
+    fn grow_weld(&mut self) {
+        let capacity = self.weld_keys.len() * 2;
+        let old_keys = core::mem::replace(&mut self.weld_keys, vec![u64::MAX; capacity]);
+        let old_values = core::mem::replace(&mut self.weld_values, vec![0u32; capacity]);
+        self.weld_mask = capacity - 1;
+        for (key, value) in old_keys.into_iter().zip(old_values) {
+            if key == u64::MAX {
+                continue;
+            }
+            let mut slot = (splitmix(key) as usize) & self.weld_mask;
+            while self.weld_keys[slot] != u64::MAX {
+                slot = (slot + 1) & self.weld_mask;
+            }
+            self.weld_keys[slot] = key;
+            self.weld_values[slot] = value;
+        }
+    }
+
+    fn triangle(&mut self, a: u32, b: u32, c: u32, normal: u8) {
+        self.indices.extend_from_slice(&[a, b, c]);
+        self.face_normals.push(normal);
+    }
+
+    /// The corner of cell `(col, row)` at hexagon vertex `k`, on layer plane `z`.
+    fn corner(&mut self, col: i32, row: i32, z: i32, k: usize) -> u32 {
+        self.vertex(3 * col + CORNER_X[k], 2 * row + (col & 1) + CORNER_Y[k], z)
+    }
+
+    /// One lateral face: the quad swept by hexagon edge `lateral_edge(direction)` from layer plane
+    /// `z` to `z + 1`.
+    ///
+    /// Wound counter-clockwise seen from outside. Corners run in increasing hexagon-vertex order,
+    /// which is counter-clockwise in XY, so `(bottom_a → bottom_b) × ẑ` is the outward normal.
+    fn emit_lateral(&mut self, col: i32, row: i32, z: i32, direction: usize) {
+        let edge = lateral_edge(direction);
+        let a = self.corner(col, row, z, edge);
+        let b = self.corner(col, row, z, (edge + 1) % 6);
+        let b_top = self.corner(col, row, z + 1, (edge + 1) % 6);
+        let a_top = self.corner(col, row, z + 1, edge);
+        let normal = direction as u8;
+        self.triangle(a, b, b_top, normal);
+        self.triangle(a, b_top, a_top, normal);
+    }
+
+    /// One cap: a four-triangle fan from hexagon vertex 0. `up` selects the winding — hexagon
+    /// vertices ascend counter-clockwise in XY, which is outward for a top cap and inward for a
+    /// bottom one.
+    fn emit_cap(&mut self, col: i32, row: i32, z: i32, up: bool) {
+        let mut fan = [0u32; 6];
+        for (k, slot) in fan.iter_mut().enumerate() {
+            *slot = self.corner(col, row, z, k);
+        }
+        let normal = if up { NORMAL_UP as u8 } else { NORMAL_DOWN as u8 };
+        for k in 1..5 {
+            if up {
+                self.triangle(fan[0], fan[k], fan[k + 1], normal);
+            } else {
+                self.triangle(fan[0], fan[k + 1], fan[k], normal);
+            }
+        }
+    }
+}
+
+/// SplitMix64 finalizer — a fixed, platform-independent mixer for the weld table. Deliberately not
+/// `RandomState`: nothing here may depend on a per-process seed.
+#[inline]
+fn splitmix(mut key: u64) -> u64 {
+    key = (key ^ (key >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    key = (key ^ (key >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    key ^ (key >> 31)
 }
 
 /// Engine version for hosts recording a reproducible recipe.
@@ -1115,6 +1459,303 @@ mod tests {
         s.finalize_volume(KEEP_ALL).unwrap();
         assert!(s.finalize_volume(KEEP_ALL).is_err());
         assert!(s.push_layer().is_err());
+    }
+
+    // ---- Phase 2: the mesher ------------------------------------------------------------------
+
+    /// Build a stack with a single solid voxel at `cell` and mesh it.
+    fn one_voxel(rows: usize, cols: usize, cell: usize) -> WorldSolid {
+        let mut s = WorldSolid::new(rows, cols, 1, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let mut layer = vec![0u8; rows * cols];
+        layer[cell] = 1;
+        s.staging.copy_from_slice(&layer);
+        s.push_layer().unwrap();
+        s.finalize_volume(KEEP_ALL).unwrap();
+        s.build_mesh(MERGE_NONE).unwrap();
+        s
+    }
+
+    /// Every triangle's three (vertex, vertex) edges, as directed lattice-index pairs.
+    fn directed_edges(mesh: &Mesh) -> Vec<(u32, u32)> {
+        let mut edges = Vec::with_capacity(mesh.face_normals.len() * 3);
+        for triangle in 0..mesh.face_normals.len() {
+            let a = mesh.indices[triangle * 3];
+            let b = mesh.indices[triangle * 3 + 1];
+            let c = mesh.indices[triangle * 3 + 2];
+            edges.push((a, b));
+            edges.push((b, c));
+            edges.push((c, a));
+        }
+        edges
+    }
+
+    /// §9 test 1 — the irreducible case.
+    #[test]
+    fn an_isolated_voxel_is_eight_faces_and_twenty_triangles() {
+        let s = one_voxel(6, 8, 2 * 8 + 3);
+        // 6 lateral quads = 12 triangles, 2 caps x 4-triangle fan = 8.
+        assert_eq!(s.triangle_count(), 20);
+        // A hexagonal prism has 12 distinct corners and every one is welded exactly once.
+        assert_eq!(s.vertex_count(), 12);
+    }
+
+    /// §9 test 2 — watertight. Every edge appears exactly twice, once in each direction. This is
+    /// the single strongest statement that the surface bounds a solid.
+    #[test]
+    fn the_surface_is_watertight_and_consistently_wound() {
+        let check = |s: &WorldSolid| {
+            let edges = directed_edges(&s.mesh);
+            let mut sorted = edges.clone();
+            sorted.sort_unstable();
+            for (a, b) in &edges {
+                assert_eq!(
+                    sorted.binary_search(&(*a, *b)).is_ok(),
+                    true,
+                    "edge missing from its own list"
+                );
+                // The opposite half-edge must exist exactly once, and this one exactly once.
+                assert_eq!(
+                    sorted.iter().filter(|e| **e == (*a, *b)).count(),
+                    1,
+                    "edge {a}->{b} used twice in the same direction"
+                );
+                assert_eq!(
+                    sorted.iter().filter(|e| **e == (*b, *a)).count(),
+                    1,
+                    "edge {a}->{b} has no opposite"
+                );
+            }
+        };
+        check(&one_voxel(6, 8, 2 * 8 + 3));
+
+        // A column, a slab, and a random blob: the interesting cases are the culled interiors.
+        let mut column = WorldSolid::new(6, 8, 4, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let mut layer = vec![0u8; 48];
+        layer[2 * 8 + 3] = 1;
+        for _ in 0..4 {
+            column.staging.copy_from_slice(&layer);
+            column.push_layer().unwrap();
+        }
+        column.finalize_volume(KEEP_ALL).unwrap();
+        column.build_mesh(MERGE_NONE).unwrap();
+        check(&column);
+
+        let mut slab = WorldSolid::new(4, 6, 3, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let full = vec![1u8; 24];
+        for _ in 0..3 {
+            slab.staging.copy_from_slice(&full);
+            slab.push_layer().unwrap();
+        }
+        slab.finalize_volume(KEEP_ALL).unwrap();
+        slab.build_mesh(MERGE_NONE).unwrap();
+        check(&slab);
+
+        let mut blob = WorldSolid::new(6, 10, 6, 1, 1, 0b10, INTERPOLATE_BRIDGE).unwrap();
+        let mut rng = 0xC0FFEEu64;
+        for _ in 0..6 {
+            let mut cells = vec![0u8; 60];
+            for cell in cells.iter_mut() {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                *cell = (rng & 1) as u8;
+            }
+            blob.staging.copy_from_slice(&cells);
+            blob.push_layer().unwrap();
+        }
+        blob.finalize_volume(KEEP_ALL).unwrap();
+        blob.build_mesh(MERGE_NONE).unwrap();
+        check(&blob);
+    }
+
+    /// §9 test 3 — Euler characteristic on genus-0 fixtures.
+    #[test]
+    fn genus_zero_fixtures_have_euler_characteristic_two() {
+        let euler = |s: &WorldSolid| {
+            let vertices = s.vertex_count() as i64;
+            let faces = s.triangle_count() as i64;
+            let mut edges: Vec<(u32, u32)> = directed_edges(&s.mesh)
+                .into_iter()
+                .map(|(a, b)| if a < b { (a, b) } else { (b, a) })
+                .collect();
+            edges.sort_unstable();
+            edges.dedup();
+            vertices - edges.len() as i64 + faces
+        };
+
+        assert_eq!(euler(&one_voxel(6, 8, 2 * 8 + 3)), 2);
+
+        let mut column = WorldSolid::new(6, 8, 5, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let mut layer = vec![0u8; 48];
+        layer[3 * 8 + 4] = 1;
+        for _ in 0..5 {
+            column.staging.copy_from_slice(&layer);
+            column.push_layer().unwrap();
+        }
+        column.finalize_volume(KEEP_ALL).unwrap();
+        column.build_mesh(MERGE_NONE).unwrap();
+        assert_eq!(euler(&column), 2);
+
+        let mut slab = WorldSolid::new(4, 6, 2, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let full = vec![1u8; 24];
+        for _ in 0..2 {
+            slab.staging.copy_from_slice(&full);
+            slab.push_layer().unwrap();
+        }
+        slab.finalize_volume(KEEP_ALL).unwrap();
+        slab.build_mesh(MERGE_NONE).unwrap();
+        assert_eq!(euler(&slab), 2);
+    }
+
+    /// §9 test 4 — culling. A fully solid volume must emit its boundary shell and nothing else.
+    #[test]
+    fn a_solid_block_emits_only_its_boundary_shell() {
+        let rows = 4;
+        let cols = 6;
+        let layers = 3;
+        let mut s = WorldSolid::new(rows, cols, layers, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let full = vec![1u8; rows * cols];
+        for _ in 0..layers {
+            s.staging.copy_from_slice(&full);
+            s.push_layer().unwrap();
+        }
+        s.finalize_volume(KEEP_ALL).unwrap();
+        s.build_mesh(MERGE_NONE).unwrap();
+
+        // Count the exposed faces independently of the mesher: a lateral face is exposed where the
+        // open-boundary neighbor is missing, and caps only on the top and bottom layers.
+        let mut lateral = 0usize;
+        for cell in 0..rows * cols {
+            for direction in 0..6 {
+                if s.neighbors[cell * 6 + direction] == NO_NEIGHBOR {
+                    lateral += 1;
+                }
+            }
+        }
+        let expected = (lateral * layers) * 2 + (rows * cols) * 2 * 4;
+        assert_eq!(s.triangle_count(), expected);
+    }
+
+    /// The two prisms sharing a face must agree on where that face IS. If the direction-to-edge
+    /// mapping were wrong on either parity, these vertices would not coincide — and the mesh would
+    /// look plausible while being unweldable.
+    #[test]
+    fn shared_faces_have_identical_vertices() {
+        let rows = 6;
+        let cols = 8;
+        let s = WorldSolid::new(rows, cols, 1, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        let lattice = |col: i32, row: i32, k: usize| {
+            (3 * col + CORNER_X[k], 2 * row + (col & 1) + CORNER_Y[k])
+        };
+        for cell in 0..rows * cols {
+            let col = (cell % cols) as i32;
+            let row = (cell / cols) as i32;
+            for direction in 0..6 {
+                let neighbor = s.neighbors[cell * 6 + direction];
+                if neighbor == NO_NEIGHBOR {
+                    continue;
+                }
+                let n_col = (neighbor as usize % cols) as i32;
+                let n_row = (neighbor as usize / cols) as i32;
+
+                let edge = lateral_edge(direction);
+                let mine = [lattice(col, row, edge), lattice(col, row, (edge + 1) % 6)];
+                // The neighbor sees the same wall through the opposite direction.
+                let opposite = lateral_edge((direction + 3) % 6);
+                let theirs = [
+                    lattice(n_col, n_row, opposite),
+                    lattice(n_col, n_row, (opposite + 1) % 6),
+                ];
+                assert!(
+                    (mine[0] == theirs[0] && mine[1] == theirs[1])
+                        || (mine[0] == theirs[1] && mine[1] == theirs[0]),
+                    "cell {cell} direction {direction}: {mine:?} vs {theirs:?}"
+                );
+            }
+        }
+    }
+
+    /// §9 test 8 — determinism. Identical option blocks produce byte-identical exports.
+    #[test]
+    fn exports_are_byte_identical_across_runs() {
+        let run = || {
+            let mut s = WorldSolid::new(6, 10, 8, 1, 1, 0b10, INTERPOLATE_BRIDGE).unwrap();
+            let mut rng = 0x5EEDu64;
+            for _ in 0..8 {
+                let mut cells = vec![0u8; 60];
+                for cell in cells.iter_mut() {
+                    rng ^= rng << 13;
+                    rng ^= rng >> 7;
+                    rng ^= rng << 17;
+                    *cell = (rng & 1) as u8;
+                }
+                s.staging.copy_from_slice(&cells);
+                s.push_layer().unwrap();
+            }
+            s.finalize_volume(KEEP_PLATE_CONNECTED).unwrap();
+            s.build_mesh(MERGE_NONE).unwrap();
+            s.serialize_mesh(FORMAT_STL, 2.0, 0.8).unwrap();
+            s.mesh_bytes.clone()
+        };
+        let first = run();
+        assert_eq!(first, run());
+        assert_eq!(first, run());
+        assert!(first.len() > 84);
+    }
+
+    #[test]
+    fn binary_stl_has_the_shape_the_format_promises() {
+        let mut s = one_voxel(6, 8, 2 * 8 + 3);
+        s.serialize_mesh(FORMAT_STL, 2.0, 0.8).unwrap();
+        let bytes = &s.mesh_bytes;
+        assert_eq!(bytes.len(), 84 + 20 * 50);
+        assert_eq!(&bytes[..7], b"HexLife");
+        let count = u32::from_le_bytes(bytes[80..84].try_into().unwrap());
+        assert_eq!(count, 20);
+
+        // The first triangle belongs to lateral direction 0, whose outward normal is 150°.
+        let normal_x = f32::from_le_bytes(bytes[84..88].try_into().unwrap());
+        let normal_y = f32::from_le_bytes(bytes[88..92].try_into().unwrap());
+        assert_eq!(normal_x, -SQRT3_OVER_2);
+        assert_eq!(normal_y, 0.5);
+
+        // Every Z lands on a layer plane; the prism is exactly one layer tall.
+        let mut zs = Vec::new();
+        for triangle in 0..20 {
+            for corner in 0..3 {
+                let offset = 84 + triangle * 50 + 12 + corner * 12 + 8;
+                zs.push(f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap()));
+            }
+        }
+        assert!(zs.iter().all(|z| *z == 0.0 || *z == 0.8));
+    }
+
+    #[test]
+    fn geometry_scales_by_one_multiply_from_the_lattice() {
+        let mut s = one_voxel(6, 8, 0);
+        s.serialize_mesh(FORMAT_STL, 2.0, 0.5).unwrap();
+        // Cell 0 is column 0, row 0: centre at the origin, so corner 0 sits at (+R, 0) = (2, 0).
+        let xs: Vec<f32> = (0..3)
+            .map(|corner| {
+                let offset = 84 + 12 + corner * 12;
+                f32::from_le_bytes(s.mesh_bytes[offset..offset + 4].try_into().unwrap())
+            })
+            .collect();
+        assert!(xs.iter().all(|x| x.abs() <= 2.0 + 1e-6));
+    }
+
+    #[test]
+    fn refuses_to_mesh_before_finalizing_and_refuses_a_phase_three_option() {
+        let mut s = WorldSolid::new(4, 8, 1, 0, 0, 0b10, INTERPOLATE_NONE).unwrap();
+        assert!(s.build_mesh(MERGE_NONE).is_err());
+        s.staging.copy_from_slice(&vec![0u8; 32]);
+        s.push_layer().unwrap();
+        s.finalize_volume(KEEP_ALL).unwrap();
+        assert!(s.build_mesh(MERGE_GREEDY).is_err());
+        s.build_mesh(MERGE_NONE).unwrap();
+        assert!(s.serialize_mesh(9, 1.0, 1.0).is_err());
+        assert!(s.serialize_mesh(FORMAT_STL, 0.0, 1.0).is_err());
+        assert!(s.serialize_mesh(FORMAT_STL, 1.0, -1.0).is_err());
     }
 
     #[test]

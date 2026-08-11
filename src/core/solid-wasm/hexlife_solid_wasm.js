@@ -19,6 +19,20 @@ export class WorldSolid {
         return ret >>> 0;
     }
     /**
+     * Cull every face shared with a kept solid voxel and emit the rest as an indexed mesh.
+     *
+     * A lateral face becomes one quad (two triangles); a cap becomes a four-triangle fan — a
+     * six-triangle centre fan would cost 50% more for nothing, and caps are a minority of the
+     * surface in any tall extrusion.
+     * @param {number} merge
+     */
+    buildMesh(merge) {
+        const ret = wasm.worldsolid_buildMesh(this.__wbg_ptr, merge);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * @returns {number}
      */
     get columns() {
@@ -91,6 +105,20 @@ export class WorldSolid {
      */
     layerPtr() {
         const ret = wasm.worldsolid_layerPtr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    get meshLen() {
+        const ret = wasm.worldsolid_meshLen(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    meshPtr() {
+        const ret = wasm.worldsolid_meshPtr(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -169,6 +197,23 @@ export class WorldSolid {
         return ret >>> 0;
     }
     /**
+     * Serialize the built mesh. `cell_size` is the hexagon circumradius in millimetres and
+     * `layer_height` the thickness of one layer; they are independent so the Z aspect ratio is a
+     * print decision rather than a tick-count accident.
+     *
+     * Writes into a Wasm buffer and leaves it addressable through `meshPtr`/`meshLen`. JavaScript
+     * never formats a triangle.
+     * @param {number} format
+     * @param {number} cell_size
+     * @param {number} layer_height
+     */
+    serializeMesh(format, cell_size, layer_height) {
+        const ret = wasm.worldsolid_serializeMesh(this.__wbg_ptr, format, cell_size, layer_height);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * @returns {number}
      */
     get solidStates() {
@@ -195,6 +240,20 @@ export class WorldSolid {
      */
     get totalLayers() {
         const ret = wasm.worldsolid_totalLayers(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    get triangleCount() {
+        const ret = wasm.worldsolid_triangleCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    get vertexCount() {
+        const ret = wasm.worldsolid_vertexCount(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**

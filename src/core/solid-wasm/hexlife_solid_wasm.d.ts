@@ -5,6 +5,14 @@ export class WorldSolid {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * Cull every face shared with a kept solid voxel and emit the rest as an indexed mesh.
+     *
+     * A lateral face becomes one quad (two triangles); a cap becomes a four-triangle fan — a
+     * six-triangle centre fan would cost 50% more for nothing, and caps are a minority of the
+     * surface in any tall extrusion.
+     */
+    buildMesh(merge: number): void;
+    /**
      * Weld the volume, label components, apply the retention policy, and report what happened.
      *
      * A slicer will not join separate bodies — it will happily print forty loose fragments — so
@@ -16,6 +24,7 @@ export class WorldSolid {
      * Pointer to the staging layer. JS builds one `Uint8Array` over this and reuses it forever.
      */
     layerPtr(): number;
+    meshPtr(): number;
     /**
      * The linear index of `cell`'s neighbor in canonical `direction` 0..5, or `-1` where that
      * direction leaves the grid.
@@ -41,6 +50,15 @@ export class WorldSolid {
      * one now that both endpoints are known.
      */
     pushLayer(): void;
+    /**
+     * Serialize the built mesh. `cell_size` is the hexagon circumradius in millimetres and
+     * `layer_height` the thickness of one layer; they are independent so the Z aspect ratio is a
+     * print decision rather than a tick-count accident.
+     *
+     * Writes into a Wasm buffer and leaves it addressable through `meshPtr`/`meshLen`. JavaScript
+     * never formats a triangle.
+     */
+    serializeMesh(format: number, cell_size: number, layer_height: number): void;
     /**
      * FNV-1a over the packed volume. The mesh must be a pure function of its inputs, and this is
      * the cheapest way for a test to hold the first half of that promise.
@@ -69,6 +87,7 @@ export class WorldSolid {
      */
     readonly keptComponents: number;
     readonly keptVoxels: number;
+    readonly meshLen: number;
     readonly numCells: number;
     readonly pushedLayers: number;
     readonly rows: number;
@@ -79,6 +98,8 @@ export class WorldSolid {
      * Height of the finished volume in layers, base plate included.
      */
     readonly totalLayers: number;
+    readonly triangleCount: number;
+    readonly vertexCount: number;
     /**
      * Bytes the bit-packed volume occupies.
      */
@@ -116,6 +137,12 @@ export interface InitOutput {
     readonly worldsolid_keptVoxels: (a: number) => number;
     readonly worldsolid_droppedVoxels: (a: number) => number;
     readonly worldsolid_floating: (a: number) => number;
+    readonly worldsolid_buildMesh: (a: number, b: number) => [number, number];
+    readonly worldsolid_triangleCount: (a: number) => number;
+    readonly worldsolid_vertexCount: (a: number) => number;
+    readonly worldsolid_serializeMesh: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly worldsolid_meshPtr: (a: number) => number;
+    readonly worldsolid_meshLen: (a: number) => number;
     readonly worldsolid_volumeChecksum: (a: number) => number;
     readonly worldsolid_voxelAt: (a: number, b: number, c: number) => [number, number, number];
     readonly solid_engine_version: () => number;

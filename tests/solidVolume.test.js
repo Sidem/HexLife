@@ -6,9 +6,11 @@ import {
   INTERPOLATE_BRIDGE,
   INTERPOLATE_NONE,
   INTERPOLATE_UNION,
+  FORMAT_STL,
   KEEP_ALL,
   KEEP_LARGEST,
   KEEP_PLATE_CONNECTED,
+  MERGE_NONE,
 } from '../src/embed/solid.js';
 import {createSimulation} from '../src/embed/sim.js';
 import {isVacuumStable, rulesetToHex, VACUUM_RULE_INDEX} from '../src/core/rulesetHex.js';
@@ -276,6 +278,83 @@ describe('solid volume interpolation and components', () => {
     expect(small.pushedLayers).toBe(1);
     large.free();
     small.free();
+  });
+
+  it('meshes and exports a real STL a slicer can open', async () => {
+    const rows = 6;
+    const cols = 8;
+    const cells = new Uint8Array(rows * cols);
+    cells[cellAt(cols, 2, 3)] = 1;
+    const {stack} = run({rows, cols, interpolate: INTERPOLATE_NONE}, [cells]);
+
+    const bytes = await stack.export({
+      format: FORMAT_STL,
+      cellSize: 2,
+      layerHeight: 0.8,
+      merge: MERGE_NONE,
+    });
+    // One isolated prism: six lateral quads and two four-triangle caps.
+    expect(stack.triangleCount).toBe(20);
+    expect(stack.vertexCount).toBe(12);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.byteLength).toBe(84 + 20 * 50);
+
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(view.getUint32(80, true)).toBe(20);
+    stack.free();
+  });
+
+  it('produces byte-identical exports for identical option blocks', async () => {
+    const rows = 8;
+    const cols = 10;
+    const layers = [];
+    let rng = 20260811;
+    for (let tick = 0; tick < 6; tick++) {
+      const cells = new Uint8Array(rows * cols);
+      for (let cell = 0; cell < cells.length; cell++) {
+        rng = (rng * 1103515245 + 12345) >>> 0;
+        cells[cell] = rng % 3 === 0 ? 1 : 0;
+      }
+      layers.push(cells);
+    }
+    const build = async () => {
+      const {stack} = run(
+        {rows, cols, interpolate: INTERPOLATE_BRIDGE, subLayers: 1, basePlate: 1},
+        layers,
+        KEEP_PLATE_CONNECTED,
+      );
+      const bytes = await stack.export({format: FORMAT_STL, cellSize: 1.5, layerHeight: 0.6, merge: MERGE_NONE});
+      const triangles = stack.triangleCount;
+      stack.free();
+      return {bytes, triangles};
+    };
+    const first = await build();
+    const second = await build();
+    expect(second.triangles).toBe(first.triangles);
+    expect(Array.from(second.bytes)).toEqual(Array.from(first.bytes));
+  });
+
+  it('survives two exports from one stack even though export grows the memory', async () => {
+    const rows = 6;
+    const cols = 8;
+    const cells = new Uint8Array(rows * cols).fill(1);
+    const {stack} = run({rows, cols, interpolate: INTERPOLATE_NONE}, [cells, cells]);
+    const first = await stack.export({format: FORMAT_STL, merge: MERGE_NONE});
+    const second = await stack.export({format: FORMAT_STL, merge: MERGE_NONE});
+    // The second export must not read a detached view or a half-overwritten buffer.
+    expect(second.byteLength).toBe(first.byteLength);
+    expect(Array.from(second)).toEqual(Array.from(first));
+    stack.free();
+  });
+
+  it('rejects export options it cannot honour', async () => {
+    const rows = 4;
+    const cols = 8;
+    const {stack} = run({rows, cols, interpolate: INTERPOLATE_NONE}, [new Uint8Array(rows * cols)]);
+    await expect(stack.export({format: 'obj'})).rejects.toThrow(/format/);
+    await expect(stack.export({merge: 'clever'})).rejects.toThrow(/merge/);
+    await expect(stack.export({cellSize: 0, merge: MERGE_NONE})).rejects.toThrow(/positive/);
+    stack.free();
   });
 
   it('refuses a half-pushed finalize and rejects unknown policies', () => {

@@ -56,6 +56,18 @@ export const FORMAT_STL = 'stl';
 export const FORMAT_PLY = 'ply';
 export const FORMAT_3MF = '3mf';
 
+const FORMAT_TAGS = {[FORMAT_STL]: 0};
+
+/**
+ * Quad merging. `greedy` collapses runs of coplanar exposed faces into single quads, which is
+ * where most of the triangle budget goes; `none` is the setting to reach for when a strict
+ * manifold validator objects to the T-junctions merging necessarily creates.
+ */
+export const MERGE_NONE = 'none';
+export const MERGE_GREEDY = 'greedy';
+
+const MERGE_TAGS = {[MERGE_NONE]: 0, [MERGE_GREEDY]: 1};
+
 /** Solid-state mask for a binary world: state 1 is matter, state 0 is void. */
 export const SOLID_STATES_BINARY = 0b10;
 
@@ -314,6 +326,56 @@ export class SolidStack {
     /** FNV-1a over the packed volume: the cheap half of the determinism promise. */
     volumeChecksum() {
         return this._live().volumeChecksum();
+    }
+
+    /** Triangles in the last built mesh. */
+    get triangleCount() {
+        return this._live().triangleCount;
+    }
+
+    /** Welded vertices in the last built mesh. */
+    get vertexCount() {
+        return this._live().vertexCount;
+    }
+
+    /**
+     * Mesh the finalized volume and serialize it.
+     *
+     * `cellSize` is the hexagon circumradius in millimetres and `layerHeight` the thickness of one
+     * layer. They are independent on purpose: the Z aspect ratio of the object is a print decision,
+     * not an accident of how many ticks were run.
+     *
+     * Async because the 3MF container is deflated by `CompressionStream` — the one piece of this
+     * pipeline JavaScript owns, and only because it is not a per-voxel loop.
+     *
+     * @param {{format?: string, cellSize?: number, layerHeight?: number, merge?: string}} [options]
+     * @returns {Promise<Uint8Array>}
+     */
+    async export(options = {}) {
+        const {
+            format = FORMAT_STL,
+            cellSize = 2,
+            layerHeight = 0.8,
+            // Phase 3 makes `greedy` the default, once there is a greedy merger to default to.
+            merge = MERGE_NONE,
+        } = options;
+        if (!(format in FORMAT_TAGS)) {
+            throw new RangeError(
+                `export: format must be one of ${Object.keys(FORMAT_TAGS).join(', ')}.`,
+            );
+        }
+        if (!(merge in MERGE_TAGS)) {
+            throw new RangeError(`export: merge must be one of ${Object.keys(MERGE_TAGS).join(', ')}.`);
+        }
+        const world = this._live();
+        world.buildMesh(MERGE_TAGS[merge]);
+        world.serializeMesh(FORMAT_TAGS[format], cellSize, layerHeight);
+        // Serialization allocates, so the memory may have grown and every view into it is stale.
+        // Re-view here, and refresh the layer views the caller may still be holding.
+        refreshAllViews();
+        const bytes = new Uint8Array(wasmExports.memory.buffer, world.meshPtr(), world.meshLen);
+        // Copy out: the Blob must outlive the next export, which will overwrite this buffer.
+        return bytes.slice();
     }
 
     /**
