@@ -148,6 +148,13 @@
   font-size: 0.88rem;
 }
 
+/* The `.garden-overlay[hidden]` trap again, one class down: the rule above sets `display: flex`,
+   which outranks the user-agent `display: none` the `hidden` attribute works through. Without this
+   the density slider stays on screen in single-seed mode, where it controls nothing. */
+.garden-field[hidden] {
+  display: none;
+}
+
 .garden-field > label {
   flex: 0 0 6.2rem;
   color: var(--demo-muted, #8b96a8);

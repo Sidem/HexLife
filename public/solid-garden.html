@@ -134,15 +134,18 @@
               <label for="seed">Seed</label>
               <input id="seed" type="number" min="0" max="999999" value="12345" step="1" />
             </div>
-            <div class="garden-grid-2">
-              <div class="garden-field">
-                <label for="rows">Rows</label>
-                <input id="rows" type="number" min="6" max="256" value="24" step="1" />
-              </div>
-              <div class="garden-field">
-                <label for="cols">Columns</label>
-                <input id="cols" type="number" min="6" max="256" value="30" step="2" />
-              </div>
+            <div class="garden-field">
+              <label for="size">Size</label>
+              <!-- The option value IS the geometry: `rows x cols`. Every size keeps the same
+                   column-to-row ratio, so picking one changes how much world there is without
+                   changing the shape of the frame it is drawn in. Columns are even throughout —
+                   the odd-q lattice does not close otherwise and the engine refuses an odd count. -->
+              <select id="size">
+                <option value="16x20">Small</option>
+                <option value="24x30" selected>Medium</option>
+                <option value="40x50">Large</option>
+                <option value="56x70">Huge</option>
+              </select>
             </div>
             <div class="garden-field">
               <label for="ticks">Ticks</label>

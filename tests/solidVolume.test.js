@@ -553,9 +553,11 @@ describe('solid volume interpolation and components', () => {
       const block = page.slice(page.indexOf(`<select id="${id}"`));
       return block.slice(0, block.indexOf('</select>')).match(/<option value="([^"]+)" selected>/)[1];
     };
+    // The size selector carries its geometry in the option value: `rows x cols`.
+    const [rows, cols] = selected('size').split('x').map(Number);
     const defaults = {
-      rows: numeric('rows'),
-      cols: numeric('cols'),
+      rows,
+      cols,
       ticks: numeric('ticks'),
       subLayers: numeric('sub-layers'),
       basePlate: numeric('base-plate'),

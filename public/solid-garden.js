@@ -76,8 +76,7 @@ const ui = {
   density: $('density'),
   densityOut: $('density-out'),
   seed: $('seed'),
-  rows: $('rows'),
-  cols: $('cols'),
+  size: $('size'),
   ticks: $('ticks'),
   ticksOut: $('ticks-out'),
   interpolate: $('interpolate'),
@@ -135,6 +134,22 @@ let paintValue = 1
  */
 const MAX_VOXELS = 1 << 24
 
+/** Fallback geometry if the size select ever holds something unparseable — the medium preset. */
+const DEFAULT_SIZE = {rows: 24, cols: 30}
+
+/**
+ * The grid the size selector is asking for.
+ *
+ * The option value carries the geometry itself (`rows x cols`) rather than a name the page would
+ * then have to look up, so adding a size is an HTML edit and nothing else.
+ */
+function readSize() {
+  const [rows, cols] = String(ui.size.value).split('x').map(Number)
+  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 6 || cols < 6) return DEFAULT_SIZE
+  // The lattice only closes on an even column count, and the engine rejects an odd one outright.
+  return {rows, cols: cols % 2 === 0 ? cols : cols + 1}
+}
+
 const number = (value) => value.toLocaleString('en-US')
 const mm = (value) => `${value.toFixed(1)} mm`
 
@@ -151,10 +166,7 @@ function setOverlay(message) {
 
 /** Read the controls once, so a run is a value rather than a scatter of live DOM reads. */
 function readOptions() {
-  const rows = Math.max(6, Math.min(256, Number(ui.rows.value) || 24))
-  // The lattice only closes on an even column count, and the engine rejects an odd one outright.
-  let cols = Math.max(6, Math.min(256, Number(ui.cols.value) || 30))
-  if (cols % 2 !== 0) cols += 1
+  const {rows, cols} = readSize()
   const interpolate = ui.interpolate.value
   return {
     hex: ui.ruleHex.value.trim().toUpperCase(),
@@ -226,8 +238,16 @@ function ensureRenderer(rows, cols) {
   renderer = createRenderer(ui.stage, {
     rows,
     columns: cols,
-    palette: 'default',
-    flickerProof: true,
+    // Live cells white, dead cells black. This page is a printing preview, not a rule visualiser:
+    // the cross-section has to read as the material it will become, and the default spectrum colors
+    // by rule index, which says nothing about the object.
+    palette: 'monochrome',
+    // NOT flicker-proof, and that is load-bearing here. The anti-strobe override blacks out LUT
+    // entry (rule 0, state on) — and this page uploads cells without rule indices, so every cell
+    // reads entry 0. Under flicker-proofing that paints the live cells black on a black field: the
+    // whole cross-section disappears. Flicker-proofing only means anything to a caller that
+    // actually colours by rule index, which this one does not.
+    flickerProof: false,
     repeatToroidal: false,
   })
   renderedGeometry = geometry
@@ -588,8 +608,7 @@ function init() {
   for (const input of [
     ui.density,
     ui.seed,
-    ui.rows,
-    ui.cols,
+    ui.size,
     ui.ticks,
     ui.subLayers,
     ui.basePlate,

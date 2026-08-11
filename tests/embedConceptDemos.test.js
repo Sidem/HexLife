@@ -274,8 +274,10 @@ describe('Solid Garden', () => {
     expect(css).toContain('.garden-overlay[hidden]')
     expect(rule.slice(0, 60)).toContain('display: none')
 
-    // Same trap, same fix, for the draw-tool group.
+    // Same trap, same fix, for the draw-tool group and for any field that hides itself — both set
+    // their own `display`, so both need the hiding restated as an author rule.
     expect(css).toContain('.garden-draw-tools[hidden]')
+    expect(css).toContain('.garden-field[hidden]')
   })
 
   it('is reachable from every other demo in the library', () => {
@@ -306,19 +308,37 @@ describe('Solid Garden', () => {
     expect(source).toContain('function fitDrawn')
   })
 
-  it('opens the grid up to the engine ceiling rather than an arbitrary one', () => {
+  it('picks a grid by size rather than by two numbers', () => {
     const html = page()
     const source = host()
+    const block = html.slice(html.indexOf('<select id="size"'))
+    const options = [...block.slice(0, block.indexOf('</select>')).matchAll(/<option value="(\d+)x(\d+)"/g)]
+    expect(options.map((match) => match[0])).toHaveLength(4)
+
+    let previous = 0
+    for (const [, rows, cols] of options) {
+      const cells = Number(rows) * Number(cols)
+      // Columns must stay even: the odd-q lattice does not close otherwise and the engine refuses.
+      expect(Number(cols) % 2, `${rows}x${cols} has an even column count`).toBe(0)
+      // Small → huge, and each step is a real jump rather than a relabelled duplicate.
+      expect(cells, `${rows}x${cols} is larger than the size before it`).toBeGreaterThan(previous)
+      previous = cells
+    }
+    expect(html).toMatch(/<select id="size"[\s\S]*?<option value="\d+x\d+" selected>Medium</)
+    expect(source).toContain('function readSize')
+
     const max = (id) => Number(/max="(\d+)"/.exec(html.match(new RegExp(`<input id="${id}"[^>]*>`))[0])[1])
-    expect(max('rows')).toBeGreaterThanOrEqual(128)
-    expect(max('cols')).toBeGreaterThanOrEqual(128)
     expect(max('ticks')).toBeGreaterThanOrEqual(200)
-    // Columns must stay even: the odd-q lattice does not close otherwise and the engine refuses.
-    expect(html).toMatch(/<input id="cols"[^>]*step="2"/)
     // Past the real ceiling the page has to explain what to reduce, not surface a raw constructor
     // error — so it knows the ceiling itself.
     expect(source).toContain('const MAX_VOXELS = 1 << 24')
     expect(source).toContain('past the engine')
+  })
+
+  it('draws the cross-section as matter, not as rule identity', () => {
+    // A printing preview answers "what will this be", so live cells are white and dead cells black.
+    // The default spectrum colors by rule index, which says nothing about the object.
+    expect(host()).toContain("palette: 'monochrome'")
   })
 
   it('moves data in bulk and never loops over cells', () => {
