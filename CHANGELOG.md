@@ -52,6 +52,23 @@ is not major if every code above still resolves to the same world.
 - **Hex Ecology runs a cycle of three, four or five species**, with the palette, legend, brush
   materials and interventions all derived from the count.
 
+### `@hexlife/embed` 1.10.1 — 2026-08-11
+
+Documentation and package metadata only. No engine, element, or codec behaviour changed, and the
+shipped `src/` is byte-identical to 1.10.0.
+
+#### Changed
+
+- **The package README is a landing page again, and the reference moved to
+  [`docs/embed/`](docs/embed/README.md).** It had grown to 1,100 lines — a full manual rendered into
+  npm's narrow single-column page, where a reader deciding whether to install had to scroll past the
+  lattice-gas collision operator to reach the requirements. The README now answers "what is it, how
+  do I install it, what does one world look like, where are the docs", and each surface —
+  `<hexlife-world>`, `<hexlife-grid>`, `/sim`, `/render`, `/ca`, `/stochastic`, `/api`, determinism —
+  gets its own page. Nothing was dropped in the move.
+- **Package metadata for the npm page:** `keywords` (npm search reads them and there were none),
+  `author`, `bugs`, and a `homepage` that now points at the documentation rather than the Explorer.
+
 ### `@hexlife/embed` 1.10.0 — 2026-08-10
 
 #### Added

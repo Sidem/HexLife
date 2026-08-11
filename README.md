@@ -340,9 +340,12 @@ the package without Explorer internals or a local build.
 grid.rulesets = Array.from({length: 256}, (_, i) => 'T' + i.toString(16).padStart(2, '0'));
 ```
 
-Full attribute and API reference: [`packages/hexlife-embed/README.md`](packages/hexlife-embed/README.md).
-The package is built from `src/embed/` with `npm run build:embed`; the standalone CDN and in-app
-“Copy embed code” workflows remain open.
+Full attribute and API reference: [**`docs/embed/`**](docs/embed/README.md) — one page per surface,
+starting at [Getting started](docs/embed/getting-started.md) and
+[Entry points](docs/embed/entrypoints.md). The
+[package README](packages/hexlife-embed/README.md) is the npm landing page. The package is built
+from `src/embed/` with `npm run build:embed`; the standalone CDN and in-app “Copy embed code”
+workflows remain open.
 
 For an offline copy of the 256-world sampler, run `npm run build:standalone` and open
 `dist/totalistic-256-standalone.html` directly in a browser. It is one self-contained file: the
@@ -377,7 +380,8 @@ top-level URLs.
 | `index.html`, `src/` | Explorer application, UI, renderer, services, and JavaScript simulation orchestration |
 | `hexlife-wasm/` | Rust tick engine compiled to WebAssembly |
 | `src/embed/` | Reusable single-world runtime and host boundary |
-| `packages/hexlife-embed/` | Metadata and documentation for the published embed package |
+| `packages/hexlife-embed/` | Manifest and npm landing page for the published embed package |
+| `docs/embed/` | Full `@hexlife/embed` reference documentation |
 | `tests/` | Explorer unit, regression, determinism, and codec tests |
 
 The Explorer and the separate Reddit app share the engine, ruleset descriptors, and world codec

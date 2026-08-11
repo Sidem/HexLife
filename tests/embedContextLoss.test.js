@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 /**
- * WebGL context loss on `<hexlife-world>` (see `packages/hexlife-embed/README.md` § Losing the GPU).
+ * WebGL context loss on `<hexlife-world>` (see `docs/embed/hexlife-world.md` § Losing the GPU).
  *
  * Same approach as `embedTorus.test.js`: the element needs a DOM + WebGL2 + wasm, and a *lost*
  * context needs a driver that has decided to take one away, so the contract is pinned from source

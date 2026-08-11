@@ -3,9 +3,9 @@
  * registered by `@hexlife/embed/stochastic-element`.
  *
  * The stochastic counterpart of `ca-element.d.ts`, and it carries the same obligation: **this file
- * is documentation with teeth and must match `packages/hexlife-embed/README.md`**, which is what
- * consumers of the published package actually read. Adding to the element's surface means editing
- * the element, that README and this file together.
+ * is documentation with teeth and must match `docs/embed/stochastic.md`**, which is what consumers
+ * of the published package actually read. Adding to the element's surface means editing the element,
+ * that doc and this file together.
  *
  * Importing `@hexlife/embed/stochastic-element` is what *defines* the element, and it is the only
  * element entry that reaches the isolated stochastic Wasm artifact. See `stochastic-element.js`.

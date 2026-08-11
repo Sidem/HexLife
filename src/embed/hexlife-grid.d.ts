@@ -3,7 +3,7 @@
  *
  * Same contract as `hexlife-world.d.ts`: `src/embed/` is plain JS, so this file is the one place the
  * element's *documented* surface is written down in a form a compiler can enforce, and it **must
- * match `packages/hexlife-embed/README.md`**, which is what consumers actually read.
+ * match `docs/embed/hexlife-grid.md`**, which is what consumers actually read.
  *
  * There is no `hexlife-grid.js` — the runtime lives in `HexLifeGridElement.js` and registers itself
  * via `index.js`. Import this module for types only (`import type`), alongside the side-effecting
@@ -58,7 +58,7 @@ export interface HexLifeGridElementEventMap {
 /**
  * `<hexlife-grid>` — many worlds in one WebGL context.
  *
- * See `packages/hexlife-embed/README.md` § `<hexlife-grid>` for the full contract:
+ * See `docs/embed/hexlife-grid.md` for the full contract:
  * `rulesets` (required; comma/space-separated 32-char hexes or short codes) · `layout` (`COLSxROWS`,
  * default squarest) · `rows` (16–512, default 48) · `seed` · `density` · `speed` · `paused` ·
  * `palette` / `palette-on` / `palette-off` / `hue-shift` · `flicker-proof` · `gap` (0–32 CSS px) · `max-dpr` ·

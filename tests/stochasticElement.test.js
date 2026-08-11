@@ -185,10 +185,11 @@ describe('<hexlife-stochastic> package boundary', () => {
       ['brush', 'code', 'draw', 'draw-state', 'link', 'palette', 'paused', 'rows', 'speed'],
     );
 
-    const readme = await readFile(new URL('../packages/hexlife-embed/README.md', import.meta.url), 'utf8');
-    const table = readme.slice(readme.indexOf('## `<hexlife-stochastic>`'));
+    // The package README is a landing page; the attribute contract lives in the docs set.
+    const doc = await readFile(new URL('../docs/embed/stochastic.md', import.meta.url), 'utf8');
+    const table = doc.slice(doc.indexOf('## `<hexlife-stochastic>`'));
     for (const attribute of observed) {
-      expect(table, `README documents ${attribute}`).toContain(`| \`${attribute}\` |`);
+      expect(table, `docs/embed/stochastic.md documents ${attribute}`).toContain(`| \`${attribute}\` |`);
     }
     expect(table).toContain('@hexlife/embed/stochastic-element');
   });

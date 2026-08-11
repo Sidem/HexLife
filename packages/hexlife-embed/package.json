@@ -1,9 +1,26 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines",
+  "keywords": [
+    "cellular-automata",
+    "hexagonal",
+    "hex-grid",
+    "simulation",
+    "artificial-life",
+    "game-of-life",
+    "lattice-gas",
+    "webassembly",
+    "wasm",
+    "webgl2",
+    "web-components",
+    "custom-elements",
+    "deterministic",
+    "generative-art"
+  ],
   "type": "module",
   "license": "MIT",
+  "author": "Sidem",
   "sideEffects": [
     "./src/embed/index.js",
     "./src/embed/ca-element.js",
@@ -65,5 +82,8 @@
     "type": "git",
     "url": "git+https://github.com/Sidem/HexLife.git"
   },
-  "homepage": "https://sidem.github.io/HexLife/"
+  "bugs": {
+    "url": "https://github.com/Sidem/HexLife/issues"
+  },
+  "homepage": "https://github.com/Sidem/HexLife/blob/main/docs/embed/README.md"
 }

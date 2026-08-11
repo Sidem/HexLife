@@ -6,9 +6,9 @@
  * enforce. It also gives TypeScript hosts, including the separate Devvit repository, a declaration
  * that cannot silently drift from the element maintained here.
  *
- * **This file is documentation with teeth: it must match `packages/hexlife-embed/README.md`**, which
- * is what consumers of the published package actually read. The embed's API is frozen (additive
- * changes only), so adding to it means editing that README, the element, and this file together.
+ * **This file is documentation with teeth: it must match `docs/embed/hexlife-world.md`**, which is
+ * what consumers of the published package actually read. The embed's API is frozen (additive
+ * changes only), so adding to it means editing that doc, the element, and this file together.
  *
  * There is no `hexlife-world.js` — the runtime lives in `HexLifeElement.js` and registers itself
  * via `index.js`. Import this module for types only (`import type`), alongside the side-effecting
@@ -104,7 +104,7 @@ export interface HexLifeElementEventMap {
 }
 
 /**
- * `<hexlife-world>` — see `packages/hexlife-embed/README.md` § Attributes for the full contract:
+ * `<hexlife-world>` — see `docs/embed/hexlife-world.md` § Attributes for the full contract:
  * `ruleset` · `seed` · `density` · `rows` · `speed` · `palette` · `palette-on`/`off` ·
  * `hue-shift` (0–359 degrees; rotates chromatic colors) ·
  * `flicker-proof` (suppress the birth/death flash; preset palettes only) · `code`

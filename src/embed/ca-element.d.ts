@@ -3,9 +3,9 @@
  * `@hexlife/embed/ca-element`.
  *
  * The k-state counterpart of `hexlife-world.d.ts`, and it carries the same obligation: **this file
- * is documentation with teeth and must match `packages/hexlife-embed/README.md`**, which is what
- * consumers of the published package actually read. Adding to the element's surface means editing
- * the element, that README and this file together.
+ * is documentation with teeth and must match `docs/embed/ca.md`**, which is what consumers of the
+ * published package actually read. Adding to the element's surface means editing the element, that
+ * doc and this file together.
  *
  * `src/embed/` is plain JS (see the note atop `EmbedSim.js`), so this is the one place the element's
  * documented surface is written down in a form a compiler can enforce.
