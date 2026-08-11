@@ -1,5 +1,5 @@
 import { PRESET_PALETTES } from '../core/colorPalettes.js';
-import { countSetBits } from '../core/Symmetry.js';
+import { countSetBits, precomputeSymmetryGroups } from '../core/Symmetry.js';
 
 /**
  * Converts hex color to RGB array.
@@ -100,6 +100,58 @@ export function getGradientColor(factor, gradient) {
 }
 
 /**
+ * Symmetry tables for callers that have none of their own (`logicPresetColor` is reached from the
+ * embed, which threads its own in, and from UI paths that do not). `precomputeSymmetryGroups` is pure
+ * and runs over 64 bitmasks; memoized so a host that supplies its own never pays for a second copy.
+ */
+let fallbackSymmetryData = null;
+function resolveSymmetryData(symmetryData) {
+    if (symmetryData) return symmetryData;
+    if (!fallbackSymmetryData) fallbackSymmetryData = precomputeSymmetryGroups();
+    return fallbackSymmetryData;
+}
+
+/**
+ * A fresh copy of a `logic` preset's per-group table — the single definition of what "Neighbor
+ * Counts" and "Symmetry Groups" look like, for the embed's `palette` attribute and for the seed
+ * Chroma Lab hands the user to edit.
+ *
+ * The table is authored, not derived (see the note beside it in `colorPalettes.js`): these palettes
+ * color by *rule structure*, and the colors that make 7 counts or 14 orbits separable were picked by
+ * eye rather than sampled off a ramp. Copied on every call because ColorController stores the result
+ * as the user's editable settings — handing out the shared literal would let an edit in Chroma Lab
+ * rewrite the preset itself.
+ *
+ * @param {{logic: string, colors: Object<string, {on: string, off: string}>}} preset A `logic`
+ *   PRESET_PALETTES entry.
+ * @returns {Object<string, {on: string, off: string}>} Keyed `${centerState}-${group}`, where group
+ *   is a neighbor count (0-6) or a canonical orbit representative bitmask.
+ */
+export function buildLogicPresetColors(preset) {
+    const colors = {};
+    for (const [key, entry] of Object.entries(preset.colors)) {
+        colors[key] = { on: entry.on, off: entry.off };
+    }
+    return colors;
+}
+
+/**
+ * The color a `logic` preset gives one rule — a lookup into the preset's own table, so the embed's
+ * `palette="neighborGradient"` and the app's own neighbor-count mode cannot drift apart.
+ * @returns {number[]} [r, g, b]
+ */
+function logicPresetColor(preset, ruleIndex, outputState, symmetryData) {
+    const colorsByKey = preset.colors;
+    const centerState = (ruleIndex >> 6) & 1;
+    const neighborMask = ruleIndex & 0x3F;
+    const group = preset.logic === 'neighbor_count'
+        ? countSetBits(neighborMask)
+        : resolveSymmetryData(symmetryData).bitmaskToCanonical.get(neighborMask);
+    const entry = colorsByKey[`${centerState}-${group}`];
+    return hexToRgb(entry ? entry[outputState === 1 ? 'on' : 'off'] : '#808080');
+}
+
+/**
  * Creates a Uint8Array representing a 128x2 RGBA texture for rule colors.
  * Row 0: Inactive states
  * Row 1: Active states
@@ -123,27 +175,7 @@ export function generateColorLUT(colorSettings, symmetryData) {
                     const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
                     rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
                 } else if (preset.logic) {
-                    const centerState = (ruleIndex >> 6) & 1;
-                    const neighborMask = ruleIndex & 0x3F;
-                    if (outputState === 0) {
-                        rgb = hexToRgb(preset.offColor);
-                    } else {
-                        let factor;
-                        if (preset.logic === 'neighbor_count') {
-                            const neighborCount = countSetBits(neighborMask);
-                            factor = (neighborCount / 6.0) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
-                            rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
-                        } else { // symmetry
-                            const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
-                            if (canonical === undefined) {
-                                rgb = [128, 128, 128];
-                            } else {
-                                const groupIndex = symmetryData.canonicalRepresentatives.findIndex(g => g.representative === canonical);
-                                factor = groupIndex >= 0 ? (groupIndex / (symmetryData.canonicalRepresentatives.length - 1)) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1) : 0;
-                                rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
-                            }
-                        }
-                    }
+                    rgb = logicPresetColor(preset, ruleIndex, outputState, symmetryData);
                 } else {
                     const factor = ruleIndex / (width - 1);
                     const onGradient = preset.gradient.map(hexToRgb);
@@ -236,17 +268,8 @@ export function generateSingleRuleColor(ruleIndex, outputState, colorSettings, s
             const saturation = 1.0;
             const value = outputState === 1 ? 1.0 : 0.4;
             return hsvToRgb(hue, saturation, value);
-        } else if (preset.logic === 'neighbor_count') {
-            if (outputState === 0) return hexToRgb(preset.offColor);
-            const neighborCount = countSetBits(neighborMask);
-            const factor = (neighborCount / 6.0) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
-            return getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
-        } else if (preset.logic === 'symmetry') {
-            if (outputState === 0) return hexToRgb(preset.offColor);
-            const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
-            const groupIndex = symmetryData.canonicalRepresentatives.findIndex(g => g.representative === canonical);
-            const factor = (groupIndex / (symmetryData.canonicalRepresentatives.length - 1)) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
-            return getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
+        } else if (preset.logic) {
+            return logicPresetColor(preset, ruleIndex, outputState, symmetryData);
         }
         const factor = ruleIndex / 127.0;
         const onGradient = preset.gradient.map(hexToRgb);
@@ -284,31 +307,14 @@ export function generateSingleRuleColor(ruleIndex, outputState, colorSettings, s
 export function getRuleIndexColor(ruleIndex, outputState, colorSettings, symmetryData) {
     let rgb;
     const { mode, activePreset, customGradient, customNeighborColors, customSymmetryColors } = colorSettings;
-    const centerState = (ruleIndex >> 6) & 1; // Added for logic presets
-    const neighborMask = ruleIndex & 0x3F; // Added for logic presets
-    
+
     if (mode === 'preset') {
         const preset = PRESET_PALETTES[activePreset];
         if (activePreset === 'default' || !preset) {
             const hue = ((ruleIndex / 128.0) + 0.1667) % 1.0;
             rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.4);
-        } else if (preset.logic === 'neighbor_count') {
-            if (outputState === 0) {
-                 rgb = hexToRgb(preset.offColor);
-            } else {
-                const neighborCount = countSetBits(neighborMask);
-                const factor = (neighborCount / 6.0) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
-                rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
-            }
-        } else if (preset.logic === 'symmetry') {
-            if (outputState === 0) {
-                rgb = hexToRgb(preset.offColor);
-            } else {
-                const canonical = symmetryData.bitmaskToCanonical.get(neighborMask);
-                const groupIndex = symmetryData.canonicalRepresentatives.findIndex(g => g.representative === canonical);
-                const factor = (groupIndex / (symmetryData.canonicalRepresentatives.length - 1)) * (centerState === 1 ? 1.0 : 0.8) + (centerState === 1 ? 0.0 : 0.1);
-                rgb = getGradientColor(Math.min(1, factor), preset.gradient.map(hexToRgb));
-            }
+        } else if (preset.logic) {
+            rgb = logicPresetColor(preset, ruleIndex, outputState, symmetryData);
         } else {
             const factor = ruleIndex / 127.0;
             const onGradient = preset.gradient.map(hexToRgb);
@@ -427,6 +433,9 @@ export function generatePaletteVisualizationLUT(colorSettings, symmetryData) {
                     // For the visualization, we want both to be bright.
                     // We use a slightly lower value for OFF state to differentiate it subtly.
                     rgb = hsvToRgb(hue, 1.0, outputState === 1 ? 1.0 : 0.075);
+                } else if (preset.logic) {
+                    // No ramp to sample — a rule-aware preset only has meaning per group.
+                    rgb = logicPresetColor(preset, ruleIndex, outputState, symmetryData);
                 } else {
                     const factor = ruleIndex / (width - 1);
                     const onGradient = preset.gradient.map(hexToRgb);

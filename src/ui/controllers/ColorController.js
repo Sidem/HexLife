@@ -2,7 +2,7 @@ import * as PersistenceService from '../../services/PersistenceService.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import { PRESET_PALETTES } from '../../core/colorPalettes.js';
 import { DEFAULT_COLOR_SCHEMES } from '../../core/config.js';
-import { hexToRgb, getGradientColor } from '../../utils/ruleVizUtils.js';
+import { hexToRgb, getGradientColor, buildLogicPresetColors } from '../../utils/ruleVizUtils.js';
 
 export class ColorController {
     constructor() {
@@ -35,48 +35,21 @@ export class ColorController {
         const selectedPreset = this.presets[presetName];
 
         if (selectedPreset.logic) {
-            // If the preset has a 'logic' key, switch to that customization mode and generate custom colors from gradient only if not already set
+            // A `logic` preset is not a preset here at all: it becomes the matching customization
+            // mode, seeded with the table `buildLogicPresetColors` derives. That builder is also what
+            // the embed renders these palettes through (`palette="neighborGradient"` never reaches
+            // ColorController), so the two paths agree by construction rather than by two formulas
+            // happening to match — which they did not. Seeded only when empty: once the user has
+            // edited a group in Chroma Lab, the table is theirs.
             this.settings.mode = selectedPreset.logic;
-
-            const gradient = selectedPreset.gradient.map(hexToRgb);
-            const offColorHex = selectedPreset.offColor;
 
             if (selectedPreset.logic === 'neighbor_count') {
                 if (!this.settings.customNeighborColors || Object.keys(this.settings.customNeighborColors).length === 0) {
-                    const numGroups = 14;
-                    this.settings.customNeighborColors = {};
-                    for (let center = 0; center < 2; center++) {
-                        for (let count = 0; count < 7; count++) {
-                            const i = center * 7 + count;
-                            const factor = i / (numGroups - 1);
-                            const rgb = getGradientColor(factor, gradient);
-                            const hex = `#${((1 << 24) + (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]).toString(16).slice(1).toLowerCase()}`;
-                            const key = `${center}-${count}`;
-                            this.settings.customNeighborColors[key] = { on: hex, off: offColorHex };
-                        }
-                    }
-                    // Flicker-proof
-                    this.settings.customNeighborColors['0-0'].on = '#000000';
-                    this.settings.customNeighborColors['1-6'].off = '#000000';
+                    this.settings.customNeighborColors = buildLogicPresetColors(selectedPreset);
                 }
             } else if (selectedPreset.logic === 'symmetry') {
                 if (!this.settings.customSymmetryColors || Object.keys(this.settings.customSymmetryColors).length === 0) {
-                    const symmetryGroups = [0,1,3,5,7,9,11,13,15,21,23,27,31,63];
-                    const numGroups = 28;
-                    this.settings.customSymmetryColors = {};
-                    for (let center = 0; center < 2; center++) {
-                        for (let g = 0; g < symmetryGroups.length; g++) {
-                            const i = center * 14 + g;
-                            const factor = i / (numGroups - 1);
-                            const rgb = getGradientColor(factor, gradient);
-                            const hex = `#${((1 << 24) + (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]).toString(16).slice(1).toLowerCase()}`;
-                            const key = `${center}-${symmetryGroups[g]}`;
-                            this.settings.customSymmetryColors[key] = { on: hex, off: offColorHex };
-                        }
-                    }
-                    // Flicker-proof
-                    this.settings.customSymmetryColors['0-0'].on = '#000000';
-                    this.settings.customSymmetryColors['1-63'].off = '#000000';
+                    this.settings.customSymmetryColors = buildLogicPresetColors(selectedPreset);
                 }
             }
         } else {

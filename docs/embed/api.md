@@ -63,6 +63,12 @@ listPresetPalettes()
 `key` is what the `palette` attribute takes. `logic` marks the two presets that color by *rule
 structure* rather than by taste; `cvdSafe` marks the perceptually-uniform, colorblind-safe ramps.
 
+The two `logic` presets are authored tables rather than ramps: one saturated hue per group — 7
+live-neighbor counts, or 14 C6 orbits — on pure black, the same colors the explorer shows, so a rule
+reads identically in both. The center bit is deliberately not a color channel, so `palette` answers
+"which group fired" and nothing else. Because OFF outputs are black throughout, they carry the
+birth/death flash guard for free, whatever `flicker-proof` says.
+
 ## GPU support
 
 ```js

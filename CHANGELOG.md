@@ -25,6 +25,29 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Rule-aware palettes
+
+#### Fixed
+
+- **"Neighbor Counts" and "Symmetry Groups" showed different colors in an embed than in the
+  Explorer.** The two palettes color by rule *structure*, and each surface computed that from its own
+  formula: the Explorer switched into a per-group mode seeded from one table, while a page setting
+  `palette="neighborGradient"` on `<hexlife-world>` or `<hexlife-grid>` sampled a ramp that restarted
+  for each center state. Every one of the 128 lit entries disagreed. Both now read one authored table,
+  locked together by tests, so a rule reads the same wherever it is shown.
+- **The Chroma Lab card for these two presets previewed a gradient they do not have.** It sampled the
+  ramp by rule index, which for a palette keyed by group means nothing; it now shows the real colors.
+
+#### Changed
+
+- **Both palettes were retuned to a saturated hue wheel on pure black** — one hue per group, seven
+  for the live-neighbor counts and fourteen for the C6 orbits. The center bit is deliberately not a
+  color channel any more: splitting the wheel in two to encode it cost more discrimination between
+  groups than the bit was worth, so `0-g` and `1-g` share a hue and the palette answers "which group
+  fired". The empty neighborhood is the one exception, where the wheel closes. Because every OFF
+  output is now black, these two carry the birth/death flash guard for free and ignore the
+  `flicker-proof` attribute. Chroma Lab tables you have already edited are untouched.
+
 ### Embed demo library
 
 #### Added

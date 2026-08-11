@@ -59,17 +59,76 @@ export const PRESET_PALETTES = {
         gradient: ['#00224E', '#35456C', '#666970', '#948E77', '#C8B866', '#FEE838'],
         offGradient: ['#000a18', '#0f1420', '#1e1f21', '#2b2a23', '#3b371e', '#4c4511']
     },
+    // The two rule-aware presets. Unlike every entry above they are not a ramp sampled by rule index
+    // — they are explicit tables over *rule structure*, keyed `${centerState}-${group}` where group
+    // is a live-neighbor count (0-6) or a C6 orbit representative bitmask. Hand-tuned rather than
+    // generated, which is why the colors are written out: a hue wheel walked once across the groups,
+    // saturated so adjacent groups separate at a glance, on pure black so only the firing rule
+    // carries ink.
+    //
+    // Center state is deliberately NOT a color channel here: `0-g` and `1-g` share a hue, because
+    // what these palettes are for is reading which *group* fired, and splitting the wheel in two to
+    // encode the center bit costs more discrimination between groups than the bit is worth. The one
+    // exception is the empty neighborhood, where the two halves of the wheel close: center-off is
+    // black (that entry is also the birth flash, see below) and center-on takes the magenta the
+    // sweep starts from.
+    //
+    // OFF outputs are black throughout, which also satisfies the birth/death flash guard for free —
+    // rule 0 firing a birth (`0-0` ON) and rule 127 firing a death (`1-6` / `1-63` OFF) are the two
+    // entries that would otherwise strobe.
     neighborGradient: {
         name: 'Neighbor Counts',
         logic: 'neighbor_count', // Special key to identify this as a logic-based preset
-        gradient: ['#4A00E0', '#8E2DE2', '#C968A9', '#F8A589'],
-        offColor: '#1A1A1A'
+        colors: {
+            '0-0': { on: '#000000', off: '#000000' },
+            '1-0': { on: '#ff00fe', off: '#000000' },
+            '0-1': { on: '#ff002a', off: '#000000' },
+            '1-1': { on: '#ff002a', off: '#000000' },
+            '0-2': { on: '#ffaa00', off: '#000000' },
+            '1-2': { on: '#ffaa00', off: '#000000' },
+            '0-3': { on: '#3fff00', off: '#000000' },
+            '1-3': { on: '#3fff00', off: '#000000' },
+            '0-4': { on: '#00fed4', off: '#000000' },
+            '1-4': { on: '#00fed4', off: '#000000' },
+            '0-5': { on: '#0055ff', off: '#000000' },
+            '1-5': { on: '#0055ff', off: '#000000' },
+            '0-6': { on: '#7f00ff', off: '#000000' },
+            '1-6': { on: '#7f00ff', off: '#000000' },
+        }
     },
     symmetryGradient: {
         name: 'Symmetry Groups',
         logic: 'symmetry', // Special key to identify this as a logic-based preset
-        gradient: ['#009FFF', '#36D1DC', '#6EFA7D', '#B4FF64'],
-        offColor: '#1A1A1A'
+        colors: {
+            '0-0': { on: '#000000', off: '#000000' },
+            '1-0': { on: '#ff00fe', off: '#000000' },
+            '0-1': { on: '#ff009c', off: '#000000' },
+            '1-1': { on: '#ff009c', off: '#000000' },
+            '0-3': { on: '#ff003b', off: '#000000' },
+            '1-3': { on: '#ff003b', off: '#000000' },
+            '0-5': { on: '#ff2700', off: '#000000' },
+            '1-5': { on: '#ff2700', off: '#000000' },
+            '0-7': { on: '#ff8900', off: '#000000' },
+            '1-7': { on: '#ff8900', off: '#000000' },
+            '0-9': { on: '#feeb00', off: '#000000' },
+            '1-9': { on: '#feeb00', off: '#000000' },
+            '0-11': { on: '#88ff00', off: '#000000' },
+            '1-11': { on: '#88ff00', off: '#000000' },
+            '0-13': { on: '#27ff31', off: '#000000' },
+            '1-13': { on: '#27ff31', off: '#000000' },
+            '0-15': { on: '#00ff93', off: '#000000' },
+            '1-15': { on: '#00ff93', off: '#000000' },
+            '0-21': { on: '#00fef5', off: '#000000' },
+            '1-21': { on: '#00fef5', off: '#000000' },
+            '0-23': { on: '#00a6ff', off: '#000000' },
+            '1-23': { on: '#00a6ff', off: '#000000' },
+            '0-27': { on: '#0044ff', off: '#000000' },
+            '1-27': { on: '#0044ff', off: '#000000' },
+            '0-31': { on: '#1d00ff', off: '#000000' },
+            '1-31': { on: '#1d00ff', off: '#000000' },
+            '0-63': { on: '#7f00ff', off: '#000000' },
+            '1-63': { on: '#7f00ff', off: '#000000' },
+        }
     }
 };
 
