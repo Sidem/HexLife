@@ -111,12 +111,24 @@
               <select id="start">
                 <option value="seed">A single seed</option>
                 <option value="soup">Random soup</option>
+                <option value="draw">Draw it yourself</option>
               </select>
             </div>
             <div class="garden-field" id="density-field" hidden>
               <label for="density">Density</label>
               <input id="density" type="range" min="5" max="60" value="30" step="1" />
               <output id="density-out">30%</output>
+            </div>
+            <div class="garden-draw-tools" id="draw-tools" hidden>
+              <p class="garden-note">
+                Drag on the cross-section to paint. Starting on a live cell erases instead, so the
+                same gesture does both.
+              </p>
+              <div class="garden-button-row">
+                <button id="draw-clear" type="button">Clear</button>
+                <button id="draw-random" type="button">Scatter</button>
+                <button id="draw-centre" type="button">Single seed</button>
+              </div>
             </div>
             <div class="garden-field">
               <label for="seed">Seed</label>
@@ -125,18 +137,19 @@
             <div class="garden-grid-2">
               <div class="garden-field">
                 <label for="rows">Rows</label>
-                <input id="rows" type="number" min="6" max="48" value="24" step="3" />
+                <input id="rows" type="number" min="6" max="256" value="24" step="1" />
               </div>
               <div class="garden-field">
                 <label for="cols">Columns</label>
-                <input id="cols" type="number" min="6" max="60" value="30" step="2" />
+                <input id="cols" type="number" min="6" max="256" value="30" step="2" />
               </div>
             </div>
             <div class="garden-field">
               <label for="ticks">Ticks</label>
-              <input id="ticks" type="range" min="5" max="150" value="60" step="5" />
+              <input id="ticks" type="range" min="5" max="400" value="60" step="5" />
               <output id="ticks-out">60</output>
             </div>
+            <p class="garden-note" id="budget"></p>
 
             <h2>The solid</h2>
             <div class="garden-field">

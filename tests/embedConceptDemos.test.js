@@ -264,6 +264,63 @@ describe('Solid Garden', () => {
     expect(source).toContain('ui.download.disabled = true')
   })
 
+  it('hides its own overlay with an author rule, not the bare hidden attribute', () => {
+    // `hidden` works through a *user-agent* `display: none`, which loses to any author `display` on
+    // the same element — and `.garden-overlay` sets `display: grid`. Without the restatement the
+    // overlay sits fully opaque over the canvas forever and a page that finished building looks
+    // permanently stuck on "Growing…". This shipped once; it does not get to ship twice.
+    const css = read('public/solid-garden.css')
+    const rule = css.slice(css.indexOf('.garden-overlay[hidden]'))
+    expect(css).toContain('.garden-overlay[hidden]')
+    expect(rule.slice(0, 60)).toContain('display: none')
+
+    // Same trap, same fix, for the draw-tool group.
+    expect(css).toContain('.garden-draw-tools[hidden]')
+  })
+
+  it('is reachable from every other demo in the library', () => {
+    // A demo nobody can navigate to is not in the library. The concept pages render their nav from
+    // the shared host, so that string is the tenth page.
+    for (const file of [
+      'totalistic-256.html',
+      'public/coffee-percolation.html',
+      'public/ca-builder.html',
+      'public/embed-demos.html',
+      'public/embed-concept-lab.js',
+    ]) {
+      expect(read(file), `${file} links Solid Garden`).toContain('./solid-garden.html')
+    }
+  })
+
+  it('lets a visitor draw the initial state instead of only seeding one', () => {
+    const html = page()
+    const source = host()
+    expect(html).toContain('<option value="draw">')
+    expect(html).toContain('id="draw-clear"')
+    expect(html).toContain('id="draw-random"')
+    expect(html).toContain('id="draw-centre"')
+    // The hit test is the renderer's own inverse of its layout. A second copy of the hexagon
+    // geometry in the page is exactly the drift the geometry contract exists to prevent.
+    expect(source).toContain('renderer.hitTest(')
+    // A drawing has to survive a grid change, and row-major means a flat copy would shear it.
+    expect(source).toContain('function fitDrawn')
+  })
+
+  it('opens the grid up to the engine ceiling rather than an arbitrary one', () => {
+    const html = page()
+    const source = host()
+    const max = (id) => Number(/max="(\d+)"/.exec(html.match(new RegExp(`<input id="${id}"[^>]*>`))[0])[1])
+    expect(max('rows')).toBeGreaterThanOrEqual(128)
+    expect(max('cols')).toBeGreaterThanOrEqual(128)
+    expect(max('ticks')).toBeGreaterThanOrEqual(200)
+    // Columns must stay even: the odd-q lattice does not close otherwise and the engine refuses.
+    expect(html).toMatch(/<input id="cols"[^>]*step="2"/)
+    // Past the real ceiling the page has to explain what to reduce, not surface a raw constructor
+    // error — so it knows the ceiling itself.
+    expect(source).toContain('const MAX_VOXELS = 1 << 24')
+    expect(source).toContain('past the engine')
+  })
+
   it('moves data in bulk and never loops over cells', () => {
     const source = host()
     // The one permitted copy per tick, and its scrubber twin — both bulk, neither a loop.

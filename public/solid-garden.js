@@ -93,6 +93,12 @@ const ui = {
   download: $('download'),
   verdict: $('verdict'),
   timing: $('timing'),
+  budget: $('budget'),
+  frame: document.querySelector('.garden-canvas-frame'),
+  drawTools: $('draw-tools'),
+  drawClear: $('draw-clear'),
+  drawRandom: $('draw-random'),
+  drawCentre: $('draw-centre'),
   out: {
     pieces: $('r-pieces'),
     floating: $('r-floating'),
@@ -112,6 +118,23 @@ let renderedGeometry = ''
 let latest = null
 let pending = 0
 
+/**
+ * The hand-drawn initial state, kept at the current grid size.
+ *
+ * Its own buffer rather than a snapshot, because it has to survive a rebuild: every parameter
+ * change re-runs the simulation from tick 0, and tick 0 is this.
+ */
+let drawn = new Uint8Array(0)
+let drawnGeometry = ''
+let paintValue = 1
+
+/**
+ * The engine's own ceiling: `rows × cols × totalLayers` voxels, capped at 2²⁴ because the component
+ * pass needs a parent, a size and a flag per voxel. Checked here so an over-ambitious grid gets a
+ * sentence about what to reduce instead of a raw error from the constructor.
+ */
+const MAX_VOXELS = 1 << 24
+
 const number = (value) => value.toLocaleString('en-US')
 const mm = (value) => `${value.toFixed(1)} mm`
 
@@ -128,14 +151,14 @@ function setOverlay(message) {
 
 /** Read the controls once, so a run is a value rather than a scatter of live DOM reads. */
 function readOptions() {
-  const rows = Math.max(6, Math.min(48, Number(ui.rows.value) || 24))
+  const rows = Math.max(6, Math.min(256, Number(ui.rows.value) || 24))
   // The lattice only closes on an even column count, and the engine rejects an odd one outright.
-  let cols = Math.max(6, Math.min(60, Number(ui.cols.value) || 30))
+  let cols = Math.max(6, Math.min(256, Number(ui.cols.value) || 30))
   if (cols % 2 !== 0) cols += 1
   const interpolate = ui.interpolate.value
   return {
     hex: ui.ruleHex.value.trim().toUpperCase(),
-    fromSeed: ui.start.value === 'seed',
+    start: ui.start.value,
     density: Number(ui.density.value) / 100,
     seed: Math.max(0, Number(ui.seed.value) || 0),
     rows,
@@ -162,6 +185,38 @@ function drawTick(index) {
   ui.previewTickOut.textContent = String(clamped)
   renderer?.setState(snapshots[clamped])
   renderer?.draw()
+}
+
+/**
+ * Resize the drawn state to the current grid, keeping whatever still fits.
+ *
+ * Row-major, so a plain copy would shear the picture the moment the column count changed. Copying
+ * row by row is the only way a drawing survives a grid tweak looking like itself.
+ */
+function fitDrawn(rows, cols) {
+  const geometry = `${rows}x${cols}`
+  if (drawnGeometry === geometry) return drawn
+
+  const next = new Uint8Array(rows * cols)
+  if (drawn.length) {
+    const [oldRows, oldCols] = drawnGeometry.split('x').map(Number)
+    const keepRows = Math.min(rows, oldRows)
+    const keepCols = Math.min(cols, oldCols)
+    for (let row = 0; row < keepRows; row++) {
+      next.set(drawn.subarray(row * oldCols, row * oldCols + keepCols), row * cols)
+    }
+  } else {
+    next[Math.floor(rows / 2) * cols + Math.floor(cols / 2)] = 1
+  }
+  drawn = next
+  drawnGeometry = geometry
+  return drawn
+}
+
+/** Voxels the requested geometry would allocate, and whether the engine will take it. */
+function volumeOf(options) {
+  const layers = options.basePlate + options.ticks * (1 + options.subLayers)
+  return {layers, voxels: options.rows * options.cols * layers}
 }
 
 function ensureRenderer(rows, cols) {
@@ -198,17 +253,32 @@ async function build() {
     ? preset.note
     : `${rulesetName(normalized)} — ${stable ? 'vacuum-stable' : 'not vacuum-stable'}.`
 
+  const {layers, voxels} = volumeOf(options)
+  ui.budget.textContent =
+    `${number(options.rows * options.cols)} cells × ${number(layers)} layers = ` +
+    `${number(voxels)} voxels.`
+  if (voxels > MAX_VOXELS) {
+    setOverlay(
+      `${number(voxels)} voxels is past the engine's ${number(MAX_VOXELS)} ceiling. ` +
+        'Reduce ticks, sub-layers, or the grid.',
+    )
+    return
+  }
+
   setOverlay('Growing…')
   const startedAt = performance.now()
 
-  const initialCells = options.fromSeed
-    ? seedCell(options.rows, options.cols)
-    : createDensityState({
-        rows: options.rows,
-        columns: options.cols,
-        seed: options.seed,
-        density: options.density,
-      })
+  const initialCells =
+    options.start === 'draw'
+      ? fitDrawn(options.rows, options.cols).slice()
+      : options.start === 'seed'
+        ? seedCell(options.rows, options.cols)
+        : createDensityState({
+            rows: options.rows,
+            columns: options.cols,
+            seed: options.seed,
+            density: options.density,
+          })
 
   const world = await createSimulation({
     rulesetHex: normalized,
@@ -300,7 +370,9 @@ async function build() {
 
   ui.previewTick.max = String(Math.max(0, snapshots.length - 1))
   ensureRenderer(options.rows, options.cols)
-  drawTick(snapshots.length - 1)
+  // While drawing, hold the view on tick 0 — which IS the drawing, since it is what got pushed
+  // first. Snapping to the final tick after every stroke would take the canvas away mid-edit.
+  drawTick(options.start === 'draw' ? 0 : snapshots.length - 1)
   setOverlay('')
   ui.download.disabled = false
 
@@ -313,6 +385,77 @@ function seedCell(rows, cols) {
   const cells = new Uint8Array(rows * cols)
   cells[Math.floor(rows / 2) * cols + Math.floor(cols / 2)] = 1
   return cells
+}
+
+const isDrawing = () => ui.start.value === 'draw'
+
+/** Show the drawn state itself, which is tick 0 of whatever gets built from it. */
+function showDrawn() {
+  const options = readOptions()
+  const cells = fitDrawn(options.rows, options.cols)
+  ensureRenderer(options.rows, options.cols)
+  renderer.setState(cells)
+  renderer.draw()
+  ui.previewTick.value = '0'
+  ui.previewTickOut.textContent = '0'
+}
+
+/**
+ * Paint one cell under the pointer.
+ *
+ * `hitTest` is the renderer's own inverse of its layout, in CSS pixels relative to the canvas — the
+ * alternative is a second copy of the hexagon geometry here, which is exactly the drift the
+ * geometry contract exists to prevent.
+ */
+function paintAt(event) {
+  if (!renderer) return
+  const rect = ui.stage.getBoundingClientRect()
+  const target = renderer.hitTest(event.clientX - rect.left, event.clientY - rect.top)
+  if (!target || drawn[target.index] === paintValue) return
+  drawn[target.index] = paintValue
+  renderer.setState(drawn)
+  renderer.draw()
+  schedule()
+}
+
+function bindPainting() {
+  ui.stage.addEventListener('pointerdown', (event) => {
+    if (!isDrawing() || event.button !== 0 || !renderer) return
+    const rect = ui.stage.getBoundingClientRect()
+    const target = renderer.hitTest(event.clientX - rect.left, event.clientY - rect.top)
+    if (!target) return
+    // The first cell decides the whole gesture: start on empty space and you paint, start on a live
+    // cell and you erase. One drag does both, with nothing to discover in a toolbar.
+    paintValue = drawn[target.index] ? 0 : 1
+    // Capture keeps a fast drag from escaping the canvas mid-stroke. It throws for a pointer id the
+    // browser has no record of, which a synthetic event has, so a failure here must not lose the
+    // stroke — the painting below does not depend on it.
+    try {
+      ui.stage.setPointerCapture(event.pointerId)
+    } catch {
+      /* not a live pointer; paint anyway */
+    }
+    event.preventDefault()
+    paintAt(event)
+  })
+  ui.stage.addEventListener('pointermove', (event) => {
+    if (!isDrawing() || !ui.stage.hasPointerCapture(event.pointerId)) return
+    paintAt(event)
+  })
+  const release = (event) => {
+    if (ui.stage.hasPointerCapture(event.pointerId)) ui.stage.releasePointerCapture(event.pointerId)
+  }
+  ui.stage.addEventListener('pointerup', release)
+  ui.stage.addEventListener('pointercancel', release)
+}
+
+/** Replace the drawn state, redraw it, and rebuild from it. */
+function setDrawn(fill) {
+  const options = readOptions()
+  fitDrawn(options.rows, options.cols)
+  fill(drawn, options)
+  showDrawn()
+  schedule()
 }
 
 /**
@@ -362,6 +505,15 @@ function schedule() {
   }, 120)
 }
 
+/** Only one of the two start-mode control groups is ever relevant. */
+function syncStartMode() {
+  const mode = ui.start.value
+  // Density seeds the soup, and it also seeds the Scatter button — so it stays visible for both.
+  ui.densityField.hidden = mode === 'seed'
+  ui.drawTools.hidden = mode !== 'draw'
+  ui.frame.dataset.painting = String(mode === 'draw')
+}
+
 function bindOutput(input, output, format = (value) => value) {
   const sync = () => {
     output.textContent = format(input.value)
@@ -389,6 +541,7 @@ function init() {
   bindOutput(ui.subLayers, ui.subLayersOut)
   bindOutput(ui.basePlate, ui.basePlateOut)
   bindOutput(ui.density, ui.densityOut, (value) => `${value}%`)
+  syncStartMode()
 
   ui.rule.addEventListener('change', () => {
     if (ui.rule.value === 'custom') {
@@ -404,9 +557,29 @@ function init() {
     schedule()
   })
   ui.start.addEventListener('change', () => {
-    ui.densityField.hidden = ui.start.value !== 'soup'
+    syncStartMode()
+    if (isDrawing()) showDrawn()
     schedule()
   })
+  bindPainting()
+  ui.drawClear.addEventListener('click', () => setDrawn((cells) => cells.fill(0)))
+  ui.drawCentre.addEventListener('click', () =>
+    setDrawn((cells, options) => {
+      cells.fill(0)
+      cells[Math.floor(options.rows / 2) * options.cols + Math.floor(options.cols / 2)] = 1
+    }),
+  )
+  ui.drawRandom.addEventListener('click', () =>
+    setDrawn((cells, options) => {
+      const seeded = createDensityState({
+        rows: options.rows,
+        columns: options.cols,
+        seed: options.seed,
+        density: options.density,
+      })
+      cells.set(seeded)
+    }),
+  )
   ui.interpolate.addEventListener('change', () => {
     ui.subLayers.disabled = ui.interpolate.value === 'none'
     schedule()

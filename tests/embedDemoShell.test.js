@@ -27,6 +27,7 @@ describe('embed demo presentation shell', () => {
     expect(page).toContain('href="./totalistic-256.html"')
     expect(page).toContain('href="./coffee-percolation.html"')
     expect(page).toContain('href="./ca-builder.html"')
+    expect(page).toContain('href="./solid-garden.html"')
     expect(page).toContain('class="demo-package-card"')
     expect(page).toContain('Built with the published npm package')
     expect(page).toContain('https://www.npmjs.com/package/@hexlife/embed')

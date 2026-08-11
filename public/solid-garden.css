@@ -113,6 +113,15 @@
   line-height: 1.5;
 }
 
+/* `hidden` alone does NOT hide this.
+   The attribute works through a *user-agent* `display: none`, which loses to any author `display`
+   on the same element — and the rule above sets `display: grid`. Without this line the overlay
+   stays fully opaque over the canvas forever, so a page that has finished building looks
+   permanently stuck on "Growing…". Restate the hiding as an author rule that outranks the layout. */
+.garden-overlay[hidden] {
+  display: none;
+}
+
 .garden-scrub {
   display: flex;
   align-items: center;
@@ -178,6 +187,43 @@
   text-align: right;
   color: var(--demo-muted, #8b96a8);
   font-variant-numeric: tabular-nums;
+}
+
+.garden-draw-tools {
+  margin: -0.2rem 0 0.8rem;
+}
+
+.garden-draw-tools[hidden] {
+  display: none;
+}
+
+.garden-button-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.garden-button-row button {
+  flex: 1;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid var(--demo-border, #2a3140);
+  border-radius: 7px;
+  background: #0e131b;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.garden-button-row button:hover,
+.garden-button-row button:focus-visible {
+  border-color: var(--demo-accent, #6fd3c7);
+}
+
+/* Painting needs the pointer over the canvas, not a text caret or a drag-select. */
+.garden-canvas-frame[data-painting='true'] canvas {
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .garden-grid-2 {
