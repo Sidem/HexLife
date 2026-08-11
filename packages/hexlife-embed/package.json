@@ -1,7 +1,7 @@
 {
   "name": "@hexlife/embed",
   "version": "1.10.1",
-  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines",
+  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines, with a solid extruder for 3D printing",
   "keywords": [
     "cellular-automata",
     "hexagonal",
@@ -16,7 +16,11 @@
     "web-components",
     "custom-elements",
     "deterministic",
-    "generative-art"
+    "generative-art",
+    "3d-printing",
+    "stl",
+    "3mf",
+    "mesh"
   ],
   "type": "module",
   "license": "MIT",

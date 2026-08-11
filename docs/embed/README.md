@@ -34,6 +34,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | [`/render`](./renderer.md) | The renderer alone, for hosts that already own their simulation. |
 | [`/ca`](./ca.md) | k-state worlds: two backends, conservation, isotropy, `HXK1` codes. |
 | [`/stochastic`](./stochastic.md) | Probability and time-in-state, the conserved lattice gas, `HXS1` codes. |
+| [`/solid`](./solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |
 | [`/api`](./api.md) | DOM-free metadata, world codecs, palettes, GPU probing. |
 
 ## Contracts

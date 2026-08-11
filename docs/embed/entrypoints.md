@@ -2,8 +2,8 @@
 
 # Entry points
 
-Eight public imports. The split is not cosmetic: each one is the boundary between "this host needs
-a DOM", "this host needs the second Wasm artifact", and "this host needs neither".
+Nine public imports. The split is not cosmetic: each one is the boundary between "this host needs
+a DOM", "this host needs a separately loaded Wasm artifact", and "this host needs neither".
 
 | Import | Needs | Use for |
 | :--- | :--- | :--- |
@@ -14,7 +14,8 @@ a DOM", "this host needs the second Wasm artifact", and "this host needs neither
 | `@hexlife/embed/ca` | Wasm | **k-state** worlds: multi-state simulation on the same lattice, with an optionally mass-conserving backend. A second engine — everything else here stays binary. No DOM at module scope. → [`/ca`](./ca.md) |
 | `@hexlife/embed/ca-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-ca>`, the k-state element. Separate from `/ca` because that entry is DOM-free, and separate from the root because a binary embed should not carry the k-state engine. |
 | `@hexlife/embed/stochastic` | Wasm | Stateful/probabilistic neighborhood worlds and the conserved lattice gas, with compiled native rules, age epochs, counter RNG, census and checksums. A separately loaded artifact with no DOM at module scope. → [`/stochastic`](./stochastic.md) |
-| `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-stochastic>`. The **only** element entry that reaches the second Wasm artifact — which is why it is separate from both `/stochastic` (DOM-free) and every other element entry. |
+| `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-stochastic>`. The **only** element entry that reaches the stochastic artifact — which is why it is separate from both `/stochastic` (DOM-free) and every other element entry. |
+| `@hexlife/embed/solid` | Wasm | Extrude a run of *any* of these engines through time into a printable solid, and serialize STL, PLY or 3MF. A third separately loaded artifact; no DOM at module scope. → [`/solid`](./solid.md) |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
@@ -22,16 +23,17 @@ entry evaluates custom-element, Wasm and WebGL code at import time.
 The browser bundle **inlines the Wasm binary** as a data URI rather than fetching a side-car asset,
 because a strict host CSP (a Reddit webview, for instance) is not something an embed can widen.
 
-## Three engines, one package
+## Three engines and an extruder, one package
 
 | Engine | States | Entry | Wasm artifact |
 | :--- | :--- | :--- | :--- |
 | Binary | 2 | root, `/sim` | The main one. |
 | k-state | 2–16 | `/ca`, `/ca-element` | The same one, a separate engine struct. |
 | Stochastic | up to 64 rows of transitions, or 5 gas states | `/stochastic`, `/stochastic-element` | A **second** artifact, loaded only by these two. |
+| Solid extruder | simulates nothing — a layer sink for any of the above | `/solid` | A **third** artifact, loaded only by this one. |
 
 Importing the package root, `/sim`, `/ca`, or `/ca-element` neither downloads nor initializes the
-stochastic artifact.
+stochastic or solid artifacts.
 
 ## Types
 

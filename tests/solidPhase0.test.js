@@ -137,6 +137,77 @@ describe('solid Phase-0 geometry contract', () => {
   it('reports a version hosts can record with a recipe', () => {
     expect(solidEngineVersion()).toBe(1);
   });
+});
+
+describe('solid package contract', () => {
+  const read = (relative) => readFile(new URL(`../${relative}`, import.meta.url), 'utf8');
+
+  /**
+   * `docs/SOLID-PLAN.md` is gitignored, so it cannot be the home of a published contract. These
+   * assertions are what force the contract to live in tracked files a consumer can actually reach.
+   */
+  it('publishes the contract in tracked files, not only in the plan', async () => {
+    const readme = await read('packages/hexlife-embed/README.md');
+    const doc = await read('docs/embed/solid.md');
+
+    for (const source of [readme, doc]) {
+      expect(source).toContain('@hexlife/embed/solid');
+      expect(source).toContain('createSolidStack');
+      // The three things a host gets wrong if nobody tells them: build the layer view once, read
+      // the report before exporting, and free the stack.
+      expect(source).toContain('layerView()');
+      expect(source).toContain('keptComponents');
+      expect(source).toContain('free()');
+    }
+
+    // The guarantee is exactly as good as its precondition, so both have to be stated together.
+    for (const source of [readme, doc]) {
+      expect(source).toMatch(/vacuum-stable/i);
+      expect(source).toContain('isVacuumStable');
+    }
+
+    // `merge: 'none'` is a supported setting; documenting it as a debug flag would be a defect.
+    for (const source of [readme, doc]) {
+      expect(source).toContain('T-junction');
+      expect(source).toContain("`merge: 'none'`");
+    }
+  });
+
+  it('documents every format and mode the module actually accepts', async () => {
+    const source = await read('src/embed/solid.js');
+    const doc = await read('docs/embed/solid.md');
+
+    const tags = (name) => {
+      const body = source.match(new RegExp(`const ${name} = \\{([^}]*)\\}`))[1];
+      return [...body.matchAll(/\[([A-Z0-9_]+)\]/g)].map((match) => match[1]);
+    };
+    // Every wire tag corresponds to an exported string constant, and every one is documented. A
+    // format that exists in code but not in the docs is a format nobody can discover.
+    for (const constant of [...tags('FORMAT_TAGS'), ...tags('MERGE_TAGS'), ...tags('KEEP_TAGS')]) {
+      const value = source.match(new RegExp(`export const ${constant} = '([^']+)'`))[1];
+      expect(doc, `docs/embed/solid.md documents ${constant}`).toContain(`\`'${value}'\``);
+    }
+    expect(tags('FORMAT_TAGS')).toEqual(['FORMAT_STL', 'FORMAT_PLY', 'FORMAT_3MF']);
+  });
+
+  it('is listed wherever the package enumerates its entry points', async () => {
+    for (const file of ['packages/hexlife-embed/README.md', 'docs/embed/entrypoints.md']) {
+      expect(await read(file), `${file} lists /solid`).toContain('@hexlife/embed/solid');
+    }
+    // The docs index and the entry-point page both have to route to the reference page, or it is
+    // reachable only by someone who already knows it exists.
+    for (const file of ['docs/embed/README.md', 'docs/embed/entrypoints.md']) {
+      expect(await read(file), `${file} links solid.md`).toContain('](./solid.md)');
+    }
+  });
+
+  it('never suggests jsDelivr\'s /+esm transform for a subpath', async () => {
+    // It bundles each entry standalone, so `/solid` would get its own module state and its own
+    // Wasm instance — the exact failure that left two demos stuck on "Loading Wasm…".
+    for (const file of ['docs/embed/solid.md', 'packages/hexlife-embed/README.md']) {
+      expect(await read(file)).not.toContain('/+esm');
+    }
+  });
 
   it('shares the canonical neighbor table on both lattice parities, with an open boundary', () => {
     // §4: the mesh's adjacency must BE the simulation's adjacency. If these disagree, every lateral

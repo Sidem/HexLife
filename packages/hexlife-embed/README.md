@@ -55,6 +55,58 @@ const packed = packCells(sim.snapshotCells())
 sim.dispose()
 ```
 
+## Printable solids
+
+`@hexlife/embed/solid` extrudes a run through time into an object you can print: the hex grid is the
+cross-section, each tick is a layer, on cells are matter. It **simulates nothing** — it is a layer
+sink, so the binary, k-state and stochastic engines all feed the same buffer.
+
+```js
+import {createSolidStack, initSolidEngine} from '@hexlife/embed/solid'
+
+await initSolidEngine()
+const stack = createSolidStack({rows, cols, ticks, interpolate: 'bridge', subLayers: 1, basePlate: 2})
+
+const layer = stack.layerView()          // build ONCE, outside the loop
+for (let tick = 0; tick < ticks; tick++) {
+  layer.set(world.state)                 // one memcpy per tick
+  stack.pushLayer()
+  world.tick()
+}
+
+const report = stack.finalize({keepComponents: 'plate-connected'})
+report.keptComponents // → 1 means it prints as a single piece
+report.floating       // → components that never reach the build surface
+
+const bytes = await stack.export({format: '3mf', cellSize: 2, layerHeight: 0.8})
+stack.free()                             // mandatory
+```
+
+**Read the report before you export.** A slicer will not join separate bodies — it will happily
+print forty loose fragments and let you find out on the build plate.
+
+**`interpolate: 'bridge'`** is what makes the object hold together. Two prisms on consecutive layers
+whose cells are diagonal neighbours meet along a single vertical edge — a zero-thickness hinge that
+reports as connected and prints as two pieces. Bridging inserts exactly the set that turns that into
+face contact, without the fattening `'union'` causes. For a **vacuum-stable** ruleset it guarantees
+that nothing floats: every voxel is face-connected down to tick 0. Check with `isVacuumStable()` from
+`/api` first — the guarantee is precisely as good as its precondition.
+
+**Units are millimetres.** `cellSize` (hexagon circumradius) and `layerHeight` are independent, so
+the object's Z aspect ratio is a print decision rather than an accident of tick count. Formats are
+`'stl'` (default, universal), `'ply'` (indexed, ~⅓ the bytes) and `'3mf'` (indexed XML in a zip —
+what slicers prefer, and the only one that carries real units).
+
+**`merge: 'greedy'`** is the default and welds runs of coplanar faces into single quads: 586,864
+triangles down to 16,796 on a 30×36×100 volume, and the 3MF down to 0.125 MiB. `merge: 'none'` is a
+supported first-class setting, not a debug flag — merging necessarily leaves T-junctions, slicers do
+not care, strict manifold validators do. Both meshes bound exactly the same solid.
+
+The boundary of the printed object is **open, not toroidal**: the simulation wraps, an object cannot,
+so features are cut at the grid edge and two pieces touching only across the seam are two pieces.
+
+→ [Full `/solid` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md)
+
 ## Documentation
 
 The full reference lives in the repository, one page per surface:
@@ -70,6 +122,7 @@ The full reference lives in the repository, one page per surface:
 | [`/render`](https://github.com/Sidem/HexLife/blob/main/docs/embed/renderer.md) | The renderer alone, for hosts that own their simulation. |
 | [`/ca`](https://github.com/Sidem/HexLife/blob/main/docs/embed/ca.md) | k-state worlds, conservation, isotropy, `<hexlife-ca>`, `HXK1` codes. |
 | [`/stochastic`](https://github.com/Sidem/HexLife/blob/main/docs/embed/stochastic.md) | Probability and time-in-state, the lattice gas, `<hexlife-stochastic>`, `HXS1` codes. |
+| [`/solid`](https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |
 | [`/api`](https://github.com/Sidem/HexLife/blob/main/docs/embed/api.md) | DOM-free metadata, world codecs, palettes, GPU probing. |
 | [Determinism & versioning](https://github.com/Sidem/HexLife/blob/main/docs/embed/determinism.md) | The reproducibility contract and what a major bump means. |
 
@@ -84,7 +137,8 @@ The full reference lives in the repository, one page per surface:
 | `@hexlife/embed/ca` | Wasm | **k-state** worlds — a second engine, with an optionally mass-conserving backend. |
 | `@hexlife/embed/ca-element` | DOM, WebGL2, Wasm | Registers `<hexlife-ca>`. |
 | `@hexlife/embed/stochastic` | Wasm | Probabilistic and time-dependent worlds, plus the conserved lattice gas. A separately loaded artifact. |
-| `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Registers `<hexlife-stochastic>`. The only element entry that reaches the second artifact. |
+| `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Registers `<hexlife-stochastic>`. The only element entry that reaches the stochastic artifact. |
+| `@hexlife/embed/solid` | Wasm | **Printable solids.** Extrude a run of any of the engines above through time; export STL, PLY or 3MF. A third separately loaded artifact. |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
