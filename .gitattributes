@@ -3,6 +3,15 @@
 # pins LF in the *working tree* there, because Biome refuses to format CRLF.)
 * text=auto
 
+# wasm-pack output. LF in the WORKING TREE too, not just the index: the #39 artifact gate
+# (`tests/solidPhase0.test.js`) hashes these files byte-for-byte to prove the third Wasm artifact
+# costs the other two nothing, and "check out native" would hand a Windows clone CRLF glue and a
+# hash mismatch that has nothing to do with the engine. Listed BEFORE the binary block below so
+# `*.wasm binary` still wins for the binaries themselves — the last matching line sets the attribute.
+src/core/wasm-engine/**     text eol=lf
+src/core/stochastic-wasm/** text eol=lf
+src/core/solid-wasm/**      text eol=lf
+
 # Binary: never diff, never normalize.
 *.wasm binary
 *.gif  binary
@@ -16,7 +25,9 @@
 # Generated, not authored. Keeps GitHub's language stats honest (the wasm-pack JS glue is ~9 KB
 # of machine output that would otherwise read as hand-written source) and collapses these in
 # pull-request diffs.
-src/core/wasm-engine/** linguist-generated=true
+src/core/wasm-engine/**     linguist-generated=true
+src/core/stochastic-wasm/** linguist-generated=true
+src/core/solid-wasm/**      linguist-generated=true
 package-lock.json       linguist-generated=true
 devvit/package-lock.json linguist-generated=true
 

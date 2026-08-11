@@ -2249,3 +2249,20 @@ mod tests {
     const GOLDEN_AFTER_1: i32 = 2137887712;
     const GOLDEN_AFTER_50: i32 = -205264731;
 }
+
+// -------------------------------------------------------------------------------------------
+// The solid extrusion engine (roadmap #39) — declared HERE, at the end of the file, on purpose.
+//
+// Rust bakes panic locations into the data section as (file, line, column). An item inserted
+// higher up shifts those line numbers, and the DEFAULT artifact changes bytes even though not one
+// instruction moved — which is precisely the signal the byte-identity gate exists to raise.
+// Appending keeps that gate honest: a real leak into `World`, `WorldK`, or `WorldStochastic` still
+// shows up, and a purely additive third artifact does not.
+//
+// `WorldSolid` simulates nothing. Hosts push one layer per tick from whichever engine they are
+// running, so it shares `compute_neighbor_indices` and the generated direction tables — nothing
+// else. It compiles only under `--no-default-features --features solid`.
+#[cfg(feature = "solid")]
+mod solid;
+#[cfg(feature = "solid")]
+pub use solid::{solid_engine_version, WorldSolid, SOLID_ENGINE_VERSION};

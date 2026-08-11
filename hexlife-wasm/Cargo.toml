@@ -16,6 +16,9 @@ standard = []
 # Built separately with `--no-default-features --features stochastic`; never imported by the
 # default package entries.
 stochastic = []
+# Built separately with `--no-default-features --features solid`; the third artifact. Only
+# `src/embed/solid.js` imports it. See `docs/SOLID-PLAN.md` §3.
+solid = []
 
 [dependencies]
 wasm-bindgen = "0.2" # The core dependency for JS interop

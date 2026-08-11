@@ -21,6 +21,9 @@ export default defineConfig({
         ca: 'src/embed/ca.js',
         // Isolated artifact boundary: no other entry imports this module or its Wasm URL.
         stochastic: 'src/embed/stochastic.js',
+        // The third isolated artifact, on the same terms. DOM-free and registers nothing, so it
+        // stays out of "sideEffects".
+        solid: 'src/embed/solid.js',
         // Separate from `ca` on purpose: `ca.js` is DOM-free and outside "sideEffects", so the
         // `customElements.define` for <hexlife-ca> cannot live there. See ca-element.js.
         'ca-element': 'src/embed/ca-element.js',

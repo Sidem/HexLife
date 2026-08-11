@@ -18,6 +18,7 @@ const copies = [
   ['src/embed/render.d.ts', 'dist/embed-package/src/embed/render.d.ts'],
   ['src/embed/ca.d.ts', 'dist/embed-package/src/embed/ca.d.ts'],
   ['src/embed/stochastic.d.ts', 'dist/embed-package/src/embed/stochastic.d.ts'],
+  ['src/embed/solid.d.ts', 'dist/embed-package/src/embed/solid.d.ts'],
   ['src/embed/ca-element.d.ts', 'dist/embed-package/src/embed/ca-element.d.ts'],
   ['src/embed/stochastic-element.d.ts', 'dist/embed-package/src/embed/stochastic-element.d.ts'],
   ['src/embed/index.d.ts', 'dist/embed-package/src/embed/index.d.ts'],

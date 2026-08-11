@@ -57,6 +57,11 @@
       "import": "./src/embed/stochastic.js",
       "default": "./src/embed/stochastic.js"
     },
+    "./solid": {
+      "types": "./src/embed/solid.d.ts",
+      "import": "./src/embed/solid.js",
+      "default": "./src/embed/solid.js"
+    },
     "./ca-element": {
       "types": "./src/embed/ca-element.d.ts",
       "import": "./src/embed/ca-element.js",
