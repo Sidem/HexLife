@@ -1,6 +1,6 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.10.1",
+  "version": "1.11.0",
   "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines, with a solid extruder for 3D printing",
   "keywords": [
     "cellular-automata",

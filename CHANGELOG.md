@@ -25,6 +25,61 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Printable solids
+
+#### Added
+
+- **A cellular automaton run can now become an object you can print.** The hex grid is the
+  cross-section, each tick is a layer, live cells are matter — and the stack of them is a solid, in
+  STL, PLY or 3MF. It arrives as `@hexlife/embed/solid` (see the package section below) and as a new
+  demo page, [**Solid Garden**](https://sidem.github.io/HexLife/solid-garden.html), which grows a
+  crystal from a single seed and hands you the file.
+- **The demo tells you whether it will print as one piece before you download it.** A slicer will not
+  join separate bodies; it will happily print forty loose fragments and let you discover that on the
+  build plate. Solid Garden shows the component report — pieces, floating fragments, matter kept and
+  dropped — along with the object's millimetre dimensions and the exact file size, live, as you
+  change anything. The whole pipeline runs in about 34 ms, so nothing there is an estimate.
+- **Five growth rules chosen so the result is guaranteed, not lucky.** Two cells that are diagonal
+  neighbours on consecutive layers touch along a single vertical edge — a zero-thickness hinge that
+  *reports* as connected and *prints* as two pieces. Bridge interpolation converts that contact into
+  a real face, and under a vacuum-stable rule that is enough to prove every part of the object is
+  connected down to the build plate. Every preset is vacuum-stable and starts from one cell, which is
+  exactly the configuration the proof covers. Soup starts and other rules are there to be opted into,
+  with the report explaining what they cost.
+
+### `@hexlife/embed` 1.11.0 — 2026-08-11
+
+#### Added
+
+- **`@hexlife/embed/solid` — extrude a run into a printable solid.** A third separately loaded Wasm
+  artifact that **simulates nothing**: it is a layer sink, so the binary, k-state and stochastic
+  engines all feed the same buffer, and a page that never exports an object pays nothing for the
+  mesher. Push one layer per tick, read the component report, export STL, PLY or 3MF.
+- **Units that mean something.** `cellSize` (hexagon circumradius) and `layerHeight` are independent
+  millimetres, so the object's Z aspect ratio is a print decision rather than an accident of how many
+  ticks were run. 3MF carries them into the slicer; nothing has to be guessed at import.
+- **A component report before you commit.** `finalize()` returns `componentCount`, `keptComponents`,
+  `keptVoxels`, `droppedVoxels` and `floating`, plus `keepComponents: 'all' | 'largest' |
+  'plate-connected'` and a `basePlate` that makes "plate-connected" mean reachable from the build
+  surface.
+- **Exports are reproducible.** Vertices weld on exact integer lattice coordinates rather than
+  floats — no epsilon comparisons, no cracks — and nothing depends on hash iteration order or a
+  per-process seed. Record `solidEngineVersion()` with the option block and the object reproduces
+  exactly. One stated limit: for 3MF that covers the model, not the compressed container, because the
+  deflate is the platform's.
+- **`solidMemoryBytes()`** reports the artifact's linear memory so a host can budget a large run.
+
+#### Performance
+
+- **Greedy merging is the default and is worth 34.9×.** On a 30 × 36 × 100 reference volume it takes
+  the mesh from 586,864 triangles to 16,796, the STL from 27.98 MiB to 0.80 MiB, and the 3MF to
+  **0.125 MiB** — 1/224 of the unmerged STL. Peak engine memory for that export is 4.94 MiB, and the
+  whole pipeline runs in 22 ms.
+- **`merge: 'none'` is a supported setting, not a debug flag.** Merging necessarily leaves
+  T-junctions; slicers intersect planes and never notice, strict manifold validators do. Both meshes
+  bound exactly the same solid — the engine proves it by comparing their surface areas and enclosed
+  volumes as exact integers rather than within a tolerance.
+
 ### Rule-aware palettes
 
 #### Fixed
