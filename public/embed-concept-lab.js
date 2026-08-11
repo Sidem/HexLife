@@ -7,6 +7,7 @@ import '@hexlife/embed/ca-element';
 import {sealPerimeter} from './embed-concept-boundaries.js';
 import {neighborIndex} from './embed-demo-geometry.js';
 import {demoOwnershipFor} from './embed-demo-manifest.js';
+import {RunHistory, toCsv} from './lab-history.js';
 import {
   AIR,
   EMBER,
@@ -76,6 +77,30 @@ const SIZE_PRESETS = [
 /** Brush radii the demos expose. 0 is a single cell; 12 is a comfortable pouring nozzle. */
 const BRUSH_MIN = 0;
 const BRUSH_MAX = 12;
+
+/**
+ * Outbreak Counterfactuals' recorded channels, and the two colours everything about it is drawn in.
+ *
+ * The arm colours are the palette's own: the untreated arm is drawn in the infectious red it fills
+ * up with, the policy arm in the vaccinated green. A column of the table and a curve on the chart
+ * therefore agree with the world above them without anyone having to read a caption.
+ *
+ * Up here with the other module constants rather than beside the outbreak functions, because the
+ * dispatch at the bottom of this block runs `setupOutbreak` while the module is still evaluating —
+ * a `const` further down the file would still be in its temporal dead zone. Same reason as
+ * `ECOLOGY_SPECIES` above.
+ */
+const OUTBREAK_CHANNELS = ['baselineInfectious', 'policyInfectious', 'baselineCases', 'policyCases', 'prevented'];
+const OUTBREAK_CSV_COLUMNS = [
+  {key: 'generation', label: 'generation'},
+  {key: 'baselineInfectious', label: 'infectious_no_vaccine'},
+  {key: 'policyInfectious', label: 'infectious_policy'},
+  {key: 'baselineCases', label: 'cumulative_cases_no_vaccine'},
+  {key: 'policyCases', label: 'cumulative_cases_policy'},
+  {key: 'prevented', label: 'cases_prevented'},
+];
+const ARM_A = '#ff6577';
+const ARM_B = '#76d68d';
 
 /**
  * Hex Ecology's full five-species vocabulary; a shorter cycle is simply a prefix of it.
@@ -756,13 +781,17 @@ function setupStochasticLab(item) {
  */
 function setupOutbreak(item) {
   const {params, stage} = renderControls(item, {copyLabel: 'Copy comparison snapshot'});
-  renderLegend(item.names, item.palette);
-  setText('metric-focus-label', 'Cases prevented');
   const mount = document.getElementById('world-mount');
   mount.innerHTML = '<div class="dual-worlds" id="dual"></div>';
   const left = createStochasticElement(item, stage); const right = createStochasticElement(item, stage);
   document.getElementById('dual').append(figure('No vaccine', left), figure('Vaccination policy', right));
-  let running = false; let timer = 0; let ready = 0; const trace = [];
+  renderOutbreakReadout(item);
+  mountOutbreakHistory();
+  // One record of the whole run rather than a rolling window: an outbreak's shape — when it took
+  // off, where it peaked, whether the policy arm merely delayed it — is a fact about the run, and a
+  // 90-sample window is exactly the part of it you cannot see. Five channels, thinned at capacity.
+  const history = new RunHistory({channels: OUTBREAK_CHANNELS, capacity: 420});
+  let running = false; let timer = 0; let ready = 0;
   const onReady = () => {
     if (++ready !== 2) return;
     running = true;
@@ -782,6 +811,7 @@ function setupOutbreak(item) {
     const cells = right.world.snapshotCells();
     const ages = right.world.snapshotElapsedAges();
     right.setCells(stochastic.outbreakVaccinateRing(cells, right.rows, right.columns), ages);
+    history.mark(left.generation, 'Vaccination ring added to the policy arm');
     update();
     setText('control-status', 'Vaccination ring added only to the policy world.');
   });
@@ -792,6 +822,12 @@ function setupOutbreak(item) {
       baseline: await left.stochasticCode(), intervention: await right.stochasticCode(),
     }), 'Paired HXS1 comparison copied — both arms resume exactly where they are.');
   });
+  // The history is the measurement, so it leaves the page as data rather than as a picture.
+  document.getElementById('history-csv').addEventListener('click', async () => {
+    if (!history.length) { setText('control-status', 'Nothing recorded yet — run the counterfactual first.'); return; }
+    await copyText(toCsv(OUTBREAK_CSV_COLUMNS, history.records()),
+      `${history.length} samples of the run copied as CSV (every ${history.stride} generation${history.stride === 1 ? '' : 's'}).`);
+  });
 
   bindParameterControls(item, params, (parameter) => {
     if (!running) return;
@@ -799,6 +835,9 @@ function setupOutbreak(item) {
       // Both arms, one table: they share the exposure stream, so they must share the rule too.
       const rule = stochastic.outbreakStochasticRule(params);
       left.setRule(rule); right.setRule(rule);
+      // The history outlives the change, so the change has to be IN the history — otherwise the
+      // curve has a kink in it that nothing on the page explains.
+      history.mark(left.generation, `${parameter.label} → ${params[parameter.id]}${parameter.suffix || ''}`);
       setText('control-status', `${parameter.label} recompiled onto both arms at generation ${left.generation} — the study continues.`);
       update();
     } else {
@@ -825,7 +864,9 @@ function setupOutbreak(item) {
     left.setRule(rule); right.setRule(rule);
     left.setInitialState(stochastic.outbreakInitialState(left.rows, left.columns, params, {intervention: false}));
     right.setInitialState(stochastic.outbreakInitialState(right.rows, right.columns, params, {intervention: true}));
-    trace.length = 0;
+    // A new run is a new record. The old one described a population that no longer exists.
+    history.clear();
+    history.mark(0, `Run started · ${params.coverage}% coverage at ${params.efficacy}% efficacy, ${params.infection}% per infected neighbour`);
     setText('control-status', 'Counterfactual replayed from identical initial cases and the same compiled stream.');
     update();
   }
@@ -833,20 +874,215 @@ function setupOutbreak(item) {
   function update() {
     if (!running || !left.world || !right.world) return;
     const leftCensus = left.census(); const rightCensus = right.census();
-    const prevented = infections(left) - infections(right);
+    const baselineCases = infections(left); const policyCases = infections(right);
+    const prevented = baselineCases - policyCases;
     // One bounded scalar crosses the boundary; the full-grid comparison stays inside Wasm.
     const differences = left.world.differenceCount(right.world);
-    trace.push(Math.max(0, prevented)); if (trace.length > 90) trace.shift();
-    setText('metric-generation', left.generation); setText('metric-focus', prevented);
-    setText('metric-change', `${differences.toLocaleString()} cells`);
-    setText('metric-checksum', `${leftCensus[1]} vs ${rightCensus[1]} infectious`);
-    drawTrace(trace, item.accent);
+    // Every number here was already read for the readout, so the record costs no extra crossing.
+    history.push(left.generation, [leftCensus[1], rightCensus[1], baselineCases, policyCases, prevented]);
+    setText('metric-generation', left.generation.toLocaleString());
+    setText('metric-focus', prevented.toLocaleString());
+    setText('metric-change', baselineCases ? `${(prevented / baselineCases * 100).toFixed(1)}%` : '—');
+    setText('metric-checksum', `${differences.toLocaleString()} cells`);
+    renderOutbreakArms(history, {
+      population: left.rows * left.columns,
+      baseline: {census: leftCensus, cases: baselineCases},
+      policy: {census: rightCensus, cases: policyCases},
+    });
+    drawOutbreakHistory(history, item.accent);
   }
   /** Cumulative infections, straight off the engine's per-row transition counters. */
   function infections(world) {
     const counts = world.world.transitionCounts();
     return stochastic.OUTBREAK_INFECTION_ROWS.reduce((sum, row) => sum + (counts[row] || 0), 0);
   }
+}
+
+/**
+ * The instrument panel for a two-armed study.
+ *
+ * The shared readout has one column of numbers, which is the wrong shape here: a counterfactual is
+ * read across, arm against arm, and "1,240 infectious" means nothing without the other arm beside
+ * it. So the trace canvas gives up its place to a side-by-side table, and the run's shape moves to
+ * the full-width history section where there is room to draw all of it.
+ */
+function renderOutbreakReadout(item) {
+  const readout = document.querySelector('.concept-readout');
+  readout.innerHTML = `<h2>Instrument panel</h2>
+    <div class="metric-grid">
+      <div class="metric"><span>Generation</span><strong id="metric-generation">0</strong></div>
+      <div class="metric"><span>Cases prevented</span><strong id="metric-focus">—</strong></div>
+      <div class="metric"><span>Share averted</span><strong id="metric-change">—</strong></div>
+      <div class="metric"><span>Arms differ by</span><strong id="metric-checksum">—</strong></div>
+    </div>
+    <h3>Arm by arm</h3>
+    <table class="arm-table"><thead><tr><td></td><td class="arm-a">No vaccine</td><td class="arm-b">Policy</td></tr></thead><tbody id="arm-rows"></tbody></table>
+    <div class="legend" id="legend"></div>`;
+  renderLegend(item.names, item.palette);
+}
+
+/** The side-by-side numbers. Peaks come from the history, so thinning cannot round them off. */
+function renderOutbreakArms(history, {population, baseline, policy}) {
+  const peakA = history.peak('baselineInfectious');
+  const peakB = history.peak('policyInfectious');
+  // Cases per cell rather than an attack rate: immunity wanes here, so a cell can be infected more
+  // than once and the cumulative count runs past the population. "710% attacked" would be nonsense;
+  // "7.10 cases per cell" is the thing that is actually being counted.
+  const rate = (cases) => (population ? (cases / population).toFixed(2) : '—');
+  const peak = (value) => `${compactCount(value.value)}<small>gen ${value.generation.toLocaleString()}</small>`;
+  const row = (label, a, b) => `<tr><th>${label}</th><td class="arm-a">${a}</td><td class="arm-b">${b}</td></tr>`;
+  document.getElementById('arm-rows').innerHTML = [
+    row('infectious now', compactCount(baseline.census[1]), compactCount(policy.census[1])),
+    row('peak infectious', peak(peakA), peak(peakB)),
+    row('cases to date', compactCount(baseline.cases), compactCount(policy.cases)),
+    row('cases per cell', rate(baseline.cases), rate(policy.cases)),
+    row('susceptible', compactCount(baseline.census[0]), compactCount(policy.census[0])),
+    row('recovered', compactCount(baseline.census[2]), compactCount(policy.census[2])),
+    row('vaccinated', compactCount(baseline.census[3]), compactCount(policy.census[3])),
+  ].join('');
+}
+
+/** The full-width history section, inserted under the workspace on this one demo. */
+function mountOutbreakHistory() {
+  const legend = (color, label) => `<span><i style="background:${color}"></i>${label}</span>`;
+  document.querySelector('.concept-workspace').insertAdjacentHTML('afterend', `<section class="concept-panel outbreak-history">
+    <div class="history-head"><h2>Full-run history</h2>
+      <p>The whole run, not the last few seconds: at capacity the record drops every other sample and keeps spanning generation zero to now. Peaks are measured over every generation, so thinning the curve never moves the number beside it.</p>
+      <button id="history-csv">Copy history CSV</button></div>
+    <div class="history-charts">
+      <figure><figcaption>Infectious population — the epidemic curve of each arm</figcaption>
+        <canvas id="chart-prevalence" width="880" height="240" aria-label="Infectious population in both arms over the whole run"></canvas>
+        <div class="chart-legend">${legend(ARM_A, 'no vaccine')}${legend(ARM_B, 'vaccination policy')}</div></figure>
+      <figure><figcaption>Cumulative cases — the gap between the arms is what the policy did</figcaption>
+        <canvas id="chart-cases" width="880" height="240" aria-label="Cumulative cases in both arms over the whole run"></canvas>
+        <div class="chart-legend">${legend(ARM_A, 'no vaccine')}${legend(ARM_B, 'vaccination policy')}<span><i class="band" id="band-swatch"></i><span id="band-label">cases prevented</span></span></div></figure>
+    </div>
+    <div class="history-log"><h3>Study log</h3><ol id="history-log"></ol></div>
+  </section>`);
+}
+
+function drawOutbreakHistory(history, accent) {
+  const generations = history.generations;
+  const marks = history.marks;
+  drawRunChart(document.getElementById('chart-prevalence'), {
+    generations, marks,
+    lines: [
+      {values: history.channel('baselineInfectious'), color: ARM_A},
+      {values: history.channel('policyInfectious'), color: ARM_B},
+    ],
+  });
+  // The band can invert, and saying so is the honest thing: with waning immunity a vaccinated
+  // population can sustain an endemic cycle after the untreated one has burned out, and then the
+  // gap is extra cases rather than prevented ones. Colour and caption follow the sign.
+  const baselineCases = history.channel('baselineCases');
+  const policyCases = history.channel('policyCases');
+  const averted = (baselineCases.at(-1) ?? 0) - (policyCases.at(-1) ?? 0);
+  const bandColor = averted >= 0 ? accent : ARM_A;
+  drawRunChart(document.getElementById('chart-cases'), {
+    generations, marks,
+    band: {upper: baselineCases, lower: policyCases, color: bandColor},
+    lines: [
+      {values: baselineCases, color: ARM_A},
+      {values: policyCases, color: ARM_B},
+    ],
+  });
+  document.getElementById('band-swatch').style.background = `${bandColor}47`;
+  setText('band-label', averted >= 0 ? 'cases prevented' : 'extra cases under the policy');
+  // The charts are redrawn every tick; the log only changes when the operator does something, so
+  // it is rebuilt on that event rather than on the clock.
+  const log = document.getElementById('history-log');
+  // Keyed on the newest entry's text as well as the count: a replay clears the log and writes one
+  // fresh "run started" line, and two replays in a row differ only in what that line says.
+  const newest = marks[marks.length - 1];
+  const signature = newest ? `${marks.length}:${newest.generation}:${newest.label}` : '0';
+  if (log.dataset.marks === signature) return;
+  log.dataset.marks = signature;
+  const entries = [...marks].reverse();
+  log.innerHTML = entries.length
+    ? entries.map((mark) => `<li><b>gen ${mark.generation.toLocaleString()}</b> · ${escapeHtml(mark.label)}</li>`).join('')
+    : '<li>Nothing has been changed yet — every generation so far ran under the same policy.</li>';
+}
+
+/**
+ * A whole run on one canvas.
+ *
+ * x is the GENERATION rather than the sample index, so a thinning — which halves the sampling rate
+ * mid-run — moves no part of the curve that is already drawn, and an operator's mark lands on the
+ * generation it actually happened at.
+ */
+function drawRunChart(canvas, {generations, lines, band = null, marks = []}) {
+  const context = canvas.getContext('2d');
+  const {width, height} = canvas;
+  const left = 4; const right = width - 4; const top = 10; const bottom = height - 18;
+  context.clearRect(0, 0, width, height);
+  context.strokeStyle = '#243141';
+  context.lineWidth = 1;
+  for (let line = 0; line <= 4; line++) {
+    const y = top + line * (bottom - top) / 4;
+    context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke();
+  }
+  context.fillStyle = '#61707f';
+  context.font = '11px ui-monospace, monospace';
+  if (generations.length < 2) {
+    context.fillText('recording…', left + 6, top + 16);
+    return;
+  }
+  const first = generations[0];
+  const last = generations[generations.length - 1];
+  const span = Math.max(1, last - first);
+  let ceiling = 1;
+  for (const line of lines) for (const value of line.values) if (value > ceiling) ceiling = value;
+  const x = (generation) => left + (generation - first) / span * (right - left);
+  const y = (value) => bottom - value / ceiling * (bottom - top);
+
+  for (const mark of marks) {
+    if (mark.generation < first || mark.generation > last) continue;
+    context.save();
+    context.strokeStyle = '#4c5c6d';
+    context.setLineDash([3, 4]);
+    context.beginPath(); context.moveTo(x(mark.generation), top); context.lineTo(x(mark.generation), bottom); context.stroke();
+    context.restore();
+  }
+
+  // The band is the measurement made visible: the area between the two cumulative curves IS the
+  // number the readout prints as "cases prevented".
+  if (band) {
+    context.beginPath();
+    band.upper.forEach((value, index) => {
+      const point = [x(generations[index]), y(value)];
+      index ? context.lineTo(...point) : context.moveTo(...point);
+    });
+    for (let index = band.lower.length - 1; index >= 0; index--) context.lineTo(x(generations[index]), y(band.lower[index]));
+    context.closePath();
+    context.fillStyle = band.color;
+    context.globalAlpha = 0.16;
+    context.fill();
+    context.globalAlpha = 1;
+  }
+
+  context.lineWidth = 2.5;
+  context.lineJoin = 'round';
+  for (const line of lines) {
+    context.strokeStyle = line.color;
+    context.beginPath();
+    line.values.forEach((value, index) => {
+      const point = [x(generations[index]), y(value)];
+      index ? context.lineTo(...point) : context.moveTo(...point);
+    });
+    context.stroke();
+  }
+
+  context.fillStyle = '#61707f';
+  context.fillText(ceiling.toLocaleString(), left + 6, top + 12);
+  const axis = `gen ${first.toLocaleString()} → ${last.toLocaleString()}`;
+  context.fillText(axis, right - context.measureText(axis).width - 6, height - 5);
+}
+
+/** Six digits of population do not fit a 255px column; the exact value stays in the tooltip. */
+function compactCount(value) {
+  const number = Number(value) || 0;
+  if (number < 100000) return number.toLocaleString();
+  return `<span title="${number.toLocaleString()}">${(number / 1000).toFixed(number < 1000000 ? 0 : 1)}k</span>`;
 }
 
 function setupButterfly(item) {

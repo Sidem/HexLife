@@ -1,3 +1,6 @@
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import canonicalNeighborDirs from '../src/core/neighbor-dirs.json';
 import {
@@ -106,5 +109,37 @@ describe('coffee lab finish allowance', () => {
         expect(quietTickLimit(66)).toBe(396);
         expect(quietTickLimit(150)).toBe(900);
         expect(quietTickLimit(300)).toBe(1800);
+    });
+});
+
+describe('coffee lab brew history', () => {
+    const page = readFileSync(
+        path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'coffee-percolation.html'),
+        'utf8',
+    );
+
+    it('writes a row only where a brew actually ends', () => {
+        // Both labs log from their terminal branch and nowhere else: a brew abandoned mid-pour by a
+        // slider move is not a result, and logging one would fill the table with noise.
+        expect(page).toContain('if (!brew.finished) { brew.finished = true; renderLab(); recordSixRun(); }');
+        expect(page).toContain('renderDual();       // once more, so the phase label and the footer switch over\n        recordDualRun();');
+        expect(page.match(/recordSixRun\(\)/g)).toHaveLength(2);   // the call and its definition
+        expect(page.match(/recordDualRun\(\)/g)).toHaveLength(2);
+    });
+
+    it('starts every brew on the same partition phase, so two runs are comparable', () => {
+        // The engine's tick counter picks the partition phase and the handedness, and it only goes
+        // back to zero on a re-boot — so without this a second brew takes a different path from the
+        // first at identical settings, and no logged row can be reproduced.
+        expect(page).toContain('const PARTITION_PERIOD = 6;');
+        expect(page).toContain('alignPartitionPhase(lab);');
+        expect(page).toContain('alignPartitionPhase(lab2);');
+    });
+
+    it('logs the puck seed, which is what makes a restored row an exact replay', () => {
+        expect(page).toContain('seed: brew.seed');
+        expect(page).toContain('seed: dBrew.seed');
+        expect(page).toContain('brew.seed = entry.seed;');
+        expect(page).toContain('dBrew.seed = entry.seed;');
     });
 });

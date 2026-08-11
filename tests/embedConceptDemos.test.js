@@ -31,8 +31,8 @@ describe('embed concept demo library', () => {
     const page = read(`public/${route}`)
     expect(page).toContain(`data-concept="${id}"`)
     expect(page).toContain('embed-demo-shell.css')
-    expect(page).toContain('embed-concept-lab.css?v=20260811-hex-matter')
-    expect(page).toContain('embed-concept-lab.js?v=20260811-hex-matter')
+    expect(page).toContain('embed-concept-lab.css?v=20260811-run-history')
+    expect(page).toContain('embed-concept-lab.js?v=20260811-run-history')
     // The package's OWN files, never jsDelivr's `/+esm` aliases. `+esm` re-bundles each subpath
     // entry standalone, so `@hexlife/embed/sim` would carry a private copy of `EmbedSim` — its own
     // module state and its own Wasm instance — and the analysis primitives would be inspecting a
@@ -124,6 +124,26 @@ describe('embed concept demo library', () => {
         expect(cells[row * columns + column]).toBe(border ? 7 : 1)
       }
     }
+  })
+
+  it('records the whole outbreak run and reads it arm against arm', () => {
+    const host = read('public/embed-concept-lab.js')
+    expect(host).toContain("import {RunHistory, toCsv} from './lab-history.js'")
+    expect(host).toContain('new RunHistory({channels: OUTBREAK_CHANNELS')
+    // The side-by-side statistics and the full-run section are what make this demo readable; the
+    // rolling 90-sample trace every other demo draws is exactly what a counterfactual cannot use.
+    expect(host).toContain('renderOutbreakArms')
+    expect(host).toContain('class="arm-table"')
+    expect(host).toContain('id="chart-prevalence"')
+    expect(host).toContain('id="chart-cases"')
+    // Peaks are read off the history, which measures them over every generation — never off the
+    // thinned curve, which may not contain the peak at all.
+    expect(host).toContain("history.peak('baselineInfectious')")
+    expect(host).toContain("history.peak('policyInfectious')")
+    // Anything that changes the study mid-run has to be in the record, or the curve has a kink in
+    // it that nothing on the page explains.
+    expect(host).toContain('history.mark(left.generation')
+    expect(host).toContain('toCsv(OUTBREAK_CSV_COLUMNS, history.records())')
   })
 
   it('declares finite and intentionally wrapped topologies without hidden seam hacks', () => {

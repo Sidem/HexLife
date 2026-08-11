@@ -276,6 +276,80 @@
   background: #090e13;
 }
 
+/* --- Outbreak Counterfactuals: two arms side by side, and the whole run underneath -------------
+   A counterfactual is read ACROSS rather than down, so its readout is a table with one column per
+   arm instead of the single stack of numbers every other demo wants. */
+
+.arm-table {
+  width: 100%;
+  margin-top: 9px;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.arm-table th {
+  padding: 4px 4px 4px 0;
+  color: var(--demo-dim);
+  font-weight: 500;
+  text-align: left;
+}
+.arm-table td {
+  padding: 4px 0 4px 6px;
+  font-family: ui-monospace, monospace;
+  text-align: right;
+  white-space: nowrap;
+}
+.arm-table thead td {
+  color: var(--demo-dim);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+.arm-table tbody tr + tr th,
+.arm-table tbody tr + tr td { border-top: 1px solid #1c2531; }
+.arm-table td small { display: block; color: var(--demo-dim); font-family: inherit; font-size: 9.5px; }
+.arm-table .arm-a { color: #ff8b98; }
+.arm-table .arm-b { color: #8fdfa4; }
+
+.outbreak-history { margin-top: 14px; padding: 15px; }
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.history-head p { flex: 1 1 340px; margin: 0; color: var(--demo-dim); font-size: 12px; line-height: 1.5; }
+.history-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+.history-charts figure { min-width: 0; margin: 0; }
+.history-charts figcaption { margin-bottom: 6px; color: var(--demo-dim); font-size: 11px; }
+.history-charts canvas {
+  display: block;
+  width: 100%;
+  height: 200px;
+  border: 1px solid var(--demo-line);
+  border-radius: 8px;
+  background: #090e13;
+}
+.chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px; color: var(--demo-dim); font-size: 11px; }
+.chart-legend span { display: flex; gap: 6px; align-items: center; }
+.chart-legend i { display: block; width: 15px; height: 3px; border-radius: 2px; }
+.chart-legend i.band { height: 10px; border-radius: 2px; background: rgba(var(--concept-accent-rgb), 0.28); }
+
+.history-log { margin-top: 13px; padding-top: 11px; border-top: 1px dashed var(--demo-line); }
+.history-log ol {
+  display: grid;
+  gap: 4px;
+  max-height: 128px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  overflow-y: auto;
+  color: var(--demo-dim);
+  font-size: 12px;
+}
+.history-log b { color: var(--concept-accent); font-family: ui-monospace, monospace; font-weight: 600; }
+
 .legend { display: grid; gap: 7px; margin-top: 13px; }
 .legend-item { display: flex; gap: 8px; align-items: center; color: var(--demo-dim); font-size: 11px; }
 .swatch { width: 12px; height: 12px; flex: 0 0 auto; border: 1px solid #ffffff2e; border-radius: 3px; }
@@ -361,6 +435,7 @@
   .world-mount { min-height: 0; padding: 8px; }
   .concept-notes { grid-template-columns: 1fr; }
   .dual-worlds { grid-template-columns: 1fr; }
+  .history-charts { grid-template-columns: 1fr; }
   .demo-library-grid,
   .reference-links { grid-template-columns: 1fr; }
 }
