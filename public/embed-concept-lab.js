@@ -7,6 +7,26 @@ import '@hexlife/embed/ca-element';
 import {sealPerimeter} from './embed-concept-boundaries.js';
 import {neighborIndex} from './embed-demo-geometry.js';
 import {demoOwnershipFor} from './embed-demo-manifest.js';
+import {
+  AIR,
+  EMBER,
+  MATERIAL_COLORS,
+  MATERIAL_NAMES,
+  OIL,
+  PLANT,
+  SAND,
+  STATES as MATTER_STATES,
+  STATE_COLORS,
+  STONE,
+  WATER,
+  conservesMaterials,
+  materialCensus,
+  materialOf,
+  matterTransition,
+  repairParity,
+  seedMatterVessel,
+  stateFor,
+} from './hex-matter-model.js';
 
 /**
  * The stochastic engine and the analysis primitives are loaded **per demo**, never per page.
@@ -242,19 +262,25 @@ const concepts = [
   },
   {
     id: 'hex-matter', href: 'hex-matter.html', title: 'Hex Matter',
-    kicker: 'Eight-state material sandbox', deck: 'Choose a material brush, pour substances, build vessels, and tune their reactions.',
+    kicker: 'Eight materials, one hydrostatic lattice', deck: 'Pour liquids that find their level, heap sand that keeps its angle, and set fire to the difference.',
     complexity: '09 · most complex', accent: '#5cc8ff', rgb: '92, 200, 255', kind: 'native',
-    surface: '<hexlife-ca> · block k³ · k = 8', topology: 'sealed stone vessel',
-    experiment: 'Sand sinks, water and oil separate, steam rises, embers ignite oil and plants, and water quenches heat. Select any material as the drawing brush, widen it, then pour or ignite authored regions. Gravity and reaction modes rebuild the block rule without disturbing the material already in the vessel, so you can isolate transport from chemistry mid-pour.',
-    packageNote: 'The 8³ Margolus-style block table combines local transport with optional reactions. Drawing and the census expose all eight states without custom renderer code.',
-    states: 8, rows: 72, backend: 'block', speed: 22, focusState: 3, paintable: true, brush: 3,
-    palette: ['#091018', '#3ba7ff', '#e5a84b', '#d6bd78', '#65717f', '#ff654f', '#d9f2ff', '#61ae5b'],
-    names: ['air', 'water', 'oil', 'sand', 'stone', 'ember', 'steam', 'plant'],
+    surface: '<hexlife-ca> · block k³ · k = 13', topology: 'sealed stone basin',
+    experiment: 'Water and oil level themselves, and find the *same* level on both sides of the interior wall once they top it; oil separates out and rides on the water; sand sinks through both and slumps to a real angle of repose instead of puddling. Embers fall like the coals they are, run a front along the slick, and boil what they reach — and the steam they give off condenses on the cold stone and rains back down, which is often what finally puts the fire out. Set Chemistry to "Transport only" to watch the same pour with every reaction switched off.',
+    packageNote: 'A liquid levels only if it can take one step to the *same row*, and on a flat-top lattice no two neighbours share a height — so a purely downhill block rule leaves any liquid standing in a 30° cone, whatever you sort it by. The fix is in the state, not in the host: air and both liquids carry their own column parity, which is what lets the k³ table tell that bond from the diagonal one, hand it to liquids, and withhold it from sand. Thirteen states, one table, every tick still inside the Wasm block engine.',
+    states: MATTER_STATES, rows: 72, backend: 'block', speed: 22, focusState: WATER, paintable: true, brush: 3,
+    alternates: true,
+    palette: STATE_COLORS,
+    names: MATERIAL_NAMES,
+    legendColors: MATERIAL_COLORS,
+    stateOf: (material) => stateFor(material, 0),
+    fold: materialCensus,
+    repair: repairParity,
+    invariant: matterInvariant,
     parameters: [
-      range('gravity', 'Gravity', 0, 4, 3, '', {scope: 'rule'}),
+      range('gravity', 'Gravity & flow', 0, 3, 3, '', {scope: 'rule'}),
       select('reactions', 'Chemistry', 'full', [['full', 'Full reactions'], ['no-fire', 'No combustion'], ['transport', 'Transport only']], {scope: 'rule'}),
     ],
-    actions: [['rain', 'Rain water'], ['sand', 'Pour sand'], ['oil', 'Pour oil'], ['ignite', 'Add embers'], ['garden', 'Grow plants'], ['clear', 'Clear vessel']],
+    actions: [['rain', 'Rain water'], ['sand', 'Pour sand'], ['oil', 'Pour oil'], ['ignite', 'Light the fuel'], ['garden', 'Plant the shore'], ['clear', 'Empty the basin']],
     rule: matterRule, seed: seedMatter, action: matterAction,
   },
 ];
@@ -364,8 +390,16 @@ function renderControls(item, {playLabel = 'Play', copyLabel = 'Copy exact world
   };
 }
 
+/**
+ * The brush list.
+ *
+ * `names` is the demo's *vocabulary*, which is not always its state list: Hex Matter's eight
+ * materials are spread over thirteen engine states, so `stateOf` maps an entry back to the state a
+ * stroke should actually write.
+ */
 function paintOptions(item, params) {
-  return resolve(item.names, params).map((name, index) => `<option value="${index}"${index === (item.drawState ?? 1) ? ' selected' : ''}>${index} · ${name}</option>`).join('');
+  const stateOf = item.stateOf ?? ((index) => index);
+  return resolve(item.names, params).map((name, index) => `<option value="${stateOf(index)}"${index === (item.drawState ?? 1) ? ' selected' : ''}>${index} · ${name}</option>`).join('');
 }
 
 function actionOptions(item, params) {
@@ -460,7 +494,8 @@ function createCaElement(item, stage, {draw = false} = {}) {
   })) world.setAttribute(name, String(value));
   if (draw) {
     world.setAttribute('draw', '');
-    world.setAttribute('draw-state', String(item.drawState ?? 1));
+    // `drawState` names a vocabulary entry, which is the state itself everywhere but Hex Matter.
+    world.setAttribute('draw-state', String((item.stateOf ?? ((index) => index))(item.drawState ?? 1)));
     world.setAttribute('brush', String(stage.brush));
   }
   return world;
@@ -499,6 +534,10 @@ function setupNativeLab(item) {
   // arrives with no rule and no cells. This event is the only signal that it is ready for them.
   world.addEventListener('hexlife-ca-ready', () => {
     ready = true;
+    // The up-triangle partition is left-handed — its odd slot always sits one column the same way —
+    // which biases sideways transport. Any demo that lets material move has to cancel that, or a
+    // pour leans downhill to one side of the screen for no reason in the model at all.
+    if (item.alternates) world.world.setBlockAlternates(true);
     installModel();
     setText('stage-status', `${item.backend} · k = ${world.states} · ${world.rows} × ${world.columns} · ${item.topology}`);
     update();
@@ -509,12 +548,26 @@ function setupNativeLab(item) {
   document.getElementById('reset').addEventListener('click', () => { if (ready) { world.pause(); installModel(); update(); } });
   document.getElementById('action').addEventListener('click', () => {
     if (!ready) return;
-    item.action(world, params, document.getElementById('action-choice').value);
-    setText('control-status', `Intervention applied at generation ${world.generation}.`);
+    // An intervention may report back — "there was nothing here to light" is worth saying.
+    const note = item.action(world, params, document.getElementById('action-choice').value);
+    setText('control-status', note || `Intervention applied at generation ${world.generation}.`);
     update();
   });
   document.getElementById('copy').addEventListener('click', async () => { if (ready) await copyText(await world.caCode(), 'Exact HXK1 world copied.'); });
   if (item.paintable) document.getElementById('paint-state').addEventListener('change', (event) => world.setAttribute('draw-state', event.target.value));
+  // A model whose states encode where a cell *is* has to survive the brush, which paints one fixed
+  // state value into both column parities. The rule votes its way through a stroke in progress;
+  // this puts the field back the moment the stroke ends. Pointer events cross the shadow root, so
+  // listening on the element itself is enough, and `setCell` keeps the activity tracker awake.
+  if (item.repair) {
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      world.addEventListener(type, () => {
+        if (!ready || !world.world) return;
+        const cells = world.world.snapshotCells();
+        for (const index of item.repair(cells, world.columns)) world.world.setCell(index, cells[index]);
+      });
+    }
+  }
 
   bindParameterControls(item, params, (parameter) => {
     if (!ready) return;
@@ -563,13 +616,15 @@ function setupNativeLab(item) {
       world.setCells(item.seed(world.rows, world.columns, params));
       trace.length = 0;
       lastGeneration = -1;
-      const invariant = item.backend === 'block' ? `${isConservative(world.states, rule) ? 'conservative' : 'reactive'} · ${isIsotropic(world.states, rule) ? 'isotropic' : 'directional'}` : 'six-neighbor radius 1';
+      const blockInvariant = item.invariant ?? ((states, table) => `${isConservative(states, table) ? 'conservative' : 'reactive'} · ${isIsotropic(states, table) ? 'isotropic' : 'directional'}`);
+      const invariant = item.backend === 'block' ? blockInvariant(world.states, rule) : 'six-neighbor radius 1';
       setText('control-status', `Model rebuilt from controls: ${invariant}. Paint or run when ready.`);
     }
   }
   function update() {
     if (!ready || !world.world) return;
-    const census = world.census();
+    // `fold` collapses engine states back onto the demo's vocabulary where the two differ.
+    const census = item.fold ? item.fold(world.census()) : world.census();
     setText('metric-generation', world.generation.toLocaleString());
     setText('metric-focus', (census[item.focusState] || 0).toLocaleString());
     setText('metric-change', world.world.lastChangedCount.toLocaleString());
@@ -581,7 +636,7 @@ function setupNativeLab(item) {
 /** Legend, focus label, brush options and intervention list, for a demo whose `k` can change. */
 function refreshStateVocabulary(item, params) {
   const names = resolve(item.names, params);
-  renderLegend(names, resolve(item.palette, params));
+  renderLegend(names, item.legendColors ?? resolve(item.palette, params));
   setText('metric-focus-label', names[item.focusState] || 'Active');
   const paint = document.getElementById('paint-state');
   if (paint) {
@@ -589,7 +644,7 @@ function refreshStateVocabulary(item, params) {
     paint.innerHTML = paintOptions(item, params);
     // Keep the brush pointed at the same material when there still is one; a shorter cycle can
     // retire the state that was selected, and a `draw-state` past `k` would clamp silently.
-    if (Number(previous) < names.length) paint.value = previous;
+    if ([...paint.options].some((option) => option.value === previous)) paint.value = previous;
     document.querySelector('hexlife-ca')?.setAttribute('draw-state', paint.value);
   }
   const actions = document.getElementById('action-choice');
@@ -1031,9 +1086,79 @@ function tissueRule(params) { return ruleFromTable(4, (center, neighbors) => { i
 function seedTissue(rows, columns, params) { const cells = new Uint8Array(rows * columns); for (let index = 0; index < cells.length; index++) if (seeded(index, 0x71550e) < params.scars / 100) cells[index] = 3; sealPerimeter(cells, rows, columns, 3); const width = params.stimulus === 'thin-front' ? 1 : params.width; if (params.stimulus === 'pacemaker') paintDisk(cells, rows, columns, rows / 2, columns / 2, Math.max(2, width), 1); else { for (let r = 3; r < rows - 3; r++) for (let c = 3; c < 3 + width; c++) if (params.stimulus !== 'broken-wave' || r < rows * 0.43 || r > rows * 0.58) cells[r * columns + c] = 1; } return cells; }
 function tissueAction(world, params, action) { const cells = world.world.snapshotCells(); if (action === 'pulse') paintDisk(cells, world.rows, world.columns, world.rows / 2, world.columns / 2, Math.max(2, params.width), 1); else if (action === 'scar') { const column = Math.floor(world.columns * 0.63); for (let row = 8; row < world.rows - 8; row++) if (row < world.rows * 0.46 || row > world.rows * 0.55) cells[row * world.columns + column] = 3; } else for (let row = 3; row < world.rows - 3; row++) for (let column = 3; column < 3 + params.width; column++) cells[row * world.columns + column] = 1; world.setCells(cells); }
 
-function matterRule(params) { const density = [0, 3, 2, 5, 9, 1, -1, 8]; return blockRuleFromTable(8, (block) => { const out = [...block]; if (params.reactions !== 'transport') { const ember = out.indexOf(5); const water = out.indexOf(1); const oil = out.indexOf(2); const plant = out.indexOf(7); if (ember !== -1 && water !== -1) { out[ember] = 6; out[water] = 4; } else if (params.reactions === 'full' && ember !== -1 && oil !== -1) out[oil] = 5; else if (params.reactions === 'full' && ember !== -1 && plant !== -1) out[plant] = 5; } const movable = (state) => state !== 4 && state !== 7; const swap = (a, b) => { [out[a], out[b]] = [out[b], out[a]]; }; if (params.gravity > 0 && movable(out[0]) && movable(out[2]) && density[out[0]] > density[out[2]]) swap(0, 2); else if (params.gravity > 1 && movable(out[0]) && movable(out[1]) && out[2] !== 0 && density[out[0]] > density[out[1]]) swap(0, 1); else if (params.gravity > 2 && movable(out[1]) && movable(out[2]) && out[0] !== 0 && density[out[1]] > density[out[2]]) swap(1, 2); return out; }); }
-function seedMatter(rows, columns) { const cells = new Uint8Array(rows * columns); for (let r = Math.floor(rows * 0.17); r < rows * 0.42; r++) for (let c = 5; c < columns - 5; c++) { const p = seeded(r * columns + c, 0x6a77e2); cells[r * columns + c] = p < 0.18 ? 3 : p < 0.27 ? 1 : p < 0.34 ? 2 : 0; } for (let r = Math.floor(rows * 0.82); r < rows; r++) for (let c = 0; c < columns; c++) cells[r * columns + c] = 4; for (let r = Math.floor(rows * 0.58); r < rows * 0.8; r++) cells[r * columns + Math.floor(columns * 0.72)] = 7; cells[Math.floor(rows * 0.64) * columns + Math.floor(columns * 0.68)] = 5; return sealPerimeter(cells, rows, columns, 4); }
-function matterAction(world, params, action) { const state = {rain: 1, oil: 2, sand: 3, ignite: 5, garden: 7}[action]; const cells = world.world.snapshotCells(); if (action === 'clear') { for (let r = 2; r < world.rows - 2; r++) for (let c = 2; c < world.columns - 2; c++) cells[r * world.columns + c] = 0; } else { const start = action === 'garden' ? Math.floor(world.rows * 0.63) : 3; const end = action === 'garden' ? Math.floor(world.rows * 0.78) : action === 'ignite' ? 8 : 12; for (let r = start; r < end; r++) for (let c = Math.floor(world.columns * 0.22); c < world.columns * 0.78; c++) if (seeded(r * world.columns + c, world.generation + state * 101) < (action === 'ignite' ? 0.12 : 0.5)) cells[r * world.columns + c] = state; } world.setCells(cells); }
+/**
+ * Hex Matter's rule, seed and interventions.
+ *
+ * The physics itself lives in `hex-matter-model.js`, package-free, so `tests/hexMatter.test.js` can
+ * run the whole sandbox against a port of the engine's own block partition and assert what the
+ * material *does* — that a pool levels, that a heap does not — rather than what the source says.
+ */
+function matterRule(params) { return blockRuleFromTable(MATTER_STATES, (block) => matterTransition(block, params)); }
+
+/**
+ * The invariant line under the stage.
+ *
+ * `isConservative` is the wrong question here twice over: the reactions genuinely are not
+ * conservative, and even pure transport moves a liquid between the two column sublattices, so the
+ * per-*state* census cannot hold whatever the rule does. What the table can claim is that transport
+ * alone only ever moves materials around, and that is the claim worth printing.
+ */
+function matterInvariant(states, rule) {
+  const unpack = (packed) => [Math.floor(packed / (states * states)), Math.floor(packed / states) % states, packed % states];
+  for (let index = 0; index < rule.length; index++) {
+    if (!conservesMaterials(unpack(index), unpack(rule[index]))) return 'reactive · directional';
+  }
+  return 'material-conserving · directional';
+}
+function seedMatter(rows, columns) { return seedMatterVessel(rows, columns, seeded); }
+/**
+ * The interventions. Every one of them writes through `stateFor`, so the sublattice survives — that
+ * is the one thing a host of this model may not get wrong.
+ */
+function matterAction(world, params, action) {
+  const {rows, columns} = world;
+  const cells = world.world.snapshotCells();
+  const put = (row, column, material) => { cells[row * columns + column] = stateFor(material, column); };
+  const at = (row, column) => materialOf(cells[row * columns + column]);
+
+  if (action === 'clear') {
+    for (let row = 2; row < rows - 2; row++) {
+      for (let column = 2; column < columns - 2; column++) if (at(row, column) !== STONE) put(row, column, AIR);
+    }
+  } else if (action === 'ignite') {
+    // Into the fuel that is already there. A spark dropped in clear air is out in three ticks —
+    // that is the model being right about sparks, so lighting the air would light nothing at all.
+    let lit = 0;
+    for (let index = 0; index < cells.length; index++) {
+      const material = materialOf(cells[index]);
+      if (material !== OIL && material !== PLANT) continue;
+      if (seeded(index, world.generation * 31 + 977) > 0.05) continue;
+      put(Math.floor(index / columns), index % columns, EMBER);
+      lit++;
+    }
+    if (!lit) return 'Nothing to light — pour some oil or plant the shore first.';
+  } else if (action === 'garden') {
+    // Rooted on whatever surface it grows from, because a plant does not fall.
+    for (let column = Math.floor(columns * 0.55); column < columns - 3; column++) {
+      let surface = -1;
+      for (let row = 3; row < rows - 2 && surface < 0; row++) {
+        if (at(row, column) === STONE || at(row, column) === SAND) surface = row;
+      }
+      if (surface < 8) continue;
+      for (let row = surface - 5; row < surface; row++) if (at(row, column) === AIR) put(row, column, PLANT);
+    }
+  } else {
+    const material = {rain: WATER, sand: SAND, oil: OIL}[action];
+    for (let row = 3; row < 11; row++) {
+      for (let column = Math.floor(columns * 0.12); column < columns * 0.88; column++) {
+        if (at(row, column) !== AIR) continue;
+        if (seeded(row * columns + column, world.generation * 7 + material * 101) < 0.55) put(row, column, material);
+      }
+    }
+  }
+  world.setCells(cells);
+  return null;
+}
 
 // `laneBirths` lived here until the meter moved into Wasm. The native lane index is the same
 // expression in integer arithmetic — `(index % cols) * 8 / cols`, clamped — and the representative

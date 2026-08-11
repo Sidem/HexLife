@@ -31,8 +31,8 @@ describe('embed concept demo library', () => {
     const page = read(`public/${route}`)
     expect(page).toContain(`data-concept="${id}"`)
     expect(page).toContain('embed-demo-shell.css')
-    expect(page).toContain('embed-concept-lab.css?v=20260810-stage-controls')
-    expect(page).toContain('embed-concept-lab.js?v=20260810-stage-controls')
+    expect(page).toContain('embed-concept-lab.css?v=20260811-hex-matter')
+    expect(page).toContain('embed-concept-lab.js?v=20260811-hex-matter')
     // The package's OWN files, never jsDelivr's `/+esm` aliases. `+esm` re-bundles each subpath
     // entry standalone, so `@hexlife/embed/sim` would carry a private copy of `EmbedSim` — its own
     // module state and its own Wasm instance — and the analysis primitives would be inspecting a
@@ -66,7 +66,9 @@ describe('embed concept demo library', () => {
     expect(host).toContain("from '@hexlife/embed/ca'")
     expect(host).toContain("import '@hexlife/embed/ca-element'")
     expect(host).toContain('ruleFromTable(4')
-    expect(host).toContain('blockRuleFromTable(8')
+    // Hex Matter's table is built from the model module, so the arity travels with it.
+    expect(host).toContain('blockRuleFromTable(MATTER_STATES')
+    expect(host).toContain("from './hex-matter-model.js'")
     expect(host).toContain('world.world.lastChangedCount')
     expect(host).toContain('world.caCode()')
     expect(host).toContain('world.worldCode()')
@@ -129,7 +131,7 @@ describe('embed concept demo library', () => {
     expect(host).toContain("topology: 'finite reflecting vessel'")
     expect(host).toContain("topology: 'sealed clearing rim'")
     expect(host).toContain("topology: 'sealed scar rim'")
-    expect(host).toContain("topology: 'sealed stone vessel'")
+    expect(host).toContain("topology: 'sealed stone basin'")
     expect(host).toContain("topology: 'intentional toroidal habitat'")
     expect(host).toContain("topology: 'intentional toroidal population'")
     expect(host).not.toContain('sealVerticalSeam')
