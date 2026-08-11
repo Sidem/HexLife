@@ -534,6 +534,69 @@ describe('solid volume interpolation and components', () => {
     expect(solidMemoryBytes() % 65536).toBe(0);
   });
 
+  /**
+   * §8 gate 5 — the Solid Garden default export lands under 5 MB.
+   *
+   * The budget is not negotiable against the grid size: if this fails, the demo's default grid
+   * shrinks. So the defaults are read out of the page itself rather than restated here, and the
+   * pipeline is actually run — a number copied into a test would only pin the number.
+   */
+  it('keeps the demo page default export inside the 5 MB budget', async () => {
+    const page = await readFile(new URL('../public/solid-garden.html', import.meta.url), 'utf8');
+    const host = await readFile(new URL('../public/solid-garden.js', import.meta.url), 'utf8');
+
+    const numeric = (id) => {
+      const tag = page.match(new RegExp(`<input id="${id}"[^>]*>`))[0];
+      return Number(tag.match(/value="([\d.]+)"/)[1]);
+    };
+    const selected = (id) => {
+      const block = page.slice(page.indexOf(`<select id="${id}"`));
+      return block.slice(0, block.indexOf('</select>')).match(/<option value="([^"]+)" selected>/)[1];
+    };
+    const defaults = {
+      rows: numeric('rows'),
+      cols: numeric('cols'),
+      ticks: numeric('ticks'),
+      subLayers: numeric('sub-layers'),
+      basePlate: numeric('base-plate'),
+      cellSize: numeric('cell-size'),
+      layerHeight: numeric('layer-height'),
+      interpolate: selected('interpolate'),
+      keepComponents: selected('keep'),
+      format: selected('format'),
+      merge: selected('merge'),
+    };
+    // The default rule is the first preset, and the page starts from a single seed.
+    const rulesetHex = host.match(/hex: '([0-9A-F]{32})'/)[1];
+    expect(isVacuumStable(rulesetHex)).toBe(true);
+
+    const initialCells = new Uint8Array(defaults.rows * defaults.cols);
+    initialCells[Math.floor(defaults.rows / 2) * defaults.cols + Math.floor(defaults.cols / 2)] = 1;
+    const sim = await createSimulation({
+      rulesetHex,
+      rows: defaults.rows,
+      columns: defaults.cols,
+      initialCells,
+    });
+    const stack = createSolidStack({...defaults, ticks: defaults.ticks});
+    const layer = stack.layerView();
+    for (let tick = 0; tick < defaults.ticks; tick++) {
+      layer.set(sim.state);
+      stack.pushLayer();
+      sim.tick();
+    }
+    const report = stack.finalize({keepComponents: defaults.keepComponents});
+    const bytes = await stack.export(defaults);
+
+    expect(bytes.byteLength, `default export is ${(bytes.byteLength / 1024 / 1024).toFixed(2)} MB`)
+      .toBeLessThan(5 * 1024 * 1024);
+    // And the default is the configuration that provably prints as one connected piece.
+    expect(report.keptComponents).toBe(1);
+    expect(report.floating).toBe(0);
+    stack.free();
+    sim.dispose?.();
+  });
+
   it('refuses a half-pushed finalize and rejects unknown policies', () => {
     const stack = createSolidStack({rows: 4, cols: 8, ticks: 3, interpolate: INTERPOLATE_NONE});
     stack.layerView().set(new Uint8Array(32));

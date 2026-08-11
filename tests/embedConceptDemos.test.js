@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs'
 import {fileURLToPath} from 'node:url'
 import path from 'node:path'
 import {describe, expect, it} from 'vitest'
+import {isVacuumStable} from '../src/core/rulesetHex.js'
 import {sealPerimeter} from '../public/embed-concept-boundaries.js'
 import {
   combinedExposureProbability,
@@ -184,5 +185,97 @@ describe('embed concept demo library', () => {
   it('links the library from both Explorer menus', () => {
     expect(read('index.html')).toContain('href="embed-demos.html"')
     expect(read('src/ui/views/MoreView.js')).toContain('href="embed-demos.html"')
+  })
+})
+
+describe('Solid Garden', () => {
+  const page = () => read('public/solid-garden.html')
+  const host = () => read('public/solid-garden.js')
+
+  it('is a package consumer pinned to an exact published version', () => {
+    const html = page()
+    // Every subpath resolves from the package's OWN files at one exact version. `@latest` lags a
+    // publish by hours, and `/+esm` re-bundles each entry standalone — which would hand `/solid`
+    // its own module state and its own Wasm instance, separate from the engine feeding it.
+    for (const entry of ['api', 'sim', 'render', 'solid']) {
+      expect(html).toMatch(
+        new RegExp(`"@hexlife/embed/${entry}": "https://cdn\\.jsdelivr\\.net/npm/@hexlife/embed@\\d+\\.\\d+\\.\\d+/src/embed/${entry}\\.js"`),
+      )
+    }
+    expect(html).not.toContain('+esm')
+    expect(html).not.toContain('@hexlife/embed@latest')
+
+    // One version across the import map and the card that advertises it.
+    const versions = new Set([...html.matchAll(/@hexlife\/embed@(\d+\.\d+\.\d+)/g)].map((m) => m[1]))
+    expect(versions.size, `one pinned version, saw ${[...versions].join(', ')}`).toBe(1)
+  })
+
+  it('wears the shared demo shell and is reachable from the library', () => {
+    const html = page()
+    expect(html).toContain('data-concept="solid-garden"')
+    expect(html).toContain('embed-demo-shell.css')
+    expect(html).toContain('href="./solid-garden.html" aria-current="page"')
+    expect(html).toContain('Built with the published npm package')
+    expect(read('public/embed-demos.html')).toContain('href="./solid-garden.html"')
+  })
+
+  it('lives in public/, where an import-map page has to live', () => {
+    // Vite resolves inline-module specifiers itself, so an import-map page can never be a build
+    // input — naming one would also replace Vite's default input set rather than extend it.
+    const config = read('vite.config.js')
+    expect(config).not.toContain('solid-garden.html')
+  })
+
+  it('defaults to the configuration the connectivity guarantee actually covers', () => {
+    const html = page()
+    const source = host()
+    // §5.3's guarantee needs a vacuum-stable rule AND bridge with at least one sub-layer. The
+    // default has to be the configuration that provably prints as one piece, not one that usually
+    // does — soup and `interpolate: none` are what a user opts into afterwards.
+    expect(html).toContain('<option value="bridge" selected>')
+    expect(html).toMatch(/id="sub-layers"[^>]*value="1"/)
+    expect(html).toMatch(/<option value="seed">A single seed<\/option>[\s\S]*<option value="soup">/)
+    expect(html).toContain('<option value="plate-connected" selected>')
+    // And the claim is conditioned on both halves rather than asserted whenever it looks true.
+    expect(source).toContain(
+      "const guaranteed = stable && options.interpolate === 'bridge' && options.subLayers >= 1",
+    )
+  })
+
+  it('offers only vacuum-stable presets that can grow from one cell', () => {
+    const source = host()
+    const presets = [...source.matchAll(/hex: '([0-9A-F]{32})'/g)].map((match) => match[1])
+    expect(presets.length).toBeGreaterThanOrEqual(4)
+    for (const hex of presets) {
+      // Vacuum stability is exactly "the empty neighbourhood stays empty", which is rule index 0 —
+      // the high bit of the first hex character. So the whole predicate is the leading digit.
+      expect(isVacuumStable(hex), `${hex} is vacuum-stable`).toBe(true)
+    }
+    expect(new Set(presets).size).toBe(presets.length)
+  })
+
+  it('reads the report before it offers a download', () => {
+    const source = host()
+    expect(source).toContain("stack.finalize({keepComponents: options.keepComponents})")
+    expect(source).toContain('setVerdict(report, stable, options)')
+    // A slicer will not join separate bodies, so the page has to say so rather than hand over a
+    // file that quietly prints as thirty-seven pieces.
+    expect(source).toContain('separate bodies')
+    expect(source).toContain('ui.download.disabled = true')
+  })
+
+  it('moves data in bulk and never loops over cells', () => {
+    const source = host()
+    // The one permitted copy per tick, and its scrubber twin — both bulk, neither a loop.
+    expect(source).toContain('layer.set(world.state)')
+    expect(source).toContain('snapshots.push(world.state.slice())')
+    expect(source).toContain('stack.free()')
+    expect(source).toContain('world.dispose?.()')
+    // Nothing may read the volume one voxel at a time from JavaScript.
+    expect(source).not.toContain('voxelAt')
+    // The tick loop's body is exactly the four bulk statements above.
+    const loop = source.slice(source.indexOf('for (let tick = 0; tick < options.ticks; tick++)'))
+    const body = loop.slice(loop.indexOf('{') + 1, loop.indexOf('}'))
+    expect(body).not.toMatch(/\bfor\b|\bwhile\b|\.forEach\(/)
   })
 })

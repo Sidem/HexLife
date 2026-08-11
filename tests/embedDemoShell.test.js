@@ -10,6 +10,7 @@ const DEMOS = [
   ['totalistic-256.html', 'totalistic-256.html'],
   ['public/coffee-percolation.html', 'coffee-percolation.html'],
   ['public/ca-builder.html', 'ca-builder.html'],
+  ['public/solid-garden.html', 'solid-garden.html'],
 ]
 
 describe('embed demo presentation shell', () => {

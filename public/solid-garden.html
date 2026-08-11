@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Grow a hexagonal automaton and extrude the run into a 3D-printable solid: STL, PLY or 3MF, straight from the browser."
+    />
+    <title>HexLife · Solid Garden</title>
+    <link rel="stylesheet" href="./embed-demo-shell.css" />
+    <link rel="stylesheet" href="./solid-garden.css?v=20260811-solid" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@hexlife/embed/api": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/api.js",
+          "@hexlife/embed/sim": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/sim.js",
+          "@hexlife/embed/render": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/render.js",
+          "@hexlife/embed/solid": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/solid.js"
+        }
+      }
+    </script>
+  </head>
+  <body class="demo-page" data-concept="solid-garden">
+    <div class="demo-shell" style="--demo-shell-width: 1400px">
+      <header class="demo-masthead">
+        <div class="demo-topbar">
+          <a class="demo-brand" href="./embed-demos.html"><span>HexLife</span> embed demos</a>
+          <nav class="demo-nav" aria-label="HexLife embed demos">
+            <a href="./embed-demos.html">Demo library</a>
+            <a href="./totalistic-256.html">Rule atlas</a>
+            <a href="./coffee-percolation.html">Coffee lab</a>
+            <a href="./ca-builder.html">CA builder</a>
+            <a href="./solid-garden.html" aria-current="page">Solid Garden</a>
+          </nav>
+        </div>
+        <div class="demo-hero-grid">
+          <div>
+            <p class="demo-kicker">From a rule to a thing you can hold</p>
+            <h1>Solid Garden</h1>
+            <p class="demo-deck">
+              Every tick becomes a layer. The hex grid is the cross-section, live cells are
+              matter, and the stack of them is an object your printer can make. Grown from a
+              single seed under a rule that guarantees the result holds together.
+            </p>
+          </div>
+          <a
+            class="demo-package-card"
+            href="https://www.npmjs.com/package/@hexlife/embed"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span>Built with the published npm package</span>
+            <strong>@hexlife/embed@1.11.0</strong>
+            <small><code>/solid</code> + <code>/sim</code> + <code>/render</code> · Wasm + WebGL2</small>
+          </a>
+        </div>
+      </header>
+
+      <main class="demo-content">
+        <section class="callout">
+          <div>
+            <strong>Why it does not fall apart.</strong> Two cells that are diagonal neighbours on
+            consecutive layers touch along a single vertical edge — a zero-thickness hinge that
+            reports as connected and prints as two pieces. <code>interpolate: 'bridge'</code>
+            inserts exactly the set that turns that contact into a real face, and under a
+            <em>vacuum-stable</em> rule that is enough to guarantee every voxel is connected down to
+            the build plate. The rules below are all vacuum-stable, which is why the report keeps
+            saying <strong>one piece, nothing floating</strong>.
+          </div>
+          <a
+            href="https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Read the <code>/solid</code> contract →</a
+          >
+        </section>
+
+        <div class="garden-layout">
+          <section class="garden-panel garden-stage" aria-label="Cross-section">
+            <h2>Cross-section</h2>
+            <p class="garden-hint">
+              The layer being extruded, drawn by <code>/render</code> while <code>/sim</code> ticks.
+              Watch it fill: that outline is the shape of the object at that height.
+            </p>
+            <div class="garden-canvas-frame">
+              <canvas id="stage" width="640" height="560" aria-label="Automaton cross-section"></canvas>
+              <div id="stage-overlay" class="garden-overlay" hidden></div>
+            </div>
+            <div class="garden-scrub">
+              <label for="preview-tick">Tick</label>
+              <input id="preview-tick" type="range" min="0" max="0" value="0" step="1" />
+              <output id="preview-tick-out">0</output>
+            </div>
+          </section>
+
+          <section class="garden-panel garden-controls" aria-label="Controls">
+            <h2>The run</h2>
+            <div class="garden-field">
+              <label for="rule">Rule</label>
+              <select id="rule"></select>
+            </div>
+            <div class="garden-field">
+              <label for="rule-hex">Ruleset</label>
+              <input id="rule-hex" type="text" spellcheck="false" maxlength="32" />
+            </div>
+            <p id="rule-note" class="garden-note"></p>
+
+            <div class="garden-field">
+              <label for="start">Start from</label>
+              <select id="start">
+                <option value="seed">A single seed</option>
+                <option value="soup">Random soup</option>
+              </select>
+            </div>
+            <div class="garden-field" id="density-field" hidden>
+              <label for="density">Density</label>
+              <input id="density" type="range" min="5" max="60" value="30" step="1" />
+              <output id="density-out">30%</output>
+            </div>
+            <div class="garden-field">
+              <label for="seed">Seed</label>
+              <input id="seed" type="number" min="0" max="999999" value="12345" step="1" />
+            </div>
+            <div class="garden-grid-2">
+              <div class="garden-field">
+                <label for="rows">Rows</label>
+                <input id="rows" type="number" min="6" max="48" value="24" step="3" />
+              </div>
+              <div class="garden-field">
+                <label for="cols">Columns</label>
+                <input id="cols" type="number" min="6" max="60" value="30" step="2" />
+              </div>
+            </div>
+            <div class="garden-field">
+              <label for="ticks">Ticks</label>
+              <input id="ticks" type="range" min="5" max="150" value="60" step="5" />
+              <output id="ticks-out">60</output>
+            </div>
+
+            <h2>The solid</h2>
+            <div class="garden-field">
+              <label for="interpolate">Interpolate</label>
+              <select id="interpolate">
+                <option value="bridge" selected>bridge — weld diagonal contact</option>
+                <option value="union">union — weld and fatten</option>
+                <option value="none">none — raw layers</option>
+              </select>
+            </div>
+            <div class="garden-field">
+              <label for="sub-layers">Sub-layers</label>
+              <input id="sub-layers" type="range" min="1" max="4" value="1" step="1" />
+              <output id="sub-layers-out">1</output>
+            </div>
+            <div class="garden-field">
+              <label for="base-plate">Base plate</label>
+              <input id="base-plate" type="range" min="0" max="8" value="2" step="1" />
+              <output id="base-plate-out">2</output>
+            </div>
+            <div class="garden-field">
+              <label for="keep">Keep</label>
+              <select id="keep">
+                <option value="plate-connected" selected>plate-connected</option>
+                <option value="largest">largest</option>
+                <option value="all">all</option>
+              </select>
+            </div>
+            <div class="garden-grid-2">
+              <div class="garden-field">
+                <label for="cell-size">Cell size</label>
+                <input id="cell-size" type="number" min="0.3" max="8" value="2" step="0.1" />
+              </div>
+              <div class="garden-field">
+                <label for="layer-height">Layer height</label>
+                <input id="layer-height" type="number" min="0.05" max="3" value="0.8" step="0.05" />
+              </div>
+            </div>
+            <div class="garden-grid-2">
+              <div class="garden-field">
+                <label for="format">Format</label>
+                <select id="format">
+                  <option value="3mf" selected>3MF</option>
+                  <option value="stl">STL</option>
+                  <option value="ply">PLY</option>
+                </select>
+              </div>
+              <div class="garden-field">
+                <label for="merge">Merge</label>
+                <select id="merge">
+                  <option value="greedy" selected>greedy</option>
+                  <option value="none">none</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="garden-panel garden-report" aria-label="Report">
+            <h2>What you would print</h2>
+            <p class="garden-hint">
+              Computed in full before you commit to a download — a slicer will not join separate
+              bodies, so this is the difference between one object and thirty-seven loose ones.
+            </p>
+            <dl class="garden-readout" id="readout">
+              <div><dt>Pieces</dt><dd id="r-pieces">—</dd></div>
+              <div><dt>Floating</dt><dd id="r-floating">—</dd></div>
+              <div><dt>Matter kept</dt><dd id="r-kept">—</dd></div>
+              <div><dt>Dropped</dt><dd id="r-dropped">—</dd></div>
+              <div><dt>Layers</dt><dd id="r-layers">—</dd></div>
+              <div><dt>Size</dt><dd id="r-size">—</dd></div>
+              <div><dt>Triangles</dt><dd id="r-triangles">—</dd></div>
+              <div><dt>File</dt><dd id="r-bytes">—</dd></div>
+            </dl>
+            <p id="verdict" class="garden-verdict"></p>
+            <button id="download" type="button" class="garden-download" disabled>
+              Download
+            </button>
+            <p class="garden-note" id="timing"></p>
+          </section>
+        </div>
+
+        <section class="callout">
+          <div>
+            <strong>The boundary is a cut, not a wrap.</strong> The simulation is toroidal; a printed
+            object cannot be. Features are cut at the grid edge, and two pieces touching only across
+            the seam are two pieces — the extruder culls against an open-boundary neighbour table so
+            those faces stay real, exposed surface instead of holes.
+          </div>
+          <a
+            href="https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md#geometry-and-units"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Geometry and units →</a
+          >
+        </section>
+      </main>
+
+      <footer class="demo-footer">
+        <p>Built with <strong>@hexlife/embed</strong> from npm.</p>
+        <nav aria-label="Demo resources">
+          <a href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">npm package</a>
+          <a href="https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md" target="_blank" rel="noopener noreferrer">API docs</a>
+          <a href="./ca-builder.html">CA builder</a>
+          <a href="./">HexLife Explorer</a>
+        </nav>
+      </footer>
+    </div>
+    <script type="module" src="./solid-garden.js?v=20260811-solid"></script>
+  </body>
+</html>

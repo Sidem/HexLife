@@ -25,6 +25,10 @@ export const EMBED_DEMO_OWNERSHIP = Object.freeze([
   demo('totalistic-256', 'totalistic-256.html', 'reference', 'binary', 'World/grid'),
   demo('coffee-percolation', 'coffee-percolation.html', 'reference', 'k-state', 'WorldK/block-alternating'),
   demo('ca-builder', 'ca-builder.html', 'reference', 'k-state', 'WorldK/neighborhood-or-block'),
+  // The engine family is the one that RUNS the world, which is what this manifest audits. Solid
+  // Garden ticks a binary `World`; `WorldSolid` simulates nothing — it is a layer sink that owns
+  // the meshing, so it appears here as the second half of the owner rather than as an engine.
+  demo('solid-garden', 'solid-garden.html', 'reference', 'binary', 'World+WorldSolid/extrude'),
 ]);
 
 function demo(id, href, section, engine, currentOwner, debts = []) {
