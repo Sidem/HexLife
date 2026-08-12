@@ -68,6 +68,8 @@ uniform float u_maxLateralStep;
 uniform int u_highlightLayer;
 
 const float SQRT3 = 1.7320508075688772;
+/** Key light, high and slightly off-axis so the caps read as horizontal and the walls as vertical. */
+const vec3 LIGHT_DIRECTION = normalize(vec3(0.38, 0.86, 0.34));
 
 /**
  * Flat-top, odd-q offset grid — the exact layout `gridToPixelCoords` lays down (odd columns pushed
@@ -138,13 +140,37 @@ void main() {
     float tExit = min(min(hi.x, hi.y), hi.z);
     if (tExit <= max(tEnter, 0.0)) discard;
 
+    float t = max(tEnter, 0.0);
+
     float slabStep = u_layerHeight / absDirection.y;
     float lateralStep = u_maxLateralStep > 0.0
         ? u_maxLateralStep / max(length(rayDirection.xz), 1e-6)
         : 1e30;
-    float marchStep = min(slabStep, lateralStep);
+    // The step cap is a budget, not a distance: a near-horizontal ray crosses the whole footprint,
+    // which at the larger presets is thousands of lateral steps. Running out mid-object would simply
+    // stop the ray and erase everything behind that point, so widen the step until the traversal
+    // fits instead. Coarser sampling costs thin features; a truncated ray costs half the object.
+    float budgetStep = (tExit - t) / float(max(u_maxSteps, 1));
+    float marchStep = max(min(slabStep, lateralStep), budgetStep);
 
-    float t = max(tEnter, 0.0);
+    // Opacity is per unit DISTANCE, not per sample, so the object is equally see-through from every
+    // angle. Sampling density is view-dependent (one sample per tick looking down the time axis,
+    // several per hex looking along the footprint), and charging `u_layerAlpha` per sample made a
+    // side-on view several times more opaque than a top-down one — the interior vanished behind its
+    // own outer shell. One tick's thickness is the reference length, so the top-down look is
+    // unchanged. Same fix the torus view needed for its four-intersection rays.
+    float alphaExponent = marchStep / max(u_layerHeight, 1e-6);
+    float stepAlpha = 1.0 - pow(1.0 - clamp(u_layerAlpha, 0.0, 1.0), alphaExponent);
+
+    // Wall normal: the vertical face of the voxel, turned to face the camera. Constant for the whole
+    // ray, so it is computed once here. A ray straight down the time axis has no lateral component
+    // at all — normalizing that would be a NaN, and it can only ever hit caps anyway.
+    vec3 lateralDirection = vec3(-rayDirection.x, 0.0, -rayDirection.z);
+    float lateralLength = length(lateralDirection);
+    vec3 wallNormal = lateralLength > 1e-5
+        ? lateralDirection / lateralLength
+        : vec3(0.0, -signDirection.y, 0.0);
+
     vec3 accumulated = vec3(0.0);
     float alpha = 0.0;
 
@@ -162,12 +188,19 @@ void main() {
         // One extra fetch buys a flat cap/side split: if the layer we came from is empty this is a
         // horizontal face, otherwise shade it as a wall facing the camera.
         bool capExposed = (voxelAt(cell, layer - int(signDirection.y)) & 1u) == 0u;
+        // The cap normal points back along the ray's vertical travel, so it FLIPS at the horizon:
+        // rays leaving the eye upward saw -Y, rays leaving it downward saw +Y. Shading them at full
+        // strength drew a hard bright/dark seam straight across the object at eye level. Fade the cap
+        // in by how vertical the ray is — a horizontal face seen edge-on contributes nothing — and
+        // both sides of the horizon meet at the wall normal instead.
         vec3 normal = capExposed
-            ? vec3(0.0, -signDirection.y, 0.0)
-            : normalize(vec3(-rayDirection.x, 0.0, -rayDirection.z));
+            ? normalize(mix(wallNormal, vec3(0.0, -signDirection.y, 0.0), absDirection.y))
+            : wallNormal;
         vec3 base = voxelColor(voxel);
-        float diffuse = 0.42 + 0.58 * max(dot(normal, normalize(vec3(0.38, 0.86, 0.34))), 0.0);
-        vec3 lit = base * diffuse;
+        // Half-Lambert. A plain clamped dot leaves every face turned away from the key light at flat
+        // ambient, which is most of the object from below and most of the history from the side.
+        float lambert = 0.5 + 0.5 * dot(normal, LIGHT_DIRECTION);
+        vec3 lit = base * (0.45 + 0.55 * lambert);
 
         // The scrub plane. Drawn opaque and lifted well clear of the surrounding translucent haze so
         // it reads as a solid cross-section through the object rather than one slightly paler tick.
@@ -186,7 +219,7 @@ void main() {
             return;
         }
 
-        float voxelAlpha = u_layerAlpha * (1.0 - alpha);
+        float voxelAlpha = stepAlpha * (1.0 - alpha);
         accumulated += lit * voxelAlpha;
         alpha += voxelAlpha;
         if (alpha > 0.99) break;

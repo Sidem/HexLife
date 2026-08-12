@@ -379,6 +379,38 @@ describe('the ray-march shader', () => {
         expect(SPACETIME_DEFAULTS.maxSteps).toBeGreaterThanOrEqual(Config.STATE_HISTORY_RING_SIZE);
     });
 
+    it('spends the step budget over the whole ray instead of stopping inside the object', () => {
+        // A near-horizontal ray crosses the entire footprint: at the large presets that is thousands
+        // of lateral steps, far past the cap. Exhausting the cap mid-object erases everything behind
+        // that point, so the step widens to fit the budget rather than the march ending early.
+        expect(fragment).toContain('float budgetStep = (tExit - t) / float(max(u_maxSteps, 1));');
+        expect(fragment).toContain('float marchStep = max(min(slabStep, lateralStep), budgetStep);');
+    });
+
+    it('charges opacity per unit distance, so the object is as see-through from any angle', () => {
+        // Sampling density is view-dependent — one sample per tick down the time axis, several per
+        // hex along the footprint. Charging u_layerAlpha per SAMPLE made a side-on view several
+        // times more opaque than a top-down one and hid the interior behind its own shell.
+        expect(fragment).toContain('float alphaExponent = marchStep / max(u_layerHeight, 1e-6);');
+        expect(fragment).toContain('pow(1.0 - clamp(u_layerAlpha, 0.0, 1.0), alphaExponent)');
+        expect(fragment).toContain('float voxelAlpha = stepAlpha * (1.0 - alpha);');
+        // The per-sample charge is gone: u_layerAlpha now reaches the accumulation only through
+        // stepAlpha, and otherwise only picks opaque mode.
+        expect(fragment).not.toMatch(/u_layerAlpha \* \(1\.0 - alpha\)/);
+    });
+
+    it('shades continuously across eye level rather than seaming the object in half', () => {
+        // The cap normal is taken from the ray's vertical direction, which flips sign exactly at the
+        // horizon. Shading it at full strength drew a hard bright/dark line across the middle of a
+        // side-on object. It is faded in by how vertical the ray is, so both sides meet at the wall.
+        expect(fragment).toContain(
+            'normalize(mix(wallNormal, vec3(0.0, -signDirection.y, 0.0), absDirection.y))',
+        );
+        // Half-Lambert: a face turned away from the key light is dimmed, never erased to ambient.
+        expect(fragment).toContain('float lambert = 0.5 + 0.5 * dot(normal, LIGHT_DIRECTION);');
+        expect(fragment).not.toContain('max(dot(normal,');
+    });
+
     it('draws from gl_VertexID so the pass owns no buffers', () => {
         expect(read('shaders/spacetime_vertex.glsl')).toContain('gl_VertexID');
         expect(read('src/rendering/spacetime/SpacetimeView.js')).toContain('gl.drawArrays(gl.TRIANGLES, 0, 3)');
