@@ -95,6 +95,6 @@ because a strict host CSP (a Reddit webview, for instance) is not something an e
 
 ## Next
 
-- [Entry points](./entrypoints.md) — the eight imports and what each requires.
+- [Entry points](./entrypoints.md) — the ten imports and what each requires.
 - [Determinism and versioning](./determinism.md) — the reproducibility contract and how to check a
   build against the pinned reference checksum.

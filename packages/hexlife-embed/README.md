@@ -107,6 +107,32 @@ so features are cut at the grid edge and two pieces touching only across the sea
 
 → [Full `/solid` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md)
 
+## The same run, in 3D
+
+`@hexlife/embed/spacetime` draws those layers instead of meshing them: the grid is the cross-section,
+time runs up, and the whole history is one ray-marched solid you can turn, zoom and slice. It is the
+HexLife Explorer's spacetime view, packaged — and it simulates nothing either, so it eats exactly the
+same per-tick states the extruder does.
+
+```js
+import {createSpacetimeView} from '@hexlife/embed/spacetime'
+
+const view = createSpacetimeView(canvas, {rows, columns, depth: ticks})
+for (let tick = 0; tick < ticks; tick++) {
+  view.pushState(sim.state, {ruleIndices: sim.ruleIndices, tick})
+  sim.tick()
+}
+view.draw()                        // drag to turn, wheel to dolly — controls are on by default
+view.setCrossSection(30)           // slice it: layer 30 as an opaque plane through the solid
+```
+
+Cost is **pixels × march steps and is independent of grid resolution** — a 576-row world costs the
+same per frame as a 96-row one. What a bigger world costs is texture memory: one byte per cell per
+layer, allocated once. The layer byte *is* the colour-table index, so changing the palette retints
+every layer of history and re-uploads nothing.
+
+→ [Full `/spacetime` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/spacetime.md)
+
 ## Documentation
 
 The full reference lives in the repository, one page per surface:
@@ -115,11 +141,12 @@ The full reference lives in the repository, one page per surface:
 | :--- | :--- |
 | [**Docs index**](https://github.com/Sidem/HexLife/blob/main/docs/embed/README.md) | Everything below, in one table. |
 | [Getting started](https://github.com/Sidem/HexLife/blob/main/docs/embed/getting-started.md) | Install, first world, sizing, host-owned simulation, requirements. |
-| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the eight imports you need and what each requires. |
+| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the ten imports you need and what each requires. |
 | [`<hexlife-world>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-world.md) | Attributes, JavaScript API, events, GPU-loss recovery, policies, styling. |
 | [`<hexlife-grid>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-grid.md) | Many worlds in one WebGL context. |
 | [`/sim`](https://github.com/Sidem/HexLife/blob/main/docs/embed/sim.md) | DOM-free simulation, seeded and sparse states, vacuum stability, block skipping. |
 | [`/render`](https://github.com/Sidem/HexLife/blob/main/docs/embed/renderer.md) | The renderer alone, for hosts that own their simulation. |
+| [`/spacetime`](https://github.com/Sidem/HexLife/blob/main/docs/embed/spacetime.md) | A run drawn as a 3D solid: one tick per layer, ray-marched, turnable and sliceable. |
 | [`/ca`](https://github.com/Sidem/HexLife/blob/main/docs/embed/ca.md) | k-state worlds, conservation, isotropy, `<hexlife-ca>`, `HXK1` codes. |
 | [`/stochastic`](https://github.com/Sidem/HexLife/blob/main/docs/embed/stochastic.md) | Probability and time-in-state, the lattice gas, `<hexlife-stochastic>`, `HXS1` codes. |
 | [`/solid`](https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |
@@ -134,6 +161,7 @@ The full reference lives in the repository, one page per surface:
 | `@hexlife/embed/api` | Nothing | Node and browsers alike: world codes, ruleset metadata, palettes, GPU probing. |
 | `@hexlife/embed/sim` | Wasm | Node and workers: deterministic host-driven simulation, no DOM or rendering. |
 | `@hexlife/embed/render` | DOM, WebGL2 | Draw externally supplied state without ticking a simulation. |
+| `@hexlife/embed/spacetime` | DOM, WebGL2 | **A run as a 3D solid.** One retained tick per layer, ray-marched; turn it, slice it, look inside it. No Wasm artifact at all. |
 | `@hexlife/embed/ca` | Wasm | **k-state** worlds — a second engine, with an optionally mass-conserving backend. |
 | `@hexlife/embed/ca-element` | DOM, WebGL2, Wasm | Registers `<hexlife-ca>`. |
 | `@hexlife/embed/stochastic` | Wasm | Probabilistic and time-dependent worlds, plus the conserved lattice gas. A separately loaded artifact. |

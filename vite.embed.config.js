@@ -18,6 +18,9 @@ export default defineConfig({
         api: 'src/embed/api.js',
         sim: 'src/embed/sim.js',
         render: 'src/embed/render.js',
+        // The ray-marched history volume. Separate from `render` because it is a second program,
+        // two more shaders and a texture ring, and a host drawing a flat world must not carry them.
+        spacetime: 'src/embed/spacetime.js',
         ca: 'src/embed/ca.js',
         // Isolated artifact boundary: no other entry imports this module or its Wasm URL.
         stochastic: 'src/embed/stochastic.js',

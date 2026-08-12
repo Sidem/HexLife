@@ -1,9 +1,15 @@
 /**
  * Solid Garden — a package consumer that turns a run into a printable object.
  *
- * Four published entry points and nothing else: `/sim` ticks the automaton, `/render` draws the
- * cross-section, `/solid` welds the layers into a solid and serializes it, and `/api` answers the
- * one question the whole guarantee rests on — is this rule vacuum-stable?
+ * Five published entry points and nothing else: `/sim` ticks the automaton, `/spacetime` draws the
+ * whole run as the solid it would become, `/render` draws the single layer being extruded,
+ * `/solid` welds the layers and serializes them, and `/api` answers the one question the whole
+ * guarantee rests on — is this rule vacuum-stable?
+ *
+ * `/spacetime` and `/solid` are fed from the *same* per-tick states, which is what makes the
+ * preview trustworthy: the shape you turn on screen is the shape in the file, not a second
+ * derivation of it. What the preview does not show is interpolation and the base plate — those are
+ * layers the extruder synthesizes below and between these ones (see the stage hint).
  *
  * The ownership rule this page has to respect: every per-voxel operation lives in Wasm. The only
  * data movement here is one `TypedArray.set` per tick into the stack's staging layer, plus one
@@ -65,9 +71,15 @@ const $ = (id) => document.getElementById(id)
 
 const ui = {
   stage: $('stage'),
+  stage3d: $('stage-3d'),
+  stageHint: $('stage-hint'),
+  viewSolid: $('view-solid'),
+  viewFlat: $('view-flat'),
   overlay: $('stage-overlay'),
   previewTick: $('preview-tick'),
   previewTickOut: $('preview-tick-out'),
+  seeInside: $('see-inside'),
+  seeInsideOut: $('see-inside-out'),
   rule: $('rule'),
   ruleHex: $('rule-hex'),
   ruleNote: $('rule-note'),
@@ -94,6 +106,7 @@ const ui = {
   timing: $('timing'),
   budget: $('budget'),
   frame: document.querySelector('.garden-canvas-frame'),
+  seeInsideField: $('see-inside-field'),
   drawTools: $('draw-tools'),
   drawClear: $('draw-clear'),
   drawRandom: $('draw-random'),
@@ -116,6 +129,37 @@ let renderer = null
 let renderedGeometry = ''
 let latest = null
 let pending = 0
+
+/**
+ * The 3D preview: `createSpacetimeView` from `@hexlife/embed/spacetime`, plus what it was built for.
+ *
+ * Loaded with a dynamic import rather than a static one so a CDN that has not caught up with a
+ * fresh publish costs this page its 3D view and nothing else — the cross-section, the report and
+ * the download all still work. A page that cannot draw the object must still be able to make it.
+ */
+let createSpacetimeView = null
+let spacetime = null
+let spacetimeGeometry = ''
+/**
+ * Which view the frame is showing: the solid, or the layer being extruded.
+ *
+ * The request and the result are separate because the 3D entry arrives asynchronously: the page
+ * opens asking for the solid, falls back to flat until the module lands, and switches over without
+ * the user having asked twice.
+ */
+let requestedView = 'solid'
+let view = 'flat'
+/**
+ * Ticks per drawn layer.
+ *
+ * WebGL2 only guarantees 256 array texture layers and the tick slider goes to 400, so on a device
+ * at that floor the whole run cannot be one-layer-per-tick. Showing every nth tick keeps the WHOLE
+ * object on screen; keeping the newest 256 would silently cut the bottom off the thing being
+ * previewed, which is worse than a coarser sample of all of it.
+ */
+let tickStride = 1
+/** The device's layer cap, learned from the first renderer and reused for every later one. */
+let deviceMaxLayers = 0
 
 /**
  * The hand-drawn initial state, kept at the current grid size.
@@ -189,14 +233,25 @@ function readOptions() {
   }
 }
 
-/** The cross-section for a given tick. `/render` owns the WebGL lifecycle; we only hand it bytes. */
-function drawTick(index) {
+/**
+ * Show a given tick in both views.
+ *
+ * `/render` owns the WebGL lifecycle of the flat one; we only hand it bytes. In the solid, the same
+ * tick is a cross-section plane cut through the object — the scrub position and the shape are one
+ * piece of state shown two ways, so they cannot disagree. `slice: false` is the after-a-build case:
+ * the object is shown whole, with no plane through it, until the user actually reaches for the bar.
+ */
+function drawTick(index, {slice = true} = {}) {
   if (!snapshots.length) return
   const clamped = Math.max(0, Math.min(snapshots.length - 1, index))
   ui.previewTick.value = String(clamped)
   ui.previewTickOut.textContent = String(clamped)
   renderer?.setState(snapshots[clamped])
   renderer?.draw()
+  if (spacetime) {
+    spacetime.setCrossSection(slice ? Math.round(clamped / tickStride) : null)
+    spacetime.draw()
+  }
 }
 
 /**
@@ -253,6 +308,109 @@ function ensureRenderer(rows, cols) {
   renderedGeometry = geometry
   renderer.resize()
   return renderer
+}
+
+/** The opacity the "See inside" slider is asking for. 0 is the opaque solid — the honest preview. */
+function seeInsideAlpha() {
+  return Math.max(0, Number(ui.seeInside.value) || 0) / 100
+}
+
+/**
+ * How many layers the object will have, and how many ticks each one stands for.
+ *
+ * Before the first renderer exists the device cap is unknown, so the first plan is optimistic (one
+ * layer per tick) and {@link showSolid} re-plans once if the device turns out to be stingier.
+ */
+function planLayers(ticks) {
+  const cap = deviceMaxLayers || ticks
+  const stride = Math.max(1, Math.ceil(ticks / cap))
+  return {stride, layers: Math.ceil(ticks / stride)}
+}
+
+/** The 3D preview for this geometry, sized to hold exactly the layers this run will push. */
+function ensureSpacetime(rows, cols, layers) {
+  if (!createSpacetimeView) return null
+  const geometry = `${rows}x${cols}x${layers}`
+  if (spacetime && spacetimeGeometry === geometry) return spacetime
+  spacetime?.destroy()
+  spacetime = createSpacetimeView(ui.stage3d, {
+    rows,
+    columns: cols,
+    // Exactly the layers that will be pushed. The object's height comes from the volume's CAPACITY
+    // — that is what makes a live one grow rather than stretch — so asking for more than we will
+    // fill would stand this finished object part-way up an invisible taller one.
+    depth: layers,
+    // White matter on the panel's own background, matching the cross-section: this is a printing
+    // preview, and the default spectrum colours by rule index, which says nothing about the object.
+    palette: 'monochrome',
+    background: '#0b0e14',
+    layerAlpha: seeInsideAlpha(),
+  })
+  spacetimeGeometry = geometry
+  deviceMaxLayers = spacetime.maxLayers
+  spacetime.resize()
+  return spacetime
+}
+
+/**
+ * Hand the finished run to `/spacetime`.
+ *
+ * The states are the very ones that were pushed into the solid stack, so the object on screen is
+ * the object in the file — not a second derivation of it that could quietly disagree.
+ */
+function showSolid(rows, cols) {
+  if (!createSpacetimeView || !snapshots.length) return
+  let plan = planLayers(snapshots.length)
+  let solid = ensureSpacetime(rows, cols, plan.layers)
+  if (solid && solid.depth < plan.layers) {
+    // First run on a device at the 256-layer floor: we asked for more layers than it will give.
+    // Now that the real cap is known, re-plan and rebuild once; every later run uses the cache.
+    plan = planLayers(snapshots.length)
+    spacetimeGeometry = ''
+    solid = ensureSpacetime(rows, cols, plan.layers)
+  }
+  if (!solid) return
+
+  tickStride = plan.stride
+  const layers = []
+  for (let tick = 0; tick < snapshots.length; tick += plan.stride) layers.push(snapshots[tick])
+  solid.setHistory(layers)
+  syncStageHint()
+}
+
+/** Which of the two canvases is on top, and which controls belong to it. */
+function setView(next) {
+  if (next === 'solid' || next === 'flat') requestedView = next
+  view = createSpacetimeView && requestedView === 'solid' ? 'solid' : 'flat'
+  ui.frame.dataset.view = view
+  ui.viewSolid.setAttribute('aria-pressed', String(view === 'solid'))
+  ui.viewFlat.setAttribute('aria-pressed', String(view === 'flat'))
+  ui.seeInsideField.hidden = view !== 'solid'
+  syncStageHint()
+  if (view === 'solid') spacetime?.draw()
+  else renderer?.draw()
+}
+
+/** Say what is on screen, and — for the solid — what is deliberately not. */
+function syncStageHint() {
+  if (!createSpacetimeView) {
+    ui.stageHint.textContent =
+      'The layer being extruded, drawn by /render while /sim ticks. The 3D preview needs ' +
+      '@hexlife/embed/spacetime, which this page could not load — everything else still works.'
+    return
+  }
+  if (view === 'flat') {
+    ui.stageHint.textContent =
+      'The layer being extruded, drawn by /render while /sim ticks. Watch it fill: that outline ' +
+      'is the shape of the object at that height.'
+    return
+  }
+  const sampled =
+    tickStride > 1 ? ` Showing every ${tickStride}th tick — this device caps a volume at ${deviceMaxLayers} layers.` : ''
+  ui.stageHint.textContent =
+    'The whole run as one solid, ray-marched by /spacetime from the same states the extruder ' +
+    'welded. Drag to turn it, scroll to zoom, and move the tick slider to slice it. Interpolation ' +
+    `and the base plate are the extruder's own layers and are not in the preview.${sampled}`
 }
 
 async function build() {
@@ -390,9 +548,11 @@ async function build() {
 
   ui.previewTick.max = String(Math.max(0, snapshots.length - 1))
   ensureRenderer(options.rows, options.cols)
+  showSolid(options.rows, options.cols)
   // While drawing, hold the view on tick 0 — which IS the drawing, since it is what got pushed
   // first. Snapping to the final tick after every stroke would take the canvas away mid-edit.
-  drawTick(options.start === 'draw' ? 0 : snapshots.length - 1)
+  // Either way the solid is shown whole: the slicing plane appears when the bar is touched.
+  drawTick(options.start === 'draw' ? 0 : snapshots.length - 1, {slice: false})
   setOverlay('')
   ui.download.disabled = false
 
@@ -532,6 +692,9 @@ function syncStartMode() {
   ui.densityField.hidden = mode === 'seed'
   ui.drawTools.hidden = mode !== 'draw'
   ui.frame.dataset.painting = String(mode === 'draw')
+  // Painting needs the surface being painted. Switching to it is enough — the hidden canvas takes
+  // no pointer events either way, so the two gestures can never fight over one drag.
+  if (mode === 'draw') setView('flat')
 }
 
 function bindOutput(input, output, format = (value) => value) {
@@ -561,6 +724,10 @@ function init() {
   bindOutput(ui.subLayers, ui.subLayersOut)
   bindOutput(ui.basePlate, ui.basePlateOut)
   bindOutput(ui.density, ui.densityOut, (value) => `${value}%`)
+  bindOutput(ui.seeInside, ui.seeInsideOut, (value) =>
+    Number(value) === 0 ? 'solid' : (Number(value) / 100).toFixed(2),
+  )
+  setView(requestedView)
   syncStartMode()
 
   ui.rule.addEventListener('change', () => {
@@ -623,6 +790,15 @@ function init() {
 
   ui.previewTick.addEventListener('input', () => drawTick(Number(ui.previewTick.value)))
 
+  ui.viewSolid.addEventListener('click', () => setView('solid'))
+  ui.viewFlat.addEventListener('click', () => setView('flat'))
+  // Opacity is a pure look change: the volume is not re-uploaded, because the voxel byte is a
+  // colour-table index and the march reads the same bytes at a different alpha.
+  ui.seeInside.addEventListener('input', () => {
+    spacetime?.setOptions({layerAlpha: seeInsideAlpha()})
+    spacetime?.draw()
+  })
+
   ui.download.addEventListener('click', () => {
     if (!latest) return
     const blob = new Blob([latest.file], {type: 'application/octet-stream'})
@@ -637,16 +813,42 @@ function init() {
   // `resize()` reshapes the viewport but does not redraw, and this page draws on demand rather
   // than from a frame loop — so without the explicit draw the canvas stays at the old size.
   window.addEventListener('resize', () => {
-    if (!renderer) return
-    renderer.resize()
-    renderer.draw()
+    if (renderer) {
+      renderer.resize()
+      renderer.draw()
+    }
+    if (spacetime) {
+      spacetime.resize()
+      spacetime.draw()
+    }
   })
 }
 
 setOverlay('Loading the solid engine…')
 init()
-initSolidEngine()
-  .then(() => build())
+
+/**
+ * The 3D view is optional, and loaded that way on purpose: a CDN that has not yet caught up with a
+ * publish costs this page its preview and nothing else. Everything the page is *for* — growing the
+ * run, welding it, reporting whether it prints as one piece, downloading it — is unaffected.
+ */
+// eslint-disable-next-line import/no-unresolved -- the import map resolves this, like the rest.
+const spacetimeReady = import('@hexlife/embed/spacetime')
+  .then((module) => {
+    createSpacetimeView = module.createSpacetimeView
+  })
+  .catch((error) => {
+    console.warn('Solid Garden: @hexlife/embed/spacetime unavailable, staying flat.', error)
+    createSpacetimeView = null
+    ui.viewSolid.disabled = true
+    setView('flat')
+  })
+
+Promise.all([initSolidEngine(), spacetimeReady])
+  .then(() => {
+    setView(requestedView)
+    return build()
+  })
   .catch((error) => setOverlay(`Could not start: ${error.message ?? error}`))
 
 // A headless hook, mirroring the rest of the demo library: the state a test needs to assert
@@ -655,6 +857,22 @@ window.__solidGarden = {
   presets: PRESETS,
   options: readOptions,
   rebuild: () => build(),
+  setView,
+  get view() {
+    return view
+  },
+  get solid() {
+    if (!spacetime) return null
+    return {
+      layers: spacetime.layerCount,
+      depth: spacetime.depth,
+      maxLayers: spacetime.maxLayers,
+      tickStride,
+      crossSection: spacetime.crossSection,
+      camera: spacetime.camera,
+      stats: spacetime.stats,
+    }
+  },
   get latest() {
     return latest
   },

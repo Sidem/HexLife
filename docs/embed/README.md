@@ -15,7 +15,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | Page | What it covers |
 | :--- | :--- |
 | [Getting started](./getting-started.md) | Install, first world, sizing, the host-owned simulation path, requirements. |
-| [Entry points](./entrypoints.md) | Which of the eight imports you need, what each one costs, and what it requires. |
+| [Entry points](./entrypoints.md) | Which of the ten imports you need, what each one costs, and what it requires. |
 
 ## Elements
 
@@ -32,6 +32,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | :--- | :--- |
 | [`/sim`](./sim.md) | DOM-free binary simulation, seeded and sparse initial states, vacuum stability, block skipping. |
 | [`/render`](./renderer.md) | The renderer alone, for hosts that already own their simulation. |
+| [`/spacetime`](./spacetime.md) | A whole run drawn as a 3D solid: one tick per layer, ray-marched, turnable and sliceable. |
 | [`/ca`](./ca.md) | k-state worlds: two backends, conservation, isotropy, `HXK1` codes. |
 | [`/stochastic`](./stochastic.md) | Probability and time-in-state, the conserved lattice gas, `HXS1` codes. |
 | [`/solid`](./solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |

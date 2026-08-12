@@ -9,14 +9,15 @@
     />
     <title>HexLife · Solid Garden</title>
     <link rel="stylesheet" href="./embed-demo-shell.css" />
-    <link rel="stylesheet" href="./solid-garden.css?v=20260811-solid" />
+    <link rel="stylesheet" href="./solid-garden.css?v=20260812-spacetime" />
     <script type="importmap">
       {
         "imports": {
-          "@hexlife/embed/api": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/api.js",
-          "@hexlife/embed/sim": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/sim.js",
-          "@hexlife/embed/render": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/render.js",
-          "@hexlife/embed/solid": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.11.0/src/embed/solid.js"
+          "@hexlife/embed/api": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.12.0/src/embed/api.js",
+          "@hexlife/embed/sim": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.12.0/src/embed/sim.js",
+          "@hexlife/embed/render": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.12.0/src/embed/render.js",
+          "@hexlife/embed/spacetime": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.12.0/src/embed/spacetime.js",
+          "@hexlife/embed/solid": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.12.0/src/embed/solid.js"
         }
       }
     </script>
@@ -41,7 +42,8 @@
             <p class="demo-deck">
               Every tick becomes a layer. The hex grid is the cross-section, live cells are
               matter, and the stack of them is an object your printer can make. Grown from a
-              single seed under a rule that guarantees the result holds together.
+              single seed under a rule that guarantees the result holds together — turn it,
+              slice it at any tick, then download it.
             </p>
           </div>
           <a
@@ -51,8 +53,11 @@
             rel="noopener noreferrer"
           >
             <span>Built with the published npm package</span>
-            <strong>@hexlife/embed@1.11.0</strong>
-            <small><code>/solid</code> + <code>/sim</code> + <code>/render</code> · Wasm + WebGL2</small>
+            <strong>@hexlife/embed@1.12.0</strong>
+            <small
+              ><code>/solid</code> + <code>/sim</code> + <code>/render</code> +
+              <code>/spacetime</code> · Wasm + WebGL2</small
+            >
           </a>
         </div>
       </header>
@@ -77,13 +82,29 @@
         </section>
 
         <div class="garden-layout">
-          <section class="garden-panel garden-stage" aria-label="Cross-section">
-            <h2>Cross-section</h2>
-            <p class="garden-hint">
-              The layer being extruded, drawn by <code>/render</code> while <code>/sim</code> ticks.
-              Watch it fill: that outline is the shape of the object at that height.
-            </p>
-            <div class="garden-canvas-frame">
+          <section class="garden-panel garden-stage" aria-label="Preview">
+            <div class="garden-stage-head">
+              <h2>The object</h2>
+              <!-- Two views of one run: the stack seen from outside, and the single layer being
+                   extruded. Both are drawn from the same per-tick states — the 3D one by
+                   `/spacetime`, the flat one by `/render`. -->
+              <div class="garden-viewswitch" role="group" aria-label="Preview mode">
+                <button id="view-solid" type="button" data-view="solid" aria-pressed="true">
+                  Solid
+                </button>
+                <button id="view-flat" type="button" data-view="flat" aria-pressed="false">
+                  Cross-section
+                </button>
+              </div>
+            </div>
+            <p class="garden-hint" id="stage-hint"></p>
+            <div class="garden-canvas-frame" data-view="solid">
+              <canvas
+                id="stage-3d"
+                width="640"
+                height="560"
+                aria-label="The run as a solid — drag to turn it"
+              ></canvas>
               <canvas id="stage" width="640" height="560" aria-label="Automaton cross-section"></canvas>
               <div id="stage-overlay" class="garden-overlay" hidden></div>
             </div>
@@ -91,6 +112,14 @@
               <label for="preview-tick">Tick</label>
               <input id="preview-tick" type="range" min="0" max="0" value="0" step="1" />
               <output id="preview-tick-out">0</output>
+            </div>
+            <div class="garden-scrub" id="see-inside-field">
+              <label for="see-inside">See inside</label>
+              <!-- 0 is the honest print preview: an opaque solid, the object as it would come off
+                   the plate. Above 0 the march accumulates instead of stopping at the first hit,
+                   which is the only way to see the history buried inside the shape. -->
+              <input id="see-inside" type="range" min="0" max="40" value="0" step="2" />
+              <output id="see-inside-out">solid</output>
             </div>
           </section>
 
@@ -260,6 +289,6 @@
         </nav>
       </footer>
     </div>
-    <script type="module" src="./solid-garden.js?v=20260811-solid"></script>
+    <script type="module" src="./solid-garden.js?v=20260812-spacetime"></script>
   </body>
 </html>

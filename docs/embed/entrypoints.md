@@ -2,7 +2,7 @@
 
 # Entry points
 
-Nine public imports. The split is not cosmetic: each one is the boundary between "this host needs
+Ten public imports. The split is not cosmetic: each one is the boundary between "this host needs
 a DOM", "this host needs a separately loaded Wasm artifact", and "this host needs neither".
 
 | Import | Needs | Use for |
@@ -11,6 +11,7 @@ a DOM", "this host needs a separately loaded Wasm artifact", and "this host need
 | `@hexlife/embed/api` | Nothing | Node and browsers alike: world codes, ruleset metadata, palette names, GPU probing. No DOM at module scope. → [`/api`](./api.md) |
 | `@hexlife/embed/sim` | Wasm | Node and browser workers: deterministic host-driven simulation without DOM or rendering. → [`/sim`](./sim.md) |
 | `@hexlife/embed/render` | DOM, WebGL2 | Browser hosts: draw externally supplied state without allocating or ticking a simulation. → [`/render`](./renderer.md) |
+| `@hexlife/embed/spacetime` | DOM, WebGL2 | Browser hosts: a whole run drawn as a 3D solid — one retained tick per layer, ray-marched, turnable and sliceable. Simulates nothing; a host feeds it generations. Separate from `/render` because it is a second program, two more shaders and a texture ring. → [`/spacetime`](./spacetime.md) |
 | `@hexlife/embed/ca` | Wasm | **k-state** worlds: multi-state simulation on the same lattice, with an optionally mass-conserving backend. A second engine — everything else here stays binary. No DOM at module scope. → [`/ca`](./ca.md) |
 | `@hexlife/embed/ca-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-ca>`, the k-state element. Separate from `/ca` because that entry is DOM-free, and separate from the root because a binary embed should not carry the k-state engine. |
 | `@hexlife/embed/stochastic` | Wasm | Stateful/probabilistic neighborhood worlds and the conserved lattice gas, with compiled native rules, age epochs, counter RNG, census and checksums. A separately loaded artifact with no DOM at module scope. → [`/stochastic`](./stochastic.md) |
@@ -31,6 +32,7 @@ because a strict host CSP (a Reddit webview, for instance) is not something an e
 | k-state | 2–16 | `/ca`, `/ca-element` | The same one, a separate engine struct. |
 | Stochastic | up to 64 rows of transitions, or 5 gas states | `/stochastic`, `/stochastic-element` | A **second** artifact, loaded only by these two. |
 | Solid extruder | simulates nothing — a layer sink for any of the above | `/solid` | A **third** artifact, loaded only by this one. |
+| Spacetime view | simulates nothing — the same layer sink, drawn instead of meshed | `/spacetime` | **None.** Pure WebGL2. |
 
 Importing the package root, `/sim`, `/ca`, or `/ca-element` neither downloads nor initializes the
 stochastic or solid artifacts.

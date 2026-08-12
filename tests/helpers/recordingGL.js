@@ -31,6 +31,7 @@ export function createRecordingGL(overrides = {}) {
         TEXTURE_WRAP_S: 0x2802,
         TEXTURE_WRAP_T: 0x2803,
         UNPACK_ALIGNMENT: 0x0cf5,
+        COLOR_BUFFER_BIT: 0x4000,
         MAX_ARRAY_TEXTURE_LAYERS: 0x88ff,
         TEXTURE0: 0x84c0,
         TEXTURE1: 0x84c1,
@@ -63,7 +64,7 @@ export function createRecordingGL(overrides = {}) {
         createProgram: () => { record('createProgram', []); return make('program'); },
         deleteProgram: (p) => { record('deleteProgram', [p?.__id]); live.delete(p); },
         createShader: () => make('shader'),
-        deleteShader: () => {},
+        deleteShader: (s) => { live.delete(s); },
         shaderSource: () => {},
         compileShader: () => {},
         attachShader: () => {},
@@ -82,6 +83,14 @@ export function createRecordingGL(overrides = {}) {
         texSubImage3D: (target, level, x, y, z, w, h, d, fmt, type, data) =>
             record('texSubImage3D', [target, level, x, y, z, w, h, d, fmt, type, data?.length ?? 0]),
         texParameteri: (...a) => record('texParameteri', a),
+        // The 128x2 colour table an embed renderer owns for itself. Recorded by byte COUNT, like
+        // texSubImage3D above, so a palette swap can be told apart from a volume upload.
+        texImage2D: (target, level, internal, w, h, border, fmt, type, data) =>
+            record('texImage2D', [target, level, internal, w, h, border, fmt, type, data?.length ?? 0]),
+        texSubImage2D: (target, level, x, y, w, h, fmt, type, data) =>
+            record('texSubImage2D', [target, level, x, y, w, h, fmt, type, data?.length ?? 0]),
+        clearColor: (...a) => record('clearColor', a),
+        clear: (mask) => record('clear', [mask]),
         pixelStorei: (...a) => record('pixelStorei', a),
         viewport: (...a) => record('viewport', a),
         enable: (c) => record('enable', [c]),
@@ -112,7 +121,14 @@ export function createRecordingGL(overrides = {}) {
         callsNamed(name) {
             return calls.filter((c) => c.name === name);
         },
-        clear() {
+        /**
+         * Forget everything recorded so far.
+         *
+         * NOT `clear()`: `gl.clear(mask)` is a real WebGL call, and a recorder that answered to
+         * that name would silently wipe its own log the moment a renderer cleared the canvas —
+         * which is exactly what any host-owned canvas does at the top of every frame.
+         */
+        clearCalls() {
             calls.length = 0;
         },
         ...overrides,

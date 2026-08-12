@@ -1,35 +1,35 @@
 import * as Config from '../../core/config.js';
-import * as WebGLUtils from '../webglUtils.js';
-import { lookAt, perspective } from '../mat4.js';
-import { torusOrbitCamera } from '../torusMath.js';
 import { getSpacetimeViewSettings } from '../../services/SpacetimeViewSettings.js';
 import { SpacetimeVolume } from './SpacetimeVolume.js';
-
-// eslint-disable-next-line import/no-unresolved
-import spacetimeVertexShaderSource from '../../../shaders/spacetime_vertex.glsl?raw';
-// eslint-disable-next-line import/no-unresolved
-import spacetimeFragmentShaderSource from '../../../shaders/spacetime_fragment.glsl?raw';
+import {
+    SPACETIME_MARCH_DEFAULTS,
+    computeGeometry,
+    createSpacetimeProgram,
+    drawSpacetimeVolume,
+} from './SpacetimeCore.js';
 
 /**
- * #40 Spacetime View — the ray-march half.
+ * #40 Spacetime View — the Explorer's half of the ray-march.
  *
- * This whole module (and both shaders, which it pulls in with `?raw`) lives in a lazily imported
- * chunk. `renderer.js` fetches it on the first switch into spacetime mode and never before, so a
- * session that never opens the mode pays nothing: no chunk, no program, no GL object (#40 §2.1).
- * On leaving the mode the volume texture is deleted; the compiled program and the fetched chunk
- * are deliberately kept, so a second toggle is instant.
+ * The march itself lives in {@link module:SpacetimeCore} and is shared, unmodified, with the
+ * `@hexlife/embed/spacetime` package entry. What is *here* is everything that is the Explorer's and
+ * not a general 3D volume's: where the depth cap comes from (`Config` + the device), whose settings
+ * the opacity is read from, and the plan's frame-time benchmark.
+ *
+ * This whole module (and the core and both shaders it pulls in) lives in a lazily imported chunk.
+ * `renderer.js` fetches it on the first switch into spacetime mode and never before, so a session
+ * that never opens the mode pays nothing: no chunk, no program, no GL object (#40 §2.1). On leaving
+ * the mode the volume texture is deleted; the compiled program and the fetched chunk are
+ * deliberately kept, so a second toggle is instant.
  *
  * Phase 2 replaced the procedural stand-in volume with the real thing: the worker packs one byte per
  * cell per tick in Rust and ships it, {@link SpacetimeVolume} owns the texture ring, and this module
  * only ever draws what the simulation actually produced.
  */
 
-const SQRT3 = Math.sqrt(3);
-
-/** Framing of the object in the orbit camera's space (the camera sits 4.1–10 units out). */
-const FOOTPRINT_HALF_EXTENT = 1.6;
-const TIME_HALF_EXTENT = 2.2;
-const FIELD_OF_VIEW_RADIANS = Math.PI * 42 / 180;
+// Re-exported so the object's shape has one importable definition: callers (and the tests that pin
+// the framing) ask this module for it and get the very function the march uses.
+export { computeGeometry };
 
 /**
  * Per-grid-preset layer caps, keyed by grid rows (#40 §3).
@@ -57,52 +57,11 @@ export function depthCapForGrid(rows) {
 export const SPACETIME_DEFAULTS = Object.freeze({
     /** Layers requested. Clamped to the preset cap, the ring size AND the device's layer cap. */
     depth: Config.STATE_HISTORY_RING_SIZE,
-    /**
-     * 0 = opaque solid (first hit wins); > 0 = front-to-back accumulation at this alpha.
-     * The live view runs translucent because an opaque volume is just a silhouette — you cannot
-     * see the history inside it. The Phase 1 *gate* number is still the opaque one (§6): opaque is
-     * the cheap case and the one the plan named. Users can move this (see `SpacetimeViewSettings`).
-     */
-    layerAlpha: 0.12,
-    /**
-     * Longest lateral distance one march step may cover, in hex radii. The plan's slab march is
-     * exact only for steep rays; at the orbit camera's usual elevation a full slab step crosses
-     * several hexes sideways. 0 restores the pure slab march (faster, and visibly aliased).
-     */
-    maxLateralStepHexRadii: 0.75,
-    /** Hard cap on march steps per ray. Pure slab marching never needs more than `depth`. */
-    maxSteps: 512,
+    // The sampling numbers are the core's, not this module's: they are what the plan's frame time
+    // was measured at, and the embed entry marches with exactly the same ones. Users can move
+    // `layerAlpha` from the settings panel (see `SpacetimeViewSettings`).
+    ...SPACETIME_MARCH_DEFAULTS,
 });
-
-/**
- * Geometry of the extruded object for a given grid, in object space.
- * The footprint keeps the flat grid's aspect ratio; the taller axis is normalised so the whole
- * object sits inside the orbit camera's default framing.
- *
- * `layerHeight` comes from the ring CAPACITY, not from how full it is, so a growing object grows
- * instead of stretching. `liveLayers` therefore sets only the object's top.
- */
-export function computeGeometry(cols, rows, depth, liveLayers = depth) {
-    // Flat-grid extents, in units of the hex radius (matching `getGridWorldBounds`).
-    const flatWidth = (cols - 1) * 1.5 + 2;
-    const flatHeight = rows * SQRT3 + SQRT3 / 2;
-    const hexSize = (2 * FOOTPRINT_HALF_EXTENT) / Math.max(flatWidth, flatHeight);
-    const layerHeight = (2 * TIME_HALF_EXTENT) / Math.max(1, depth);
-    const halfX = (flatWidth * hexSize) / 2;
-    const halfZ = (flatHeight * hexSize) / 2;
-    const floorY = -TIME_HALF_EXTENT;
-    return {
-        hexSize,
-        layerHeight,
-        // Object XZ = flat XY; object Y = time, bottom-anchored so the object grows upward.
-        boxMin: [-halfX, floorY, -halfZ],
-        boxMax: [halfX, floorY + Math.max(0, liveLayers) * layerHeight, halfZ],
-        gridCenter: [
-            (-hexSize + (cols - 1) * 1.5 * hexSize + hexSize) / 2,
-            (-SQRT3 * hexSize / 2 + rows * SQRT3 * hexSize) / 2,
-        ],
-    };
-}
 
 export function createSpacetimeView(gl) {
     let program = null;
@@ -123,34 +82,10 @@ export function createSpacetimeView(gl) {
 
     function ensureProgram() {
         if (program) return true;
-        program = WebGLUtils.loadShaderProgram(
-            gl,
-            spacetimeVertexShaderSource,
-            spacetimeFragmentShaderSource,
-        );
-        if (!program) return false;
-        uniforms = {
-            volume: gl.getUniformLocation(program, 'u_volume'),
-            colorLUT: gl.getUniformLocation(program, 'u_colorLUT'),
-            cameraPosition: gl.getUniformLocation(program, 'u_cameraPosition'),
-            cameraRight: gl.getUniformLocation(program, 'u_cameraRight'),
-            cameraUp: gl.getUniformLocation(program, 'u_cameraUp'),
-            cameraForward: gl.getUniformLocation(program, 'u_cameraForward'),
-            tanHalf: gl.getUniformLocation(program, 'u_tanHalf'),
-            boxMin: gl.getUniformLocation(program, 'u_boxMin'),
-            boxMax: gl.getUniformLocation(program, 'u_boxMax'),
-            gridCenter: gl.getUniformLocation(program, 'u_gridCenter'),
-            hexSize: gl.getUniformLocation(program, 'u_hexSize'),
-            gridSize: gl.getUniformLocation(program, 'u_gridSize'),
-            layerHeight: gl.getUniformLocation(program, 'u_layerHeight'),
-            layers: gl.getUniformLocation(program, 'u_layers'),
-            ringBase: gl.getUniformLocation(program, 'u_ringBase'),
-            ringDepth: gl.getUniformLocation(program, 'u_ringDepth'),
-            maxSteps: gl.getUniformLocation(program, 'u_maxSteps'),
-            layerAlpha: gl.getUniformLocation(program, 'u_layerAlpha'),
-            maxLateralStep: gl.getUniformLocation(program, 'u_maxLateralStep'),
-            highlightLayer: gl.getUniformLocation(program, 'u_highlightLayer'),
-        };
+        const compiled = createSpacetimeProgram(gl);
+        if (!compiled) return false;
+        program = compiled.program;
+        uniforms = compiled.uniforms;
         return true;
     }
 
@@ -246,74 +181,16 @@ export function createSpacetimeView(gl) {
         // the renderer falls back to the flat quad rather than showing an empty frame.
         if (volume.isEmpty) return false;
 
-        geometry = computeGeometry(volume.cols, volume.rows, volume.depth, volume.length);
-
-        const { position, up } = torusOrbitCamera(camera.yaw, camera.pitch, camera.distance);
-        const aspect = Math.max(viewRect.width / viewRect.height, 0.01);
-        const projection = perspective(FIELD_OF_VIEW_RADIANS, aspect, 0.1, 40);
-        const view = lookAt(position, [0, 0, 0], up);
-        // The view matrix's rotation rows are the camera basis in world space; row 2 points from
-        // the target back to the eye, so forward is its negation.
-        const right = [view[0], view[4], view[8]];
-        const cameraUp = [view[1], view[5], view[9]];
-        const forward = [-view[2], -view[6], -view[10]];
-
-        const viewportY = surfaceHeight - viewRect.y - viewRect.height;
-        gl.viewport(viewRect.x, viewportY, viewRect.width, viewRect.height);
-        gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.CULL_FACE);
-
-        const translucent = options.layerAlpha > 0;
-        if (translucent) {
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // fragment alpha is premultiplied
-        } else {
-            gl.disable(gl.BLEND);
-        }
-
-        gl.useProgram(program);
-        gl.bindVertexArray(null);
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D_ARRAY, volume.texture);
-        gl.uniform1i(uniforms.volume, 0);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, lutTexture);
-        gl.uniform1i(uniforms.colorLUT, 1);
-
-        gl.uniform3fv(uniforms.cameraPosition, position);
-        gl.uniform3fv(uniforms.cameraRight, right);
-        gl.uniform3fv(uniforms.cameraUp, cameraUp);
-        gl.uniform3fv(uniforms.cameraForward, forward);
-        // 1/m[0] and 1/m[5] are tan(fovY/2)*aspect and tan(fovY/2).
-        gl.uniform2f(uniforms.tanHalf, 1 / projection[0], 1 / projection[5]);
-        gl.uniform3fv(uniforms.boxMin, geometry.boxMin);
-        gl.uniform3fv(uniforms.boxMax, geometry.boxMax);
-        gl.uniform2fv(uniforms.gridCenter, geometry.gridCenter);
-        gl.uniform1f(uniforms.hexSize, geometry.hexSize);
-        gl.uniform2i(uniforms.gridSize, volume.cols, volume.rows);
-        gl.uniform1f(uniforms.layerHeight, geometry.layerHeight);
-        gl.uniform1i(uniforms.layers, volume.length);
-        gl.uniform1i(uniforms.ringBase, volume.base);
-        gl.uniform1i(uniforms.ringDepth, volume.depth);
-        gl.uniform1i(uniforms.maxSteps, options.maxSteps);
-        gl.uniform1f(uniforms.layerAlpha, options.layerAlpha);
-        gl.uniform1i(uniforms.highlightLayer, highlightLayer);
-        gl.uniform1f(
-            uniforms.maxLateralStep,
-            options.maxLateralStepHexRadii > 0
-                ? options.maxLateralStepHexRadii * geometry.hexSize
-                : 0,
-        );
-
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        gl.disable(gl.BLEND);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
-        return true;
+        geometry = drawSpacetimeVolume(gl, { program, uniforms }, {
+            volume,
+            camera,
+            viewRect,
+            surfaceHeight,
+            lutTexture,
+            options,
+            highlightLayer,
+        });
+        return geometry !== null;
     }
 
     /**

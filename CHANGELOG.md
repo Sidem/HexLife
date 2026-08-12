@@ -25,6 +25,35 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Added
+
+- **Solid Garden now shows you the object, not just a slice of it.** The whole run is drawn as one
+  turnable solid — drag to spin it, scroll to zoom, and move the tick slider to cut a cross-section
+  plane through it — with the flat view one click away for painting a starting state. The preview is
+  fed the very states the extruder welds, so what you turn on screen is what is in the downloaded
+  file.
+
+### `@hexlife/embed` 1.12.0 — 2026-08-12
+
+#### Added
+
+- **`@hexlife/embed/spacetime` — a run drawn as a 3D solid.** The grid is the cross-section, time
+  runs up, and one retained tick is one ray-marched layer you can turn, dolly and slice. It is the
+  Explorer's own spacetime view, packaged: the same march, the same shaders, the same framing, so
+  the two can never drift apart visually. Like `/solid` it **simulates nothing** — a host feeds it
+  one generation per tick from whichever engine it likes — and it loads **no Wasm artifact at all.**
+- **Cost that does not scale with the world.** The object is a fragment-shader construction, so a
+  576-row world costs the same per frame as a 96-row one; what a bigger world costs is texture
+  memory, one byte per cell per layer, reported by `stats.textureBytes`. `depth` is clamped to the
+  device's `MAX_ARRAY_TEXTURE_LAYERS` — as low as 256 by the WebGL2 guarantee — and the granted
+  depth is readable, so a host can subsample rather than lose the bottom of its object.
+- **A palette change re-uploads nothing.** The layer byte *is* the colour-table index
+  (`rule * 2 + state`), so `setPalette()` retints the entire history for the cost of a 1 KB table —
+  and a binary world with no rule indices is already packed, so `pushLayer(sim.state)` uploads a
+  live view of engine memory with no intermediate copy.
+- **Drag to orbit, wheel or pinch to dolly**, on by default and to the same constants the Explorer
+  uses, with `controls: false` for hosts that own their own gestures.
+
 ## [1.3.0] — 2026-08-11
 
 ### Printable solids

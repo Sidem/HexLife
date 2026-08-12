@@ -1,7 +1,7 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.11.0",
-  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines, with a solid extruder for 3D printing",
+  "version": "1.12.0",
+  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines, with a solid extruder for 3D printing and a ray-marched spacetime view",
   "keywords": [
     "cellular-automata",
     "hexagonal",
@@ -13,6 +13,8 @@
     "webassembly",
     "wasm",
     "webgl2",
+    "volume-rendering",
+    "ray-marching",
     "web-components",
     "custom-elements",
     "deterministic",
@@ -50,6 +52,11 @@
       "types": "./src/embed/render.d.ts",
       "import": "./src/embed/render.js",
       "default": "./src/embed/render.js"
+    },
+    "./spacetime": {
+      "types": "./src/embed/spacetime.d.ts",
+      "import": "./src/embed/spacetime.js",
+      "default": "./src/embed/spacetime.js"
     },
     "./ca": {
       "types": "./src/embed/ca.d.ts",

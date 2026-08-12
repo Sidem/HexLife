@@ -16,6 +16,7 @@ const copies = [
   ['src/embed/api.d.ts', 'dist/embed-package/src/embed/api.d.ts'],
   ['src/embed/sim.d.ts', 'dist/embed-package/src/embed/sim.d.ts'],
   ['src/embed/render.d.ts', 'dist/embed-package/src/embed/render.d.ts'],
+  ['src/embed/spacetime.d.ts', 'dist/embed-package/src/embed/spacetime.d.ts'],
   ['src/embed/ca.d.ts', 'dist/embed-package/src/embed/ca.d.ts'],
   ['src/embed/stochastic.d.ts', 'dist/embed-package/src/embed/stochastic.d.ts'],
   ['src/embed/solid.d.ts', 'dist/embed-package/src/embed/solid.d.ts'],

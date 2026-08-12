@@ -25,9 +25,7 @@
  */
 
 import * as WebGLUtils from '../rendering/webglUtils.js';
-import { generateColorLUT, rotateHue } from '../utils/ruleVizUtils.js';
-import { PRESET_PALETTES } from '../core/colorPalettes.js';
-import { precomputeSymmetryGroups } from '../core/Symmetry.js';
+import { resolveEmbedLUT } from './embedPalette.js';
 import { lookAt, multiply, perspective } from '../rendering/mat4.js';
 import { getTorusPeriods, torusOrbitCamera, wrapAngle } from '../rendering/torusMath.js';
 import { repeatOffsetsForViewport } from './repeatToroidal.js';
@@ -86,15 +84,6 @@ const TORUS_CAMERA = Object.freeze({
     pitch: 0.42,
     distance: 6.5,
 });
-
-/**
- * The symmetry tables `generateColorLUT` needs for the symmetry-keyed palettes (the
- * `symmetryGradient` preset and `mode: 'symmetry'`). The app threads these in from WorldManager;
- * the embed just recomputes them — `precomputeSymmetryGroups` is pure, ~100 lines, and runs over 64
- * bitmasks, so *transmitting* them (or refusing the palettes that need them, as v1 of this file did)
- * was never worth it. Computed once at module load and shared by every instance.
- */
-const SYMMETRY_DATA = precomputeSymmetryGroups();
 
 /**
  * Pixel center of a cell, flat-top odd-q layout (odd columns shifted down half a row).
@@ -375,46 +364,16 @@ export class EmbedRenderer {
 
     /**
      * The 128×2 RGBA table the shader samples, from whichever palette form the caller supplied.
-     * Precedence: a decoded world's `colorSettings`, then a baked `lut`, then the element's
-     * `palette-on/off` gradient attributes, then the `palette` preset name.
+     * The precedence order lives in `embedPalette.js` because `@hexlife/embed/spacetime` resolves
+     * the very same table for the very same bytes — its voxel byte *is* a LUT index.
      * @param {{palette?: string, customGradient?: object|null, colorSettings?: object|null,
      *   lut?: Uint8Array|null, flickerProof?: boolean, hueShift?: number|null}} opts
      * @returns {Uint8Array}
      */
-    _resolveLUT({ palette = 'default', customGradient = null, colorSettings = null, lut = null, flickerProof = false, hueShift = null }) {
-        if (colorSettings) {
-            const settings = hueShift === null ? colorSettings : { ...colorSettings, hueShift };
-            return generateColorLUT(settings, SYMMETRY_DATA);
-        }
-        if (lut && lut.length === 128 * 2 * 4) {
-            if (!hueShift) return lut;
-            const shifted = new Uint8Array(lut);
-            for (let i = 0; i < shifted.length; i += 4) {
-                const rgb = rotateHue([shifted[i], shifted[i + 1], shifted[i + 2]], hueShift);
-                shifted[i] = rgb[0]; shifted[i + 1] = rgb[1]; shifted[i + 2] = rgb[2];
-            }
-            return shifted;
-        }
-        if (customGradient) {
-            return generateColorLUT({ mode: 'gradient', customGradient, hueShift: hueShift || 0 }, SYMMETRY_DATA);
-        }
-        let activePreset = palette;
-        if (!PRESET_PALETTES[activePreset]) {
-            if (activePreset !== 'default') {
-                // No element name: this renderer backs both `<hexlife-world>` and `<hexlife-grid>`.
-                console.warn(`HexLife: unknown palette "${palette}", using "default".`);
-            }
-            activePreset = 'default';
-        }
-        // `flickerProofPresets` blacks out the two entries that make a palette strobe — rule 0 firing
-        // a birth and rule 127 firing a death — so a cell that is about to change does not flash a
-        // full-brightness frame first. It is the explorer's "Prevent birth/death flash", and it only
-        // means anything in preset mode there too: the branches above are a host's own colors, and
-        // silently rewriting two of them is not ours to do.
-        return generateColorLUT(
-            { mode: 'preset', activePreset, flickerProofPresets: !!flickerProof, hueShift: hueShift || 0 },
-            SYMMETRY_DATA,
-        );
+    _resolveLUT(opts) {
+        // No element name in the warning: this renderer backs both `<hexlife-world>` and
+        // `<hexlife-grid>`.
+        return resolveEmbedLUT(opts, 'HexLife');
     }
 
     /**

@@ -138,6 +138,9 @@ describe('spacetime view is free until it is used (#40 §2.1)', () => {
         const created = [
             ...view.matchAll(/gl\.create(\w+)\(/g),
             ...read('src/rendering/spacetime/SpacetimeVolume.js').matchAll(/gl\.create(\w+)\(/g),
+            // The shared march too: it compiles the program through WebGLUtils and otherwise takes
+            // nothing, so splitting it out of this module must not have smuggled in an allocation.
+            ...read('src/rendering/spacetime/SpacetimeCore.js').matchAll(/gl\.create(\w+)\(/g),
         ].map((m) => m[1]);
         expect(new Set(created)).toEqual(new Set(['Texture']));
     });
@@ -290,7 +293,7 @@ describe('the texture ring mirrors the scrub ring (#40 Phase 2)', () => {
 
     it('drops the recorded future on a truncate without touching a texel', () => {
         for (let tick = 1; tick <= 4; tick++) volume.push(layerFor(tick), tick);
-        gl.clear();
+        gl.clearCalls();
         expect(volume.truncate(2)).toBe(2);
         expect(volume.length).toBe(2);
         expect(volume.head).toBe(2);
@@ -305,7 +308,7 @@ describe('the texture ring mirrors the scrub ring (#40 Phase 2)', () => {
 
     it('empties on a reset so the object vanishes and regrows', () => {
         for (let tick = 1; tick <= 3; tick++) volume.push(layerFor(tick), tick);
-        gl.clear();
+        gl.clearCalls();
         volume.reset();
         expect(volume.isEmpty).toBe(true);
         expect(volume.length).toBe(0);
@@ -413,7 +416,7 @@ describe('the ray-march shader', () => {
 
     it('draws from gl_VertexID so the pass owns no buffers', () => {
         expect(read('shaders/spacetime_vertex.glsl')).toContain('gl_VertexID');
-        expect(read('src/rendering/spacetime/SpacetimeView.js')).toContain('gl.drawArrays(gl.TRIANGLES, 0, 3)');
+        expect(read('src/rendering/spacetime/SpacetimeCore.js')).toContain('gl.drawArrays(gl.TRIANGLES, 0, 3)');
     });
 
     it('unwraps the ring rather than requiring the layers be stored in order', () => {
