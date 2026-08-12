@@ -1,4 +1,8 @@
 import * as Config from './config.js';
+// The proxy otherwise reports upward through `worldManagerCallbacks`. The spacetime layer stream is
+// the one exception: it carries transferred ArrayBuffers straight to the renderer, and threading
+// them through WorldManager would add a hop that owns nothing and can only copy or drop them.
+import { EventBus, EVENTS } from '../services/EventBus.js';
 
 const SEED_INVALIDATING_COMMANDS = new Set([
     'LOAD_STATE',
@@ -127,6 +131,44 @@ export class WorldProxy {
                 }
                 this.renderDirty = true;
                 this.onUpdate(this.worldIndex, 'state');
+                break;
+            }
+            // --- Spacetime volume stream (#40) ------------------------------
+            // Only ever arrives while the spacetime view is open and this world is selected, so the
+            // four cases below are dead weight in every other session. Forwarded straight to the
+            // EventBus rather than stored: the volume lives in GPU memory inside the lazily loaded
+            // projection, and holding a second copy here would double a cost the plan sizes in
+            // tens of megabytes.
+            case 'SPACETIME_LAYER': {
+                EventBus.dispatch(EVENTS.SPACETIME_LAYER, {
+                    worldIndex: this.worldIndex,
+                    tick: data.tick,
+                    layerBuffer: data.layerBuffer,
+                    // The renderer returns the buffer here once it has been uploaded, so the worker
+                    // refills it on the next tick instead of allocating one per tick.
+                    reclaim: (buffer) => this._reclaimBuffer(buffer),
+                });
+                break;
+            }
+            case 'SPACETIME_BACKFILL': {
+                EventBus.dispatch(EVENTS.SPACETIME_BACKFILL, {
+                    worldIndex: this.worldIndex,
+                    count: data.count,
+                    numCells: data.numCells,
+                    buildMs: data.buildMs,
+                    layersBuffer: data.layersBuffer,
+                });
+                break;
+            }
+            case 'SPACETIME_RESET': {
+                EventBus.dispatch(EVENTS.SPACETIME_RESET, { worldIndex: this.worldIndex });
+                break;
+            }
+            case 'SPACETIME_TRUNCATE': {
+                EventBus.dispatch(EVENTS.SPACETIME_TRUNCATE, {
+                    worldIndex: this.worldIndex,
+                    length: data.length,
+                });
                 break;
             }
             case 'STATS_UPDATE': {
@@ -415,6 +457,15 @@ export class WorldProxy {
     resumeHistory() { this.sendCommand('STATE_HISTORY_RESUME', {}); }
     // Advance the live sim exactly one tick while paused (forward step past the recorded tip).
     stepHistoryLive() { this.sendCommand('STATE_HISTORY_STEP_LIVE', {}); }
+    // --- Spacetime volume stream (#40, selected world + open view only) -----
+    // Arm/disarm the per-tick layer stream. Enabling also makes the worker ship the frames the scrub
+    // ring already holds, so the object appears grown instead of building up over 240 ticks.
+    setSpacetimeCapture(enabled) { this.sendCommand('SET_SPACETIME_CAPTURE', { enabled }); }
+    // Hand a consumed spacetime layer buffer back for reuse (same ping-pong as STATE_UPDATE's).
+    _reclaimBuffer(buffer) {
+        if (!buffer || buffer.byteLength === 0) return;
+        this.worker.postMessage({ type: 'RECLAIM_BUFFERS', data: { buffers: [buffer] } }, [buffer]);
+    }
     applyBrush(col, row, brushSize) {
         this.sendCommand('APPLY_BRUSH', { col, row, brushSize });
     }

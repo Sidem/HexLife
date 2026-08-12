@@ -715,11 +715,16 @@ let spacetimeLoad = null;
 
 function _loadSpacetimeView() {
     if (spacetimeView || spacetimeLoad || !gl) return spacetimeLoad;
+    // Subscribe BEFORE awaiting the chunk, so the stream is wired by the time the worker is armed.
+    _subscribeSpacetimeStream();
     spacetimeLoad = import('./spacetime/SpacetimeView.js')
         .then(({ createSpacetimeView }) => {
             spacetimeView = createSpacetimeView(gl);
             spacetimeLoad = null;
             composeDirty = true; // the first frame of the mode was drawn flat while this loaded
+            // Only now can a layer be stored. SpacetimeCaptureController waits for this before it
+            // arms the worker, so the backfill and the live stream arrive as one unbroken sequence.
+            EventBus.dispatch(EVENTS.SPACETIME_VIEW_READY);
             return spacetimeView;
         })
         .catch((error) => {
@@ -734,6 +739,48 @@ function _releaseSpacetimeVolume() {
     spacetimeView?.releaseVolume();
 }
 
+/**
+ * Route the worker's layer stream into the volume (#40 Phase 2).
+ *
+ * Registered on the first switch into the mode rather than in `initRenderer`, so a session that
+ * never opens it holds not even a subscription (#40 §2.1). Each arriving layer dirties the
+ * composition — that is what makes the object grow live rather than on the next unrelated redraw.
+ */
+let spacetimeStreamSubscribed = false;
+function _subscribeSpacetimeStream() {
+    if (spacetimeStreamSubscribed) return;
+    spacetimeStreamSubscribed = true;
+    EventBus.subscribe(EVENTS.SPACETIME_LAYER, ({ layerBuffer, tick, reclaim }) => {
+        const bytes = new Uint8Array(layerBuffer);
+        spacetimeView?.pushLayer(bytes, tick);
+        composeDirty = true;
+        // Hand the buffer straight back so the worker refills it instead of allocating per tick.
+        reclaim?.(layerBuffer);
+    });
+    EventBus.subscribe(EVENTS.SPACETIME_BACKFILL, ({ layersBuffer, count, buildMs }) => {
+        spacetimeView?.backfill(new Uint8Array(layersBuffer), count, buildMs);
+        composeDirty = true;
+    });
+    EventBus.subscribe(EVENTS.SPACETIME_RESET, () => {
+        spacetimeView?.resetVolume();
+        composeDirty = true;
+    });
+    EventBus.subscribe(EVENTS.SPACETIME_TRUNCATE, ({ length }) => {
+        spacetimeView?.truncate(length);
+        composeDirty = true;
+    });
+    // The transport bar's position IS the cross-section plane — one piece of state, two surfaces.
+    EventBus.subscribe(EVENTS.STATE_HISTORY_CHANGED, ({ offset, isScrubbing }) => {
+        if (!spacetimeView) return;
+        spacetimeView.setScrub({ offset, isScrubbing });
+        composeDirty = true;
+    });
+    EventBus.subscribe(EVENTS.SPACETIME_SETTINGS_CHANGED, (settings) => {
+        spacetimeView?.setOptions(settings);
+        composeDirty = true;
+    });
+}
+
 function drawSpacetime(viewRect = layoutCache.selectedView, surfaceHeight = gl?.canvas?.height) {
     if (!spacetimeView || !viewRect || !surfaceHeight || !hexLUTTexture) return false;
     return spacetimeView.draw({
@@ -745,8 +792,18 @@ function drawSpacetime(viewRect = layoutCache.selectedView, surfaceHeight = gl?.
 }
 
 /**
- * #40 Phase 1 gate: measure the ray-march frame cost. Exposed on `appContext.spacetimeBench` for
- * `?headless=1` sessions; loads the spacetime chunk on demand exactly like entering the mode does.
+ * What the spacetime projection currently holds — depth, live layer count, ring head, tip tick,
+ * upload count, last backfill cost. `?headless=1` reads it to check the volume against the flat
+ * view tick-for-tick and to prove a palette change re-uploads nothing (#40 Phase 2's gate).
+ * Null until the mode has been opened at least once, which is itself part of the contract.
+ */
+export function getSpacetimeInfo() {
+    return spacetimeView?.getInfo() ?? null;
+}
+
+/**
+ * #40's frame-time gate: measure the ray-march frame cost. Exposed on `appContext.spacetimeBench`
+ * for `?headless=1` sessions; loads the spacetime chunk on demand exactly like entering the mode.
  */
 export async function runSpacetimeBenchmark(options = {}) {
     const view = spacetimeView || await _loadSpacetimeView();

@@ -207,6 +207,18 @@ export const EVENTS = {
     VIEW_MODE_CHANGED: 'renderer:viewModeChanged',
     /** @param {{offOpacity: number, radiusRatio: number, autoRotate: boolean, rotationSpeed: number}} data - Persisted torus appearance/motion settings changed. */
     TORUS_SETTINGS_CHANGED: 'renderer:torusSettingsChanged',
+    /** @param {{layerAlpha: number, depth: number}} data - Persisted spacetime-volume appearance settings changed (#40). */
+    SPACETIME_SETTINGS_CHANGED: 'renderer:spacetimeSettingsChanged',
+    /** @event Emitted with no payload once the lazily loaded spacetime projection is compiled and its volume can accept layers. The worker's layer stream is only armed after this, so no layer is ever posted into a view that cannot store it (#40 Phase 2). */
+    SPACETIME_VIEW_READY: 'renderer:spacetimeViewReady',
+    /** @param {{worldIndex: number, tick: number, layerBuffer: ArrayBuffer}} data - One retained tick of the selected world, packed as `rule * 2 + state` per cell. Only posted while spacetime capture is armed. */
+    SPACETIME_LAYER: 'simulation:spacetimeLayer',
+    /** @param {{worldIndex: number, count: number, numCells: number, buildMs: number, layersBuffer: ArrayBuffer}} data - The frames the scrub ring already held when the view opened, oldest → newest. */
+    SPACETIME_BACKFILL: 'simulation:spacetimeBackfill',
+    /** @param {{worldIndex: number}} data - The recorded timeline was discarded (reset/load/ruleset change); the volume must empty and regrow. */
+    SPACETIME_RESET: 'simulation:spacetimeReset',
+    /** @param {{worldIndex: number, length: number}} data - The recorded future beyond a scrub point was dropped on resume; the volume must shrink to `length` layers. */
+    SPACETIME_TRUNCATE: 'simulation:spacetimeTruncate',
 
     
     /** @param {boolean} isPaused - The desired pause state. */

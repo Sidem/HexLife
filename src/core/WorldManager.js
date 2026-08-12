@@ -12,6 +12,7 @@ import { encodeWorldCode } from './WorldCodec.js';
 import { ThumbnailBakeService } from './ThumbnailBakeService.js';
 import { ExploreSessionCoordinator } from './ExploreSessionCoordinator.js';
 import { ScrubHistoryController } from './ScrubHistoryController.js';
+import { SpacetimeCaptureController } from './SpacetimeCaptureController.js';
 import { rulesetToHex, hexToRuleset, findHexagonsInNeighborhood, cellsToBase64, rulesetName, getGridCenterWorld } from '../utils/utils.js';
 import { parseStateFile } from '../utils/stateFile.js';
 import { stateLibraryService } from '../services/StateLibraryService.js';
@@ -29,6 +30,8 @@ export class WorldManager {
         // State-history scrub-back (selected world) is coordinated by ScrubHistoryController, which owns
         // the view position + isScrubbing; the select-world and pause paths call into it.
         this.scrubHistoryController = new ScrubHistoryController(this);
+        // The same ring's GPU mirror (#40). Idle unless the spacetime projection is actually on screen.
+        this.spacetimeCaptureController = new SpacetimeCaptureController(this);
         this.deterministic = PersistenceService.loadUISetting('deterministic', true); // Add this
         this._hoverAffectedIndicesSet = new Set();
         this.isEntropySamplingEnabled = PersistenceService.loadUISetting('entropySamplingEnabled', false);

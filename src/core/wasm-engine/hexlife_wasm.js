@@ -244,12 +244,25 @@ export class World {
         return ret >>> 0;
     }
     /**
+     * Pack the current generation into the staging buffer as `rule_index * 2 + state`.
+     */
+    pack_render_layer() {
+        wasm.world_pack_render_layer(this.__wbg_ptr);
+    }
+    /**
      * Hamming distance between the main lane and the probe lane (number of differing cells). Zero
      * when no probe is active.
      * @returns {number}
      */
     probe_hamming() {
         const ret = wasm.world_probe_hamming(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @returns {number}
+     */
+    render_layer_ptr() {
+        const ret = wasm.world_render_layer_ptr(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -321,6 +334,14 @@ export class World {
     run_tick() {
         const ret = wasm.world_run_tick(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Allocate or drop the spacetime staging buffer. Idempotent. **Allocating**: may detach every
+     * JavaScript view over Wasm memory, so rebuild them immediately after.
+     * @param {boolean} enabled
+     */
+    set_render_layer_enabled(enabled) {
+        wasm.world_set_render_layer_enabled(this.__wbg_ptr, enabled);
     }
     /**
      * Spatial-order join-count statistic over the current state buffer (auto-explore spatial term).

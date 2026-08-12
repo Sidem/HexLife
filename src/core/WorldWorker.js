@@ -57,6 +57,26 @@ let historyCaptureEnabled = false;
 let isScrubbing = false;
 let scrubOffset = 0; // tip-relative position the user is currently viewing (0 = live present)
 
+// --- Spacetime view layer stream (#40) --------------------------------------
+// The spacetime projection draws the SAME ring above as a 3D volume, one retained tick per texture
+// layer. The ring itself is worker-private and always has been, so this is a second, GPU-shaped view
+// of it: while enabled, every advancing tick packs `rule * 2 + state` in Rust and ships those bytes
+// to the main thread, and enabling ships the frames the ring already holds so the object appears
+// grown rather than building from empty over 240 ticks.
+//
+// It must originate HERE, in the tick loop, and not in the renderer: runTickBatch runs many ticks per
+// STATE_UPDATE, so anything derived on the main thread silently drops layers at speed (#40 §1.4).
+//
+// Everything below is gated on this flag, which the main thread only sets while the selected world is
+// actually being drawn as a volume. Off, the cost is one `if` per tick and nothing else.
+let spacetimeCaptureEnabled = false;
+// Whether Rust has actually sized the staging buffer. Distinct from the flag above because the main
+// thread can arm the stream BEFORE this worker has finished booting its Wasm world (every UI surface
+// mounts ahead of the workers — see AGENTS.md § Gotchas), and a view built over an unallocated
+// buffer would read out of bounds. The request is remembered and applied at the end of INIT.
+let renderLayerAllocated = false;
+let jsRenderLayerArray = null;
+
 let isCyclePlaybackMode = false;
 let isDetectingCycle = false;
 let detectedCycle = [];
@@ -123,6 +143,12 @@ function refreshSimViews() {
     jsNextRuleIndexArray = new Uint8Array(mem, wasm_world.next_rule_indices_ptr(), n);
     ruleset = new Uint8Array(mem, wasm_world.ruleset_ptr(), 128);
     ruleUsageCounters = new Uint32Array(mem, wasm_world.rule_usage_counters_ptr(), 128);
+    // The spacetime staging buffer is opt-in and usually absent, so this view is usually null. The
+    // flag is the source of truth rather than a Wasm round trip: the worker is the thing that turned
+    // the buffer on, and asking back would only buy an export every consumer of the crate pays for.
+    jsRenderLayerArray = renderLayerAllocated
+        ? new Uint8Array(mem, wasm_world.render_layer_ptr(), n)
+        : null;
 }
 
 // Copies a view's bytes into a fresh, transferable ArrayBuffer. Required because the views are
@@ -138,7 +164,10 @@ function copyOutBuffer(view) {
 // In steady state two pairs of buffers ping-pong between worker and main thread with zero
 // per-frame allocation. Bounded so a lagging/stalled main thread can't grow it without limit.
 let cellBufferPool = [];
-const MAX_POOLED_BUFFERS = 4; // 2 in flight + slack
+// 2 STATE_UPDATE buffers in flight + 1 spacetime layer (#40, only while that view is open) + slack.
+// This is a CAP, not a reservation: the pool is empty until the main thread returns something, so a
+// session that never opens the spacetime view never holds the extra buffer.
+const MAX_POOLED_BUFFERS = 6;
 
 // Pop a pooled cell buffer of the current NUM_CELLS size, discarding any stale-sized leftovers
 // (e.g. survivors of a grid-dimension change); allocate fresh only when the pool can't supply one.
@@ -389,6 +418,72 @@ function resetStateHistory() {
     stateHistory.clear();
     isScrubbing = false;
     scrubOffset = 0;
+    // The volume mirrors this ring, so the same discontinuity must empty it: the object vanishes and
+    // regrows from the new timeline rather than showing two spliced together.
+    if (spacetimeCaptureEnabled) self.postMessage({ type: 'SPACETIME_RESET', worldIndex });
+}
+
+// --- Spacetime layer stream helpers (#40) -----------------------------------
+
+// Bring the Rust staging buffer in line with `spacetimeCaptureEnabled`, and on arming, ship the ring
+// the world already has. Split out of the command handler because INIT has to run it too: an arm
+// that arrived before this worker booted is remembered, not dropped.
+function applySpacetimeCapture() {
+    if (!wasm_world) return;
+    if (renderLayerAllocated === spacetimeCaptureEnabled) return;
+    wasm_world.set_render_layer_enabled(spacetimeCaptureEnabled);
+    renderLayerAllocated = spacetimeCaptureEnabled;
+    refreshSimViews(); // the allocation above may have grown Wasm memory and detached every view
+    if (spacetimeCaptureEnabled) sendSpacetimeBackfill();
+}
+
+// Pack the current generation into the Rust staging buffer and ship a copy as one texture layer.
+// The copy is unavoidable (Wasm linear memory can never be transferred), but it comes from the same
+// transfer-back pool STATE_UPDATE uses, so the steady state allocates nothing: the main thread posts
+// each consumed layer buffer straight back via RECLAIM_BUFFERS.
+function sendSpacetimeLayer() {
+    if (!wasm_world || !jsRenderLayerArray) return;
+    wasm_world.pack_render_layer(); // one pass over num_cells in Rust; never allocates
+    const layerBuffer = acquireCellBuffer();
+    new Uint8Array(layerBuffer).set(jsRenderLayerArray);
+    self.postMessage(
+        { type: 'SPACETIME_LAYER', worldIndex, tick: worldTickCounter, layerBuffer },
+        [layerBuffer],
+    );
+}
+
+// Ship the frames the ring ALREADY holds, oldest → newest, as one contiguous block. Without this the
+// object would start empty on every enable and take a full ring (240 ticks) to grow — the history is
+// already recorded, so making the user re-earn it would be theatre.
+//
+// This is the one place a per-cell JavaScript loop is acceptable: it runs once, on an explicit user
+// action, outside the tick path. The live stream packs in Rust (#40 §2.4). `rules` copies as a
+// memcpy; only the bit-packed state has to be spread back out a cell at a time.
+function sendSpacetimeBackfill() {
+    const count = stateHistory.length;
+    const numCells = workerConfig.NUM_CELLS;
+    const started = performance.now();
+    const bytes = new Uint8Array(count * numCells);
+    for (let frame = 0; frame < count; frame++) {
+        // at() is tip-relative; walk it backwards so `frame` counts oldest → newest.
+        const recorded = stateHistory.at(count - 1 - frame);
+        if (!recorded) continue;
+        const base = frame * numCells;
+        const layer = bytes.subarray(base, base + numCells);
+        layer.set(recorded.rules);
+        const packed = recorded.state;
+        for (let i = 0; i < numCells; i++) {
+            layer[i] = ((layer[i] & 0x7f) << 1) | ((packed[i >> 3] >> (i & 7)) & 1);
+        }
+    }
+    self.postMessage({
+        type: 'SPACETIME_BACKFILL',
+        worldIndex,
+        count,
+        numCells,
+        buildMs: performance.now() - started,
+        layersBuffer: bytes.buffer,
+    }, [bytes.buffer]);
 }
 
 // Write the frame `offset` ticks back from the tip into the live buffers and report it. The state
@@ -417,6 +512,11 @@ function scrubToOffset(offset) {
 function resumeScrub() {
     if (!isScrubbing) return;
     stateHistory.truncateToOffset(scrubOffset);
+    // The discarded future must leave the volume too — in spacetime view this is the top of the
+    // object visibly disappearing at the moment you resume from a scrub.
+    if (spacetimeCaptureEnabled) {
+        self.postMessage({ type: 'SPACETIME_TRUNCATE', worldIndex, length: stateHistory.length });
+    }
     isScrubbing = false;
     scrubOffset = 0;
     recordChecksum(stateChecksum()); // reseed the cycle-detection window from the resumed frame
@@ -439,6 +539,7 @@ function stepLive() {
     const newChecksum = stateChecksum();
     recordChecksum(newChecksum);
     if (historyCaptureEnabled) captureHistoryFrame(activeCount);
+    if (spacetimeCaptureEnabled) sendSpacetimeLayer();
     const ratio = workerConfig.NUM_CELLS > 0 ? activeCount / workerConfig.NUM_CELLS : 0;
     lastSentChecksum = newChecksum;
     lastKnownStats = buildStats(
@@ -749,6 +850,8 @@ function runTick() {
     // world that was already cycling when selected still gets a scrub-able history (the ring just
     // fills with the loop frames). Eval bursts use evalTick, a separate path that never captures.
     if (historyCaptureEnabled) captureHistoryFrame(activeCount);
+    // Same gate, same place: one layer per advancing tick, so a batched run cannot skip any.
+    if (spacetimeCaptureEnabled) sendSpacetimeLayer();
 
     const newStateChecksum = stateChecksum();
 
@@ -1363,7 +1466,10 @@ self.onmessage = async function(event) {
 
             self.postMessage({ type: 'INIT_ACK', worldIndex: worldIndex });
             sendGridUpdate();
-            sendStatsUpdate(true); 
+            sendStatsUpdate(true);
+            // A spacetime arm that arrived while this worker was still booting has been remembered
+            // but not acted on; the Wasm world exists now, so honour it (#40 Phase 2).
+            applySpacetimeCapture();
             break;
         }
 
@@ -1476,6 +1582,16 @@ self.onmessage = async function(event) {
             if (enable === historyCaptureEnabled) break;
             historyCaptureEnabled = enable;
             if (!enable) resetStateHistory();
+            break;
+        }
+        case 'SET_SPACETIME_CAPTURE': {
+            // Mirrors SET_HISTORY_CAPTURE: the main thread enables this on the SELECTED world only,
+            // and only while that world is actually being drawn as a volume. Enabling allocates the
+            // Rust staging buffer (the one allocating call in the whole path — every JS view over
+            // Wasm memory may have detached, hence the refresh) and ships the ring's existing frames
+            // so the object starts grown. Disabling releases the buffer and the stream stops dead.
+            spacetimeCaptureEnabled = !!(command.data && command.data.enabled);
+            applySpacetimeCapture();
             break;
         }
         case 'STATE_HISTORY_SCRUB': {

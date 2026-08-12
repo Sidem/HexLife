@@ -102,6 +102,12 @@ pub struct World {
     // separate materialized pass so the tick loop reads one byte per block instead of re-testing
     // nine for every grid row it crosses.
     block_fast: Vec<u8>,
+    // --- Spacetime render layer (roadmap #40) -------------------------------
+    // One byte per cell, `rule_index * 2 + state`, which is a direct index into the renderer's
+    // existing 128x2 colour LUT. Empty until `ensure_render_layer` is called, so a session that
+    // never opens the spacetime view pays nothing for it; see the impl block at the end of this
+    // file for why it is not simply sized in `new`.
+    render_layer: Vec<u8>,
 }
 
 /// Side length in cells of the uniformity tiles used by `run_tick`'s sparse fast path.
@@ -210,6 +216,8 @@ impl World {
             block_rows,
             block_uniform: vec![BLOCK_MIXED; block_cols * block_rows],
             block_fast: vec![BLOCK_MIXED; block_cols * block_rows],
+            // Deliberately empty: the spacetime view is opt-in and most sessions never open it.
+            render_layer: Vec::new(),
         }
     }
 
@@ -2266,3 +2274,126 @@ mod tests {
 mod solid;
 #[cfg(feature = "solid")]
 pub use solid::{solid_engine_version, WorldSolid, SOLID_ENGINE_VERSION};
+
+// -------------------------------------------------------------------------------------------
+// Spacetime render layer (roadmap #40) — appended for the same reason `mod solid` is.
+//
+// The spacetime view draws the worker's scrub-back ring as a 3D volume: one retained tick is one
+// texture layer, one cell is one byte. That byte is `rule_index * 2 + state`, which the fragment
+// shader uses as a DIRECT index into the renderer's live 128x2 colour LUT — so a palette change
+// retints the whole history with no re-upload, and there is no decode step per voxel.
+//
+// Why the packing lives here rather than in the worker: the worker would need a per-cell JavaScript
+// loop over both buffers on every tick, right next to the one `packCells` already runs. This is one
+// pass over `num_cells` in Rust instead.
+//
+// Why the buffer is not sized in `new`: Wasm linear memory grows and never shrinks, so a buffer
+// every World allocated up front would be a permanent per-world cost paid by every session,
+// including the overwhelming majority that never open the view. `set_render_layer_enabled` is the
+// opt-in and the only allocating call of the three, so JavaScript refreshes its views after it and
+// then packs per tick with no further allocation (#40 §2.5).
+//
+// `World` is otherwise untouched: `run_tick` neither reads nor writes `render_layer`, so evolution
+// stays byte-identical whether or not the view is open.
+//
+// NOTE ON THE COMMENTS BELOW. `///` doc comments on a `#[wasm_bindgen]` export are copied verbatim
+// into the generated JavaScript glue as JSDoc, which every consumer of this crate downloads — three
+// paragraphs of rationale here measured at ~550 gzip bytes on a file whose whole accepted budget is
+// 9.7 KB. Rationale therefore lives in `//` comments, which stop at the crate. Keep the `///` lines
+// to what a caller must know to use the method correctly.
+//
+// `set_render_layer_enabled` is one export rather than an ensure/release/has trio for the same
+// reason: the caller already knows whether it asked for the buffer, so it never needs to ask back.
+// Dropping the buffer does not shrink Wasm memory (nothing does), but it returns the block to the
+// allocator so a session that opens the view once is not holding it against the heap.
+#[cfg(feature = "standard")]
+#[wasm_bindgen]
+impl World {
+    /// Allocate or drop the spacetime staging buffer. Idempotent. **Allocating**: may detach every
+    /// JavaScript view over Wasm memory, so rebuild them immediately after.
+    pub fn set_render_layer_enabled(&mut self, enabled: bool) {
+        if !enabled {
+            self.render_layer = Vec::new();
+        } else if self.render_layer.len() != self.num_cells {
+            self.render_layer = vec![0u8; self.num_cells];
+        }
+    }
+
+    pub fn render_layer_ptr(&self) -> *const u8 {
+        self.render_layer.as_ptr()
+    }
+
+    // Never allocates, so the JavaScript view over `render_layer_ptr` stays valid across calls, and
+    // a no-op when the buffer has not been opted into. Rule indices are 0..=127 in normal play, but
+    // the reset/load paths flag "initial state" with 255, which would overflow the shift — so the
+    // index is masked to 7 bits, exactly matching the 128-wide LUT the shader samples.
+    /// Pack the current generation into the staging buffer as `rule_index * 2 + state`.
+    pub fn pack_render_layer(&mut self) {
+        if self.render_layer.len() != self.num_cells {
+            return;
+        }
+        let state = &self.state[..self.num_cells];
+        let rules = &self.rule_indices[..self.num_cells];
+        let out = &mut self.render_layer[..self.num_cells];
+        for i in 0..self.num_cells {
+            out[i] = ((rules[i] & 0x7f) << 1) | (state[i] & 1);
+        }
+    }
+}
+
+#[cfg(all(test, feature = "standard"))]
+mod render_layer_tests {
+    use super::*;
+
+    #[test]
+    fn opting_out_costs_nothing_and_packing_is_a_no_op() {
+        let mut world = World::new(8, 8);
+        assert_eq!(world.render_layer.capacity(), 0, "an unopened view must allocate nothing");
+        world.pack_render_layer(); // must not panic or allocate
+        assert_eq!(world.render_layer.len(), 0);
+    }
+
+    #[test]
+    fn packs_the_lut_index_and_masks_the_initial_state_flag() {
+        let mut world = World::new(4, 4);
+        world.set_render_layer_enabled(true);
+        assert_eq!(world.render_layer.len(), 16);
+        world.state[0] = 1;
+        world.rule_indices[0] = 63;
+        world.state[1] = 0;
+        world.rule_indices[1] = 63;
+        // The reset/load paths flag "initial state" with 255, which is not a rule index.
+        world.state[2] = 1;
+        world.rule_indices[2] = 255;
+        world.pack_render_layer();
+        assert_eq!(world.render_layer[0], 63 * 2 + 1);
+        assert_eq!(world.render_layer[1], 63 * 2);
+        assert_eq!(world.render_layer[2], 127 * 2 + 1);
+    }
+
+    #[test]
+    fn packing_never_reallocates_and_never_perturbs_the_tick() {
+        let mut world = World::new(16, 16);
+        world.ruleset[0] = 1;
+        world.state[5] = 1;
+        world.set_render_layer_enabled(true);
+        let pointer_before = world.render_layer.as_ptr();
+
+        // A World that packs must evolve exactly like one that does not.
+        let mut reference = World::new(16, 16);
+        reference.ruleset[0] = 1;
+        reference.state[5] = 1;
+
+        for _ in 0..25 {
+            world.run_tick();
+            world.pack_render_layer();
+            reference.run_tick();
+        }
+        assert_eq!(pointer_before, world.render_layer.as_ptr(), "the staging buffer moved");
+        assert_eq!(world.state, reference.state, "packing changed the simulation");
+        assert_eq!(world.rule_indices, reference.rule_indices);
+
+        world.set_render_layer_enabled(false);
+        assert_eq!(world.render_layer.len(), 0);
+    }
+}

@@ -4,14 +4,17 @@
   "why": "docs/SOLID-PLAN.md §3 artifact gate. The solid extrusion engine is a third Wasm artifact behind the `solid` Cargo feature, and it must cost the existing two exactly nothing. These are the sha256 digests of the default and stochastic artifacts as committed BEFORE any #39 code existed; tests/solidPhase0.test.js asserts the tracked files still hash to them.",
   "reproducible": "A clean release build of the unmodified crate on rustc 1.87.0 / wasm-pack 0.13 reproduced hexlife_wasm_bg.wasm byte-for-byte, so a mismatch here is a real change, not build noise.",
   "gotcha": "Rust bakes panic locations into the data section as (file, line, column). Inserting an item anywhere above existing code in lib.rs shifts those line numbers and changes the artifact's bytes without moving a single instruction. That is why the `mod solid` declaration is appended at the END of hexlife-wasm/src/lib.rs.",
+  "whyTheDefaultDigestsMoved": "#40 Phase 2 (2026-08-12) deliberately added `render_layer` + three exported methods to `World`, so the two DEFAULT artifacts below are re-recorded at their post-#40 digests. This does NOT weaken the #39 gate: the gate's claim is that the solid engine costs the other artifacts nothing, and the stochastic digests below are untouched from the pre-#39 recording. Re-record a default digest only alongside an owner-ruled entry in spacetime-artifact-record.json (or its successor) that says what changed and what it cost.",
   "artifacts": {
     "src/core/wasm-engine/hexlife_wasm.js": {
-      "bytes": 36442,
-      "sha256": "18a578e967105779f2dc54adedf41b1eb656c1d4fb23526532ffc6504971b3b4"
+      "bytes": 37134,
+      "sha256": "3679c4f3ec3265a7586b5765a2f7ce3c2e550f42b933059226e85108e329d99d",
+      "rerecorded": "2026-08-12, #40 Phase 2 (was 36442 / 18a578e9…)"
     },
     "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
-      "bytes": 64503,
-      "sha256": "9da653fc75c71a0f14c18e5c3d19b4e82fe6e196a096c00e5ff7023fce15897a"
+      "bytes": 65513,
+      "sha256": "c2f250e7eeb1f88497e19cd5756cd86e0a474c61bb4e1626719960cdfd498fc6",
+      "rerecorded": "2026-08-12, #40 Phase 2 (was 64503 / 9da653fc…)"
     },
     "src/core/stochastic-wasm/hexlife_stochastic_wasm.js": {
       "bytes": 20994,

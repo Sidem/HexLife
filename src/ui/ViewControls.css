@@ -55,9 +55,28 @@
     text-overflow: ellipsis;
 }
 
+/* Spacetime layer opacity (#40 Phase 3): the one appearance knob the volume exposes. Lower is more
+   see-through AND more expensive to draw — the ray saturates later — so the range stops at 0.4
+   rather than 1, past which the object is a silhouette and there is nothing left to look inside. */
+.view-controls-opacity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    color: var(--text-muted, #9a9aa2);
+    white-space: nowrap;
+}
+
+.view-controls-opacity input[type="range"] {
+    width: 74px;
+    accent-color: var(--accent, #f0c674);
+    cursor: pointer;
+}
+
 .view-controls-reset,
 .view-controls-spin,
-.view-controls-torus {
+.view-controls-torus,
+.view-controls-spacetime {
     flex-shrink: 0;
     padding: 3px 8px;
     border: 1px solid var(--border, #4a4a4a);
@@ -72,11 +91,13 @@
 
 .view-controls-reset:hover,
 .view-controls-spin:hover,
-.view-controls-torus:hover {
+.view-controls-torus:hover,
+.view-controls-spacetime:hover {
     background-color: var(--surface-3, #4a4a4a);
     border-color: var(--accent-border, #f0c674);
 }
 
+.view-controls-spacetime[aria-pressed="true"],
 .view-controls-torus[aria-pressed="true"] {
     border-color: var(--accent-border, #f0c674);
     background-color: color-mix(in srgb, var(--accent, #f0c674) 15%, transparent);

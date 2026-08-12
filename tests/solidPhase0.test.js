@@ -22,10 +22,16 @@ beforeAll(async () => {
 });
 
 describe('solid Phase-0 artifact isolation', () => {
-  it('leaves the default and stochastic artifacts byte-identical to their pre-#39 state', async () => {
+  it('leaves the default and stochastic artifacts byte-identical to their recorded digests', async () => {
     // The whole justification for a third artifact is that it costs the other two nothing. That is
     // a claim about bytes, so it is checked as one — not as a size budget, which would let a small
     // leak hide inside the tolerance.
+    //
+    // The stochastic digests are still the pre-#39 ones. The two DEFAULT digests were re-recorded
+    // for #40 Phase 2, which added a spacetime packer to `World` on purpose — see
+    // `whyTheDefaultDigestsMoved` in the baseline and spacetime-artifact-record.json for the cost.
+    // A digest may only move alongside a ruling that says so; drifting one to make this pass green
+    // is exactly the failure the pin exists to catch.
     for (const [file, expected] of Object.entries(artifactBaseline.artifacts)) {
       const bytes = await readFile(new URL(`../${file}`, import.meta.url));
       expect(bytes.byteLength, `${file} size`).toBe(expected.bytes);

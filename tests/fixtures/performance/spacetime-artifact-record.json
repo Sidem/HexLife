@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "recorded": "2026-08-12",
+  "item": "#40 Spacetime View, Phase 2",
+  "summary": "The one deliberate change #40 makes to the DEFAULT Wasm artifact, recorded with the measured cost. Kept separate from stochastic-artifact-exceptions.json on purpose: that record's stated scope is the docs/STOCHASTIC-PLAN.md §9 analysis primitives, and its owner ruling says it is not to be widened. This file adds nothing to it and claims nothing about it.",
+  "cause": "World gains one Vec<u8> field (`render_layer`) and three exported methods: `set_render_layer_enabled`, `render_layer_ptr`, `pack_render_layer`. They pack `rule_index * 2 + state` — one byte per cell, a direct index into the renderer's 128x2 colour LUT — into a staging buffer the spacetime view ships to the GPU as one texture layer per tick. docs/SPACETIME-VIEW-PLAN.md §2.4 forbids doing this in JavaScript: it would be a second per-cell loop in the worker's tick path, beside the one packCells already runs.",
+  "whyItCannotBeSplitOut": "The same reason the §9 primitives cannot. The packer reads World's own `state` and `rule_indices` in the same Wasm linear memory. A separate artifact would have to be handed a copy of both buffers every tick — strictly more cost, paid per tick instead of once per download.",
+  "whatItDoesNotCost": {
+    "stochasticArtifact": "byte-identical (sha256 09f110ed…, glue e0f1c26c…). WorldStochastic is behind its own Cargo feature and its own artifact; #40 does not touch it.",
+    "runtime": "`run_tick` neither reads nor writes `render_layer`, so evolution is unchanged whether or not the view is open (hexlife-wasm `render_layer_tests::packing_never_reallocates_and_never_perturbs_the_tick` pins it against a reference World).",
+    "memory": "`render_layer` starts EMPTY and is allocated only by `set_render_layer_enabled(true)`, which only the spacetime view calls. A session that never opens the mode allocates zero bytes for it. Wasm memory never shrinks, which is exactly why the buffer is not sized in `new`."
+  },
+  "measurement": {
+    "method": "gzip level 9, same as tests/stochasticPhase1.test.js, against the artifacts at commit 473874a (#40 Phases 0–1).",
+    "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
+      "rawBefore": 64503,
+      "rawAfter": 65513,
+      "gzipBefore": 26316,
+      "gzipAfter": 26645,
+      "gzipDelta": 329,
+      "growthPctVsAcceptedBaseline": 1.28
+    },
+    "src/core/wasm-engine/hexlife_wasm.js": {
+      "rawBefore": 36442,
+      "rawAfter": 37134,
+      "gzipBefore": 9663,
+      "gzipAfter": 9818,
+      "gzipDelta": 155,
+      "growthPctVsAcceptedBaseline": 1.60
+    },
+    "totalGzipDelta": 484,
+    "totalGzipDeltaPct": 1.35
+  },
+  "costAvoided": "The first build measured +878 gzip bytes. `///` doc comments on a `#[wasm_bindgen]` export are copied verbatim into the generated JavaScript glue as JSDoc, so three paragraphs of rationale were shipping to every consumer; moving them to `//` comments cut the glue delta from +549 to +155. An ensure/release/has trio was also collapsed into the single `set_render_layer_enabled`. Both notes are in lib.rs so the next person does not re-pay it.",
+  "ownerDecision": {
+    "date": "2026-08-12",
+    "ruling": "accepted as recorded",
+    "scope": "This record covers the two default-artifact files named above, at the exact gzip sizes named above, for #40 Phase 2 and nothing else. tests/stochasticPhase1.test.js enforces them at those sizes (+0.5% build noise, the same allowance every other file gets). Any further growth, and any other file, still fails the audit and needs its own ruling."
+  },
+  "files": {
+    "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
+      "acceptedGzipBytes": 26645
+    },
+    "src/core/wasm-engine/hexlife_wasm.js": {
+      "acceptedGzipBytes": 9818
+    }
+  }
+}
