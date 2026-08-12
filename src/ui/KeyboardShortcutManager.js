@@ -56,8 +56,11 @@ export class KeyboardShortcutManager {
             { key: ' ', displayKey: 'Space', description: 'Play / pause simulation', category: 'Global Controls', handler: () => {
                 EventBus.dispatch(EVENTS.COMMAND_TOGGLE_PAUSE);
             } },
+            // V still toggles the one projection it always toggled. Any other mode (spacetime) is
+            // reached deliberately, not by cycling through it with the flat-view hotkey.
             { key: 'v', description: 'Toggle flat / 3D torus view', category: 'Global Controls', handler: () => {
-                EventBus.dispatch(EVENTS.COMMAND_TOGGLE_TORUS_VIEW);
+                const current = this.appContext.viewMode?.get();
+                EventBus.dispatch(EVENTS.COMMAND_SET_VIEW_MODE, current === 'torus' ? 'flat' : 'torus');
             } },
             // Speed nudge (±1 tps). Hold to ramp continuously.
             { key: 'ArrowUp', repeatOnHold: true, description: 'Increase speed by 1 tps (hold to ramp)', category: 'Global Controls', handler: () => this._nudgeSpeed(1) },

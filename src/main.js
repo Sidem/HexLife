@@ -136,7 +136,12 @@ async function initialize() {
     });
 
     const app = new Application(appContext);
-    if (window.__headless) window.__hexlife = appContext; // headless-only debug handle for in-browser verification
+    if (window.__headless) {
+        window.__hexlife = appContext; // headless-only debug handle for in-browser verification
+        // #40 Phase 1 gate: `__hexlife.spacetimeBench({...})` times the ray-march. Attached only
+        // here so `initRenderer` stays clear of the spacetime path entirely.
+        appContext.spacetimeBench = Renderer.runSpacetimeBenchmark;
+    }
     if (benchmarkMode) appContext.suppressAutoTour = true;
     app.run();
 

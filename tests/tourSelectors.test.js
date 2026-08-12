@@ -165,9 +165,9 @@ function auditSelector(selector) {
  * a selector is resolved. Deliberately not a full app: this test is about the
  * selector strings, and a fatter stub would just rot.
  */
-const makeAppContext = (isMobile, torusEnabled = false) => ({
+const makeAppContext = (isMobile, viewMode = 'flat') => ({
     uiManager: { isMobile: () => isMobile, activeMobileViewName: null },
-    torusView: { getState: () => ({ enabled: torusEnabled }) },
+    viewMode: { get: () => viewMode, getState: () => ({ mode: viewMode }) },
 });
 
 const VIEWPORTS = [
@@ -291,8 +291,8 @@ describe('tour interaction semantics', () => {
     });
 
     it('requires flat view immediately before the core drawing step when torus view is active', () => {
-        const flatContext = makeAppContext(false, false);
-        const torusContext = makeAppContext(false, true);
+        const flatContext = makeAppContext(false, 'flat');
+        const torusContext = makeAppContext(false, 'torus');
         const core = getTours(torusContext).core;
         const flatStepIndex = core.findIndex((step) => step.title === 'Switch to Flat View');
         const drawStepIndex = core.findIndex((step) => step.title === 'Draw on the Grid');
@@ -301,9 +301,10 @@ describe('tour interaction semantics', () => {
         expect(flatStepIndex).toBe(drawStepIndex - 1);
         expect(flatStep.condition(flatContext)).toBe(false);
         expect(flatStep.condition(torusContext)).toBe(true);
-        expect(flatStep.advanceOn.eventName).toBe(EVENTS.TORUS_VIEW_CHANGED);
-        expect(flatStep.advanceOn.condition({ enabled: true })).toBe(false);
-        expect(flatStep.advanceOn.condition({ enabled: false })).toBe(true);
+        expect(flatStep.advanceOn.eventName).toBe(EVENTS.VIEW_MODE_CHANGED);
+        expect(flatStep.advanceOn.condition({ mode: 'torus' })).toBe(false);
+        expect(flatStep.advanceOn.condition({ mode: 'spacetime' })).toBe(false);
+        expect(flatStep.advanceOn.condition({ mode: 'flat' })).toBe(true);
         expect(typeof flatStep.showMe.action).toBe('function');
     });
 });

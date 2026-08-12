@@ -5,10 +5,26 @@ import {
     getTorusViewSettings,
     updateTorusViewSettings,
 } from '../services/TorusViewSettings.js';
+import { VIEW_MODES, isOrbitViewMode, normalizeViewMode } from '../rendering/viewModes.js';
+
+const VIEW_MODE_SETTING_KEY = 'viewMode';
+/** Pre-#40 boolean key, read once so an existing torus preference survives the enum migration. */
+const LEGACY_TORUS_SETTING_KEY = 'torusViewEnabled';
+
+/** Only the two finished projections are worth restoring on a reload (see `_loadPersistedMode`). */
+const PERSISTED_VIEW_MODES = [VIEW_MODES.FLAT, VIEW_MODES.TORUS];
+
+function _loadPersistedMode() {
+    const saved = PersistenceService.loadUISetting(VIEW_MODE_SETTING_KEY, null);
+    if (saved !== null) return normalizeViewMode(saved);
+    return PersistenceService.loadUISetting(LEGACY_TORUS_SETTING_KEY, false)
+        ? VIEW_MODES.TORUS
+        : VIEW_MODES.FLAT;
+}
 
 /**
- * On-canvas controls for the selected world's flat camera and the optional 3D torus view.
- * The flat camera is never mutated by torus mode, so returning to 2D restores the exact pan/zoom.
+ * On-canvas controls for the selected world's flat camera and the 3D projections.
+ * The flat camera is never mutated by a 3D mode, so returning to 2D restores the exact pan/zoom.
  */
 export class ViewControls extends BaseComponent {
     constructor(appContext) {
@@ -18,22 +34,22 @@ export class ViewControls extends BaseComponent {
         this.canvas = document.getElementById('hexGridCanvas');
         this.layout = null;
         this.isMobile = !!appContext.uiManager?.isMobile();
-        this.torusEnabled = !this.isMobile &&
-            PersistenceService.loadUISetting('torusViewEnabled', false);
+        this.viewMode = this.isMobile ? VIEW_MODES.FLAT : _loadPersistedMode();
         this.torusSettings = getTorusViewSettings();
         this.autoRotate = this.torusSettings.autoRotate;
         this._build();
         this._wire();
 
         // Headless/local QA can inspect and switch the view without reaching into renderer internals.
-        this.appContext.torusView = {
+        this.appContext.viewMode = {
+            get: () => this.viewMode,
+            set: (mode) => this.setViewMode(mode),
             getState: () => ({
-                enabled: this.torusEnabled,
+                mode: this.viewMode,
                 ...this.torusSettings,
             }),
-            setEnabled: (enabled) => this.setTorusEnabled(enabled),
         };
-        EventBus.dispatch(EVENTS.TORUS_VIEW_CHANGED, { enabled: this.torusEnabled });
+        EventBus.dispatch(EVENTS.VIEW_MODE_CHANGED, { mode: this.viewMode });
         this.render();
     }
 
@@ -66,13 +82,13 @@ export class ViewControls extends BaseComponent {
             this.worldManager.resetSelectedCamera();
         });
         this._addDOMListener(this.torusButton, 'click', () => {
-            this.setTorusEnabled(!this.torusEnabled);
+            this.setViewMode(this.viewMode === VIEW_MODES.TORUS ? VIEW_MODES.FLAT : VIEW_MODES.TORUS);
         });
         this._addDOMListener(this.spinButton, 'click', () => {
             updateTorusViewSettings({ autoRotate: !this.autoRotate });
         });
-        this._subscribeToEvent(EVENTS.COMMAND_TOGGLE_TORUS_VIEW, () => {
-            this.setTorusEnabled(!this.torusEnabled);
+        this._subscribeToEvent(EVENTS.COMMAND_SET_VIEW_MODE, (mode) => {
+            this.setViewMode(mode);
         });
         this._subscribeToEvent(EVENTS.CAMERA_CHANGED, () => this.render());
         this._subscribeToEvent(EVENTS.SELECTED_WORLD_CHANGED, () => this.render());
@@ -84,14 +100,14 @@ export class ViewControls extends BaseComponent {
         this._subscribeToEvent(EVENTS.UI_MODE_CHANGED, () => {
             const wasMobile = this.isMobile;
             this.isMobile = !!this.appContext.uiManager?.isMobile();
-            if (this.isMobile && this.torusEnabled) {
-                // Desktop-only Phase 1: leave the saved desktop preference intact while disabling
-                // the live mode for a narrow/coarse-pointer layout.
-                this.torusEnabled = false;
-                EventBus.dispatch(EVENTS.TORUS_VIEW_CHANGED, { enabled: false });
+            if (this.isMobile && this.viewMode !== VIEW_MODES.FLAT) {
+                // Desktop-only: leave the saved desktop preference intact while dropping the live
+                // 3D mode for a narrow/coarse-pointer layout.
+                this.viewMode = VIEW_MODES.FLAT;
+                EventBus.dispatch(EVENTS.VIEW_MODE_CHANGED, { mode: VIEW_MODES.FLAT });
             } else if (wasMobile && !this.isMobile) {
-                this.torusEnabled = PersistenceService.loadUISetting('torusViewEnabled', false);
-                EventBus.dispatch(EVENTS.TORUS_VIEW_CHANGED, { enabled: this.torusEnabled });
+                this.viewMode = _loadPersistedMode();
+                EventBus.dispatch(EVENTS.VIEW_MODE_CHANGED, { mode: this.viewMode });
             }
             this.render();
         });
@@ -101,13 +117,17 @@ export class ViewControls extends BaseComponent {
         });
     }
 
-    setTorusEnabled(enabled) {
+    setViewMode(mode) {
         if (this.appContext.uiManager?.isMobile()) return;
-        const next = !!enabled;
-        if (this.torusEnabled === next) return;
-        this.torusEnabled = next;
-        PersistenceService.saveUISetting('torusViewEnabled', next);
-        EventBus.dispatch(EVENTS.TORUS_VIEW_CHANGED, { enabled: next });
+        const next = normalizeViewMode(mode);
+        if (this.viewMode === next) return;
+        this.viewMode = next;
+        // Spacetime is reachable (headless hook / command) but deliberately not restored on reload:
+        // it is an unfinished projection, and stranding a session in it would be a trap.
+        if (PERSISTED_VIEW_MODES.includes(next)) {
+            PersistenceService.saveUISetting(VIEW_MODE_SETTING_KEY, next);
+        }
+        EventBus.dispatch(EVENTS.VIEW_MODE_CHANGED, { mode: next });
         this.render();
     }
 
@@ -125,18 +145,22 @@ export class ViewControls extends BaseComponent {
         if (this.isMobile) return;
 
         const zoomed = zoom > 1.01;
-        this.element.classList.toggle('is-torus', this.torusEnabled);
-        this.element.classList.toggle('is-flat-at-rest', !this.torusEnabled && !zoomed);
-        this.modeLabel.classList.toggle('hidden', !this.torusEnabled);
-        this.zoomLabel.classList.toggle('hidden', this.torusEnabled || !zoomed);
-        this.resetButton.classList.toggle('hidden', this.torusEnabled || !zoomed);
-        this.spinButton.classList.toggle('hidden', !this.torusEnabled);
-        this.torusButton.textContent = this.torusEnabled ? 'Flat view' : '3D torus';
-        this.torusButton.setAttribute('aria-pressed', String(this.torusEnabled));
+        const isTorus = this.viewMode === VIEW_MODES.TORUS;
+        const isOrbit = isOrbitViewMode(this.viewMode);
+        this.element.classList.toggle('is-torus', isOrbit);
+        this.element.classList.toggle('is-flat-at-rest', !isOrbit && !zoomed);
+        this.modeLabel.classList.toggle('hidden', !isOrbit);
+        // Only ever named while a 3D mode is showing; flat leaves the label hidden and untouched.
+        this.modeLabel.textContent = this.viewMode === VIEW_MODES.SPACETIME ? 'Spacetime' : 'Torus';
+        this.zoomLabel.classList.toggle('hidden', isOrbit || !zoomed);
+        this.resetButton.classList.toggle('hidden', isOrbit || !zoomed);
+        this.spinButton.classList.toggle('hidden', !isOrbit);
+        this.torusButton.textContent = isTorus ? 'Flat view' : '3D torus';
+        this.torusButton.setAttribute('aria-pressed', String(isTorus));
         this.spinButton.textContent = this.autoRotate ? 'Pause spin' : 'Resume spin';
         this.spinButton.setAttribute('aria-pressed', String(this.autoRotate));
         this.zoomLabel.textContent = `${zoom.toFixed(1)}×`;
-        this.hint.textContent = this.torusEnabled
+        this.hint.textContent = isOrbit
             ? 'Drag to orbit · Wheel to dolly'
             : zoomed ? 'Ctrl-drag or middle-drag to pan' : '';
         this.hint.classList.toggle('hidden', !this.hint.textContent);

@@ -157,7 +157,7 @@ export const getTours = (appContext) => {
 
     const showMeDrawMode = () => EventBus.dispatch(EVENTS.COMMAND_SET_INTERACTION_MODE, 'draw');
 
-    const showMeFlatView = () => appContext.torusView?.setEnabled(false);
+    const showMeFlatView = () => appContext.viewMode?.set('flat');
 
     const showMeCloneAndMutate = () => EventBus.dispatch(EVENTS.COMMAND_EXECUTE_CLONE_AND_MUTATE);
 
@@ -218,9 +218,9 @@ export const getTours = (appContext) => {
     }, {
         element: '.view-controls-torus',
         title: 'Switch to Flat View',
-        condition: (appContext) => appContext.torusView?.getState().enabled === true,
+        condition: (appContext) => appContext.viewMode?.getState().mode === 'torus',
         content: "Drawing happens on the flat grid. Select <span class=\"onboarding-highlight-text\">Flat view</span> before continuing.",
-        advanceOn: { type: 'event', eventName: EVENTS.TORUS_VIEW_CHANGED, condition: ({ enabled }) => !enabled },
+        advanceOn: { type: 'event', eventName: EVENTS.VIEW_MODE_CHANGED, condition: ({ mode }) => mode === 'flat' },
         showMe: { text: 'Switch for me', action: showMeFlatView }
     }, {
         element: '#selected-world-guide',

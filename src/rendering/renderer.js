@@ -10,6 +10,7 @@ import {
     wrapAngle,
 } from './torusMath.js';
 import { getTorusViewSettings } from '../services/TorusViewSettings.js';
+import { VIEW_MODES, isOrbitViewMode, normalizeViewMode } from './viewModes.js';
 
 // eslint-disable-next-line import/no-unresolved
 import hexVertexShaderSource from '../../shaders/vertex.glsl?raw';
@@ -71,8 +72,11 @@ const TORUS_SURFACE_PASS = Object.freeze({
     LIVE: 1,
     OFF: 2,
 });
+// Which projection the selected view is drawn through. `torusView` below keeps the orbit-camera
+// state (shared by every 3D mode) plus the torus-only appearance settings; the *mode* is this
+// enum, never a boolean, so a third projection needs no new flag (#40).
+let viewMode = VIEW_MODES.FLAT;
 const torusView = {
-    enabled: false,
     yaw: 0.55,
     pitch: 0.42,
     distance: 6.5,
@@ -203,8 +207,8 @@ export function initRenderer(canvasElement, appContext) {
         updateColorLUTTexture(effective, appContext.worldManager.getSymmetryData());
         appContext.worldManager.markAllWorldsRenderDirty();
     });
-    EventBus.subscribe(EVENTS.TORUS_VIEW_CHANGED, ({ enabled }) => {
-        setTorusViewEnabled(enabled);
+    EventBus.subscribe(EVENTS.VIEW_MODE_CHANGED, ({ mode }) => {
+        setViewMode(mode);
     });
     EventBus.subscribe(EVENTS.TORUS_SETTINGS_CHANGED, (settings) => {
         setTorusViewSettings(settings);
@@ -569,8 +573,12 @@ function renderMainScene(appContext, fbosDrawn) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     if (selectedWorldIndex >= 0 && selectedWorldIndex < worldFBOs.length) {
-        const torusDrawn = torusView.enabled && drawTorus(appContext);
-        if (!torusDrawn) {
+        // Each 3D projection may decline (missing data, program not compiled yet); the flat FBO
+        // quad is always the fallback, so a mode that cannot draw shows the grid instead of nothing.
+        let projectionDrawn = false;
+        if (viewMode === VIEW_MODES.TORUS) projectionDrawn = drawTorus(appContext);
+        else if (viewMode === VIEW_MODES.SPACETIME) projectionDrawn = drawSpacetime();
+        if (!projectionDrawn) {
             gl.useProgram(quadShaderProgram);
             gl.bindVertexArray(quadVAO);
             gl.activeTexture(gl.TEXTURE0);
@@ -697,6 +705,61 @@ function drawTorus(appContext, viewRect = layoutCache.selectedView, surfaceHeigh
     return true;
 }
 
+// --- Spacetime view (#40) ---------------------------------------------------
+// The whole projection — module, shaders, program, volume texture — is fetched on the first switch
+// into the mode and never before, so a session that never opens it pays nothing (#40 §2.1). On the
+// way back out only the volume texture is released; the module and its compiled program stay so a
+// second toggle is instant.
+let spacetimeView = null;
+let spacetimeLoad = null;
+
+function _loadSpacetimeView() {
+    if (spacetimeView || spacetimeLoad || !gl) return spacetimeLoad;
+    spacetimeLoad = import('./spacetime/SpacetimeView.js')
+        .then(({ createSpacetimeView }) => {
+            spacetimeView = createSpacetimeView(gl);
+            spacetimeLoad = null;
+            composeDirty = true; // the first frame of the mode was drawn flat while this loaded
+            return spacetimeView;
+        })
+        .catch((error) => {
+            console.error('Failed to load the spacetime view:', error);
+            spacetimeLoad = null;
+            return null;
+        });
+    return spacetimeLoad;
+}
+
+function _releaseSpacetimeVolume() {
+    spacetimeView?.releaseVolume();
+}
+
+function drawSpacetime(viewRect = layoutCache.selectedView, surfaceHeight = gl?.canvas?.height) {
+    if (!spacetimeView || !viewRect || !surfaceHeight || !hexLUTTexture) return false;
+    return spacetimeView.draw({
+        viewRect,
+        surfaceHeight,
+        lutTexture: hexLUTTexture,
+        camera: { yaw: torusView.yaw, pitch: torusView.pitch, distance: torusView.distance },
+    });
+}
+
+/**
+ * #40 Phase 1 gate: measure the ray-march frame cost. Exposed on `appContext.spacetimeBench` for
+ * `?headless=1` sessions; loads the spacetime chunk on demand exactly like entering the mode does.
+ */
+export async function runSpacetimeBenchmark(options = {}) {
+    const view = spacetimeView || await _loadSpacetimeView();
+    if (!view || !gl) return null;
+    return view.runBenchmark({
+        viewRect: layoutCache.selectedView,
+        surfaceHeight: gl.canvas.height,
+        lutTexture: hexLUTTexture,
+        camera: { yaw: torusView.yaw, pitch: torusView.pitch, distance: torusView.distance },
+        ...options,
+    });
+}
+
 // Upload precomputed clip-space vertices (from quadVertsCache) and draw the quad.
 function drawQuad(verts) {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffers.positionBuffer);
@@ -708,13 +771,13 @@ export function renderFrameOrLoader(appContext, areAllWorkersInitialized) {
     if (!gl || !areAllWorkersInitialized) {
         return;
     }
-    updateTorusAnimation(performance.now());
+    updateOrbitAnimation(performance.now());
     const fbosDrawn = renderWorldsToTextures(appContext);
     renderMainScene(appContext, fbosDrawn);
 }
 
-function updateTorusAnimation(now) {
-    if (!torusView.enabled) return;
+function updateOrbitAnimation(now) {
+    if (!isOrbitViewMode(viewMode)) return;
     if (!torusView.lastAnimationTime) torusView.lastAnimationTime = now;
     const elapsed = Math.min((now - torusView.lastAnimationTime) / 1000, 0.05);
     torusView.lastAnimationTime = now;
@@ -727,11 +790,15 @@ function updateTorusAnimation(now) {
     if (rotating || torusView.orbiting) composeDirty = true;
 }
 
-function setTorusViewEnabled(enabled) {
-    torusView.enabled = !!enabled;
+function setViewMode(mode) {
+    const next = normalizeViewMode(mode);
+    if (next === viewMode) return;
+    viewMode = next;
     torusView.orbiting = false;
     torusView.lastAnimationTime = performance.now();
     composeDirty = true;
+    if (next === VIEW_MODES.SPACETIME) _loadSpacetimeView();
+    else _releaseSpacetimeVolume();
 }
 
 function setTorusViewSettings(settings) {
@@ -740,23 +807,24 @@ function setTorusViewSettings(settings) {
     composeDirty = true;
 }
 
-export function isTorusViewEnabled() {
-    return torusView.enabled;
+/** The projection the selected view is drawn through — `viewModes.js` names the values. */
+export function getViewMode() {
+    return viewMode;
 }
 
 export function getTorusViewState() {
-    return { ...torusView };
+    return { ...torusView, mode: viewMode };
 }
 
-export function orbitTorusView(deltaYaw, deltaPitch) {
-    if (!torusView.enabled) return;
+export function orbitActiveView(deltaYaw, deltaPitch) {
+    if (!isOrbitViewMode(viewMode)) return;
     torusView.yaw = wrapAngle(torusView.yaw + deltaYaw);
     torusView.pitch = wrapAngle(torusView.pitch + deltaPitch);
     composeDirty = true;
 }
 
-export function dollyTorusView(wheelDelta) {
-    if (!torusView.enabled) return;
+export function dollyActiveView(wheelDelta) {
+    if (!isOrbitViewMode(viewMode)) return;
     torusView.distance = Math.max(
         4.1,
         Math.min(10, torusView.distance * Math.exp(wheelDelta * 0.001)),
@@ -764,7 +832,7 @@ export function dollyTorusView(wheelDelta) {
     composeDirty = true;
 }
 
-export function setTorusOrbiting(orbiting) {
+export function setViewOrbiting(orbiting) {
     torusView.orbiting = !!orbiting;
     composeDirty = true;
 }
@@ -1035,7 +1103,7 @@ function _ensureTorusCaptureTarget(width, height) {
 }
 
 function _captureTorusToCanvas(width, height) {
-    if (!gl || !rendererAppContext || !torusView.enabled) return null;
+    if (!gl || !rendererAppContext || viewMode !== VIEW_MODES.TORUS) return null;
     const w = Math.max(1, Math.round(width));
     const h = Math.max(1, Math.round(height));
     const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
@@ -1076,10 +1144,12 @@ function _captureTorusToCanvas(width, height) {
 
 /**
  * Capture the selected view through the active projection, falling back to the flat FBO if an
- * offscreen torus render is unavailable.
+ * offscreen torus render is unavailable. Spacetime has no capture branch yet (#40 §7) and so
+ * captures flat, exactly like a torus render that declines.
+ * @param {'flat'|'torus'|'spacetime'} mode
  */
-export function captureActiveSelectedView(torusEnabled, captureTorus, captureFlat) {
-    if (torusEnabled) {
+export function captureActiveSelectedView(mode, captureTorus, captureFlat) {
+    if (mode === VIEW_MODES.TORUS) {
         const torus = captureTorus();
         if (torus) return torus;
     }
@@ -1115,7 +1185,7 @@ export function composeCaptureFrame(ctx, { source, width, height, selectedIndex,
 
     if (source === 'selected') {
         const c = captureActiveSelectedView(
-            torusView.enabled,
+            viewMode,
             () => _captureTorusToCanvas(width, height),
             () => _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex)),
         );
@@ -1135,7 +1205,7 @@ export function composeCaptureFrame(ctx, { source, width, height, selectedIndex,
     const selectedWidth = Math.max(1, Math.round(sv.width * sx));
     const selectedHeight = Math.max(1, Math.round(sv.height * sy));
     const selC = captureActiveSelectedView(
-        torusView.enabled,
+        viewMode,
         () => _captureTorusToCanvas(selectedWidth, selectedHeight),
         () => _captureWorldToCanvas(selectedIndex, _poolCanvasFor(selectedIndex)),
     );

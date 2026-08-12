@@ -6,7 +6,7 @@ function createManager(strategy = 'pan') {
     manager.currentStrategyName = strategy;
     manager._shiftWorldKeyHeld = false;
     manager._strategyBeforeShiftWorld = null;
-    manager._strategyBeforeTorus = 'pan';
+    manager._strategyBeforeOrbit = 'pan';
     manager.previousStrategyName = 'pan';
     manager.isMobile = false;
     manager.setStrategy = vi.fn((name) => {
@@ -43,14 +43,23 @@ describe('InputManager hold-H world shifting', () => {
         expect(manager._shiftWorldKeyHeld).toBe(false);
     });
 
-    it('settles the H override before leaving Torus view', () => {
+    it('settles the H override before leaving a 3D view', () => {
         const manager = createManager('orbit');
         manager._isTextInputFocused = () => false;
         manager._handleShiftWorldKeyDown(keyEvent());
 
-        manager._handleTorusViewChanged({ enabled: false });
+        manager._handleViewModeChanged({ mode: 'flat' });
 
         expect(manager.currentStrategyName).toBe('pan');
         expect(manager._shiftWorldKeyHeld).toBe(false);
+    });
+
+    it('keeps the orbit strategy when switching between the 3D views', () => {
+        const manager = createManager('orbit');
+
+        manager._handleViewModeChanged({ mode: 'spacetime' });
+
+        expect(manager.currentStrategyName).toBe('orbit');
+        expect(manager.setStrategy).not.toHaveBeenCalled();
     });
 });

@@ -1,11 +1,12 @@
 import { BaseInputStrategy } from './BaseInputStrategy.js';
 import { EventBus, EVENTS } from '../../services/EventBus.js';
 import {
-    dollyTorusView,
-    orbitTorusView,
-    setTorusOrbiting,
+    dollyActiveView,
+    orbitActiveView,
+    setViewOrbiting,
 } from '../../rendering/renderer.js';
 
+/** Drag-to-orbit / wheel-to-dolly for every 3D projection (`isOrbitViewMode`), not just the torus. */
 export class OrbitStrategy extends BaseInputStrategy {
     constructor(manager) {
         super(manager);
@@ -24,7 +25,7 @@ export class OrbitStrategy extends BaseInputStrategy {
         this.isOrbiting = true;
         this.lastX = event.clientX;
         this.lastY = event.clientY;
-        setTorusOrbiting(true);
+        setViewOrbiting(true);
         this.manager.canvas.classList.add('torus-orbiting');
     }
 
@@ -34,11 +35,11 @@ export class OrbitStrategy extends BaseInputStrategy {
         const dy = event.clientY - this.lastY;
         this.lastX = event.clientX;
         this.lastY = event.clientY;
-        orbitTorusView(dx * 0.008, dy * 0.008);
+        orbitActiveView(dx * 0.008, dy * 0.008);
     }
 
     handleMouseWheel(event) {
-        dollyTorusView(event.deltaY);
+        dollyActiveView(event.deltaY);
     }
 
     handleMouseUp() {
@@ -56,7 +57,7 @@ export class OrbitStrategy extends BaseInputStrategy {
     _stopOrbiting() {
         if (!this.isOrbiting) return;
         this.isOrbiting = false;
-        setTorusOrbiting(false);
+        setViewOrbiting(false);
         this.manager.canvas.classList.remove('torus-orbiting');
     }
 }

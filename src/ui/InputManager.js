@@ -1,6 +1,7 @@
 import * as Config from '../core/config.js';
 import { EventBus, EVENTS } from '../services/EventBus.js';
-import { getLayoutCache, isTorusViewEnabled } from '../rendering/renderer.js';
+import { getLayoutCache, getViewMode } from '../rendering/renderer.js';
+import { isOrbitViewMode } from '../rendering/viewModes.js';
 import { textureCoordsToGridCoords, getGridWorldBounds } from '../utils/utils.js';
 
 import { PanStrategy } from './inputStrategies/PanStrategy.js';
@@ -36,7 +37,7 @@ export class InputManager {
         // mode change) so an unrelated INTERACTION_MODE_CHANGED can't strand us in shiftWorld.
         this._shiftWorldKeyHeld = false;
         this._strategyBeforeShiftWorld = null;
-        this._strategyBeforeTorus = null;
+        this._strategyBeforeOrbit = null;
         this.hoverHandler = new HoverHandler(this);
 
         this.currentStrategyName = 'pan'; 
@@ -45,8 +46,8 @@ export class InputManager {
 
         this._calculateGridBounds();
         this._setupListeners();
-        if (isTorusViewEnabled() && !this.isMobile) {
-            this._handleTorusViewChanged({ enabled: true });
+        if (isOrbitViewMode(getViewMode()) && !this.isMobile) {
+            this._handleViewModeChanged({ mode: getViewMode() });
         }
     }
 
@@ -123,16 +124,21 @@ export class InputManager {
         window.addEventListener('keyup', (e) => this._handleShiftWorldKeyUp(e));
         window.addEventListener('blur', () => this._releaseShiftWorldKey());
         EventBus.subscribe(EVENTS.INTERACTION_MODE_CHANGED, (mode) => {
-            if (!isTorusViewEnabled()) this.setStrategy(mode);
+            if (!this._isOrbiting()) this.setStrategy(mode);
         });
         EventBus.subscribe(EVENTS.COMMAND_ENTER_PLACING_MODE, (data) => {
-            if (!isTorusViewEnabled()) this.setStrategy('place', data);
+            if (!this._isOrbiting()) this.setStrategy('place', data);
         });
         EventBus.subscribe(EVENTS.COMMAND_START_PATTERN_CAPTURE, (data) => {
-            if (!isTorusViewEnabled()) this.setStrategy('select', data);
+            if (!this._isOrbiting()) this.setStrategy('select', data);
         });
         EventBus.subscribe(EVENTS.LAYOUT_CALCULATED, (newLayout) => { this.layoutCache = newLayout; });
-        EventBus.subscribe(EVENTS.TORUS_VIEW_CHANGED, (data) => this._handleTorusViewChanged(data));
+        EventBus.subscribe(EVENTS.VIEW_MODE_CHANGED, (data) => this._handleViewModeChanged(data));
+    }
+
+    /** True while a 3D projection owns the pointer, so flat-grid tools must not take the strategy. */
+    _isOrbiting() {
+        return isOrbitViewMode(getViewMode());
     }
 
     /**
@@ -153,24 +159,25 @@ export class InputManager {
         this.currentStrategy.enter(options);
     }
 
-    _handleTorusViewChanged({ enabled }) {
+    _handleViewModeChanged({ mode }) {
         // Resolve a held-H override before changing the underlying navigation strategy. Otherwise
-        // releasing H after toggling the view could restore orbit in Flat mode (or pan in Torus).
+        // releasing H after switching the view could restore orbit in Flat mode (or pan in 3D).
         if (this._shiftWorldKeyHeld) this._releaseShiftWorldKey();
-        if (enabled && !this.isMobile) {
+        const orbit = isOrbitViewMode(mode);
+        if (orbit && !this.isMobile) {
             if (this.currentStrategyName === 'orbit') return;
-            // Torus mode deliberately cancels transient placing/selecting/drawing gestures.
+            // A 3D mode deliberately cancels transient placing/selecting/drawing gestures.
             // Those strategies need entry data that cannot be reconstructed on return, while
             // previousStrategyName is their stable navigation mode.
-            this._strategyBeforeTorus = this.currentStrategyName === 'pan'
+            this._strategyBeforeOrbit = this.currentStrategyName === 'pan'
                 ? 'pan'
                 : this.previousStrategyName || 'pan';
             this.setStrategy('orbit');
             return;
         }
-        if (!enabled && this.currentStrategyName === 'orbit') {
-            const restore = this._strategyBeforeTorus || 'pan';
-            this._strategyBeforeTorus = null;
+        if (!orbit && this.currentStrategyName === 'orbit') {
+            const restore = this._strategyBeforeOrbit || 'pan';
+            this._strategyBeforeOrbit = null;
             this.setStrategy(restore);
         }
     }
