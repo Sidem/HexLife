@@ -42,20 +42,20 @@ export const SIX_NAMES = Object.freeze([
 export const SIX_PALETTE = Object.freeze([
     [18, 16, 14],
     [58, 160, 255],
-    [168, 74, 28],
-    [201, 168, 124],
-    [106, 64, 36],
-    [36, 28, 24],
+    [196, 86, 24],
+    [224, 192, 132],
+    [122, 40, 28],
+    [72, 84, 96],
 ]);
 
 /**
  * Gravity on a tet whose slot 3 is the unique lowest site.
  *
- * Face0 → apex is one of the three equally-tilted down-bonds (same (q, r) on the next layer).
- * A unique heaviest mate may take the apex too, so an isolated parcel uses all three down-bonds
- * across the period instead of only the same-(q, r) zigzag. There is no in-plane face slide:
- * that walk is handed, and even with `setBlockAlternates(true)` even-host phases apply it 2:1,
- * which drains a centre stream out one side of the puck.
+ * Isolated fluid takes only face0 → apex (same (q, r) on the next layer). That bond zigzags
+ * +offset / −offset each layer and cancels. A mate may take the apex only when face0 is a
+ * grain — going around an obstacle — never when face0 is air. Sneaking out a mate while the
+ * unique-down is open is what walked a centre stream off to one side and also let water leave
+ * a tet before extract could run.
  *
  * @param {number[]} out
  * @param {(state: number) => boolean} mobile
@@ -69,6 +69,8 @@ export function puckFall(out, mobile) {
         swap(0, 3);
         return;
     }
+    const blocked = out[0] !== EMPTY && !mobile(out[0]);
+    if (!blocked) return;
     let best = -1;
     let tied = false;
     for (let i = 1; i < 3; i++) {
@@ -83,18 +85,18 @@ export function puckFall(out, mobile) {
     if (best !== -1 && !tied) swap(best, 3);
 }
 
-/** Six-state extraction: extract, wet, then fall. */
+/** Six-state extraction: wet, extract, then fall — one contact must be able to spend a grain. */
 export function puckSixTransition(tet) {
     const out = [...tet];
+    const hasFluid = out.some((state) => state < MOBILE && state !== EMPTY);
+    if (hasFluid) {
+        for (let i = 0; i < 4; i++) if (out[i] === DRY) out[i] = WET;
+    }
     const water = out.indexOf(WATER);
     const wet = out.indexOf(WET);
     if (water !== -1 && wet !== -1) {
         out[water] = SATURATED;
         out[wet] = SPENT;
-    }
-    const hasFluid = out.some((state) => state < MOBILE && state !== EMPTY);
-    if (hasFluid) {
-        for (let i = 0; i < 4; i++) if (out[i] === DRY) out[i] = WET;
     }
     puckFall(out, (state) => state < MOBILE);
     return out;
@@ -367,10 +369,10 @@ export function dualPalette() {
     const colors = [
         [18, 16, 14],
         [58, 160, 255],
-        [120, 110, 140],
-        [168, 74, 28],
+        [160, 96, 48],
+        [196, 86, 24],
     ];
-    colors.push([210, 180, 140], [188, 152, 108], [168, 128, 82]);
+    colors.push([224, 192, 132], [200, 160, 100], [176, 128, 72]);
     for (let charge = 0; charge < 3; charge++) {
         for (let conc = 0; conc < 3; conc++) {
             colors.push([

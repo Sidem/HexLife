@@ -625,7 +625,9 @@ impl WorldHcp {
         let phase = (self.tick_count % BLOCK_PHASES) as usize;
         let sigma = (self.tick_count / TRIANGLE_PHASES) as usize % 2;
         let phi = (self.tick_count % TRIANGLE_PHASES) as usize;
-        let alternate = self.block_alternates && self.tick_count % 2 == 1;
+        // Flip the 2D conjugate once per full 6-phase period, not every tick. A 3-tick host
+        // window is odd-length, so `tick % 2` applies the mirror 2:1 and walks fluid off-axis.
+        let alternate = self.block_alternates && (self.tick_count / BLOCK_PHASES) % 2 == 1;
         let cols = self.cols;
         let rows = self.rows;
         let layer_size = rows * cols;

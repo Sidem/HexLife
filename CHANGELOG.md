@@ -25,6 +25,13 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.5 — 2026-08-14
+
+#### Fixed
+
+- **HCP `setBlockAlternates` no longer walks fluid off-axis.** The 2D conjugate now flips once
+  per 6-phase period. Flipping every tick over a 3-tick host window applied the mirror 2:1.
+
 ### `@hexlife/embed` 1.13.4 — 2026-08-14
 
 #### Changed

@@ -74,16 +74,29 @@ describe('puck host helpers', () => {
         expect(tet).toEqual([3, 0, 1, 2]);
     });
 
-    it('lets a lone mate take an empty apex so all three down-bonds work', () => {
+    it('does not sneak a mate out while the unique-down is open air', () => {
         const tet = [0, 1, 0, 0];
         puckFall(tet, (state) => state < 3);
-        expect(tet).toEqual([0, 0, 0, 1]);
+        expect(tet).toEqual([0, 1, 0, 0]);
+    });
+
+    it('lets a lone mate go around a grain', () => {
+        const tet = [3, 1, 0, 0];
+        puckFall(tet, (state) => state < 3);
+        expect(tet).toEqual([3, 0, 0, 1]);
     });
 
     it('does not slide along the face when the apex is occupied', () => {
         const tet = [1, 0, 0, 3];
         puckFall(tet, (state) => state < 3);
         expect(tet).toEqual([1, 0, 0, 3]);
+    });
+
+    it('spends a dry grain on first contact with water', () => {
+        const out = puckSixTransition([1, 3, 0, 0]);
+        expect(out).toContain(5);
+        expect(out).toContain(2);
+        expect(out).not.toContain(3);
     });
 
     it('keeps dry, wet, spent and saturated visually far apart', () => {

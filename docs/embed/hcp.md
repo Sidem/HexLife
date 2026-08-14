@@ -77,7 +77,9 @@ version bump. `isConservative` is the multiset property over all `k⁴` entries 
 enforced. `isIsotropic` is 3-fold about z (cycle the three face slots). Gravity rules fail it
 on purpose.
 
-`setBlockAlternates(true)` uses the exact 2D conjugate on odd ticks. Period becomes 12.
+`setBlockAlternates(true)` uses the exact 2D conjugate on odd *periods* (every 6 ticks), not
+odd ticks. A 3-tick host window is odd-length, so `tick % 2` applied the mirror 2:1 and walked
+fluid off-axis. Period is still 12.
 
 ## Bulk layer ops
 

@@ -9,10 +9,10 @@
   :root {
     --air: #12100e;
     --water: #3aa0ff;
-    --saturated: #a84a1c;
-    --dry: #c9a87c;
-    --wet: #6a4024;
-    --spent: #241c18;
+    --saturated: #c45618;
+    --dry: #e0c084;
+    --wet: #7a281c;
+    --spent: #485460;
   }
   hexlife-hcp { width: 100%; min-height: 420px; border-radius: 12px; background: #141210; }
   hexlife-hcp::part(overlay) { display: none; }
@@ -101,13 +101,13 @@
   <div>
     <p class="boot" id="boot">loading WorldHcp…</p>
     <hexlife-hcp id="puck" paused states="6" layers="24" rows="48" columns="56" speed="36"
-      palette="#12100e,#3aa0ff,#a84a1c,#c9a87c,#6a4024,#241c18" clip="0.22" opacity="0.55"></hexlife-hcp>
-    <p>
-      <span class="swatch" style="background:var(--water)"></span> water
-      <span class="swatch" style="background:var(--saturated)"></span> saturated
-      <span class="swatch" style="background:var(--dry)"></span> dry
-      <span class="swatch" style="background:var(--wet)"></span> wet
-      <span class="swatch" style="background:var(--spent)"></span> spent
+      palette="#12100e,#3aa0ff,#c45618,#e0c084,#7a281c,#485460" clip="0.50" opacity="0.55"></hexlife-hcp>
+    <p id="legend">
+      <span class="swatch" data-state="1" style="background:var(--water)"></span> water
+      <span class="swatch" data-state="2" style="background:var(--saturated)"></span> saturated
+      <span class="swatch" data-state="3" style="background:var(--dry)"></span> dry
+      <span class="swatch" data-state="4" style="background:var(--wet)"></span> wet
+      <span class="swatch" data-state="5" style="background:var(--spent)"></span> spent
     </p>
   </div>
   <div>
@@ -146,8 +146,8 @@
       <label>thickness <span id="layers-out">24</span>
         <input id="layers" type="range" min="8" max="48" step="2" value="24"/>
       </label>
-      <label>clip <span id="clip-out">0.22</span>
-        <input id="clip" type="range" min="0" max="1" step="0.01" value="0.22"/>
+      <label>clip <span id="clip-out">0.50</span>
+        <input id="clip" type="range" min="0" max="1" step="0.01" value="0.50"/>
       </label>
       <label>opacity <span id="opacity-out">0.55</span>
         <input id="opacity" type="range" min="0.08" max="1" step="0.01" value="0.55"/>
@@ -342,16 +342,30 @@ function loop() {
     raf = requestAnimationFrame(loop);
 }
 
+function rgbHex(rgb) {
+    return `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+}
+
 function paletteAttr(dual) {
+    return (dual ? dualPalette() : SIX_PALETTE).map(rgbHex).join(',');
+}
+
+function paintLegend(dual) {
     const colors = dual ? dualPalette() : SIX_PALETTE;
-    return colors.map((rgb) => `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`).join(',');
+    for (const swatch of document.querySelectorAll('#legend .swatch')) {
+        const state = Number(swatch.dataset.state);
+        const rgb = colors[state] || colors[0];
+        swatch.style.background = rgbHex(rgb);
+    }
 }
 
 function attachWorld() {
     if (!el.world) return;
     const dual = ui.model.value === 'dual';
     el.world.setBlockAlternates(true);
+    el.setAttribute('palette', paletteAttr(dual));
     el.setRule(dual ? dualRule : sixRule);
+    paintLegend(dual);
     layoutPuck();
     boot.hidden = true;
 }
