@@ -162,7 +162,7 @@ describe('coffee-puck page source policy', () => {
     it('declares engine hcp and has no host tet loop or per-tick setCells', async () => {
         const page = await readFile(new URL('../public/coffee-puck.html', import.meta.url), 'utf8');
         expect(page).toContain("from '@hexlife/embed/hcp'");
-        expect(page).toContain('@hexlife/embed@1.13.4');
+        expect(page).toContain('@hexlife/embed@1.13.5');
         expect(page).not.toMatch(/for\s*\([^)]*ncells/);
         expect(page).toContain('paintIf');
         expect(page).toContain('clearStatesInLayer');
@@ -174,7 +174,7 @@ describe('coffee-puck page source policy', () => {
         expect(page).not.toContain('id="size"');
         expect(page).toMatch(/id="flow"[^>]*max="240"/);
         expect(page).toMatch(/id="water"[^>]*max="8000"/);
-        expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.4/src/embed/hcp.js');
+        expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js');
     });
 });
 
