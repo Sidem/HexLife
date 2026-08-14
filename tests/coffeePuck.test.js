@@ -163,6 +163,8 @@ describe('puck host helpers', () => {
         expect(host).toContain('headspaceHoldsFluid');
         expect(host).toContain('brewHasSettled');
         expect(host).not.toMatch(/brew\.still >= PARTITION_PERIOD \|\| brew\.tick > limit/);
+        expect(host).not.toMatch(/if \(brew\.tick > limit\) return true/);
+        expect(host).toContain('brew.still < limit');
     });
 });
 

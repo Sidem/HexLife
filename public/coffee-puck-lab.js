@@ -118,11 +118,11 @@ function headspaceHoldsFluid() {
 function brewHasSettled() {
     const period = settlePeriod();
     const limit = quietTickLimit(el.world.layers, period);
-    if (brew.tick > limit) return true;
     if (brew.still < period) return false;
-    // Water waiting in the shower is not a finished extraction. Only the long allowance
-    // may give up on a pool that truly cannot find a hole.
-    if (headspaceHoldsFluid()) return false;
+    // The long allowance is consecutive quiet ticks, not a wall on the whole brew.
+    // `tick > layers*period` aborted mid-pour: 12 cells/tick × 288 ticks ≈ the
+    // 400-cell leftover that looked like a dual-porosity choke.
+    if (headspaceHoldsFluid() && brew.still < limit) return false;
     return true;
 }
 
