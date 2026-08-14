@@ -27,6 +27,8 @@ export default defineConfig({
         // The third isolated artifact, on the same terms. DOM-free and registers nothing, so it
         // stays out of "sideEffects".
         solid: 'src/embed/solid.js',
+        hcp: 'src/embed/hcp.js',
+        'hcp-element': 'src/embed/hcp-element.js',
         // Separate from `ca` on purpose: `ca.js` is DOM-free and outside "sideEffects", so the
         // `customElements.define` for <hexlife-ca> cannot live there. See ca-element.js.
         'ca-element': 'src/embed/ca-element.js',

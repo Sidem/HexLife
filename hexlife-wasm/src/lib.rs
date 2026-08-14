@@ -2397,3 +2397,16 @@ mod render_layer_tests {
         assert_eq!(world.render_layer.len(), 0);
     }
 }
+
+// -------------------------------------------------------------------------------------------
+// The HCP lattice engine (roadmap #41) — declared HERE, at the end of the file, on purpose.
+//
+// Same panic-location reason as `mod solid` and the spacetime methods: an item inserted higher
+// up shifts line numbers baked into the DEFAULT / stochastic / solid artifacts. Appending keeps
+// that gate honest. `WorldHcp` does not call `compute_neighbor_indices`; its neighbour table is
+// generated from `src/core/hcp-dirs.json`. It compiles only under
+// `--no-default-features --features hcp`.
+#[cfg(feature = "hcp")]
+mod hcp;
+#[cfg(feature = "hcp")]
+pub use hcp::{hcp_engine_version, hcp_site_xyz, WorldHcp, HCP_ENGINE_VERSION};

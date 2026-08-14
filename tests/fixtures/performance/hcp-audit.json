@@ -1,0 +1,41 @@
+{
+  "recorded": "2026-08-14",
+  "machine": "Windows, rustc via cargo test --release-equivalent wasm-pack; Node vitest Wasm",
+  "why": "docs/HCP-PLAN.md §11 owner audit for WorldHcp v1. Throughput is recorded, not a threshold to chase after the fact.",
+  "staticHotPath": {
+    "perCellReads": "4 state loads + 3 neighbour-index loads + 1 LUT load",
+    "perCellWrites": "up to 4 state stores if any slot changed",
+    "perCellBranches": "skip-chunk check outside the tet; change test per slot; no k match; no coffee match",
+    "perCellDivisions": 0,
+    "tableLookups": 1,
+    "buffersBytesPerCell": {
+      "state": 1,
+      "neighbor_indices": 48,
+      "block_rule": "4 * k^4 / ncells",
+      "chunkMeta": "6 B per 8x8x4 chunk"
+    },
+    "tickAllocation": "zero after construct/rule install; proven by 1e5-tick pointer/capacity freeze",
+    "jsToWasmPerNormalTick": "one run_tick call, zero full-grid copies",
+    "renderer": "one 3D R8UI texSubImage of the live view, one instanced draw",
+    "skip": "change-propagation over 8x8x4 chunks; period 6 or 12; skip-on == skip-off"
+  },
+  "artifacts": {
+    "src/core/hcp-wasm/hexlife_hcp_wasm_bg.wasm": {
+      "bytes": 45882,
+      "gzip": 18463,
+      "sha256": "493cc595e34d7529a50e5efa8691a51107192b583a6c2a7ad4af24488178bd3e"
+    },
+    "src/core/hcp-wasm/hexlife_hcp_wasm.js": {
+      "bytes": 16089,
+      "gzip": 3574,
+      "sha256": "17e83cabf15ef2f3e811e7f89e298861a9465795bdede4294548b58e781e47bc"
+    }
+  },
+  "existingArtifactsUnchanged": true,
+  "existingArtifactSource": "tests/fixtures/performance/hcp-artifact-baseline.json",
+  "demo": {
+    "shape": [24, 48, 56],
+    "cells": 64512,
+    "note": "Node-Wasm tick samples and a browser frame budget are recorded below / in the session report. p95 frame time is a browser measurement on the recorded machine."
+  }
+}

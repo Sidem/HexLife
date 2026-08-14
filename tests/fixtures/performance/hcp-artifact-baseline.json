@@ -1,0 +1,32 @@
+{
+  "recorded": "2026-08-14",
+  "why": "docs/HCP-PLAN.md §4 / §11.3 artifact gate. WorldHcp is a fourth Wasm artifact behind the `hcp` Cargo feature, and it must cost the existing three exactly nothing. These are the sha256 digests of the default, stochastic, and solid artifacts as committed BEFORE any #41 engine existed; tests/hcpPhase0.test.js asserts the tracked files still hash to them.",
+  "reproducible": "Copied from tests/fixtures/performance/solid-artifact-baseline.json for the default and stochastic pairs (themselves re-recorded for #40 Phase 2 on the default pair only). The solid pair is the committed hexlife_solid_wasm artifact at the start of #41.",
+  "gotcha": "Rust bakes panic locations into the data section as (file, line, column). Inserting an item anywhere above existing code in lib.rs shifts those line numbers and changes the artifact's bytes without moving a single instruction. That is why the `mod hcp` declaration is appended at the END of hexlife-wasm/src/lib.rs.",
+  "artifacts": {
+    "src/core/wasm-engine/hexlife_wasm.js": {
+      "bytes": 37134,
+      "sha256": "3679c4f3ec3265a7586b5765a2f7ce3c2e550f42b933059226e85108e329d99d"
+    },
+    "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
+      "bytes": 65513,
+      "sha256": "c2f250e7eeb1f88497e19cd5756cd86e0a474c61bb4e1626719960cdfd498fc6"
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm.js": {
+      "bytes": 20994,
+      "sha256": "e0f1c26c33e4add0594b510eb240a6fd938edbc8f5e0aaf93215b760505acbdb"
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm_bg.wasm": {
+      "bytes": 68407,
+      "sha256": "09f110ed6e95cc4f05c32e2a6f6421a6c3be105f3e2771b426a5fda62cab3c68"
+    },
+    "src/core/solid-wasm/hexlife_solid_wasm.js": {
+      "bytes": 17438,
+      "sha256": "7426ec671872d00bb26605e23b53b630f386a81f90a2143757f9e725ea5647f8"
+    },
+    "src/core/solid-wasm/hexlife_solid_wasm_bg.wasm": {
+      "bytes": 56226,
+      "sha256": "2f181cc8261b62c75d66a5f6fb78345a0a949521ad55f2cad4244d1029f0af14"
+    }
+  }
+}

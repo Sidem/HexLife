@@ -25,6 +25,20 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.0 — 2026-08-14
+
+#### Added
+
+- **`@hexlife/embed/hcp` — a general k-state CA on the hexagonal close-packed lattice.** Twelve
+  equidistant neighbours, a 6-phase tetrahedral block of size `k⁴`, gravity in slot 3. It is a
+  **fourth** isolated Wasm artifact: root, `/sim`, `/ca`, `/stochastic`, `/solid` and `/spacetime`
+  fetch none of it. `HexHcp`, `blockRuleFromTet`, `isConservative`, `isIsotropic`, and `HXP1` codes
+  live on the DOM-free entry; `<hexlife-hcp>` is registered by `/hcp-element`.
+- **A 3D coffee-puck lab** beside the existing 2D extraction page. The same six-state and
+  sixteen-state families, rewritten for a tet whose apex is down. Pour and drip are bulk layer ops
+  (`paintIf`, `clearStatesInLayer`), not a JS walk of the volume. An impermeable-grain bed should
+  still deliver past the 2D packing cliff.
+
 ### Added
 
 - **Solid Garden now shows you the object, not just a slice of it.** The whole run is drawn as one

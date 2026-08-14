@@ -7,7 +7,14 @@ import prettierConfig from 'eslint-config-prettier';
 export default [
   // Global ignores for generated output.
   {
-    ignores: ['dist/**', 'hexlife-wasm/src/core/wasm-engine/**'],
+    ignores: [
+      'dist/**',
+      'hexlife-wasm/src/core/wasm-engine/**',
+      'src/core/wasm-engine/**',
+      'src/core/stochastic-wasm/**',
+      'src/core/solid-wasm/**',
+      'src/core/hcp-wasm/**',
+    ],
   },
 
   // Base configuration for JavaScript files

@@ -1,0 +1,16 @@
+{
+  "in_plane_source": "neighbor-dirs.json",
+  "slot_order": {
+    "in_plane": [0, 1, 2, 3, 4, 5],
+    "down": [6, 7, 8],
+    "up": [9, 10, 11]
+  },
+  "even_layer_even_col_down": [[0, 0], [-1, -1], [0, -1]],
+  "even_layer_even_col_up": [[0, 0], [-1, -1], [0, -1]],
+  "even_layer_odd_col_down": [[0, 0], [-1, 0], [0, -1]],
+  "even_layer_odd_col_up": [[0, 0], [-1, 0], [0, -1]],
+  "odd_layer_even_col_down": [[0, 0], [1, 0], [0, 1]],
+  "odd_layer_even_col_up": [[0, 0], [1, 0], [0, 1]],
+  "odd_layer_odd_col_down": [[0, 0], [1, 1], [0, 1]],
+  "odd_layer_odd_col_up": [[0, 0], [1, 1], [0, 1]]
+}

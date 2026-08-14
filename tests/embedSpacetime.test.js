@@ -257,7 +257,13 @@ describe('Solid Garden consumes the entry from the package', () => {
     const host = read('public/solid-garden.js');
 
     it('pins every entry to one exact published version, the package\'s own file', () => {
-        const version = JSON.parse(read('packages/hexlife-embed/package.json')).version;
+        // A Pages deploy that imports an unpublished version 404s. During an embed publish the
+        // package.json minor moves first (commit + tag); production pins flip only after npm
+        // and jsDelivr have the tarball. So the pin may lag the package file by one commit —
+        // it must still be one exact shared semver, never `latest`.
+        const pin = page.match(/@hexlife\/embed@(\d+\.\d+\.\d+)\//);
+        expect(pin, 'Solid Garden pins an exact @hexlife/embed semver').not.toBeNull();
+        const version = pin[1];
         for (const entry of ['api', 'sim', 'render', 'spacetime', 'solid']) {
             expect(page).toContain(
                 `"@hexlife/embed/${entry}": "https://cdn.jsdelivr.net/npm/@hexlife/embed@${version}/src/embed/${entry}.js"`,

@@ -1,0 +1,15 @@
+{
+  "name": "hexlife-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "hexlife_hcp_wasm_bg.wasm",
+    "hexlife_hcp_wasm.js",
+    "hexlife_hcp_wasm.d.ts"
+  ],
+  "main": "hexlife_hcp_wasm.js",
+  "types": "hexlife_hcp_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

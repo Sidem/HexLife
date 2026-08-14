@@ -15,7 +15,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | Page | What it covers |
 | :--- | :--- |
 | [Getting started](./getting-started.md) | Install, first world, sizing, the host-owned simulation path, requirements. |
-| [Entry points](./entrypoints.md) | Which of the ten imports you need, what each one costs, and what it requires. |
+| [Entry points](./entrypoints.md) | Which of the twelve imports you need, what each one costs, and what it requires. |
 
 ## Elements
 
@@ -25,6 +25,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | [`<hexlife-grid>`](./hexlife-grid.md) | Many worlds in one WebGL context — the comparison instrument. |
 | [`<hexlife-ca>`](./ca.md#hexlife-ca--the-k-state-element) | The k-state element. |
 | [`<hexlife-stochastic>`](./stochastic.md#hexlife-stochastic--the-stochastic-element) | The stochastic element. |
+| [`<hexlife-hcp>`](./hcp.md) | The HCP element: a 3D close-packed lattice. |
 
 ## Engines and modules
 
@@ -36,6 +37,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | [`/ca`](./ca.md) | k-state worlds: two backends, conservation, isotropy, `HXK1` codes. |
 | [`/stochastic`](./stochastic.md) | Probability and time-in-state, the conserved lattice gas, `HXS1` codes. |
 | [`/solid`](./solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |
+| [`/hcp`](./hcp.md) | HCP worlds: 12-neighbour close-packed lattice, `k⁴` tetrahedral blocks, `HXP1` codes. |
 | [`/api`](./api.md) | DOM-free metadata, world codecs, palettes, GPU probing. |
 
 ## Contracts
@@ -56,5 +58,7 @@ published npm version through jsDelivr; they do not reach into Explorer internal
   totalistic class on one map, through `<hexlife-grid>`.
 - [Coffee extraction lab](https://sidem.github.io/HexLife/coffee-percolation.html) — six- and
   sixteen-state physical models with exact conservation, through `<hexlife-ca>`.
+- [3D coffee puck](https://sidem.github.io/HexLife/coffee-puck.html) — the same model on the HCP
+  lattice, through `<hexlife-hcp>`.
 - [k-state CA builder](https://sidem.github.io/HexLife/ca-builder.html) — edit exact transition
   tables and export a standalone npm-package example.

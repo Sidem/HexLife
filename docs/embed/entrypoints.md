@@ -2,7 +2,7 @@
 
 # Entry points
 
-Ten public imports. The split is not cosmetic: each one is the boundary between "this host needs
+Twelve public imports. The split is not cosmetic: each one is the boundary between "this host needs
 a DOM", "this host needs a separately loaded Wasm artifact", and "this host needs neither".
 
 | Import | Needs | Use for |
@@ -17,6 +17,8 @@ a DOM", "this host needs a separately loaded Wasm artifact", and "this host need
 | `@hexlife/embed/stochastic` | Wasm | Stateful/probabilistic neighborhood worlds and the conserved lattice gas, with compiled native rules, age epochs, counter RNG, census and checksums. A separately loaded artifact with no DOM at module scope. → [`/stochastic`](./stochastic.md) |
 | `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-stochastic>`. The **only** element entry that reaches the stochastic artifact — which is why it is separate from both `/stochastic` (DOM-free) and every other element entry. |
 | `@hexlife/embed/solid` | Wasm | Extrude a run of *any* of these engines through time into a printable solid, and serialize STL, PLY or 3MF. A third separately loaded artifact; no DOM at module scope. → [`/solid`](./solid.md) |
+| `@hexlife/embed/hcp` | Wasm | **HCP** worlds: a general k-state CA on the hexagonal close-packed lattice, with a 6-phase `k⁴` tetrahedral block. A **fourth** separately loaded artifact; no DOM at module scope. → [`/hcp`](./hcp.md) |
+| `@hexlife/embed/hcp-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-hcp>`. The only element entry that reaches the HCP artifact. |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
@@ -24,7 +26,7 @@ entry evaluates custom-element, Wasm and WebGL code at import time.
 The browser bundle **inlines the Wasm binary** as a data URI rather than fetching a side-car asset,
 because a strict host CSP (a Reddit webview, for instance) is not something an embed can widen.
 
-## Three engines and an extruder, one package
+## Four engines and an extruder, one package
 
 | Engine | States | Entry | Wasm artifact |
 | :--- | :--- | :--- | :--- |
@@ -33,9 +35,10 @@ because a strict host CSP (a Reddit webview, for instance) is not something an e
 | Stochastic | up to 64 rows of transitions, or 5 gas states | `/stochastic`, `/stochastic-element` | A **second** artifact, loaded only by these two. |
 | Solid extruder | simulates nothing — a layer sink for any of the above | `/solid` | A **third** artifact, loaded only by this one. |
 | Spacetime view | simulates nothing — the same layer sink, drawn instead of meshed | `/spacetime` | **None.** Pure WebGL2. |
+| HCP | 2–16 | `/hcp`, `/hcp-element` | A **fourth** artifact, loaded only by these two. 12-neighbour close-packed lattice, `k⁴` tets. |
 
-Importing the package root, `/sim`, `/ca`, or `/ca-element` neither downloads nor initializes the
-stochastic or solid artifacts.
+Importing the package root, `/sim`, `/ca`, `/ca-element`, `/stochastic`, `/solid` or `/spacetime`
+neither downloads nor initializes the HCP artifact.
 
 ## Types
 

@@ -1,7 +1,7 @@
 {
   "name": "@hexlife/embed",
-  "version": "1.12.0",
-  "description": "Embeddable binary, k-state, and stochastic hexagonal cellular-automaton engines, with a solid extruder for 3D printing and a ray-marched spacetime view",
+  "version": "1.13.0",
+  "description": "Embeddable binary, k-state, stochastic, and HCP hexagonal cellular-automaton engines, with a solid extruder for 3D printing and a ray-marched spacetime view",
   "keywords": [
     "cellular-automata",
     "hexagonal",
@@ -30,7 +30,8 @@
   "sideEffects": [
     "./src/embed/index.js",
     "./src/embed/ca-element.js",
-    "./src/embed/stochastic-element.js"
+    "./src/embed/stochastic-element.js",
+    "./src/embed/hcp-element.js"
   ],
   "exports": {
     ".": {
@@ -72,6 +73,16 @@
       "types": "./src/embed/solid.d.ts",
       "import": "./src/embed/solid.js",
       "default": "./src/embed/solid.js"
+    },
+    "./hcp": {
+      "types": "./src/embed/hcp.d.ts",
+      "import": "./src/embed/hcp.js",
+      "default": "./src/embed/hcp.js"
+    },
+    "./hcp-element": {
+      "types": "./src/embed/hcp-element.d.ts",
+      "import": "./src/embed/hcp-element.js",
+      "default": "./src/embed/hcp-element.js"
     },
     "./ca-element": {
       "types": "./src/embed/ca-element.d.ts",

@@ -19,7 +19,7 @@ describe('WorldStochastic Phase-0 ownership freeze', () => {
     expect(declarations).toHaveLength(EMBED_DEMO_OWNERSHIP.length);
     expect(declarations).toEqual(EMBED_DEMO_OWNERSHIP.map(({id, engine}) => ({id, engine})));
     expect(new Set(EMBED_DEMO_OWNERSHIP.map(({id}) => id)).size).toBe(EMBED_DEMO_OWNERSHIP.length);
-    expect(EMBED_DEMO_OWNERSHIP.every(({engine}) => ['binary', 'k-state', 'stochastic'].includes(engine))).toBe(true);
+    expect(EMBED_DEMO_OWNERSHIP.every(({engine}) => ['binary', 'k-state', 'stochastic', 'hcp'].includes(engine))).toBe(true);
   });
 
   /**

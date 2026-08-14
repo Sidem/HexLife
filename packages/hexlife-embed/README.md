@@ -133,6 +133,31 @@ every layer of history and re-uploads nothing.
 
 → [Full `/spacetime` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/spacetime.md)
 
+## A close-packed 3D lattice
+
+`@hexlife/embed/hcp` is a fourth engine: a general k-state CA on the hexagonal close-packed lattice
+(12 equidistant neighbours). The v1 rule is a 6-phase tetrahedral block of size `k⁴`. Slot 3 is
+always the unique lowest site, so gravity lives in the table, not in the tick. Importing it loads
+**no** bytes into a page that only uses `/ca` or `/sim`.
+
+```js
+import {initHcpEngine, HexHcp, blockRuleFromTet} from '@hexlife/embed/hcp'
+
+await initHcpEngine()
+const rule = blockRuleFromTet(6, ([a, b, c, apex]) => [a, b, c, apex])
+const world = new HexHcp({states: 6, layers: 24, rows: 48, columns: 56, rule})
+world.setBlockAlternates(true)
+world.tick(12)
+world.paintIf(0, inlets, 0, 1)
+world.clearStatesInLayer(world.layers - 1, 0b0110)
+```
+
+`HXP1` codes freeze the current world — geometry, boundaries, rule, generation, and cells — and
+resume the next tick identically. `isConservative` / `isIsotropic` report table properties; they
+never enforce them.
+
+→ [Full `/hcp` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/hcp.md)
+
 ## Documentation
 
 The full reference lives in the repository, one page per surface:
@@ -141,7 +166,7 @@ The full reference lives in the repository, one page per surface:
 | :--- | :--- |
 | [**Docs index**](https://github.com/Sidem/HexLife/blob/main/docs/embed/README.md) | Everything below, in one table. |
 | [Getting started](https://github.com/Sidem/HexLife/blob/main/docs/embed/getting-started.md) | Install, first world, sizing, host-owned simulation, requirements. |
-| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the ten imports you need and what each requires. |
+| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the twelve imports you need and what each requires. |
 | [`<hexlife-world>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-world.md) | Attributes, JavaScript API, events, GPU-loss recovery, policies, styling. |
 | [`<hexlife-grid>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-grid.md) | Many worlds in one WebGL context. |
 | [`/sim`](https://github.com/Sidem/HexLife/blob/main/docs/embed/sim.md) | DOM-free simulation, seeded and sparse states, vacuum stability, block skipping. |
@@ -150,6 +175,7 @@ The full reference lives in the repository, one page per surface:
 | [`/ca`](https://github.com/Sidem/HexLife/blob/main/docs/embed/ca.md) | k-state worlds, conservation, isotropy, `<hexlife-ca>`, `HXK1` codes. |
 | [`/stochastic`](https://github.com/Sidem/HexLife/blob/main/docs/embed/stochastic.md) | Probability and time-in-state, the lattice gas, `<hexlife-stochastic>`, `HXS1` codes. |
 | [`/solid`](https://github.com/Sidem/HexLife/blob/main/docs/embed/solid.md) | Extrude a run into a printable solid: welding, components, meshing, STL/PLY/3MF. |
+| [`/hcp`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hcp.md) | HCP worlds, `k⁴` tetrahedral blocks, `<hexlife-hcp>`, `HXP1` codes. |
 | [`/api`](https://github.com/Sidem/HexLife/blob/main/docs/embed/api.md) | DOM-free metadata, world codecs, palettes, GPU probing. |
 | [Determinism & versioning](https://github.com/Sidem/HexLife/blob/main/docs/embed/determinism.md) | The reproducibility contract and what a major bump means. |
 
@@ -167,9 +193,14 @@ The full reference lives in the repository, one page per surface:
 | `@hexlife/embed/stochastic` | Wasm | Probabilistic and time-dependent worlds, plus the conserved lattice gas. A separately loaded artifact. |
 | `@hexlife/embed/stochastic-element` | DOM, WebGL2, Wasm | Registers `<hexlife-stochastic>`. The only element entry that reaches the stochastic artifact. |
 | `@hexlife/embed/solid` | Wasm | **Printable solids.** Extrude a run of any of the engines above through time; export STL, PLY or 3MF. A third separately loaded artifact. |
+| `@hexlife/embed/hcp` | Wasm | **HCP** worlds — a fourth engine, a 12-neighbour close-packed lattice with `k⁴` tetrahedral blocks. A separately loaded artifact. |
+| `@hexlife/embed/hcp-element` | DOM, WebGL2, Wasm | Registers `<hexlife-hcp>`. The only element entry that reaches the HCP artifact. |
 
 A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
+
+Importing the package root, `/sim`, `/ca`, `/stochastic` or `/solid` neither downloads nor
+initializes the HCP artifact.
 
 The browser bundle **inlines the Wasm binary** as a data URI rather than fetching a side-car asset,
 because a strict host CSP (a Reddit webview, for instance) is not something an embed can widen.
@@ -184,6 +215,7 @@ the exact published npm version through jsDelivr; they do not reach into Explore
 | [**Interactive demo library**](https://sidem.github.io/HexLife/embed-demos.html) | Nine focused experiments spanning crystal growth, ecology, excitable media, particles, seeded probability, deterministic chaos, sound, and interacting matter. | Every public entrypoint, with each page consuming the published npm package |
 | [**256 worlds, one rule class**](https://sidem.github.io/HexLife/totalistic-256.html) | All 256 totalistic rules simultaneously, or an equally sized sample of a larger rule class. One shared clock, initial condition, palette, and GPU context make rule-to-rule comparison direct. | `<hexlife-grid>`, `<hexlife-world>`, `/api` |
 | [**Coffee extraction lab**](https://sidem.github.io/HexLife/coffee-percolation.html) | Six- and sixteen-state physical models with exact conservation, host-driven boundaries, and both rule backends side by side. | `/ca`, `/ca-element`, `<hexlife-ca>` |
+| [**3D coffee puck**](https://sidem.github.io/HexLife/coffee-puck.html) | The same model on the close-packed lattice. Impermeable grains conduct past the 2D cliff. | `/hcp`, `/hcp-element`, `<hexlife-hcp>` |
 | [**k-state CA builder**](https://sidem.github.io/HexLife/ca-builder.html) | Edit exact transition tables, paint and run the Wasm world, inspect invariants, and export a standalone npm-package example. | `/ca`, `/ca-element`, `<hexlife-ca>` |
 
 The atlas is also a performance demonstration: `<hexlife-grid>` runs hundreds of simulations but
