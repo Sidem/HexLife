@@ -25,6 +25,18 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.4 — 2026-08-14
+
+#### Changed
+
+- **HCP grains are spheres again**, the close-packed primitive, drawn as impostor quads (a
+  camera-facing square and a ray-sphere hit). That is cheaper than the hex prisms (2 triangles
+  instead of 24) and matches the lattice. Neighbouring grains touch at radius `R√3/2`; the holes
+  between them are the HCP interstices.
+- **Opacity looks into the bed.** Each grain keeps the requested alpha and later peels still
+  draw the grains behind it, so lowering the slider reveals water paths instead of ghosting the
+  whole silhouette. `auto-rotate="false"` on `<hexlife-hcp>` holds the camera.
+
 ### `@hexlife/embed` 1.13.3 — 2026-08-14
 
 #### Fixed

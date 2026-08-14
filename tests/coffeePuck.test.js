@@ -125,6 +125,7 @@ describe('coffee-puck page source policy', () => {
         expect(page).toContain('clearStatesInLayer');
         expect(page).toContain('dualPalette');
         expect(page).toContain('id="opacity"');
+        expect(page).toContain('id="spin"');
         expect(page).toContain('id="diameter"');
         expect(page).toMatch(/id="layers"[^>]*max="48"/);
         expect(page).not.toContain('id="size"');

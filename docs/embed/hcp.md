@@ -36,16 +36,17 @@ world.clearStatesInLayer(world.layers - 1, 0b0110)
 ```
 
 `<hexlife-hcp>` is registered by `@hexlife/embed/hcp-element`. Attributes stay small (`states`,
-`layers`, `rows`, `columns`, `speed`, `palette`, `paused`, `link`, `clip`, `opacity`). The rule and
-cells arrive through `setRule` / `setCells` / `code` (`HXP1.`). The element calls native `tick(n)`
-and draws the live Wasm view; it does not `setCells` after a tick.
+`layers`, `rows`, `columns`, `speed`, `palette`, `paused`, `link`, `clip`, `opacity`,
+`auto-rotate`). The rule and cells arrive through `setRule` / `setCells` / `code` (`HXP1.`). The
+element calls native `tick(n)` and draws the live Wasm view; it does not `setCells` after a tick.
 
 Layer 0 is the open / shower face and is drawn at the **top** of the canvas, so `+layer` (the
-engine's down) is visually down. Occupied sites are hex prisms of circumradius `R`, so in-plane
-neighbours share an edge. `opacity` is site alpha (`0..1`); below 1 the draw depth-selects the
-nearest occupied site and blends only that winner — the same contract as the torus shell, so
-`0.99` is almost solid rather than a stack of every cell along the ray. The clip plane is what
-opens the interior.
+engine's down) is visually down. Occupied sites are **spheres** of radius `R√3/2` (the HCP
+touching-grain radius), drawn as impostor quads — 2 triangles and a ray-sphere hit, not a
+tessellated prism. `opacity` is per-grain alpha. Below 1 the draw peels several nearest grains
+along each ray so you see the packed bed, not a ghost silhouette; `1` is an ordinary solid.
+`auto-rotate` defaults on; `auto-rotate="false"` holds the camera. The clip plane still cuts a
+slab.
 
 ## Lattice
 

@@ -92,8 +92,8 @@
   <p>
     The engine is general: a 12-neighbour conservative 3D CA. Coffee is a <code>k⁴</code> table
     a host installs. Gravity is slot 3 of every tet — the unique lowest site. Drag to orbit,
-    scroll to dolly, pull the clip plane to look inside, or drop the opacity to ghost the
-    near surface.
+    scroll to dolly, drop the opacity to see grains behind grains, or pull the clip plane
+    to cut a slab. Uncheck auto-rotate to hold the camera still.
   </p>
 </div>
 
@@ -101,7 +101,7 @@
   <div>
     <p class="boot" id="boot">loading WorldHcp…</p>
     <hexlife-hcp id="puck" paused states="6" layers="24" rows="48" columns="56" speed="36"
-      palette="#121014,#4696dc,#285096,#5c3a20,#482c1a,#2a1c12" clip="0.22" opacity="0.82"></hexlife-hcp>
+      palette="#121014,#4696dc,#285096,#5c3a20,#482c1a,#2a1c12" clip="0.22" opacity="0.55"></hexlife-hcp>
     <p>
       <span class="swatch" style="background:var(--water)"></span> water
       <span class="swatch" style="background:var(--saturated)"></span> saturated
@@ -149,9 +149,10 @@
       <label>clip <span id="clip-out">0.22</span>
         <input id="clip" type="range" min="0" max="1" step="0.01" value="0.22"/>
       </label>
-      <label>opacity <span id="opacity-out">0.82</span>
-        <input id="opacity" type="range" min="0.08" max="1" step="0.01" value="0.82"/>
+      <label>opacity <span id="opacity-out">0.55</span>
+        <input id="opacity" type="range" min="0.08" max="1" step="0.01" value="0.55"/>
       </label>
+      <label><input id="spin" type="checkbox" checked/> auto-rotate</label>
       <label><input id="uneven" type="checkbox"/> loose patch</label>
       <div class="actions">
         <button class="primary" id="run" type="button">Play</button>
@@ -218,6 +219,7 @@ const ui = {
     layers: document.getElementById('layers'),
     clip: document.getElementById('clip'),
     opacity: document.getElementById('opacity'),
+    spin: document.getElementById('spin'),
     uneven: document.getElementById('uneven'),
     run: document.getElementById('run'),
     step: document.getElementById('step'),
@@ -386,6 +388,9 @@ ui.clip.addEventListener('input', () => {
 ui.opacity.addEventListener('input', () => {
     document.getElementById('opacity-out').textContent = ui.opacity.value;
     el.setAttribute('opacity', ui.opacity.value);
+});
+ui.spin.addEventListener('change', () => {
+    el.setAttribute('auto-rotate', ui.spin.checked ? 'true' : 'false');
 });
 ui.flow.addEventListener('input', () => {
     document.getElementById('flow-out').textContent = ui.flow.value;

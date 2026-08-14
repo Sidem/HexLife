@@ -31,34 +31,29 @@ describe('<hexlife-hcp> package contract', () => {
         expect(renderer).toContain('cameraDepths');
         expect(renderer).toContain('u_layers - 1 - layer');
         expect(renderer).toContain('u_opacity');
-        expect(renderer).toContain('function hexPrism');
+        expect(renderer).toContain('impostorQuad');
+        expect(renderer).toContain('gl_FragDepth');
+        expect(renderer).not.toContain('function hexPrism');
     });
 
-    it('tiles in-plane neighbours at circumradius R', async () => {
+    it('touches neighbouring HCP sites as spheres of radius R√3/2', async () => {
         const {SITE_SCALE} = await import('../src/embed/HcpRenderer.js');
-        const {sitePosition} = await import('../src/embed/hcpCoords.js');
-        expect(SITE_SCALE).toBe(1);
-        const verts = (col, row) => {
-            const c = sitePosition(col, row, 0, 1);
-            return Array.from({length: 6}, (_, i) => {
-                const a = i * Math.PI / 3;
-                return `${(c.x + Math.cos(a) * SITE_SCALE).toFixed(6)},${(c.y + Math.sin(a) * SITE_SCALE).toFixed(6)}`;
-            });
-        };
-        const shared = verts(0, 0).filter((key) => verts(1, 0).includes(key));
-        expect(shared).toHaveLength(2);
+        const {siteDistance, sitePosition} = await import('../src/embed/hcpCoords.js');
+        expect(SITE_SCALE).toBeCloseTo(Math.sqrt(3) / 2, 10);
+        const a = sitePosition(0, 0, 0, 1);
+        const b = sitePosition(1, 0, 0, 1);
+        expect(siteDistance(a, b)).toBeCloseTo(2 * SITE_SCALE, 10);
     });
 
-    it('depth-selects one nearest site instead of accumulating every instance', async () => {
+    it('peels later grains so opacity looks into the bed', async () => {
         const renderer = await read('src/embed/HcpRenderer.js');
-        expect(renderer).toContain('const opaqueSurface = this._opacity >= OPAQUE_OPACITY');
-        expect(renderer).toMatch(
-            /gl\.colorMask\(false, false, false, false\);[\s\S]*gl\.drawArraysInstanced/,
-        );
-        expect(renderer).toMatch(
-            /gl\.colorMask\(true, true, true, true\);[\s\S]*gl\.depthFunc\(gl\.EQUAL\);[\s\S]*gl\.enable\(gl\.BLEND\);[\s\S]*gl\.depthMask\(false\);[\s\S]*gl\.drawArraysInstanced/,
-        );
-        expect(renderer).not.toMatch(/const translucent = this\._opacity < 0\.995/);
+        const element = await read('src/embed/HexHcpElement.js');
+        expect(renderer).toContain('export const PEEL_LAYERS = 8');
+        expect(renderer).toContain('u_peelIndex');
+        expect(renderer).toContain('_drawPeels');
+        expect(renderer).toContain('setAutoRotate');
+        expect(element).toContain("'auto-rotate'");
+        expect(element).toContain('_readAutoRotate');
     });
 
     it('draws layer 0 above the last layer', async () => {

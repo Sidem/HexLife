@@ -16,7 +16,7 @@ import {
 
 const APP_URL = 'https://sidem.github.io/HexLife/';
 
-const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'clip', 'opacity']);
+const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'clip', 'opacity', 'auto-rotate']);
 
 const DEFAULTS = {
     states: 6,
@@ -126,7 +126,7 @@ function readPalette(value, states) {
 
 export class HexHcpElement extends HTMLElement {
     static get observedAttributes() {
-        return ['code', 'states', 'layers', 'rows', 'columns', 'speed', 'palette', 'paused', 'link', 'clip', 'opacity'];
+        return ['code', 'states', 'layers', 'rows', 'columns', 'speed', 'palette', 'paused', 'link', 'clip', 'opacity', 'auto-rotate'];
     }
 
     constructor() {
@@ -210,6 +210,9 @@ export class HexHcpElement extends HTMLElement {
             this._drawOnce();
         } else if (name === 'opacity' && this.renderer) {
             this.renderer.setOpacity(Number(this.getAttribute('opacity')));
+            this._drawOnce();
+        } else if (name === 'auto-rotate' && this.renderer) {
+            this._applyAutoRotate();
             this._drawOnce();
         }
     }
@@ -343,7 +346,7 @@ export class HexHcpElement extends HTMLElement {
                 layers,
                 rows,
                 columns,
-                autoRotate: true,
+                autoRotate: this._readAutoRotate(),
             });
         } catch (e) {
             this._fail('This browser can’t run WebGL2.', String(e && e.message ? e.message : e));
@@ -370,10 +373,12 @@ export class HexHcpElement extends HTMLElement {
         this._onMotionChange = (e) => {
             this._reducedMotion = e.matches;
             if (e.matches) this._playRequested = false;
+            this._applyAutoRotate();
             this._syncPlayback();
         };
         this._motionQuery.addEventListener('change', this._onMotionChange);
 
+        this._applyAutoRotate();
         this._resize();
         this._drawOnce();
         this._syncPlayback();
@@ -416,6 +421,17 @@ export class HexHcpElement extends HTMLElement {
         const href = this.getAttribute('link') || APP_URL;
         this._attrib.href = href;
         this._attrib.hidden = href === 'none';
+    }
+
+    _readAutoRotate() {
+        const raw = this.getAttribute('auto-rotate');
+        if (raw == null || raw === '') return true;
+        return raw !== 'false' && raw !== '0';
+    }
+
+    _applyAutoRotate() {
+        if (!this.renderer) return;
+        this.renderer.setAutoRotate(this._readAutoRotate() && !this._reducedMotion);
     }
 
     _syncPlayback() {
