@@ -174,7 +174,8 @@ describe('coffee-puck page source policy', () => {
         expect(redirect).toContain('coffee-percolation.html#puck');
         expect(lab).toContain('id="tab-puck"');
         expect(lab).toContain('id="p-yield"');
-        expect(lab).toContain('extraction yield');
+        expect(lab).toContain('id="p-model"');
+        expect(host).toContain('puckDualTransition');
         expect(lab).toContain("from './coffee-puck-lab.js'");
         expect(lab).toContain('@hexlife/embed@1.13.5');
         expect(lab).toContain("https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js");

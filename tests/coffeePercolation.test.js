@@ -131,7 +131,10 @@ describe('coffee lab brew history', () => {
         expect(page).toContain('id="tab-puck"');
         expect(page).toContain('id="panel-puck"');
         expect(page).toContain('id="p-yield"');
-        expect(page).toContain('extraction yield');
+        expect(page).toContain('id="p-model"');
+        expect(page).toContain('value="dual"');
+        expect(page).toContain('id="p-grind"');
+        expect(page).toContain('id="p-wick"');
         expect(page).toContain('<hexlife-hcp');
         expect(page).toContain("from './coffee-puck-lab.js'");
         expect(page).toContain('@hexlife/embed/hcp');

@@ -803,16 +803,23 @@
 
 <div class="lede">
   <p>
-    <b>The 2D labs are a slice of this lattice.</b> Site percolation on the triangle has
-    <i>p<sub>c</sub> = 1/2</i>, so the six-state model goes silent near packing 0.50. HCP site
-    <i>p<sub>c</sub></i> is about 0.20. Impermeable grains should still deliver to the cup at
-    packings 0.50–0.75. Same score as next door: spent grounds over all grounds.
+    <b>The 2D labs are a slice of this lattice.</b> Six-state grains are impermeable walls, so a
+    packed bed chokes. Switch to <b>dual-porosity</b> to let grains hold liquid — the same
+    sixteen-state model as the tab next door, on HCP. The score is spent grounds (six-state) or
+    solubles extracted (dual).
   </p>
 </div>
 
 <div class="lab">
   <div class="card">
     <h3>The brew</h3>
+    <div class="field">
+      <label for="p-model">Model</label>
+      <select id="p-model">
+        <option value="six">Six-state — impermeable grains</option>
+        <option value="dual" selected>Dual-porosity — grains hold liquid</option>
+      </select>
+    </div>
     <div class="field">
       <label for="p-pour">Pour pattern</label>
       <select id="p-pour">
@@ -838,6 +845,19 @@
     </div>
     <div class="field">
       <label class="check"><input type="checkbox" id="p-uneven"> Uneven puck (a loose patch)</label>
+    </div>
+    <div id="p-dual-fields">
+      <div class="field">
+        <label for="p-grind">Grind</label>
+        <select id="p-grind">
+          <option value="1">Coarse — slow intraparticle diffusion</option>
+          <option value="2" selected>Medium</option>
+          <option value="3">Fine — fast</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="p-wick" checked> Grain-to-grain wicking</label>
+      </div>
     </div>
 
     <h3 style="margin-top:16px">The rig</h3>
@@ -884,7 +904,7 @@
       <span>in cup <b id="p-incup">0</b></span>
       <span id="p-phase" style="color:var(--accent)">pouring</span>
     </div>
-    <hexlife-hcp id="puck" paused states="6" layers="24" rows="48" columns="56" speed="0"
+    <hexlife-hcp id="puck" paused states="16" layers="24" rows="48" columns="56" speed="0"
       palette="#12100e,#3aa0ff,#c45618,#e0c084,#7a281c,#485460" clip="0.50" opacity="0.55"></hexlife-hcp>
     <div class="stagefoot" id="p-stagefoot"></div>
   </div>
@@ -892,7 +912,7 @@
   <div class="card">
     <div class="score">
       <div class="n" id="p-yield">0.0%</div>
-      <div class="l">extraction yield</div>
+      <div class="l" id="p-yield-label">solubles extracted</div>
       <div class="best">best this session <b id="p-best">—</b></div>
     </div>
     <table class="stat" id="p-bed"></table>
@@ -917,10 +937,9 @@
 
 <h2>How the 3D rule works</h2>
 <p>
-  The same two families as the six-state lab, rewritten for a tetrahedron whose lowest site is
-  always the apex. Extract, then wet, then fall — except here fall is one of three equally-tilted
-  down-bonds, not a unique vertical. Layer 0 is the shower; the last layer is the cup. Drag the
-  volume to orbit. The score is still spent grounds over all grounds.
+  Six-state is the impermeable-grain model: extract, wet, fall. Dual-porosity is the sixteen-state
+  model from the other tab — imbibe, wick, drain, then fall — so a packed bed still conducts.
+  Fall is one of three equally-tilted down-bonds. Layer 0 is the shower; the last layer is the cup.
 </p>
 
 </section>
