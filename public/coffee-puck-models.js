@@ -51,11 +51,9 @@ export const SIX_PALETTE = Object.freeze([
 /**
  * Gravity on a tet whose slot 3 is the unique lowest site.
  *
- * Isolated fluid takes only face0 → apex (same (q, r) on the next layer). That bond zigzags
- * +offset / −offset each layer and cancels. A mate may take the apex only when face0 is a
- * grain — going around an obstacle — never when face0 is air. Sneaking out a mate while the
- * unique-down is open is what walked a centre stream off to one side and also let water leave
- * a tet before extract could run.
+ * Face0 → apex is preferred when that slot holds fluid. A unique heaviest mate may take an
+ * empty apex so a parcel sitting on a grain can step into a neighbouring hole. There is still
+ * no in-plane face slide.
  *
  * @param {number[]} out
  * @param {(state: number) => boolean} mobile
@@ -69,8 +67,6 @@ export function puckFall(out, mobile) {
         swap(0, 3);
         return;
     }
-    const blocked = out[0] !== EMPTY && !mobile(out[0]);
-    if (!blocked) return;
     let best = -1;
     let tied = false;
     for (let i = 1; i < 3; i++) {
@@ -208,6 +204,8 @@ export function puckDualQuantities(tet, out) {
 export const PULSE_BLOOM_TICKS = 40;
 export const PULSE_REST_TICKS = 60;
 export const PARTITION_PERIOD = 6;
+/** 6-phase tet × conjugate periods. Quieter than this is not a finished brew. */
+export const SETTLE_TICKS_ALTERNATING = 12;
 export const HEADSPACE_LAYERS = 4;
 export const DRIP_LAYERS = 4;
 

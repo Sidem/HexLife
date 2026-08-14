@@ -74,10 +74,10 @@ describe('puck host helpers', () => {
         expect(tet).toEqual([3, 0, 1, 2]);
     });
 
-    it('does not sneak a mate out while the unique-down is open air', () => {
+    it('lets a lone mate step into an empty hole so surface water can drain', () => {
         const tet = [0, 1, 0, 0];
         puckFall(tet, (state) => state < 3);
-        expect(tet).toEqual([0, 1, 0, 0]);
+        expect(tet).toEqual([0, 0, 0, 1]);
     });
 
     it('lets a lone mate go around a grain', () => {
@@ -155,6 +155,14 @@ describe('puck host helpers', () => {
     it('scales quiet ticks with layers', () => {
         expect(quietTickLimit(24)).toBe(Math.max(240, 24 * PARTITION_PERIOD));
         expect(quietTickLimit(8, 12)).toBe(240);
+    });
+
+    it('does not treat a half alternate-period as settled', async () => {
+        const host = await readFile(new URL('../public/coffee-puck-lab.js', import.meta.url), 'utf8');
+        expect(host).toContain('SETTLE_TICKS_ALTERNATING');
+        expect(host).toContain('headspaceHoldsFluid');
+        expect(host).toContain('brewHasSettled');
+        expect(host).not.toMatch(/brew\.still >= PARTITION_PERIOD \|\| brew\.tick > limit/);
     });
 });
 

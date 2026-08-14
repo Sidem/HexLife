@@ -6,12 +6,14 @@
  */
 
 import {
+    bedRange,
     injectionSites,
     makePuckCells,
     PARTITION_PERIOD,
     puckSixFamiliesPreserved,
     puckSixTransition,
     quietTickLimit,
+    SETTLE_TICKS_ALTERNATING,
     SIX_PALETTE,
 } from './coffee-puck-models.js';
 import {bestRunIndex, pushRunEntry} from './lab-history.js';
@@ -71,9 +73,34 @@ function dims() {
     return {layers: Number(ui.layers.value), rows, cols};
 }
 
+function settlePeriod() {
+    return el.world.blockAlternates ? SETTLE_TICKS_ALTERNATING : PARTITION_PERIOD;
+}
+
 function alignPartition() {
-    const offset = el.world.generation % PARTITION_PERIOD;
-    if (offset) el.tick(PARTITION_PERIOD - offset);
+    const period = settlePeriod();
+    const offset = el.world.generation % period;
+    if (offset) el.tick(period - offset);
+}
+
+function headspaceHoldsFluid() {
+    const {lo} = bedRange(el.world.layers);
+    for (let layer = 0; layer < lo; layer++) {
+        const census = el.world.layerCensus(layer);
+        if ((census[1] || 0) + (census[2] || 0) > 0) return true;
+    }
+    return false;
+}
+
+function brewHasSettled() {
+    const period = settlePeriod();
+    const limit = quietTickLimit(el.world.layers, period);
+    if (brew.tick > limit) return true;
+    if (brew.still < period) return false;
+    // Water waiting in the shower is not a finished extraction. Only the long allowance
+    // may give up on a pool that truly cannot find a hole.
+    if (headspaceHoldsFluid()) return false;
+    return true;
 }
 
 function startBrew() {
@@ -171,7 +198,7 @@ function render() {
         + ` = ${el.world.numCells.toLocaleString()} cells`
         + ` · table <b>${6 ** 4}</b> entries`
         + ` · HCP 12-neighbour · partition <b>6-phase tet</b>`
-        + (brew.still >= PARTITION_PERIOD ? ' · <b>settled</b>' : '');
+        + (brew.still >= settlePeriod() && !headspaceHoldsFluid() ? ' · <b>settled</b>' : '');
 
     $('p-stagefoot').innerHTML = !brew.finished
         ? 'Same score as the 2D lab: spent grounds over all grounds. Drag to orbit, scroll to dolly, '
@@ -274,8 +301,7 @@ function syncLabels() {
 
 export function stepPuck() {
     if (!el?.world || !brew.running) return;
-    const limit = quietTickLimit(el.world.layers, el.world.blockAlternates ? 12 : 6);
-    if (brew.still >= PARTITION_PERIOD || brew.tick > limit) {
+    if (brewHasSettled()) {
         if (!brew.finished) { brew.finished = true; render(); recordRun(); }
         return;
     }
@@ -285,7 +311,7 @@ export function stepPuck() {
         const changed = el.world.tick(1);
         brew.tick++;
         brew.still = (touched || changed !== 0) ? 0 : brew.still + 1;
-        if (brew.still >= PARTITION_PERIOD) break;
+        if (brewHasSettled()) break;
     }
     el.tick(0);
     render();
