@@ -127,6 +127,16 @@ describe('coffee lab brew history', () => {
         expect(page.match(/recordDualRun\(\)/g)).toHaveLength(2);
     });
 
+    it('hosts the 3D puck as a tab with the same yield dashboard', () => {
+        expect(page).toContain('id="tab-puck"');
+        expect(page).toContain('id="panel-puck"');
+        expect(page).toContain('id="p-yield"');
+        expect(page).toContain('extraction yield');
+        expect(page).toContain('<hexlife-hcp');
+        expect(page).toContain("from './coffee-puck-lab.js'");
+        expect(page).toContain('@hexlife/embed/hcp');
+    });
+
     it('starts every brew on the same partition phase, so two runs are comparable', () => {
         // The engine's tick counter picks the partition phase and the handedness, and it only goes
         // back to zero on a re-boot — so without this a second brew takes a different path from the

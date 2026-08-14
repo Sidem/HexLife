@@ -240,5 +240,6 @@ truncated or padded paste fails an exact byte count instead of being half-read.
 ## Related
 
 - [Coffee extraction lab](https://sidem.github.io/HexLife/coffee-percolation.html) — six- and
-  sixteen-state conserved models, and a four-state model run under both backends at once.
+  sixteen-state conserved models, a four-state model run under both backends at once, and the
+  same extraction on the 3D HCP puck.
 - [`/stochastic`](./stochastic.md) — the third engine, for probability and time-in-state.

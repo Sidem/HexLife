@@ -25,6 +25,12 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### Changed
+
+- **The 3D coffee puck is a tab on the coffee lab**, not its own page. Same extraction-yield
+  dashboard, brew controls, and history log as the six-state 2D lab. `coffee-puck.html` redirects
+  to `coffee-percolation.html#puck`.
+
 ### `@hexlife/embed` 1.13.5 — 2026-08-14
 
 #### Fixed

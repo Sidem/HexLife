@@ -159,22 +159,26 @@ describe('puck host helpers', () => {
 });
 
 describe('coffee-puck page source policy', () => {
-    it('declares engine hcp and has no host tet loop or per-tick setCells', async () => {
-        const page = await readFile(new URL('../public/coffee-puck.html', import.meta.url), 'utf8');
-        expect(page).toContain("from '@hexlife/embed/hcp'");
-        expect(page).toContain('@hexlife/embed@1.13.5');
-        expect(page).not.toMatch(/for\s*\([^)]*ncells/);
-        expect(page).toContain('paintIf');
-        expect(page).toContain('clearStatesInLayer');
-        expect(page).toContain('dualPalette');
-        expect(page).toContain('id="opacity"');
-        expect(page).toContain('id="spin"');
-        expect(page).toContain('id="diameter"');
-        expect(page).toMatch(/id="layers"[^>]*max="48"/);
-        expect(page).not.toContain('id="size"');
-        expect(page).toMatch(/id="flow"[^>]*max="240"/);
-        expect(page).toMatch(/id="water"[^>]*max="8000"/);
-        expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js');
+    it('lives on the coffee lab page, not as its own instrument', async () => {
+        const lab = await readFile(new URL('../public/coffee-percolation.html', import.meta.url), 'utf8');
+        const redirect = await readFile(new URL('../public/coffee-puck.html', import.meta.url), 'utf8');
+        const host = await readFile(new URL('../public/coffee-puck-lab.js', import.meta.url), 'utf8');
+        expect(redirect).toContain('coffee-percolation.html#puck');
+        expect(lab).toContain('id="tab-puck"');
+        expect(lab).toContain('id="p-yield"');
+        expect(lab).toContain('extraction yield');
+        expect(lab).toContain("from './coffee-puck-lab.js'");
+        expect(lab).toContain('@hexlife/embed@1.13.5');
+        expect(lab).toContain("https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js");
+        expect(lab).toContain('<hexlife-hcp');
+        expect(host).toContain("import('@hexlife/embed/hcp')");
+        expect(host).not.toMatch(/for\s*\([^)]*ncells/);
+        expect(host).toContain('paintIf');
+        expect(host).toContain('clearStatesInLayer');
+        expect(lab).toContain('id="p-opacity"');
+        expect(lab).toContain('id="p-spin"');
+        expect(lab).toContain('id="p-diameter"');
+        expect(lab).toMatch(/id="p-layers"[^>]*max="48"/);
     });
 });
 

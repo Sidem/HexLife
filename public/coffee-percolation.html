@@ -89,7 +89,9 @@
      pour and the drip around each tick, which the element's own loop knows nothing about. So their
      poster play buttons must not be offered: pressing one would start a second loop ticking the
      same world. `::part(overlay)` is the element's supported hook for a host owning its transport. */
-  hexlife-ca#lab::part(overlay), hexlife-ca#lab2::part(overlay) { display: none; }
+  hexlife-ca#lab::part(overlay), hexlife-ca#lab2::part(overlay),
+  hexlife-hcp#puck::part(overlay) { display: none; }
+  hexlife-hcp { width: 100%; min-height: 420px; display: block; background: #141210; }
 
   /* --- tabs --- */
   .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; border-bottom: 1px solid var(--line); }
@@ -201,7 +203,9 @@
 {
   "imports": {
     "@hexlife/embed/ca": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.10.0/src/embed/ca.js",
-    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.10.0/src/embed/ca-element.js"
+    "@hexlife/embed/ca-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.10.0/src/embed/ca-element.js",
+    "@hexlife/embed/hcp": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js",
+    "@hexlife/embed/hcp-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp-element.js"
   }
 }
 </script>
@@ -213,7 +217,9 @@
   {
     "imports": {
       "@hexlife/embed/ca": "./dist/embed-package/src/embed/ca.js",
-      "@hexlife/embed/ca-element": "./dist/embed-package/src/embed/ca-element.js"
+      "@hexlife/embed/ca-element": "./dist/embed-package/src/embed/ca-element.js",
+      "@hexlife/embed/hcp": "./dist/embed-package/src/embed/hcp.js",
+      "@hexlife/embed/hcp-element": "./dist/embed-package/src/embed/hcp-element.js"
     }
   }
   </script>
@@ -235,7 +241,6 @@
       <a href="./embed-demos.html">Demo library</a>
       <a href="./totalistic-256.html">Rule atlas</a>
       <a href="./coffee-percolation.html" aria-current="page">Coffee lab</a>
-      <a href="./coffee-puck.html">3D puck</a>
       <a href="./ca-builder.html">CA builder</a><a href="./solid-garden.html">Solid Garden</a>
     </nav>
   </div>
@@ -243,7 +248,7 @@
     <div>
       <p class="demo-kicker">k-state physical-model showcase</p>
       <h1>Coffee extraction lab</h1>
-      <p class="demo-deck">A six- and sixteen-state model of water moving through coffee grounds. Pull the levers, preserve the physics, and try to spend the whole puck.</p>
+      <p class="demo-deck">A six- and sixteen-state model of water moving through coffee grounds — in the plane and on the close-packed lattice. Pull the levers, preserve the physics, and try to spend the whole puck.</p>
     </div>
     <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
       <span>Built with the published npm package</span>
@@ -276,16 +281,17 @@
     that its grains are impermeable: water can only ever sit in the gaps between them, so it pools
     on the surface, pockets of brew stay trapped forever, and at the packing a real puck runs at,
     most of the bed is never touched at all. Grains that hold liquid fix that, and that tab has the
-    measurements. The <a href="./coffee-puck.html">3D puck lab</a> is the close-packed lattice this
-    page is a slice of — the packing-threshold measurement the 2D cliff predicts. It also carries the write-up of a transport bug both rules used to share —
-    gravity pointing 60° to the left — because the fix is the same three lines in all three rules on
-    this page.
+    measurements. The <a href="#puck">3D puck</a> tab is the close-packed lattice this page is a
+    slice of — the packing-threshold measurement the 2D cliff predicts. It also carries the write-up
+    of a transport bug both rules used to share — gravity pointing 60° to the left — because the
+    fix is the same three lines in all three rules on this page.
   </p>
 </div>
 
 <nav class="tabs" role="tablist" id="tabs">
   <button role="tab" id="tab-six" aria-controls="panel-six" aria-selected="true">Extraction lab · 6 states</button>
   <button role="tab" id="tab-dual" aria-controls="panel-dual" aria-selected="false">Dual-porosity lab · 16 states</button>
+  <button role="tab" id="tab-puck" aria-controls="panel-puck" aria-selected="false">3D puck · HCP</button>
   <button role="tab" id="tab-backend" aria-controls="panel-backend" aria-selected="false">Why block mode</button>
 </nav>
 
@@ -792,6 +798,133 @@
 
 </section>
 
+<!-- ================= 3D puck lab ================= -->
+<section class="panel" id="panel-puck" role="tabpanel" aria-labelledby="tab-puck" hidden>
+
+<div class="lede">
+  <p>
+    <b>The 2D labs are a slice of this lattice.</b> Site percolation on the triangle has
+    <i>p<sub>c</sub> = 1/2</i>, so the six-state model goes silent near packing 0.50. HCP site
+    <i>p<sub>c</sub></i> is about 0.20. Impermeable grains should still deliver to the cup at
+    packings 0.50–0.75. Same score as next door: spent grounds over all grounds.
+  </p>
+</div>
+
+<div class="lab">
+  <div class="card">
+    <h3>The brew</h3>
+    <div class="field">
+      <label for="p-pour">Pour pattern</label>
+      <select id="p-pour">
+        <option value="shower">Shower — even, across the bed</option>
+        <option value="pulse">Pulse — bloom, rest, then pour</option>
+        <option value="centre">Centre stream — one spot</option>
+        <option value="dump">Dump — all of it at once</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="p-flow"><span class="val" id="p-flow-v">12</span>Flow rate <span style="opacity:.7">cells/tick</span></label>
+      <input type="range" id="p-flow" min="1" max="80" value="12">
+    </div>
+    <div class="field">
+      <label for="p-water"><span class="val" id="p-water-v">6%</span>Water volume <span style="opacity:.7">of grid</span></label>
+      <input type="range" id="p-water" min="1" max="25" value="6">
+    </div>
+
+    <h3 style="margin-top:16px">The puck</h3>
+    <div class="field">
+      <label for="p-pack"><span class="val" id="p-pack-v">0.55</span>Packing density</label>
+      <input type="range" id="p-pack" min="20" max="85" value="55">
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="p-uneven"> Uneven puck (a loose patch)</label>
+    </div>
+
+    <h3 style="margin-top:16px">The rig</h3>
+    <div class="field">
+      <label for="p-diameter">Diameter</label>
+      <select id="p-diameter">
+        <option value="36,42">compact 36×42</option>
+        <option value="48,56" selected>demo 48×56</option>
+        <option value="66,76">medium 66×76</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="p-layers"><span class="val" id="p-layers-v">24</span>Thickness <span style="opacity:.7">layers</span></label>
+      <input type="range" id="p-layers" min="8" max="48" step="2" value="24">
+    </div>
+    <div class="field">
+      <label for="p-speed"><span class="val" id="p-speed-v">2</span>Ticks per frame</label>
+      <input type="range" id="p-speed" min="1" max="8" value="2">
+    </div>
+    <div class="field row">
+      <button id="p-run">Pause</button>
+      <button id="p-brew">New brew</button>
+    </div>
+
+    <h3 style="margin-top:16px">The view</h3>
+    <div class="field">
+      <label for="p-clip"><span class="val" id="p-clip-v">0.50</span>Clip plane</label>
+      <input type="range" id="p-clip" min="0" max="1" step="0.01" value="0.50">
+    </div>
+    <div class="field">
+      <label for="p-opacity"><span class="val" id="p-opacity-v">0.55</span>Opacity</label>
+      <input type="range" id="p-opacity" min="0.08" max="1" step="0.01" value="0.55">
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="p-spin" checked> Auto-rotate</label>
+    </div>
+  </div>
+
+  <div class="card stage">
+    <div class="stagebar">
+      <span>tick <b id="p-tick">0</b></span>
+      <span>poured <b id="p-poured">0</b></span>
+      <span>in bed <b id="p-inbed">0</b></span>
+      <span>in cup <b id="p-incup">0</b></span>
+      <span id="p-phase" style="color:var(--accent)">pouring</span>
+    </div>
+    <hexlife-hcp id="puck" paused states="6" layers="24" rows="48" columns="56" speed="0"
+      palette="#12100e,#3aa0ff,#c45618,#e0c084,#7a281c,#485460" clip="0.50" opacity="0.55"></hexlife-hcp>
+    <div class="stagefoot" id="p-stagefoot"></div>
+  </div>
+
+  <div class="card">
+    <div class="score">
+      <div class="n" id="p-yield">0.0%</div>
+      <div class="l">extraction yield</div>
+      <div class="best">best this session <b id="p-best">—</b></div>
+    </div>
+    <table class="stat" id="p-bed"></table>
+    <table class="stat" id="p-cup" style="margin-top:10px"></table>
+    <p class="facts" id="p-diag"></p>
+  </div>
+</div>
+
+<div class="card runlog">
+  <div class="runlog-head">
+    <h3>Brew history</h3>
+    <span class="runlog-note">
+      Same log as the 2D lab: a row is written when a brew settles or chokes. <b>Restore</b> replays
+      that puck, pour, and thickness exactly.
+    </span>
+    <span class="runlog-actions">
+      <button id="p-log-clear">Clear</button>
+    </span>
+  </div>
+  <div class="runlog-scroll"><table class="runs" id="p-log"></table></div>
+</div>
+
+<h2>How the 3D rule works</h2>
+<p>
+  The same two families as the six-state lab, rewritten for a tetrahedron whose lowest site is
+  always the apex. Extract, then wet, then fall — except here fall is one of three equally-tilted
+  down-bonds, not a unique vertical. Layer 0 is the shower; the last layer is the cup. Drag the
+  volume to orbit. The score is still spent grounds over all grounds.
+</p>
+
+</section>
+
 <!-- ================= backend comparison ================= -->
 <section class="panel" id="panel-backend" role="tabpanel" aria-labelledby="tab-backend" hidden>
 
@@ -998,6 +1131,7 @@ import {
     coffeeFall as fall,
     coffeeSixTransition,
 } from './ca-builder-models.js';
+import {mountPuckLab, puckMounted, redrawPuck, stepPuck} from './coffee-puck-lab.js';
 
 // ===========================================================================
 // PART 1 — the six-state extraction lab
@@ -1346,6 +1480,7 @@ function frame() {
     rafId = requestAnimationFrame(frame);
     if (activeTab === 'six' && brew.running) stepSix();
     else if (activeTab === 'dual' && dBrew.running) stepDual();
+    else if (activeTab === 'puck') stepPuck();
 }
 
 /** One generation. The handedness alternates inside the engine — see `startBrew`. */
@@ -1418,8 +1553,16 @@ lab.addEventListener('hexlife-ca-ready', () => startBrew());
 const TABS = [
     { tab: 'tab-six', panel: 'panel-six', key: 'six' },
     { tab: 'tab-dual', panel: 'panel-dual', key: 'dual' },
+    { tab: 'tab-puck', panel: 'panel-puck', key: 'puck' },
     { tab: 'tab-backend', panel: 'panel-backend', key: 'backend' },
 ];
+function tabFromHash() {
+    const hash = (location.hash || '').replace(/^#/, '');
+    if (hash === 'puck' || hash === '3d') return 'puck';
+    if (hash === 'dual') return 'dual';
+    if (hash === 'backend') return 'backend';
+    return 'six';
+}
 function selectTab(key) {
     activeTab = key;
     for (const t of TABS) {
@@ -1427,14 +1570,23 @@ function selectTab(key) {
         document.getElementById(t.tab).setAttribute('aria-selected', String(on));
         document.getElementById(t.panel).hidden = !on;
     }
+    const want = key === 'six' ? '' : `#${key}`;
+    if (location.hash !== want) history.replaceState(null, '', want || location.pathname + location.search);
     // A hidden canvas has no size, so the element could not have laid itself out while the panel was
     // display:none. Repaint once now that it can.
     if (key === 'six' && lab.world) lab.tick(0);
     if (key === 'dual' && lab2.world) lab2.tick(0);
+    if (key === 'puck') {
+        mountPuckLab().then(() => { if (puckMounted()) redrawPuck(); }).catch((err) => {
+            const boot = document.getElementById('p-stagefoot');
+            if (boot) boot.innerHTML = `<b style="color:var(--bad)">3D engine failed to load.</b> ${err && err.message ? err.message : err}`;
+        });
+    }
 }
 for (const t of TABS) {
     document.getElementById(t.tab).addEventListener('click', () => selectTab(t.key));
 }
+window.addEventListener('hashchange', () => selectTab(tabFromHash()));
 
 /** Every slider's label refresher, so restoring a logged brew can repaint them all in one call. */
 const sixSyncs = [];
@@ -2285,7 +2437,7 @@ const boot = document.getElementById('boot');
 
     startBrew();
     startBrew2();
-    selectTab('six');
+    selectTab(tabFromHash());
     rafId = requestAnimationFrame(frame);
 
     cmp.block.setRule(cmpBlockRule);

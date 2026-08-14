@@ -316,13 +316,13 @@ the package without Explorer internals or a local build.
 
 > ### [**▶ Coffee extraction lab**](https://sidem.github.io/HexLife/coffee-percolation.html)
 >
-> The k-state half of the package, on `<hexlife-ca>`. Six states — air, water, saturated water, and
-> dry, wet and spent grounds — where fluid and grounds are each conserved **exactly** and the only
-> things crossing the boundary are the pour and the drip. Set the packing, the bed and the pour
-> pattern, and try to spend the whole puck. The packing slider is really a percolation experiment:
-> yield collapses from 59% to 7% as pore space crosses 0.5, which is `p_c` for site percolation on
-> the triangular lattice — exactly, and on no other common grid. The page also runs a four-state
-> version under both backends at once, which is the shortest statement of why `'block'` exists at all.
+> The k-state half of the package, on `<hexlife-ca>`, plus the same extraction on the close-packed
+> lattice through `<hexlife-hcp>`. Six states — air, water, saturated water, and dry, wet and spent
+> grounds — where fluid and grounds are each conserved **exactly** and the only things crossing the
+> boundary are the pour and the drip. The score is spent grounds over all grounds, in the plane and
+> in 3D. The packing slider is really a percolation experiment: 2D yield collapses as pore space
+> crosses 0.5, which is `p_c` for site percolation on the triangular lattice; the 3D tab is the
+> packing-threshold measurement that cliff predicts.
 
 ```html
 <hexlife-ca states="6" rows="150" backend="block"></hexlife-ca>

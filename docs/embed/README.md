@@ -57,8 +57,7 @@ published npm version through jsDelivr; they do not reach into Explorer internal
 - [256 worlds, one rule class](https://sidem.github.io/HexLife/totalistic-256.html) — the complete
   totalistic class on one map, through `<hexlife-grid>`.
 - [Coffee extraction lab](https://sidem.github.io/HexLife/coffee-percolation.html) — six- and
-  sixteen-state physical models with exact conservation, through `<hexlife-ca>`.
-- [3D coffee puck](https://sidem.github.io/HexLife/coffee-puck.html) — the same model on the HCP
-  lattice, through `<hexlife-hcp>`.
+  sixteen-state 2D labs plus the 3D HCP puck, same extraction yield, through `<hexlife-ca>` and
+  `<hexlife-hcp>`.
 - [k-state CA builder](https://sidem.github.io/HexLife/ca-builder.html) — edit exact transition
   tables and export a standalone npm-package example.

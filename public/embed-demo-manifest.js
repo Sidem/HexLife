@@ -29,7 +29,7 @@ export const EMBED_DEMO_OWNERSHIP = Object.freeze([
   // Garden ticks a binary `World`; `WorldSolid` simulates nothing — it is a layer sink that owns
   // the meshing, so it appears here as the second half of the owner rather than as an engine.
   demo('solid-garden', 'solid-garden.html', 'reference', 'binary', 'World+WorldSolid/extrude'),
-  demo('coffee-puck', 'coffee-puck.html', 'reference', 'hcp', 'WorldHcp/block'),
+  demo('coffee-puck', 'coffee-percolation.html#puck', 'reference', 'hcp', 'WorldHcp/block'),
 ]);
 
 function demo(id, href, section, engine, currentOwner, debts = []) {
