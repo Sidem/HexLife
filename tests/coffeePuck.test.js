@@ -2,8 +2,11 @@ import {readFile} from 'node:fs/promises';
 import {beforeAll, describe, expect, it} from 'vitest';
 import {blockRuleFromTet, HexHcp, initHcpEngine, sitePosition} from '../src/embed/hcp.js';
 import {
+    bedRange,
     diskCenter,
     diskIndices,
+    DRIP_LAYERS,
+    HEADSPACE_LAYERS,
     injectionSites,
     makePuckCells,
     PARTITION_PERIOD,
@@ -13,6 +16,7 @@ import {
     puckSixFamiliesPreserved,
     puckSixTransition,
     quietTickLimit,
+    SIX_PALETTE,
     siteXY,
 } from '../public/coffee-puck-models.js';
 
@@ -70,6 +74,27 @@ describe('puck host helpers', () => {
         expect(tet).toEqual([3, 0, 1, 2]);
     });
 
+    it('lets a lone mate take an empty apex so all three down-bonds work', () => {
+        const tet = [0, 1, 0, 0];
+        puckFall(tet, (state) => state < 3);
+        expect(tet).toEqual([0, 0, 0, 1]);
+    });
+
+    it('does not slide along the face when the apex is occupied', () => {
+        const tet = [1, 0, 0, 3];
+        puckFall(tet, (state) => state < 3);
+        expect(tet).toEqual([1, 0, 0, 3]);
+    });
+
+    it('keeps dry, wet, spent and saturated visually far apart', () => {
+        const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        expect(SIX_PALETTE[2][0]).toBeGreaterThan(SIX_PALETTE[2][2]);
+        expect(SIX_PALETTE[2][0]).toBeGreaterThan(100);
+        expect(dist(SIX_PALETTE[3], SIX_PALETTE[4])).toBeGreaterThan(80);
+        expect(dist(SIX_PALETTE[4], SIX_PALETTE[5])).toBeGreaterThan(50);
+        expect(dist(SIX_PALETTE[3], SIX_PALETTE[5])).toBeGreaterThan(120);
+    });
+
     it('returns distinct disk injection sites', () => {
         const disk = new Set(diskIndices(12, 16));
         for (const mode of ['shower', 'centre', 'dump', 'pulse']) {
@@ -104,9 +129,14 @@ describe('puck host helpers', () => {
         const b = makePuckCells({layers: 8, rows: 12, cols: 16, packing: 0.6, seed: 0xC0FFEE});
         expect([...a]).toEqual([...b]);
         const layer = 12 * 16;
-        expect(a.subarray(0, layer).every((v) => v === 0)).toBe(true);
-        expect(a.subarray(7 * layer).every((v) => v === 0)).toBe(true);
+        const {lo, hi} = bedRange(8);
+        expect(lo).toBeGreaterThan(1);
+        expect(hi).toBeLessThan(7);
+        expect(a.subarray(0, lo * layer).every((v) => v === 0)).toBe(true);
+        expect(a.subarray(hi * layer).every((v) => v === 0)).toBe(true);
         expect(a.some((v) => v === 3)).toBe(true);
+        expect(HEADSPACE_LAYERS).toBe(4);
+        expect(DRIP_LAYERS).toBe(4);
     });
 
     it('scales quiet ticks with layers', () => {
@@ -141,6 +171,7 @@ describe('gravity centre of mass', () => {
         const layers = 8;
         const rows = 12;
         const cols = 8;
+        const drifts = [];
         for (const layer of [1, 2]) {
             for (const col of [2, 3]) {
                 const world = new HexHcp({states: 6, layers, rows, columns: cols, rule});
@@ -164,11 +195,55 @@ describe('gravity centre of mass', () => {
                 const endCol = rem - endRow * cols;
                 const p1 = sitePosition(endCol, endRow, endLayer, 1);
                 expect(p1.z - p0.z, `layer ${layer} col ${col}`).toBeGreaterThan(0);
-                const a = Math.sqrt(3);
-                expect(Math.abs(p1.x - p0.x)).toBeLessThanOrEqual(a + 1e-9);
-                expect(Math.abs(p1.y - p0.y)).toBeLessThanOrEqual(a + 1e-9);
+                drifts.push([p1.x - p0.x, p1.y - p0.y]);
                 world.dispose();
             }
         }
+        const meanX = drifts.reduce((sum, [dx]) => sum + dx, 0) / drifts.length;
+        const meanY = drifts.reduce((sum, [, dy]) => sum + dy, 0) / drifts.length;
+        const a = Math.sqrt(3);
+        expect(Math.abs(meanX)).toBeLessThan(a);
+        expect(Math.abs(meanY)).toBeLessThan(a);
+    });
+
+    it('does not walk a centre-stream pour out one side of an empty column', () => {
+        const rule = blockRuleFromTet(6, puckSixTransition);
+        const layers = 16;
+        const rows = 12;
+        const cols = 16;
+        const world = new HexHcp({states: 6, layers, rows, columns: cols, rule});
+        world.setBlockAlternates(true);
+        const [cx, cy] = diskCenter(rows, cols);
+        const disk = diskIndices(rows, cols);
+        const centre = disk.reduce((best, index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const [x, y] = siteXY(row, col);
+            const d = (x - cx) ** 2 + (y - cy) ** 2;
+            return d < best.d ? {index, d, col, row} : best;
+        }, {index: disk[0], d: Infinity, col: 0, row: 0});
+        world.setCell(centre.row * cols + centre.col, 1);
+        const p0 = sitePosition(centre.col, centre.row, 0, 1);
+        for (let i = 0; i < 80; i++) world.tick();
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        const layerSize = rows * cols;
+        for (let i = 0; i < world.numCells; i++) {
+            if (world.state[i] !== 1 && world.state[i] !== 2) continue;
+            const layer = Math.floor(i / layerSize);
+            const rem = i - layer * layerSize;
+            const row = Math.floor(rem / cols);
+            const col = rem - row * cols;
+            const p = sitePosition(col, row, layer, 1);
+            sumX += p.x;
+            sumY += p.y;
+            count += 1;
+        }
+        expect(count).toBeGreaterThan(0);
+        const a = Math.sqrt(3);
+        expect(Math.abs(sumX / count - p0.x)).toBeLessThan(2.5 * a);
+        expect(Math.abs(sumY / count - p0.y)).toBeLessThan(2.5 * a);
+        world.dispose();
     });
 });

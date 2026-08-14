@@ -41,19 +41,21 @@ export const SIX_NAMES = Object.freeze([
 
 export const SIX_PALETTE = Object.freeze([
     [18, 16, 14],
-    [70, 150, 220],
-    [40, 80, 150],
-    [92, 58, 32],
-    [72, 44, 26],
-    [42, 28, 18],
+    [58, 160, 255],
+    [168, 74, 28],
+    [201, 168, 124],
+    [106, 64, 36],
+    [36, 28, 24],
 ]);
 
 /**
  * Gravity on a tet whose slot 3 is the unique lowest site.
  *
- * The vertical analog is face0 → apex (same (q, r)). A mate falls into the apex only when that
- * vertical source is occupied, so an isolated parcel waits for the phase that hands it the
- * unique-down bond. Face leveling is handed; `setBlockAlternates(true)` cancels it.
+ * Face0 → apex is one of the three equally-tilted down-bonds (same (q, r) on the next layer).
+ * A unique heaviest mate may take the apex too, so an isolated parcel uses all three down-bonds
+ * across the period instead of only the same-(q, r) zigzag. There is no in-plane face slide:
+ * that walk is handed, and even with `setBlockAlternates(true)` even-host phases apply it 2:1,
+ * which drains a centre stream out one side of the puck.
  *
  * @param {number[]} out
  * @param {(state: number) => boolean} mobile
@@ -62,42 +64,23 @@ export function puckFall(out, mobile) {
     const swap = (a, b) => {
         [out[a], out[b]] = [out[b], out[a]];
     };
-    if (out[3] === EMPTY && mobile(out[0])) {
+    if (out[3] !== EMPTY) return;
+    if (out[0] !== EMPTY && mobile(out[0])) {
         swap(0, 3);
         return;
     }
-    if (out[3] === EMPTY && out[0] !== EMPTY) {
-        let best = -1;
-        let tied = false;
-        for (let i = 1; i < 3; i++) {
-            if (!mobile(out[i])) continue;
-            if (best === -1 || out[i] > out[best]) {
-                best = i;
-                tied = false;
-            } else if (out[i] === out[best]) {
-                tied = true;
-            }
-        }
-        if (best !== -1 && !tied) {
-            swap(best, 3);
-            return;
+    let best = -1;
+    let tied = false;
+    for (let i = 1; i < 3; i++) {
+        if (!mobile(out[i])) continue;
+        if (best === -1 || out[i] > out[best]) {
+            best = i;
+            tied = false;
+        } else if (out[i] === out[best]) {
+            tied = true;
         }
     }
-    if (out[3] !== EMPTY) {
-        if (mobile(out[0]) && out[1] === EMPTY) {
-            swap(0, 1);
-            return;
-        }
-        if (mobile(out[1]) && out[2] === EMPTY) {
-            swap(1, 2);
-            return;
-        }
-        if (mobile(out[0]) && mobile(out[1]) && out[0] > out[1]) {
-            swap(0, 1);
-            return;
-        }
-        if (mobile(out[1]) && mobile(out[2]) && out[1] > out[2]) swap(1, 2);
-    }
+    if (best !== -1 && !tied) swap(best, 3);
 }
 
 /** Six-state extraction: extract, wet, then fall. */
@@ -223,6 +206,29 @@ export function puckDualQuantities(tet, out) {
 export const PULSE_BLOOM_TICKS = 40;
 export const PULSE_REST_TICKS = 60;
 export const PARTITION_PERIOD = 6;
+export const HEADSPACE_LAYERS = 4;
+export const DRIP_LAYERS = 4;
+
+/**
+ * Inclusive-exclusive [lo, hi) of layers that hold the bed. Headspace and drip stay empty so
+ * the pour is visible above the puck and the drip is visible below it.
+ * @param {number} layers
+ * @param {number} [headspace]
+ * @param {number} [drip]
+ */
+export function bedRange(layers, headspace = HEADSPACE_LAYERS, drip = DRIP_LAYERS) {
+    const n = Math.max(2, Math.floor(layers));
+    const cap = Math.max(1, Math.floor(n / 2) - 1);
+    const top = Math.min(Math.max(1, Math.floor(headspace)), cap);
+    const bot = Math.min(Math.max(1, Math.floor(drip)), cap);
+    let lo = top;
+    let hi = n - bot;
+    if (hi <= lo) {
+        lo = 1;
+        hi = n - 1;
+    }
+    return {lo, hi};
+}
 
 function evenlySpaced(span, count, phase) {
     const n = Math.max(0, Math.min(span, Math.floor(count)));
@@ -328,10 +334,15 @@ export function quietTickLimit(layers, period = PARTITION_PERIOD) {
 }
 
 /**
- * Seeded disk of dry grounds. Layer 0 and the last layer stay empty of grounds.
- * @param {{layers: number, rows: number, cols: number, packing: number, seed: number, uneven?: boolean}} options
+ * Seeded disk of dry grounds. Several layers above and below the bed stay empty so the
+ * shower and the drip are visible, not a one-cell film.
+ * @param {{layers: number, rows: number, cols: number, packing: number, seed: number,
+ *   uneven?: boolean, groundState?: number, headspace?: number, drip?: number}} options
  */
-export function makePuckCells({layers, rows, cols, packing, seed, uneven = false, groundState = 3}) {
+export function makePuckCells({
+    layers, rows, cols, packing, seed, uneven = false, groundState = 3,
+    headspace = HEADSPACE_LAYERS, drip = DRIP_LAYERS,
+}) {
     const cells = new Uint8Array(layers * rows * cols);
     const disk = diskIndices(rows, cols);
     let a = seed >>> 0 || 1;
@@ -341,8 +352,7 @@ export function makePuckCells({layers, rows, cols, packing, seed, uneven = false
         t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    const lo = 1;
-    const hi = layers - 1;
+    const {lo, hi} = bedRange(layers, headspace, drip);
     for (let layer = lo; layer < hi; layer++) {
         const density = uneven && layer > (lo + hi) / 2 ? packing * 0.72 : packing;
         const base = layer * rows * cols;
@@ -354,14 +364,19 @@ export function makePuckCells({layers, rows, cols, packing, seed, uneven = false
 }
 
 export function dualPalette() {
-    const colors = [[18, 16, 14], [90, 170, 230], [70, 110, 190], [50, 70, 140]];
-    colors.push([110, 72, 38], [90, 56, 30], [70, 42, 22]);
+    const colors = [
+        [18, 16, 14],
+        [58, 160, 255],
+        [120, 110, 140],
+        [168, 74, 28],
+    ];
+    colors.push([210, 180, 140], [188, 152, 108], [168, 128, 82]);
     for (let charge = 0; charge < 3; charge++) {
         for (let conc = 0; conc < 3; conc++) {
             colors.push([
-                55 + charge * 12,
-                32 + conc * 10,
-                18 + conc * 8,
+                90 + charge * 16 - conc * 8,
+                52 + conc * 8 - charge * 6,
+                28 + conc * 4,
             ]);
         }
     }
