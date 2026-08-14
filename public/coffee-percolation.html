@@ -880,6 +880,7 @@
     <div class="field row">
       <button id="p-run">Pause</button>
       <button id="p-brew">New brew</button>
+      <button id="p-log-now" title="Write the current brew into the history">Log</button>
     </div>
 
     <h3 style="margin-top:16px">The view</h3>
@@ -892,7 +893,7 @@
       <input type="range" id="p-opacity" min="0.08" max="1" step="0.01" value="0.55">
     </div>
     <div class="field">
-      <label class="check"><input type="checkbox" id="p-spin" checked> Auto-rotate</label>
+      <label class="check"><input type="checkbox" id="p-spin"> Auto-rotate</label>
     </div>
   </div>
 
@@ -905,6 +906,7 @@
       <span id="p-phase" style="color:var(--accent)">pouring</span>
     </div>
     <hexlife-hcp id="puck" paused states="16" layers="24" rows="48" columns="56" speed="0"
+      auto-rotate="false"
       palette="#12100e,#3aa0ff,#c45618,#e0c084,#7a281c,#485460" clip="0.50" opacity="0.55"></hexlife-hcp>
     <div class="stagefoot" id="p-stagefoot"></div>
   </div>
@@ -925,8 +927,8 @@
   <div class="runlog-head">
     <h3>Brew history</h3>
     <span class="runlog-note">
-      Same log as the 2D lab: a row is written when a brew settles or chokes. <b>Restore</b> replays
-      that puck, pour, and thickness exactly.
+      A row is written when a brew settles or chokes, or when you press <b>Log</b> because the
+      host never went quiet. <b>Restore</b> replays that puck, pour, and thickness exactly.
     </span>
     <span class="runlog-actions">
       <button id="p-log-clear">Clear</button>
@@ -1150,7 +1152,7 @@ import {
     coffeeFall as fall,
     coffeeSixTransition,
 } from './ca-builder-models.js';
-import {mountPuckLab, puckMounted, redrawPuck, stepPuck} from './coffee-puck-lab.js?v=20260814-nochoke';
+import {mountPuckLab, puckMounted, redrawPuck, stepPuck} from './coffee-puck-lab.js?v=20260814-log1';
 
 // ===========================================================================
 // PART 1 — the six-state extraction lab

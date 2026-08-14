@@ -191,6 +191,10 @@ describe('coffee-puck page source policy', () => {
         expect(host).toContain('clearStatesInLayer');
         expect(lab).toContain('id="p-opacity"');
         expect(lab).toContain('id="p-spin"');
+        expect(lab).not.toMatch(/id="p-spin"[^>]*\bchecked\b/);
+        expect(lab).toMatch(/auto-rotate="false"/);
+        expect(lab).toContain('id="p-log-now"');
+        expect(host).toContain('logCurrentRun');
         expect(lab).toContain('id="p-diameter"');
         expect(lab).toMatch(/id="p-layers"[^>]*max="48"/);
     });

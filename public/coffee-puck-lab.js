@@ -39,6 +39,7 @@ const P_IDS = {
     speed: 'p-speed',
     run: 'p-run',
     brew: 'p-brew',
+    log: 'p-log-now',
 };
 
 const brew = {
@@ -213,6 +214,7 @@ function startBrew() {
     brew.budget = Math.round(el.world.numCells * (Number(ui.water.value) / 100));
     brew.finished = false;
     brew.still = 0;
+    syncLogButton();
     render();
 }
 
@@ -374,6 +376,25 @@ function render() {
         + (brew.still >= settlePeriod() && !headspaceHoldsFluid() ? ' · <b>settled</b>' : '');
 }
 
+function syncLogButton() {
+    if (ui?.log) ui.log.disabled = brew.finished;
+}
+
+/**
+ * Snapshot the live dashboard into the history. Used when the host never goes
+ * quiet, so auto-settle never writes a row.
+ */
+export function logCurrentRun() {
+    if (!el?.world || brew.finished) return false;
+    brew.finished = true;
+    brew.running = false;
+    if (ui?.run) ui.run.textContent = 'Run';
+    syncLogButton();
+    render();
+    recordRun();
+    return true;
+}
+
 function recordRun() {
     const summary = brew.summary;
     if (!summary) return;
@@ -422,7 +443,7 @@ function renderLog() {
             <td>${pct(r.untouched)}</td>
             <td><button class="restore" data-run="${r.run}" title="Replay this brew exactly">restore</button></td>
         </tr>`).join('')
-        : '<tr><td class="empty" colspan="14">No finished brews yet. Let one settle — the log fills itself.</td></tr>';
+        : '<tr><td class="empty" colspan="14">No finished brews yet. Let one settle, or press Log.</td></tr>';
     $('p-log').innerHTML = header + body;
 }
 
@@ -472,9 +493,14 @@ function syncLabels() {
 }
 
 export function stepPuck() {
-    if (!el?.world || !brew.running) return;
+    if (!el?.world || !brew.running || brew.finished) return;
     if (brewHasSettled()) {
-        if (!brew.finished) { brew.finished = true; render(); recordRun(); }
+        if (!brew.finished) {
+            brew.finished = true;
+            syncLogButton();
+            render();
+            recordRun();
+        }
         return;
     }
     const steps = Number(ui.speed.value);
@@ -553,6 +579,7 @@ export async function mountPuckLab() {
         brew.running = !brew.running;
         ui.run.textContent = brew.running ? 'Pause' : 'Run';
     });
+    ui.log.addEventListener('click', logCurrentRun);
     ui.clip.addEventListener('input', () => {
         syncLabels();
         el.setAttribute('clip', ui.clip.value);
@@ -580,6 +607,8 @@ export async function mountPuckLab() {
 
     syncLabels();
     syncModelChrome();
+    syncLogButton();
+    el.setAttribute('auto-rotate', ui.spin.checked ? 'true' : 'false');
     renderLog();
 
     el.addEventListener('hexlife-hcp-ready', startBrew);
