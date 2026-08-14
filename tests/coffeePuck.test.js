@@ -2,15 +2,18 @@ import {readFile} from 'node:fs/promises';
 import {beforeAll, describe, expect, it} from 'vitest';
 import {blockRuleFromTet, HexHcp, initHcpEngine, sitePosition} from '../src/embed/hcp.js';
 import {
+    diskCenter,
     diskIndices,
     injectionSites,
     makePuckCells,
     PARTITION_PERIOD,
     puckDualQuantities,
     puckDualTransition,
+    puckFall,
     puckSixFamiliesPreserved,
     puckSixTransition,
     quietTickLimit,
+    siteXY,
 } from '../public/coffee-puck-models.js';
 
 beforeAll(async () => {
@@ -55,6 +58,18 @@ describe('3D coffee tet rules', () => {
 });
 
 describe('puck host helpers', () => {
+    it('does not tilt when both mates are equal', () => {
+        const tet = [3, 1, 1, 0];
+        puckFall(tet, (state) => state < 3);
+        expect(tet).toEqual([3, 1, 1, 0]);
+    });
+
+    it('still drops the unique heavier mate', () => {
+        const tet = [3, 2, 1, 0];
+        puckFall(tet, (state) => state < 3);
+        expect(tet).toEqual([3, 0, 1, 2]);
+    });
+
     it('returns distinct disk injection sites', () => {
         const disk = new Set(diskIndices(12, 16));
         for (const mode of ['shower', 'centre', 'dump', 'pulse']) {
@@ -62,6 +77,26 @@ describe('puck host helpers', () => {
             expect(new Set(sites).size).toBe(sites.length);
             for (const index of sites) expect(disk.has(index)).toBe(true);
         }
+    });
+
+    it('ranks centre-stream sites by physical XY, not offset indices', () => {
+        const rows = 12;
+        const cols = 16;
+        const disk = diskIndices(rows, cols);
+        const [cx, cy] = diskCenter(rows, cols);
+        const dist2 = (index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const [x, y] = siteXY(row, col);
+            return (x - cx) ** 2 + (y - cy) ** 2;
+        };
+        const ranked = [...disk].sort((a, b) => dist2(a) - dist2(b) || a - b);
+        const width = Math.max(1, Math.min(ranked.length, Math.floor(disk.length * 0.08) * 2 || 2));
+        const pool = new Set(ranked.slice(0, width));
+        const sites = injectionSites({rows, cols, flow: 4, mode: 'centre', tick: 0, remaining: 40});
+        expect(sites.length).toBeGreaterThan(0);
+        expect(pool.has(ranked[0])).toBe(true);
+        for (const index of sites) expect(pool.has(index)).toBe(true);
     });
 
     it('builds a seeded disk with empty headspace and drip layers', () => {
@@ -90,6 +125,9 @@ describe('coffee-puck page source policy', () => {
         expect(page).toContain('clearStatesInLayer');
         expect(page).toContain('dualPalette');
         expect(page).toContain('id="opacity"');
+        expect(page).toContain('id="diameter"');
+        expect(page).toMatch(/id="layers"[^>]*max="48"/);
+        expect(page).not.toContain('id="size"');
         expect(page).toMatch(/id="flow"[^>]*max="240"/);
         expect(page).toMatch(/id="water"[^>]*max="8000"/);
         expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.2/src/embed/hcp.js');

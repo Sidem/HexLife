@@ -25,6 +25,16 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.3 — 2026-08-14
+
+#### Fixed
+
+- **HCP sites tile, and opacity no longer punches through the puck.** Occupied cells are hex
+  prisms of circumradius `R`, so in-plane neighbours share an edge instead of floating as undersized
+  spheres. Below 1, `opacity` depth-selects the nearest occupied site and blends only that winner
+  (the torus-shell contract); `0.99` is almost solid. A centre-stream pour ranks by physical XY, and
+  equal-weight mates no longer tilt into one lattice direction.
+
 ### `@hexlife/embed` 1.13.2 — 2026-08-14
 
 #### Fixed

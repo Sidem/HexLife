@@ -68,10 +68,17 @@ export function puckFall(out, mobile) {
     }
     if (out[3] === EMPTY && out[0] !== EMPTY) {
         let best = -1;
+        let tied = false;
         for (let i = 1; i < 3; i++) {
-            if (mobile(out[i]) && (best === -1 || out[i] > out[best])) best = i;
+            if (!mobile(out[i])) continue;
+            if (best === -1 || out[i] > out[best]) {
+                best = i;
+                tied = false;
+            } else if (out[i] === out[best]) {
+                tied = true;
+            }
         }
-        if (best !== -1) {
+        if (best !== -1 && !tied) {
             swap(best, 3);
             return;
         }
@@ -226,21 +233,41 @@ function evenlySpaced(span, count, phase) {
     return out;
 }
 
+const SQRT3 = Math.sqrt(3);
+
+/**
+ * Odd-q pixel XY of a layer-0 site. Matches `sitePosition(col, row, 0)` in `@hexlife/embed/hcp`.
+ * @param {number} row
+ * @param {number} col
+ * @returns {[number, number]}
+ */
+export function siteXY(row, col) {
+    return [col * 1.5, (row + ((col & 1) ? 0.5 : 0)) * SQRT3];
+}
+
+/** Physical centre of the rectangular host used by {@link diskIndices}. */
+export function diskCenter(rows, cols) {
+    return [(cols - 1) * 0.75, ((rows - 1) + 0.5) * SQRT3 / 2];
+}
+
 /**
  * In-layer indices of the inscribed disk (top-face cells used for pour and puck IC).
+ * The circle is in physical XY, not offset (row, col) space — otherwise the bed is an ellipse
+ * and a "centre" pour sits off-axis.
  * @param {number} rows
  * @param {number} cols
  */
 export function diskIndices(rows, cols) {
-    const cx = (cols - 1) / 2;
-    const cy = (rows - 1) / 2;
-    const radius = Math.min(cols, rows) * 0.42;
+    const [cx, cy] = diskCenter(rows, cols);
+    const radius = Math.min(cols, rows) * 0.63;
+    const r2 = radius * radius;
     const out = [];
     for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-            const dx = col - cx;
-            const dy = (row - cy) * Math.sqrt(3) / 1.5;
-            if (dx * dx + dy * dy <= radius * radius) out.push(row * cols + col);
+            const [x, y] = siteXY(row, col);
+            const dx = x - cx;
+            const dy = y - cy;
+            if (dx * dx + dy * dy <= r2) out.push(row * cols + col);
         }
     }
     return out;
@@ -266,17 +293,17 @@ export function injectionSites({rows, cols, flow, mode, tick, remaining}) {
     if (rate <= 0) return [];
 
     if (mode === 'centre') {
-        const cx = (cols - 1) / 2;
-        const cy = (rows - 1) / 2;
+        const [cx, cy] = diskCenter(rows, cols);
         const ranked = disk
             .map((index) => {
                 const col = index % cols;
                 const row = Math.floor(index / cols);
-                const dx = col - cx;
-                const dy = row - cy;
+                const [x, y] = siteXY(row, col);
+                const dx = x - cx;
+                const dy = y - cy;
                 return {index, d: dx * dx + dy * dy};
             })
-            .sort((a, b) => a.d - b.d);
+            .sort((a, b) => a.d - b.d || a.index - b.index);
         const width = Math.max(1, Math.min(ranked.length, Math.floor(span * 0.08) * 2 || 2));
         const pool = ranked.slice(0, width).map((entry) => entry.index);
         return evenlySpaced(pool.length, Math.min(rate, pool.length), tick).map((i) => pool[i]);

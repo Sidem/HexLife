@@ -31,6 +31,34 @@ describe('<hexlife-hcp> package contract', () => {
         expect(renderer).toContain('cameraDepths');
         expect(renderer).toContain('u_layers - 1 - layer');
         expect(renderer).toContain('u_opacity');
+        expect(renderer).toContain('function hexPrism');
+    });
+
+    it('tiles in-plane neighbours at circumradius R', async () => {
+        const {SITE_SCALE} = await import('../src/embed/HcpRenderer.js');
+        const {sitePosition} = await import('../src/embed/hcpCoords.js');
+        expect(SITE_SCALE).toBe(1);
+        const verts = (col, row) => {
+            const c = sitePosition(col, row, 0, 1);
+            return Array.from({length: 6}, (_, i) => {
+                const a = i * Math.PI / 3;
+                return `${(c.x + Math.cos(a) * SITE_SCALE).toFixed(6)},${(c.y + Math.sin(a) * SITE_SCALE).toFixed(6)}`;
+            });
+        };
+        const shared = verts(0, 0).filter((key) => verts(1, 0).includes(key));
+        expect(shared).toHaveLength(2);
+    });
+
+    it('depth-selects one nearest site instead of accumulating every instance', async () => {
+        const renderer = await read('src/embed/HcpRenderer.js');
+        expect(renderer).toContain('const opaqueSurface = this._opacity >= OPAQUE_OPACITY');
+        expect(renderer).toMatch(
+            /gl\.colorMask\(false, false, false, false\);[\s\S]*gl\.drawArraysInstanced/,
+        );
+        expect(renderer).toMatch(
+            /gl\.colorMask\(true, true, true, true\);[\s\S]*gl\.depthFunc\(gl\.EQUAL\);[\s\S]*gl\.enable\(gl\.BLEND\);[\s\S]*gl\.depthMask\(false\);[\s\S]*gl\.drawArraysInstanced/,
+        );
+        expect(renderer).not.toMatch(/const translucent = this\._opacity < 0\.995/);
     });
 
     it('draws layer 0 above the last layer', async () => {

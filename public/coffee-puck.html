@@ -92,7 +92,8 @@
   <p>
     The engine is general: a 12-neighbour conservative 3D CA. Coffee is a <code>k⁴</code> table
     a host installs. Gravity is slot 3 of every tet — the unique lowest site. Drag to orbit,
-    scroll to dolly, pull the clip plane, or drop the opacity to look inside.
+    scroll to dolly, pull the clip plane to look inside, or drop the opacity to ghost the
+    near surface.
   </p>
 </div>
 
@@ -135,11 +136,15 @@
       <label>packing <span id="pack-out">0.55</span>
         <input id="pack" type="range" min="0.20" max="0.85" step="0.01" value="0.55"/>
       </label>
-      <label>size
-        <select id="size">
-          <option value="24,48,56" selected>demo 24×48×56</option>
-          <option value="32,66,76">medium 32×66×76</option>
+      <label>diameter
+        <select id="diameter">
+          <option value="36,42">compact 36×42</option>
+          <option value="48,56" selected>demo 48×56</option>
+          <option value="66,76">medium 66×76</option>
         </select>
+      </label>
+      <label>thickness <span id="layers-out">24</span>
+        <input id="layers" type="range" min="8" max="48" step="2" value="24"/>
       </label>
       <label>clip <span id="clip-out">0.22</span>
         <input id="clip" type="range" min="0" max="1" step="0.01" value="0.22"/>
@@ -209,7 +214,8 @@ const ui = {
     flow: document.getElementById('flow'),
     water: document.getElementById('water'),
     pack: document.getElementById('pack'),
-    size: document.getElementById('size'),
+    diameter: document.getElementById('diameter'),
+    layers: document.getElementById('layers'),
     clip: document.getElementById('clip'),
     opacity: document.getElementById('opacity'),
     uneven: document.getElementById('uneven'),
@@ -239,8 +245,8 @@ const brew = {
 const runs = [];
 
 function dims() {
-    const [layers, rows, cols] = ui.size.value.split(',').map(Number);
-    return {layers, rows, cols};
+    const [rows, cols] = ui.diameter.value.split(',').map(Number);
+    return {layers: Number(ui.layers.value), rows, cols};
 }
 
 function alignPartition() {
@@ -390,12 +396,17 @@ ui.water.addEventListener('input', () => {
 ui.pack.addEventListener('input', () => {
     document.getElementById('pack-out').textContent = Number(ui.pack.value).toFixed(2);
 });
-ui.size.addEventListener('change', () => {
+function applySize() {
     const {layers, rows, cols} = dims();
     el.setAttribute('layers', String(layers));
     el.setAttribute('rows', String(rows));
     el.setAttribute('columns', String(cols));
+}
+ui.layers.addEventListener('input', () => {
+    document.getElementById('layers-out').textContent = ui.layers.value;
 });
+ui.layers.addEventListener('change', applySize);
+ui.diameter.addEventListener('change', applySize);
 ui.model.addEventListener('change', () => { applyModel(); });
 
 el.addEventListener('hexlife-hcp-ready', attachWorld);

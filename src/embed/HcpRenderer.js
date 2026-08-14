@@ -11,6 +11,15 @@ const SQRT3 = Math.sqrt(3);
 const SQRT2 = Math.sqrt(2);
 const TAU = Math.PI * 2;
 
+/**
+ * In-plane hex circumradius as a multiple of `R`. Neighbours sit at `√3 R`, so 1 tiles them
+ * with a shared edge. Smaller values (the old 0.82 sphere) left a visible gap.
+ */
+export const SITE_SCALE = 1;
+
+/** Opacity at or above this is a single solid depth pass, matching the torus contract. */
+export const OPAQUE_OPACITY = 0.999;
+
 export const HCP_CAMERA = Object.freeze({
     yaw: 0.28,
     pitch: 0.58,
@@ -84,7 +93,7 @@ void main() {
     // Layer 0 is the shower / open face. Draw it at the TOP so gravity (+layer) is down.
     float z = float(u_layers - 1 - layer) * ${SQRT2.toFixed(8)} * R;
     vec3 center = vec3(x, z, y);
-    v_world = center + a_position * R * 0.82;
+    v_world = center + a_position * R * ${SITE_SCALE.toFixed(8)};
     v_color = u_palette[int(state)];
     gl_Position = u_viewProj * vec4(v_world, 1.0);
 }
@@ -110,30 +119,36 @@ void main() {
 }
 `;
 
-function icosahedron() {
-    const t = (1 + Math.sqrt(5)) / 2;
-    const raw = [
-        [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
-        [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
-        [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1],
-    ].map((p) => {
-        const len = Math.hypot(p[0], p[1], p[2]) || 1;
-        return [p[0] / len, p[1] / len, p[2] / len];
-    });
-    const faces = [
-        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
-        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
-        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
-    ];
-    const verts = new Float32Array(faces.length * 9);
+/**
+ * Pointy-top hex prism in the renderer's (x, up, z) frame.
+ *
+ * Circumradius 1 tiles the odd-q plane at neighbour distance √3. Half-height is the HCP
+ * layer spacing so stacked sites meet; odd layers stay offset, which is the lattice, not a gap.
+ */
+function hexPrism() {
+    const halfHeight = SQRT2 / 2 * 0.997;
+    const top = [];
+    const bot = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = i * Math.PI / 3;
+        const x = Math.cos(angle);
+        const z = Math.sin(angle);
+        top.push([x, halfHeight, z]);
+        bot.push([x, -halfHeight, z]);
+    }
+    const faces = [];
+    for (let i = 0; i < 6; i++) {
+        const j = (i + 1) % 6;
+        faces.push(top[i], bot[i], top[j], top[j], bot[i], bot[j]);
+        faces.push([0, halfHeight, 0], top[i], top[j]);
+        faces.push([0, -halfHeight, 0], bot[j], bot[i]);
+    }
+    const verts = new Float32Array(faces.length * 3);
     let offset = 0;
-    for (const face of faces) {
-        for (const index of face) {
-            verts[offset++] = raw[index][0];
-            verts[offset++] = raw[index][1];
-            verts[offset++] = raw[index][2];
-        }
+    for (const point of faces) {
+        verts[offset++] = point[0];
+        verts[offset++] = point[1];
+        verts[offset++] = point[2];
     }
     return verts;
 }
@@ -219,7 +234,7 @@ export class HcpRenderer {
             opacity: gl.getUniformLocation(program, 'u_opacity'),
         };
 
-        const verts = icosahedron();
+        const verts = hexPrism();
         this._vertCount = verts.length / 3;
         this.vao = gl.createVertexArray();
         gl.bindVertexArray(this.vao);
@@ -285,7 +300,7 @@ export class HcpRenderer {
         this._dirty = true;
     }
 
-    /** Site alpha in `0..1`. Below 1 the draw blends so the interior is visible. */
+    /** Site alpha in `0..1`. Below 1 only the nearest occupied site along each ray is blended. */
     setOpacity(value) {
         const number = Number(value);
         this._opacity = Number.isFinite(number) ? Math.min(1, Math.max(0.04, number)) : 1;
@@ -367,21 +382,36 @@ export class HcpRenderer {
         gl.uniform3fv(this.uniforms.palette, this._palette);
         gl.uniform4f(this.uniforms.clipPlane, 1, 0, 0, -clipX);
         gl.uniform1f(this.uniforms.opacity, this._opacity);
-        const translucent = this._opacity < 0.995;
-        if (translucent) {
+        gl.clearColor(this._background[0], this._background[1], this._background[2], this._background[3]);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LESS);
+        gl.disable(gl.CULL_FACE);
+
+        const opaqueSurface = this._opacity >= OPAQUE_OPACITY;
+        if (opaqueSurface) {
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, this._vertCount, this.numCells);
+        } else {
+            // Same contract as the torus shell: depth-select one nearest occupied site, then
+            // blend only that winner. Unordered alpha of every instance along the ray made
+            // 0.99 see through the whole puck.
+            gl.disable(gl.BLEND);
+            gl.colorMask(false, false, false, false);
+            gl.depthMask(true);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, this._vertCount, this.numCells);
+
+            gl.colorMask(true, true, true, true);
+            gl.depthFunc(gl.EQUAL);
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
             gl.depthMask(false);
-        } else {
-            gl.disable(gl.BLEND);
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, this._vertCount, this.numCells);
+
             gl.depthMask(true);
-        }
-        gl.clearColor(this._background[0], this._background[1], this._background[2], this._background[3]);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.drawArraysInstanced(gl.TRIANGLES, 0, this._vertCount, this.numCells);
-        if (translucent) {
+            gl.depthFunc(gl.LESS);
             gl.disable(gl.BLEND);
-            gl.depthMask(true);
         }
         this._dirty = rotating;
         return true;
