@@ -16,6 +16,7 @@ describe('<hexlife-hcp> package contract', () => {
         const element = await read('src/embed/HexHcpElement.js');
         expect(element).toContain('this.world.advance(dt)');
         expect(element).toContain('this.renderer.draw(this.world.state');
+        expect(element).toContain('hexlife-hcp-ready');
         expect(element).toContain("from './hcp.js'");
         expect(element).not.toContain('/spacetime');
         expect(element).not.toContain('SpacetimeCore');
@@ -27,6 +28,17 @@ describe('<hexlife-hcp> package contract', () => {
         expect(renderer).toContain('texelFetch');
         expect(renderer).not.toContain('spacetime_fragment');
         expect(renderer).toContain('u_clipPlane');
+        expect(renderer).toContain('cameraDepths');
+    });
+
+    it('places the far plane beyond a demo-size volume', async () => {
+        const {cameraDepths} = await import('../src/embed/HcpRenderer.js');
+        const span = 84;
+        const distance = 1.15 * span;
+        const {near, far} = cameraDepths(distance, span);
+        expect(far).toBeGreaterThan(distance + span);
+        expect(near).toBeLessThan(far);
+        expect(far).toBeGreaterThan(40);
     });
 
     it('publishes the contract in tracked files', async () => {

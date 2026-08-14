@@ -14,13 +14,25 @@ const TAU = Math.PI * 2;
 export const HCP_CAMERA = Object.freeze({
     yaw: 0.55,
     pitch: 0.42,
-    distance: 2.6,
-    minDistance: 0.9,
+    distance: 1.15,
+    minDistance: 0.55,
     maxDistance: 8,
     fovY: Math.PI / 5,
     near: 0.05,
     far: 40,
 });
+
+/**
+ * Near/far planes that actually contain a volume of `span` viewed from `distance`.
+ * A fixed far of 40 clips a demo-size puck (span ≈ 80, camera ≈ 90+) entirely.
+ */
+export function cameraDepths(distance, span) {
+    const reach = Math.max(1, Number(distance) || 0) + Math.max(1, Number(span) || 0) * 2;
+    return {
+        near: Math.max(0.05, reach * 0.002),
+        far: reach,
+    };
+}
 
 const ORBIT_RADIANS_PER_PIXEL = 0.008;
 const DOLLY_PER_WHEEL_UNIT = 0.001;
@@ -224,7 +236,7 @@ export class HcpRenderer {
         );
 
         gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.CULL_FACE);
+        gl.disable(gl.CULL_FACE);
 
         this._onPointerDown = this._onPointerDown.bind(this);
         this._onPointerMove = this._onPointerMove.bind(this);
@@ -298,6 +310,7 @@ export class HcpRenderer {
         if (!this._dirty && !rotating) return false;
 
         const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_3D, this.stateTex);
         gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
         gl.texSubImage3D(
@@ -309,12 +322,13 @@ export class HcpRenderer {
         );
 
         const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-        const proj = perspective(HCP_CAMERA.fovY, aspect, HCP_CAMERA.near, HCP_CAMERA.far);
         const cx = this._center[0];
         const cy = this._center[1];
         const cz = this._center[2];
-        const span = Math.max(this._center[0], this._center[1], this._center[2]) * 2;
+        const span = Math.max(this._center[0], this._center[1], this._center[2], 1) * 2;
         const dist = this._distance * span;
+        const depth = cameraDepths(dist, span);
+        const proj = perspective(HCP_CAMERA.fovY, aspect, depth.near, depth.far);
         const cosP = Math.cos(this._pitch);
         const eye = [
             cx + Math.sin(this._yaw) * cosP * dist,

@@ -144,6 +144,7 @@ export class HexHcpElement extends HTMLElement {
         this._initialCells = null;
         this._palette = null;
         this._userPaused = false;
+        this._simPlaying = false;
         this._onScreen = true;
         this._docVisible = true;
         this._reducedMotion = false;
@@ -268,7 +269,7 @@ export class HexHcpElement extends HTMLElement {
 
     get generation() { return this.world ? this.world.generation : 0; }
     get isSettled() { return this.world ? this.world.isSettled : false; }
-    get playing() { return this._rafId !== 0; }
+    get playing() { return this._simPlaying; }
     get userPaused() { return this._userPaused; }
 
     async _boot(generation) {
@@ -372,6 +373,11 @@ export class HexHcpElement extends HTMLElement {
         this._resize();
         this._drawOnce();
         this._syncPlayback();
+        this.dispatchEvent(new CustomEvent('hexlife-hcp-ready', {
+            bubbles: true,
+            composed: true,
+            detail: {states, layers, rows, columns},
+        }));
     }
 
     _teardown() {
@@ -410,14 +416,16 @@ export class HexHcpElement extends HTMLElement {
 
     _syncPlayback() {
         if (!this.world || !this.renderer || this.error || this._contextLost) {
+            this._simPlaying = false;
             this._stopLoop();
             return;
         }
         const motionAllowed = !this._reducedMotion || this._playRequested;
-        const wants = !this._userPaused && motionAllowed;
-        const canRun = wants && this._onScreen && this._docVisible;
-        this._overlay.hidden = wants;
-        if (canRun) this._startLoop();
+        const wantsSim = !this._userPaused && motionAllowed && this._onScreen && this._docVisible;
+        this._simPlaying = wantsSim;
+        this._overlay.hidden = wantsSim || this.hasAttribute('paused');
+        // Orbit and auto-rotate must keep drawing while the host holds `paused`.
+        if (this._onScreen && this._docVisible) this._startLoop();
         else this._stopLoop();
     }
 
@@ -436,14 +444,9 @@ export class HexHcpElement extends HTMLElement {
     _frame(now) {
         const dt = Math.min(now - this._lastFrameTime, 100);
         this._lastFrameTime = now;
-        this.world.advance(dt);
-        if (this.world.isSettled && !this.renderer.autoRotate) {
-            this._rafId = 0;
-            this.renderer.draw(this.world.state, {dtMs: dt});
-            return;
-        }
+        if (this._simPlaying) this.world.advance(dt);
         this._rafId = requestAnimationFrame(this._frame);
-        this.renderer.draw(this.world.state, {dtMs: dt});
+        this.renderer.draw(this.world.state, {dtMs: this._simPlaying || this.renderer.autoRotate ? dt : 0});
     }
 
     _drawOnce() {

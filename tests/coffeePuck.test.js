@@ -88,6 +88,7 @@ describe('coffee-puck page source policy', () => {
         expect(page).not.toMatch(/for\s*\([^)]*ncells/);
         expect(page).toContain('paintIf');
         expect(page).toContain('clearStatesInLayer');
+        expect(page).toContain('dualPalette');
         expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.0/src/embed/hcp.js');
     });
 });

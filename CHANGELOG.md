@@ -25,6 +25,15 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.1 — 2026-08-14
+
+#### Fixed
+
+- **`<hexlife-hcp>` actually shows the lattice.** The camera far plane was a fixed 40 units, which
+  clips a demo-size puck entirely (the volume is ~80 units across and the eye sits farther out than
+  that). Near/far now scale with the volume. Orbit and auto-rotation keep drawing while the host
+  holds `paused`. Dual-porosity on the puck page no longer throws `dualPalette is not defined`.
+
 ### `@hexlife/embed` 1.13.0 — 2026-08-14
 
 #### Added

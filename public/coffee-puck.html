@@ -186,6 +186,7 @@ import {
 } from '@hexlife/embed/hcp';
 import '@hexlife/embed/hcp-element';
 import {
+    dualPalette,
     injectionSites,
     makePuckCells,
     PARTITION_PERIOD,
@@ -329,20 +330,26 @@ function loop() {
     raf = requestAnimationFrame(loop);
 }
 
-async function waitForWorld() {
-    while (!el.world) await new Promise((resolve) => requestAnimationFrame(resolve));
+function paletteAttr(dual) {
+    const colors = dual ? dualPalette() : SIX_PALETTE;
+    return colors.map((rgb) => `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`).join(',');
 }
 
-async function applyModel() {
+function attachWorld() {
+    if (!el.world) return;
     const dual = ui.model.value === 'dual';
-    el.setAttribute('states', dual ? '16' : '6');
-    el.setAttribute('palette', dual
-        ? dualPalette().map((rgb) => `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`).join(',')
-        : SIX_PALETTE.map((rgb) => `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`).join(','));
-    await waitForWorld();
     el.world.setBlockAlternates(true);
     el.setRule(dual ? dualRule : sixRule);
     layoutPuck();
+    boot.hidden = true;
+}
+
+function applyModel() {
+    const dual = ui.model.value === 'dual';
+    el.setAttribute('palette', paletteAttr(dual));
+    const states = dual ? '16' : '6';
+    if ((el.getAttribute('states') || '6') !== states) el.setAttribute('states', states);
+    else attachWorld();
 }
 
 ui.run.addEventListener('click', () => {
@@ -383,20 +390,9 @@ ui.size.addEventListener('change', () => {
 });
 ui.model.addEventListener('change', () => { applyModel(); });
 
+el.addEventListener('hexlife-hcp-ready', attachWorld);
 await initHcpEngine();
-const ready = new Promise((resolve) => {
-    const wait = () => {
-        if (el.world) resolve();
-        else requestAnimationFrame(wait);
-    };
-    wait();
-});
-await ready;
-el.world.setBlockAlternates(true);
-el.setRule(sixRule);
-el.world.speed = 36;
-layoutPuck();
-boot.hidden = true;
+if (el.world) attachWorld();
 
 
 </script>
