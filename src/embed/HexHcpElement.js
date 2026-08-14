@@ -16,7 +16,7 @@ import {
 
 const APP_URL = 'https://sidem.github.io/HexLife/';
 
-const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'clip']);
+const LIVE_ATTRS = new Set(['paused', 'speed', 'palette', 'link', 'clip', 'opacity']);
 
 const DEFAULTS = {
     states: 6,
@@ -126,7 +126,7 @@ function readPalette(value, states) {
 
 export class HexHcpElement extends HTMLElement {
     static get observedAttributes() {
-        return ['code', 'states', 'layers', 'rows', 'columns', 'speed', 'palette', 'paused', 'link', 'clip'];
+        return ['code', 'states', 'layers', 'rows', 'columns', 'speed', 'palette', 'paused', 'link', 'clip', 'opacity'];
     }
 
     constructor() {
@@ -207,6 +207,9 @@ export class HexHcpElement extends HTMLElement {
         } else if (name === 'link') this._updateAttribution();
         else if (name === 'clip' && this.renderer) {
             this.renderer.setClip(Number(this.getAttribute('clip')));
+            this._drawOnce();
+        } else if (name === 'opacity' && this.renderer) {
+            this.renderer.setOpacity(Number(this.getAttribute('opacity')));
             this._drawOnce();
         }
     }
@@ -347,6 +350,7 @@ export class HexHcpElement extends HTMLElement {
             return;
         }
         this.renderer.setClip(Number(this.getAttribute('clip') ?? 0.35));
+        this.renderer.setOpacity(this.hasAttribute('opacity') ? Number(this.getAttribute('opacity')) : 1);
         this._applyPalette(decoded ? decoded.palette : null);
         this._updateAttribution();
 

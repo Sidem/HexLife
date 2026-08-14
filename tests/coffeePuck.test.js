@@ -89,6 +89,9 @@ describe('coffee-puck page source policy', () => {
         expect(page).toContain('paintIf');
         expect(page).toContain('clearStatesInLayer');
         expect(page).toContain('dualPalette');
+        expect(page).toContain('id="opacity"');
+        expect(page).toMatch(/id="flow"[^>]*max="240"/);
+        expect(page).toMatch(/id="water"[^>]*max="8000"/);
         expect(page).toContain('https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.1/src/embed/hcp.js');
     });
 });

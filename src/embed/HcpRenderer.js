@@ -12,8 +12,8 @@ const SQRT2 = Math.sqrt(2);
 const TAU = Math.PI * 2;
 
 export const HCP_CAMERA = Object.freeze({
-    yaw: 0.55,
-    pitch: 0.42,
+    yaw: 0.28,
+    pitch: 0.58,
     distance: 1.15,
     minDistance: 0.55,
     maxDistance: 8,
@@ -26,6 +26,11 @@ export const HCP_CAMERA = Object.freeze({
  * Near/far planes that actually contain a volume of `span` viewed from `distance`.
  * A fixed far of 40 clips a demo-size puck (span ≈ 80, camera ≈ 90+) entirely.
  */
+/** World-space height of a layer. Layer 0 (shower) is the highest. */
+export function visualHeight(layer, layers, hexSize = 1) {
+    return (layers - 1 - layer) * SQRT2 * hexSize;
+}
+
 export function cameraDepths(distance, span) {
     const reach = Math.max(1, Number(distance) || 0) + Math.max(1, Number(span) || 0) * 2;
     return {
@@ -76,7 +81,8 @@ void main() {
         x += 0.5 * R;
         y += 0.5 * ${SQRT3.toFixed(8)} * R;
     }
-    float z = float(layer) * ${SQRT2.toFixed(8)} * R;
+    // Layer 0 is the shower / open face. Draw it at the TOP so gravity (+layer) is down.
+    float z = float(u_layers - 1 - layer) * ${SQRT2.toFixed(8)} * R;
     vec3 center = vec3(x, z, y);
     v_world = center + a_position * R * 0.82;
     v_color = u_palette[int(state)];
@@ -87,6 +93,7 @@ void main() {
 const FS = `#version 300 es
 precision highp float;
 uniform vec4 u_clipPlane;
+uniform float u_opacity;
 in vec3 v_color;
 in vec3 v_world;
 in float v_alive;
@@ -99,7 +106,7 @@ void main() {
     vec3 dy = dFdy(v_world);
     vec3 normal = normalize(cross(dx, dy));
     float lambert = 0.35 + 0.65 * max(dot(normal, light), 0.0);
-    outColor = vec4(v_color * lambert, 1.0);
+    outColor = vec4(v_color * lambert, u_opacity);
 }
 `;
 
@@ -180,6 +187,7 @@ export class HcpRenderer {
         this._distance = options.camera?.distance ?? HCP_CAMERA.distance;
         this._dirty = true;
         this._clip = 0.02;
+        this._opacity = 1;
         this._palette = new Float32Array(16 * 3);
         this._dragging = false;
         this._lastX = 0;
@@ -208,6 +216,7 @@ export class HcpRenderer {
             state: gl.getUniformLocation(program, 'u_state'),
             palette: gl.getUniformLocation(program, 'u_palette'),
             clipPlane: gl.getUniformLocation(program, 'u_clipPlane'),
+            opacity: gl.getUniformLocation(program, 'u_opacity'),
         };
 
         const verts = icosahedron();
@@ -273,6 +282,13 @@ export class HcpRenderer {
     /** @param {number} t 0 = closed, 1 = fully open slab */
     setClip(t) {
         this._clip = Math.min(1, Math.max(0, Number(t) || 0));
+        this._dirty = true;
+    }
+
+    /** Site alpha in `0..1`. Below 1 the draw blends so the interior is visible. */
+    setOpacity(value) {
+        const number = Number(value);
+        this._opacity = Number.isFinite(number) ? Math.min(1, Math.max(0.04, number)) : 1;
         this._dirty = true;
     }
 
@@ -350,9 +366,23 @@ export class HcpRenderer {
         gl.uniform1i(this.uniforms.state, 0);
         gl.uniform3fv(this.uniforms.palette, this._palette);
         gl.uniform4f(this.uniforms.clipPlane, 1, 0, 0, -clipX);
+        gl.uniform1f(this.uniforms.opacity, this._opacity);
+        const translucent = this._opacity < 0.995;
+        if (translucent) {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.depthMask(false);
+        } else {
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
+        }
         gl.clearColor(this._background[0], this._background[1], this._background[2], this._background[3]);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.drawArraysInstanced(gl.TRIANGLES, 0, this._vertCount, this.numCells);
+        if (translucent) {
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
+        }
         this._dirty = rotating;
         return true;
     }

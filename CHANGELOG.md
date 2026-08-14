@@ -25,6 +25,14 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.13.2 — 2026-08-14
+
+#### Fixed
+
+- **The HCP view had gravity pointing the wrong way.** Layer 0 is the shower; it is now drawn at
+  the top of the canvas, so fluid falls down the screen. `opacity` is a live attribute on
+  `<hexlife-hcp>` for seeing into the volume without relying only on the clip plane.
+
 ### `@hexlife/embed` 1.13.1 — 2026-08-14
 
 #### Fixed

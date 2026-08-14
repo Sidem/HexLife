@@ -36,9 +36,12 @@ world.clearStatesInLayer(world.layers - 1, 0b0110)
 ```
 
 `<hexlife-hcp>` is registered by `@hexlife/embed/hcp-element`. Attributes stay small (`states`,
-`layers`, `rows`, `columns`, `speed`, `palette`, `paused`, `link`, `clip`). The rule and cells
-arrive through `setRule` / `setCells` / `code` (`HXP1.`). The element calls native `tick(n)` and
-draws the live Wasm view; it does not `setCells` after a tick.
+`layers`, `rows`, `columns`, `speed`, `palette`, `paused`, `link`, `clip`, `opacity`). The rule and
+cells arrive through `setRule` / `setCells` / `code` (`HXP1.`). The element calls native `tick(n)`
+and draws the live Wasm view; it does not `setCells` after a tick.
+
+Layer 0 is the open / shower face and is drawn at the **top** of the canvas, so `+layer` (the
+engine's down) is visually down. `opacity` is site alpha (`0..1`); below 1 the draw blends.
 
 ## Lattice
 

@@ -92,7 +92,7 @@
   <p>
     The engine is general: a 12-neighbour conservative 3D CA. Coffee is a <code>k⁴</code> table
     a host installs. Gravity is slot 3 of every tet — the unique lowest site. Drag to orbit,
-    scroll to dolly, and pull the clip plane to look inside.
+    scroll to dolly, pull the clip plane, or drop the opacity to look inside.
   </p>
 </div>
 
@@ -100,7 +100,7 @@
   <div>
     <p class="boot" id="boot">loading WorldHcp…</p>
     <hexlife-hcp id="puck" paused states="6" layers="24" rows="48" columns="56" speed="36"
-      palette="#121014,#4696dc,#285096,#5c3a20,#482c1a,#2a1c12" clip="0.38"></hexlife-hcp>
+      palette="#121014,#4696dc,#285096,#5c3a20,#482c1a,#2a1c12" clip="0.22" opacity="0.82"></hexlife-hcp>
     <p>
       <span class="swatch" style="background:var(--water)"></span> water
       <span class="swatch" style="background:var(--saturated)"></span> saturated
@@ -126,11 +126,11 @@
           <option value="dump">dump</option>
         </select>
       </label>
-      <label>flow <span id="flow-out">6</span>
-        <input id="flow" type="range" min="1" max="24" value="6"/>
+      <label>flow <span id="flow-out">12</span>
+        <input id="flow" type="range" min="1" max="240" value="12"/>
       </label>
-      <label>budget <span id="water-out">180</span>
-        <input id="water" type="range" min="40" max="600" value="180"/>
+      <label>budget <span id="water-out">400</span>
+        <input id="water" type="range" min="10" max="8000" value="400"/>
       </label>
       <label>packing <span id="pack-out">0.55</span>
         <input id="pack" type="range" min="0.20" max="0.85" step="0.01" value="0.55"/>
@@ -141,8 +141,11 @@
           <option value="32,66,76">medium 32×66×76</option>
         </select>
       </label>
-      <label>clip <span id="clip-out">0.38</span>
-        <input id="clip" type="range" min="0" max="1" step="0.01" value="0.38"/>
+      <label>clip <span id="clip-out">0.22</span>
+        <input id="clip" type="range" min="0" max="1" step="0.01" value="0.22"/>
+      </label>
+      <label>opacity <span id="opacity-out">0.82</span>
+        <input id="opacity" type="range" min="0.08" max="1" step="0.01" value="0.82"/>
       </label>
       <label><input id="uneven" type="checkbox"/> loose patch</label>
       <div class="actions">
@@ -208,6 +211,7 @@ const ui = {
     pack: document.getElementById('pack'),
     size: document.getElementById('size'),
     clip: document.getElementById('clip'),
+    opacity: document.getElementById('opacity'),
     uneven: document.getElementById('uneven'),
     run: document.getElementById('run'),
     step: document.getElementById('step'),
@@ -372,6 +376,10 @@ ui.brew.addEventListener('click', () => {
 ui.clip.addEventListener('input', () => {
     document.getElementById('clip-out').textContent = ui.clip.value;
     el.setAttribute('clip', ui.clip.value);
+});
+ui.opacity.addEventListener('input', () => {
+    document.getElementById('opacity-out').textContent = ui.opacity.value;
+    el.setAttribute('opacity', ui.opacity.value);
 });
 ui.flow.addEventListener('input', () => {
     document.getElementById('flow-out').textContent = ui.flow.value;

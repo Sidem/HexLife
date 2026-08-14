@@ -29,6 +29,14 @@ describe('<hexlife-hcp> package contract', () => {
         expect(renderer).not.toContain('spacetime_fragment');
         expect(renderer).toContain('u_clipPlane');
         expect(renderer).toContain('cameraDepths');
+        expect(renderer).toContain('u_layers - 1 - layer');
+        expect(renderer).toContain('u_opacity');
+    });
+
+    it('draws layer 0 above the last layer', async () => {
+        const {visualHeight} = await import('../src/embed/HcpRenderer.js');
+        expect(visualHeight(0, 24)).toBeGreaterThan(visualHeight(23, 24));
+        expect(visualHeight(23, 24)).toBe(0);
     });
 
     it('places the far plane beyond a demo-size volume', async () => {
