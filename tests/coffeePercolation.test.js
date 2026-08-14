@@ -136,7 +136,7 @@ describe('coffee lab brew history', () => {
         expect(page).toContain('id="p-grind"');
         expect(page).toContain('id="p-wick"');
         expect(page).toContain('<hexlife-hcp');
-        expect(page).toContain("from './coffee-puck-lab.js'");
+        expect(page).toMatch(/from '\.\/coffee-puck-lab\.js\?v=/);
         expect(page).toContain('@hexlife/embed/hcp');
     });
 

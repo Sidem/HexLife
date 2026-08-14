@@ -7,6 +7,7 @@
 
 import {
     bedRange,
+    diskIndices,
     dualPalette,
     injectionSites,
     makePuckCells,
@@ -115,15 +116,58 @@ function headspaceHoldsFluid() {
     return false;
 }
 
+function showerHasRoom() {
+    const disk = diskIndices(el.world.rows, el.world.columns);
+    for (const index of disk) {
+        if (el.world.state[index] === 0) return true;
+    }
+    return false;
+}
+
+/** Paint up to `need` air cells anywhere in the layer-0 disk. */
+function paintOpenDisk(world, rows, cols, need, tick) {
+    const disk = diskIndices(rows, cols);
+    if (disk.length === 0 || need <= 0) return 0;
+    const start = ((tick * 13) >>> 0) % disk.length;
+    let painted = 0;
+    let offset = 0;
+    while (painted < need && offset < disk.length) {
+        const take = Math.min(need - painted, disk.length - offset);
+        const window = new Uint32Array(take);
+        for (let i = 0; i < take; i++) window[i] = disk[(start + offset + i) % disk.length];
+        painted += world.paintIf(0, window, 0, 1);
+        offset += take;
+    }
+    return painted;
+}
+
+/**
+ * Remaining budget is never a choke while the shower can still take water.
+ * A full shower (or leftover water in the headspace) needs the long quiet
+ * allowance — not the 12-tick period, and never a wall on `brew.tick`.
+ */
+export function settleDecision({
+    still, poured, budget, headspaceFluid, showerRoom, period, limit,
+}) {
+    if (poured < budget && showerRoom) return false;
+    if (still < period) return false;
+    if (poured < budget && still < limit) return false;
+    if (headspaceFluid && still < limit) return false;
+    return true;
+}
+
 function brewHasSettled() {
     const period = settlePeriod();
     const limit = quietTickLimit(el.world.layers, period);
-    if (brew.still < period) return false;
-    // The long allowance is consecutive quiet ticks, not a wall on the whole brew.
-    // `tick > layers*period` aborted mid-pour: 12 cells/tick × 288 ticks ≈ the
-    // 400-cell leftover that looked like a dual-porosity choke.
-    if (headspaceHoldsFluid() && brew.still < limit) return false;
-    return true;
+    return settleDecision({
+        still: brew.still,
+        poured: brew.poured,
+        budget: brew.budget,
+        headspaceFluid: headspaceHoldsFluid(),
+        showerRoom: showerHasRoom(),
+        period,
+        limit,
+    });
 }
 
 function applyModel() {
@@ -177,11 +221,19 @@ function pourAndDrip() {
     const {layers, rows, columns: cols} = world;
     let touched = false;
     if (brew.poured < brew.budget) {
+        const remaining = brew.budget - brew.poured;
+        const flow = Number(ui.flow.value);
+        const mode = ui.pour.value;
         const sites = injectionSites({
-            rows, cols, flow: Number(ui.flow.value), mode: ui.pour.value,
-            tick: brew.tick, remaining: brew.budget - brew.poured,
+            rows, cols, flow, mode, tick: brew.tick, remaining,
         });
-        const n = world.paintIf(0, sites, 0, 1);
+        let n = sites.length ? world.paintIf(0, sites, 0, 1) : 0;
+        const want = Math.min(flow, remaining);
+        // Scheduled shower/pulse/dump cells can be occupied while other disk
+        // cells are still air. Pulse rest returns no sites on purpose.
+        if (n < want && sites.length > 0 && mode !== 'centre') {
+            n += paintOpenDisk(world, rows, cols, want - n, brew.tick);
+        }
         brew.poured += n;
         if (n) touched = true;
     }

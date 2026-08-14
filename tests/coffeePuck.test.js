@@ -1,6 +1,7 @@
 import {readFile} from 'node:fs/promises';
 import {beforeAll, describe, expect, it} from 'vitest';
 import {blockRuleFromTet, HexHcp, initHcpEngine, sitePosition} from '../src/embed/hcp.js';
+import {settleDecision} from '../public/coffee-puck-lab.js';
 import {
     bedRange,
     diskCenter,
@@ -162,9 +163,11 @@ describe('puck host helpers', () => {
         expect(host).toContain('SETTLE_TICKS_ALTERNATING');
         expect(host).toContain('headspaceHoldsFluid');
         expect(host).toContain('brewHasSettled');
+        expect(host).toContain('settleDecision');
+        expect(host).toContain('showerHasRoom');
         expect(host).not.toMatch(/brew\.still >= PARTITION_PERIOD \|\| brew\.tick > limit/);
         expect(host).not.toMatch(/if \(brew\.tick > limit\) return true/);
-        expect(host).toContain('brew.still < limit');
+        expect(host).toContain('poured < budget && showerRoom');
     });
 });
 
@@ -178,7 +181,7 @@ describe('coffee-puck page source policy', () => {
         expect(lab).toContain('id="p-yield"');
         expect(lab).toContain('id="p-model"');
         expect(host).toContain('puckDualTransition');
-        expect(lab).toContain("from './coffee-puck-lab.js'");
+        expect(lab).toMatch(/from '\.\/coffee-puck-lab\.js\?v=/);
         expect(lab).toContain('@hexlife/embed@1.13.5');
         expect(lab).toContain("https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js");
         expect(lab).toContain('<hexlife-hcp');
@@ -190,6 +193,132 @@ describe('coffee-puck page source policy', () => {
         expect(lab).toContain('id="p-spin"');
         expect(lab).toContain('id="p-diameter"');
         expect(lab).toMatch(/id="p-layers"[^>]*max="48"/);
+    });
+});
+
+describe('3D host pour actually enters the bed', () => {
+    it('drops dual-porosity water through empty headspace', () => {
+        const rule = blockRuleFromTet(16, (tet) => puckDualTransition(tet));
+        const layers = 8;
+        const rows = 12;
+        const cols = 8;
+        const world = new HexHcp({states: 16, layers, rows, columns: cols, rule});
+        world.setBlockAlternates(true);
+        world.setCell(2 * cols + 2, 1);
+        const layerSize = rows * cols;
+        for (let i = 0; i < 48; i++) world.tick();
+        let layer0 = 0;
+        let below = 0;
+        for (let i = 0; i < world.numCells; i++) {
+            if (world.state[i] !== 1 && world.state[i] !== 2 && world.state[i] !== 3) continue;
+            if (i < layerSize) layer0 += 1;
+            else below += 1;
+        }
+        expect(below, `layer0=${layer0} below=${below}`).toBeGreaterThan(0);
+        expect(layer0).toBe(0);
+        world.dispose();
+    });
+
+    it('keeps pouring a dual puck instead of stalling with budget left', () => {
+        const rule = blockRuleFromTet(16, (tet) => puckDualTransition(tet));
+        const layers = 8;
+        const rows = 12;
+        const cols = 16;
+        const world = new HexHcp({states: 16, layers, rows, columns: cols, rule});
+        world.setBlockAlternates(true);
+        world.setCells(makePuckCells({
+            layers, rows, cols, packing: 0.55, seed: 0xC0FFEE, groundState: 6,
+        }));
+        const budget = Math.round(world.numCells * 0.06);
+        let poured = 0;
+        let still = 0;
+        let stalled = 0;
+        for (let tick = 0; tick < 400 && poured < budget; tick++) {
+            const sites = injectionSites({
+                rows, cols, flow: 12, mode: 'shower', tick, remaining: budget - poured,
+            });
+            const n = world.paintIf(0, sites, 0, 1);
+            poured += n;
+            const changed = world.tick();
+            if (n === 0) stalled += 1;
+            still = (n || changed !== 0) ? 0 : still + 1;
+        }
+        expect(poured, `poured ${poured} of ${budget}, stalled ${stalled}, still ${still}`).toBe(budget);
+        world.dispose();
+    });
+
+    it('does not treat leftover budget as a choke while the shower has air', () => {
+        const period = 12;
+        const limit = 288;
+        const leftover = {
+            still: 12, poured: 3468, budget: 3871,
+            headspaceFluid: false, showerRoom: true, period, limit,
+        };
+        expect(settleDecision(leftover), '403-cell leftover after 289×12 pours').toBe(false);
+        expect(settleDecision({...leftover, still: 0})).toBe(false);
+        expect(settleDecision({...leftover, still: 289, headspaceFluid: true})).toBe(false);
+        expect(settleDecision({
+            still: 288, poured: 3468, budget: 3871,
+            headspaceFluid: true, showerRoom: false, period, limit,
+        }), 'full shower + long quiet is a real choke').toBe(true);
+        expect(settleDecision({
+            still: 12, poured: 3871, budget: 3871,
+            headspaceFluid: false, showerRoom: true, period, limit,
+        }), 'budget met and quiet').toBe(true);
+    });
+
+    it('does not choke a demo-size dual shower under the host settle rule', () => {
+        const rule = blockRuleFromTet(16, (tet) => puckDualTransition(tet));
+        const layers = 24;
+        const rows = 48;
+        const cols = 56;
+        const world = new HexHcp({states: 16, layers, rows, columns: cols, rule});
+        world.setBlockAlternates(true);
+        world.setCells(makePuckCells({
+            layers, rows, cols, packing: 0.55, seed: 0xC0FFEE, groundState: 6,
+        }));
+        const budget = Math.round(world.numCells * 0.06);
+        const period = 12;
+        const limit = quietTickLimit(layers, period);
+        const {lo} = bedRange(layers);
+        const disk = diskIndices(rows, cols);
+        let poured = 0;
+        let still = 0;
+        let tick = 0;
+        let falseChoke = null;
+        const headspaceFluid = () => {
+            for (let layer = 0; layer < lo; layer++) {
+                const census = world.layerCensus(layer);
+                if ((census[1] || 0) + (census[2] || 0) + (census[3] || 0) > 0) return true;
+            }
+            return false;
+        };
+        const showerRoom = () => disk.some((index) => world.state[index] === 0);
+        for (; tick < 800 && poured < budget; tick++) {
+            const sites = injectionSites({
+                rows, cols, flow: 12, mode: 'shower', tick, remaining: budget - poured,
+            });
+            const n = world.paintIf(0, sites, 0, 1);
+            poured += n;
+            world.clearStatesInLayer(layers - 1, 0b1110);
+            const changed = world.tick();
+            still = (n || changed !== 0) ? 0 : still + 1;
+            const settled = settleDecision({
+                still, poured, budget,
+                headspaceFluid: headspaceFluid(),
+                showerRoom: showerRoom(),
+                period, limit,
+            });
+            if (settled && poured < budget) {
+                falseChoke = {tick, poured, still};
+                break;
+            }
+        }
+        expect(falseChoke, falseChoke
+            ? `host settle fired at tick ${falseChoke.tick} with ${budget - falseChoke.poured} unpoured`
+            : '').toBeNull();
+        expect(poured, `choked with ${budget - poured} unpoured at tick ${tick}`).toBe(budget);
+        world.dispose();
     });
 });
 
