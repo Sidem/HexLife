@@ -33,26 +33,23 @@
   th, td { text-align: left; padding: 0.25rem 0.4rem; border-bottom: 1px solid #2c333b; }
   .score { text-align: right; font-variant-numeric: tabular-nums; }
 </style>
-<!--
-  Commit 1 keeps the local embed-package map. After @hexlife/embed@1.13.0 is on npm, swap this
-  block for the jsDelivr pin (the commented map below). Do not pin an unpublished version.
--->
 <script type="importmap">
 {
   "imports": {
-    "@hexlife/embed/hcp": "./dist/embed-package/src/embed/hcp.js",
-    "@hexlife/embed/hcp-element": "./dist/embed-package/src/embed/hcp-element.js"
+    "@hexlife/embed/hcp": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.0/src/embed/hcp.js",
+    "@hexlife/embed/hcp-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.0/src/embed/hcp-element.js"
   }
 }
 </script>
 <!--
-  Production pin, after publish:
+  Local build (`npm run build:embed`). Swap the map above for this one to run against uncommitted
+  engine changes; nothing else in the page changes:
 
   <script type="importmap">
   {
     "imports": {
-      "@hexlife/embed/hcp": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.0/src/embed/hcp.js",
-      "@hexlife/embed/hcp-element": "https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.0/src/embed/hcp-element.js"
+      "@hexlife/embed/hcp": "./dist/embed-package/src/embed/hcp.js",
+      "@hexlife/embed/hcp-element": "./dist/embed-package/src/embed/hcp-element.js"
     }
   }
   </script>
@@ -77,9 +74,9 @@
       <p class="demo-deck">The same extraction model on the close-packed lattice the 2D lab is a slice of. Impermeable grains should still conduct past the 2D cliff.</p>
     </div>
     <a class="demo-package-card" href="https://www.npmjs.com/package/@hexlife/embed" target="_blank" rel="noopener noreferrer">
-      <span>Built with a local embed build</span>
-      <strong>@hexlife/embed (local)</strong>
-      <small><code>&lt;hexlife-hcp&gt;</code> · swap the import map after 1.13.0 publishes</small>
+      <span>Built with the published npm package</span>
+      <strong>@hexlife/embed@1.13.0</strong>
+      <small><code>&lt;hexlife-hcp&gt;</code> · jsDelivr import map · no build step</small>
     </a>
   </div>
 </header>
