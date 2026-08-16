@@ -261,6 +261,20 @@ export class HexLifeSpacetime {
     }
 
     /**
+     * Append an `EmbedSim` generation through its native packer. This is the live-tick path: it
+     * performs no per-cell JavaScript work and allocates its Wasm scratch layer only on first use.
+     * @param {{numCells: number, generation?: number, packRenderLayer: () => Uint8Array}} sim
+     * @param {number} [tick]
+     */
+    pushSimulation(sim, tick = sim?.generation ?? -1) {
+        this._assertAlive();
+        if (!sim || sim.numCells !== this.numCells || typeof sim.packRenderLayer !== 'function') {
+            throw new TypeError('Expected a same-sized EmbedSim with packRenderLayer().');
+        }
+        return this.pushLayer(sim.packRenderLayer(), tick);
+    }
+
+    /**
      * Replace the whole object with a finished run, oldest generation first, in one upload.
      *
      * This is the `/solid` shape of the API: a host that already has the run — every tick of it —

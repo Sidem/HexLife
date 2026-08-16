@@ -64,6 +64,10 @@ export class WorldStochastic {
      * it on state, ages, census, transition counts, and both checksums after every tick.
      */
     run_tick(): number;
+    /**
+     * Advance `count` generations and return the final changed-cell count.
+     */
+    run_ticks(count: number): number;
     seed(): bigint;
     set_cell(index: number, value: number): void;
     /**
@@ -178,6 +182,7 @@ export interface InitOutput {
     readonly worldstochastic_active_chunk_count: (a: number) => number;
     readonly worldstochastic_chunk_count: (a: number) => number;
     readonly worldstochastic_run_tick: (a: number) => [number, number, number];
+    readonly worldstochastic_run_ticks: (a: number, b: number) => [number, number, number];
     readonly worldstochastic_resume_at_generation: (a: number, b: bigint) => void;
     readonly worldstochastic_rebase_epochs: (a: number) => void;
     readonly worldstochastic_compute_elapsed_ages: (a: number) => void;

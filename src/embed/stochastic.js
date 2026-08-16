@@ -5,7 +5,8 @@
  * The root, `/sim`, and `/ca` entries continue to load the long-standing default artifact only.
  */
 
-import init, {
+import {
+    initSync,
     is_conservative_gas_rule as wasmIsConservativeGasRule,
     random_u32 as wasmRandomU32,
     WorldStochastic,
@@ -361,7 +362,7 @@ export async function initStochasticEngine() {
     if (!initPromise) {
         initPromise = (async () => {
             const bytes = await loadWasmBytes(wasmUrl);
-            wasmExports = await init({module_or_path: bytes});
+            wasmExports = initSync({module: await WebAssembly.compile(bytes)});
         })();
     }
     await initPromise;
@@ -409,6 +410,11 @@ function refreshAllViews() {
     for (const world of liveWorlds) world._refreshViews();
 }
 
+function refreshViewsAfterAllocation(previousBuffer, owner) {
+    if (wasmExports.memory.buffer !== previousBuffer) refreshAllViews();
+    else owner._refreshViews();
+}
+
 /**
  * Allocation-free stochastic-neighborhood runtime.
  *
@@ -441,6 +447,7 @@ export class StochasticWorld {
         this._wasm = wasmExports;
         this.backend = backend;
         this._isGas = backend === BACKEND_LATTICE_GAS;
+        const previousBuffer = this._wasm.memory.buffer;
         try {
             this.world = this._isGas
                 ? WorldStochastic.new_lattice_gas(columns, rows, toU64(seed, 'seed'))
@@ -454,7 +461,7 @@ export class StochasticWorld {
         this.numCells = this.world.num_cells();
         this.seed = this.world.seed();
         liveWorlds.add(this);
-        refreshAllViews();
+        refreshViewsAfterAllocation(previousBuffer, this);
         if (rule) this.setRule(rule);
         if (this._isGas) {
             if (channels || walls) this.setInitialGasState(channels, walls);
@@ -502,11 +509,12 @@ export class StochasticWorld {
      */
     setRule(rule) {
         this._assertLive();
+        const previousBuffer = this._wasm.memory.buffer;
         const bytes = rule instanceof Uint8Array ? rule : Uint8Array.from(rule);
         rethrowAsError(() => (this._isGas
             ? this.world.set_gas_rule(bytes)
             : this.world.set_neighborhood_rule(bytes)));
-        refreshAllViews();
+        if (this._wasm.memory.buffer !== previousBuffer) refreshAllViews();
     }
 
     /**
@@ -641,11 +649,13 @@ export class StochasticWorld {
         this._assertLive();
         const ticks = Math.max(0, Math.floor(count));
         let changed = 0;
-        for (let index = 0; index < ticks; index++) {
-            changed = rethrowAsError(() => this.world.run_tick());
+        if (ticks > 0) {
+            changed = rethrowAsError(() => this.world.run_ticks(ticks));
             // The neighborhood tick swaps its two visible buffers; the gas projects in place, so
             // its live view never moves. Neither path allocates or copies a grid.
-            if (!this._isGas) [this.state, this.nextState] = [this.nextState, this.state];
+            if (!this._isGas && ticks % 2 === 1) {
+                [this.state, this.nextState] = [this.nextState, this.state];
+            }
         }
         return changed;
     }

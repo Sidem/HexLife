@@ -91,6 +91,26 @@ describe('@hexlife/embed/ca rule construction', () => {
 });
 
 describe('@hexlife/embed/ca runtime', () => {
+    it('constructs many worlds without triangular typed-view rebuilding', () => {
+        const original = HexCA.prototype._refreshViews;
+        let refreshes = 0;
+        HexCA.prototype._refreshViews = function countedRefresh() {
+            refreshes++;
+            return original.call(this);
+        };
+        const worlds = [];
+        try {
+            for (let i = 0; i < 64; i++) {
+                worlds.push(new HexCA({states: 2, rows: 6, columns: 8}));
+            }
+            // The old unconditional registry refresh is 1+…+64 = 2,080 calls.
+            expect(refreshes).toBeLessThan(512);
+        } finally {
+            for (const world of worlds) world.dispose();
+            HexCA.prototype._refreshViews = original;
+        }
+    });
+
     it('refuses a block grid whose rows would seam the partition, and names a way out', () => {
         // The embed's own default of 64 rows fails this, which is precisely why it throws instead
         // of rounding: the grid you asked for would not be the grid you got.

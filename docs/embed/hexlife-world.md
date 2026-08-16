@@ -186,7 +186,8 @@ than showing a blank canvas. If you paint a pressed-state 3D toggle, read this a
 attribute — otherwise your button will claim 3D is on over an unmistakably flat world.
 
 `sim` exposes `rows`, `cols`, `numCells`, `rulesetHex`, `tickCount`, `activeCount` (live cells),
-`speed`, `state`, and `snapshotCells()`.
+`lastChangedCount`, `isSettled`, `speed`, `state`, `snapshotCells()`, and the native spacetime bridge
+`packRenderLayer()`.
 
 > `sim.state` is a **view into Wasm linear memory**, not a copy. It changes every tick, and
 > constructing another world anywhere on the page can detach it. Use `snapshotCells()` for anything
@@ -214,7 +215,8 @@ world.addEventListener('hexlife-playstate', (e) => {
 Playback has five invisible gates — the attribute, an API call, the viewport, tab visibility and
 reduced motion — so `hexlife-playstate` exists to keep a host's play/pause label honest without
 polling a getter on a timer. Count `userPaused`, not `playing`: `playing` also flips on every
-scroll-offscreen auto-pause and tab switch.
+scroll-offscreen auto-pause and tab switch. It also becomes false at a fixed point: the element
+parks its frame loop once a generation maps to itself, and any rule or cell edit wakes it again.
 
 `hexlife-playstate` fires **before** `hexlife-ready` on boot, so attach listeners before connecting
 the element.

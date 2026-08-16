@@ -761,6 +761,15 @@ impl WorldStochastic {
         Ok(changed)
     }
 
+    /// Advance `count` generations and return the final changed-cell count.
+    pub fn run_ticks(&mut self, count: u32) -> Result<u32, String> {
+        let mut changed = self.last_changed_count;
+        for _ in 0..count {
+            changed = self.run_tick()?;
+        }
+        Ok(changed)
+    }
+
     /// Clamp every stored epoch to at most `u16::MAX` ticks back so the `u32` distance can never
     /// approach the half-range. Exact, because [`saturating_age`] already saturates there.
     /// Resume the current world at `generation`, preserving every elapsed age exactly.
@@ -2707,5 +2716,4 @@ mod tests {
         );
     }
 }
-
 

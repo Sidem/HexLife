@@ -119,7 +119,7 @@ import {createSpacetimeView} from '@hexlife/embed/spacetime'
 
 const view = createSpacetimeView(canvas, {rows, columns, depth: ticks})
 for (let tick = 0; tick < ticks; tick++) {
-  view.pushState(sim.state, {ruleIndices: sim.ruleIndices, tick})
+  view.pushSimulation(sim, tick)          // native rule×2+state packing; no JS cell loop
   sim.tick()
 }
 view.draw()                        // drag to turn, wheel to dolly — controls are on by default

@@ -222,6 +222,15 @@ export class WorldHcp {
         return ret >>> 0;
     }
     /**
+     * Advance `count` generations and return the final changed-cell count.
+     * @param {number} count
+     * @returns {number}
+     */
+    run_ticks(count) {
+        const ret = wasm.worldhcp_run_ticks(this.__wbg_ptr, count);
+        return ret >>> 0;
+    }
+    /**
      * @param {boolean} alternates
      */
     set_block_alternates(alternates) {

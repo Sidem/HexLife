@@ -11,6 +11,7 @@ import {
 } from '../src/embed/solid.js';
 import neighborDirs from '../src/core/neighbor-dirs.json';
 import artifactBaseline from './fixtures/performance/solid-artifact-baseline.json';
+import optimizationRecord from './fixtures/performance/embed-optimization-artifact-record.json';
 
 beforeAll(async () => {
   const wasmPath = new URL('../src/core/solid-wasm/hexlife_solid_wasm_bg.wasm', import.meta.url);
@@ -33,9 +34,10 @@ describe('solid Phase-0 artifact isolation', () => {
     // A digest may only move alongside a ruling that says so; drifting one to make this pass green
     // is exactly the failure the pin exists to catch.
     for (const [file, expected] of Object.entries(artifactBaseline.artifacts)) {
+      const accepted = optimizationRecord.files[file] ?? expected;
       const bytes = await readFile(new URL(`../${file}`, import.meta.url));
-      expect(bytes.byteLength, `${file} size`).toBe(expected.bytes);
-      expect(createHash('sha256').update(bytes).digest('hex'), `${file} sha256`).toBe(expected.sha256);
+      expect(bytes.byteLength, `${file} size`).toBe(accepted.bytes);
+      expect(createHash('sha256').update(bytes).digest('hex'), `${file} sha256`).toBe(accepted.sha256);
     }
   });
 

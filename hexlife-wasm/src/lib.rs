@@ -404,6 +404,15 @@ impl World {
         active
     }
 
+    /// Advance `count` generations and return the final active-cell count.
+    pub fn run_ticks(&mut self, count: u32) -> u32 {
+        let mut active = self.last_active_count;
+        for _ in 0..count {
+            active = self.run_tick();
+        }
+        active
+    }
+
     /// Number of active cells in the current generation (as of the last `run_tick`).
     pub fn active_count(&self) -> u32 {
         self.last_active_count

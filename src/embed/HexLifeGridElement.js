@@ -263,7 +263,7 @@ export class HexLifeGridElement extends HTMLElement {
             case 'density': {
                 const p = this._readParams();
                 for (const sim of this.sims) { sim.density = p.density; sim.reset(p.seed); }
-                this._drawOnce();
+                this._afterMutation();
                 break;
             }
             case 'speed': {
@@ -332,7 +332,7 @@ export class HexLifeGridElement extends HTMLElement {
         if (!this.sims.length) return;
         const s = seed === undefined ? this._readParams().seed : seed;
         for (const sim of this.sims) sim.reset(s);
-        this._drawOnce();
+        this._afterMutation();
     }
 
     /**
@@ -373,7 +373,7 @@ export class HexLifeGridElement extends HTMLElement {
     clear() {
         if (!this.sims.length || this.error) return;
         for (const sim of this.sims) sim.clear();
-        this._drawOnce();
+        this._afterMutation();
     }
 
     /**
@@ -384,10 +384,9 @@ export class HexLifeGridElement extends HTMLElement {
     tick(n = 1) {
         if (!this.sims.length) return 0;
         const steps = Math.max(0, Math.floor(n));
-        for (const sim of this.sims) {
-            for (let i = 0; i < steps; i++) sim.tick();
-        }
+        for (const sim of this.sims) sim.tick(steps);
         this._drawOnce();
+        this._syncPlayback();
         return this.sims[0].tickCount;
     }
 
@@ -423,7 +422,7 @@ export class HexLifeGridElement extends HTMLElement {
             this.sims[i].reset(seed);
         }
         this._hexes = hexes;
-        this._drawOnce();
+        this._afterMutation();
     }
 
     /** @returns {number} How many worlds are live. */
@@ -737,7 +736,8 @@ export class HexLifeGridElement extends HTMLElement {
 
         const motionAllowed = !this._reducedMotion || this._playRequested;
         const wants = !this._userPaused && motionAllowed;
-        const canRun = wants && this._onScreen && this._docVisible;
+        const allSettled = this.sims.length > 0 && this.sims.every((sim) => sim.isSettled);
+        const canRun = wants && !allSettled && this._onScreen && this._docVisible;
 
         this._overlay.hidden = wants;
 
@@ -783,14 +783,24 @@ export class HexLifeGridElement extends HTMLElement {
         this._lastFrameTime = now;
         // Every sim gets the same dt and carries its own accumulator, so the tiles stay in lockstep
         // — which is the whole contract: at generation N, every tile is showing generation N.
-        for (let i = 0; i < this.sims.length; i++) this.sims[i].advance(dt);
-        this.renderer.drawGrid(this.sims);
+        let ticks = 0;
+        for (let i = 0; i < this.sims.length; i++) ticks = Math.max(ticks, this.sims[i].advance(dt));
+        if (ticks > 0) this.renderer.drawGrid(this.sims);
+        if (ticks > 0 && this.sims.every((sim) => sim.isSettled)) {
+            this._stopLoop();
+            this._emitPlayState();
+        }
     }
 
     _drawOnce() {
         if (this.sims.length && this.renderer && !this.error && !this._contextLost) {
             this.renderer.drawGrid(this.sims);
         }
+    }
+
+    _afterMutation() {
+        this._drawOnce();
+        this._syncPlayback();
     }
 
     // --- GPU context loss -----------------------------------------------------

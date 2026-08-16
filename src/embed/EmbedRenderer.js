@@ -254,6 +254,8 @@ export class EmbedRenderer {
         this._statePaletteTexture = null;
         /** `k` — the palette's width in texels, and what puts a state on its texel centre. */
         this._statePaletteSize = 0;
+        /** Whether the two binary instance buffers contain a complete state ready to redraw. */
+        this._binaryStateUploaded = false;
     }
 
     _setupGeometry() {
@@ -414,6 +416,7 @@ export class EmbedRenderer {
         const gl = this.gl;
         WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, cells);
         if (ruleIndices) WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, ruleIndices);
+        this._binaryStateUploaded = ruleIndices !== null;
     }
 
     /** @param {number|null} index Row-major selected-cell index. */
@@ -814,7 +817,7 @@ export class EmbedRenderer {
      * nearest off cell, then blend only that winner.
      * @param {import('./EmbedSim.js').EmbedSim} sim
      */
-    _drawTorus(sim) {
+    _drawTorus(sim, upload = true) {
         const gl = this.gl;
 
         gl.clearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3]);
@@ -828,8 +831,11 @@ export class EmbedRenderer {
 
         gl.useProgram(this._torusProgram);
         gl.bindVertexArray(this.vao);
-        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
-        WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+        if (upload || !this._binaryStateUploaded) {
+            WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
+            WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+            this._binaryStateUploaded = true;
+        }
 
         const u = this._torusUniforms;
         const period = getTorusPeriods(this.cols, this.rows, this._hexSize);
@@ -1064,18 +1070,21 @@ export class EmbedRenderer {
      * Draw the sim's current generation. One instanced call over every cell.
      * @param {import('./EmbedSim.js').EmbedSim} sim
      */
-    draw(sim) {
+    draw(sim, { upload = true } = {}) {
         const gl = this.gl;
         if (!this._hexSize) this.resize(this.canvas.clientWidth || 1, this.canvas.clientHeight || 1);
 
         if (this._torusEnabled && this._torusProgram) {
-            this._drawTorus(sim);
+            this._drawTorus(sim, upload);
             return;
         }
 
         // The views are windows onto wasm memory — upload straight from them, no copy.
-        WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
-        WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+        if (upload || !this._binaryStateUploaded) {
+            WebGLUtils.updateBuffer(gl, this.stateBuffer, gl.ARRAY_BUFFER, sim.state);
+            WebGLUtils.updateBuffer(gl, this.ruleIndexBuffer, gl.ARRAY_BUFFER, sim.ruleIndices);
+            this._binaryStateUploaded = true;
+        }
 
         this.drawCurrent();
     }

@@ -490,7 +490,7 @@ export class HexLifeElement extends HTMLElement {
                 this.sim.setRuleset(hex);
                 this.sim.reset();          // A new rule table on an evolved state is meaningless.
                 this._updateAttribution();
-                this._drawOnce();
+                this._afterMutation();
                 break;
             }
             case 'seed':
@@ -498,7 +498,7 @@ export class HexLifeElement extends HTMLElement {
                 const p = this._readParams();
                 this.sim.density = p.density;
                 this.sim.reset(p.seed);
-                this._drawOnce();
+                this._afterMutation();
                 break;
             }
             case 'speed':
@@ -510,7 +510,7 @@ export class HexLifeElement extends HTMLElement {
             case 'hue-shift':
             case 'flicker-proof':
                 this.renderer.setPalette(this._paletteOptions());
-                this._drawOnce();
+                this._drawViewOnly();
                 break;
             case 'brush':
                 this._brushSize = this._readBrushSize();
@@ -525,7 +525,7 @@ export class HexLifeElement extends HTMLElement {
                 break;
             case 'max-dpr':
                 this._resize();
-                this._drawOnce();
+                this._drawViewOnly();
                 break;
             case 'link':
                 this._updateAttribution();
@@ -586,7 +586,7 @@ export class HexLifeElement extends HTMLElement {
     reset(seed) {
         if (!this.sim) return;
         this.sim.reset(seed === undefined ? this._readParams().seed : seed);
-        this._drawOnce();
+        this._afterMutation();
     }
 
     /**
@@ -601,7 +601,7 @@ export class HexLifeElement extends HTMLElement {
     clear() {
         if (!this.sim || this.error) return;
         this.sim.clear();
-        this._drawOnce();
+        this._afterMutation();
     }
 
     /**
@@ -612,8 +612,9 @@ export class HexLifeElement extends HTMLElement {
      */
     tick(n = 1) {
         if (!this.sim) return 0;
-        for (let i = 0; i < Math.max(0, Math.floor(n)); i++) this.sim.tick();
+        this.sim.tick(n);
         this._drawOnce();
+        this._syncPlayback();
         return this.sim.tickCount;
     }
 
@@ -802,7 +803,7 @@ export class HexLifeElement extends HTMLElement {
 
         this._resizeObserver = new ResizeObserver(() => {
             this._resize();
-            if (!this.playing) this._drawOnce();   // A paused poster must survive a resize.
+            if (!this.playing) this._drawViewOnly();   // A paused poster must survive a resize.
         });
         this._resizeObserver.observe(this);
 
@@ -830,7 +831,7 @@ export class HexLifeElement extends HTMLElement {
         this._resize();
         this._updateAttribution();
         // Before the first draw, so a world booted with `torus` already set never flashes flat.
-        this._syncTorus();
+        this._syncTorus(false);
         this._drawOnce();
         this._syncPlayback();
 
@@ -1096,7 +1097,7 @@ export class HexLifeElement extends HTMLElement {
         const motionAllowed = !this._reducedMotion || this._playRequested;
         // Drawing also holds the loop (pause-while-drawing), same as the explorer.
         const wants = !this._userPaused && motionAllowed && !this._drawing;
-        const canRun = wants && this._onScreen && this._docVisible;
+        const canRun = wants && !this.sim.isSettled && this._onScreen && this._docVisible;
 
         // When `draw` is enabled the host usually owns play chrome (Devvit transport bar); keep the
         // poster off so pointer events reach the canvas for painting. `torus` claims the pointer the
@@ -1409,14 +1410,33 @@ export class HexLifeElement extends HTMLElement {
         this._lastFrameTime = now;
         // The camera rides this loop while it exists — `_syncSpinLoop` keeps its own rAF parked for
         // exactly as long as this one is running, so the torus never spins at double rate.
-        this._advanceSpin(dt);
-        this.sim.advance(dt);
-        this.renderer.draw(this.sim);
+        const cameraMoved = this._advanceSpin(dt);
+        const ticks = this.sim.advance(dt);
+        if (ticks > 0) this.renderer.draw(this.sim);
+        else if (cameraMoved) this.renderer.draw(this.sim, { upload: false });
+        if (ticks > 0 && this.sim.isSettled) {
+            this._stopLoop();
+            this._emitPlayState();
+            this._syncSpinLoop();
+        }
     }
 
     /** Render the current generation exactly once (poster frames, resizes, `tick()`, `reset()`). */
     _drawOnce() {
-        if (this.sim && this.renderer && !this.error && !this._contextLost) this.renderer.draw(this.sim);
+        if (this.sim && this.renderer && !this.error && !this._contextLost) {
+            this.renderer.draw(this.sim);
+        }
+    }
+
+    _drawViewOnly() {
+        if (this.sim && this.renderer && !this.error && !this._contextLost) {
+            this.renderer.draw(this.sim, {upload: false});
+        }
+    }
+
+    _afterMutation() {
+        this._drawOnce();
+        this._syncPlayback();
     }
 
     _resize() {
@@ -1453,7 +1473,7 @@ export class HexLifeElement extends HTMLElement {
      * Apply the `torus` attribute to the renderer and everything that follows from it. Safe to call
      * repeatedly — the renderer's own program build is the only one-time part.
      */
-    _syncTorus() {
+    _syncTorus(redraw = true) {
         if (!this.renderer || this.error) return;
         const want = this.hasAttribute('torus');
         // The overwhelmingly common case — a flat world that has never been anything else. There is
@@ -1474,7 +1494,7 @@ export class HexLifeElement extends HTMLElement {
         this._applyPointerAffordance();
         this._syncSpinLoop();
         this._syncPlayback();
-        this._drawOnce();
+        if (redraw) this._drawViewOnly();
     }
 
     /**
@@ -1521,7 +1541,7 @@ export class HexLifeElement extends HTMLElement {
         const dt = Math.min(now - this._spinLastTime, 100);
         this._spinLastTime = now;
         this._advanceSpin(dt);
-        this._drawOnce();
+        this._drawViewOnly();
     }
 
     /**
@@ -1529,10 +1549,11 @@ export class HexLifeElement extends HTMLElement {
      * @param {number} dt Milliseconds since the previous frame (already clamped by the caller).
      */
     _advanceSpin(dt) {
-        if (!this._torusActive() || this._orbitPointerId != null) return;
+        if (!this._torusActive() || this._orbitPointerId != null) return false;
         const degreesPerSecond = this._readTorusSpin();
-        if (degreesPerSecond <= 0) return;
+        if (degreesPerSecond <= 0) return false;
         this.renderer.orbitTorus((degreesPerSecond * Math.PI / 180) * (dt / 1000), 0);
+        return true;
     }
 
     /** Drag-to-orbit: take the pointer, or ignore it if another one already has the camera. */
@@ -1556,7 +1577,7 @@ export class HexLifeElement extends HTMLElement {
         this._orbitLast = { x: e.clientX, y: e.clientY };
         // Drag right turns the torus right; drag down tips the near face toward the viewer.
         this.renderer.orbitTorus(-dx * TORUS_ORBIT_RADIANS_PER_PX, dy * TORUS_ORBIT_RADIANS_PER_PX);
-        if (!this.playing) this._drawOnce();
+        this._drawViewOnly();
     }
 
     _endOrbit() {
@@ -1601,7 +1622,7 @@ export class HexLifeElement extends HTMLElement {
                 this._viewPanX = 0;
                 this._viewPanY = 0;
                 this._applyView();
-                if (!this.playing) this._drawOnce();
+                this._drawViewOnly();
             }
             return;
         }
@@ -1626,7 +1647,7 @@ export class HexLifeElement extends HTMLElement {
             this._viewZoom = next;
         }
         this._applyView();
-        if (!this.playing) this._drawOnce();
+        this._drawViewOnly();
     }
 
     _onWheel(e) {
@@ -1640,7 +1661,7 @@ export class HexLifeElement extends HTMLElement {
         // about the centre, which is also the only place the whole shape stays framed.
         if (this._torusActive()) {
             this.renderer.dollyTorus(Math.exp(e.deltaY * 0.001));
-            if (!this.playing) this._drawOnce();
+            this._drawViewOnly();
             return;
         }
         const rect = this._canvas.getBoundingClientRect();
@@ -1690,7 +1711,7 @@ export class HexLifeElement extends HTMLElement {
             // `dollyTorus` accumulates into a clamped distance and has no absolute target to aim at.
             this.renderer.dollyTorus((this._pinchLastDist || dist) / dist);
             this._pinchLastDist = dist;
-            if (!this.playing) this._drawOnce();
+            this._drawViewOnly();
             return;
         }
         const factor = dist / this._pinchStartDist;
@@ -1733,7 +1754,7 @@ export class HexLifeElement extends HTMLElement {
         this._viewPanX = nextX;
         this._viewPanY = nextY;
         this._applyView();
-        if (!this.playing) this._drawOnce();
+        this._drawViewOnly();
     }
 
     _onTouchEnd(e) {

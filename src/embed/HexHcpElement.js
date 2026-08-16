@@ -199,7 +199,7 @@ export class HexHcpElement extends HTMLElement {
         if (name === 'speed') this.world.speed = readSpeed(this.getAttribute('speed'));
         else if (name === 'palette') {
             this._applyPalette();
-            this._drawOnce();
+            this._drawOnce(false);
         } else if (name === 'paused') {
             this._userPaused = this.hasAttribute('paused');
             if (this._userPaused) this._playRequested = false;
@@ -207,13 +207,14 @@ export class HexHcpElement extends HTMLElement {
         } else if (name === 'link') this._updateAttribution();
         else if (name === 'clip' && this.renderer) {
             this.renderer.setClip(Number(this.getAttribute('clip')));
-            this._drawOnce();
+            this._drawOnce(false);
         } else if (name === 'opacity' && this.renderer) {
             this.renderer.setOpacity(Number(this.getAttribute('opacity')));
-            this._drawOnce();
+            this._drawOnce(false);
         } else if (name === 'auto-rotate' && this.renderer) {
             this._applyAutoRotate();
-            this._drawOnce();
+            this._drawOnce(false);
+            this._syncPlayback();
         }
     }
 
@@ -347,6 +348,9 @@ export class HexHcpElement extends HTMLElement {
                 rows,
                 columns,
                 autoRotate: this._readAutoRotate(),
+                onInvalidate: () => {
+                    if (!this._rafId) this._drawOnce(false);
+                },
             });
         } catch (e) {
             this._fail('This browser can’t run WebGL2.', String(e && e.message ? e.message : e));
@@ -360,7 +364,7 @@ export class HexHcpElement extends HTMLElement {
         document.addEventListener('visibilitychange', this._onVisibilityChange);
         this._resizeObserver = new ResizeObserver(() => {
             this._resize();
-            if (!this.playing) this._drawOnce();
+            if (!this.playing) this._drawOnce(false);
         });
         this._resizeObserver.observe(this);
         this._intersectionObserver = new IntersectionObserver((entries) => {
@@ -441,11 +445,12 @@ export class HexHcpElement extends HTMLElement {
             return;
         }
         const motionAllowed = !this._reducedMotion || this._playRequested;
-        const wantsSim = !this._userPaused && motionAllowed && this._onScreen && this._docVisible;
+        const motionIntent = !this._userPaused && motionAllowed;
+        const wantsSim = motionIntent && !this.world.isSettled && this._onScreen && this._docVisible;
         this._simPlaying = wantsSim;
-        this._overlay.hidden = wantsSim || this.hasAttribute('paused');
-        // Orbit and auto-rotate must keep drawing while the host holds `paused`.
-        if (this._onScreen && this._docVisible) this._startLoop();
+        this._overlay.hidden = motionIntent || this.hasAttribute('paused');
+        // A fully static poster owns no animation frame. Pointer controls invalidate synchronously.
+        if (this._onScreen && this._docVisible && (wantsSim || this.renderer.autoRotate)) this._startLoop();
         else this._stopLoop();
     }
 
@@ -464,14 +469,19 @@ export class HexHcpElement extends HTMLElement {
     _frame(now) {
         const dt = Math.min(now - this._lastFrameTime, 100);
         this._lastFrameTime = now;
-        if (this._simPlaying) this.world.advance(dt);
+        const ticks = this._simPlaying ? this.world.advance(dt) : 0;
+        if (ticks > 0) this.renderer.markStateDirty();
         this._rafId = requestAnimationFrame(this._frame);
-        this.renderer.draw(this.world.state, {dtMs: this._simPlaying || this.renderer.autoRotate ? dt : 0});
+        this.renderer.draw(this.world.state, {dtMs: this.renderer.autoRotate ? dt : 0});
+        if (ticks > 0 && this.world.isSettled) {
+            this._syncPlayback();
+        }
     }
 
-    _drawOnce() {
+    _drawOnce(stateChanged = true) {
         if (this.world && this.renderer && !this.error && !this._contextLost) {
-            this.renderer.markDirty();
+            if (stateChanged) this.renderer.markStateDirty();
+            else this.renderer.markDirty();
             this.renderer.draw(this.world.state);
         }
     }

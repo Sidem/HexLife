@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {createDensityState, packCells, unpackCells} from '../src/embed/sim.js';
 import {EmbedSim} from '../src/embed/EmbedSim.js';
 
@@ -27,6 +27,34 @@ describe('@hexlife/embed/sim', () => {
         expect([...packed]).toEqual([0b10001101, 0b00000001]);
         expect(unpackCells(packed, cells.length)).toEqual(cells);
         expect(() => unpackCells(Uint8Array.of(0, 0b10000000), 9)).toThrow(/padding/);
+    });
+
+    it('batches ticks into one native call and mirrors buffer parity once', () => {
+        const state = Uint8Array.of(0);
+        const nextState = Uint8Array.of(1);
+        const ruleIndices = Uint8Array.of(2);
+        const nextRuleIndices = Uint8Array.of(3);
+        const runTicks = vi.fn(() => 1);
+        const fake = {
+            state,
+            nextState,
+            ruleIndices,
+            nextRuleIndices,
+            activeCount: 0,
+            tickCount: 0,
+            world: {run_ticks: runTicks, last_changed_count: () => 0},
+        };
+        EmbedSim.prototype.tick.call(fake, 4);
+        expect(runTicks).toHaveBeenCalledOnce();
+        expect(runTicks).toHaveBeenCalledWith(4);
+        expect(fake.state).toBe(state);
+        expect(fake.tickCount).toBe(4);
+        expect(fake.isSettled).toBe(true);
+
+        EmbedSim.prototype.tick.call(fake, 3);
+        expect(fake.state).toBe(nextState);
+        expect(fake.ruleIndices).toBe(nextRuleIndices);
+        expect(fake.tickCount).toBe(7);
     });
 
     it('creates canonical deterministic density states without Wasm', () => {

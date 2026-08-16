@@ -31,6 +31,27 @@ is not major if every code above still resolves to the same world.
   dashboard, brew controls, and history log as the six-state 2D lab. `coffee-puck.html` redirects
   to `coffee-percolation.html#puck`.
 
+### `@hexlife/embed` 1.14.0 — 2026-08-16
+
+#### Added
+
+- **Native `/sim` → `/spacetime` layer packing.** `view.pushSimulation(sim)` uses
+  `sim.packRenderLayer()` to produce `ruleIndex * 2 + state` inside Wasm, removing the per-cell
+  JavaScript pass from a live history feed.
+
+#### Changed
+
+- **Every engine batches `tick(count)` in one Wasm call.** JavaScript mirrors double-buffer parity
+  once after the batch; trajectories and checksums are unchanged.
+- **Static and low-rate embeds do substantially less work.** Binary, grid and k-state renderers draw
+  only after a tick or view change; deterministic fixed points park their animation loops. HCP
+  camera motion no longer re-uploads the 3D state texture, and a static HCP poster owns no rAF.
+- **Large grids construct in linear view-refresh work.** Allocating a world refreshes every live
+  Wasm view only when linear memory actually grows, instead of after every construction.
+- **The package root carries one copy of its Wasm payload.** The build uses the already-resolved
+  inlined bytes for `initSync`, taking the root transitive closure from about 130 KB to 98 KB gzip;
+  a release audit now enforces four isolated payloads and the 100 KB root ceiling.
+
 ### `@hexlife/embed` 1.13.5 — 2026-08-14
 
 #### Fixed

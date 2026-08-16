@@ -26,6 +26,10 @@ export interface HexLifeSim {
     readonly tickCount: number;
     /** Live cells in the current generation. Maintained by ticks, draw strokes and `clear`. */
     readonly activeCount: number;
+    /** Cells that changed on the final tick of the most recent batch. */
+    readonly lastChangedCount: number;
+    /** Whether the current generation maps to itself and automatic playback is parked. */
+    readonly isSettled: boolean;
     /** Target ticks/second once playing. */
     speed: number;
     /**
@@ -33,14 +37,16 @@ export interface HexLifeSim {
      * This is a **view into wasm linear memory**, not a copy — see `snapshotCells`.
      */
     readonly state: Uint8Array | null;
-    /** Advance exactly one generation. @returns Active cells in the new generation. */
-    tick(): number;
+    /** Advance exact generations in one native batch. @returns Active cells in the final generation. */
+    tick(count?: number): number;
     /** Re-seed the initial state and rewind to tick 0. */
     reset(seed?: number | null): void;
     /** Blank every cell and forget the rule history. @returns Whether the sim was live. */
     clear(): boolean;
     /** Rolling hash of the current state — the determinism cross-check hook. */
     checksum(): number;
+    /** Native `rule * 2 + state` layer for `@hexlife/embed/spacetime`. */
+    packRenderLayer(): Uint8Array;
     /**
      * A private copy of the current cells, safe to hold across allocating wasm calls (which detach
      * the `state` view) and across ticks. Null once the sim is freed.

@@ -782,7 +782,7 @@ export class HexCAElement extends HTMLElement {
         }
 
         this._rafId = requestAnimationFrame(this._frame);
-        this.renderer.drawStates(this.world.state);
+        if (ticks > 0) this.renderer.drawStates(this.world.state);
     }
 
     /** Render the current generation exactly once (resizes, `tick()`, `reset()`, paint strokes). */

@@ -97,7 +97,7 @@ describe('embed torus loop', () => {
         // `playing` is `_rafId !== 0` and `hexlife-playstate` is derived from it, so a camera
         // animation that borrowed `_rafId` would tell every host the paused world was running.
         expect(element).toContain('this._spinRafId = requestAnimationFrame(this._spinFrame);');
-        expect(element).toMatch(/_spinFrame\(now\)[\s\S]*this\._advanceSpin\(dt\);[\s\S]*this\._drawOnce\(\);/);
+        expect(element).toMatch(/_spinFrame\(now\)[\s\S]*this\._advanceSpin\(dt\);[\s\S]*this\._drawViewOnly\(\);/);
         const spinSync = element.slice(
             element.indexOf('_syncSpinLoop() {'),
             element.indexOf('_spinFrame(now) {'),

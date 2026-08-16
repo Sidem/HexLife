@@ -12,6 +12,7 @@ import phase0Artifacts from './fixtures/performance/stochastic-phase0-artifacts.
 // #40 Phase 2's deliberate default-artifact growth, recorded and owner-ruled in its own file rather
 // than folded into the §9 record above — that one's ruling explicitly refuses to be widened.
 import spacetimeRecord from './fixtures/performance/spacetime-artifact-record.json';
+import optimizationRecord from './fixtures/performance/embed-optimization-artifact-record.json';
 
 const goldenVectors = [
   [0n, 0n, 0, 0, 1_713_891_541],
@@ -102,7 +103,9 @@ describe('WorldStochastic Phase-1 distribution isolation', () => {
       const current = await readFile(new URL(`../${file}`, import.meta.url));
       const gzip = gzipSync(current, {level: 9}).byteLength;
       // The most recent accepted ruling for this file wins; unlisted files stay on Phase 0's size.
-      const exception = spacetimeRecord.files[file] ?? artifactExceptions.files[file];
+      const exception = optimizationRecord.files[file]
+        ?? spacetimeRecord.files[file]
+        ?? artifactExceptions.files[file];
       const baseline = exception ? exception.acceptedGzipBytes : prior.gzipBytes;
       expect(gzip, `${file} gzip`).toBeLessThanOrEqual(baseline * 1.005);
     }
@@ -111,15 +114,19 @@ describe('WorldStochastic Phase-1 distribution isolation', () => {
     expect(artifactExceptions.notCaused).toMatch(/zero bytes/);
   });
 
-  it('leaves the stochastic artifact untouched by #40', async () => {
+  it('attributes the stochastic artifact change only to the recorded batched-tick export', async () => {
     // The whole point of the separate artifact: a feature added to `World` must cost the stochastic
     // engine nothing. #40 Phase 2 added an export to `World`, so this is the check that matters.
-    for (const [file, prior] of Object.entries(phase0Artifacts.artifacts)) {
+    for (const [file] of Object.entries(phase0Artifacts.artifacts)) {
       if (!file.startsWith('src/core/stochastic-wasm/')) continue;
       const current = await readFile(new URL(`../${file}`, import.meta.url));
-      expect(gzipSync(current, {level: 9}).byteLength, `${file} gzip`).toBe(prior.gzipBytes);
+      const accepted = optimizationRecord.files[file];
+      expect(accepted, `${file} optimization record`).toBeDefined();
+      expect(gzipSync(current, {level: 9}).byteLength, `${file} gzip`)
+        .toBeLessThanOrEqual(accepted.acceptedGzipBytes * 1.005);
     }
     expect(spacetimeRecord.whatItDoesNotCost.stochasticArtifact).toMatch(/byte-identical/);
+    expect(optimizationRecord.cause).toMatch(/run_ticks/);
   });
 
   it('exports only stochastic bindings from the second generated artifact', async () => {

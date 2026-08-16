@@ -20,7 +20,7 @@ const world = await createSimulation({rulesetHex, rows: 24, columns: 30})
 const view = createSpacetimeView(canvas, {rows: 24, columns: 30, depth: 120})
 
 for (let tick = 0; tick < 120; tick++) {
-  view.pushState(world.state, {ruleIndices: world.ruleIndices, tick})
+  view.pushSimulation(world, tick)
   world.tick()
 }
 view.draw()
@@ -64,8 +64,9 @@ run on a device with a low cap should feed every nth tick rather than let the bo
 
 | Call | Use for |
 | :--- | :--- |
+| `pushSimulation(sim, tick?)` | A live `/sim` world. Packs `rule * 2 + state` natively with no per-cell JavaScript work. |
 | `pushLayer(bytes, tick?)` | One tick, already one byte per cell. No copy at all. |
-| `pushState(cells, {ruleIndices, tick})` | One generation, packed for you. |
+| `pushState(cells, {ruleIndices, tick})` | An external or occasional snapshot, packed for you. |
 | `setHistory(generations, {ruleIndices})` | A finished run, in a single upload. |
 | `truncate(length)` / `reset()` | Drop the newest layers, or empty the object. Neither touches a texel. |
 
@@ -74,8 +75,9 @@ knowing.
 
 The first is that a binary world with no rule indices is *already packed* — its 0/1 state bytes are
 valid layer bytes as they stand — so `pushLayer(world.state)` uploads a live view of the engine's
-memory with no intermediate copy. With `ruleIndices`, `pushState` packs them in one JavaScript pass
-per tick; a host feeding many worlds at once should pack in its own engine and call `pushLayer`.
+memory with no intermediate copy. For a running `/sim` world, use `pushSimulation`: the engine packs
+the full colour index in Wasm into one lazily allocated scratch layer. `pushState` retains a
+JavaScript packing path for external snapshots; do not put it in a high-rate simulation loop.
 
 The second is that **changing the palette re-uploads nothing**. `setPalette()` rewrites a 1 KB table
 and retints every layer of history; not one byte of the volume moves. `view.stats.uploads` is there

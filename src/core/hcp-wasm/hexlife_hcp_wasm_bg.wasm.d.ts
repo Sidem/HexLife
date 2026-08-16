@@ -29,6 +29,7 @@ export const worldhcp_skipping_enabled: (a: number) => number;
 export const worldhcp_set_block_alternates: (a: number, b: number) => void;
 export const worldhcp_block_alternates: (a: number) => number;
 export const worldhcp_run_tick: (a: number) => number;
+export const worldhcp_run_ticks: (a: number, b: number) => number;
 export const worldhcp_tick_count: (a: number) => bigint;
 export const worldhcp_set_tick_count: (a: number, b: bigint) => void;
 export const worldhcp_phase: (a: number) => number;

@@ -19,7 +19,7 @@
  * Phase 0 extraction into `rng.js` / `rulesetHex.js` / `gridMath.js`.
  */
 
-import init, { World } from '../core/wasm-engine/hexlife_wasm.js';
+import { initSync, World } from '../core/wasm-engine/hexlife_wasm.js';
 // eslint-disable-next-line import/no-unresolved
 import wasmUrl from '../core/wasm-engine/hexlife_wasm_bg.wasm?url';
 import { mulberry32 } from '../core/rng.js';
@@ -100,7 +100,12 @@ export function initEmbedWasm() {
     if (!initPromise) {
         initPromise = (async () => {
             const bytes = await loadWasmBytes(wasmUrl);
-            wasmExports = await init({ module_or_path: bytes });
+            // `initSync` is intentional even though this function remains async while the bytes may
+            // come from the dev server. Importing wasm-bindgen's default initializer retains its own
+            // `new URL(...wasm)` fallback; with the package's all-assets-inline build that embeds the
+            // same Wasm binary a second time. We already resolved the bytes above, so compile exactly
+            // that one copy and keep strict-host CSP compatibility.
+            wasmExports = initSync({ module: await WebAssembly.compile(bytes) });
             return wasmExports;
         })();
     }
@@ -139,9 +144,21 @@ export function unregisterViewOwner(owner) {
     liveSims.delete(owner);
 }
 
-/** Rebuild every registered owner's views. Call after ANY allocating wasm call. */
+/** Rebuild every registered owner's views. Call after an allocating wasm call grew memory. */
 export function refreshAllWasmViews() {
     refreshAllViews();
+}
+
+/**
+ * Refresh every owner only when an allocating call actually grew shared memory. Otherwise refresh
+ * just the new/changed owner. This keeps construction of large `<hexlife-grid>` sets linear rather
+ * than rebuilding every earlier world's six views after every allocation.
+ * @param {ArrayBuffer} previousBuffer
+ * @param {{_refreshViews: () => void}} owner
+ */
+export function refreshWasmViewsAfterAllocation(previousBuffer, owner) {
+    if (wasmExports.memory.buffer !== previousBuffer) refreshAllViews();
+    else owner._refreshViews();
 }
 
 /**
@@ -206,14 +223,17 @@ export class EmbedSim {
         this.speed = speed;
         this.tickCount = 0;
         this.activeCount = 0;
+        this.lastChangedCount = 0;
+        this.isSettled = false;
+        this._renderLayerEnabled = false;
+        this.renderLayer = null;
         /** Fractional ticks owed, carried across frames so real TPS tracks `speed`. */
         this._accumulator = 0;
 
+        const previousBuffer = wasmExports.memory.buffer;
         this.world = new World(this.cols, this.rows);
         liveSims.add(this);
-        // A World was just constructed: memory may have grown, so EVERY live sim (including this
-        // one, which has no views yet) must (re)build its views.
-        refreshAllViews();
+        refreshWasmViewsAfterAllocation(previousBuffer, this);
 
         this.setRuleset(rulesetHex);
         this.reset(seed);
@@ -229,6 +249,9 @@ export class EmbedSim {
         this.nextRuleIndices = new Uint8Array(mem, this.world.next_rule_indices_ptr(), n);
         this.ruleset = new Uint8Array(mem, this.world.ruleset_ptr(), 128);
         this.ruleUsageCounters = new Uint32Array(mem, this.world.rule_usage_counters_ptr(), 128);
+        if (this._renderLayerEnabled) {
+            this.renderLayer = new Uint8Array(mem, this.world.render_layer_ptr(), n);
+        }
     }
 
     /**
@@ -239,6 +262,7 @@ export class EmbedSim {
     setRuleset(hex) {
         this.rulesetHex = hex;
         this.ruleset.set(hexToRuleset(hex));
+        this.isSettled = false;
     }
 
     /**
@@ -253,6 +277,8 @@ export class EmbedSim {
         this.seed = seed;
         this.tickCount = 0;
         this._accumulator = 0;
+        this.lastChangedCount = 0;
+        this.isSettled = false;
 
         if (this.initialCells) {
             this.state.set(this.initialCells);
@@ -275,7 +301,7 @@ export class EmbedSim {
     }
 
     /**
-     * Advance exactly one generation.
+     * Advance exactly `count` generations in one JS→Wasm crossing.
      *
      * `run_tick` swaps the current/next buffers *inside* wasm and returns the new generation's
      * active-cell count, so JS must mirror that swap on its view references or it would keep
@@ -285,11 +311,23 @@ export class EmbedSim {
      */
     tick(count = 1) {
         const ticks = Math.max(0, Math.floor(count));
-        for (let i = 0; i < ticks; i++) {
-            this.activeCount = this.world.run_tick();
-            [this.state, this.nextState] = [this.nextState, this.state];
-            [this.ruleIndices, this.nextRuleIndices] = [this.nextRuleIndices, this.ruleIndices];
-            this.tickCount++;
+        if (ticks > 0) {
+            if (typeof this.world.run_ticks === 'function') {
+                this.activeCount = this.world.run_ticks(ticks);
+            } else {
+                // Keeps prototype-level host mocks and older injected bindings compatible; the
+                // bundled production engine always takes the one-crossing branch above.
+                for (let i = 0; i < ticks; i++) this.activeCount = this.world.run_tick();
+            }
+            this.lastChangedCount = typeof this.world.last_changed_count === 'function'
+                ? this.world.last_changed_count()
+                : Number.POSITIVE_INFINITY;
+            this.isSettled = this.lastChangedCount === 0;
+            if (ticks % 2 === 1) {
+                [this.state, this.nextState] = [this.nextState, this.state];
+                [this.ruleIndices, this.nextRuleIndices] = [this.nextRuleIndices, this.ruleIndices];
+            }
+            this.tickCount += ticks;
         }
         return this.activeCount;
     }
@@ -318,6 +356,7 @@ export class EmbedSim {
             this.activeCount += edit.value ? 1 : -1;
             changed++;
         }
+        if (changed) this.isSettled = false;
         return changed;
     }
 
@@ -346,7 +385,7 @@ export class EmbedSim {
         } else {
             this._accumulator -= ticks;
         }
-        for (let i = 0; i < ticks; i++) this.tick();
+        this.tick(ticks);
         return ticks;
     }
 
@@ -357,6 +396,23 @@ export class EmbedSim {
      */
     checksum() {
         return this.world.checksum_state();
+    }
+
+    /**
+     * Pack the current generation as `rule * 2 + state` natively for `/spacetime`.
+     * The scratch layer is allocated lazily once; normal simulations pay no memory or tick cost.
+     * @returns {Uint8Array} A live Wasm-memory view, valid until another world grows the memory.
+     */
+    packRenderLayer() {
+        if (!this.world) throw new Error('EmbedSim: simulation is disposed.');
+        if (!this._renderLayerEnabled) {
+            const previousBuffer = wasmExports.memory.buffer;
+            this.world.set_render_layer_enabled(true);
+            this._renderLayerEnabled = true;
+            refreshWasmViewsAfterAllocation(previousBuffer, this);
+        }
+        this.world.pack_render_layer();
+        return this.renderLayer;
     }
 
     /**
@@ -397,6 +453,7 @@ export class EmbedSim {
             this.activeCount += next ? 1 : -1;
             changed = true;
         }
+        if (changed) this.isSettled = false;
         return changed;
     }
 
@@ -422,6 +479,7 @@ export class EmbedSim {
             this.activeCount += next ? 1 : -1;
             changed = true;
         }
+        if (changed) this.isSettled = false;
         return changed;
     }
 
@@ -443,6 +501,7 @@ export class EmbedSim {
         this.state.fill(0);
         this.ruleIndices.fill(RULE_INDEX_INITIAL);
         this.activeCount = 0;
+        this.isSettled = false;
         return true;
     }
 
@@ -468,7 +527,7 @@ export class EmbedSim {
         this.world.free();
         this.world = null;
         this.state = this.nextState = this.ruleIndices = this.nextRuleIndices = null;
-        this.ruleset = this.ruleUsageCounters = null;
+        this.ruleset = this.ruleUsageCounters = this.renderLayer = null;
     }
 
     /** Public headless-API spelling; `free()` remains for existing element callers. */

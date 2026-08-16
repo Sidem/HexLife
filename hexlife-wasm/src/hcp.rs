@@ -426,6 +426,15 @@ impl WorldHcp {
         changed
     }
 
+    /// Advance `count` generations and return the final changed-cell count.
+    pub fn run_ticks(&mut self, count: u32) -> u32 {
+        let mut changed = self.last_changed_count;
+        for _ in 0..count {
+            changed = self.run_tick();
+        }
+        changed
+    }
+
     pub fn tick_count(&self) -> u64 {
         self.tick_count
     }

@@ -67,8 +67,13 @@ uniformly live — but it is what keeps a sparse world sparse enough to benefit 
 ## The simulation object
 
 `createSimulation()` resolves to a `HexLifeSim`, which exposes `rows`, `cols`, `numCells`,
-`rulesetHex`, `tickCount`, `activeCount` (live cells), `speed`, `state`, `snapshotCells()`, `tick()`
-and `dispose()`.
+`rulesetHex`, `tickCount`, `activeCount` (live cells), `lastChangedCount`, `isSettled`, `speed`,
+`state`, `snapshotCells()`, `tick()` and `dispose()`. `tick(count)` crosses into Wasm once even when
+`count > 1`; the native engine owns the whole batch.
+
+`packRenderLayer()` is the zero-copy bridge to [`/spacetime`](./spacetime.md). It packs
+`ruleIndex * 2 + state` natively into a lazily allocated Wasm scratch layer and returns its live
+view. Most hosts should call `view.pushSimulation(sim)` rather than calling it directly.
 
 > `sim.state` is a **view into Wasm linear memory**, not a copy. It changes every tick, and
 > constructing another world anywhere on the page can detach it. Use `snapshotCells()` for anything
