@@ -14,6 +14,7 @@ const copies = [
   ['packages/hexlife-embed/README.md', 'dist/embed-package/README.md'],
   ['LICENSE', 'dist/embed-package/LICENSE'],
   ['src/embed/api.d.ts', 'dist/embed-package/src/embed/api.d.ts'],
+  ['src/embed/hex.d.ts', 'dist/embed-package/src/embed/hex.d.ts'],
   ['src/embed/sim.d.ts', 'dist/embed-package/src/embed/sim.d.ts'],
   ['src/embed/render.d.ts', 'dist/embed-package/src/embed/render.d.ts'],
   ['src/embed/spacetime.d.ts', 'dist/embed-package/src/embed/spacetime.d.ts'],

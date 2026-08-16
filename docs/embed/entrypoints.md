@@ -2,13 +2,14 @@
 
 # Entry points
 
-Twelve public imports. The split is not cosmetic: each one is the boundary between "this host needs
+Thirteen public imports. The split is not cosmetic: each one is the boundary between "this host needs
 a DOM", "this host needs a separately loaded Wasm artifact", and "this host needs neither".
 
 | Import | Needs | Use for |
 | :--- | :--- | :--- |
 | `@hexlife/embed` | DOM, WebGL2, Wasm | The browser. Importing it registers [`<hexlife-world>`](./hexlife-world.md) and [`<hexlife-grid>`](./hexlife-grid.md). |
 | `@hexlife/embed/api` | Nothing | Node and browsers alike: world codes, ruleset metadata, palette names, GPU probing. No DOM at module scope. → [`/api`](./api.md) |
+| `@hexlife/embed/hex` | Nothing | Unbounded pointy-top axial coordinates, directions, distance/rounding, pixels, lines, and negative-safe chunks. No DOM or Wasm. → [`/hex`](./hex.md) |
 | `@hexlife/embed/sim` | Wasm | Node and browser workers: deterministic host-driven simulation without DOM or rendering. → [`/sim`](./sim.md) |
 | `@hexlife/embed/render` | DOM, WebGL2 | Browser hosts: draw externally supplied state without allocating or ticking a simulation. → [`/render`](./renderer.md) |
 | `@hexlife/embed/spacetime` | DOM, WebGL2 | Browser hosts: a whole run drawn as a 3D solid — one retained tick per layer, ray-marched, turnable and sliceable. Simulates nothing; a host feeds it generations. Separate from `/render` because it is a second program, two more shaders and a texture ring. → [`/spacetime`](./spacetime.md) |
@@ -20,7 +21,8 @@ a DOM", "this host needs a separately loaded Wasm artifact", and "this host need
 | `@hexlife/embed/hcp` | Wasm | **HCP** worlds: a general k-state CA on the hexagonal close-packed lattice, with a 6-phase `k⁴` tetrahedral block. A **fourth** separately loaded artifact; no DOM at module scope. → [`/hcp`](./hcp.md) |
 | `@hexlife/embed/hcp-element` | DOM, WebGL2, Wasm | Importing it registers `<hexlife-hcp>`. The only element entry that reaches the HCP artifact. |
 
-A server that validates a pasted world code must import **only** `@hexlife/embed/api` — the root
+A geometry-only host imports **only** `@hexlife/embed/hex`; a server that validates a pasted world
+code imports **only** `@hexlife/embed/api` — the root
 entry evaluates custom-element, Wasm and WebGL code at import time.
 
 The browser bundle **inlines the Wasm binary** as a data URI rather than fetching a side-car asset,
@@ -37,7 +39,8 @@ because a strict host CSP (a Reddit webview, for instance) is not something an e
 | Spacetime view | simulates nothing — the same layer sink, drawn instead of meshed | `/spacetime` | **None.** Pure WebGL2. |
 | HCP | 2–16 | `/hcp`, `/hcp-element` | A **fourth** artifact, loaded only by these two. 12-neighbour close-packed lattice, `k⁴` tets. |
 
-Importing the package root, `/sim`, `/ca`, `/ca-element`, `/stochastic`, `/solid` or `/spacetime`
+Importing `/hex` evaluates no DOM, WebGL, or Wasm code. Importing the package root, `/sim`, `/ca`,
+`/ca-element`, `/stochastic`, `/solid` or `/spacetime`
 neither downloads nor initializes the HCP artifact.
 
 ## Types

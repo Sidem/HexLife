@@ -14,6 +14,21 @@ The package bundles the Rust/Wasm tick engine and WebGL2 renderer used by
 custom elements for the quickest integration, or DOM-free simulation and renderer-only entrypoints
 for applications that own more of the stack.
 
+For applications that need the hex map but not a cellular automaton, `/hex` is a zero-dependency,
+DOM-free and Wasm-free pointy-top axial geometry module:
+
+```ts
+import {axialNeighbor, axialToPixel, pixelToAxial} from '@hexlife/embed/hex'
+
+const east = axialNeighbor({q: 0, r: 0}, 0)
+const center = axialToPixel(east, 24, {x: 320, y: 240})
+const picked = pixelToAxial(center, 24, {x: 320, y: 240})
+```
+
+Direction 0 is east; indices continue clockwise in screen coordinates. The contract also includes
+cube rounding, distance, line traversal, rotation, and negative-coordinate-safe storage chunks.
+→ [Full `/hex` reference](https://github.com/Sidem/HexLife/blob/main/docs/embed/hex.md)
+
 The same `(ruleset, seed, density, rows)` produces a byte-identical tick sequence in HexLife
 Explorer, an embed, and HexLife on Reddit. An embed is therefore a reproducible world, not a visual
 approximation of one.
@@ -166,7 +181,8 @@ The full reference lives in the repository, one page per surface:
 | :--- | :--- |
 | [**Docs index**](https://github.com/Sidem/HexLife/blob/main/docs/embed/README.md) | Everything below, in one table. |
 | [Getting started](https://github.com/Sidem/HexLife/blob/main/docs/embed/getting-started.md) | Install, first world, sizing, host-owned simulation, requirements. |
-| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the twelve imports you need and what each requires. |
+| [Entry points](https://github.com/Sidem/HexLife/blob/main/docs/embed/entrypoints.md) | Which of the thirteen imports you need and what each requires. |
+| [`/hex`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hex.md) | Pointy-top axial coordinates, direction protocol, pixels, lines, rounding, and chunks. |
 | [`<hexlife-world>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-world.md) | Attributes, JavaScript API, events, GPU-loss recovery, policies, styling. |
 | [`<hexlife-grid>`](https://github.com/Sidem/HexLife/blob/main/docs/embed/hexlife-grid.md) | Many worlds in one WebGL context. |
 | [`/sim`](https://github.com/Sidem/HexLife/blob/main/docs/embed/sim.md) | DOM-free simulation, seeded and sparse states, vacuum stability, block skipping. |
@@ -185,6 +201,7 @@ The full reference lives in the repository, one page per surface:
 | :--- | :--- | :--- |
 | `@hexlife/embed` | DOM, WebGL2, Wasm | The browser. Registers `<hexlife-world>` and `<hexlife-grid>`. |
 | `@hexlife/embed/api` | Nothing | Node and browsers alike: world codes, ruleset metadata, palettes, GPU probing. |
+| `@hexlife/embed/hex` | Nothing | Unbounded pointy-top axial coordinates, directions, pixels, lines, and storage chunks. |
 | `@hexlife/embed/sim` | Wasm | Node and workers: deterministic host-driven simulation, no DOM or rendering. |
 | `@hexlife/embed/render` | DOM, WebGL2 | Draw externally supplied state without ticking a simulation. |
 | `@hexlife/embed/spacetime` | DOM, WebGL2 | **A run as a 3D solid.** One retained tick per layer, ray-marched; turn it, slice it, look inside it. No Wasm artifact at all. |
