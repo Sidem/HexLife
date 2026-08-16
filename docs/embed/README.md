@@ -15,7 +15,7 @@ These pages track `main`. The documentation for a published version is the copy 
 | Page | What it covers |
 | :--- | :--- |
 | [Getting started](./getting-started.md) | Install, first world, sizing, the host-owned simulation path, requirements. |
-| [Entry points](./entrypoints.md) | Which of the twelve imports you need, what each one costs, and what it requires. |
+| [Entry points](./entrypoints.md) | Which of the thirteen imports you need, what each one costs, and what it requires. |
 
 ## Elements
 
@@ -31,6 +31,7 @@ These pages track `main`. The documentation for a published version is the copy 
 
 | Page | What it covers |
 | :--- | :--- |
+| [`/hex`](./hex.md) | DOM/Wasm-free unbounded pointy-top axial geometry, hit testing, lines, and chunks. |
 | [`/sim`](./sim.md) | DOM-free binary simulation, seeded and sparse initial states, vacuum stability, block skipping. |
 | [`/render`](./renderer.md) | The renderer alone, for hosts that already own their simulation. |
 | [`/spacetime`](./spacetime.md) | A whole run drawn as a 3D solid: one tick per layer, ray-marched, turnable and sliceable. |

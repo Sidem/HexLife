@@ -16,6 +16,8 @@ export default defineConfig({
       entry: {
         index: 'src/embed/index.js',
         api: 'src/embed/api.js',
+        // Pure unbounded pointy-top axial geometry. No DOM, renderer, simulation, or Wasm.
+        hex: 'src/embed/hex.js',
         sim: 'src/embed/sim.js',
         render: 'src/embed/render.js',
         // The ray-marched history volume. Separate from `render` because it is a second program,

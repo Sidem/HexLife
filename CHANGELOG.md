@@ -25,6 +25,15 @@ is not major if every code above still resolves to the same world.
 
 ## [Unreleased]
 
+### `@hexlife/embed` 1.15.0 — 2026-08-16
+
+#### Added
+
+- **`@hexlife/embed/hex` — typed, zero-dependency pointy-top axial geometry.** The DOM/Wasm-free
+  entry pins one clockwise direction protocol plus neighbors, rotation, cube distance and rounding,
+  pixel conversion/hit testing, line traversal, and negative-coordinate-safe storage chunks. It is
+  an unbounded generic host primitive and adds no factory semantics or cost to any CA engine.
+
 ### Changed
 
 - **The 3D coffee puck is a tab on the coffee lab**, not its own page. Same extraction-yield
