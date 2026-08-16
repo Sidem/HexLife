@@ -56,6 +56,17 @@ describe('<hexlife-hcp> package contract', () => {
         expect(element).toContain('_readAutoRotate');
     });
 
+    it('does not re-upload the 3D state texture for camera-only frames', async () => {
+        const renderer = await read('src/embed/HcpRenderer.js');
+        const draw = renderer.slice(renderer.indexOf('draw(state, options = {})'));
+        expect(renderer).toContain('this._stateDirty = true');
+        expect(draw).toMatch(/if \(this\._stateDirty\)[\s\S]*texSubImage3D/);
+        expect(draw).toContain('this._stateDirty = false');
+        expect(renderer).toContain('this._onInvalidate?.()');
+        expect(await read('src/embed/HexHcpElement.js'))
+            .toContain('if (!this._rafId) this._drawOnce(false)');
+    });
+
     it('draws layer 0 above the last layer', async () => {
         const {visualHeight} = await import('../src/embed/HcpRenderer.js');
         expect(visualHeight(0, 24)).toBeGreaterThan(visualHeight(23, 24));

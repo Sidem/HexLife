@@ -6,7 +6,8 @@
  * 6-phase tetrahedral block of size `k^4`. DOM-free: works in Node and in workers.
  */
 
-import init, {
+import {
+    initSync,
     hcp_engine_version as wasmHcpEngineVersion,
     hcp_site_xyz as wasmHcpSiteXyz,
     WorldHcp,
@@ -75,7 +76,7 @@ export async function initHcpEngine() {
     if (!initPromise) {
         initPromise = (async () => {
             const bytes = await loadWasmBytes(wasmUrl);
-            wasmExports = await init({module_or_path: bytes});
+            wasmExports = initSync({module: await WebAssembly.compile(bytes)});
         })();
     }
     await initPromise;
@@ -93,6 +94,11 @@ export function hcpSiteXyz(col, row, layer, hexSize = 1) {
 
 function refreshAllViews() {
     for (const owner of viewOwners) owner._refreshViews();
+}
+
+function refreshViewsAfterAllocation(previousBuffer, owner) {
+    if (wasmExports.memory.buffer !== previousBuffer) refreshAllViews();
+    else owner._refreshViews();
 }
 
 /** @template T @param {() => T} fn */
@@ -277,6 +283,7 @@ export class HexHcp {
         this._accumulator = 0;
         this._wasm = wasmExports;
 
+        const previousBuffer = this._wasm.memory.buffer;
         this.world = rethrowAsError(() => new WorldHcp(
             layers,
             rows,
@@ -287,7 +294,7 @@ export class HexHcp {
             Z_TAGS[zBoundary],
         ));
         viewOwners.add(this);
-        refreshAllViews();
+        refreshViewsAfterAllocation(previousBuffer, this);
 
         if (rule) this.setRule(rule);
         if (cells) this.setCells(cells);
@@ -312,19 +319,21 @@ export class HexHcp {
     /** @param {ArrayLike<number>} rule */
     setRule(rule) {
         this._assertLive();
+        const previousBuffer = this._wasm.memory.buffer;
         rethrowAsError(() => {
             this.world.set_block_rule(rule instanceof Uint32Array ? rule : Uint32Array.from(rule));
         });
-        refreshAllViews();
+        if (this._wasm.memory.buffer !== previousBuffer) refreshAllViews();
     }
 
     /** @param {ArrayLike<number>} cells */
     setCells(cells) {
         this._assertLive();
+        const previousBuffer = this._wasm.memory.buffer;
         rethrowAsError(() => {
             this.world.set_cells(cells instanceof Uint8Array ? cells : Uint8Array.from(cells));
         });
-        refreshAllViews();
+        if (this._wasm.memory.buffer !== previousBuffer) refreshAllViews();
     }
 
     /** @param {number} index @param {number} value */
@@ -401,9 +410,7 @@ export class HexHcp {
     tick(count = 1) {
         this._assertLive();
         const ticks = Math.max(0, Math.floor(count));
-        let changed = 0;
-        for (let i = 0; i < ticks; i++) changed = this.world.run_tick();
-        return changed;
+        return ticks > 0 ? this.world.run_ticks(ticks) : 0;
     }
 
     /** @param {number} dtMs */

@@ -53,6 +53,10 @@ export class WorldHcp {
      * Advance one generation. Writes in place; no second buffer, no JS copy.
      */
     run_tick(): number;
+    /**
+     * Advance `count` generations and return the final changed-cell count.
+     */
+    run_ticks(count: number): number;
     set_block_alternates(alternates: boolean): void;
     /**
      * Install the `k^4` packed-output table. **Allocates** (the slice is copied in from JS).
@@ -122,6 +126,7 @@ export interface InitOutput {
     readonly worldhcp_set_block_alternates: (a: number, b: number) => void;
     readonly worldhcp_block_alternates: (a: number) => number;
     readonly worldhcp_run_tick: (a: number) => number;
+    readonly worldhcp_run_ticks: (a: number, b: number) => number;
     readonly worldhcp_tick_count: (a: number) => bigint;
     readonly worldhcp_set_tick_count: (a: number, b: bigint) => void;
     readonly worldhcp_phase: (a: number) => number;

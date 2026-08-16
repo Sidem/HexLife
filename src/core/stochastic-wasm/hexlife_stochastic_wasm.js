@@ -227,6 +227,18 @@ export class WorldStochastic {
         return ret[0] >>> 0;
     }
     /**
+     * Advance `count` generations and return the final changed-cell count.
+     * @param {number} count
+     * @returns {number}
+     */
+    run_ticks(count) {
+        const ret = wasm.worldstochastic_run_ticks(this.__wbg_ptr, count);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
      * @returns {bigint}
      */
     seed() {

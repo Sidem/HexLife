@@ -11,7 +11,7 @@
         "build:wasm:hcp": "wasm-pack build ./hexlife-wasm --target web --out-dir ../src/core/hcp-wasm --out-name hexlife_hcp_wasm -- --no-default-features --features hcp",
         "build": "npm run build:wasm && vite build && npm run build:standalone",
         "build:standalone": "vite build --config vite.totalistic-standalone.config.js && node scripts/inline-totalistic-standalone.mjs",
-        "build:embed": "npm run build:wasm:stochastic && npm run build:wasm:solid && npm run build:wasm:hcp && vite build --config vite.embed.config.js && node scripts/prepare-embed-package.mjs",
+        "build:embed": "npm run build:wasm:stochastic && npm run build:wasm:solid && npm run build:wasm:hcp && vite build --config vite.embed.config.js && node scripts/prepare-embed-package.mjs && node scripts/embed-package-audit.mjs",
         "pack:embed": "npm run build:embed && npm pack ./dist/embed-package --pack-destination dist",
         "publish:embed": "npm run build:embed && npm publish ./dist/embed-package --access public",
         "preview": "vite preview",
@@ -22,6 +22,7 @@
         "test:run": "vitest run",
         "library:merge": "node scripts/merge-library-pack.mjs",
         "audit:stochastic": "node scripts/stochastic-oracle-fixtures.mjs && node scripts/stochastic-artifact-audit.mjs",
+        "audit:embed": "node scripts/embed-package-audit.mjs",
         "benchmark:stochastic:native": "node scripts/stochastic-native-baseline.mjs",
         "benchmark:stochastic:release": "node scripts/stochastic-release-audit.mjs --write"
     },

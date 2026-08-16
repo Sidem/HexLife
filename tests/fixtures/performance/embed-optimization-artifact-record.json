@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "recorded": "2026-08-16",
+  "item": "@hexlife/embed 1.14.0 runtime optimization",
+  "summary": "Owner-approved artifact update for native run_ticks(count) exports. The export removes repeated JavaScript-to-Wasm crossings when a frame or host advances more than one generation; state-transition work remains entirely native and output parity is unchanged.",
+  "cause": "World, WorldK, WorldStochastic, and WorldHcp each gain one thin run_ticks(count) export. The default and stochastic Wasm payloads compress smaller despite the export; generated glue grows by 56 and 48 gzip bytes respectively. HCP grows by 52 gzip bytes total. The solid artifact is byte-identical because it has no tick engine. The root/CA bundle measurements also cover dirty rendering, fixed-point parking, and batched wrapper logic. Symmetry is a pre-existing unrecorded baseline drift found when the audit was made exhaustive; it measured 2681 gzip bytes before this work and is unchanged by it.",
+  "ownerDecision": {
+    "date": "2026-08-16",
+    "ruling": "accepted as recorded",
+    "scope": "Exact bytes and SHA-256 digests below replace prior digest pins only for the six native files; the three named package bundles receive only their exact gzip ceilings. Any later change still requires a separate measured record."
+  },
+  "files": {
+    "src/core/wasm-engine/hexlife_wasm_bg.wasm": {
+      "bytes": 66031,
+      "sha256": "3b74472f00989e8731046db02d3d0131ab52d576a0a9501bae8a97293aff4f98",
+      "acceptedGzipBytes": 26488,
+      "gzipBefore": 26645
+    },
+    "src/core/wasm-engine/hexlife_wasm.js": {
+      "bytes": 37666,
+      "sha256": "0bf751455be694208666887891b4d838e39de1c65ff680c9414323a551270789",
+      "acceptedGzipBytes": 9874,
+      "gzipBefore": 9818
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm_bg.wasm": {
+      "bytes": 68838,
+      "sha256": "4fc2c6cd46c9177b1d480f94e08dc1d7301e8d3c6e3218ace2507075336b681c",
+      "acceptedGzipBytes": 27321,
+      "gzipBefore": 27503
+    },
+    "src/core/stochastic-wasm/hexlife_stochastic_wasm.js": {
+      "bytes": 21356,
+      "sha256": "75b81dea85b1bbafe82fb7b61d861405da4492ed1720bd094a8b2bb18a74dfbc",
+      "acceptedGzipBytes": 4651,
+      "gzipBefore": 4603
+    },
+    "src/core/hcp-wasm/hexlife_hcp_wasm_bg.wasm": {
+      "bytes": 46150,
+      "sha256": "ce1d2f1b88abad3a221fb31199b81ba532dff2f038603ab9b28e9aeb2a31f407",
+      "acceptedGzipBytes": 18483,
+      "gzipBefore": 18469
+    },
+    "src/core/hcp-wasm/hexlife_hcp_wasm.js": {
+      "bytes": 16358,
+      "sha256": "59e3ba1ce5d1677c436284258131d300c83f30795093b0d336480da5cd4ae48a",
+      "acceptedGzipBytes": 3604,
+      "gzipBefore": 3566
+    },
+    "dist/embed-package/src/embed/ca.js": {
+      "acceptedGzipBytes": 6184,
+      "note": "Batched native tick wrapper."
+    },
+    "dist/embed-package/src/embed/index.js": {
+      "acceptedGzipBytes": 21665,
+      "note": "Dirty-gated rendering and fixed-point loop parking."
+    },
+    "dist/embed-package/src/embed/chunks/Symmetry-<hash>.js": {
+      "acceptedGzipBytes": 2681,
+      "note": "Pre-existing main-branch baseline drift, measured unchanged before optimization edits."
+    }
+  }
+}

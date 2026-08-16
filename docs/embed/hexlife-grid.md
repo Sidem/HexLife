@@ -84,6 +84,10 @@ than one per world.
 | `indexAt(clientX, clientY)` | `number \| null` | Which tile a point is in; null in a gutter. |
 | `tileRect(i)` | `{x, y, width, height}` | CSS px relative to the element. |
 
+The grid schedules no redraw on frames that produce no tick, and parks its animation loop once
+every tile is settled. It still advances settled tiles while another tile is active so all worlds
+remain on the same generation; any reset, clear, cell replacement, or rule change wakes the grid.
+
 ## Events
 
 | Event | `detail` |

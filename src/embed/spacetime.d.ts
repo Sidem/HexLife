@@ -81,6 +81,10 @@ export class HexLifeSpacetime {
 
   pushLayer(layer: Uint8Array | ArrayBuffer, tick?: number): boolean
   pushState(cells: Uint8Array, options?: {ruleIndices?: Uint8Array | null; tick?: number}): boolean
+  pushSimulation(
+    sim: {readonly numCells: number; readonly generation?: number; packRenderLayer(): Uint8Array},
+    tick?: number,
+  ): boolean
   setHistory(
     generations: Uint8Array | Iterable<Uint8Array>,
     options?: {ruleIndices?: Uint8Array[] | null; count?: number},

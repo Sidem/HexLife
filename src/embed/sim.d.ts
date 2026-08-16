@@ -37,8 +37,12 @@ export interface HexLifeSimulation {
   readonly numCells: number
   readonly generation: number
   readonly activeCount: number
+  readonly lastChangedCount: number
+  readonly isSettled: boolean
   setCells(edits: Iterable<CellAssignment>): number
   tick(count?: number): number
+  /** Native `rule * 2 + state` packing for `@hexlife/embed/spacetime`. */
+  packRenderLayer(): Uint8Array
   snapshotCells(): Uint8Array | null
   dispose(): void
 }

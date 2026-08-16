@@ -13,6 +13,7 @@ import {
     slotOrder,
 } from '../src/embed/hcpCoords.js';
 import artifactBaseline from './fixtures/performance/hcp-artifact-baseline.json';
+import optimizationRecord from './fixtures/performance/embed-optimization-artifact-record.json';
 
 describe('hcp Phase-0 lattice freeze', () => {
     it('imports the in-plane identity from neighbor-dirs.json rather than a second table', () => {
@@ -86,6 +87,16 @@ describe('hcp Phase-0 lattice freeze', () => {
 describe('hcp Phase-0 existing-artifact digest pins', () => {
     it('leaves the default, stochastic, and solid artifacts byte-identical to their recorded digests', async () => {
         for (const [file, expected] of Object.entries(artifactBaseline.artifacts)) {
+            const accepted = optimizationRecord.files[file] ?? expected;
+            const bytes = await readFile(new URL(`../${file}`, import.meta.url));
+            expect(bytes.byteLength, `${file} size`).toBe(accepted.bytes);
+            expect(createHash('sha256').update(bytes).digest('hex'), `${file} sha256`).toBe(accepted.sha256);
+        }
+    });
+
+    it('pins the optimized HCP artifact at its owner-approved digest', async () => {
+        for (const [file, expected] of Object.entries(optimizationRecord.files)) {
+            if (!file.includes('/hcp-wasm/')) continue;
             const bytes = await readFile(new URL(`../${file}`, import.meta.url));
             expect(bytes.byteLength, `${file} size`).toBe(expected.bytes);
             expect(createHash('sha256').update(bytes).digest('hex'), `${file} sha256`).toBe(expected.sha256);

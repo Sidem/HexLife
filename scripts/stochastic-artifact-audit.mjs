@@ -8,6 +8,11 @@ const exceptionsPath = new URL(
   '../tests/fixtures/performance/stochastic-artifact-exceptions.json',
   import.meta.url,
 );
+const acceptedRecordPaths = [
+  exceptionsPath,
+  new URL('../tests/fixtures/performance/spacetime-artifact-record.json', import.meta.url),
+  new URL('../tests/fixtures/performance/embed-optimization-artifact-record.json', import.meta.url),
+];
 const files = [
   'src/core/wasm-engine/hexlife_wasm_bg.wasm',
   'src/core/wasm-engine/hexlife_wasm.js',
@@ -37,10 +42,15 @@ if (process.argv.includes('--write')) {
   console.log(`Wrote ${output.pathname}`);
 } else {
   const baseline = JSON.parse(await readFile(output, 'utf8'));
-  const exceptions = JSON.parse(await readFile(exceptionsPath, 'utf8'));
-  const accepted = new Map(
-    Object.entries(exceptions.files).map(([file, record]) => [logicalPath(file), record]),
+  const records = await Promise.all(
+    acceptedRecordPaths.map(async (path) => JSON.parse(await readFile(path, 'utf8'))),
   );
+  const accepted = new Map();
+  for (const record of records) {
+    for (const [file, measurements] of Object.entries(record.files)) {
+      accepted.set(logicalPath(file), measurements);
+    }
+  }
   const changed = [];
   const noted = [];
   const currentByLogicalPath = new Map(
@@ -72,11 +82,8 @@ if (process.argv.includes('--write')) {
   if (changed.length) throw new Error(`Existing artifact boundary regressed:\n${changed.join('\n')}`);
   if (noted.length) {
     console.log(`Existing artifacts within their recorded exceptions:\n  ${noted.join('\n  ')}`);
-    console.log(`Cause: ${exceptions.cause}`);
-    if (exceptions.ownerDecision) {
-      console.log(`Owner ruling ${exceptions.ownerDecision.date}: ${exceptions.ownerDecision.ruling}. `
-        + exceptions.ownerDecision.scope);
-    }
+    console.log(`Latest owner ruling ${records.at(-1).ownerDecision.date}: `
+      + `${records.at(-1).ownerDecision.ruling}. ${records.at(-1).ownerDecision.scope}`);
   } else {
     console.log('Existing artifact gzip sizes stay within the frozen 0.5% ceiling.');
   }

@@ -336,6 +336,15 @@ export class World {
         return ret >>> 0;
     }
     /**
+     * Advance `count` generations and return the final active-cell count.
+     * @param {number} count
+     * @returns {number}
+     */
+    run_ticks(count) {
+        const ret = wasm.world_run_ticks(this.__wbg_ptr, count);
+        return ret >>> 0;
+    }
+    /**
      * Allocate or drop the spacetime staging buffer. Idempotent. **Allocating**: may detach every
      * JavaScript view over Wasm memory, so rebuild them immediately after.
      * @param {boolean} enabled
@@ -672,6 +681,15 @@ export class WorldK {
      */
     run_tick() {
         const ret = wasm.worldk_run_tick(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Advance `count` generations and return the final changed-cell count.
+     * @param {number} count
+     * @returns {number}
+     */
+    run_ticks(count) {
+        const ret = wasm.worldk_run_ticks(this.__wbg_ptr, count);
         return ret >>> 0;
     }
     /**

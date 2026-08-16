@@ -47,6 +47,7 @@ import { WorldK } from '../core/wasm-engine/hexlife_wasm.js';
 import {
     initEmbedWasm,
     refreshAllWasmViews,
+    refreshWasmViewsAfterAllocation,
     registerViewOwner,
     unregisterViewOwner,
     wasmExportsOrThrow,
@@ -350,12 +351,11 @@ export class HexCA {
         /** Fractional ticks owed, carried across frames so the real rate tracks `speed`. */
         this._accumulator = 0;
 
+        const previousBuffer = this._wasm.memory.buffer;
         this.world = rethrowAsError(() => new WorldK(columns, rows, states, tag));
         this._doubleBuffered = this.world.is_double_buffered();
         registerViewOwner(this);
-        // A WorldK was just constructed, so linear memory may have grown and detached the views of
-        // every OTHER live world on the page — including binary `<hexlife-world>` instances.
-        refreshAllWasmViews();
+        refreshWasmViewsAfterAllocation(previousBuffer, this);
 
         if (rule) this.setRule(rule);
         if (cells) this.setCells(cells);
@@ -384,6 +384,7 @@ export class HexCA {
      */
     setRule(rule) {
         this._assertLive();
+        const previousBuffer = this._wasm.memory.buffer;
         rethrowAsError(() => {
             if (this._doubleBuffered) {
                 this.world.set_neighborhood_rule(rule instanceof Uint8Array ? rule : Uint8Array.from(rule));
@@ -391,8 +392,7 @@ export class HexCA {
                 this.world.set_block_rule(rule instanceof Uint16Array ? rule : Uint16Array.from(rule));
             }
         });
-        // The slice was copied into wasm memory, which may have grown it.
-        refreshAllWasmViews();
+        if (this._wasm.memory.buffer !== previousBuffer) refreshAllWasmViews();
     }
 
     /**
@@ -404,10 +404,11 @@ export class HexCA {
      */
     setCells(cells) {
         this._assertLive();
+        const previousBuffer = this._wasm.memory.buffer;
         rethrowAsError(() => {
             this.world.set_cells(cells instanceof Uint8Array ? cells : Uint8Array.from(cells));
         });
-        refreshAllWasmViews();
+        if (this._wasm.memory.buffer !== previousBuffer) refreshAllWasmViews();
     }
 
     /**
@@ -487,9 +488,9 @@ export class HexCA {
         this._assertLive();
         const ticks = Math.max(0, Math.floor(count));
         let changed = 0;
-        for (let i = 0; i < ticks; i++) {
-            changed = this.world.run_tick();
-            if (this._doubleBuffered) {
+        if (ticks > 0) {
+            changed = this.world.run_ticks(ticks);
+            if (this._doubleBuffered && ticks % 2 === 1) {
                 [this.state, this.nextState] = [this.nextState, this.state];
             }
         }

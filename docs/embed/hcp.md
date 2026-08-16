@@ -46,7 +46,8 @@ touching-grain radius), drawn as impostor quads — 2 triangles and a ray-sphere
 tessellated prism. `opacity` is per-grain alpha. Below 1 the draw peels several nearest grains
 along each ray so you see the packed bed, not a ghost silhouette; `1` is an ordinary solid.
 `auto-rotate` defaults on; `auto-rotate="false"` holds the camera. The clip plane still cuts a
-slab.
+slab. Camera-only frames reuse the resident 3D state texture, and a deterministic fixed point parks
+simulation ticking; auto-rotation may continue without waking the engine.
 
 ## Lattice
 

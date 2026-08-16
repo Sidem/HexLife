@@ -126,6 +126,16 @@ describe('the volume a host feeds', () => {
         }
     });
 
+    it('feeds a live simulation through its native packer', () => {
+        const {view} = createView();
+        const packed = layerFor(9);
+        const packRenderLayer = () => packed;
+        const sim = {numCells: CELLS, generation: 9, packRenderLayer};
+        expect(view.pushSimulation(sim)).toBe(true);
+        expect(view.tipTick).toBe(9);
+        expect(() => view.pushSimulation({...sim, numCells: CELLS + 1})).toThrow(/same-sized/);
+    });
+
     it('takes a finished run in one upload, newest kept when it overflows', () => {
         const { gl, view } = createView();
         const before = gl.callsNamed('texSubImage3D').length;

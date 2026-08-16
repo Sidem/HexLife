@@ -41,6 +41,7 @@ export const worldstochastic_skipping_enabled: (a: number) => number;
 export const worldstochastic_active_chunk_count: (a: number) => number;
 export const worldstochastic_chunk_count: (a: number) => number;
 export const worldstochastic_run_tick: (a: number) => [number, number, number];
+export const worldstochastic_run_ticks: (a: number, b: number) => [number, number, number];
 export const worldstochastic_resume_at_generation: (a: number, b: bigint) => void;
 export const worldstochastic_rebase_epochs: (a: number) => void;
 export const worldstochastic_compute_elapsed_ages: (a: number) => void;

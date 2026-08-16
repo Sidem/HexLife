@@ -270,7 +270,8 @@ export class HcpRenderer {
     /**
      * @param {HTMLCanvasElement} canvas
      * @param {{layers: number, rows: number, columns: number, background?: string,
-     *   controls?: boolean, autoRotate?: boolean, camera?: object}} options
+     *   controls?: boolean, autoRotate?: boolean, camera?: object,
+     *   onInvalidate?: () => void}} options
      */
     constructor(canvas, options) {
         this.canvas = canvas;
@@ -284,7 +285,9 @@ export class HcpRenderer {
         this._yaw = options.camera?.yaw ?? HCP_CAMERA.yaw;
         this._pitch = options.camera?.pitch ?? HCP_CAMERA.pitch;
         this._distance = options.camera?.distance ?? HCP_CAMERA.distance;
-        this._dirty = true;
+        this._frameDirty = true;
+        this._stateDirty = true;
+        this._onInvalidate = options.onInvalidate || null;
         this._clip = 0.02;
         this._opacity = 1;
         this._palette = new Float32Array(16 * 3);
@@ -352,7 +355,7 @@ export class HcpRenderer {
             gl.TEXTURE_3D, 0, gl.R8UI,
             this.columns, this.rows, this.layers,
             0, gl.RED_INTEGER, gl.UNSIGNED_BYTE,
-            new Uint8Array(this.numCells),
+            null,
         );
 
         this._peelFbo = null;
@@ -438,13 +441,13 @@ export class HcpRenderer {
             this._palette[i * 3 + 1] = (colors[i][1] || 0) / 255;
             this._palette[i * 3 + 2] = (colors[i][2] || 0) / 255;
         }
-        this._dirty = true;
+        this._frameDirty = true;
     }
 
     /** @param {number} t 0 = closed, 1 = fully open slab */
     setClip(t) {
         this._clip = Math.min(1, Math.max(0, Number(t) || 0));
-        this._dirty = true;
+        this._frameDirty = true;
     }
 
     /**
@@ -454,17 +457,23 @@ export class HcpRenderer {
     setOpacity(value) {
         const number = Number(value);
         this._opacity = Number.isFinite(number) ? Math.min(1, Math.max(0.04, number)) : 1;
-        this._dirty = true;
+        this._frameDirty = true;
     }
 
     /** @param {boolean} enabled */
     setAutoRotate(enabled) {
         this.autoRotate = !!enabled;
-        this._dirty = true;
+        this._frameDirty = true;
     }
 
     markDirty() {
-        this._dirty = true;
+        this._frameDirty = true;
+    }
+
+    /** Mark the volume contents dirty after native state mutation. */
+    markStateDirty() {
+        this._stateDirty = true;
+        this._frameDirty = true;
     }
 
     /**
@@ -479,7 +488,7 @@ export class HcpRenderer {
         if (this.canvas.width !== w || this.canvas.height !== h) {
             this.canvas.width = w;
             this.canvas.height = h;
-            this._dirty = true;
+            this._frameDirty = true;
         }
         this.gl.viewport(0, 0, w, h);
     }
@@ -516,21 +525,24 @@ export class HcpRenderer {
         const rotating = this.autoRotate && !this._dragging;
         if (rotating) {
             this._yaw = ((this._yaw + (options.dtMs || 16) * 0.00025) % TAU + TAU) % TAU;
-            this._dirty = true;
+            this._frameDirty = true;
         }
-        if (!this._dirty && !rotating) return false;
+        if (!this._frameDirty && !rotating) return false;
 
         const gl = this.gl;
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_3D, this.stateTex);
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.texSubImage3D(
-            gl.TEXTURE_3D, 0,
-            0, 0, 0,
-            this.columns, this.rows, this.layers,
-            gl.RED_INTEGER, gl.UNSIGNED_BYTE,
-            state,
-        );
+        if (this._stateDirty) {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_3D, this.stateTex);
+            gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+            gl.texSubImage3D(
+                gl.TEXTURE_3D, 0,
+                0, 0, 0,
+                this.columns, this.rows, this.layers,
+                gl.RED_INTEGER, gl.UNSIGNED_BYTE,
+                state,
+            );
+            this._stateDirty = false;
+        }
 
         const aspect = this.canvas.width / Math.max(1, this.canvas.height);
         const cx = this._center[0];
@@ -570,7 +582,7 @@ export class HcpRenderer {
             this._drawPeels(viewProj, eye, camRight, camUp, clipX);
         }
 
-        this._dirty = rotating;
+        this._frameDirty = rotating;
         return true;
     }
 
@@ -638,7 +650,8 @@ export class HcpRenderer {
 
     restoreContext() {
         this._deleteTargets();
-        this._dirty = true;
+        this._frameDirty = true;
+        this._stateDirty = true;
     }
 
     dispose() {
@@ -677,7 +690,8 @@ export class HcpRenderer {
         this._lastY = event.clientY;
         this._yaw = ((this._yaw - dx * ORBIT_RADIANS_PER_PIXEL) % TAU + TAU) % TAU;
         this._pitch = Math.min(1.2, Math.max(-0.15, this._pitch + dy * ORBIT_RADIANS_PER_PIXEL));
-        this._dirty = true;
+        this._frameDirty = true;
+        this._onInvalidate?.();
     }
 
     _onPointerUp(event) {
@@ -694,6 +708,7 @@ export class HcpRenderer {
             HCP_CAMERA.maxDistance,
             Math.max(HCP_CAMERA.minDistance, this._distance * factor),
         );
-        this._dirty = true;
+        this._frameDirty = true;
+        this._onInvalidate?.();
     }
 }

@@ -16,7 +16,8 @@
  * The published contract for this entry point lives in `packages/hexlife-embed/README.md`.
  */
 
-import init, {
+import {
+    initSync,
     solid_engine_version as wasmSolidEngineVersion,
     WorldSolid,
 } from '../core/solid-wasm/hexlife_solid_wasm.js';
@@ -98,7 +99,7 @@ export async function initSolidEngine() {
     if (!initPromise) {
         initPromise = (async () => {
             const bytes = await loadWasmBytes(wasmUrl);
-            wasmExports = await init({module_or_path: bytes});
+            wasmExports = initSync({module: await WebAssembly.compile(bytes)});
         })();
     }
     await initPromise;
@@ -179,7 +180,8 @@ export class SolidStack {
         this._layerView = null;
 
         // Allocating this stack may grow the isolated linear memory, which detaches every view an
-        // EARLIER stack handed out. Refresh them before this one is even usable.
+        // earlier stack handed out. Refresh all of them only if the buffer actually changed.
+        const previousBuffer = wasmExports.memory.buffer;
         this._world = new WorldSolid(
             toCount(rows, 'rows', 0),
             toCount(cols, 'cols', 0),
@@ -189,8 +191,9 @@ export class SolidStack {
             solidStates,
             INTERPOLATE_TAGS[interpolate],
         );
-        refreshAllViews();
         liveStacks.add(this);
+        if (wasmExports.memory.buffer !== previousBuffer) refreshAllViews();
+        else this._refreshViews();
     }
 
     /** @returns {any} */
@@ -396,11 +399,12 @@ export class SolidStack {
             throw new RangeError(`export: merge must be one of ${Object.keys(MERGE_TAGS).join(', ')}.`);
         }
         const world = this._live();
+        const previousBuffer = wasmExports.memory.buffer;
         world.buildMesh(MERGE_TAGS[merge]);
         world.serializeMesh(FORMAT_TAGS[format], cellSize, layerHeight);
         // Serialization allocates, so the memory may have grown and every view into it is stale.
         // Re-view here, and refresh the layer views the caller may still be holding.
-        refreshAllViews();
+        if (wasmExports.memory.buffer !== previousBuffer) refreshAllViews();
 
         const parts = world.zipPartCount;
         if (parts === 0) {

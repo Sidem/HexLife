@@ -182,8 +182,8 @@ describe('coffee-puck page source policy', () => {
         expect(lab).toContain('id="p-model"');
         expect(host).toContain('puckDualTransition');
         expect(lab).toMatch(/from '\.\/coffee-puck-lab\.js\?v=/);
-        expect(lab).toContain('@hexlife/embed@1.13.5');
-        expect(lab).toContain("https://cdn.jsdelivr.net/npm/@hexlife/embed@1.13.5/src/embed/hcp.js");
+        expect(lab).toContain('@hexlife/embed@1.14.0');
+        expect(lab).toContain("https://cdn.jsdelivr.net/npm/@hexlife/embed@1.14.0/src/embed/hcp.js");
         expect(lab).toContain('<hexlife-hcp');
         expect(host).toContain("import('@hexlife/embed/hcp')");
         expect(host).not.toMatch(/for\s*\([^)]*ncells/);
