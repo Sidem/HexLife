@@ -5,6 +5,7 @@
  * element stays `paused`. HCP wasm is imported on first open so the 2D tabs pay nothing.
  */
 
+/* eslint-disable import/no-unresolved -- query pins the browser-visible coffee rule revision */
 import {
     bedRange,
     diskIndices,
@@ -19,7 +20,8 @@ import {
     quietTickLimit,
     SETTLE_TICKS_ALTERNATING,
     SIX_PALETTE,
-} from './coffee-puck-models.js';
+} from './coffee-puck-models.js?v=20260816-wick1';
+/* eslint-enable import/no-unresolved */
 import {bestRunIndex, pushRunEntry} from './lab-history.js';
 
 const P_IDS = {

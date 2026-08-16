@@ -105,21 +105,30 @@ function dTransfer(out, locked, can, act, towardApex = false) {
         locked[a] = true;
         locked[b] = true;
     };
+
+    // A fixed "first eligible bond" gives one face slot a permanent head start. In a packed
+    // bed, wicking presents several equivalent dry neighbours often enough for that microscopic
+    // tie-break to become a macroscopic sideways channel. Only resolve a transfer when the local
+    // state identifies one bond uniquely; an exact geometric tie waits for a later partition.
+    const takeUnique = (pairs) => {
+        let candidate = null;
+        for (const [a, b] of pairs) {
+            if (!open(a, b) || !can(out, a, b)) continue;
+            if (candidate !== null) return false;
+            candidate = [a, b];
+        }
+        if (candidate !== null) {
+            take(candidate[0], candidate[1]);
+            return true;
+        }
+        return false;
+    };
+
     if (towardApex) {
-        for (let face = 0; face < 3; face++) {
-            if (open(face, 3) && can(out, face, 3)) {
-                take(face, 3);
-                return;
-            }
-        }
+        takeUnique([[0, 3], [1, 3], [2, 3]]);
+        return;
     }
-    const pairs = [[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]];
-    for (const [a, b] of pairs) {
-        if (open(a, b) && can(out, a, b)) {
-            take(a, b);
-            return;
-        }
-    }
+    takeUnique([[0, 1], [1, 2], [2, 0], [0, 3], [1, 3], [2, 3]]);
 }
 
 const dCanImbibe = (out, a, b) =>

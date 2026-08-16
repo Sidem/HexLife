@@ -60,6 +60,14 @@ describe('3D coffee tet rules', () => {
             expect(puckDualQuantities(input, output), `[${input}]`).toBe(true);
         }
     });
+
+    it('keeps grain-to-grain wicking when the destination is unique', () => {
+        expect(puckDualTransition([7, 4, 0, 0])).toEqual([4, 7, 0, 0]);
+    });
+
+    it('does not give an arbitrary face priority to tied wicking destinations', () => {
+        expect(puckDualTransition([7, 4, 4, 6])).toEqual([7, 4, 4, 6]);
+    });
 });
 
 describe('puck host helpers', () => {
@@ -407,4 +415,57 @@ describe('gravity centre of mass', () => {
         expect(Math.abs(sumY / count - p0.y)).toBeLessThan(2.5 * a);
         world.dispose();
     });
+
+    it('does not steer a packed dual-porosity centre stream across seeds', () => {
+        const rule = blockRuleFromTet(16, (tet) => puckDualTransition(tet));
+        const layers = 24;
+        const rows = 48;
+        const cols = 56;
+        const [cx, cy] = diskCenter(rows, cols);
+        const drifts = [];
+        let cupTotal = 0;
+        for (const seed of [1, 2, 3, 0xC0FFEE, 123456789]) {
+            const world = new HexHcp({states: 16, layers, rows, columns: cols, rule});
+            world.setBlockAlternates(true);
+            world.setCells(makePuckCells({
+                layers, rows, cols, packing: 0.55, seed, groundState: 6,
+            }));
+            let poured = 0;
+            const budget = Math.round(world.numCells * 0.06);
+            for (let tick = 0; tick < 288; tick++) {
+                const sites = injectionSites({
+                    rows, cols, flow: 12, mode: 'centre', tick, remaining: budget - poured,
+                });
+                poured += world.paintIf(0, sites, 0, 1);
+                const removed = world.clearStatesInLayer(layers - 1, 0b1110);
+                cupTotal += (removed[1] || 0) + (removed[2] || 0) + (removed[3] || 0);
+                world.tick();
+            }
+
+            let count = 0;
+            let sumX = 0;
+            let sumY = 0;
+            const layerSize = rows * cols;
+            for (let index = 0; index < world.numCells; index++) {
+                if (world.state[index] < 1 || world.state[index] > 3) continue;
+                const layer = Math.floor(index / layerSize);
+                const rem = index - layer * layerSize;
+                const row = Math.floor(rem / cols);
+                const col = rem - row * cols;
+                const p = sitePosition(col, row, layer, 1);
+                count++;
+                sumX += p.x;
+                sumY += p.y;
+            }
+            expect(count).toBeGreaterThan(0);
+            drifts.push([sumX / count - cx, sumY / count - cy]);
+            world.dispose();
+        }
+        const meanX = drifts.reduce((sum, [dx]) => sum + dx, 0) / drifts.length;
+        const meanY = drifts.reduce((sum, [, dy]) => sum + dy, 0) / drifts.length;
+        for (const [dx, dy] of drifts) expect(Math.hypot(dx, dy)).toBeLessThan(Math.sqrt(3));
+        expect(Math.abs(meanX)).toBeLessThan(0.5);
+        expect(Math.abs(meanY)).toBeLessThan(0.5);
+        expect(cupTotal).toBeGreaterThan(0);
+    }, 30_000);
 });
